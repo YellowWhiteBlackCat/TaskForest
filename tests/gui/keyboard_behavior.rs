@@ -2,6 +2,7 @@
 
 use gpui::{AppContext, Entity, Keystroke, TestAppContext, WindowHandle};
 use taskmanager_application::{ConfirmationKind, SurfaceKind};
+use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_gpui::gpui_app::dashboard::DashboardPanel;
 use taskmanager_gpui::gpui_app::root::{
@@ -9,6 +10,7 @@ use taskmanager_gpui::gpui_app::root::{
 };
 use taskmanager_gpui::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use taskmanager_theme::Theme;
+use taskmanager_ui::overlays::toast::{ToastKind, ToastState};
 
 /// The harness window root is our own RootView directly (P4 consumption switch:
 /// the gc Root wrapper is gone; the LayerStack overlay host lives inside
@@ -197,17 +199,11 @@ async fn mc06_modal_cancel_case_escape_closes_open_modals(cx: &mut TestAppContex
         v.show_first_run();
         v.show_run_task();
         v.show_dashboard_panel(DashboardPanel::Events);
-        v.local_feedback_toast = Some(cx.new(|cx| {
-            taskmanager_ui::overlays::toast::ToastState::new(
-                1,
-                "unchanged",
-                taskmanager_ui::overlays::toast::ToastKind::Info,
-                cx,
-            )
-        }));
+        v.local_feedback_toast =
+            Some(cx.new(|cx| ToastState::new(1, "unchanged", ToastKind::Info, cx)));
         v.request_system_health_self_test_confirmation(SmartSelfTestConfirmationRequest {
             device_id: "disk:wwid:escape-fixture".into(),
-            device_generation: taskmanager_core::core::DeviceGeneration::INITIAL,
+            device_generation: DeviceGeneration::INITIAL,
             disk_name: "nvme0n1".into(),
             disk_label: "Escape fixture".into(),
             kind: SmartSelfTestKind::Short,

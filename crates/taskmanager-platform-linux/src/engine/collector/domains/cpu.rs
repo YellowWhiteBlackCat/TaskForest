@@ -11,6 +11,7 @@ use taskmanager_core::{CpuMetrics, CpuTelemetryObservation};
 use super::{LinuxSystemDomainCollector, SourceQuality, source_quality};
 use crate::engine::collector::compute::collect_cpu;
 use crate::engine::hardware::{detect_cpu_cache, read_sysfs_u64};
+use taskmanager_core::CpuIdleState;
 
 /// CPU-only Linux collector with a private sysinfo refresh and RAPL baseline.
 pub(crate) struct LinuxCpuTelemetryCollector {
@@ -20,7 +21,7 @@ pub(crate) struct LinuxCpuTelemetryCollector {
     rapl_max_energy_uj: u64,
     static_facts_initialized: bool,
     last_value: Option<(CpuMetrics, u64)>,
-    last_idle_states: Option<(Vec<taskmanager_core::CpuIdleState>, u64)>,
+    last_idle_states: Option<(Vec<CpuIdleState>, u64)>,
 }
 
 impl LinuxCpuTelemetryCollector {

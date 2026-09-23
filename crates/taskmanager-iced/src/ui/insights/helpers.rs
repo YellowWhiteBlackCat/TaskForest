@@ -4,16 +4,21 @@ use iced::widget::{column, row, text};
 use iced::{Element, Length};
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
-pub(crate) use taskmanager_core::core::metrics::ScalarObservation;
-pub(crate) use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessThreadInfo};
-pub(crate) use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_core::core::metrics;
+use taskmanager_core::core::process_telemetry;
+use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
 use crate::theme;
 
-pub(crate) const DASH: &str = taskmanager_shell::presentation::MISSING_VALUE;
+pub(crate) use metrics::ScalarObservation;
+pub(crate) use process_telemetry::{OpenFileEntry, ProcessThreadInfo};
+
+pub(crate) const DASH: &str = MISSING_VALUE;
 
 pub(crate) fn section_column<'a>(
     theme_snapshot: &'a Theme,
@@ -121,7 +126,7 @@ pub(crate) fn thread_row_vm(thread: &ProcessThreadInfo) -> ThreadRowVm {
         |nanos| {
             let kind = thread
                 .wait_kind
-                .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+                .map(process_telemetry::ThreadWaitKind::as_str)
                 .unwrap_or("wait");
             format!("{kind} {:.1}ms", nanos as f64 / 1_000_000.0)
         },
@@ -179,7 +184,7 @@ pub(crate) fn format_engine_usage(
         .map_or_else(|| DASH.to_string(), |value| format!("{value:.1}%"));
     let cumulative = time_ns
         .current_value()
-        .map(|nanos| taskmanager_shell::presentation::duration(*nanos / 1_000_000_000))
+        .map(|nanos| duration(*nanos / 1_000_000_000))
         .or_else(|| {
             cycles
                 .current_value()

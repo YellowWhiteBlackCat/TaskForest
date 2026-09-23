@@ -4,6 +4,9 @@ use super::{
     ProcessDetailsSection, RefreshRequest, RootView, TopPage, services_view, startup_view,
 };
 use gpui::{App, Context, KeyDownEvent, ModifiersChangedEvent, Window};
+use taskmanager_application::TelemetryRefreshPolicyChange;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_shell::ProcessControlScope;
 
 use taskmanager_application::{
     AppAction, CommandContext, CommandScope, ConfirmationKind, FocusDirection, KeyChord, KeyCode,
@@ -252,19 +255,13 @@ fn apply_app_action(
             let availability = view.process_control_availability();
             if availability.is_ready() {
                 match availability.scope() {
-                    Some(taskmanager_shell::ProcessControlScope::Tree) => {
-                        view.request_process_batch(
-                            taskmanager_core::core::process::ProcessBatchAction::EndProcessTree,
-                            cx,
-                        );
+                    Some(ProcessControlScope::Tree) => {
+                        view.request_process_batch(ProcessBatchAction::EndProcessTree, cx);
                     }
-                    Some(taskmanager_shell::ProcessControlScope::Batch) => {
-                        view.request_process_batch(
-                            taskmanager_core::core::process::ProcessBatchAction::End,
-                            cx,
-                        );
+                    Some(ProcessControlScope::Batch) => {
+                        view.request_process_batch(ProcessBatchAction::End, cx);
                     }
-                    Some(taskmanager_shell::ProcessControlScope::Single) => {
+                    Some(ProcessControlScope::Single) => {
                         if let Some(identity) = view.selected_process_identity() {
                             view.request_end_task_confirmation(identity);
                         }
@@ -286,7 +283,7 @@ fn apply_app_action(
         AppAction::TogglePause => {
             let paused = view.telemetry_refresh_policy.is_manually_paused();
             view.telemetry_refresh_policy
-                .apply(taskmanager_application::TelemetryRefreshPolicyChange::SetPaused(!paused));
+                .apply(TelemetryRefreshPolicyChange::SetPaused(!paused));
             super::tray::sync_tray_pause_checkmark(view, !paused);
         }
         AppAction::ToggleSidebar => view.sidebar_visible = !view.sidebar_visible,
@@ -320,9 +317,8 @@ impl RootView {
         if view.telemetry_refresh_policy.is_control_held() == control_held {
             return;
         }
-        view.telemetry_refresh_policy.apply(
-            taskmanager_application::TelemetryRefreshPolicyChange::SetControlHeld(control_held),
-        );
+        view.telemetry_refresh_policy
+            .apply(TelemetryRefreshPolicyChange::SetControlHeld(control_held));
         cx.notify();
     }
 

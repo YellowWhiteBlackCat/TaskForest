@@ -1,3 +1,4 @@
+use taskmanager_application::service_submission_failure;
 use taskmanager_application::{
     ServiceDependenciesLifecycle, ServiceLifecycleState, ServiceLogStreamLifecycle,
     ServiceRequestCorrelation,
@@ -134,17 +135,15 @@ fn log_lifecycle_correlates_request_filter_cursor_failure_and_retry() {
 #[test]
 fn admission_attempt_identity_and_filter_generation_are_not_implicit() {
     assert_eq!(
-        taskmanager_application::service_submission_failure(SubmissionErrorKind::Busy),
+        service_submission_failure(SubmissionErrorKind::Busy),
         FailureKind::TemporarilyUnavailable
     );
     assert_eq!(
-        taskmanager_application::service_submission_failure(
-            SubmissionErrorKind::UnsupportedCapability
-        ),
+        service_submission_failure(SubmissionErrorKind::UnsupportedCapability),
         FailureKind::Unsupported
     );
     assert_eq!(
-        taskmanager_application::service_submission_failure(SubmissionErrorKind::InvalidRequest),
+        service_submission_failure(SubmissionErrorKind::InvalidRequest),
         FailureKind::Rejected
     );
     let service = ServiceId::new("systemd:demo.service");

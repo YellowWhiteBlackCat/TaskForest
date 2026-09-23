@@ -16,6 +16,7 @@ use taskmanager_shell::InputDispatch;
 use taskmanager_shell::presentation::{missing_value, trend};
 
 use crate::{PerfDevice, TuiApp};
+use taskmanager_application::AppPage;
 
 /// Minimum samples a series needs before a hover/cursor is meaningful. A
 /// single sample cannot be stepped across, so the cursor stays absent rather
@@ -75,7 +76,7 @@ impl TuiApp {
 /// and consume the key. Scoped to the bare chords on the CPU device so a
 /// modifier chord still falls through to the shared router.
 pub(crate) fn chart_cursor_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
-    if app.page() != taskmanager_application::AppPage::Performance
+    if app.page() != AppPage::Performance
         || app.perf_device != PerfDevice::Cpu
         || key.modifiers.intersects(
             KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER | KeyModifiers::SHIFT,

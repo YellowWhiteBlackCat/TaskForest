@@ -1,5 +1,9 @@
 use super::{binding_declaration, local_binding_rows};
 use gpui::AppContext;
+use taskmanager_application::CommandId;
+use taskmanager_shell::command_help;
+use taskmanager_shell::page_help;
+use taskmanager_shell::shell_local_bindings;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::{
     Binding, BindingCoverageStatus, FrontendShape, coverage_report, drift_findings,
@@ -19,7 +23,7 @@ fn theme() -> Theme {
 /// router genuinely wires.
 #[test]
 fn every_page_help_row_has_label_and_shortcut() {
-    let pages = taskmanager_shell::page_help();
+    let pages = page_help();
     assert_eq!(pages.len(), 7, "page_help covers all seven pages");
     for page in pages {
         assert!(!page.label.is_empty(), "page {:?} has no label", page.page);
@@ -35,10 +39,10 @@ fn every_page_help_row_has_label_and_shortcut() {
 /// the modal never advertises a half-empty line.
 #[test]
 fn every_command_help_row_has_label_description_and_shortcut() {
-    let commands = taskmanager_shell::command_help();
+    let commands = command_help();
     assert_eq!(
         commands.len(),
-        taskmanager_application::CommandId::ALL.len(),
+        CommandId::ALL.len(),
         "one row per shared CommandId"
     );
     for help in commands {
@@ -64,7 +68,7 @@ fn local_binding_rows_advertise_the_question_toggle() {
     let rows = local_binding_rows(&t);
     assert_eq!(rows.len(), 1, "the GPUI local binding is exactly F1 / ?");
     assert!(
-        taskmanager_shell::shell_local_bindings()
+        shell_local_bindings()
             .iter()
             .any(|binding| binding.shortcut == "?"),
         "the shell table must still document the local ? binding"
@@ -79,10 +83,7 @@ fn local_binding_rows_advertise_the_question_toggle() {
 fn binding_declaration_binds_every_contract_command() {
     let declaration = binding_declaration();
     assert_eq!(declaration.frontend, FrontendShape::Gpui);
-    assert_eq!(
-        declaration.entries.len(),
-        taskmanager_application::CommandId::ALL.len()
-    );
+    assert_eq!(declaration.entries.len(), CommandId::ALL.len());
     let report = coverage_report(&declaration);
     assert!(drift_findings(&report).is_empty(), "{report:?}");
     for (command, status) in report {
@@ -100,7 +101,7 @@ fn binding_declaration_binds_every_contract_command() {
 #[test]
 fn binding_declaration_mirrors_the_help_modal_command_rows() {
     let declaration = binding_declaration();
-    let commands = taskmanager_shell::command_help();
+    let commands = command_help();
     assert_eq!(declaration.entries.len(), commands.len());
     for (entry, help) in declaration.entries.iter().zip(commands) {
         assert_eq!(entry.command, help.command);

@@ -1,6 +1,12 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_test_support::{DiskMetricsFixtureBuilder, pin_english};
 
 /// A disk whose throughput history has >=2 samples renders a real sparkline
 /// (a ramp block) on its trend line; a disk with no history renders the
@@ -8,10 +14,10 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 #[test]
 fn disk_trend_line_matches_that_disks_own_history_window() {
     // Record two snapshots for "sda" so its window has >=2 samples.
-    let mut shell = taskmanager_shell::ShellApp::new();
+    let mut shell = ShellApp::new();
     let snapshot = SystemSnapshot {
         disks: vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("disk:test:sda".into())
                 .name("sda".into())
                 .current_read_bytes_per_sec(1_048_576)
@@ -20,8 +26,8 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
         ],
         ..SystemSnapshot::default()
     };
-    taskmanager_shell::fixture::record_demo_history_frame(&mut shell, &snapshot, None, None);
-    taskmanager_shell::fixture::record_demo_history_frame(&mut shell, &snapshot, None, None);
+    record_demo_history_frame(&mut shell, &snapshot, None, None);
+    record_demo_history_frame(&mut shell, &snapshot, None, None);
     let history = &shell.history;
     // A constant throughput window resolves and trends to a flat mid-ramp.
     // The demo seeding resets the ring for generation 1, so the probe reads
@@ -38,10 +44,10 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
     // reset for — a bound platform row always does; an unbound 0 renders no
     // curve by contract.
     let known = disk_lines(
-        &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        &[DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:sda".into())
             .name("sda".into())
-            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+            .device_generation(DeviceGeneration::new(1))
             .build()],
         &shell,
         TuiTheme::default(),
@@ -63,10 +69,10 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
     // bound row (gen 1) with no accepted ring, so the assertion stays about
     // identity absence, not an unbound generation.
     let cold = disk_lines(
-        &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        &[DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:nvme1".into())
             .name("nvme1n1".into())
-            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+            .device_generation(DeviceGeneration::new(1))
             .build()],
         &shell,
         TuiTheme::default(),
@@ -87,20 +93,18 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
 
 #[test]
 fn smart_temperature_trend_never_mixes_other_disks_history() {
-    let mut shell = taskmanager_shell::ShellApp::new();
+    let mut shell = ShellApp::new();
     for (timestamp_ms, temperature_a, temperature_b) in [(1_u64, 31.0, 61.0), (2_u64, 33.0, 63.0)] {
         let disk = |device_id: &str, name: &str, temperature_c| {
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id(device_id.to_owned())
                 .name(name.to_owned())
-                .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
-                .smart_state(taskmanager_core::core::device_state::DeviceState::healthy(
-                    timestamp_ms,
-                ))
+                .smart_availability(SmartAvailability::Available)
+                .smart_state(DeviceState::healthy(timestamp_ms))
                 .smart_temperature_c(Some(temperature_c))
                 .build()
         };
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(
             &mut shell,
             &SystemSnapshot {
                 timestamp_ms,
@@ -115,11 +119,11 @@ fn smart_temperature_trend_never_mixes_other_disks_history() {
         );
     }
 
-    let selected = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let selected = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:temperature-a".into())
         .name("disk-a".into())
-        .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
-        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+        .device_generation(DeviceGeneration::new(1))
+        .smart_availability(SmartAvailability::Available)
         .smart_temperature_c(Some(33.0))
         .build();
     let text = disk_lines(&[selected], &shell, TuiTheme::default(), true, true, 60)
@@ -155,10 +159,10 @@ fn rate_disk(read: Option<u64>, write: Option<u64>) -> DiskMetrics {
     // the two conditional setters below share one builder type. The demo
     // seeding resets rings for generation 1, so the rendered row carries that
     // bound generation like a real platform row would.
-    let builder = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let builder = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:sda".into())
         .name("sda".into())
-        .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+        .device_generation(DeviceGeneration::new(1))
         .scalar_observations(Default::default());
     let builder = match read {
         Some(value) => builder.current_read_bytes_per_sec(value),
@@ -173,8 +177,8 @@ fn rate_disk(read: Option<u64>, write: Option<u64>) -> DiskMetrics {
 
 /// Record `disk` as one history frame at `timestamp_ms` through the same
 /// correlated ingestor the live collector uses.
-fn record_frame(shell: &mut taskmanager_shell::ShellApp, timestamp_ms: u64, disk: DiskMetrics) {
-    taskmanager_shell::fixture::record_demo_history_frame(
+fn record_frame(shell: &mut ShellApp, timestamp_ms: u64, disk: DiskMetrics) {
+    record_demo_history_frame(
         shell,
         &SystemSnapshot {
             timestamp_ms,
@@ -197,8 +201,8 @@ fn disk_direction_rows_share_one_scale_and_keep_the_summed_summary() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
-    let mut shell = taskmanager_shell::ShellApp::new();
+    pin_english();
+    let mut shell = ShellApp::new();
     record_frame(&mut shell, 1, rate_disk(Some(1_048_576), Some(3_145_728)));
     record_frame(&mut shell, 2, rate_disk(Some(2_097_152), Some(3_145_728)));
     record_frame(&mut shell, 3, rate_disk(Some(3_145_728), Some(3_145_728)));
@@ -238,8 +242,8 @@ fn disk_direction_rows_render_per_direction_gaps() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
-    let mut shell = taskmanager_shell::ShellApp::new();
+    pin_english();
+    let mut shell = ShellApp::new();
     // Frames 1-2: write-only (read scalar unavailable → NaN gaps). Frames
     // 3-4: read joins at 1 then 2 MiB/s while write stays at 2 MiB/s.
     record_frame(&mut shell, 1, rate_disk(None, Some(2_097_152)));
@@ -283,13 +287,13 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
-    let mut shell = taskmanager_shell::ShellApp::new();
+    pin_english();
+    let mut shell = ShellApp::new();
     let active_disk = |active_pct: f32| {
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:sda".into())
             .name("sda".into())
-            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+            .device_generation(DeviceGeneration::new(1))
             .current_read_bytes_per_sec(1_048_576)
             .current_write_bytes_per_sec(1_048_576)
             .current_active_time_pct(active_pct)
@@ -328,10 +332,10 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
     // A disk the activity ring has never seen keeps the dotted placeholder
     // and no fabricated percent summary — a bound row (gen 1) with no ring.
     let cold = disk_lines(
-        &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        &[DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:nvme-cold".into())
             .name("nvme-cold".into())
-            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+            .device_generation(DeviceGeneration::new(1))
             .build()],
         &shell,
         TuiTheme::default(),
@@ -368,7 +372,7 @@ fn with_languages(body: impl FnOnce()) {
 /// One "sda" fixture with the given device health and removability, so the
 /// status rows assert known typed values instead of builder defaults.
 fn health_disk(state: DeviceState, removable: Option<bool>) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:sda".into())
         .name("sda".into())
         .device_state(state)
@@ -379,7 +383,7 @@ fn health_disk(state: DeviceState, removable: Option<bool>) -> DiskMetrics {
 fn disk_line_texts(disk: &DiskMetrics) -> Vec<String> {
     disk_lines(
         std::slice::from_ref(disk),
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         true,
         true,
@@ -401,7 +405,7 @@ fn disk_status_row_expresses_typed_health_and_proven_removability() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
+    pin_english();
 
     // Fixture-known healthy value, plus proven removable media.
     let healthy = disk_line_texts(&health_disk(DeviceState::healthy(1), Some(true)));
@@ -465,11 +469,11 @@ fn disk_status_rows_render_the_active_locale_copy() {
         "common.yes",
     ];
     with_languages(|| {
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+        set_language(Language::En);
         let en_texts = disk_line_texts(&stale_removable);
         let en_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
 
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+        set_language(Language::Zh);
         let zh_texts = disk_line_texts(&stale_removable);
         let zh_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
 

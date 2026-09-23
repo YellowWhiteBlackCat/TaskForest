@@ -21,13 +21,14 @@ use std::io::{self, Write};
 use serde_json::json;
 use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::MsrHelperOutcome;
+use taskmanager_escalation::polkit::invoke_msr_helper;
 
 /// Run the `--msr` mode against stdout: invoke the privileged helper through
 /// the per-feature gate and print the typed outcome as JSON. Returns `Ok` as
 /// long as the document could be written; the OUTCOME is carried in the
 /// printed JSON, not in the process exit code.
 pub fn run_msr() -> io::Result<()> {
-    let outcome = taskmanager_escalation::polkit::invoke_msr_helper();
+    let outcome = invoke_msr_helper();
     let document = render_outcome(&outcome);
     let stdout = io::stdout();
     let mut handle = stdout.lock();

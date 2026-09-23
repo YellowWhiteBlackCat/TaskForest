@@ -10,12 +10,11 @@ use super::super::{
 };
 use super::PROCESSES_OBSERVED_AT_MS;
 use std::sync::Arc;
+use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
 
 fn history_pair() -> (Arc<TelemetryStore>, CorrelatedSystemTelemetryIngestor) {
-    TelemetryStore::shared_with_correlated_ingestion(
-        taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
-    )
+    TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY)
 }
 
 #[test]

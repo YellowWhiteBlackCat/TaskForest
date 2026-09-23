@@ -11,6 +11,7 @@ use crate::gpui_app::graph::GraphOpts;
 use gpui::{Bounds, Point, Rgba, Size, px};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use taskmanager_application::history_decimation::lttb_indices;
 
 fn bounds(x: f32, y: f32, w: f32, h: f32) -> Bounds<gpui::Pixels> {
     Bounds {
@@ -465,11 +466,10 @@ fn decimate_run_parity_with_the_neutral_lttb_kernel() {
     ];
     for run in cases {
         for budget in [0, 1, 2, 3, 7, 12, run.len(), run.len() + 5] {
-            let expected: Vec<(usize, f32)> =
-                taskmanager_application::history_decimation::lttb_indices(&run, budget)
-                    .into_iter()
-                    .map(|position| run[position])
-                    .collect();
+            let expected: Vec<(usize, f32)> = lttb_indices(&run, budget)
+                .into_iter()
+                .map(|position| run[position])
+                .collect();
             assert_eq!(
                 decimate_run(&run, budget),
                 expected,

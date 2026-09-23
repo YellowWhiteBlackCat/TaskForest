@@ -1,6 +1,10 @@
 //! Stateless System dashboard backed by typed, RootView-owned UI state.
 
 use std::collections::HashSet;
+use taskmanager_application::AlertEvaluation;
+use taskmanager_application::ManagedAlertRuleEdit;
+use taskmanager_application::ManagedAlertRuleEditOutcome;
+use taskmanager_core::core::alerts::AlertRuleTransferError;
 
 mod panels;
 pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
@@ -324,11 +328,8 @@ impl RootView {
     /// when it changed. GPUI retains no durable rule or enabled-state mirror.
     pub fn edit_dashboard_alert_rules(
         &mut self,
-        edit: taskmanager_application::ManagedAlertRuleEdit,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
+        edit: ManagedAlertRuleEdit,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
         let outcome = self.shell.edit_alert_rules(edit)?;
         if !outcome.changed() {
             return Ok(outcome);
@@ -345,10 +346,7 @@ impl RootView {
     /// Accept a synchronous rule-edit evaluation into the same shared store
     /// used by platform folds. This is not a second RootView alert authority:
     /// render and event history consume the revision-keyed materialization.
-    pub fn accept_alert_evaluation(
-        &mut self,
-        evaluation: taskmanager_application::AlertEvaluation,
-    ) {
+    pub fn accept_alert_evaluation(&mut self, evaluation: AlertEvaluation) {
         let next = evaluation.active;
         let revision = self.shell.accept_alert_evaluation(next.clone());
         self.materialize_active_alerts(revision, next);

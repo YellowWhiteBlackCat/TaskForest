@@ -14,6 +14,7 @@ use super::super::sources::{DiskstatsObservation, apply_smart, parse_proc_diskst
 use super::super::{DiskCollectionState, DiskStatsState};
 use super::inventory::{collect_storage_inventory, reconcile_storage_snapshot_identity};
 use crate::engine::smart;
+use taskmanager_core::core::smart::refresh_state;
 
 /// Collect one storage domain refresh with sysfs as its sole discovery source.
 ///
@@ -71,7 +72,7 @@ pub(crate) fn collect_storage_domain(
                 .smart_providers
                 .observe(physical_name, disk.connection());
             let mut smart_value = observation.value;
-            taskmanager_core::core::smart::refresh_state(previous, &mut smart_value, now_ms);
+            refresh_state(previous, &mut smart_value, now_ms);
             apply_smart(disk, &smart_value);
             state
                 .smart_source_cache

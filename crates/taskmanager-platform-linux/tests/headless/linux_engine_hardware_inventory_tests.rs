@@ -5,6 +5,7 @@ use super::system_info::{
     package_manager_candidates, parse_rpm_package_version, parse_version_token,
 };
 use super::*;
+use taskmanager_core::KernelLogPriority;
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(1);
 
@@ -472,16 +473,10 @@ fn kernel_error_parser_keeps_only_severe_priorities_and_bounds_messages() {
     let entries =
         parse_kernel_errors("<3>[T=12] nvme reset\n<4>[T=13] warning\n[14] plain error\n");
     assert_eq!(entries.len(), 2);
-    assert_eq!(
-        entries[0].priority,
-        taskmanager_core::KernelLogPriority::Error
-    );
+    assert_eq!(entries[0].priority, KernelLogPriority::Error);
     assert_eq!(entries[0].timestamp_seconds, Some(12));
     assert_eq!(entries[0].message, "nvme reset");
-    assert_eq!(
-        entries[1].priority,
-        taskmanager_core::KernelLogPriority::Error
-    );
+    assert_eq!(entries[1].priority, KernelLogPriority::Error);
     assert_eq!(entries[1].timestamp_seconds, None);
 }
 

@@ -43,6 +43,7 @@ use crate::TuiApp;
 pub(crate) mod containers_support;
 use crate::TuiTheme;
 use crate::ui::{DeviceHealth, classify_device_state};
+use taskmanager_shell::SortDir;
 
 /// The shared modal host: `Clear` plus a bordered, titled overlay block.
 /// Presentation only — the popup `Rect` arrives from the caller and the inner
@@ -228,7 +229,7 @@ pub(super) enum WindowedTableOutcome {
 pub(super) fn sort_header_row<'a, const N: usize>(
     headers: [&'a str; N],
     theme: TuiTheme,
-    sort: Option<(usize, taskmanager_shell::SortDir)>,
+    sort: Option<(usize, SortDir)>,
 ) -> Row<'a> {
     super::header_row(headers, theme.accent, theme.color(Color::White), sort)
 }

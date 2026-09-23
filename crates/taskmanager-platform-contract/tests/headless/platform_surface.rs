@@ -7,6 +7,7 @@
 //! redeclaration never duplicates an entry.
 
 use super::*;
+use taskmanager_core::FailureKind;
 
 /// The typed constructor accepts exactly the four absence projections and
 /// refuses every runtime state: a transient is never a static commitment.
@@ -26,7 +27,7 @@ fn absent_accepts_the_absence_projections_and_refuses_runtime_states() {
     }
     for status in [
         CapabilityStatus::Available,
-        CapabilityStatus::Degraded(taskmanager_core::FailureKind::TimedOut),
+        CapabilityStatus::Degraded(FailureKind::TimedOut),
         CapabilityStatus::TemporarilyUnavailable,
         CapabilityStatus::Stale,
     ] {

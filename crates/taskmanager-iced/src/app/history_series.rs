@@ -15,6 +15,8 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::trend::{self, TrendSeries};
 
 use super::IcedApp;
+use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
+use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
 
 #[derive(Clone)]
 struct Entry {
@@ -311,7 +313,7 @@ impl IcedApp {
         &self,
         device_id: &str,
         generation: u64,
-        metric: taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric,
+        metric: GpuChartMetric,
     ) -> Rc<[f32]> {
         let stem = metric.id_stem();
         self.cached_device_series(
@@ -321,14 +323,7 @@ impl IcedApp {
                 stem,
                 &generation.to_string(),
             ),
-            |shell| {
-                taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
-                    &shell.history,
-                    device_id,
-                    generation,
-                    metric,
-                )
-            },
+            |shell| gpu_chart_metric_history(&shell.history, device_id, generation, metric),
         )
     }
 

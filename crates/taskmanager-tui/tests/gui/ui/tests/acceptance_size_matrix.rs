@@ -14,6 +14,7 @@ use super::acceptance_support::{
 };
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
+use taskmanager_assets::product::NAME;
 
 const MINIMUM: (u16, u16) = (54, 16);
 const SHORT_WIDE: (u16, u16) = (70, 18);
@@ -168,7 +169,7 @@ fn the_wide_and_tall_extremes_render_the_full_chrome() {
             // monogram instead of the full name, and the paragraph trim
             // drops the span's leading pad — so the narrow tier matches the
             // monogram on the header row itself.
-            let brand = taskmanager_assets::product::NAME;
+            let brand = NAME;
             let header = frame.lines().next().unwrap_or_default();
             assert!(
                 frame.contains(brand) || header.contains("TF"),

@@ -31,10 +31,11 @@ const FEATURE_EVIDENCE_TABLE: &str = include_str!(concat!(
 ));
 
 /// The exact column header of the committed feature-evidence table.
-const FEATURE_EVIDENCE_HEADER: &str = "feature_id\tfrontend\ttest_id\tstatus\tnote";
+const FEATURE_EVIDENCE_HEADER: &str = "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id";
 
 /// The "no value" marker the committed table uses for the unused column of a
-/// row (`test_id` on a pending row, `note` on an anchored row).
+/// row (`test_id` on a pending row, `note` on an anchored row, `co_test_id` on
+/// a row that declares no co-anchor).
 const FEATURE_EVIDENCE_DASH: &str = "-";
 
 /// Whether a committed feature-evidence row carries a resolvable anchor or is
@@ -82,6 +83,9 @@ pub struct FeatureEvidenceRow {
     pub anchor: &'static str,
     /// The gap reason of a pending row; empty for an anchored row.
     pub note: &'static str,
+    /// An optional co-anchor test id: a further discoverable test that proves a
+    /// named clause of this row's cell. Empty when the row declares none.
+    pub co_test_id: &'static str,
     /// 1-based line in the committed table, for diagnostics.
     pub line: usize,
 }
@@ -103,7 +107,7 @@ impl FeatureEvidenceRow {
 pub enum FeatureEvidenceFinding {
     /// The first non-comment line is not the declared column header.
     MalformedHeader { line: usize },
-    /// A data row does not carry exactly five columns.
+    /// A data row does not carry exactly six columns.
     MalformedRow { line: usize },
     /// `feature_id` is not a registered [`FeatureId`].
     UnknownFeature { line: usize, raw: &'static str },
@@ -195,7 +199,7 @@ impl FeatureEvidenceTable {
                 continue;
             }
             let fields: Vec<&'static str> = trimmed.split('\t').map(str::trim).collect();
-            if fields.len() != 5 {
+            if fields.len() != 6 {
                 findings.push(FeatureEvidenceFinding::MalformedRow { line });
                 continue;
             }
@@ -222,6 +226,7 @@ impl FeatureEvidenceTable {
             };
             let anchor = fields[2];
             let note = fields[4];
+            let co_test_id = fields[5];
             let mut defect = None;
             match status {
                 FeatureEvidenceStatus::Anchored => {
@@ -293,6 +298,11 @@ impl FeatureEvidenceTable {
                 } else {
                     ""
                 },
+                co_test_id: if co_test_id == FEATURE_EVIDENCE_DASH {
+                    ""
+                } else {
+                    co_test_id
+                },
                 line,
             });
         }
@@ -331,6 +341,25 @@ impl FeatureEvidenceTable {
                     && row.status == FeatureEvidenceStatus::Anchored
             })
             .map(|row| row.anchor)
+    }
+
+    /// The committed co-anchor test id for one cell, if the row declares one.
+    ///
+    /// A co-anchor is a further discoverable test that proves a named clause of
+    /// the cell whose primary [`anchor`](Self::anchor) this table returns; it
+    /// extends that anchor, never replaces it, and can never make a cell
+    /// `Ready`.
+    #[must_use]
+    pub fn co_anchor(&self, feature: FeatureId, frontend: FrontendShape) -> Option<&'static str> {
+        self.rows
+            .iter()
+            .find(|row| {
+                row.feature == feature
+                    && row.frontend == frontend
+                    && row.status == FeatureEvidenceStatus::Anchored
+                    && !row.co_test_id.is_empty()
+            })
+            .map(|row| row.co_test_id)
     }
 
     /// The explicit gap reason for one cell, if the row is pending.

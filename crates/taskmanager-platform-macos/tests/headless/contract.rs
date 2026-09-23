@@ -17,6 +17,7 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+use taskmanager_application::SmartEvent;
 use taskmanager_application::{
     CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, EnvironmentFacets,
     IntegrationFacets, LatestControlRequest, PlatformClient, PlatformEventBatch, PlatformFacets,
@@ -298,7 +299,7 @@ fn smart_batches(drains: &Drains) -> Vec<&SmartObservationBatch> {
         .iter()
         .flat_map(|batch| &batch.smart_events)
         .map(|event| match &event.event {
-            taskmanager_application::SmartEvent::Batch(batch) => batch,
+            SmartEvent::Batch(batch) => batch,
         })
         .collect()
 }

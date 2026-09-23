@@ -1,38 +1,64 @@
 //! Windows process control providers and escalation seam dispatch.
 
 use super::*;
+#[cfg(any(windows, test))]
+use taskmanager_core::ResourceGroupCpuLimit;
+use taskmanager_core::ResourceGroupLimitRequest;
+#[cfg(any(windows, test))]
+use taskmanager_escalation::EscalationDenialReason;
+#[cfg(any(windows, test))]
+use taskmanager_escalation::polkit::ForeignProcessControlFailure;
+#[cfg(windows)]
+use taskmanager_escalation::polkit::ForeignProcessControlOperation;
+#[cfg(windows)]
+use taskmanager_escalation::polkit::ForeignProcessControlOutcome;
+#[cfg(windows)]
+use taskmanager_escalation::polkit::ForeignProcessControlTarget;
+#[cfg(windows)]
+use taskmanager_escalation::uac::invoke_uac_foreign_process_control_with;
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::ProcessPriorityClass;
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsApiError;
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::WindowsJobLimitRequest;
+#[cfg(windows)]
+use taskmanager_windows_api::apply_process_job_limits;
+#[cfg(windows)]
+use taskmanager_windows_api::clear_process_job_limits;
+#[cfg(windows)]
+use taskmanager_windows_api::resume_process_threads;
+#[cfg(windows)]
+use taskmanager_windows_api::set_process_affinity_exact;
+#[cfg(windows)]
+use taskmanager_windows_api::set_process_priority_exact;
+#[cfg(windows)]
+use taskmanager_windows_api::suspend_process_threads;
+#[cfg(windows)]
+use taskmanager_windows_api::terminate_process_exact;
 
 #[cfg(windows)]
-pub(crate) fn map_windows_api_failure(
-    error: taskmanager_windows_api::WindowsApiError,
-) -> ProviderFailure {
+pub(crate) fn map_windows_api_failure(error: WindowsApiError) -> ProviderFailure {
     match error {
-        taskmanager_windows_api::WindowsApiError::PermissionDenied => {
-            ProviderFailure::PermissionDenied
-        }
-        taskmanager_windows_api::WindowsApiError::IdentityChanged
-        | taskmanager_windows_api::WindowsApiError::InvalidInput => {
+        WindowsApiError::PermissionDenied => ProviderFailure::PermissionDenied,
+        WindowsApiError::IdentityChanged | WindowsApiError::InvalidInput => {
             ProviderFailure::IdentityChanged
         }
-        taskmanager_windows_api::WindowsApiError::Unsupported => ProviderFailure::Unsupported,
-        taskmanager_windows_api::WindowsApiError::ResourceLimit
-        | taskmanager_windows_api::WindowsApiError::InvalidText
-        | taskmanager_windows_api::WindowsApiError::QueryFailed => {
-            ProviderFailure::TemporarilyUnavailable
-        }
+        WindowsApiError::Unsupported => ProviderFailure::Unsupported,
+        WindowsApiError::ResourceLimit
+        | WindowsApiError::InvalidText
+        | WindowsApiError::QueryFailed => ProviderFailure::TemporarilyUnavailable,
     }
 }
 
 // Consumed by the `#[cfg(windows)]` set-priority path and by the mounted
 // headless mapping test; dormant elsewhere.
 #[cfg(any(windows, test))]
-pub(crate) fn windows_priority_class(
-    tier: PriorityTier,
-) -> taskmanager_windows_api::ProcessPriorityClass {
+pub(crate) fn windows_priority_class(tier: PriorityTier) -> ProcessPriorityClass {
     match tier {
-        PriorityTier::High => taskmanager_windows_api::ProcessPriorityClass::AboveNormal,
-        PriorityTier::Normal => taskmanager_windows_api::ProcessPriorityClass::Normal,
-        PriorityTier::Low => taskmanager_windows_api::ProcessPriorityClass::BelowNormal,
+        PriorityTier::High => ProcessPriorityClass::AboveNormal,
+        PriorityTier::Normal => ProcessPriorityClass::Normal,
+        PriorityTier::Low => ProcessPriorityClass::BelowNormal,
     }
 }
 
@@ -42,9 +68,8 @@ pub(crate) fn windows_priority_class(
 /// failure cannot silently collapse into identity or permission semantics.
 #[cfg(any(windows, test))]
 pub(crate) const fn map_foreign_control_failure(
-    failure: taskmanager_escalation::polkit::ForeignProcessControlFailure,
+    failure: ForeignProcessControlFailure,
 ) -> ProviderFailure {
-    use taskmanager_escalation::polkit::ForeignProcessControlFailure;
     match failure {
         ForeignProcessControlFailure::IdentityChanged => ProviderFailure::IdentityChanged,
         ForeignProcessControlFailure::PermissionDenied => ProviderFailure::PermissionDenied,
@@ -56,10 +81,7 @@ pub(crate) const fn map_foreign_control_failure(
 
 /// Map prompt/helper availability without fabricating a user denial.
 #[cfg(any(windows, test))]
-pub(crate) const fn map_escalation_denial(
-    reason: taskmanager_escalation::EscalationDenialReason,
-) -> ProviderFailure {
-    use taskmanager_escalation::EscalationDenialReason;
+pub(crate) const fn map_escalation_denial(reason: EscalationDenialReason) -> ProviderFailure {
     match reason {
         EscalationDenialReason::Unsupported => ProviderFailure::Unsupported,
         EscalationDenialReason::PermissionDenied => ProviderFailure::PermissionDenied,
@@ -72,35 +94,33 @@ pub(crate) const fn map_escalation_denial(
 #[cfg(windows)]
 pub(crate) fn finish_with_escalation(
     target: &FrozenProcessIdentity,
-    operation: taskmanager_escalation::polkit::ForeignProcessControlOperation,
+    operation: ForeignProcessControlOperation,
     direct: Result<(), ProviderFailure>,
 ) -> Result<(), ProviderFailure> {
     let Err(ProviderFailure::PermissionDenied) = direct else {
         return direct;
     };
-    let Some(helper_target) = target.authoritative_start_token().and_then(|token| {
-        taskmanager_escalation::polkit::ForeignProcessControlTarget::new(target.pid, token)
-    }) else {
+    let Some(helper_target) = target
+        .authoritative_start_token()
+        .and_then(|token| ForeignProcessControlTarget::new(target.pid, token))
+    else {
         return Err(ProviderFailure::IdentityChanged);
     };
     // ADR-035 stage 2: the Windows crossing is the UAC runas transport
     // (ShellExecuteExW via the audited boundary + the one-shot reply
     // channel), classified by the same escalation outcome vocabulary as the
     // Linux pkexec crossing.
-    let outcome = taskmanager_escalation::uac::invoke_uac_foreign_process_control_with(
+    let outcome = invoke_uac_foreign_process_control_with(
         &super::uac::RunasUacTransport::new(),
         helper_target,
         operation,
     );
     match outcome {
-        taskmanager_escalation::polkit::ForeignProcessControlOutcome::Applied => Ok(()),
-        taskmanager_escalation::polkit::ForeignProcessControlOutcome::Failed { kind, .. } => {
-            Err(map_foreign_control_failure(kind))
+        ForeignProcessControlOutcome::Applied => Ok(()),
+        ForeignProcessControlOutcome::Failed { kind, .. } => Err(map_foreign_control_failure(kind)),
+        ForeignProcessControlOutcome::Unavailable { reason, .. } => {
+            Err(map_escalation_denial(reason))
         }
-        taskmanager_escalation::polkit::ForeignProcessControlOutcome::Unavailable {
-            reason,
-            ..
-        } => Err(map_escalation_denial(reason)),
     }
 }
 
@@ -150,13 +170,9 @@ impl WinProcessControlProvider {
             let expected = target
                 .authoritative_start_token()
                 .ok_or(ProviderFailure::IdentityChanged)?;
-            let direct = taskmanager_windows_api::terminate_process_exact(target.pid, expected)
-                .map_err(map_windows_api_failure);
-            finish_with_escalation(
-                target,
-                taskmanager_escalation::polkit::ForeignProcessControlOperation::Kill,
-                direct,
-            )
+            let direct =
+                terminate_process_exact(target.pid, expected).map_err(map_windows_api_failure);
+            finish_with_escalation(target, ForeignProcessControlOperation::Kill, direct)
         }
 
         #[cfg(not(windows))]
@@ -199,9 +215,9 @@ impl WinProcessControlProvider {
             // silently-wrong suspension as success.
             let expected = validate_process_target(target)?;
             let direct = if suspend {
-                taskmanager_windows_api::suspend_process_threads(target.pid)
+                suspend_process_threads(target.pid)
             } else {
-                taskmanager_windows_api::resume_process_threads(target.pid)
+                resume_process_threads(target.pid)
             }
             .map(|_| ())
             .map_err(map_windows_api_failure)
@@ -209,9 +225,9 @@ impl WinProcessControlProvider {
             finish_with_escalation(
                 target,
                 if suspend {
-                    taskmanager_escalation::polkit::ForeignProcessControlOperation::Suspend
+                    ForeignProcessControlOperation::Suspend
                 } else {
-                    taskmanager_escalation::polkit::ForeignProcessControlOperation::Resume
+                    ForeignProcessControlOperation::Resume
                 },
                 direct,
             )
@@ -234,17 +250,12 @@ impl WinProcessControlProvider {
             let expected = target
                 .authoritative_start_token()
                 .ok_or(ProviderFailure::IdentityChanged)?;
-            let direct = taskmanager_windows_api::set_process_priority_exact(
-                target.pid,
-                expected,
-                windows_priority_class(tier),
-            )
-            .map_err(map_windows_api_failure);
+            let direct =
+                set_process_priority_exact(target.pid, expected, windows_priority_class(tier))
+                    .map_err(map_windows_api_failure);
             finish_with_escalation(
                 target,
-                taskmanager_escalation::polkit::ForeignProcessControlOperation::SetPriority(
-                    tier.canonical_nice(),
-                ),
+                ForeignProcessControlOperation::SetPriority(tier.canonical_nice()),
                 direct,
             )
         }
@@ -357,14 +368,11 @@ impl ProcessAffinityControlProvider for WinProcessAffinityControlProvider {
             let expected = target
                 .authoritative_start_token()
                 .ok_or(ProviderFailure::IdentityChanged)?;
-            let direct =
-                taskmanager_windows_api::set_process_affinity_exact(target.pid, expected, cpus)
-                    .map_err(map_windows_api_failure);
+            let direct = set_process_affinity_exact(target.pid, expected, cpus)
+                .map_err(map_windows_api_failure);
             finish_with_escalation(
                 target,
-                taskmanager_escalation::polkit::ForeignProcessControlOperation::SetAffinity(
-                    cpus.to_vec(),
-                ),
+                ForeignProcessControlOperation::SetAffinity(cpus.to_vec()),
                 direct,
             )
         }
@@ -405,8 +413,8 @@ impl WinProcessResourceControlProvider {
     ///   boundary-owned job evaporates every session-scoped limit.
     #[cfg(any(windows, test))]
     fn job_limit_request(
-        limits: &taskmanager_core::ResourceGroupLimitRequest,
-    ) -> Result<Option<taskmanager_windows_api::WindowsJobLimitRequest>, ProviderFailure> {
+        limits: &ResourceGroupLimitRequest,
+    ) -> Result<Option<WindowsJobLimitRequest>, ProviderFailure> {
         use taskmanager_core::LimitValue;
 
         let memory_limit_bytes = match limits.memory {
@@ -424,12 +432,12 @@ impl WinProcessResourceControlProvider {
             None => None,
         };
 
-        let request = taskmanager_windows_api::WindowsJobLimitRequest {
+        let request = WindowsJobLimitRequest {
             memory_limit_bytes,
             process_count_limit,
             cpu_rate_percent,
         };
-        if request == taskmanager_windows_api::WindowsJobLimitRequest::default() {
+        if request == WindowsJobLimitRequest::default() {
             Ok(None)
         } else {
             Ok(Some(request))
@@ -439,9 +447,7 @@ impl WinProcessResourceControlProvider {
     /// Whole-number percent 1..=100 or a typed `Unsupported`; the arithmetic
     /// runs in `u128` so a large quota can never wrap into a bogus rate.
     #[cfg(any(windows, test))]
-    fn cpu_rate_percent(
-        cpu: &taskmanager_core::ResourceGroupCpuLimit,
-    ) -> Result<Option<u32>, ProviderFailure> {
+    fn cpu_rate_percent(cpu: &ResourceGroupCpuLimit) -> Result<Option<u32>, ProviderFailure> {
         use taskmanager_core::LimitValue;
 
         let quota = match cpu.quota {
@@ -469,7 +475,7 @@ impl ProcessResourceControlProvider for WinProcessResourceControlProvider {
     fn apply_limits(
         &mut self,
         target: &FrozenProcessIdentity,
-        limits: &taskmanager_core::ResourceGroupLimitRequest,
+        limits: &ResourceGroupLimitRequest,
     ) -> Result<(), ProviderFailure> {
         #[cfg(windows)]
         {
@@ -478,14 +484,12 @@ impl ProcessResourceControlProvider for WinProcessResourceControlProvider {
                 None => {
                     // Every dimension is absent or unlimited: releasing the
                     // boundary-owned job is the honest full relaxation.
-                    taskmanager_windows_api::clear_process_job_limits(target.pid, expected)
+                    clear_process_job_limits(target.pid, expected)
                         .map(|_| ())
                         .map_err(map_windows_api_failure)
                 }
-                Some(request) => taskmanager_windows_api::apply_process_job_limits(
-                    target.pid, expected, &request,
-                )
-                .map_err(map_windows_api_failure),
+                Some(request) => apply_process_job_limits(target.pid, expected, &request)
+                    .map_err(map_windows_api_failure),
             };
             // The foreign-process escalation vocabulary has no job-limits
             // operation, so a denied open stays a typed `PermissionDenied` —
@@ -573,14 +577,14 @@ impl WinProcessControlProviders {
         ProcessControlExecutors::new(
             move |target, cpus| affinity_control.set_affinity(&target, &cpus),
             move |request| match request {
-                taskmanager_application::ProcessControlRequest::EndTask(target) => {
+                ProcessControlRequest::EndTask(target) => {
                     control.end_task(target.clone())?;
                     Ok(ProcessControlCompletion::EndTask(target))
                 }
-                taskmanager_application::ProcessControlRequest::ExecuteBatch(intent) => Ok(
-                    ProcessControlCompletion::Batch(control.execute_batch(intent)?),
-                ),
-                taskmanager_application::ProcessControlRequest::SendSignal { target, signal } => {
+                ProcessControlRequest::ExecuteBatch(intent) => Ok(ProcessControlCompletion::Batch(
+                    control.execute_batch(intent)?,
+                )),
+                ProcessControlRequest::SendSignal { target, signal } => {
                     control.send_signal(&target, signal)?;
                     Ok(ProcessControlCompletion::Signal { target, signal })
                 }
@@ -588,14 +592,14 @@ impl WinProcessControlProviders {
                 // stop/continue signals at this adapter edge, which the Windows
                 // provider backs with the audited per-thread boundary; the
                 // completion rides the signal event (same shape as macOS).
-                taskmanager_application::ProcessControlRequest::Suspend { target } => {
+                ProcessControlRequest::Suspend { target } => {
                     control.send_signal(&target, ProcessSignal::Stop)?;
                     Ok(ProcessControlCompletion::Signal {
                         target,
                         signal: ProcessSignal::Stop,
                     })
                 }
-                taskmanager_application::ProcessControlRequest::Resume { target } => {
+                ProcessControlRequest::Resume { target } => {
                     control.send_signal(&target, ProcessSignal::Continue)?;
                     Ok(ProcessControlCompletion::Signal {
                         target,

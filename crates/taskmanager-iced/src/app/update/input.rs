@@ -3,6 +3,7 @@
 use super::super::surface::InteractionSnapshot;
 use super::super::{FocusTarget, IcedApp, IcedKey, InputScope, LocalSurface, Message};
 use super::dispatch::UpdateDispatch;
+use taskmanager_application::SurfaceKind;
 
 impl IcedApp {
     /// The selectable value that owns the window's one active text selection;
@@ -47,9 +48,7 @@ impl IcedApp {
                         }
                         None
                     }
-                    InputScope::SharedSurface(
-                        taskmanager_application::SurfaceKind::Confirmation(_),
-                    )
+                    InputScope::SharedSurface(SurfaceKind::Confirmation(_))
                     | InputScope::Help
                     | InputScope::Suggestions
                     | InputScope::Search => self
@@ -64,9 +63,7 @@ impl IcedApp {
                         .shell
                         .handle_local_char(character, modifiers)
                         .into_effect(),
-                    InputScope::SharedSurface(
-                        taskmanager_application::SurfaceKind::ProcessProperties,
-                    )
+                    InputScope::SharedSurface(SurfaceKind::ProcessProperties)
                     | InputScope::LocalSurface(_)
                     | InputScope::ContextMenu(_) => None,
                 };

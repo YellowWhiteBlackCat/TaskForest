@@ -1,23 +1,28 @@
 use gpui::AppContext;
+use taskmanager_application::PendingConfirmation;
 use taskmanager_application::{
     ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use super::RootView;
 use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .parent_pid(Some(1))
         .name(name.into())
         .cmdline(format!("{name} --flag"))
-        .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+        .scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(u64::from(pid) + 10_000, 1_000),
             ..Default::default()
         })
@@ -26,13 +31,11 @@ fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         .current_disk_read_bytes_per_sec(0)
         .current_disk_write_bytes_per_sec(0)
         .status("S".into())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            None,
+            1,
+        ))
         .build()
 }
 
@@ -145,7 +148,7 @@ async fn process_materialization_is_single_fold_and_shared_by_render_and_input(
             let confirmation = view
                 .pending_confirmation()
                 .expect("input path freezes the visible process");
-            let taskmanager_application::PendingConfirmation::EndTask(target) = confirmation else {
+            let PendingConfirmation::EndTask(target) = confirmation else {
                 panic!("single-process end must use the shared EndTask branch")
             };
             assert_eq!(target.pid, rendered_identity.pid());

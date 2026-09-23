@@ -1,6 +1,7 @@
 //! Per-core and aggregate utilization cache consumed by the fixed CPU page.
 
 use std::rc::Rc;
+use taskmanager_shell::presentation;
 
 use taskmanager_telemetry_store::TelemetryStore;
 
@@ -107,7 +108,7 @@ pub(crate) fn per_core_cell_label(
         frequency_mhz.map(|value| crate::gpui_app::formatting::optional_ghz(Some(value)));
     let temperature = temperature_c
         .filter(|value| value.is_finite())
-        .map(taskmanager_shell::presentation::temperature_c);
+        .map(presentation::temperature_c);
     let mut parts = Vec::with_capacity(3);
     parts.extend(usage);
     parts.extend(frequency);

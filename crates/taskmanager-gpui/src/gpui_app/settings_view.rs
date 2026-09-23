@@ -12,6 +12,9 @@ use gpui::{
     div, px,
 };
 use std::collections::HashMap;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use taskmanager_ui::inputs::select::{SelectOption, select};
 use taskmanager_ui::inputs::slider::SliderState;
@@ -200,9 +203,7 @@ pub(crate) fn render_settings(
     let mut system_sections = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(section(
             t,
             i18n::t("settings.devices"),
@@ -279,9 +280,7 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(section(
                     t,
                     i18n::t("settings.language"),
@@ -304,9 +303,7 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(section(
                     t,
                     i18n::t("settings.ui_size"),
@@ -340,9 +337,7 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(section(
                     t,
                     i18n::t("settings.fonts"),
@@ -361,9 +356,7 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(section(
                     t,
                     i18n::t("settings.notifications"),
@@ -395,9 +388,7 @@ fn group(t: &Theme, key: &'static str, content: Div) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             SectionHeader::new(i18n::t(key).to_owned(), t.palette())
                 .debug_selector(key)
@@ -413,13 +404,11 @@ fn section(t: &Theme, label: &str, content: impl IntoElement) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(t.fg_dim))
                 .child(label.to_string()),
         )
         .child(content)
@@ -438,9 +427,7 @@ fn skin_row(
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(skin_pill(
             t,
             ent.clone(),
@@ -543,9 +530,7 @@ fn language_row(
     div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(pill(
             t,
             "lang-en",

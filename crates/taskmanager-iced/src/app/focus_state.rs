@@ -2,7 +2,9 @@
 
 use super::{FocusTarget, IcedApp, Message, PresenceTransition};
 use iced::Task;
+use taskmanager_application::ConfirmationKind;
 use taskmanager_application::FocusDirection;
+use taskmanager_application::SurfaceKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FocusCommand {
@@ -133,21 +135,15 @@ impl IcedApp {
     /// an open end-task / service-control bar, else the generic modal close.
     pub(super) fn modal_focus_target(&self) -> FocusTarget {
         match self.input_scope() {
-            super::InputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::EndTask,
-                ),
-            ) => FocusTarget::ConfirmEndTask,
-            super::InputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::ServiceControl,
-                ),
-            ) => FocusTarget::ConfirmServiceControl,
-            super::InputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::SmartSelfTest,
-                ),
-            ) => FocusTarget::ConfirmSmartSelfTest,
+            super::InputScope::SharedSurface(SurfaceKind::Confirmation(
+                ConfirmationKind::EndTask,
+            )) => FocusTarget::ConfirmEndTask,
+            super::InputScope::SharedSurface(SurfaceKind::Confirmation(
+                ConfirmationKind::ServiceControl,
+            )) => FocusTarget::ConfirmServiceControl,
+            super::InputScope::SharedSurface(SurfaceKind::Confirmation(
+                ConfirmationKind::SmartSelfTest,
+            )) => FocusTarget::ConfirmSmartSelfTest,
             super::InputScope::LocalSurface(super::LocalSurfaceKind::RunTask) => {
                 FocusTarget::RunTaskCommandInput
             }

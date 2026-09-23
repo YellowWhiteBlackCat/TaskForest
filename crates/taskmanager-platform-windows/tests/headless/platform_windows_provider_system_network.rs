@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
+use taskmanager_windows_api::WindowsAdapterType;
+use taskmanager_windows_api::WindowsNetworkAdapter;
 
 #[test]
 fn loopback_filter_does_not_hide_named_windows_adapters() {
@@ -14,7 +17,7 @@ fn windows_wifi_metadata_is_unavailable_without_location_access() {
     let wireless = wireless_observations_for(NetworkAdapterType::WiFi, 100);
     assert_eq!(
         wireless.ssid.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
     assert_eq!(wireless.ssid.current_value(), None);
     assert_eq!(wireless.signal_dbm.current_value(), None);
@@ -42,10 +45,10 @@ fn operational_state_is_not_guessed_for_unknown_values() {
 
 #[test]
 fn link_capacity_uses_the_larger_native_direction() {
-    let adapter = taskmanager_windows_api::WindowsNetworkAdapter {
+    let adapter = WindowsNetworkAdapter {
         name: "Ethernet".to_owned(),
         description: "Intel Ethernet".to_owned(),
-        adapter_type: taskmanager_windows_api::WindowsAdapterType::Ethernet,
+        adapter_type: WindowsAdapterType::Ethernet,
         receive_link_speed_bps: Some(1_000_000_000),
         transmit_link_speed_bps: Some(100_000_000),
         link_up: Some(true),
@@ -118,7 +121,7 @@ fn derive_utilization_pct_never_turns_a_rate_failure_into_zero() {
 
     assert_eq!(
         utilization.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
     assert_eq!(utilization.current_value(), None);
 }

@@ -4,6 +4,7 @@
 //! useful bounded history window for every frontend that consumes them.
 
 use super::*;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 
 #[test]
@@ -53,7 +54,7 @@ fn demo_telemetry_contains_measured_chart_windows() {
     assert!(store.system_history.storage_rate_total().samples().len() >= 2);
     assert!(store.system_history.network_rate_total().samples().len() >= 2);
 
-    let disk = taskmanager_core::core::identity::DeviceId::new("disk:demo:nvme0");
+    let disk = DeviceId::new("disk:demo:nvme0");
     assert!(
         store
             .system_history

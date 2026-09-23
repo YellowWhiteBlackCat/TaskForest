@@ -16,13 +16,14 @@
 use std::time::SystemTime;
 
 use taskmanager_core::{FailureKind, LocalTimeRules, LocalTimeRulesObservation, unix_millis};
+use taskmanager_windows_api::query_time_zone_rules;
 use taskmanager_windows_api::{WindowsApiError, WindowsTimeZoneRules, WindowsYearZoneRule};
 
 /// Read and validate the Windows process's configured local-time rules.
 #[must_use]
 pub fn local_time_rules() -> LocalTimeRulesObservation {
     let observed_at_ms = unix_millis(SystemTime::now());
-    let rules = match taskmanager_windows_api::query_time_zone_rules() {
+    let rules = match query_time_zone_rules() {
         Ok(rules) => rules,
         Err(WindowsApiError::Unsupported) => {
             return LocalTimeRulesObservation::unavailable(

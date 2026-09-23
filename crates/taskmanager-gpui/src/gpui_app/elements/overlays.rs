@@ -12,6 +12,11 @@ use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowCorner};
 use taskmanager_ui::overlays::dialog::Dialog;
 use taskmanager_ui::overlays::layer_stack::{LayerBackfill, LayerStack};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::{appear, fade_in};
 
 /// A modal overlay built on the own `taskmanager_ui` dialog + layer stack
@@ -166,7 +171,7 @@ pub fn dialog_overlay_width(
                 .rounded_tr(px(scrim_corners[1]))
                 .rounded_br(px(scrim_corners[2]))
                 .rounded_bl(px(scrim_corners[3]))
-                .bg(taskmanager_ui::theme_binding::fill(scrim_color))
+                .bg(fill(scrim_color))
                 .on_any_mouse_down(move |event: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
                     if event.button == MouseButton::Left {
@@ -231,21 +236,15 @@ pub fn dialog_overlay_width(
 /// `anchored` / `deferred` wrapper if you need custom placement.
 pub fn tooltip(t: &Theme, text: &str) -> Div {
     div()
-        .bg(taskmanager_ui::theme_binding::fill(t.card_surface()))
+        .bg(fill(t.card_surface()))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(t.border))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(t),
-        ))
+        .border_color(hsla(t.border))
+        .rounded(absolute(tokens::control_radius(t)))
         .shadow_lg()
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_4))
+        .text_size(font_size(tokens::FONT_12))
+        .text_color(hsla(t.fg))
         .child(text.to_string())
 }
 
@@ -368,8 +367,8 @@ pub fn truncated_text(text: &str) -> Div {
 /// surface always tells the user how much exists beyond the cap.
 pub fn more_rows_hint(t: &Theme, hidden: usize) -> Div {
     div()
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+        .text_size(font_size(tokens::FONT_11))
+        .text_color(hsla(t.fg_dim))
         .child(more_rows_label(hidden))
 }
 

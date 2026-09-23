@@ -22,6 +22,7 @@ use super::{
 use super::{ServiceLogAvailability, ServiceLogFeed, ServiceLogLevelFilter};
 #[cfg(any(test, feature = "test-support"))]
 use super::{ServiceLogStreamEnd, ServiceLogStreamSnapshot};
+use taskmanager_platform_contract::ProviderFailure;
 
 #[cfg(target_os = "linux")]
 const STREAM_TIMEOUT: Duration = Duration::from_secs(2);
@@ -133,12 +134,12 @@ fn classify_stream_outcome(
 pub(crate) fn fetch(
     query: &ServiceLogQuery,
     observed_at_ms: u64,
-) -> Result<ServiceLogStreamState, taskmanager_platform_contract::ProviderFailure> {
+) -> Result<ServiceLogStreamState, ProviderFailure> {
     #[cfg(target_os = "linux")]
     {
         let target = resolve_active_service_target(&query.service_id)?;
         if target.init() != InitSystem::Systemd {
-            return Err(taskmanager_platform_contract::ProviderFailure::Unsupported);
+            return Err(ProviderFailure::Unsupported);
         }
         let unit = target.native();
         let mut command = Command::new("journalctl");
@@ -170,7 +171,7 @@ pub(crate) fn fetch(
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (query, observed_at_ms);
-        Err(taskmanager_platform_contract::ProviderFailure::Unsupported)
+        Err(ProviderFailure::Unsupported)
     }
 }
 

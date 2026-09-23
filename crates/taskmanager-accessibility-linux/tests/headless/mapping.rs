@@ -8,6 +8,9 @@ use accesskit_consumer::{Node, Tree, TreeChangeHandler};
 use taskmanager_accessibility_linux::mapping::{
     focused_node_id, map_action, map_role, stable_node_id,
 };
+use taskmanager_accessibility_linux::snapshot_to_tree_update;
+use taskmanager_ui_contract::SemanticNodeId;
+use taskmanager_ui_contract::SemanticSnapshot;
 use taskmanager_ui_contract::{
     GraphSummary, ProcessRowInput, SemanticAction, SemanticRole, SemanticSnapshotBuilder,
 };
@@ -23,7 +26,7 @@ impl TreeChangeHandler for NoOpChangeHandler {
     fn node_removed(&mut self, _node: &Node) {}
 }
 
-fn sample_snapshot() -> taskmanager_ui_contract::SemanticSnapshot {
+fn sample_snapshot() -> SemanticSnapshot {
     SemanticSnapshotBuilder::new(7)
         .application_name("TaskForest")
         .process_rows([
@@ -52,15 +55,12 @@ fn sample_snapshot() -> taskmanager_ui_contract::SemanticSnapshot {
         .expect("canonical builder snapshot must be well-formed")
 }
 
-fn build_consumer_tree(snapshot: &taskmanager_ui_contract::SemanticSnapshot) -> Tree {
+fn build_consumer_tree(snapshot: &SemanticSnapshot) -> Tree {
     build_consumer_tree_with_focus(snapshot, false)
 }
 
-fn build_consumer_tree_with_focus(
-    snapshot: &taskmanager_ui_contract::SemanticSnapshot,
-    is_host_focused: bool,
-) -> Tree {
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(snapshot);
+fn build_consumer_tree_with_focus(snapshot: &SemanticSnapshot, is_host_focused: bool) -> Tree {
+    let update = snapshot_to_tree_update(snapshot);
     // accesskit_consumer::Tree::new panics on a malformed tree (missing root,
     // dangling child, focus not in node list, etc.). If it returns, the tree is
     // connected, acyclic, root-present, and focus-valid.
@@ -157,10 +157,7 @@ fn focus_falls_back_to_root_when_nothing_is_selected() {
         .expect("snapshot well-formed");
 
     let root_focus = focused_node_id(&snapshot);
-    assert_eq!(
-        root_focus,
-        stable_node_id(&taskmanager_ui_contract::SemanticNodeId::borrowed("app"))
-    );
+    assert_eq!(root_focus, stable_node_id(&SemanticNodeId::borrowed("app")));
 }
 
 #[test]
@@ -188,7 +185,7 @@ fn incremental_snapshot_diffs_cleanly_through_consumer() {
         .build()
         .expect("second revision well-formed");
 
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&second);
+    let update = snapshot_to_tree_update(&second);
     let mut handler = NoOpChangeHandler;
     tree.update_and_process_changes(update, &mut handler);
 
@@ -265,7 +262,5 @@ fn find_child_by_role<'a>(parent: &Node<'a>, role: Role) -> Option<Node<'a>> {
 }
 
 fn stable_node_id_snapshot_row(pid: &str) -> NodeId {
-    stable_node_id(&taskmanager_ui_contract::SemanticNodeId::owned(format!(
-        "row:{pid}"
-    )))
+    stable_node_id(&SemanticNodeId::owned(format!("row:{pid}")))
 }

@@ -6,6 +6,13 @@
 //! dispatch ArrowLeft/ArrowRight, and assert the `RootView` sort state moved.
 //! No pixels, no filesystem, no process signals.
 
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::SortDir;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 #[path = "tests/category.rs"]
 mod category;
 #[path = "tests/keyboard_tree_nav.rs"]
@@ -36,9 +43,9 @@ use taskmanager_core::core::process::{
 };
 /// The expected row id of one fixture process (token from
 /// `fixture_start_token`, the builder's single source).
-fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Process(
-        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+fn row_id(pid: u32) -> ProcessRowId {
+    ProcessRowId::Process(
+        ProcessLiveKey::from_parts(pid, fixture_start_token(pid))
             .expect("fixture pid and token are non-zero"),
     )
 }
@@ -108,7 +115,7 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
         v.replace_processes_for_test(
             (1..=6)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("worker-{pid}"))
                         .build()
@@ -122,7 +129,7 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
 
     // Right walks the visible columns in canonical order; direction is kept.
     view.update(cx, |v, cx| {
-        v.set_process_sort(SortCol::Cpu, taskmanager_shell::SortDir::Desc);
+        v.set_process_sort(SortCol::Cpu, SortDir::Desc);
         cx.notify();
     });
     for (key, expected) in [
@@ -144,10 +151,7 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
             "ArrowRight from Cpu must land on {expected:?}"
         );
         assert!(
-            !view.read_with(cx, |v, _cx| matches!(
-                v.process_sort().1,
-                taskmanager_shell::SortDir::Asc
-            )),
+            !view.read_with(cx, |v, _cx| matches!(v.process_sort().1, SortDir::Asc)),
             "Arrow-key navigation must preserve the sort direction, not flip it"
         );
     }
@@ -172,7 +176,7 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
 
     // The direction really is preserved: flip sort_asc, step right, assert both.
     view.update(cx, |v, cx| {
-        v.set_process_sort(SortCol::Cpu, taskmanager_shell::SortDir::Asc);
+        v.set_process_sort(SortCol::Cpu, SortDir::Asc);
         cx.notify();
     });
     cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
@@ -180,10 +184,7 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
         view.read_with(cx, |v, _cx| v.process_sort().0),
         SortCol::Memory
     );
-    assert!(view.read_with(cx, |v, _cx| matches!(
-        v.process_sort().1,
-        taskmanager_shell::SortDir::Asc
-    )));
+    assert!(view.read_with(cx, |v, _cx| matches!(v.process_sort().1, SortDir::Asc)));
 
     // Hidden columns are skipped by the navigation (same projection as the
     // rendered header). Hide Memory + Swap + Pss + DiskWrite + Network: Cpu's right neighbor is
@@ -233,7 +234,7 @@ async fn process_rows_render_with_expected_geometry(cx: &mut TestAppContext) {
         v.replace_processes_for_test(
             (1..=5)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("worker-{pid}"))
                         .build()
@@ -271,7 +272,7 @@ async fn process_search_highlight_keeps_name_row_geometry_stable(cx: &mut TestAp
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Apps;
         v.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(4242)
                 .name("taskforest-gui-long-process-name".into())
                 .build(),
@@ -328,18 +329,13 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
         v.replace_processes_for_test(
             (1..=4)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("compact-worker-{pid}"))
-                        .scalar_observations(
-                            taskmanager_core::core::process::ProcessScalarObservations {
-                                start_token: taskmanager_core::core::ScalarObservation::available(
-                                    u64::from(pid),
-                                    1,
-                                ),
-                                ..Default::default()
-                            },
-                        )
+                        .scalar_observations(ProcessScalarObservations {
+                            start_token: ScalarObservation::available(u64::from(pid), 1),
+                            ..Default::default()
+                        })
                         .build()
                 })
                 .collect(),
@@ -426,7 +422,7 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
         view.read_with(cx, |v, _| {
             v.process_batch_confirmation().map(|intent| intent.action)
         }),
-        Some(taskmanager_core::core::process::ProcessBatchAction::Kill),
+        Some(ProcessBatchAction::Kill),
         "a secondary destructive command must remain reachable through the real compact menu"
     );
 }
@@ -456,13 +452,13 @@ async fn mc03_apps_doubleclick_case_chevron_click_expands_and_collapses_the_row(
         v.page = TopPage::Apps;
         v.processes_state.expanded_apps.clear();
         v.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(101)
                 .name("firefox".into())
                 .current_cpu_percentage(4.0)
                 .status("R".into())
                 .build(),
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(102)
                 .name("firefox".into())
                 .current_cpu_percentage(2.0)
@@ -561,7 +557,7 @@ async fn header_body_columns_align_exactly(cx: &mut TestAppContext) {
         v.replace_processes_for_test(
             (1..=5)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("worker-{pid}"))
                         .build()
@@ -608,9 +604,9 @@ async fn apps_column_navigation_moves_without_losing_row_selection(cx: &mut Test
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Apps;
         v.processes_state.hidden_cols.clear();
-        v.set_process_sort(SortCol::Cpu, taskmanager_shell::SortDir::Desc);
+        v.set_process_sort(SortCol::Cpu, SortDir::Desc);
         v.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(101)
                 .name("keyboard-worker".into())
                 .build(),
@@ -1003,7 +999,7 @@ async fn status_filter_segmented_keyboard_moves_the_typed_bucket_and_rows(cx: &m
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Apps;
         v.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(4242)
                 .name("segmented-running-worker".into())
                 .status("R".into())

@@ -3,6 +3,7 @@
 use super::RootView;
 use crate::gpui_app::services_view;
 use taskmanager_application::i18n;
+use taskmanager_application::service_submission_failure;
 use taskmanager_application::{
     RefreshRequest, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
     ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
@@ -93,9 +94,7 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map_err(|error| {
-                        taskmanager_application::service_submission_failure(error.kind)
-                    })
+                    .map_err(|error| service_submission_failure(error.kind))
             });
         match dependencies {
             Ok(request_id) => self
@@ -120,9 +119,7 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map_err(|error| {
-                        taskmanager_application::service_submission_failure(error.kind)
-                    })
+                    .map_err(|error| service_submission_failure(error.kind))
             });
         match logs {
             Ok(request_id) => {
@@ -152,9 +149,7 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map_err(|error| {
-                        taskmanager_application::service_submission_failure(error.kind)
-                    })
+                    .map_err(|error| service_submission_failure(error.kind))
             });
         match result {
             Ok(request_id) => {
@@ -200,9 +195,7 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map_err(|error| {
-                        taskmanager_application::service_submission_failure(error.kind)
-                    })
+                    .map_err(|error| service_submission_failure(error.kind))
             });
         match result {
             Ok(request_id) => self.service_details.accept_stream(attempt_id, request_id),
@@ -287,7 +280,7 @@ impl RootView {
 
     pub(super) fn apply_service_control_outcome_from_shared(
         &mut self,
-        outcome: taskmanager_application::ServiceControlOutcome,
+        outcome: ServiceControlOutcome,
     ) {
         let succeeded = outcome.result.is_ok();
         self.shell.feedback.record_service(outcome);

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 
 fn fixture_root(name: &str) -> PathBuf {
     crate::test_support::repo_temp_dir().join(format!(
@@ -36,7 +37,7 @@ fn thermal_zone_value_and_malformed_sibling_keep_partial_source_truth() {
         snapshot.readings[0]
             .measurement_observation()
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+        ScalarAvailability::Unavailable(FailureKind::ProviderFault)
     );
     assert!(snapshot.readings.iter().any(|reading| {
         reading.label() == "x86_pkg_temp"

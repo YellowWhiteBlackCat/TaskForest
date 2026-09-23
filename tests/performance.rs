@@ -41,11 +41,15 @@ use taskmanager_core::core::{
 use taskmanager_core::core::HostRuntimeFacts;
 #[cfg(target_os = "linux")]
 use taskmanager_core::core::HostRuntimeObservation;
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+#[cfg(target_os = "linux")]
+use taskmanager_platform_linux::{parse_proc_io, parse_proc_stat, parse_proc_status_memory};
 use taskmanager_shell::matches_process_query;
 #[cfg(target_os = "linux")]
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 #[cfg(target_os = "linux")]
 use taskmanager_telemetry_store::{CorrelatedTelemetryStamp, TelemetryStore};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn refs(items: &[ProcessItem]) -> Vec<&ProcessItem> {
     items.iter().collect()
@@ -105,7 +109,7 @@ fn synthetic_processes(count: usize) -> Vec<ProcessItem> {
             let pid = index as u32 + 1;
             let parent_pid = (index != 0).then(|| ((index - 1) / 8) as u32 + 1);
             let marked = index % 10 == 0;
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .parent_pid(parent_pid)
                 .name(if marked {
@@ -123,16 +127,11 @@ fn synthetic_processes(count: usize) -> Vec<ProcessItem> {
                 } else {
                     "Sleeping".into()
                 })
-                .metadata_observations(
-                    taskmanager_core::core::process::ProcessMetadataObservations::current(
-                        taskmanager_core::core::process::ProcessOwner::opaque(format!(
-                            "user-{}",
-                            index % 16
-                        )),
-                        None,
-                        1,
-                    ),
-                )
+                .metadata_observations(ProcessMetadataObservations::current(
+                    ProcessOwner::opaque(format!("user-{}", index % 16)),
+                    None,
+                    1,
+                ))
                 .build()
         })
         .collect()
@@ -271,34 +270,30 @@ fn proc_parse_of_ten_thousand_synthetic_ticks_stays_under_budget() {
     // Sanity: the fixtures must actually parse (the parser's own unit tests cover
     // field-by-field correctness; here we only confirm we are timing the real
     // parse path, not a `None`/error fast-path that would make the gate trivial).
-    assert!(
-        stat_texts
-            .iter()
-            .all(|t| taskmanager_platform_linux::parse_proc_stat(t).is_some())
-    );
+    assert!(stat_texts.iter().all(|t| parse_proc_stat(t).is_some()));
     assert!(
         status_texts
             .iter()
-            .all(|t| taskmanager_platform_linux::parse_proc_status_memory(t).is_ok())
+            .all(|t| parse_proc_status_memory(t).is_ok())
     );
     assert!(io_texts.iter().all(|t| {
-        let fields = taskmanager_platform_linux::parse_proc_io(t);
+        let fields = parse_proc_io(t);
         fields.read_bytes.is_ok() && fields.write_bytes.is_ok()
     }));
 
     // Warm up: touch every allocation once so the timed loop measures steady-state
     // parse cost, not the allocator's first-touch page faults.
     for i in 0..LARGE_WORKLOAD {
-        let _ = taskmanager_platform_linux::parse_proc_stat(&stat_texts[i]);
-        let _ = taskmanager_platform_linux::parse_proc_status_memory(&status_texts[i]);
-        let _ = taskmanager_platform_linux::parse_proc_io(&io_texts[i]);
+        let _ = parse_proc_stat(&stat_texts[i]);
+        let _ = parse_proc_status_memory(&status_texts[i]);
+        let _ = parse_proc_io(&io_texts[i]);
     }
 
     let started = Instant::now();
     for i in 0..LARGE_WORKLOAD {
-        let _ = taskmanager_platform_linux::parse_proc_stat(&stat_texts[i]);
-        let _ = taskmanager_platform_linux::parse_proc_status_memory(&status_texts[i]);
-        let _ = taskmanager_platform_linux::parse_proc_io(&io_texts[i]);
+        let _ = parse_proc_stat(&stat_texts[i]);
+        let _ = parse_proc_status_memory(&status_texts[i]);
+        let _ = parse_proc_io(&io_texts[i]);
     }
     let elapsed = started.elapsed();
     eprintln!(
@@ -478,7 +473,7 @@ const COLLECT_RETAINED_GROWTH_LIMIT: usize = 4 * 1024 * 1024;
 #[cfg(target_os = "linux")]
 fn self_cpu_ticks() -> u64 {
     let text = std::fs::read_to_string("/proc/self/stat").expect("test process stat is readable");
-    let fields = taskmanager_platform_linux::parse_proc_stat(&text).expect("self stat parses");
+    let fields = parse_proc_stat(&text).expect("self stat parses");
     fields.cpu_ticks_total()
 }
 
@@ -501,11 +496,10 @@ fn simulate_collect_tick(
     let mut cpu_total: u64 = 0;
     let mut memory_rss_kib: u64 = 0;
     for index in 0..fixtures.stat.len() {
-        let stat = taskmanager_platform_linux::parse_proc_stat(&fixtures.stat[index])
-            .expect("synthetic stat parses");
-        let rss_kib = taskmanager_platform_linux::parse_proc_status_memory(&fixtures.status[index])
-            .expect("synthetic status parses");
-        let io = taskmanager_platform_linux::parse_proc_io(&fixtures.io[index]);
+        let stat = parse_proc_stat(&fixtures.stat[index]).expect("synthetic stat parses");
+        let rss_kib =
+            parse_proc_status_memory(&fixtures.status[index]).expect("synthetic status parses");
+        let io = parse_proc_io(&fixtures.io[index]);
         let _ = io.read_bytes.expect("synthetic io reads");
         let _ = io.write_bytes.expect("synthetic io writes");
         cpu_total = cpu_total.saturating_add(stat.cpu_ticks_total());

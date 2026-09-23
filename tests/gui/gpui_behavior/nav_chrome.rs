@@ -19,6 +19,7 @@
 //! assertion ("control absent") is meaningful.
 
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::setup::SetupScriptInfo;
 use taskmanager_gpui::gpui_app::dashboard::SystemSection;
 use taskmanager_gpui::gpui_app::first_run::{FirstRunPhase, FirstRunUiState};
@@ -486,7 +487,7 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
     assert_eq!(
         win.read_with(cx, |view, _cx| view.first_run.phase.clone())
             .unwrap(),
-        FirstRunPhase::Failed(taskmanager_core::core::failure::FailureKind::TemporarilyUnavailable),
+        FirstRunPhase::Failed(FailureKind::TemporarilyUnavailable),
         "a missing typed provider must remain an honest failure"
     );
     assert!(

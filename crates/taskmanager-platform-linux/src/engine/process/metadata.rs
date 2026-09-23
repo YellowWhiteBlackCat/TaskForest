@@ -253,12 +253,12 @@ fn observation_outcome<T>(observation: &ProcessMetadataObservation<T>) -> Source
             SourceOutcome::Unavailable(shared_failure(failure))
         }
         ProcessMetadataAvailability::Unknown => {
-            SourceOutcome::Unavailable(taskmanager_core::FailureKind::ProviderFault)
+            SourceOutcome::Unavailable(FailureKind::ProviderFault)
         }
     }
 }
 
-const fn shared_failure(failure: ProcessMetadataFailure) -> taskmanager_core::FailureKind {
+const fn shared_failure(failure: ProcessMetadataFailure) -> FailureKind {
     use taskmanager_core::FailureKind;
 
     match failure {

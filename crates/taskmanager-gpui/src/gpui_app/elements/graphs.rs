@@ -10,8 +10,16 @@ use gpui::{
 };
 use std::rc::Rc;
 use taskmanager_application::i18n;
+use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rgba;
 
 /// The card shadow's ambient layer: the share of the ink alpha, the drop, and
 /// the blur radius. 2026-08 稳固效果 policy (owner: "很深的 blur 效果很糟糕")
@@ -32,15 +40,13 @@ pub fn card_shadow(t: &Theme) -> Vec<BoxShadow> {
     let ink = t.card_shadow();
     vec![
         BoxShadow {
-            color: taskmanager_ui::theme_binding::hsla(
-                ink.with_alpha(ink.a * CARD_SHADOW_AMBIENT_ALPHA),
-            ),
+            color: hsla(ink.with_alpha(ink.a * CARD_SHADOW_AMBIENT_ALPHA)),
             offset: Point::new(px(0.0), px(CARD_SHADOW_AMBIENT_DROP)),
             blur_radius: px(CARD_SHADOW_AMBIENT_BLUR),
             spread_radius: px(0.0),
         },
         BoxShadow {
-            color: taskmanager_ui::theme_binding::hsla(ink),
+            color: hsla(ink),
             offset: Point::new(px(0.0), px(1.0)),
             blur_radius: px(4.0),
             spread_radius: px(0.0),
@@ -62,12 +68,10 @@ pub fn graph_card(theme: &Theme, graph: impl IntoElement) -> Div {
     div()
         .flex_1()
         .min_h(px(0.0))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::card_radius(theme),
-        ))
+        .rounded(absolute(tokens::card_radius(theme)))
         .border(px(1.0))
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
+        .border_color(hsla(theme.border))
+        .bg(fill(theme.card_surface()))
         .shadow(card_shadow(theme))
         .overflow_hidden()
         .child(graph)
@@ -125,20 +129,14 @@ fn graph_card_with_explicit_state(
                 .justify_center()
                 .child(
                     div()
-                        .px(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_12,
-                        ))
-                        .py(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_6,
-                        ))
-                        .rounded(taskmanager_ui::theme_binding::absolute(
-                            tokens::control_radius(theme),
-                        ))
+                        .px(definite_length(tokens::SPACE_12))
+                        .py(definite_length(tokens::SPACE_6))
+                        .rounded(absolute(tokens::control_radius(theme)))
                         .border_1()
-                        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-                        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .border_color(hsla(theme.border))
+                        .bg(fill(theme.card_surface()))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg_dim))
                         .child(label),
                 ),
         );
@@ -158,7 +156,7 @@ pub(crate) fn mini_graph_cell(
     theme: &Theme,
     id: impl Into<ElementId>,
     samples: Rc<[f32]>,
-    color: taskmanager_theme::Color,
+    color: Color,
     label: &str,
     settings: GraphSettings,
     cache: GraphCacheHandle,
@@ -172,13 +170,7 @@ pub(crate) fn mini_graph_cell(
     // the caller's full generation-scoped window.
     graph_card_with_state(
         theme,
-        graph_element(
-            id,
-            Rc::clone(&samples),
-            taskmanager_ui::theme_binding::rgba(color),
-            opts,
-            cache,
-        ),
+        graph_element(id, Rc::clone(&samples), rgba(color), opts, cache),
         &samples,
     )
     .child(
@@ -186,11 +178,9 @@ pub(crate) fn mini_graph_cell(
             .absolute()
             .top(px(4.0))
             .left(px(6.0))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
-            .font_weight(taskmanager_ui::theme_binding::font_weight(
-                tokens::FONT_WEIGHT_BOLD,
-            ))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(font_size(tokens::FONT_10))
+            .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+            .text_color(hsla(theme.fg_dim))
             .child(label.to_owned()),
     )
 }
@@ -214,12 +204,10 @@ pub fn graph_legend(theme: &Theme, entries: &[GraphLegendEntry]) -> Div {
         .flex_row()
         .items_center()
         .justify_end()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .w_full()
         .min_w(px(0.0))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+        .text_size(font_size(tokens::FONT_11))
         .debug_selector(|| "tm-graph-legend".to_string());
     for (index, entry) in entries.iter().enumerate() {
         row = row.child(
@@ -227,9 +215,7 @@ pub fn graph_legend(theme: &Theme, entries: &[GraphLegendEntry]) -> Div {
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
                         .size(px(8.0))
@@ -239,7 +225,7 @@ pub fn graph_legend(theme: &Theme, entries: &[GraphLegendEntry]) -> Div {
                 )
                 .child(
                     div()
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_color(hsla(theme.fg_dim))
                         .child(entry.label.clone())
                         .debug_selector(move || format!("tm-graph-legend-label:{index}")),
                 ),

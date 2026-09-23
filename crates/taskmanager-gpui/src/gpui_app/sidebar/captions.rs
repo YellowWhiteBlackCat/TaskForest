@@ -5,8 +5,10 @@ use crate::gpui_app::perf_views::gpu_percentage_readout;
 use taskmanager_application::i18n;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
+use taskmanager_core::core::units::bytes_percent;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_core::core::{BatteryInfo, SensorReading};
+use taskmanager_shell::presentation::device_status_i18n_key;
 
 pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {
     units.format_quantity(bytes_per_sec, QuantityFamily::Network, true)
@@ -147,7 +149,7 @@ pub(super) fn append_status_badge(caption: &mut String, status: DeviceStatus) {
     if status == DeviceStatus::Healthy {
         return;
     }
-    let key = taskmanager_shell::presentation::device_status_i18n_key(status);
+    let key = device_status_i18n_key(status);
     if !caption.is_empty() {
         caption.push_str("  ·  ");
     }
@@ -239,7 +241,7 @@ pub(super) fn gpu_caption_line2(g: &GpuMetrics) -> String {
     };
 
     if let (Some(used), Some(total)) = (vram_used, vram_total)
-        && let Some(pct) = taskmanager_core::core::units::bytes_percent(used, total)
+        && let Some(pct) = bytes_percent(used, total)
     {
         parts.push(format!("VRAM {:.0}%", pct.min(100.0).round()));
     }

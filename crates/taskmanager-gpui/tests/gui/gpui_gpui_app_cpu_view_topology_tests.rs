@@ -1,4 +1,5 @@
 use taskmanager_core::core::hardware::CoreBreakdown;
+use taskmanager_test_support::pin_english;
 
 use super::{
     cpu_frequency_readout, cpu_frequency_readout_for_source, cpu_temperature_readout,
@@ -22,7 +23,7 @@ fn optional_cpu_readouts_distinguish_missing_from_measured_zero() {
 
 #[test]
 fn temperature_readout_qualifies_labeled_fallback_tiers_only() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     // Dedicated CPU sensor chips keep the plain reading.
     assert_eq!(
         cpu_temperature_readout_for_source(Some(54.0), CpuTemperatureSource::Coretemp),

@@ -20,6 +20,9 @@ use super::{
 };
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
+use taskmanager_core::core::metrics::NetworkAdapterType;
+use taskmanager_core::core::sensors::SensorQuantity;
+use taskmanager_theme::Theme;
 
 /// Compact detail viewport ownership. CPU and GPU use elastic, non-scrolling
 /// aggregate surfaces; device pages with variable-length inventories keep the
@@ -156,7 +159,7 @@ pub(crate) fn performance_page(
 /// startup-unavailable notice, and nothing at all.
 fn history_replay_entry_row<'a>(
     app: &crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     if app.history_replay_startup_unavailable() {
         return Some(
@@ -235,10 +238,7 @@ pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
                 >= sensors
                     .readings
                     .iter()
-                    .filter(|reading| {
-                        reading.quantity()
-                            == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
-                    })
+                    .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
                     .count()
         }),
     }
@@ -248,7 +248,7 @@ pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
 /// parity): the page names the loss and waits for the hardware identity
 /// instead of silently rendering another device's facts.
 fn disconnected_device<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     container(
         column![
@@ -283,7 +283,7 @@ fn disconnected_device<'a>(
 /// windowed pill strip so offscreen identities do not enter the element tree.
 fn performance_sidebar<'a>(
     app: &crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     selected: PerfDevice,
     navigation: DeviceNavigationPresentation,
     budget: PerformancePageBudget,
@@ -496,9 +496,7 @@ pub(crate) fn available_perf_devices(app: &crate::IcedApp) -> Vec<PerfDevice> {
             sensors
                 .readings
                 .iter()
-                .filter(|reading| {
-                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
-                })
+                .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
                 .enumerate()
                 .map(|(index, _)| PerfDevice::Fan(index)),
         );
@@ -537,18 +535,15 @@ struct NetworkVisibility {
 }
 
 impl NetworkVisibility {
-    const fn allows(
-        self,
-        adapter_type: taskmanager_core::core::metrics::NetworkAdapterType,
-    ) -> bool {
+    const fn allows(self, adapter_type: NetworkAdapterType) -> bool {
         match adapter_type {
-            taskmanager_core::core::metrics::NetworkAdapterType::Ethernet => self.wired,
-            taskmanager_core::core::metrics::NetworkAdapterType::WiFi => self.wireless,
-            taskmanager_core::core::metrics::NetworkAdapterType::Vpn => self.vpn,
-            taskmanager_core::core::metrics::NetworkAdapterType::Virtual => self.virtual_devices,
-            taskmanager_core::core::metrics::NetworkAdapterType::Unknown
-            | taskmanager_core::core::metrics::NetworkAdapterType::Loopback
-            | taskmanager_core::core::metrics::NetworkAdapterType::Other => self.other,
+            NetworkAdapterType::Ethernet => self.wired,
+            NetworkAdapterType::WiFi => self.wireless,
+            NetworkAdapterType::Vpn => self.vpn,
+            NetworkAdapterType::Virtual => self.virtual_devices,
+            NetworkAdapterType::Unknown
+            | NetworkAdapterType::Loopback
+            | NetworkAdapterType::Other => self.other,
         }
     }
 }

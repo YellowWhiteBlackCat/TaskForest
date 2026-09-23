@@ -1,6 +1,12 @@
 use super::super::startup::FONT_TOKEN_SYSTEM;
 use super::*;
 use std::collections::HashSet;
+use taskmanager_application::i18n::Language;
+use taskmanager_core::core::alerts::NotificationPolicy;
+use taskmanager_core::core::alerts::QuietHours;
+use taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT;
+use taskmanager_shell::ProcessViewing;
+use taskmanager_shell::SortDir;
 
 use gpui::{AppContext, SharedString, TestAppContext};
 
@@ -30,10 +36,7 @@ fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut
 
     assert_eq!(config.mode, COLOR_SCHEME_DARK);
     assert_eq!(config.startup_page, STARTUP_PAGE_PROCESSES);
-    assert_eq!(
-        config.text_rendering,
-        taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT
-    );
+    assert_eq!(config.text_rendering, TEXT_RENDERING_PLATFORM_DEFAULT);
     assert_eq!(config.graph_data_points, 600);
 }
 
@@ -77,7 +80,7 @@ fn config_projection_persists_explicit_language_choice(cx: &mut TestAppContext) 
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let config = root.update(cx, |view, _cx| {
         let mut presentation = view.presentation_snapshot();
-        presentation.appearance.language = Some(taskmanager_application::i18n::Language::Zh);
+        presentation.appearance.language = Some(Language::Zh);
         view.replace_presentation(presentation);
         config_from_view(view)
     });
@@ -252,8 +255,8 @@ fn strict_unknown_tokens_skip_whole_preset_and_preserve_process_defaults() {
     // Mirrors `apply_process_config`'s split state: hidden columns are
     // GPUI-local chrome state, while sort lives in the shell viewing slot.
     let mut processes = ProcessesState::default();
-    let mut viewing = taskmanager_shell::ProcessViewing::default();
-    viewing.set_sort(SortCol::Nice, taskmanager_shell::SortDir::Desc);
+    let mut viewing = ProcessViewing::default();
+    viewing.set_sort(SortCol::Nice, SortDir::Desc);
     let config = Config {
         process_sort_col: "future-sort".into(),
         process_sort_asc: true,
@@ -264,19 +267,16 @@ fn strict_unknown_tokens_skip_whole_preset_and_preserve_process_defaults() {
         viewing.set_sort(
             sort,
             if config.process_sort_asc {
-                taskmanager_shell::SortDir::Asc
+                SortDir::Asc
             } else {
-                taskmanager_shell::SortDir::Desc
+                SortDir::Desc
             },
         );
     }
     if let Some(hidden) = hidden_from_tokens(&config.process_hidden_columns) {
         processes.hidden_cols = hidden;
     }
-    assert_eq!(
-        viewing.sort(),
-        (SortCol::Nice, taskmanager_shell::SortDir::Desc)
-    );
+    assert_eq!(viewing.sort(), (SortCol::Nice, SortDir::Desc));
     // Invalid hidden-column tokens are ignored, so hidden stays at the
     // built-in default (the MC 8-column set) instead of being wiped to empty.
     assert_eq!(processes.hidden_cols, ProcessesState::default().hidden_cols);
@@ -317,15 +317,13 @@ fn desktop_notification_policy_round_trips_through_config_serialization() {
     assert!(reloaded.notify_enabled);
     assert_eq!(reloaded.notify_quiet_hours, Some((1320, 420)));
 
-    let policy = taskmanager_core::core::alerts::NotificationPolicy {
+    let policy = NotificationPolicy {
         enabled: reloaded.notify_enabled,
-        quiet_hours: reloaded.notify_quiet_hours.map(|(start, end)| {
-            taskmanager_core::core::alerts::QuietHours {
-                start_minutes: start,
-                end_minutes: end,
-            }
+        quiet_hours: reloaded.notify_quiet_hours.map(|(start, end)| QuietHours {
+            start_minutes: start,
+            end_minutes: end,
         }),
-        ..taskmanager_core::core::alerts::NotificationPolicy::default()
+        ..NotificationPolicy::default()
     };
     assert!(policy.enabled);
     let hours = policy.quiet_hours.expect("quiet hours restored");

@@ -1,5 +1,9 @@
 use super::*;
+use taskmanager_core::core::metrics::{ScalarObservation, SystemSnapshot};
+use taskmanager_core::core::power::BatteryScalarObservations;
 use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::record_demo_history_frame;
 
 /// A battery whose charge-% history has >=2 samples renders a real sparkline
 /// (a ramp block) on its trend line; a battery with no history renders the
@@ -8,29 +12,19 @@ use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 fn battery_trend_line_matches_that_batterys_own_history_window() {
     // Record two power-supply snapshots for "BAT0" so its window has >=2
     // samples. Batteries live on the power event, not the system snapshot.
-    let mut shell = taskmanager_shell::ShellApp::new();
+    let mut shell = ShellApp::new();
     let mut battery = BatteryInfo::new("BAT0", Default::default());
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(80, 1),
         ..Default::default()
     });
     let snapshot = PowerSupplySnapshot {
         batteries: vec![battery],
         ..PowerSupplySnapshot::default()
     };
-    let system = taskmanager_core::core::metrics::SystemSnapshot::default();
-    taskmanager_shell::fixture::record_demo_history_frame(
-        &mut shell,
-        &system,
-        Some(&snapshot),
-        None,
-    );
-    taskmanager_shell::fixture::record_demo_history_frame(
-        &mut shell,
-        &system,
-        Some(&snapshot),
-        None,
-    );
+    let system = SystemSnapshot::default();
+    record_demo_history_frame(&mut shell, &system, Some(&snapshot), None);
+    record_demo_history_frame(&mut shell, &system, Some(&snapshot), None);
     let history = &shell.history;
     // A constant charge-% window resolves and trends to a flat mid-ramp.
     let window = history.battery_capacity_pct_for("BAT0");

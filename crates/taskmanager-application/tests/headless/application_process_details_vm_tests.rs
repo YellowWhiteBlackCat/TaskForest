@@ -1,16 +1,16 @@
 use super::*;
 use std::path::PathBuf;
+use taskmanager_core::DeviceState;
+use taskmanager_core::ProcessSchedulingPolicy;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
     ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
     ProcessOwnerIdentity, ProcessScalarObservations,
 };
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_core::core::units::UnitPreferences;
 
-fn process_details_rows(
-    item: &ProcessItem,
-    units: &taskmanager_core::core::units::UnitPreferences,
-) -> Vec<ProcessDetailsRowVm> {
+fn process_details_rows(item: &ProcessItem, units: &UnitPreferences) -> Vec<ProcessDetailsRowVm> {
     super::process_details_rows_with_local_time(
         item,
         units,
@@ -25,7 +25,7 @@ fn fully_observed_item() -> ProcessItem {
     item.parent_pid = Some(1);
     item.cmdline = "sample --flag value".to_owned();
     item.status = "S".to_owned();
-    item.scheduling_policy = Some(taskmanager_core::ProcessSchedulingPolicy::Other);
+    item.scheduling_policy = Some(ProcessSchedulingPolicy::Other);
     item.oom_score = Some(250);
     item.minor_page_faults = Some(15000);
     item.major_page_faults = Some(3);
@@ -600,7 +600,7 @@ fn environment_variable_and_entry_rendering() {
 
     // Full snapshot rendering
     let snapshot = ProcessEnvironment {
-        state: taskmanager_core::DeviceState::healthy(42),
+        state: DeviceState::healthy(42),
         working_directory: Some(PathBuf::from("/app")),
         entries,
         truncated_count: 5,

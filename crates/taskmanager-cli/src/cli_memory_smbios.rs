@@ -19,6 +19,7 @@ use std::io::{self, Write};
 
 use serde_json::json;
 use taskmanager_escalation::EscalationDenialReason;
+use taskmanager_escalation::polkit::invoke_smbios_helper;
 use taskmanager_escalation::polkit::{DmiIdentityFacts, SmbiosHelperOutcome};
 
 /// Run the `--memory-smbios` mode against stdout: invoke the privileged
@@ -26,7 +27,7 @@ use taskmanager_escalation::polkit::{DmiIdentityFacts, SmbiosHelperOutcome};
 /// Returns `Ok` as long as the document could be written; the OUTCOME is
 /// carried in the printed JSON, not in the process exit code.
 pub fn run_memory_smbios() -> io::Result<()> {
-    let outcome = taskmanager_escalation::polkit::invoke_smbios_helper();
+    let outcome = invoke_smbios_helper();
     let document = render_outcome(&outcome);
     let stdout = io::stdout();
     let mut handle = stdout.lock();

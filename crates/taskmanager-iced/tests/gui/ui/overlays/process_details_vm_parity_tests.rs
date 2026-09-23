@@ -4,10 +4,16 @@
 //! CPU width-6 alignment, and its drop-on-missing row policy.
 use super::*;
 use std::path::PathBuf;
+use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::time::LocalTimeRules;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(4242)
         .parent_pid(Some(1))
         .name("sample".to_owned())
@@ -17,13 +23,11 @@ fn fixture() -> ProcessItem {
         .current_disk_read_bytes_per_sec(1536)
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                Some(PathBuf::from("/usr/bin/sample")),
-                42,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            Some(PathBuf::from("/usr/bin/sample")),
+            42,
+        ))
         .current_threads(8)
         .current_start_time_secs(1_600_000_000)
         .current_cpu_time_secs(3_690)
@@ -31,36 +35,24 @@ fn fixture() -> ProcessItem {
         .current_nice(10)
         .build();
     let mut observations = *item.scalar_observations();
-    observations.start_token =
-        taskmanager_core::core::metrics::ScalarObservation::available(600, 42);
-    observations.memory_pss_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(50 * 1024 * 1024, 42);
-    observations.memory_uss_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(32 * 1024 * 1024, 42);
-    observations.swap_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(2 * 1024 * 1024, 42);
-    observations.disk_read_bytes_total =
-        taskmanager_core::core::metrics::ScalarObservation::available(10 * 1024 * 1024, 42);
-    observations.disk_write_bytes_total =
-        taskmanager_core::core::metrics::ScalarObservation::available(20 * 1024 * 1024, 42);
+    observations.start_token = ScalarObservation::available(600, 42);
+    observations.memory_pss_bytes = ScalarObservation::available(50 * 1024 * 1024, 42);
+    observations.memory_uss_bytes = ScalarObservation::available(32 * 1024 * 1024, 42);
+    observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
+    observations.disk_read_bytes_total = ScalarObservation::available(10 * 1024 * 1024, 42);
+    observations.disk_write_bytes_total = ScalarObservation::available(20 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
     item
 }
 
-fn local_time_rules() -> taskmanager_core::core::time::LocalTimeRulesObservation {
-    taskmanager_core::core::time::LocalTimeRulesObservation::current(
-        taskmanager_core::core::time::LocalTimeRules::utc(),
-        0,
-    )
+fn local_time_rules() -> LocalTimeRulesObservation {
+    LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0)
 }
 
 fn vm_value(field: ProcessDetailsField) -> String {
     let rows = details_vm(
         &fixture(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     vm_text(&rows, field)
 }

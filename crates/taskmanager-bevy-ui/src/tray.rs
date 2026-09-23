@@ -14,6 +14,8 @@ use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, channel};
 
 use bevy::ecs::resource::Resource;
+use taskmanager_app_host::spawn_tray;
+use taskmanager_application::i18n::t;
 use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
 use taskmanager_core::core::tray::{
     TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
@@ -64,26 +66,26 @@ pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
     let menu = TrayMenuSpec::from_items(vec![
         TrayMenuItem::Action {
             id: TRAY_ACTION_SHOW,
-            label: taskmanager_application::i18n::t("tray.show_window").to_owned(),
+            label: t("tray.show_window").to_owned(),
             enabled: true,
         },
         TrayMenuItem::Checkmark {
             id: TRAY_ACTION_PAUSE,
-            label: taskmanager_application::i18n::t("tray.pause_refresh").to_owned(),
+            label: t("tray.pause_refresh").to_owned(),
             checked: paused,
             enabled: true,
         },
         TrayMenuItem::Separator,
         TrayMenuItem::Action {
             id: TRAY_ACTION_QUIT,
-            label: taskmanager_application::i18n::t("tray.quit").to_owned(),
+            label: t("tray.quit").to_owned(),
             enabled: true,
         },
     ])
     .map_err(TraySpecError::Menu)?;
     TraySpec::new(
         icon,
-        Some(taskmanager_application::i18n::t("tray.tooltip").to_owned()),
+        Some(t("tray.tooltip").to_owned()),
         Some(product::BEVY_NAME.to_owned()),
         menu,
         false,
@@ -164,7 +166,7 @@ pub fn spawn_tray_host(
         }
     };
     let (events_tx, events_rx) = channel::<TrayEvent>();
-    match taskmanager_app_host::spawn_tray(spec, events_tx) {
+    match spawn_tray(spec, events_tx) {
         Ok(controller) => (Some(controller), Some(events_rx)),
         Err(failure) => {
             eprintln!("taskforest-b: system tray unavailable: {failure:?}");

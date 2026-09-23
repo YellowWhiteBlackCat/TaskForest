@@ -13,6 +13,9 @@ use super::{
 };
 use crate::app::Message;
 use iced::Size;
+use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_shell::SortCol;
+use taskmanager_theme::Theme;
 
 fn frame(width: f32, height: f32) -> Size {
     Size::new(width, height)
@@ -505,27 +508,27 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
     // In compact viewports (narrow 720x480 or wide-short 2048x540), presets_ribbon must converge
     // to a single horizontal scrollable strip of bounded height 32.0 px, preventing it from
     // breaking into multiple vertical lines that consume the process table viewport.
-    let theme = taskmanager_theme::Theme::dark();
+    let theme = Theme::dark();
     let presets = vec![
         crate::saved_views::SavedViewPreset::built_in(
             1,
             "saved_views.preset_default",
-            taskmanager_shell::ProcessStatusFilter::All,
-            taskmanager_shell::SortCol::Cpu,
+            ProcessStatusFilter::All,
+            SortCol::Cpu,
             false,
         ),
         crate::saved_views::SavedViewPreset::built_in(
             2,
             "saved_views.preset_running",
-            taskmanager_shell::ProcessStatusFilter::Running,
-            taskmanager_shell::SortCol::Memory,
+            ProcessStatusFilter::Running,
+            SortCol::Memory,
             false,
         ),
     ];
 
     let compact_ribbon_state = PresetsRibbonState {
-        filter: taskmanager_shell::ProcessStatusFilter::All,
-        sort: taskmanager_shell::SortCol::Cpu,
+        filter: ProcessStatusFilter::All,
+        sort: SortCol::Cpu,
         ascending: false,
         feedback: None,
         compact: true,

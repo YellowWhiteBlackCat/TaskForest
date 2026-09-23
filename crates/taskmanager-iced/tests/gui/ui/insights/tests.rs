@@ -4,6 +4,12 @@
 //! source-size budget. Moved verbatim; the assertions are unchanged.
 
 use super::*;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process_telemetry::ConnectionState;
+use taskmanager_core::core::process_telemetry::OpenFileKind;
+use taskmanager_core::core::process_telemetry::ThreadState;
+use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_theme::Theme;
 
 /// Honesty: a thread whose `stat` lacked parseable CPU counters must render
 /// the explicit dash, never a fabricated "0.0s"/"0.0%". These are the same
@@ -13,7 +19,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     let gap = ProcessThreadInfo {
         tid: 4243,
         comm: "reaper".into(),
-        state: taskmanager_core::core::process_telemetry::ThreadState::Running,
+        state: ThreadState::Running,
         cpu_time_secs: None,
         cpu_percent: None,
         wchan: None,
@@ -23,7 +29,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     let warm = ProcessThreadInfo {
         tid: 4242,
         comm: "telemetry-main".into(),
-        state: taskmanager_core::core::process_telemetry::ThreadState::Sleep,
+        state: ThreadState::Sleep,
         cpu_time_secs: Some(12.5),
         cpu_percent: Some(18.5),
         wchan: None,
@@ -83,13 +89,13 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
 fn open_file_row_marks_an_unreadable_target_not_blank() {
     let readable = OpenFileEntry {
         fd: 0,
-        kind: taskmanager_core::core::process_telemetry::OpenFileKind::File,
+        kind: OpenFileKind::File,
         target: Some("/dev/null".into()),
         deleted: false,
     };
     let unreadable = OpenFileEntry {
         fd: 9,
-        kind: taskmanager_core::core::process_telemetry::OpenFileKind::Other,
+        kind: OpenFileKind::Other,
         target: None,
         deleted: false,
     };
@@ -113,7 +119,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
     let many: Vec<OpenFileEntry> = (0..MAX_FACET_ROWS + 3)
         .map(|index| OpenFileEntry {
             fd: index as u32,
-            kind: taskmanager_core::core::process_telemetry::OpenFileKind::File,
+            kind: OpenFileKind::File,
             target: Some(format!("/tmp/session-{index}.lock")),
             deleted: false,
         })
@@ -211,7 +217,7 @@ mod connection_tests {
             family,
             local,
             remote,
-            state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
+            state: ConnectionState::Established,
             provider_key: None,
             rtt_ms: None,
         }
@@ -292,7 +298,7 @@ fn insights_sections_render_all_states_without_panic() {
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
     use taskmanager_core::core::process::FrozenProcessIdentity;
 
-    let theme = taskmanager_theme::Theme::default();
+    let theme = Theme::default();
 
     // None (initial)
     let _ = environment_section(&theme, None);

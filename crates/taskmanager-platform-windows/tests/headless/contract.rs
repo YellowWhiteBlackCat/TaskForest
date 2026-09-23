@@ -27,6 +27,12 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+use taskmanager_application::DirectoryUsageEvent;
+use taskmanager_application::GpuEngineRowsEvent;
+use taskmanager_application::GpuEngineRowsRequest;
+use taskmanager_application::NpuInventoryEvent;
+use taskmanager_application::NpuInventoryRequest;
+use taskmanager_application::SmartEvent;
 use taskmanager_application::{
     ContainerRollupEvent, DesktopNotificationRequest, DirectoryUsageRequest, EnvironmentFacets,
     IntegrationFacets, LatestControlRequest, PlatformClient, PlatformEventBatch, PlatformFacets,
@@ -36,6 +42,10 @@ use taskmanager_application::{
     SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
     SmartObservationBatch, StorageFacets, SystemFacets,
 };
+use taskmanager_core::DirectoryScanStatus;
+use taskmanager_core::DirectoryUsageSnapshot;
+use taskmanager_core::NpuInventorySnapshot;
+use taskmanager_core::ScalarAvailability;
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceId, ProviderId};
@@ -362,7 +372,7 @@ fn smart_batches(drains: &Drains) -> Vec<&SmartObservationBatch> {
         .iter()
         .flat_map(|batch| &batch.smart_events)
         .map(|event| match &event.event {
-            taskmanager_application::SmartEvent::Batch(batch) => batch,
+            SmartEvent::Batch(batch) => batch,
         })
         .collect()
 }
@@ -734,7 +744,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         // one typed failure snapshot for a fixture device no DXGI adapter
         // owns (asserted below).
         client.submit_gpu_engine_rows(
-            taskmanager_application::GpuEngineRowsRequest {
+            GpuEngineRowsRequest {
                 device_id: DeviceId::new("contract-fixture-gpu"),
             },
             1,
@@ -742,7 +752,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         // The NPU inventory facet: accepted, then completed by its lane as
         // one snapshot — the honest SetupAPI inventory on Windows, the typed
         // dormant-boundary failure elsewhere (asserted below).
-        client.submit_npu_inventory(taskmanager_application::NpuInventoryRequest {}, 1),
+        client.submit_npu_inventory(NpuInventoryRequest {}, 1),
         // NOTE: `shell.command.launch` and `shell.url.open` are deliberately
         // NOT submitted here — the real providers spawn a child process /
         // open the platform browser, and a headless/CI run must not trigger
@@ -845,7 +855,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         .iter()
         .flat_map(|batch| &batch.gpu_engine_rows_events)
         .map(|event| match &event.event {
-            taskmanager_application::GpuEngineRowsEvent::Update(snapshot) => snapshot,
+            GpuEngineRowsEvent::Update(snapshot) => snapshot,
         })
         .collect();
     assert_eq!(
@@ -870,12 +880,12 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
     // exactly one snapshot — real SetupAPI devices or the honest empty
     // inventory on the Windows host, the typed dormant-boundary failure
     // everywhere else. Never a fabricated device row.
-    let npu_snapshots: Vec<&taskmanager_core::NpuInventorySnapshot> = drains
+    let npu_snapshots: Vec<&NpuInventorySnapshot> = drains
         .batches
         .iter()
         .flat_map(|batch| &batch.npu_inventory_events)
         .map(|event| match &event.event {
-            taskmanager_application::NpuInventoryEvent::Update(snapshot) => snapshot,
+            NpuInventoryEvent::Update(snapshot) => snapshot,
         })
         .collect();
     assert_eq!(
@@ -910,7 +920,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
     assert!(
         npu_snapshots[0].devices.iter().all(|device| matches!(
             device.utilization_pct.availability(),
-            taskmanager_core::ScalarAvailability::Unavailable(_)
+            ScalarAvailability::Unavailable(_)
         )),
         "a discovered NPU must never carry a fabricated utilization curve"
     );
@@ -919,12 +929,12 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
     // drives the shared pure-safe scanner to its terminal state, and publishes
     // real progress + terminal snapshots attributed to the windows provider —
     // real aggregates, never a fabricated entry, total, or Unsupported.
-    let directory_snapshots: Vec<&taskmanager_core::DirectoryUsageSnapshot> = drains
+    let directory_snapshots: Vec<&DirectoryUsageSnapshot> = drains
         .batches
         .iter()
         .flat_map(|batch| &batch.directory_usage_events)
         .map(|event| match &event.event {
-            taskmanager_application::DirectoryUsageEvent::Update(snapshot) => snapshot,
+            DirectoryUsageEvent::Update(snapshot) => snapshot,
         })
         .collect();
     assert!(
@@ -945,7 +955,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         .expect("at least one terminal snapshot");
     assert_eq!(
         terminal.status,
-        taskmanager_core::DirectoryScanStatus::Completed,
+        DirectoryScanStatus::Completed,
         "the wired directory-usage scan must complete with real data"
     );
     assert_eq!(terminal.totals.files_counted, 2);

@@ -12,6 +12,7 @@ use crate::platform::{
 };
 
 use super::{PendingSystemTelemetryRequest, PlatformClient, submit_request};
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 impl PlatformClient {
     /// Schedule all six domains under one application-owned revision.
@@ -57,7 +58,7 @@ impl PlatformClient {
                 .map(|capability| {
                     Err(SubmissionError {
                         capability,
-                        kind: taskmanager_platform_contract::SubmissionErrorKind::InvalidRequest,
+                        kind: SubmissionErrorKind::InvalidRequest,
                     })
                 })
                 .collect(),
@@ -87,7 +88,7 @@ impl PlatformClient {
                             capability.clone(),
                             Err(SubmissionError {
                                 capability,
-                                kind: taskmanager_platform_contract::SubmissionErrorKind::InvalidRequest,
+                                kind: SubmissionErrorKind::InvalidRequest,
                             }),
                         )
                     })

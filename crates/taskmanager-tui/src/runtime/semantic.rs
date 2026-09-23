@@ -25,6 +25,7 @@ use taskmanager_ui_contract::{
 };
 
 use crate::TuiApp;
+use taskmanager_application::{PendingConfirmation, SurfaceKind};
 
 /// Maximum number of process rows published to the semantic tree (GPUI/Iced
 /// parity): a screen reader reads the tree top-down, so the bounded prefix
@@ -277,16 +278,16 @@ impl TuiApp {
                     description: Some(String::from("Process CPU affinity editor")),
                 }),
             },
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::ProcessProperties,
-            ) => self.process_properties().map(|target| ModalInput {
-                id: String::from("process-properties-modal"),
-                name: String::from("Process properties modal"),
-                description: Some(format!(
-                    "Properties for {} (PID {})",
-                    target.item.name, target.item.pid
-                )),
-            }),
+            crate::TuiInputScope::SharedSurface(SurfaceKind::ProcessProperties) => {
+                self.process_properties().map(|target| ModalInput {
+                    id: String::from("process-properties-modal"),
+                    name: String::from("Process properties modal"),
+                    description: Some(format!(
+                        "Properties for {} (PID {})",
+                        target.item.name, target.item.pid
+                    )),
+                })
+            }
             crate::TuiInputScope::ServiceLog => {
                 self.shell.service_log.as_ref().map(|log| ModalInput {
                     id: String::from("service-log-modal"),
@@ -307,68 +308,58 @@ impl TuiApp {
                 name: String::from(t("alerts.threshold_suggestions")),
                 description: Some(String::from("Observed samples only")),
             }),
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(_),
-            ) => match self.shell.pending_confirmation()? {
-                taskmanager_application::PendingConfirmation::EndTask(target) => Some(ModalInput {
-                    id: String::from("end-task-confirmation"),
-                    name: String::from("End task confirmation"),
-                    description: Some(format!(
-                        "Confirm the requested action for process {} ({})",
-                        target.pid, target.name
-                    )),
-                }),
-                taskmanager_application::PendingConfirmation::ServiceControl(target) => {
-                    Some(ModalInput {
+            crate::TuiInputScope::SharedSurface(SurfaceKind::Confirmation(_)) => {
+                match self.shell.pending_confirmation()? {
+                    PendingConfirmation::EndTask(target) => Some(ModalInput {
+                        id: String::from("end-task-confirmation"),
+                        name: String::from("End task confirmation"),
+                        description: Some(format!(
+                            "Confirm the requested action for process {} ({})",
+                            target.pid, target.name
+                        )),
+                    }),
+                    PendingConfirmation::ServiceControl(target) => Some(ModalInput {
                         id: String::from("service-control-confirmation"),
                         name: String::from("Service control confirmation"),
                         description: Some(format!(
                             "Confirm the requested {:?} action for service {}",
                             target.action, target.service_id
                         )),
-                    })
-                }
-                taskmanager_application::PendingConfirmation::ProcessBatch(target) => {
-                    Some(ModalInput {
+                    }),
+                    PendingConfirmation::ProcessBatch(target) => Some(ModalInput {
                         id: String::from("batch-action-confirmation"),
                         name: String::from("Batch action confirmation"),
                         description: Some(format!(
                             "Confirm the requested action for {} processes",
                             target.targets.len()
                         )),
-                    })
-                }
-                taskmanager_application::PendingConfirmation::SessionControl(target) => {
-                    Some(ModalInput {
+                    }),
+                    PendingConfirmation::SessionControl(target) => Some(ModalInput {
                         id: String::from("session-control-confirmation"),
                         name: String::from("Session control confirmation"),
                         description: Some(format!(
                             "Confirm the requested {:?} action for session {}",
                             target.action, target.session.user
                         )),
-                    })
-                }
-                taskmanager_application::PendingConfirmation::StartupControl(target) => {
-                    Some(ModalInput {
+                    }),
+                    PendingConfirmation::StartupControl(target) => Some(ModalInput {
                         id: String::from("startup-action-confirmation"),
                         name: String::from("Startup action confirmation"),
                         description: Some(format!(
                             "Confirm toggling startup item {}",
                             target.entry.name
                         )),
-                    })
-                }
-                taskmanager_application::PendingConfirmation::SmartSelfTest(target) => {
-                    Some(ModalInput {
+                    }),
+                    PendingConfirmation::SmartSelfTest(target) => Some(ModalInput {
                         id: String::from("smart-self-test-confirmation"),
                         name: String::from("SMART self-test confirmation"),
                         description: Some(format!(
                             "Confirm {:?} self-test for {}",
                             target.kind, target.display_name
                         )),
-                    })
+                    }),
                 }
-            },
+            }
             crate::TuiInputScope::Search
             | crate::TuiInputScope::DetailsPanel
             | crate::TuiInputScope::Content => None,

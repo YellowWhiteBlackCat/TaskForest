@@ -14,10 +14,18 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_assets::product;
 
 use crate::{IcedApp, Message, ui};
+use taskmanager_app_host::acquire_single_instance;
+use taskmanager_assets::embedded_fonts;
+use taskmanager_platform_contract::InstanceEvent;
+use taskmanager_platform_contract::InstanceGuard;
+use taskmanager_platform_contract::InstanceRole;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 type InstanceLease = (
-    Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
-    Option<Receiver<taskmanager_platform_contract::InstanceEvent>>,
+    Option<Box<dyn InstanceGuard>>,
+    Option<Receiver<InstanceEvent>>,
 );
 
 /// The same two viewport contracts used by the GPUI frontend: a spacious
@@ -66,11 +74,9 @@ fn acquire_instance(demo: bool) -> Option<InstanceLease> {
     }
 
     let (sender, receiver) = channel();
-    match taskmanager_app_host::acquire_single_instance(product::ICED_NAME, sender) {
-        Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => {
-            Some((Some(guard), Some(receiver)))
-        }
-        Ok(taskmanager_platform_contract::InstanceRole::Secondary) => None,
+    match acquire_single_instance(product::ICED_NAME, sender) {
+        Ok(InstanceRole::Primary(guard)) => Some((Some(guard), Some(receiver))),
+        Ok(InstanceRole::Secondary) => None,
         Err(failure) => {
             eprintln!(
                 "taskforest-i: single-instance unavailable ({failure}); continuing without the guard"
@@ -127,36 +133,36 @@ pub fn run(demo: bool) -> iced::Result {
                 );
                 if let Some(error) = config_error {
                     app.shell.report_notice(
-                        taskmanager_shell::FeedbackSource::Settings,
-                        taskmanager_shell::FeedbackSeverity::Error,
-                        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                        FeedbackSource::Settings,
+                        FeedbackSeverity::Error,
+                        FeedbackLifecycle::UntilReplaced,
                         format!("Configuration runtime unavailable: {error}"),
                     );
                 }
                 match host.snapshot_export_client() {
                     Ok(client) => app.install_snapshot_export_client(client),
                     Err(error) => app.shell.report_notice(
-                        taskmanager_shell::FeedbackSource::Persistence,
-                        taskmanager_shell::FeedbackSeverity::Error,
-                        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                        FeedbackSource::Persistence,
+                        FeedbackSeverity::Error,
+                        FeedbackLifecycle::UntilReplaced,
                         format!("Snapshot export runtime unavailable: {error}"),
                     ),
                 }
                 match host.diagnostic_bundle_client() {
                     Ok(client) => app.install_service_log_export_client(client),
                     Err(error) => app.shell.report_notice(
-                        taskmanager_shell::FeedbackSource::Persistence,
-                        taskmanager_shell::FeedbackSeverity::Error,
-                        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                        FeedbackSource::Persistence,
+                        FeedbackSeverity::Error,
+                        FeedbackLifecycle::UntilReplaced,
                         format!("Diagnostic bundle runtime unavailable: {error}"),
                     ),
                 }
                 match host.window_capture_client() {
                     Ok(client) => app.install_window_capture_client(client),
                     Err(error) => app.shell.report_notice(
-                        taskmanager_shell::FeedbackSource::Persistence,
-                        taskmanager_shell::FeedbackSeverity::Error,
-                        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                        FeedbackSource::Persistence,
+                        FeedbackSeverity::Error,
+                        FeedbackLifecycle::UntilReplaced,
                         format!("Window capture runtime unavailable: {error}"),
                     ),
                 }
@@ -219,7 +225,7 @@ pub fn run(demo: bool) -> iced::Result {
     // glyphs automatically — no per-site shaping call is needed (iced compiles
     // the Advanced path unconditionally; only the default variant is
     // feature-gated, and the unpinned default is `Auto`).
-    let builder = taskmanager_assets::embedded_fonts()
+    let builder = embedded_fonts()
         .into_iter()
         .fold(builder, |builder, font_bytes| builder.font(font_bytes));
 

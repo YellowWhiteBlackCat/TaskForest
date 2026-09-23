@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
 
 /// Every skin × mode resolves a valid terminal palette with the semantic
@@ -81,9 +82,9 @@ fn config_tokens_resolve_onto_typed_theme_params() {
     );
 
     // Follow system setting when appearance is observed
-    let light_appearance = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Light,
+    let light_appearance = DesktopAppearance {
+        family: DesktopFamily::Gnome,
+        color_scheme: PreferredColorScheme::Light,
         high_contrast: Some(false),
     };
     assert_eq!(
@@ -100,9 +101,9 @@ fn config_tokens_resolve_onto_typed_theme_params() {
         }
     );
 
-    let hc_appearance = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Kde,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Dark,
+    let hc_appearance = DesktopAppearance {
+        family: DesktopFamily::Kde,
+        color_scheme: PreferredColorScheme::Dark,
         high_contrast: Some(true),
     };
     assert_eq!(
@@ -117,6 +118,60 @@ fn config_tokens_resolve_onto_typed_theme_params() {
             mode: LightDark::Dark,
             hc: true,
         }
+    );
+}
+
+/// The shared `TM_SKIN` testing override selects the demo appearance. Unset
+/// (and invalid) keeps today's GNOME-dark demo default; a valid token resolves
+/// the requested skin/mode (with the optional `TM_SKIN_HC` contrast flag) and
+/// repaints the terminal palette.
+#[test]
+fn tm_skin_override_resolves_the_demo_appearance() {
+    assert_eq!(
+        ThemeParams::default(),
+        ThemeParams {
+            skin: Skin::Gnome,
+            mode: LightDark::Dark,
+            hc: false,
+        },
+        "the demo default must stay GNOME dark"
+    );
+    assert_eq!(
+        forced_theme_params(None, false),
+        None,
+        "unset is not an override"
+    );
+    assert_eq!(
+        forced_theme_params(Some("plasma-dark"), false),
+        None,
+        "an unknown skin is not an override"
+    );
+
+    let light = forced_theme_params(Some("gnome-light"), false).expect("gnome-light override");
+    assert_eq!(
+        light,
+        ThemeParams {
+            skin: Skin::Gnome,
+            mode: LightDark::Light,
+            hc: false,
+        }
+    );
+    let default = TuiTheme::from_params(ThemeParams::default());
+    let light_theme = TuiTheme::from_params(light);
+    assert_ne!(
+        light_theme.bg, default.bg,
+        "gnome-light must repaint the demo backdrop"
+    );
+
+    let contrast = forced_theme_params(Some("KDE-DARK"), true).expect("case-insensitive override");
+    assert_eq!(
+        contrast,
+        ThemeParams {
+            skin: Skin::Kde,
+            mode: LightDark::Dark,
+            hc: true,
+        },
+        "TM_SKIN_HC rides the same override"
     );
 }
 

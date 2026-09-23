@@ -42,6 +42,8 @@ use taskmanager_core::core::process_telemetry::ProcessGpuEngineUsage;
 // builds under -D warnings.
 #[cfg(target_os = "linux")]
 use taskmanager_core::core::DeviceState;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
 
 /// Hard cap on how many processes the one-shot bulk GPU scan opens. Keeps the
 /// stateless CLI fast on hosts with thousands of processes; a GPU process past
@@ -346,8 +348,8 @@ pub fn render_json_snapshot(
     snapshot: &SystemSnapshot,
     processes: &[ProcessItem],
     containers: &[ContainerSummary],
-    hardware: Option<&taskmanager_core::core::hardware::HardwareInfo>,
-    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    hardware: Option<&HardwareInfo>,
+    npu_inventory: Option<&NpuInventorySnapshot>,
     now_ms: u64,
 ) -> String {
     let gpu_owned = collect_bulk_process_gpu_engines(processes, now_ms);

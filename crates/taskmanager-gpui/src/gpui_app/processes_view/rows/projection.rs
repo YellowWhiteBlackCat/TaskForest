@@ -3,6 +3,8 @@
 
 use std::collections::HashSet;
 use std::rc::Rc;
+use taskmanager_core::core::text::match_ranges_ascii_ci;
+use taskmanager_core::core::time::LocalTimeRulesCacheKey;
 
 use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
@@ -233,7 +235,7 @@ impl RowCellText {
             nice: optional_i32_dash(row.nice, format_nice),
             start_time: format_start_time(
                 row.start_time_secs,
-                &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+                &LocalTimeRulesObservation::unsupported(0),
             ),
             precomputed: true,
         }
@@ -242,7 +244,7 @@ impl RowCellText {
     fn apply_local_time(
         &mut self,
         start_time_secs: Option<u64>,
-        rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+        rules: &LocalTimeRulesObservation,
     ) {
         self.start_time = super::formatting::format_start_time(start_time_secs, rules);
     }
@@ -404,9 +406,9 @@ pub fn category_tree_rows(
     units: UnitPreferences,
 ) -> Vec<VisibleRow> {
     let direction = if ascending {
-        taskmanager_shell::SortDir::Asc
+        SortDir::Asc
     } else {
-        taskmanager_shell::SortDir::Desc
+        SortDir::Desc
     };
     project_process_tree_rows(
         processes,
@@ -741,8 +743,7 @@ pub fn project_visible_rows_from_shell(props: ShellVisibleRowsProps<'_>) -> Vec<
     let trimmed = query.trim();
     for row in &mut rows {
         if !trimmed.is_empty() {
-            row.name_highlights =
-                taskmanager_core::core::text::match_ranges_ascii_ci(&row.name, trimmed);
+            row.name_highlights = match_ranges_ascii_ci(&row.name, trimmed);
         }
         if !row.cell_text.precomputed {
             row.cell_text = RowCellText::build(row, units);
@@ -785,7 +786,7 @@ pub struct ProjectionCache {
     pub filter: ProcessStatusFilter,
     pub collapsed: HashSet<ProcessLiveKey>,
     pub expanded_apps: HashSet<String>,
-    pub local_time_rules: taskmanager_core::core::time::LocalTimeRulesCacheKey,
+    pub local_time_rules: LocalTimeRulesCacheKey,
     pub rows: Rc<Vec<VisibleRow>>,
     pub process_identities: Rc<Vec<ProcessLiveKey>>,
     pub application_count: usize,

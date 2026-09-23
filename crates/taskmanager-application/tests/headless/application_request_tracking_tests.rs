@@ -298,7 +298,7 @@ fn missing_opaque_identity_is_rejected_instead_of_minting_an_empty_target() {
             service_id: ServiceId::default(),
         }
         .runtime_tracking(),
-        Err(taskmanager_platform_contract::RequestTrackingError::EmptyTargetScope)
+        Err(RequestTrackingError::EmptyTargetScope)
     );
     assert_eq!(
         StartupControlRequest {
@@ -307,7 +307,7 @@ fn missing_opaque_identity_is_rejected_instead_of_minting_an_empty_target() {
             enabled: false,
         }
         .runtime_tracking(),
-        Err(taskmanager_platform_contract::RequestTrackingError::EmptyTargetScope)
+        Err(RequestTrackingError::EmptyTargetScope)
     );
     assert_eq!(
         SessionControlRequest {
@@ -316,6 +316,6 @@ fn missing_opaque_identity_is_rejected_instead_of_minting_an_empty_target() {
             action: SessionControlAction::Disconnect,
         }
         .runtime_tracking(),
-        Err(taskmanager_platform_contract::RequestTrackingError::EmptyTargetScope)
+        Err(RequestTrackingError::EmptyTargetScope)
     );
 }

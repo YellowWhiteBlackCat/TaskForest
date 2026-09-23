@@ -3,6 +3,9 @@
 //! every module under the line guard.
 
 use super::*;
+use taskmanager_application::i18n::t;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 // ── two-series main graphs (disk read/write, NIC rx/tx) ────────────────────
 
@@ -17,7 +20,7 @@ fn split_storage_observation(
     read_bytes_per_sec: u64,
     write_bytes_per_sec: u64,
 ) -> StorageTelemetryObservation {
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(1))
         .device_state(DeviceState::healthy(10))
@@ -51,7 +54,7 @@ fn split_network_observation(
     rx_bytes_per_sec: u64,
     tx_bytes_per_sec: u64,
 ) -> NetworkTelemetryObservation {
-    let network = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let network = NetworkMetricsFixtureBuilder::new()
         .device_id(std::sync::Arc::from(device_id))
         .device_generation(DeviceGeneration::new(1))
         .device_state(DeviceState::healthy(10))
@@ -89,7 +92,7 @@ fn split_network_observation(
 async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &mut TestAppContext) {
     for key in ["disk.read", "disk.write", "net.receive", "net.send"] {
         assert_ne!(
-            taskmanager_application::i18n::t(key),
+            t(key),
             key,
             "the legend direction labels must be localized product keys"
         );
@@ -114,7 +117,7 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
             )
             .expect("network split fixture enters system history");
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("disk:wwid:legend".into())
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState::healthy(10))
@@ -124,7 +127,7 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
                 .build(),
         ];
         v.system_snapshot_mut_for_test().networks = vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id("net:mac:legend".into())
                 .device_generation(DeviceGeneration::new(1))
                 .interface_name("legend0".into())

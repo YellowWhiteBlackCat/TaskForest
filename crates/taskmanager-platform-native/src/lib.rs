@@ -33,7 +33,8 @@ pub use taskmanager_platform_linux::NativePlatformRuntime;
 #[cfg(target_os = "linux")]
 #[must_use]
 pub fn capability_surface() -> PlatformCapabilitySurface {
-    taskmanager_platform_linux::capability_surface()
+    use taskmanager_platform_linux::capability_surface;
+    capability_surface()
 }
 
 /// The selected adapter's layer-B capability registration surface (see the
@@ -41,7 +42,8 @@ pub fn capability_surface() -> PlatformCapabilitySurface {
 #[cfg(target_os = "macos")]
 #[must_use]
 pub fn capability_surface() -> PlatformCapabilitySurface {
-    taskmanager_platform_macos::capability_surface()
+    use taskmanager_platform_macos::capability_surface;
+    capability_surface()
 }
 
 /// The selected adapter's layer-B capability registration surface (see the
@@ -49,24 +51,28 @@ pub fn capability_surface() -> PlatformCapabilitySurface {
 #[cfg(target_os = "windows")]
 #[must_use]
 pub fn capability_surface() -> PlatformCapabilitySurface {
-    taskmanager_platform_windows::capability_surface()
+    use taskmanager_platform_windows::capability_surface;
+    capability_surface()
 }
 
 #[cfg(target_os = "linux")]
 pub fn native_config_path() -> PathBuf {
-    taskmanager_platform_linux::user_config_path()
+    use taskmanager_platform_linux::user_config_path;
+    user_config_path()
 }
 
 #[cfg(target_os = "linux")]
 pub fn native_history_dir() -> PathBuf {
-    taskmanager_platform_linux::user_history_dir()
+    use taskmanager_platform_linux::user_history_dir;
+    user_history_dir()
 }
 
 /// Discover validated local-time rules through the selected Linux adapter.
 #[cfg(target_os = "linux")]
 #[must_use]
-pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation {
-    taskmanager_platform_linux::local_time_rules()
+pub fn native_local_time_rules() -> LocalTimeRulesObservation {
+    use taskmanager_platform_linux::local_time_rules;
+    local_time_rules()
 }
 
 /// Discover validated local-time rules through the Windows adapter: the
@@ -75,8 +81,9 @@ pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation 
 /// acceptance gate.
 #[cfg(target_os = "windows")]
 #[must_use]
-pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation {
-    taskmanager_platform_windows::local_time_rules()
+pub fn native_local_time_rules() -> LocalTimeRulesObservation {
+    use taskmanager_platform_windows::local_time_rules;
+    local_time_rules()
 }
 
 /// macOS keeps this capability explicit until its audited native time-zone
@@ -84,10 +91,8 @@ pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation 
 /// though it were the user's local zone.
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
 #[must_use]
-pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation {
-    taskmanager_core::LocalTimeRulesObservation::unsupported(taskmanager_core::unix_millis(
-        std::time::SystemTime::now(),
-    ))
+pub fn native_local_time_rules() -> LocalTimeRulesObservation {
+    LocalTimeRulesObservation::unsupported(unix_millis(std::time::SystemTime::now()))
 }
 
 /// Probe whether a process that held a native persistent-history lock is gone.
@@ -98,7 +103,8 @@ pub fn native_local_time_rules() -> taskmanager_core::LocalTimeRulesObservation 
 #[cfg(target_os = "linux")]
 #[must_use]
 pub fn history_lock_holder_is_gone(pid: u32) -> bool {
-    taskmanager_platform_linux::history_lock_holder_is_gone(pid)
+    use taskmanager_platform_linux::history_lock_holder_is_gone;
+    history_lock_holder_is_gone(pid)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -113,12 +119,14 @@ pub use taskmanager_platform_macos::NativePlatformRuntime;
 
 #[cfg(target_os = "macos")]
 pub fn native_config_path() -> PathBuf {
-    taskmanager_platform_macos::user_config_path()
+    use taskmanager_platform_macos::user_config_path;
+    user_config_path()
 }
 
 #[cfg(target_os = "macos")]
 pub fn native_history_dir() -> PathBuf {
-    taskmanager_platform_macos::user_history_dir()
+    use taskmanager_platform_macos::user_history_dir;
+    user_history_dir()
 }
 
 #[cfg(target_os = "windows")]
@@ -126,17 +134,19 @@ pub use taskmanager_platform_windows::NativePlatformRuntime;
 
 #[cfg(target_os = "windows")]
 pub fn native_config_path() -> PathBuf {
-    taskmanager_platform_windows::user_config_path()
+    use taskmanager_platform_windows::user_config_path;
+    user_config_path()
 }
 
 #[cfg(target_os = "windows")]
 pub fn native_history_dir() -> PathBuf {
-    taskmanager_platform_windows::user_history_dir()
+    use taskmanager_platform_windows::user_history_dir;
+    user_history_dir()
 }
 
 #[cfg(target_os = "windows")]
 pub fn native_locale_name() -> Option<String> {
-    taskmanager_platform_windows::user_locale_name()
+    user_locale_name()
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -152,6 +162,17 @@ pub use tray::spawn_tray;
 pub mod instance;
 
 pub use instance::acquire_single_instance;
+use taskmanager_core::LocalTimeRulesObservation;
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+use taskmanager_core::unix_millis;
+#[cfg(target_os = "linux")]
+use taskmanager_platform_linux::LinuxWindowCapture;
+#[cfg(target_os = "macos")]
+use taskmanager_platform_macos::MacosWindowCapture;
+#[cfg(target_os = "windows")]
+use taskmanager_platform_windows::WindowsWindowCapture;
+#[cfg(target_os = "windows")]
+use taskmanager_platform_windows::user_locale_name;
 
 static IN_PROCESS_CAPTURE_FN: std::sync::RwLock<Option<InProcessCaptureFn>> =
     std::sync::RwLock::new(None);
@@ -165,17 +186,17 @@ pub fn register_in_process_capture(f: InProcessCaptureFn) {
 
 #[cfg(target_os = "linux")]
 fn native_window_capture() -> impl NativeWindowCapture {
-    taskmanager_platform_linux::LinuxWindowCapture
+    LinuxWindowCapture
 }
 
 #[cfg(target_os = "windows")]
 fn native_window_capture() -> impl NativeWindowCapture {
-    taskmanager_platform_windows::WindowsWindowCapture
+    WindowsWindowCapture
 }
 
 #[cfg(target_os = "macos")]
 fn native_window_capture() -> impl NativeWindowCapture {
-    taskmanager_platform_macos::MacosWindowCapture
+    MacosWindowCapture
 }
 
 /// Capture the currently active window through the three-tier pipeline:

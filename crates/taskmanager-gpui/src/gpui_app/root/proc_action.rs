@@ -63,7 +63,7 @@ impl RootView {
         self.local_feedback_subscription = Some(cx.subscribe(
             &toast,
             move |view: &mut Self,
-                  _toast: Entity<taskmanager_ui::overlays::toast::ToastState>,
+                  _toast: Entity<ToastState>,
                   _: &ToastEvent,
                   cx: &mut Context<Self>| {
                 view.local_feedback_toast = None;

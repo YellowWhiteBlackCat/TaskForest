@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::setup::SetupScriptAction;
@@ -65,7 +66,7 @@ pub struct DesktopNotificationRequest {
     pub instance_id: String,
     pub title: String,
     pub body: String,
-    pub severity: taskmanager_core::core::alerts::AlertSeverity,
+    pub severity: AlertSeverity,
     pub target: String,
 }
 

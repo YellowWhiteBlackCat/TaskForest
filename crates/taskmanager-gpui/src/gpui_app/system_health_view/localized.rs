@@ -32,9 +32,9 @@ pub fn localized_text(text: SystemHealthText) -> String {
         SystemHealthText::Progress => "health.progress",
         SystemHealthText::LifetimeHours => "health.lifetime_hours",
         SystemHealthText::FirstErrorLba => "health.first_error_lba",
-        SystemHealthText::SensorGroup(SensorGroup::Temperature) => "common.temperature",
+        SystemHealthText::SensorGroup(SensorGroup::Temperature) => "common.thermal_zones",
         SystemHealthText::SensorGroup(SensorGroup::FanSpeed) => "health.fans",
-        SystemHealthText::SensorGroup(SensorGroup::Power) => "common.power",
+        SystemHealthText::SensorGroup(SensorGroup::Power) => "common.power_sensors",
         SystemHealthText::DeviceStatus(DeviceStatus::Healthy) => "device.healthy",
         SystemHealthText::DeviceStatus(DeviceStatus::Stale) => "device.stale",
         SystemHealthText::DeviceStatus(DeviceStatus::PermissionDenied) => {
@@ -73,3 +73,7 @@ pub fn localized_text(text: SystemHealthText) -> String {
     };
     i18n::t(key).to_string()
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_system_health_view_localized_tests.rs"]
+mod tests;

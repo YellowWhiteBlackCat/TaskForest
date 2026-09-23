@@ -6,6 +6,10 @@
 //! values. Render and input code consume immutable `RootView` accessors.
 
 use std::{rc::Rc, sync::Arc};
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::fixture::DirectTrackSeedFact;
+use taskmanager_shell::fixture::seed_direct_track_fact;
 
 use taskmanager_application::StartupEvidenceUnavailable;
 use taskmanager_core::core::Alert;
@@ -110,8 +114,7 @@ pub(super) struct ProjectionMaterialization {
     directory_usage: Materialized<Option<Rc<DirectoryUsageSnapshot>>>,
     npu_inventory: Materialized<Option<Rc<NpuInventorySnapshot>>>,
     active_alerts: Materialized<Rc<Vec<Alert>>>,
-    storage_health:
-        SourcedMaterialized<Rc<taskmanager_core::core::storage_health::FilesystemHealthSnapshot>>,
+    storage_health: SourcedMaterialized<Rc<FilesystemHealthSnapshot>>,
 }
 
 impl ProjectionMaterialization {
@@ -236,7 +239,7 @@ impl ProjectionMaterialization {
     pub(super) fn replace_storage_health(
         &mut self,
         revision: u64,
-        filesystems: taskmanager_core::core::storage_health::FilesystemHealthSnapshot,
+        filesystems: FilesystemHealthSnapshot,
         sources: Vec<SourceStatus>,
     ) {
         let _ = self
@@ -388,9 +391,7 @@ impl ProjectionMaterialization {
         self.active_alerts.value.as_slice()
     }
 
-    pub(super) fn storage_health(
-        &self,
-    ) -> &taskmanager_core::core::storage_health::FilesystemHealthSnapshot {
+    pub(super) fn storage_health(&self) -> &FilesystemHealthSnapshot {
         self.storage_health.materialized.value.as_ref()
     }
 
@@ -598,9 +599,7 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub fn storage_health(
-        &self,
-    ) -> &taskmanager_core::core::storage_health::FilesystemHealthSnapshot {
+    pub fn storage_health(&self) -> &FilesystemHealthSnapshot {
         self.materialized.storage_health()
     }
 
@@ -649,9 +648,9 @@ impl super::RootView {
         };
         if processes_updated && fixture_requested {
             let fixture_processes = self.materialized.processes().as_ref().clone();
-            taskmanager_shell::fixture::seed_direct_track_fact(
+            seed_direct_track_fact(
                 &mut self.shell,
-                taskmanager_shell::fixture::DirectTrackSeedFact::Processes(fixture_processes),
+                DirectTrackSeedFact::Processes(fixture_processes),
             );
             let projection = self.shell.projection();
             let revision = projection.process_revision;
@@ -666,7 +665,7 @@ impl super::RootView {
     pub(super) fn sync_capture_service_system(
         &mut self,
         services_updated: bool,
-    ) -> Option<taskmanager_core::core::target::ServiceId> {
+    ) -> Option<ServiceId> {
         let (capture_evidence, materialized) = (&mut self.capture_evidence, &mut self.materialized);
         capture_evidence.on_services_update(
             services_updated,

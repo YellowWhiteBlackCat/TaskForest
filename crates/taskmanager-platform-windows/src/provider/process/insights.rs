@@ -19,6 +19,19 @@ use taskmanager_platform_provider::{
 #[cfg(windows)]
 use super::map_windows_api_failure;
 use super::{snapshot_identity, validate_process_target, validate_process_target_after};
+use taskmanager_windows_api::WindowsApiError;
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::WindowsOpenHandleEntry;
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::WindowsOpenHandleKind;
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::WindowsProcessEnvironmentBlock;
+use taskmanager_windows_api::WindowsThreadDetail;
+#[cfg(windows)]
+use taskmanager_windows_api::query_process_environment;
+#[cfg(windows)]
+use taskmanager_windows_api::query_process_open_files;
+use taskmanager_windows_api::query_process_thread_details;
 
 /// Per-tid CPU rate baselines for the threads facet. `WinProcessThreadsProvider`
 /// is constructed as a unit value in `provider.rs` (outside this module's
@@ -46,7 +59,7 @@ struct ThreadCpuBaselines {
 fn thread_rows_with_rates(
     target: &FrozenProcessIdentity,
     start_token: u64,
-    details: Vec<taskmanager_windows_api::WindowsThreadDetail>,
+    details: Vec<WindowsThreadDetail>,
     observed_at_ms: u64,
 ) -> Vec<ProcessThreadInfo> {
     let mut details = details;
@@ -123,21 +136,12 @@ impl ProcessThreadsProvider for WinProcessThreadsProvider {
         observed_at_ms: u64,
     ) -> Result<ProcessInsightSnapshot<ProcessThreads>, ProviderFailure> {
         let expected = validate_process_target(target)?;
-        let details =
-            taskmanager_windows_api::query_process_thread_details(target.pid).map_err(|err| {
-                match err {
-                    taskmanager_windows_api::WindowsApiError::PermissionDenied => {
-                        ProviderFailure::PermissionDenied
-                    }
-                    taskmanager_windows_api::WindowsApiError::IdentityChanged => {
-                        ProviderFailure::IdentityChanged
-                    }
-                    taskmanager_windows_api::WindowsApiError::Unsupported => {
-                        ProviderFailure::Unsupported
-                    }
-                    _ => ProviderFailure::ProviderFault,
-                }
-            })?;
+        let details = query_process_thread_details(target.pid).map_err(|err| match err {
+            WindowsApiError::PermissionDenied => ProviderFailure::PermissionDenied,
+            WindowsApiError::IdentityChanged => ProviderFailure::IdentityChanged,
+            WindowsApiError::Unsupported => ProviderFailure::Unsupported,
+            _ => ProviderFailure::ProviderFault,
+        })?;
         validate_process_target_after(target, expected)?;
 
         let threads = thread_rows_with_rates(target, expected, details, observed_at_ms);
@@ -172,8 +176,8 @@ impl ProcessOpenFilesProvider for WinProcessOpenFilesProvider {
         #[cfg(windows)]
         {
             let expected = validate_process_target(target)?;
-            let raw_entries = taskmanager_windows_api::query_process_open_files(target.pid)
-                .map_err(map_windows_api_failure)?;
+            let raw_entries =
+                query_process_open_files(target.pid).map_err(map_windows_api_failure)?;
             validate_process_target_after(target, expected)?;
 
             let value = open_files_value_from_boundary(raw_entries, observed_at_ms);
@@ -197,7 +201,7 @@ impl ProcessOpenFilesProvider for WinProcessOpenFilesProvider {
 /// stable.
 #[cfg(any(windows, test))]
 pub(crate) fn open_files_value_from_boundary(
-    raw_entries: Vec<taskmanager_windows_api::WindowsOpenHandleEntry>,
+    raw_entries: Vec<WindowsOpenHandleEntry>,
     observed_at_ms: u64,
 ) -> ProcessOpenFiles {
     use taskmanager_core::{OpenFileEntry, OpenFileKind};
@@ -215,11 +219,11 @@ pub(crate) fn open_files_value_from_boundary(
             unreadable_count = unreadable_count.saturating_add(1);
         }
         let kind = match raw.kind {
-            taskmanager_windows_api::WindowsOpenHandleKind::File => OpenFileKind::File,
-            taskmanager_windows_api::WindowsOpenHandleKind::Pipe => OpenFileKind::Pipe,
+            WindowsOpenHandleKind::File => OpenFileKind::File,
+            WindowsOpenHandleKind::Pipe => OpenFileKind::Pipe,
             // Windows has no honest socket source in this walk (the
             // connections insight owns that fact), so Other stays Other.
-            taskmanager_windows_api::WindowsOpenHandleKind::Other => OpenFileKind::Other,
+            WindowsOpenHandleKind::Other => OpenFileKind::Other,
         };
         entries.push(OpenFileEntry {
             fd,
@@ -257,8 +261,7 @@ impl ProcessEnvironmentProvider for WinProcessEnvironmentProvider {
         #[cfg(windows)]
         {
             let expected = validate_process_target(target)?;
-            let raw = taskmanager_windows_api::query_process_environment(target.pid)
-                .map_err(map_windows_api_failure)?;
+            let raw = query_process_environment(target.pid).map_err(map_windows_api_failure)?;
             validate_process_target_after(target, expected)?;
 
             let value = environment_value_from_boundary(raw, observed_at_ms);
@@ -285,7 +288,7 @@ impl ProcessEnvironmentProvider for WinProcessEnvironmentProvider {
 // facet (`with_environment`).
 #[cfg(any(windows, test))]
 pub(crate) fn environment_value_from_boundary(
-    raw: taskmanager_windows_api::WindowsProcessEnvironmentBlock,
+    raw: WindowsProcessEnvironmentBlock,
     observed_at_ms: u64,
 ) -> ProcessEnvironment {
     use std::path::PathBuf;

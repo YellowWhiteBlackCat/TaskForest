@@ -1,6 +1,7 @@
 use super::*;
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, process_category};
 use taskmanager_test_support::{
     category_fixture_with_empty_bucket, mixed_availability_category_fixture,
@@ -211,25 +212,20 @@ fn fixture_bucket_aggregates_match_the_documented_totals() {
 
 #[test]
 fn process_projection_distinguishes_zero_stale_unavailable_and_unknown() {
-    let zero = ProcessItem::new(1, "zero").with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
-            cpu_percentage: ScalarObservation::available(0.0, 7),
-            ..Default::default()
-        },
-    );
-    let stale = ProcessItem::new(2, "stale").with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
-            cpu_percentage: ScalarObservation::available(4.0, 6)
-                .transition_failure(FailureKind::TimedOut),
-            ..Default::default()
-        },
-    );
-    let unavailable = ProcessItem::new(3, "unavailable").with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
+    let zero = ProcessItem::new(1, "zero").with_scalar_observations(ProcessScalarObservations {
+        cpu_percentage: ScalarObservation::available(0.0, 7),
+        ..Default::default()
+    });
+    let stale = ProcessItem::new(2, "stale").with_scalar_observations(ProcessScalarObservations {
+        cpu_percentage: ScalarObservation::available(4.0, 6)
+            .transition_failure(FailureKind::TimedOut),
+        ..Default::default()
+    });
+    let unavailable =
+        ProcessItem::new(3, "unavailable").with_scalar_observations(ProcessScalarObservations {
             cpu_percentage: ScalarObservation::unavailable(FailureKind::Unsupported),
             ..Default::default()
-        },
-    );
+        });
     let unknown = ProcessItem::new(4, "unknown");
 
     let zero_items = [zero];

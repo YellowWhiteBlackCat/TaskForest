@@ -1,9 +1,10 @@
 use taskmanager_core::{FailureKind, ScalarAvailability, ScalarObservation};
 
 use super::*;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn disk(generation: u64, iops: ScalarObservation<u64>) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id("disk:wwid:fixture".into())
         .device_generation(DeviceGeneration::new(generation))
         .scalar_observations(DiskScalarObservations {

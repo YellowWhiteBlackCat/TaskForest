@@ -255,21 +255,77 @@ fi
 COUNT="$(awk -F '\t' 'NR > 1 && $1 != "" { n++ } END { print n + 0 }' "$FILTERED")"
 [ "$COUNT" -gt 0 ] || die 'capture matrix selection is empty'
 
-printf 'scenario\tpage\trequested_window\timage\tmarkers\twindows\taction\tapp_pid\twindow_id\twidth\theight\tbytes\tsha256\tstatus\n' >"$RUN_DIR/manifest.tsv"
+# The explicit appearance dimension. The scenario table's trailing `skin`
+# column uses the product's existing `TM_SKIN` token vocabulary
+# (`<skin>-<light|dark>`), which this harness passes to the app; the rendered
+# frame is read back through its mean luminance so the receipt records what was
+# actually painted, not only what was requested, and the requested/rendered
+# comparison is the measured `appearance_control` verdict. The matrix validator
+# knows only the identity columns, so the harness projects them out for it
+# below.
+VALIDATOR_MATRIX="$RUN_DIR/matrix-validator.tsv"
+VALIDATOR_MANIFEST="$RUN_DIR/manifest-validator.tsv"
+APPEARANCE_RECEIPT="$RUN_DIR/appearance.tsv"
+appearance_of() {
+    local image="$1" luminance=""
+    if command -v identify >/dev/null 2>&1; then
+        luminance="$(identify -format \
+            '%[fx:0.2126*mean.r+0.7152*mean.g+0.0722*mean.b]' \
+            "$image" 2>/dev/null || true)"
+    fi
+    case "$luminance" in
+        '') printf 'unknown' ;;
+        *) awk -v value="$luminance" \
+            'BEGIN { print (value + 0 >= 0.5) ? "light" : "dark" }' ;;
+    esac
+}
+
+# The requested mode is the `TM_SKIN` token suffix. A mode the mean-luminance
+# readback cannot distinguish (eye-forest) stays inconclusive rather than being
+# forced into light/dark.
+appearance_mode_of() {
+    case "$1" in
+        *-light) printf 'light' ;;
+        *-dark) printf 'dark' ;;
+        *) printf 'unknown' ;;
+    esac
+}
+
+# The measured verdict for one frame: `honored` when the readback agrees with
+# the requested mode, `ignored` when it disagrees, and `unknown` when either
+# side is inconclusive. This claims only what the pixels support; the old
+# hard-coded `ignored` is gone.
+appearance_control_of() {
+    local requested rendered
+    requested="$(appearance_mode_of "$1")"
+    rendered="$2"
+    if [ "$rendered" = unknown ] || [ "$requested" = unknown ]; then
+        printf 'unknown'
+    elif [ "$requested" = "$rendered" ]; then
+        printf 'honored'
+    else
+        printf 'ignored'
+    fi
+}
+
+printf 'scenario\tpage\trequested_window\timage\tmarkers\twindows\taction\tapp_pid\twindow_id\twidth\theight\tbytes\tsha256\tstatus\tappearance\n' >"$RUN_DIR/manifest.tsv"
+printf 'scenario\tskin\tappearance\tcontrol\n' >"$APPEARANCE_RECEIPT"
 
 capture_one() {
-    local name="$1" page="$2" window_size="$3"
+    local name="$1" page="$2" window_size="$3" skin="$4"
     local scenario_dir="$RUN_DIR/$name" log="$RUN_DIR/$name/app.log"
     local markers="$scenario_dir/markers.log" windows="$scenario_dir/windows.json"
     local action="$scenario_dir/action.log" image="$scenario_dir/image.png"
     mkdir -p "$scenario_dir"
     local width=0 height=0 bytes=0 hash=- status=failed app_pid="" window_id=""
+    local rendered=unknown control=unknown
     local expected_width expected_height
     IFS=x read -r expected_width expected_height <<<"$window_size"
     XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
         XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
         XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \
         TM_BEVY_CAPTURE_PAGE="$page" TM_BEVY_WINDOW_SIZE="$window_size" \
+        TM_SKIN="$skin" \
         LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
     app_pid=$!
     for _ in $(seq 1 120); do
@@ -305,26 +361,31 @@ capture_one() {
                 read -r width height < <(file "$image" | sed -nE 's/.*PNG image data, ([0-9]+) x ([0-9]+).*/\1 \2/p')
                 bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
                 hash="$(sha256sum "$image" | cut -d' ' -f1)"
+                rendered="$(appearance_of "$image")"
                 if [ "${width:-0}" -ge "$expected_width" ] && [ "${height:-0}" -ge "$expected_height" ]; then
                     status=ok
                 fi
             fi
         fi
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$name" "$page" "$window_size" "$name/image.png" "$name/markers.log" \
         "$name/windows.json" "$name/action.log" "$app_pid" "$window_id" \
-        "$width" "$height" "$bytes" "$hash" "$status" >>"$RUN_DIR/manifest.tsv"
+        "$width" "$height" "$bytes" "$hash" "$status" "$rendered" \
+        >>"$RUN_DIR/manifest.tsv"
+    control="$(appearance_control_of "$skin" "$rendered")"
+    printf '%s\t%s\t%s\t%s\n' "$name" "$skin" "$rendered" "$control" \
+        >>"$APPEARANCE_RECEIPT"
     kill "$app_pid" 2>/dev/null || true
     wait "$app_pid" 2>/dev/null || true
     [ "$status" = ok ]
 }
 
 failures=0
-while IFS=$'\t' read -r name page window_size; do
+while IFS=$'\t' read -r name page window_size skin; do
     [ "$name" = name ] && continue
     [ -n "$name" ] || continue
-    if capture_one "$name" "$page" "$window_size"; then
+    if capture_one "$name" "$page" "$window_size" "$skin"; then
         printf '  PASS %-22s\n' "$name"
     else
         printf '  FAIL %-22s (see %s)\n' "$name" "$RUN_DIR" >&2
@@ -332,6 +393,31 @@ while IFS=$'\t' read -r name page window_size; do
     fi
 done <"$FILTERED"
 [ "$failures" -eq 0 ] || die "$failures scenario(s) failed; evidence retained at $RUN_DIR"
+
+# The validator owns the identity-column contract; the explicit appearance
+# dimension stays in the reader-facing manifest.tsv/appearance.tsv and the
+# projected copies keep the validator's exact field sets.
+cut -f1-3 "$FILTERED" >"$VALIDATOR_MATRIX"
+cut -f1-14 "$RUN_DIR/manifest.tsv" >"$VALIDATOR_MANIFEST"
+APPEARANCE_REQUESTED="$(cut -f2 "$APPEARANCE_RECEIPT" | tail -n +2 | sort -u | paste -sd, -)"
+APPEARANCE_RENDERED="$(cut -f3 "$APPEARANCE_RECEIPT" | tail -n +2 | sort -u | paste -sd, -)"
+# Fold the per-frame verdicts into one measured control value. `honored` only
+# when every measured frame agrees; `ignored` when at least one disagrees (the
+# request was demonstrably not honoured); `unknown` when nothing disagrees but
+# at least one frame is inconclusive. Never stronger than the rows support.
+APPEARANCE_CONTROL="$(awk -F '\t' '
+    NR > 1 {
+        if ($4 == "honored") honored += 1
+        else if ($4 == "ignored") ignored += 1
+        else unknown += 1
+    }
+    END {
+        if (honored + ignored + unknown == 0) print "unknown"
+        else if (ignored > 0) print "ignored"
+        else if (unknown > 0) print "unknown"
+        else print "honored"
+    }
+' "$APPEARANCE_RECEIPT")"
 
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 {
@@ -362,10 +448,15 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'scenario_count=%s\n' "$COUNT"
     printf 'source_scope=bevy\n'
     printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
+    printf 'appearance_requested=%s\n' "$APPEARANCE_REQUESTED"
+    printf 'appearance_rendered=%s\n' "$APPEARANCE_RENDERED"
+    printf 'appearance_control=%s\n' "$APPEARANCE_CONTROL"
+    printf 'appearance_mechanism=bevy-demo-theme-honors-tm-skin-light-reference-default\n'
+    printf 'appearance_receipt=%s\n' "${APPEARANCE_RECEIPT#"$REPO/"}"
     printf 'command=bash scripts/capture-bevy.sh\n'
 } >"$RUN_DIR/metadata.txt"
 PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 scripts/validate_bevy_matrix.py \
-    --matrix "$FILTERED" --manifest "$RUN_DIR/manifest.tsv" --run-dir "$RUN_DIR" \
+    --matrix "$VALIDATOR_MATRIX" --manifest "$VALIDATOR_MANIFEST" --run-dir "$RUN_DIR" \
     --metadata "$RUN_DIR/metadata.txt" --source-manifest "$SOURCE_MANIFEST" \
     --niri-outputs "$RUN_DIR/niri-outputs.json" --receipt "$RUN_DIR/bevy-capture-validation.json" \
     --repo-root "$REPO" --binary "$APP" --current-worktree

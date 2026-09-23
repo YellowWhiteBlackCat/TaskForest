@@ -1,4 +1,9 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics};
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn hardware_fixture() -> HardwareInfo {
     HardwareInfo {
@@ -15,11 +20,8 @@ fn hardware_fixture() -> HardwareInfo {
 fn snapshot_fixture() -> SystemSnapshot {
     SystemSnapshot {
         timestamp_ms: 1_700_000_000_000,
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(Default::default()),
-        memory: taskmanager_core::core::metrics::MemoryMetrics::from_observations(
-            Default::default(),
-            Default::default(),
-        ),
+        cpu: CpuMetrics::from_observations(Default::default()),
+        memory: MemoryMetrics::from_observations(Default::default(), Default::default()),
         disks: Vec::new(),
         networks: Vec::new(),
         gpu: Vec::new(),
@@ -35,18 +37,16 @@ fn snapshot_fixture() -> SystemSnapshot {
 }
 
 fn process_with_user(pid: u32, name: &str, user: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.to_owned())
         .current_cpu_percentage(12.5)
         .current_memory_bytes(100 * 1024 * 1024)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque(user),
-                None,
-                42,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque(user),
+            None,
+            42,
+        ))
         .build()
 }
 
@@ -110,7 +110,7 @@ fn export_diagnostic_report_writes_to_file_and_updates_feedback() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let mut app = crate::demo_app();
     let scratch = scratch_dir("diag-export");
@@ -151,9 +151,9 @@ fn export_diagnostic_report_to_custom_path_succeeds() {
 #[test]
 fn export_diagnostic_report_redacts_process_usernames_on_disk() {
     let mut app = crate::TuiApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![process_with_user(
+        ProjectionSeedFact::Processes(Some(vec![process_with_user(
             4242,
             "sample",
             "secret_admin",
@@ -183,7 +183,7 @@ fn export_diagnostic_report_without_data_warns_and_writes_nothing() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let mut app = crate::TuiApp::new();
     let scratch = scratch_dir("diag-empty");

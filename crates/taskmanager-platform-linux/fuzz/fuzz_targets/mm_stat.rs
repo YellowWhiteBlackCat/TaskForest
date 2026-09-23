@@ -7,6 +7,7 @@
 //! specification the parser owns: the three leading whitespace-separated
 //! tokens must each parse as u64.
 use libfuzzer_sys::fuzz_target;
+use taskmanager_platform_linux::parse_zram_mm_stat;
 
 fn leading_u64(token: Option<&str>) -> Option<u64> {
     token?.parse::<u64>().ok()
@@ -14,7 +15,7 @@ fn leading_u64(token: Option<&str>) -> Option<u64> {
 
 fuzz_target!(|data: &[u8]| {
     let text = String::from_utf8_lossy(data);
-    let got = taskmanager_platform_linux::parse_zram_mm_stat(&text);
+    let got = parse_zram_mm_stat(&text);
     let expected = {
         let mut tokens = text.split_whitespace();
         match (

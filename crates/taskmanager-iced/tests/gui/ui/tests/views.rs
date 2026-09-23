@@ -14,6 +14,16 @@ use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{SortCol, SortDir};
 
 use super::super::process_projection::ProcessProjection;
+use taskmanager_application::AppPage;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
+use taskmanager_test_support::pin_english;
+use taskmanager_theme::tokens::UiSize;
 
 /// Render the Applications table for the app's current view state and return
 /// the row count (the shared seam the view-mode tests assert on).
@@ -29,7 +39,7 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         app.shell.process_sort,
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
         0,
     );
     let hidden_columns = std::collections::HashSet::new();
@@ -59,7 +69,7 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
         search_active: false,
         swap_visible: true,
         compact: false,
-        ui_size: taskmanager_theme::tokens::UiSize::Standard,
+        ui_size: UiSize::Standard,
         selected_identities: std::rc::Rc::new(std::collections::HashSet::new()),
         selected_row: None,
         gray_zero: false,
@@ -74,10 +84,7 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
     assert_ne!(base, applications_table_key(7, &render));
     render.query.clear();
     let mut selected = std::collections::HashSet::new();
-    selected.insert(
-        ProcessLiveKey::from_parts(1, taskmanager_test_support::fixture_start_token(1))
-            .expect("non-zero parts"),
-    );
+    selected.insert(ProcessLiveKey::from_parts(1, fixture_start_token(1)).expect("non-zero parts"));
     render.selected_identities = std::rc::Rc::new(selected);
     assert_ne!(base, applications_table_key(7, &render));
     render.selected_identities = std::rc::Rc::new(std::collections::HashSet::new());
@@ -118,11 +125,8 @@ fn root_view_uses_the_shared_frame_lifecycle_for_first_paint() {
         .snapshot
         .clone()
         .expect("demo fixture starts with a committed frame");
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
-    app.shell.application.active_page = taskmanager_application::AppPage::Applications;
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
+    app.shell.application.active_page = AppPage::Applications;
 
     assert_eq!(
         app.shell.telemetry_frame_state(),
@@ -134,9 +138,9 @@ fn root_view_uses_the_shared_frame_lifecycle_for_first_paint() {
         let _warmup = view(&app);
     }
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(committed))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(committed))),
     );
     assert_eq!(
         app.shell.telemetry_frame_state(),
@@ -150,7 +154,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
     let app = crate::IcedApp::demo();
     let processes: Vec<ProcessItem> = (0..1_000)
         .map(|index| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(10_000 + index)
                 .name(format!("worker-{index}"))
                 .current_cpu_percentage(index as f32)
@@ -164,7 +168,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         (SortCol::Cpu, SortDir::Desc),
         &expanded,
         &std::collections::HashSet::new(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
         0,
     );
     let ctx = RowRender {
@@ -173,7 +177,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         search_active: false,
         swap_visible: true,
         compact: false,
-        ui_size: taskmanager_theme::tokens::UiSize::Standard,
+        ui_size: UiSize::Standard,
         selected_identities: std::rc::Rc::new(std::collections::HashSet::new()),
         selected_row: None,
         gray_zero: false,
@@ -211,24 +215,22 @@ fn app_history_page_tab_registers_a_stable_focus_id() {
 /// Build a minimal canonical `ProcessItem` for grouped-view tests with only
 /// the identity, owner, and current observations consumed by the projection.
 fn grouped_process_fixture(pid: u32, name: &str, cpu: f32, memory_bytes: u64) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .current_cpu_percentage(cpu)
         .current_memory_bytes(memory_bytes)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("devuser"),
+            None,
+            1,
+        ))
         .build()
 }
 
 #[test]
 fn canonical_hierarchy_control_composes_without_selector_state() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let app = crate::IcedApp::demo();
     let _control = process_view_selector(app.theme());
     assert_eq!(t("proc.mode_category_tree"), "Categories · Tree");
@@ -239,7 +241,7 @@ fn process_status_filter_selector_is_localized_focusable_and_filters_rows() {
     use crate::app::{FocusTarget, Message};
     use taskmanager_shell::ProcessStatusFilter;
 
-    taskmanager_test_support::pin_english();
+    pin_english();
     for filter in ProcessStatusFilter::ALL {
         assert!(!filter.label().is_empty());
         let id = crate::focus::focus_id(FocusTarget::ProcessStatusFilterTab(filter));
@@ -275,9 +277,9 @@ fn category_tree_groups_processes_without_an_alternate_selector() {
     let _ = app.update(Message::SelectPage(AppPage::Applications));
     // Two same-app processes (both normalize to "Zed") + one distinct app to
     // prove the collapse is per-app, not global.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             grouped_process_fixture(100, "zed", 24.8, 2_640 * mib),
             grouped_process_fixture(101, "zed-worker", 11.2, 1_000 * mib),
             grouped_process_fixture(102, "gnome-shell", 9.6, 1_120 * mib),
@@ -318,9 +320,9 @@ fn category_tree_keeps_one_first_level_category_axis() {
     let _ = app.update(Message::SelectPage(AppPage::Applications));
     // Two userspace + two kernel processes so each type-group is multi-member
     // and exercises the expandable header path.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             grouped_process_fixture(200, "gnome-shell", 9.6, 1_120 * mib),
             grouped_process_fixture(202, "zed", 5.0, 800 * mib),
             grouped_process_fixture(201, "[kworker/u8:1]", 0.2, 8 * mib),

@@ -7,7 +7,10 @@
 use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::perf_history::ProcessPerfHistory;
+use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_theme::FontAvailability;
+use taskmanager_ui_contract::SemanticSnapshot;
 
 impl IcedApp {
     /// The view reads this to decide the search cursor rendering.
@@ -38,7 +41,7 @@ impl IcedApp {
     /// Installed family names offered by the Settings font pickers. The
     /// snapshot is bounded and already excludes the two bundled product faces.
     #[must_use]
-    pub fn font_availability(&self) -> &taskmanager_theme::FontAvailability {
+    pub fn font_availability(&self) -> &FontAvailability {
         &self.configuration.preferences().font_availability
     }
 
@@ -101,7 +104,7 @@ impl IcedApp {
     /// resource (or no GPU) is viewed — the shell fold then leaves the
     /// selection untouched (ADR-034 stage 2).
     #[must_use]
-    pub fn viewed_gpu(&self) -> Option<&taskmanager_core::core::metrics::GpuMetrics> {
+    pub fn viewed_gpu(&self) -> Option<&GpuMetrics> {
         let index = match self.performance.selected_device {
             PerfDevice::Gpu(index) => index,
             _ => return None,
@@ -249,7 +252,7 @@ impl IcedApp {
     /// makes no AT-SPI or screen-reader availability claim, and keeps no
     /// live-loop call site — see [`crate::a11y`].
     #[must_use]
-    pub fn semantic_snapshot(&self) -> Option<taskmanager_ui_contract::SemanticSnapshot> {
+    pub fn semantic_snapshot(&self) -> Option<SemanticSnapshot> {
         crate::a11y::semantic_snapshot(&self.shell)
     }
 
@@ -258,9 +261,7 @@ impl IcedApp {
     /// that route is open. Same detached-projection policy as
     /// [`Self::semantic_snapshot`] (no live-loop call site).
     #[must_use]
-    pub fn semantic_snapshot_with_local(
-        &self,
-    ) -> Option<taskmanager_ui_contract::SemanticSnapshot> {
+    pub fn semantic_snapshot_with_local(&self) -> Option<SemanticSnapshot> {
         crate::a11y::semantic_snapshot_with_local(self)
     }
 

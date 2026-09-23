@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::{
     CommandLaunchRequest, PlatformEvent, SetupScriptRequest, ShellEvent,
 };
@@ -105,19 +102,15 @@ fn shared_integration_runtime_maps_command_completion_without_native_event_logic
         })
         .expect("command request accepted");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            assert!(matches!(
-                event.outcome,
-                Ok(PlatformEvent::Shell(ShellEvent::CommandLaunched {
-                    pid: 73
-                }))
-            ));
-            return;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("integration runtime event did not arrive");
+    let event = crate::wait_for!("integration runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    });
+    assert!(matches!(
+        event.outcome,
+        Ok(PlatformEvent::Shell(ShellEvent::CommandLaunched {
+            pid: 73
+        }))
+    ));
 }
 
 #[test]
@@ -162,19 +155,15 @@ fn optional_setup_script_lane_is_typed_and_does_not_change_complete_core_require
         })
         .expect("setup action accepted by its own bounded lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            assert!(matches!(
-                event.outcome,
-                Ok(PlatformEvent::SetupScript(
-                    SetupScriptEvent::ActionCompleted {
-                        action: SetupScriptAction::Run
-                    }
-                ))
-            ));
-            return;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("setup script runtime event did not arrive");
+    let event = crate::wait_for!("setup script runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    });
+    assert!(matches!(
+        event.outcome,
+        Ok(PlatformEvent::SetupScript(
+            SetupScriptEvent::ActionCompleted {
+                action: SetupScriptAction::Run
+            }
+        ))
+    ));
 }

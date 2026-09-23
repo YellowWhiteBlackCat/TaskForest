@@ -14,8 +14,11 @@ use std::fs;
 use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::time::SystemTime;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::ScalarObservationGroup;
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{detect_gpu_metrics_from_paths, is_virtual_interface};
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
 fn test_memory_metrics_calculation() {
@@ -179,10 +182,7 @@ fn test_system_snapshot_with_gpu() {
 
     let mut cpu = CpuMetrics::from_observations(CpuScalarObservations {
         global_usage_pct: ScalarObservation::available(12.0, 1_000),
-        core_usage_group: taskmanager_core::core::metrics::ScalarObservationGroup::available(
-            vec![12.0],
-            1_000,
-        ),
+        core_usage_group: ScalarObservationGroup::available(vec![12.0], 1_000),
         frequency_mhz: ScalarObservation::available(4_500, 1_000),
         ..Default::default()
     });
@@ -240,7 +240,7 @@ fn test_system_snapshot_with_gpu() {
 
 #[test]
 fn test_disk_metrics_smart_fields_reported() {
-    let d = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let d = DiskMetricsFixtureBuilder::new()
         .name("nvme0n1".to_string())
         .smart_availability(SmartAvailability::Available)
         .smart_temperature_c(Some(42.5))
@@ -265,7 +265,7 @@ fn test_smart_critical_warning_round_trips_three_states() {
     // `Option<bool>`'s derived PartialEq, not the DiskMetrics wire contract.
     // (The None baseline is covered by test_disk_metrics_default_smart_fields_none.)
     for value in [true, false] {
-        let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        let disk = DiskMetricsFixtureBuilder::new()
             .smart_critical_warning(Some(value))
             .build();
         let wire = serde_json::to_value(&disk).expect("DiskMetrics serializes");
@@ -281,7 +281,7 @@ fn test_smart_percent_used_round_trips() {
     // asserted `100.0 >= 100.0` on hardcoded values — trivially true for any
     // f64 and oblivious to the DiskMetrics wire contract.
     for value in [0.0_f32, 15.0, 50.0, 99.5, 100.0, 120.0] {
-        let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        let disk = DiskMetricsFixtureBuilder::new()
             .smart_percent_used(Some(value))
             .build();
         let wire = serde_json::to_value(&disk).expect("DiskMetrics serializes");
@@ -451,7 +451,7 @@ fn test_disk_smart_availability_serializes_as_stable_snake_case() {
         (SmartAvailability::MissingTool, "missing_tool"),
         (SmartAvailability::PermissionDenied, "permission_denied"),
     ] {
-        let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        let disk = DiskMetricsFixtureBuilder::new()
             .smart_availability(availability)
             .build();
         let value = serde_json::to_value(&disk).unwrap();
@@ -474,7 +474,7 @@ fn test_smart_availability_ui_keys_are_exhaustive_and_distinct() {
     ];
     for (index, key) in keys.iter().enumerate() {
         assert!(keys[..index].iter().all(|prior| prior != key));
-        assert_ne!(taskmanager_application::i18n::t(key), *key);
+        assert_ne!(t(key), *key);
     }
 }
 
@@ -483,14 +483,14 @@ fn test_smart_status_alone_counts_as_reported_ui_data() {
     use taskmanager_core::core::device_state::DeviceStatus;
     use taskmanager_shell::presentation::{effective_smart_status, has_smart_fields};
 
-    let status_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let status_only = DiskMetricsFixtureBuilder::new()
         .smart_availability(SmartAvailability::Available)
         .smart_critical_warning(Some(false))
         .build();
     assert!(has_smart_fields(&status_only));
     assert!(!has_smart_fields(&DiskMetrics::default()));
 
-    let legacy_missing_tool = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let legacy_missing_tool = DiskMetricsFixtureBuilder::new()
         .smart_availability(SmartAvailability::MissingTool)
         .build();
     assert_eq!(

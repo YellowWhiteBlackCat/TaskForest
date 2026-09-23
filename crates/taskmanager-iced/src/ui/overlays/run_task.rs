@@ -8,6 +8,7 @@ use taskmanager_theme::tokens;
 use super::modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
+use taskmanager_theme::Theme;
 
 /// State backing the Run New Task modal.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -17,7 +18,7 @@ pub struct RunTaskState {
 }
 
 pub fn run_task_overlay<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: &'a RunTaskState,
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {

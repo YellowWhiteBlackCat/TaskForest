@@ -10,6 +10,8 @@ use taskmanager_core::FailureKind;
 use tracing::{info, warn};
 
 use super::ProcessManager;
+#[cfg(not(unix))]
+use taskmanager_core::ProcessSignal;
 
 impl ProcessManager {
     // ── process control: Unix (real nix/rustix syscalls) ───────────────────
@@ -94,10 +96,7 @@ impl ProcessManager {
     /// platform-neutral [`taskmanager_core::ProcessSignal`] because nix's
     /// `Signal` type does not exist off Unix.
     #[cfg(not(unix))]
-    pub fn send_signal(
-        _pid: u32,
-        _sig: taskmanager_core::ProcessSignal,
-    ) -> Result<(), FailureKind> {
+    pub fn send_signal(_pid: u32, _sig: ProcessSignal) -> Result<(), FailureKind> {
         Err(FailureKind::Unsupported)
     }
     /// Non-Unix stub: terminating a process is unsupported.

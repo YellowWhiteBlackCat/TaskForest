@@ -83,6 +83,19 @@ use self::process_rows::{ProcessProjectionGeneration, ProcessRowId};
 pub use self::service_log::OpenServiceLog;
 pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
+use taskmanager_application::i18n::t;
+use taskmanager_application::{
+    AlertSuggestionWindow, InteractionEvent, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
+    PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle, SessionControlOutcome,
+};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
+};
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
 /// The Applications-table page size for PageUp/PageDown motion. Shared by
 /// every frontend's page-step navigation; the TUI reuses it for the
@@ -184,13 +197,13 @@ pub struct SystemProjectionStore {
     /// system domains, so accepted aggregate samples live beside that lane.
     pub npu_usage_history: std::collections::VecDeque<f32>,
     /// Latest filesystem-health facts and their independent provider status.
-    storage_health: Option<taskmanager_core::core::storage_health::FilesystemHealthSnapshot>,
+    storage_health: Option<FilesystemHealthSnapshot>,
     storage_health_source: Option<Vec<SourceStatus>>,
     /// Application-owned anti-resurrection projection of the latest SMART
     /// batch. The request id is retained only to resolve the matching control
     /// affordance; renderers consume observations, not raw events.
     smart_observations: SmartObservationProjection,
-    smart_subject: Option<taskmanager_core::core::storage::StorageDeviceTarget>,
+    smart_subject: Option<StorageDeviceTarget>,
     /// Latest application-correlated six-domain state. `snapshot` is the
     /// complete render model and changes only when all domains are current.
     pub system_telemetry: Option<ProjectedSystemTelemetry>,
@@ -217,7 +230,7 @@ pub struct SystemProjectionStore {
     /// mirrors the latest evaluation for the in-app surfaces; notifications
     /// accumulate in a bounded queue the frontend drains and submits.
     pub alert_center: AlertCenter,
-    pub alert_active: Vec<taskmanager_core::core::alerts::Alert>,
+    pub alert_active: Vec<Alert>,
     pub(crate) pending_notifications: std::collections::VecDeque<DesktopNotificationRequest>,
     /// Timestamp of the last snapshot folded into the rolling suggestion
     /// window. Used to avoid double-counting a snapshot that did not change
@@ -231,7 +244,7 @@ pub struct SystemProjectionStore {
     /// The last accepted session-control outcome, for point-of-action
     /// feedback in any frontend's action bar. Cleared when a new action is
     /// requested so stale feedback expires.
-    pub session_control_feedback: Option<taskmanager_application::SessionControlOutcome>,
+    pub session_control_feedback: Option<SessionControlOutcome>,
     /// Latest-wins correlation for renderer-neutral startup-entry actions.
     pub startup_control_requests: LatestControlRequest,
     /// Latest-wins correlation for renderer-neutral service-control actions,
@@ -344,17 +357,16 @@ pub struct ShellApp {
     pub sessions_sort: Option<(InfoSortCol, SortDir)>,
     /// Single renderer-neutral live graph store. Its private paired writer is
     /// fed only from application-correlated outcomes below.
-    pub history: taskmanager_telemetry_store::live_graph::LiveGraphHistory,
+    pub history: LiveGraphHistory,
     /// Bounded evidence for alert-threshold suggestions and the SMART detail
     /// trend. It intentionally owns no general live graph series.
-    pub alert_suggestions: taskmanager_application::AlertSuggestionWindow,
+    pub alert_suggestions: AlertSuggestionWindow,
     /// Write capability paired with `history`. Kept private so renderers can
     /// only read accepted telemetry.
-    history_ingestor: Option<taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor>,
+    history_ingestor: Option<CorrelatedSystemTelemetryIngestor>,
     /// Optional durable application-history fan-out. The capability is
     /// installed only while the owning frontend session has history enabled.
-    persistent_application_history:
-        Option<taskmanager_application::PersistentApplicationHistoryRecorder>,
+    persistent_application_history: Option<PersistentApplicationHistoryRecorder>,
     /// Single quit + typed feedback lifecycle authority. All transitions go
     /// through the lifecycle reducer in `app/lifecycle.rs`.
     lifecycle: ShellLifecycleState,
@@ -364,7 +376,7 @@ pub struct ShellApp {
     pub service_log: Option<OpenServiceLog>,
     /// Correlated dependency-panel lifecycle. Frontends render this shared
     /// state and never keep parallel loading/data/failure fields.
-    pub service_dependencies: taskmanager_application::ServiceDependenciesLifecycle,
+    pub service_dependencies: ServiceDependenciesLifecycle,
     /// Monotonic wall-clock (ms) of the last follow request the shell emitted,
     /// so `poll_service_log` throttles incremental streams to ~1 Hz without
     /// touching a clock itself.
@@ -552,16 +564,13 @@ impl ShellApp {
     /// Apply one semantic edit to the canonical managed alert-rule set.
     pub fn edit_alert_rules(
         &mut self,
-        edit: taskmanager_application::ManagedAlertRuleEdit,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
+        edit: ManagedAlertRuleEdit,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
         self.data.alert_center.edit_rules(edit)
     }
 
     /// Replace desktop-notification policy without exposing the alert engine.
-    pub fn set_alert_policy(&mut self, policy: taskmanager_core::core::alerts::NotificationPolicy) {
+    pub fn set_alert_policy(&mut self, policy: NotificationPolicy) {
         self.data.alert_center.set_policy(policy);
     }
 
@@ -573,10 +582,7 @@ impl ShellApp {
 
     /// Install deterministic alert transition history through the shared
     /// fixture/capture seam; live history still comes only from evaluation.
-    pub fn replace_alert_event_history(
-        &mut self,
-        events: Vec<taskmanager_core::core::alerts::AlertEvent>,
-    ) {
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
         self.data.alert_center.replace_event_history(events);
     }
 
@@ -656,9 +662,7 @@ impl ShellApp {
     }
 
     #[must_use]
-    pub const fn pending_smart_self_test(
-        &self,
-    ) -> Option<&taskmanager_core::core::system_health::SmartSelfTestIntent> {
+    pub const fn pending_smart_self_test(&self) -> Option<&SmartSelfTestIntent> {
         match self.pending_confirmation() {
             Some(PendingConfirmation::SmartSelfTest(intent)) => Some(intent),
             _ => None,
@@ -716,11 +720,7 @@ impl ShellApp {
             FeedbackSource::Navigation,
             FeedbackSeverity::Info,
             FeedbackLifecycle::SHORT,
-            format!(
-                "{}: {}",
-                taskmanager_application::i18n::t("proc.status_filter"),
-                filter.label()
-            ),
+            format!("{}: {}", t("proc.status_filter"), filter.label()),
         );
     }
 
@@ -822,9 +822,10 @@ impl ShellApp {
     }
 
     fn arm_confirmation(&mut self, pending: PendingConfirmation) {
-        let reduction = self.application.interaction.reduce(
-            taskmanager_application::InteractionEvent::ArmConfirmation(pending),
-        );
+        let reduction = self
+            .application
+            .interaction
+            .reduce(InteractionEvent::ArmConfirmation(pending));
         self.apply_surface_transition(reduction.transition);
         debug_assert!(reduction.effect.is_none());
     }
@@ -833,7 +834,7 @@ impl ShellApp {
         let reduction = self
             .application
             .interaction
-            .reduce(taskmanager_application::InteractionEvent::Confirm(expected));
+            .reduce(InteractionEvent::Confirm(expected));
         self.apply_surface_transition(reduction.transition);
         if let Some(effect) = reduction.effect.as_ref() {
             self.report_effect_queued(effect);

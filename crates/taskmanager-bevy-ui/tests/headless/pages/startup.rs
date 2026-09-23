@@ -50,6 +50,8 @@ use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskmanager_core::core::startup::StartupCriticalChainNode;
+use taskmanager_core::core::startup::StartupFailedUnit;
 
 // ---- fixtures ----
 
@@ -375,22 +377,18 @@ fn evidence_line_stays_silent_then_honest() {
     );
     let mut shell = ShellApp::new();
     let mut snapshot = StartupBootEvidenceSnapshot::default();
-    snapshot
-        .critical_chain
-        .push(taskmanager_core::core::startup::StartupCriticalChainNode {
-            unit: "multi-user.target".to_owned(),
-            activated_at_ms: Some(1200),
-            duration_ms: Some(300),
-        });
-    snapshot
-        .failed_units
-        .push(taskmanager_core::core::startup::StartupFailedUnit {
-            unit: "broken.service".to_owned(),
-            load_state: "loaded".to_owned(),
-            active_state: "failed".to_owned(),
-            sub_state: "failed".to_owned(),
-            description: "broken".to_owned(),
-        });
+    snapshot.critical_chain.push(StartupCriticalChainNode {
+        unit: "multi-user.target".to_owned(),
+        activated_at_ms: Some(1200),
+        duration_ms: Some(300),
+    });
+    snapshot.failed_units.push(StartupFailedUnit {
+        unit: "broken.service".to_owned(),
+        load_state: "loaded".to_owned(),
+        active_state: "failed".to_owned(),
+        sub_state: "failed".to_owned(),
+        description: "broken".to_owned(),
+    });
     shell.apply_platform_batch(PlatformEventBatch {
         startup_evidence_projections: vec![ProjectedStartupEvidence {
             revision: StartupEvidenceRevision::new(2),

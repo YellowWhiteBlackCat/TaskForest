@@ -16,6 +16,8 @@ use crate::ui::applications::{
 };
 use crate::ui::tables::services_columns;
 use crate::ui::users::users_columns;
+use taskmanager_ui_contract::PROCESS_COLUMNS;
+use taskmanager_ui_contract::find;
 
 /// Every renderable Applications column (except the shell-superset `Pss`)
 /// resolves to a `PROCESS_COLUMNS` row and carries exactly its default width,
@@ -28,7 +30,7 @@ fn process_column_widths_and_tokens_are_contract_truth() {
         if *column == SortCol::Pss {
             continue; // shell superset: no contract row by design
         }
-        let spec = taskmanager_ui_contract::find(sort_col_contract_id(*column))
+        let spec = find(sort_col_contract_id(*column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         assert_eq!(
             *width, spec.default_width,
@@ -40,7 +42,7 @@ fn process_column_widths_and_tokens_are_contract_truth() {
         .iter()
         .map(|(column, _)| sort_col_contract_id(*column))
         .collect();
-    for spec in taskmanager_ui_contract::PROCESS_COLUMNS {
+    for spec in PROCESS_COLUMNS {
         assert!(
             tokens.contains(spec.id),
             "contract column {} must have a table column",
@@ -62,7 +64,7 @@ fn numeric_alignment_follows_the_contract_numeric_flag() {
         if column == SortCol::Pss {
             continue;
         }
-        let spec = taskmanager_ui_contract::find(sort_col_contract_id(column))
+        let spec = find(sort_col_contract_id(column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         let expected = if spec.numeric {
             Horizontal::Right
@@ -82,7 +84,7 @@ fn column_menu_toggles_only_contract_hideable_columns() {
         if column == SortCol::Pss {
             continue;
         }
-        let spec = taskmanager_ui_contract::find(sort_col_contract_id(column))
+        let spec = find(sort_col_contract_id(column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         assert_eq!(
             column_hideable(column),

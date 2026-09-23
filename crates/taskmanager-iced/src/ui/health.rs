@@ -11,13 +11,16 @@ use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
-use crate::i18n::{self, Key};
+use crate::i18n::{self, Key, Language};
 use crate::theme;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::{
     bytes, health_score_for_snapshot, health_score_summary, missing_value,
 };
+use taskmanager_theme::Theme;
 
 mod projection;
 
@@ -54,13 +57,13 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let summary_panel: Element<'_, Message, iced::Theme, iced::Renderer> =
         match shell.projection().snapshot.as_ref() {
             Some(snapshot) => {
-                let rows = health_rows(snapshot);
+                let rows = health_rows(snapshot, language);
                 panel(
                     theme_snapshot,
                     i18n::t(language, Key::DeviceSummary),
                     column(
                         rows.into_iter()
-                            .map(|row| health_row(theme_snapshot, row))
+                            .map(|row| health_row(theme_snapshot, row, language))
                             .collect::<Vec<_>>(),
                     )
                     .spacing(1)
@@ -92,25 +95,33 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let mut modal_panels: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> =
         vec![summary_panel];
     if let Some(snapshot) = shell.projection().snapshot.as_ref()
-        && let Some(sensor_panel) = sensors_and_thermal_panel(snapshot, theme_snapshot)
+        && let Some(sensor_panel) = sensors_and_thermal_panel(snapshot, theme_snapshot, language)
     {
         modal_panels.push(sensor_panel);
     }
     if let Some(sensors) = shell.projection().sensors.as_ref()
-        && let Some(zone_panel) = thermal_zone_sensor_panel(sensors, theme_snapshot)
+        && let Some(zone_panel) = thermal_zone_sensor_panel(sensors, theme_snapshot, language)
     {
         modal_panels.push(zone_panel);
     }
     modal_panels.push(alert_panel);
 
+    // The body scrollbar is EMBEDDED, not floated: iced's default rail floats
+    // over the content, so inside this panel-wrapped body it painted over each
+    // panel's right inner padding and left the content's left/right insets
+    // asymmetric. `Scrollable::spacing` reserves the rail's gutter with the
+    // shared spacing token, so the panels keep symmetric padding and the rail
+    // sits outside them (the same "content never touches the rail" rule the
+    // UI charter states for pinned rails).
     modal_overlay(
         theme_snapshot,
         i18n::t(language, Key::Health),
-        "Observed samples only · Esc closes",
+        i18n::t(language, Key::HealthObservedHint),
         scrollable(column(modal_panels).spacing(12))
             .id(BODY_SCROLL_ID)
             .height(Length::Fixed(430.0))
             .width(Length::Fill)
+            .spacing(f32::from(tokens::SPACE_8))
             .into(),
         appear,
     )
@@ -127,15 +138,17 @@ pub(super) struct HealthRow {
 
 /// Build the per-domain device summary from one snapshot. A domain with no
 /// current reading is honest `Partial`/unhealthy rather than a fabricated
-/// zero.
+/// zero. Every label and composed value resolves through the active
+/// [`Language`] so the iced summary reads in the same tongue as the rest of
+/// the modal.
 #[must_use]
-pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
+pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<HealthRow> {
     let observed = projection::HealthObservation::from(snapshot);
     let mut rows = Vec::new();
 
     if let Some(score) = health_score_for_snapshot(snapshot) {
         rows.push(HealthRow {
-            label: taskmanager_application::i18n::t("system.health_score").to_owned(),
+            label: i18n::t(language, Key::HealthScore).to_owned(),
             value: health_score_summary(&score),
             healthy: score.score >= 80,
         });
@@ -155,7 +168,7 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     };
     let cpu_temp_text = cpu_temp.map_or_else(missing_value, |temp| format!("{temp:.0} °C"));
     rows.push(HealthRow {
-        label: "CPU".into(),
+        label: i18n::t(language, Key::Cpu).to_owned(),
         value: format!("{cpu_text} · {cpu_temp_text}"),
         healthy: cpu_usage.is_some(),
     });
@@ -175,12 +188,12 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let memory_healthy = memory.is_some();
     let swap_healthy = swap.is_some();
     rows.push(HealthRow {
-        label: "Memory".into(),
+        label: i18n::t(language, Key::Memory).to_owned(),
         value: memory.unwrap_or_else(missing_value),
         healthy: memory_healthy,
     });
     rows.push(HealthRow {
-        label: "Swap".into(),
+        label: i18n::t(language, Key::Swap).to_owned(),
         value: swap.unwrap_or_else(missing_value),
         healthy: swap_healthy,
     });
@@ -188,15 +201,16 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let disk_text = if snapshot.disks.is_empty() {
         missing_value()
     } else {
-        format!(
-            "{} device{} · {}",
+        count_value(
+            language,
+            Key::HealthDeviceCountOne,
+            Key::HealthDeviceCountMany,
             snapshot.disks.len(),
-            if snapshot.disks.len() == 1 { "" } else { "s" },
-            snapshot.disks[0].model,
+            &snapshot.disks[0].model,
         )
     };
     rows.push(HealthRow {
-        label: "Disks".into(),
+        label: i18n::t(language, Key::Disk).to_owned(),
         value: disk_text,
         healthy: !snapshot.disks.is_empty(),
     });
@@ -204,19 +218,16 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let network_text = if snapshot.networks.is_empty() {
         missing_value()
     } else {
-        format!(
-            "{} interface{} · {}",
+        count_value(
+            language,
+            Key::HealthInterfaceCountOne,
+            Key::HealthInterfaceCountMany,
             snapshot.networks.len(),
-            if snapshot.networks.len() == 1 {
-                ""
-            } else {
-                "s"
-            },
-            snapshot.networks[0].interface_name,
+            &snapshot.networks[0].interface_name,
         )
     };
     rows.push(HealthRow {
-        label: "Networks".into(),
+        label: i18n::t(language, Key::Network).to_owned(),
         value: network_text,
         healthy: !snapshot.networks.is_empty(),
     });
@@ -224,46 +235,64 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let gpu_text = if snapshot.gpu.is_empty() {
         missing_value()
     } else {
-        format!(
-            "{} GPU{} · {}",
+        count_value(
+            language,
+            Key::HealthGpuCountOne,
+            Key::HealthGpuCountMany,
             snapshot.gpu.len(),
-            if snapshot.gpu.len() == 1 { "" } else { "s" },
-            snapshot.gpu[0].brand,
+            &snapshot.gpu[0].brand,
         )
     };
     rows.push(HealthRow {
-        label: "GPU".into(),
+        label: i18n::t(language, Key::Gpu).to_owned(),
         value: gpu_text,
         healthy: !snapshot.gpu.is_empty(),
     });
 
     rows.push(HealthRow {
-        label: "System".into(),
-        value: format!(
-            "uptime {} · {} processes · {} threads",
-            taskmanager_shell::presentation::duration(snapshot.uptime_secs),
-            snapshot.processes,
-            snapshot
-                .threads
-                .map_or_else(missing_value, |threads| threads.to_string()),
-        ),
+        label: i18n::t(language, Key::SystemDomain).to_owned(),
+        value: i18n::t(language, Key::HealthSystemValue)
+            .replace("{uptime}", &duration(snapshot.uptime_secs))
+            .replace("{processes}", &snapshot.processes.to_string())
+            .replace(
+                "{threads}",
+                &snapshot
+                    .threads
+                    .map_or_else(missing_value, |threads| threads.to_string()),
+            ),
         healthy: snapshot.processes > 0,
     });
 
     rows
 }
 
+/// Resolve one "count + noun + first model" domain value: pick the
+/// singular/plural template for the active locale, then substitute the shared
+/// named placeholders. Chinese uses the same template for both counts (no
+/// plural inflection), so only the selected key differs.
+fn count_value(language: Language, one: Key, many: Key, count: usize, model: &str) -> String {
+    let key = if count == 1 { one } else { many };
+    i18n::t(language, key)
+        .replace("{count}", &count.to_string())
+        .replace("{model}", model)
+}
+
 fn health_row<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     row: HealthRow,
+    language: Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
         text(row.label.clone()).width(Length::Fixed(150.0)),
         text(row.value.clone()).width(Length::Fill),
-        text(if row.healthy { "OK" } else { "Unavailable" })
-            .size(f32::from(tokens::FONT_12))
-            .color(theme::status_color(theme_snapshot, row.healthy))
-            .width(Length::Fixed(110.0)),
+        text(if row.healthy {
+            i18n::t(language, Key::HealthVerdictOk)
+        } else {
+            i18n::t(language, Key::HealthUnavailable)
+        })
+        .size(f32::from(tokens::FONT_12))
+        .color(theme::status_color(theme_snapshot, row.healthy))
+        .width(Length::Fixed(110.0)),
     ]
     .spacing(8)
     .padding(4)
@@ -272,9 +301,9 @@ fn health_row<'a>(
 }
 
 fn alert_row<'a>(
-    _theme_snapshot: &taskmanager_theme::Theme,
+    _theme_snapshot: &Theme,
     metric: AlertMetric,
-    shell: &taskmanager_shell::ShellApp,
+    shell: &ShellApp,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
         text(metric_label(metric)).width(Length::Fixed(190.0)),
@@ -287,7 +316,7 @@ fn alert_row<'a>(
 }
 
 fn panel<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     title: &'static str,
     body: Element<'a, Message, iced::Theme, iced::Renderer>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -310,32 +339,36 @@ fn panel<'a>(
 /// Thermal heat-map badges and fan tachometer gauges panel.
 pub(crate) fn sensors_and_thermal_panel<'a>(
     snapshot: &SystemSnapshot,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
+    language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let mut items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
 
     // 1. Thermal readings
-    let temps = projection::thermal_readings(snapshot);
+    let temps = projection::thermal_readings(snapshot, language);
 
     if !temps.is_empty() {
         let mut temp_pills: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
         for (label, temp) in temps {
             let (bg_color, tag) = if temp < 45.0 {
-                (crate::theme_binding::color(theme_snapshot.network), "Cool")
+                (
+                    crate::theme_binding::color(theme_snapshot.network),
+                    i18n::t(language, Key::HealthThermalCool),
+                )
             } else if temp < 70.0 {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().accent),
-                    "Normal",
+                    i18n::t(language, Key::HealthThermalNormal),
                 )
             } else if temp < 85.0 {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().warning),
-                    "Warm",
+                    i18n::t(language, Key::HealthThermalWarm),
                 )
             } else {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().danger),
-                    "Hot",
+                    i18n::t(language, Key::HealthThermalHot),
                 )
             };
 
@@ -375,7 +408,7 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
 
         items.push(
             column![
-                text("Thermal Heatmap & Sensors")
+                text(i18n::t(language, Key::HealthThermalHeatmap))
                     .size(f32::from(tokens::FONT_12))
                     .style(move |_| text::Style {
                         color: Some(theme::muted_text_color(theme_snapshot)),
@@ -392,7 +425,7 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
     } else {
         Some(panel(
             theme_snapshot,
-            "Sensors & Thermal Health",
+            i18n::t(language, Key::HealthSensorsThermal),
             column(items).spacing(6).into(),
         ))
     }
@@ -405,7 +438,8 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
 /// snapshot carries no temperature channel at all.
 pub(super) fn thermal_zone_sensor_panel<'a>(
     sensors: &SensorCenterSnapshot,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
+    language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let rows = projection::thermal_zone_rows(sensors);
     if rows.is_empty() {
@@ -413,7 +447,7 @@ pub(super) fn thermal_zone_sensor_panel<'a>(
     }
     Some(panel(
         theme_snapshot,
-        "Thermal Zone Sensors",
+        i18n::t(language, Key::ThermalZones),
         column(
             rows.into_iter()
                 .map(|row| thermal_zone_row(theme_snapshot, row))
@@ -429,7 +463,7 @@ pub(super) fn thermal_zone_sensor_panel<'a>(
 /// normal foreground; a typed absence takes the status tint so an unread zone
 /// cannot read as a real temperature.
 fn thermal_zone_row<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     row: projection::ThermalZoneRow,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let value = text(row.value).width(Length::Fill);

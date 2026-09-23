@@ -26,6 +26,7 @@ use crate::app::FrontendTrack;
 use crate::palette::{UiPalette, no_wrap_text, space_4, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use taskmanager_shell::presentation::service_diagnostics_rows;
 
 #[derive(Resource, Default)]
 pub(crate) struct ServiceDetailsModalState {
@@ -91,9 +92,7 @@ pub(crate) fn service_details_modal_scene(
         fact_row_scene(t("svc.sub_state"), &service.sub_state, palette),
         fact_row_scene(t("common.description"), &service.description, palette),
     ];
-    for (label, value) in
-        taskmanager_shell::presentation::service_diagnostics_rows(service.diagnostics())
-    {
+    for (label, value) in service_diagnostics_rows(service.diagnostics()) {
         rows.push(fact_row_scene(&label, &value, palette));
     }
 

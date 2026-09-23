@@ -20,7 +20,6 @@ crates/taskmanager-shell/src/presentation/gpu_chart_metric.rs
 crates/taskmanager-shell/src/presentation/gpu_engine_rows.rs
 crates/taskmanager-shell/tests/headless/presentation_trend_tests.rs
 packaging/regenerate-ui-icons.sh
-scripts/bevy_interaction_matrix.tsv
 scripts/accept-bevy-interactions.sh
 scripts/capture-bevy.sh
 scripts/capture_bevy_scenarios.tsv

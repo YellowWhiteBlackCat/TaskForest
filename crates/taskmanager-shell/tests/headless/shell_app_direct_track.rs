@@ -1,19 +1,20 @@
 use super::*;
+use taskmanager_application::LatestControlRequest;
 use taskmanager_application::ServiceControlOutcome;
+use taskmanager_core::SessionId;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::target::ServiceId;
 
 /// Deterministic fixture: pid N carries start token N*10, so every identity
 /// is distinct and a "reused pid" is expressible by shifting the token.
-fn live(pid: u32) -> taskmanager_core::core::process::ProcessItem {
-    taskmanager_core::core::process::ProcessItem::new(pid, "worker").with_scalar_observations(
-        ProcessScalarObservations {
-            start_token: ScalarObservation::available(u64::from(pid) * 10, 1),
-            ..ProcessScalarObservations::default()
-        },
-    )
+fn live(pid: u32) -> ProcessItem {
+    ProcessItem::new(pid, "worker").with_scalar_observations(ProcessScalarObservations {
+        start_token: ScalarObservation::available(u64::from(pid) * 10, 1),
+        ..ProcessScalarObservations::default()
+    })
 }
 
 fn id(pid: u32) -> ProcessLiveKey {
@@ -297,14 +298,13 @@ fn session_order_covers_user_session_and_seat() {
     order_session_rows(&mut rows, Some((InfoSortCol::Name, SortDir::Asc)));
     assert_eq!(rows[0].user, "alice");
     order_session_rows(&mut rows, Some((InfoSortCol::Session, SortDir::Asc)));
-    assert_eq!(rows[0].id, taskmanager_core::SessionId::new("1"));
+    assert_eq!(rows[0].id, SessionId::new("1"));
     order_session_rows(&mut rows, Some((InfoSortCol::Seat, SortDir::Desc)));
     assert_eq!(rows[0].seat.as_deref(), Some("seat1"));
 }
 
 #[test]
 fn feedback_slots_are_latest_wins() {
-    use taskmanager_application::LatestControlRequest;
     use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::services::ServiceAction;
     use taskmanager_core::core::target::ServiceId;
@@ -331,7 +331,7 @@ fn feedback_slots_are_latest_wins() {
 #[test]
 fn direct_track_uses_one_state_for_inventory_outcomes_and_runtime_notices() {
     let mut state = DirectTrackState::default();
-    let request_id = taskmanager_application::LatestControlRequest::default().begin();
+    let request_id = LatestControlRequest::default().begin();
     let service = ServiceControlOutcome {
         request_id,
         service_id: ServiceId::new("demo.service"),

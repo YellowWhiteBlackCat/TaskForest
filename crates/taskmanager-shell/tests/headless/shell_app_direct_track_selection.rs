@@ -5,6 +5,7 @@
 use crate::app::direct_track::ProcessSelection;
 use crate::app::process_rows::ProcessRowId;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessCategory;
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 
 fn live_process(pid: u32, start_token: u64) -> ProcessItem {
@@ -73,8 +74,7 @@ fn pid_reuse_never_matches_the_impostor() {
 
 #[test]
 fn structural_category_row_clears_actionable_selection() {
-    let category =
-        ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Application);
+    let category = ProcessRowId::Category(ProcessCategory::Application);
     let mut selection = ProcessSelection::default();
     selection.select_single(identity(10, 100));
     selection.move_to_row(Some(category), false);

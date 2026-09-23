@@ -7,7 +7,13 @@
 
 use gpui::{Div, InteractiveElement, ParentElement, Stateful, Styled, div, px};
 use taskmanager_assets::product;
+use taskmanager_ui::icons_binding;
 use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::formatting;
@@ -44,26 +50,22 @@ fn metric_card(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_5,
-                ))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .gap(definite_length(tokens::SPACE_5))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(
-                    taskmanager_ui::icons_binding::icon(icon)
+                    icons_binding::icon(icon)
                         .size(px(14.0))
-                        .text_color(taskmanager_ui::theme_binding::hsla(color)),
+                        .text_color(hsla(color)),
                 )
                 .child(label),
         )
         .child(
             div()
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(color))
+                .mt(length(tokens::SPACE_6))
+                .text_size(font_size(tokens::FONT_20))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(color))
                 .child(value),
         )
         .render()
@@ -91,9 +93,7 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
     let first_row = div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .flex_1()
         .min_h(px(0.0))
         .child(metric_card(
@@ -118,9 +118,7 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
     let second_row = div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .flex_1()
         .min_h(px(0.0))
         .child(metric_card(
@@ -144,14 +142,10 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
         .id("taskforest-desktop-widget")
         .debug_selector(|| "taskforest-desktop-widget".to_owned())
         .size_full()
-        .p(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
+        .p(definite_length(tokens::SPACE_16))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
                 .flex()
@@ -161,16 +155,14 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
                 .h(px(24.0))
                 .child(
                     div()
-                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                            tokens::FONT_WEIGHT_HEADER,
-                        ))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_14))
+                        .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+                        .text_size(font_size(tokens::FONT_14))
                         .child(product::GPUI_NAME),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(i18n::t("dashboard.title")),
                 ),
         )

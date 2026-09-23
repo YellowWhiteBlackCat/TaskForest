@@ -30,6 +30,12 @@ use taskmanager_ui_contract::{
 
 use crate::app::FrontendTrack;
 use crate::confirmation::PendingConfirmationView;
+use taskmanager_application::process_sort::ProcessSortAxis;
+use taskmanager_application::process_sort::compare_processes;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::process_semantic_key;
+use taskmanager_ui_contract::GraphSummary;
 
 /// Upper bound on rows in one semantic snapshot. Assistive technology reads
 /// the same visible-window discipline the renderer uses; a five-figure
@@ -67,7 +73,7 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
         .filter(|value| value.is_finite())
     {
         let current = f64::from(cpu_current.clamp(0.0, 100.0));
-        builder = builder.cpu_graph(taskmanager_ui_contract::GraphSummary {
+        builder = builder.cpu_graph(GraphSummary {
             current,
             peak: current,
             maximum: 100.0,
@@ -80,14 +86,7 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
         .as_ref()
         .and_then(|snapshot| snapshot.memory.current_total_bytes());
     let mut rows_vec = shell.visible_processes();
-    rows_vec.sort_by(|left, right| {
-        taskmanager_application::process_sort::compare_processes(
-            left,
-            right,
-            taskmanager_application::process_sort::ProcessSortAxis::Cpu,
-            false,
-        )
-    });
+    rows_vec.sort_by(|left, right| compare_processes(left, right, ProcessSortAxis::Cpu, false));
 
     let rows: Vec<ProcessRowInput> = rows_vec
         .into_iter()
@@ -108,18 +107,13 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
                     .map(|bytes| (bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0))
             });
             let selected = match shell.selected_row {
-                Some(taskmanager_shell::ProcessRowId::Process(identity)) => {
-                    taskmanager_core::core::process::ProcessLiveKey::from_process(process)
-                        .is_some_and(|row_identity| row_identity == identity)
-                }
-                Some(
-                    taskmanager_shell::ProcessRowId::Application(_)
-                    | taskmanager_shell::ProcessRowId::Category(_),
-                ) => false,
+                Some(ProcessRowId::Process(identity)) => ProcessLiveKey::from_process(process)
+                    .is_some_and(|row_identity| row_identity == identity),
+                Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) => false,
                 None => index == shell.selected,
             } || shell.is_process_selected(process);
             ProcessRowInput {
-                id: taskmanager_shell::process_semantic_key(process),
+                id: process_semantic_key(process),
                 name,
                 cpu_percent: process
                     .current_cpu_percentage()

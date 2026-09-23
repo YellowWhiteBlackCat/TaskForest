@@ -18,6 +18,7 @@
 use taskmanager_core::alerts::{Alert, NotificationGate, NotificationPolicy};
 
 use crate::platform::DesktopNotificationRequest;
+use taskmanager_core::alerts::AlertMetric;
 
 /// Shared alert-to-notification delivery state.
 #[derive(Debug, Clone)]
@@ -83,28 +84,28 @@ impl AlertDispatcher {
                     return None;
                 }
                 let metric_label = match alert.metric {
-                    taskmanager_core::alerts::AlertMetric::CpuUsagePercent => "CPU Usage",
-                    taskmanager_core::alerts::AlertMetric::MemoryUsagePercent => "Memory Usage",
-                    taskmanager_core::alerts::AlertMetric::DiskTemperatureC => "Disk Temperature",
-                    taskmanager_core::alerts::AlertMetric::SmartPercentUsed => "SSD Wear",
-                    taskmanager_core::alerts::AlertMetric::SmartCriticalWarning => "SMART Warning",
+                    AlertMetric::CpuUsagePercent => "CPU Usage",
+                    AlertMetric::MemoryUsagePercent => "Memory Usage",
+                    AlertMetric::DiskTemperatureC => "Disk Temperature",
+                    AlertMetric::SmartPercentUsed => "SSD Wear",
+                    AlertMetric::SmartCriticalWarning => "SMART Warning",
                 };
                 let body = match alert.metric {
-                    taskmanager_core::alerts::AlertMetric::CpuUsagePercent
-                    | taskmanager_core::alerts::AlertMetric::MemoryUsagePercent
-                    | taskmanager_core::alerts::AlertMetric::SmartPercentUsed => {
+                    AlertMetric::CpuUsagePercent
+                    | AlertMetric::MemoryUsagePercent
+                    | AlertMetric::SmartPercentUsed => {
                         format!(
                             "{}: {:.0}% (threshold: {:.0}%)",
                             metric_label, alert.value, alert.threshold
                         )
                     }
-                    taskmanager_core::alerts::AlertMetric::DiskTemperatureC => {
+                    AlertMetric::DiskTemperatureC => {
                         format!(
                             "{}: {:.0}°C (threshold: {:.0}°C)",
                             metric_label, alert.value, alert.threshold
                         )
                     }
-                    taskmanager_core::alerts::AlertMetric::SmartCriticalWarning => {
+                    AlertMetric::SmartCriticalWarning => {
                         format!("{}: Warning flag reported by drive", metric_label)
                     }
                 };

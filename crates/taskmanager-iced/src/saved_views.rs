@@ -25,6 +25,7 @@ use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_theme::Theme;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SavedViewImportSummary {
@@ -330,7 +331,7 @@ pub struct PresetsRibbonState {
 
 /// Render the Presets Ribbon bar above the process table.
 pub fn presets_ribbon<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     presets: &'a [SavedViewPreset],
     state: PresetsRibbonState,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {

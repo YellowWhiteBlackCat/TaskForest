@@ -41,6 +41,10 @@ use super::{
     DrawCycleInputs, EVENT_DRAIN_BATCH, EVENT_POLL, capture_page_name, drain_process_refresh,
     handle_key, should_draw, submit_alert_notifications, unix_now_ms,
 };
+use taskmanager_application::{AppPage, GpuEngineRowsState};
+use taskmanager_shell::{
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp, queue_effect,
+};
 
 /// The terminal event source seam. Production uses [`CrosstermEventSource`];
 /// tests (and later remote transports) script their own. `pub(crate)` so the
@@ -227,7 +231,7 @@ pub(crate) fn apply_terminal_event_with_plan(
                                 return EventReaction::default();
                             }
                             let selected = index;
-                            if app.page() == taskmanager_application::AppPage::Applications {
+                            if app.page() == AppPage::Applications {
                                 let rows = app.process_rows_snapshot();
                                 let process =
                                     crate::process_view::process_at(&rows, selected).cloned();
@@ -400,9 +404,8 @@ impl RefreshPacing {
     pub(super) fn due(&self, app: &TuiApp, now: Instant) -> bool {
         matches!(
             app.shell.gpu_engine_rows_state(),
-            taskmanager_application::GpuEngineRowsState::Loading { .. }
-                | taskmanager_application::GpuEngineRowsState::Ready(_)
-        ) && app.page() == taskmanager_application::AppPage::Performance
+            GpuEngineRowsState::Loading { .. } | GpuEngineRowsState::Ready(_)
+        ) && app.page() == AppPage::Performance
             && app.perf_device == crate::PerfDevice::Gpu
             && now.saturating_duration_since(self.gpu_engine_rows) >= super::GPU_ENGINE_ROWS_REFRESH
     }
@@ -500,11 +503,7 @@ where
             let gpu_engine_rows_due = pacing.due(app, now);
             if gpu_engine_rows_due {
                 if let Some(device_id) = app.gpu_engine_rows_device_id() {
-                    taskmanager_shell::queue_effect(
-                        app,
-                        platform,
-                        taskmanager_shell::ShellApp::request_gpu_engine_rows(device_id),
-                    );
+                    queue_effect(app, platform, ShellApp::request_gpu_engine_rows(device_id));
                 }
                 cycle.refresh_queued = true;
             }
@@ -516,17 +515,17 @@ where
             // throttles it to 1 Hz; the wall clock lives here, not in the
             // shell or the renderer).
             if let Some(effect) = app.refresh_selected_process_insights() {
-                taskmanager_shell::queue_effect(app, platform, effect);
+                queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }
             if let Some(effect) = app.refresh_selected_service_dependencies() {
-                taskmanager_shell::queue_effect(app, platform, effect);
+                queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }
             let now_ms = unix_now_ms();
             app.service_log_now_micros = now_ms.saturating_mul(1_000);
             if let Some(effect) = app.shell.poll_service_log(now_ms) {
-                taskmanager_shell::queue_effect(app, platform, effect);
+                queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }
         }
@@ -584,11 +583,11 @@ where
                 pending_draw |= reaction.dirty;
                 if let Some(effect) = reaction.effect {
                     match platform.as_deref_mut() {
-                        Some(platform) => taskmanager_shell::queue_effect(app, platform, effect),
+                        Some(platform) => queue_effect(app, platform, effect),
                         None => app.report_notice(
-                            taskmanager_shell::FeedbackSource::Demo,
-                            taskmanager_shell::FeedbackSeverity::Warning,
-                            taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                            FeedbackSource::Demo,
+                            FeedbackSeverity::Warning,
+                            FeedbackLifecycle::UntilReplaced,
                             "Demo mode suppresses platform actions",
                         ),
                     }

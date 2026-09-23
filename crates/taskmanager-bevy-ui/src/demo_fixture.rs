@@ -12,10 +12,13 @@
 //! appended only inside the capture composition.
 
 use taskmanager_core::core::metrics::{CpuMetrics, ScalarObservation, ScalarObservationGroup};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::record_demo_history_frame;
 
 /// Build the capture-only shell with a warm, deterministic graph window.
-pub(crate) fn demo_shell() -> taskmanager_shell::ShellApp {
-    let mut shell = taskmanager_shell::demo_app();
+pub(crate) fn demo_shell() -> ShellApp {
+    let mut shell = demo_app();
     if let Some(seed) = shell.projection().snapshot.clone() {
         for offset in 1..=24_u64 {
             let mut next = seed.clone();
@@ -23,7 +26,7 @@ pub(crate) fn demo_shell() -> taskmanager_shell::ShellApp {
                 .timestamp_ms
                 .saturating_add(offset.saturating_mul(1_000));
             next.cpu = demo_cpu_frame(&next.cpu, next.timestamp_ms, offset);
-            taskmanager_shell::fixture::record_demo_history_frame(&mut shell, &next, None, None);
+            record_demo_history_frame(&mut shell, &next, None, None);
         }
     }
     shell

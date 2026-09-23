@@ -4,6 +4,8 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
+use crate::i18n::{self, Key, Language};
+
 pub(super) struct HealthObservation {
     pub cpu_usage_pct: Option<f32>,
     pub cpu_frequency: String,
@@ -67,17 +69,25 @@ pub(super) fn thermal_zone_rows(sensors: &SensorCenterSnapshot) -> Vec<ThermalZo
 }
 
 #[must_use]
-pub(super) fn thermal_readings(snapshot: &SystemSnapshot) -> Vec<(String, f32)> {
+pub(super) fn thermal_readings(
+    snapshot: &SystemSnapshot,
+    language: Language,
+) -> Vec<(String, f32)> {
     let mut readings = Vec::new();
     if let Some(temperature) = snapshot.cpu.current_temperature_c() {
-        readings.push(("CPU Package".to_owned(), temperature));
+        readings.push((
+            i18n::t(language, Key::HealthCpuPackage).to_owned(),
+            temperature,
+        ));
     }
     readings.extend(snapshot.gpu.iter().enumerate().filter_map(|(index, gpu)| {
         let temperature = gpu.current_temperature_c()?;
         let label = if gpu.brand.is_empty() {
-            format!("GPU {index}")
+            i18n::t(language, Key::HealthGpuIndex).replace("{index}", &index.to_string())
         } else {
-            format!("GPU {index} ({})", gpu.brand)
+            i18n::t(language, Key::HealthGpuIndexBrand)
+                .replace("{index}", &index.to_string())
+                .replace("{brand}", &gpu.brand)
         };
         Some((label, temperature))
     }));

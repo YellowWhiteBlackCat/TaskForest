@@ -11,11 +11,17 @@ use taskmanager_core::core::process::ProcessItem;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_application::SurfaceKind;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {
     // Every measurement enters through the typed fixture builder or the
     // canonical observation group; no schema-v1 row mirror participates.
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(4242)
         .parent_pid(Some(1))
         .name("sample".to_owned())
@@ -25,13 +31,11 @@ fn fixture() -> ProcessItem {
         .current_disk_read_bytes_per_sec(1536)
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                Some(PathBuf::from("/usr/bin/sample")),
-                42,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            Some(PathBuf::from("/usr/bin/sample")),
+            42,
+        ))
         .current_threads(8)
         .current_start_time_secs(1_600_000_000)
         .current_cpu_time_secs(3_690)
@@ -56,13 +60,10 @@ fn fixture() -> ProcessItem {
 }
 
 fn vm(field: ProcessDetailsField) -> String {
-    let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
+    let rows = process_details_rows_with_local_time(
         &fixture(),
         &UnitPreferences::default(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     match detail_value(&rows, field) {
         DetailValue::Text(text) => text.clone(),
@@ -74,10 +75,7 @@ fn vm(field: ProcessDetailsField) -> String {
 fn overview_rows_mirror_the_neutral_vm() {
     let pairs = overview_pairs(
         &fixture(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     assert_eq!(pairs.len(), 16);
     let fields = [
@@ -107,10 +105,7 @@ fn overview_rows_mirror_the_neutral_vm() {
 fn command_rows_mirror_the_neutral_vm() {
     let pairs = command_pairs(
         &fixture(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     assert_eq!(pairs.len(), 3);
     assert_eq!(pairs[0].1, vm(ProcessDetailsField::Name));
@@ -120,13 +115,10 @@ fn command_rows_mirror_the_neutral_vm() {
 
 #[test]
 fn performance_currents_mirror_the_neutral_vm() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let pairs = performance_pairs(
         &fixture(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     assert_eq!(pairs.len(), 4);
     // With an empty history window the peak floors at the live reading,
@@ -156,7 +148,7 @@ fn properties_modal_host_paints_border_and_identity_title() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let app = crate::demo_app();
     let theme = crate::TuiTheme::default();
     let target = ProcessPropertiesTarget {
@@ -166,7 +158,7 @@ fn properties_modal_host_paints_border_and_identity_title() {
     };
     let focus = crate::ui::frame_plan::TuiFocusPlan {
         target: crate::ui::frame_plan::TuiFocusTarget::SharedSurface(
-            taskmanager_application::SurfaceKind::ProcessProperties,
+            SurfaceKind::ProcessProperties,
         ),
         order: crate::ui::frame_plan::TuiFocusOrder::None,
         control: crate::ui::frame_plan::TuiFocusControl::PropertiesTab(

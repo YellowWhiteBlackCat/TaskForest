@@ -17,6 +17,7 @@ use taskmanager_theme::tokens;
 use super::super::responsive::{
     DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
 };
+use taskmanager_theme::Theme;
 
 /// The Performance-page per-disk panel readiness.
 #[must_use]
@@ -321,7 +322,7 @@ fn smart_footer<'a>(
     app: &crate::IcedApp,
     disk: &DiskMetrics,
     index: usize,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     if let Some(pending) = app.shell.pending_smart_self_test()
         && pending.device_id.as_str() == disk.device_id
@@ -472,7 +473,7 @@ fn drive_throughput_formatter(units: UnitPrefs) -> fn(f32) -> String {
 /// trustworthy free/used numbers.
 pub(crate) fn partition_panel<'a>(
     disk: &'a DiskMetrics,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     units: UnitPrefs,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let mut rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
@@ -578,9 +579,9 @@ pub(crate) fn partition_usage_text(
 }
 
 fn partition_row<'a>(
-    partition: &taskmanager_core::core::metrics::DiskPartition,
+    partition: &DiskPartition,
     observed: &super::projection::PartitionObservation,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     units: UnitPrefs,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let label = partition_label(partition);

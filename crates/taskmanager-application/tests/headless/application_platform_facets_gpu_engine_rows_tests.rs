@@ -2,6 +2,7 @@ use taskmanager_core::GpuEngineMetric;
 use taskmanager_platform_contract::CapabilityRequest;
 
 use super::*;
+use taskmanager_core::GpuEngineKind;
 
 #[test]
 fn gpu_engine_rows_request_owns_the_telemetry_gpu_engines_capability() {
@@ -17,7 +18,7 @@ fn update_events_only_accept_the_telemetry_gpu_engines_capability() {
         DeviceId::new("gpu:0"),
         vec![GpuEngineMetric {
             name: "Render Ring".to_owned(),
-            kind: taskmanager_core::GpuEngineKind::Unknown,
+            kind: GpuEngineKind::Unknown,
             utilization_pct: 12.5,
         }],
     ));

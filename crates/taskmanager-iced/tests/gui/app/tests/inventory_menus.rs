@@ -1,4 +1,9 @@
 use super::*;
+use taskmanager_application::PlatformEffect;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn service_and_startup_row_menus_preserve_provider_identity() {
@@ -13,14 +18,14 @@ fn service_and_startup_row_menus_preserve_provider_identity() {
     let expected_service_id = app.service_menu_target().map(|service| service.id.clone());
     let mut reordered_services = app.shell.projection().services.clone().unwrap_or_default();
     reordered_services.reverse();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(reordered_services)),
+        ProjectionSeedFact::Services(Some(reordered_services)),
     );
     let _ = crate::ui::view(&app);
     let _ = app.update(Message::RequestServiceAction {
         index: 0,
-        action: taskmanager_core::core::services::ServiceAction::Stop,
+        action: ServiceAction::Stop,
     });
     assert!(app.service_menu_index().is_none());
     assert_eq!(
@@ -45,9 +50,9 @@ fn service_and_startup_row_menus_preserve_provider_identity() {
         .clone()
         .unwrap_or_default();
     reordered_startup.reverse();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupEntries(Some(reordered_startup)),
+        ProjectionSeedFact::StartupEntries(Some(reordered_startup)),
     );
     let _ = crate::ui::view(&app);
     let _ = app.update(Message::RequestStartupControlFor {
@@ -75,13 +80,13 @@ fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
 
     let mut reordered_sessions = app.shell.projection().sessions.clone().unwrap_or_default();
     reordered_sessions.reverse();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(reordered_sessions)),
+        ProjectionSeedFact::Sessions(Some(reordered_sessions)),
     );
 
-    let Some(taskmanager_application::PlatformEffect::SessionControl(target)) =
-        app.request_user_menu_action(taskmanager_core::core::session::SessionControlAction::Lock)
+    let Some(PlatformEffect::SessionControl(target)) =
+        app.request_user_menu_action(SessionControlAction::Lock)
     else {
         panic!("the frozen Users menu should emit a session-control effect");
     };

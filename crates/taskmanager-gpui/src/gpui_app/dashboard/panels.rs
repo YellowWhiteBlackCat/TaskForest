@@ -13,10 +13,16 @@ use taskmanager_application::i18n;
 use taskmanager_core::core::AlertEventKind;
 use taskmanager_core::core::{AlertEvent, AlertMetric, AlertSeverity};
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_shell::SortDir;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 use super::saved_view_transfer::{
     SavedViewTransferFeedback, export_saved_views_json, import_saved_views_json,
@@ -110,14 +116,11 @@ fn render_events(
     events: &[AlertEvent],
     entity: Entity<RootView>,
 ) -> Div {
-    let mut filters =
-        div()
-            .flex()
-            .flex_row()
-            .flex_wrap()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ));
+    let mut filters = div()
+        .flex()
+        .flex_row()
+        .flex_wrap()
+        .gap(definite_length(tokens::SPACE_4));
     for filter in [EventFilter::All, EventFilter::Active, EventFilter::Cleared] {
         let entity = entity.clone();
         filters = filters.child(elements::pill(
@@ -139,17 +142,13 @@ fn render_events(
     let mut events = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ));
+        .gap(definite_length(tokens::SPACE_6));
     if visible.is_empty() {
         events = events.child(
             div()
-                .py(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_24,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .py(definite_length(tokens::SPACE_24))
+                .text_color(hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
                 .child(i18n::t("events.empty")),
         );
     }
@@ -169,14 +168,10 @@ fn render_events(
                     div()
                         .flex()
                         .justify_between()
-                        .gap(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_8,
-                        ))
+                        .gap(definite_length(tokens::SPACE_8))
                         .child(
                             div()
-                                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                    tokens::FONT_WEIGHT_SEMIBOLD,
-                                ))
+                                .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
                                 .child(format!(
                                     "{} · {}",
                                     event_kind_label(event.kind),
@@ -185,18 +180,16 @@ fn render_events(
                         )
                         .child(
                             div()
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_11,
-                                ))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                                .text_size(font_size(tokens::FONT_11))
+                                .text_color(hsla(theme.fg_dim))
                                 .child(format!("{} ms", event.observed_at_ms)),
                         ),
                 )
                 .child(
                     div()
-                        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_3))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .mt(length(tokens::SPACE_3))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg_dim))
                         .child(format!(
                             "{} · {:.1} / {:.1}",
                             event.alert.target, event.alert.value, event.alert.threshold
@@ -204,7 +197,7 @@ fn render_events(
                 )
                 .render()
                 .border_l_2()
-                .border_color(taskmanager_ui::theme_binding::hsla(color)),
+                .border_color(hsla(color)),
         );
     }
     let mark = entity.clone();
@@ -212,25 +205,19 @@ fn render_events(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .flex_wrap()
                 .justify_between()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(filters)
                 .child(
                     div()
                         .flex()
-                        .gap(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_4,
-                        ))
+                        .gap(definite_length(tokens::SPACE_4))
                         .child(elements::pill(
                             theme,
                             "events-mark-read",
@@ -271,9 +258,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
     let mut rows = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_7,
-        ));
+        .gap(definite_length(tokens::SPACE_7));
     for preset in &state.saved_views {
         let apply = entity.clone();
         let remove = entity.clone();
@@ -281,9 +266,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
         let preset_id = preset.id;
         let mut actions = div()
             .flex()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ))
+            .gap(definite_length(tokens::SPACE_4))
             .child(elements::pill(
                 theme,
                 ("saved-view-apply", preset_id),
@@ -329,28 +312,20 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                         .flex_wrap()
                         .items_center()
                         .justify_between()
-                        .gap(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_8,
-                        ))
+                        .gap(definite_length(tokens::SPACE_8))
                         .child(
                             div()
                                 .flex_1()
                                 .min_w(px(190.0))
                                 .child(
                                     div()
-                                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                            tokens::FONT_WEIGHT_SEMIBOLD,
-                                        ))
+                                        .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
                                         .child(preset.display_name()),
                                 )
                                 .child(
                                     div()
-                                        .text_size(taskmanager_ui::theme_binding::font_size(
-                                            tokens::FONT_11,
-                                        ))
-                                        .text_color(taskmanager_ui::theme_binding::hsla(
-                                            theme.fg_dim,
-                                        ))
+                                        .text_size(font_size(tokens::FONT_11))
+                                        .text_color(hsla(theme.fg_dim))
                                         .child(format!(
                                             "{} · {} · {} {}",
                                             process_hierarchy_label(),
@@ -371,13 +346,11 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
     let mut content = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("saved_views.help")),
         )
         .child(
@@ -385,9 +358,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(elements::pill(
                     theme,
                     "saved-view-save-current",
@@ -400,7 +371,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                             view.dashboard.save_current_view(
                                 view.process_status_filter(),
                                 sort_col,
-                                matches!(sort_dir, taskmanager_shell::SortDir::Asc),
+                                matches!(sort_dir, SortDir::Asc),
                                 view.processes_state.hidden_cols.clone(),
                             );
                             cx.notify();
@@ -457,8 +428,8 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
         content = content.child(
             div()
                 .id("saved-view-transfer-feedback")
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(saved_view_transfer_feedback(feedback)),
         );
     }

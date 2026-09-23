@@ -1,5 +1,7 @@
 use super::*;
+use bevy::input::keyboard;
 use taskmanager_application::{AppAction, AppPage, CommandContext, CommandScope, FocusDirection};
+use taskmanager_ui_contract::SemanticNodeId;
 
 fn modifiers(control: bool, alt: bool, shift: bool) -> InputModifiers {
     InputModifiers {
@@ -17,11 +19,19 @@ fn bevy_page_keys_use_the_shared_router_and_reject_wrong_chords() {
         ..CommandContext::default()
     };
     assert_eq!(
-        normalize_key(KeyCode::Digit2, modifiers(false, true, false), context),
+        normalize_key(
+            keyboard::KeyCode::Digit2,
+            modifiers(false, true, false),
+            context
+        ),
         Some(AppAction::SelectPage(AppPage::Applications))
     );
     assert_eq!(
-        normalize_key(KeyCode::Digit2, InputModifiers::default(), context),
+        normalize_key(
+            keyboard::KeyCode::Digit2,
+            InputModifiers::default(),
+            context
+        ),
         None
     );
 }
@@ -33,7 +43,11 @@ fn focus_traversal_and_process_shortcuts_honor_scope_and_text_input() {
         ..CommandContext::default()
     };
     assert_eq!(
-        normalize_key(KeyCode::Tab, modifiers(false, false, true), global),
+        normalize_key(
+            keyboard::KeyCode::Tab,
+            modifiers(false, false, true),
+            global
+        ),
         Some(AppAction::MoveFocus(FocusDirection::Previous))
     );
 
@@ -43,7 +57,11 @@ fn focus_traversal_and_process_shortcuts_honor_scope_and_text_input() {
         ..CommandContext::default()
     };
     assert_eq!(
-        normalize_key(KeyCode::Delete, InputModifiers::default(), process_list),
+        normalize_key(
+            keyboard::KeyCode::Delete,
+            InputModifiers::default(),
+            process_list
+        ),
         Some(AppAction::RequestEndTask)
     );
 
@@ -52,11 +70,19 @@ fn focus_traversal_and_process_shortcuts_honor_scope_and_text_input() {
         ..process_list
     };
     assert_eq!(
-        normalize_key(KeyCode::Delete, InputModifiers::default(), ime_focused),
+        normalize_key(
+            keyboard::KeyCode::Delete,
+            InputModifiers::default(),
+            ime_focused
+        ),
         None
     );
     assert_eq!(
-        normalize_key(KeyCode::ArrowDown, InputModifiers::default(), ime_focused),
+        normalize_key(
+            keyboard::KeyCode::ArrowDown,
+            InputModifiers::default(),
+            ime_focused
+        ),
         None
     );
 }
@@ -127,10 +153,7 @@ fn semantic_addresses_are_stable_across_rebuilds() {
     let snapshot = crate::semantic::build_snapshot(&shell).expect("valid semantic snapshot");
     let node_ids: Vec<_> = snapshot.nodes().map(|node| node.id().clone()).collect();
     for row in shell.visible_processes() {
-        let expected = taskmanager_ui_contract::SemanticNodeId::owned(format!(
-            "row:{}",
-            process_semantic_key(row)
-        ));
+        let expected = SemanticNodeId::owned(format!("row:{}", process_semantic_key(row)));
         assert!(
             node_ids.contains(&expected),
             "the AT snapshot must announce the production row identity {expected:?}"

@@ -11,6 +11,7 @@ use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};
 use crate::{ServiceDependenciesTarget, TuiApp, TuiTheme};
+use taskmanager_core::core::target::ServiceId;
 
 /// Render the service dependencies modal overlay.
 pub(super) fn render_service_dependencies_at(
@@ -110,10 +111,7 @@ fn build_relation_section<'a>(
     deps: &ServiceDeps,
     kind: &ServiceRelationKind,
 ) -> Vec<Line<'a>> {
-    let targets: Vec<&str> = deps
-        .relation_targets(kind)
-        .map(taskmanager_core::core::target::ServiceId::as_str)
-        .collect();
+    let targets: Vec<&str> = deps.relation_targets(kind).map(ServiceId::as_str).collect();
     if targets.is_empty() {
         return vec![Line::from(Span::styled(
             format!("{header}: —"),

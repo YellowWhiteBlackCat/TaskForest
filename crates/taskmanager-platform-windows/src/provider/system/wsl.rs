@@ -27,6 +27,7 @@ use std::time::Duration;
 use taskmanager_core::{ContainerSummary, FailureKind, IsolationKind, ScalarObservation};
 
 use crate::command::run_with_timeout;
+use taskmanager_windows_api::query_wsl_distributions;
 
 const WSL_EXE: &str = "wsl.exe";
 const WSL_LIST_TIMEOUT: Duration = Duration::from_secs(3);
@@ -282,7 +283,7 @@ impl WslRollupCollector {
     /// stopped distributions (or an unknown running set) keep typed-unavailable
     /// metrics; running ones are sampled through the fixed-program channel.
     pub(super) fn rollup(&mut self, now_ms: u64) -> WslRollupOutcome {
-        let distros = match taskmanager_windows_api::query_wsl_distributions() {
+        let distros = match query_wsl_distributions() {
             Ok(distros) => distros,
             Err(_) => {
                 self.rates.clear();

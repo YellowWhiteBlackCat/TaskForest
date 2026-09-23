@@ -18,6 +18,7 @@ use taskmanager_application::{
     ServiceUpdate, SessionControlOutcome, StartupControlOutcome, TelemetryInterval,
     TelemetryRefreshPolicyChange, UiEffect,
 };
+use taskmanager_application::{DirectoryUsageRequest, SmartControlRequest};
 use taskmanager_platform_contract::{EventPortError, OperationFailure, SubmissionError};
 
 impl SystemProjectionStore {
@@ -203,10 +204,10 @@ impl ShellApp {
                 format!("Desktop notification queued: {}", request.title)
             }
             PlatformEffect::DirectoryUsage(request) => match request {
-                taskmanager_application::DirectoryUsageRequest::StartScan(spec) => {
+                DirectoryUsageRequest::StartScan(spec) => {
                     format!("Directory usage scan queued for {}", spec.root)
                 }
-                taskmanager_application::DirectoryUsageRequest::Cancel(scan_id) => {
+                DirectoryUsageRequest::Cancel(scan_id) => {
                     format!("Directory usage scan {} cancel queued", scan_id.get())
                 }
             },
@@ -218,12 +219,8 @@ impl ShellApp {
             PlatformEffect::RaplPower(_) => "CPU package power queued".into(),
             PlatformEffect::MsrReadout(_) => "CPU MSR readout queued".into(),
             PlatformEffect::SmartControl(request) => match request {
-                taskmanager_application::SmartControlRequest::StartSelfTest(_) => {
-                    "SMART self-test queued".into()
-                }
-                taskmanager_application::SmartControlRequest::StopTracking(_) => {
-                    "SMART tracking stop queued".into()
-                }
+                SmartControlRequest::StartSelfTest(_) => "SMART self-test queued".into(),
+                SmartControlRequest::StopTracking(_) => "SMART tracking stop queued".into(),
             },
             PlatformEffect::ServiceDependencies(request) => format!(
                 "Service dependencies queued for {}",

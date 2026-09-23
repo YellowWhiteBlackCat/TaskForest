@@ -1,7 +1,12 @@
 use super::*;
 use crate::app::Message;
+use taskmanager_application::AlertRuleImportMode;
+use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::alerts::{AlertMetric, AlertRule};
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 fn pin_english() {
     set_language(Language::En);
@@ -70,8 +75,8 @@ fn active_alert_lines_name_the_metric_value_and_severity() {
     // One zero-duration CPU rule at 30% (below the fixture's 37.4%) so a
     // single evaluation fires.
     app.shell
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Import {
-            rules: vec![taskmanager_application::ManagedAlertRule::new(
+        .edit_alert_rules(ManagedAlertRuleEdit::Import {
+            rules: vec![ManagedAlertRule::new(
                 AlertRule::new(
                     "cpu-hot",
                     AlertMetric::CpuUsagePercent,
@@ -82,7 +87,7 @@ fn active_alert_lines_name_the_metric_value_and_severity() {
                 ),
                 true,
             )],
-            mode: taskmanager_application::AlertRuleImportMode::Replace,
+            mode: AlertRuleImportMode::Replace,
         })
         .unwrap();
     let snapshot = app
@@ -92,9 +97,9 @@ fn active_alert_lines_name_the_metric_value_and_severity() {
         .clone()
         .expect("demo snapshot fixture");
     let evaluation = app.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ActiveAlerts(evaluation.active),
+        ProjectionSeedFact::ActiveAlerts(evaluation.active),
     );
     assert_eq!(app.shell.projection().alert_active.len(), 1);
 
@@ -116,9 +121,9 @@ fn an_empty_rule_set_renders_the_localized_empty_state() {
     pin_english();
     let mut app = crate::IcedApp::demo();
     app.shell
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Import {
+        .edit_alert_rules(ManagedAlertRuleEdit::Import {
             rules: Vec::new(),
-            mode: taskmanager_application::AlertRuleImportMode::Replace,
+            mode: AlertRuleImportMode::Replace,
         })
         .unwrap();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));

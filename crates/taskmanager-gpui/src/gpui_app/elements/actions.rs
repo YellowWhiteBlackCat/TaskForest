@@ -9,8 +9,14 @@ use std::rc::Rc;
 use taskmanager_theme::Theme;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::tokens;
+use taskmanager_ui::icons_binding;
 use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
 use taskmanager_ui::primitives::pill::PillState;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 /// A pill / segmented-control segment. Active = accent fill + white text; inactive
@@ -118,6 +124,8 @@ impl Pill {
 
     /// Render the pill with the current theme.
     pub fn render(self, t: &Theme) -> impl IntoElement {
+        use taskmanager_ui::primitives::pill::Pill;
+
         // taskmanager-ui pill visual (accent fill + on-accent when active,
         // surface + border when idle) inside our own focusable shell. The
         // shell is the keyboard contract the old gc `Button` provided: a real
@@ -129,7 +137,7 @@ impl Pill {
         let on_click = self.on_click;
         let on_hover = self.on_hover;
         let enabled = self.enabled;
-        let pill = taskmanager_ui::primitives::pill::Pill::new(
+        let pill = Pill::new(
             self.label,
             if self.active {
                 PillState::Active
@@ -159,10 +167,8 @@ impl Pill {
             Some(icon) => wrapper
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
-                .child(taskmanager_ui::icons_binding::icon(icon).size(px(12.0)))
+                .gap(definite_length(tokens::SPACE_8))
+                .child(icons_binding::icon(icon).size(px(12.0)))
                 .child(pill),
             None => wrapper.child(pill),
         }
@@ -287,17 +293,11 @@ impl ToolBtn {
         // branches below inherit the ring + tab-stop.
         let btn = div()
             .id(self.id)
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_12,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_6,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::control_radius(theme),
-            ))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_14))
-            .text_color(taskmanager_ui::theme_binding::hsla(fg));
+            .px(definite_length(tokens::SPACE_12))
+            .py(definite_length(tokens::SPACE_6))
+            .rounded(absolute(tokens::control_radius(theme)))
+            .text_size(font_size(tokens::FONT_14))
+            .text_color(hsla(fg));
         let mut btn = if self.enabled {
             btn.focusable().tab_stop(true).focus(focus_ring(theme))
         } else {
@@ -313,33 +313,26 @@ impl ToolBtn {
             let base = theme.sidebar_card_bg;
             let hover = theme.hover_bg();
             let hovered = self.hovered;
-            btn = btn
-                .bg(taskmanager_ui::theme_binding::fill(base))
-                .relative()
-                .child(
-                    div().absolute().inset_0().child(
-                        div()
-                            .size_full()
-                            .rounded(taskmanager_ui::theme_binding::absolute(
-                                tokens::control_radius(theme),
-                            ))
-                            .with_animation(
-                                ("tool-btn-bg", hover_state_key(false, hovered)),
-                                hover_animation(),
-                                move |el, delta| {
-                                    if hovered {
-                                        el.bg(taskmanager_ui::theme_binding::fill(mix(
-                                            base, hover, delta,
-                                        )))
-                                    } else {
-                                        el.bg(taskmanager_ui::theme_binding::fill(base))
-                                    }
-                                },
-                            ),
-                    ),
-                );
+            btn = btn.bg(fill(base)).relative().child(
+                div().absolute().inset_0().child(
+                    div()
+                        .size_full()
+                        .rounded(absolute(tokens::control_radius(theme)))
+                        .with_animation(
+                            ("tool-btn-bg", hover_state_key(false, hovered)),
+                            hover_animation(),
+                            move |el, delta| {
+                                if hovered {
+                                    el.bg(fill(mix(base, hover, delta)))
+                                } else {
+                                    el.bg(fill(base))
+                                }
+                            },
+                        ),
+                ),
+            );
         } else {
-            btn = btn.bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg));
+            btn = btn.bg(fill(theme.sidebar_card_bg));
         }
         // Label slot. The icon inherits `fg` from this div (the same text_color
         // inheritance chrome tabs rely on for their Icon child).
@@ -347,10 +340,8 @@ impl ToolBtn {
             Some(ic) => btn
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .child(taskmanager_ui::icons_binding::icon(ic).size(px(13.0)))
+                .gap(definite_length(tokens::SPACE_6))
+                .child(icons_binding::icon(ic).size(px(13.0)))
                 .child(self.label),
             None => btn.child(self.label),
         };

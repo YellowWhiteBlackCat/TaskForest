@@ -9,15 +9,19 @@
 # requirement alone.
 #
 # Fail-closed contract (mirrors accept-gpui-interactions.sh):
-#   1. scripts/iced_interaction_matrix.tsv covers every public requirement,
-#      every requirement carries a success path, and every capture
-#      scenario name exists in capture_iced_scenarios.tsv.
-#   2. Every matrix test name is present in `cargo nextest list` for the
-#      taskmanager-iced lib target.
+#   1. The unified interaction matrix's `iced` projection covers every public
+#      requirement, every requirement carries a success path, and every capture
+#      scenario name exists in capture_iced_scenarios.tsv.  The authoritative
+#      row schema, target and uniqueness rules live in the resolver, and the
+#      `paths` vocabulary in the Rust `ContractTag` conformance; this gate keeps
+#      a local shape check and the iced-specific capture-scenario membership
+#      check, and does not re-declare the path vocabulary.
+#   2. Every projected matrix test name is present in `cargo nextest list` for
+#      the taskmanager-iced lib target.
 #   3. The whole lib target runs with the locked workspace and the CI nextest
 #      profile (NEXTEST_EXPERIMENTAL_LIBTEST_JSON for per-test events).
-#   4. A libtest JSON `ok` event must exist for every matrix test; a missing,
-#      filtered, renamed or failed case fails the receipt validator.
+#   4. A libtest JSON `ok` event must exist for every projected matrix test; a
+#      missing, filtered, renamed or failed case fails the receipt validator.
 #   5. Git/Rust/discovery/run/validation receipts land under
 #      target/iced-interaction-evidence/<run>/.
 #
@@ -30,20 +34,39 @@ export LC_ALL=C
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
-MATRIX="$REPO/scripts/iced_interaction_matrix.tsv"
+# D6: the retired per-frontend compatibility view is gone; the unified matrix is
+# the single declaration authority and this gate projects its `iced` rows.
+UNIFIED_MATRIX="$REPO/scripts/parity/cross_frontend_matrix.tsv"
 REQUIREMENTS="$REPO/scripts/interaction_requirements.tsv"
 CAPTURE_SCENARIOS="$REPO/scripts/capture_iced_scenarios.tsv"
 
 MATRIX_FIELDS=(case_id p0_id target test_name paths capture_scenarios)
 ALLOWED_TARGETS=(lib)
-ALLOWED_PATHS=(
-    cancel evidence failure focus isolation keyboard lifecycle pointer
-    provider-gap recovery responsive success toggle
-)
 
 die() {
     printf 'Iced interaction gate: FAIL: %s\n' "$1" >&2
     exit 1
+}
+
+# Project the unified matrix's `iced` rows to the columns this gate consumes.
+# The projection is generated per run, never committed; `paths` tokens are
+# copied verbatim (their vocabulary authority is the Rust `ContractTag`).
+project_matrix() {
+    local output="$1"
+    [ -s "$UNIFIED_MATRIX" ] \
+        || die "unified interaction matrix is empty or missing: $UNIFIED_MATRIX"
+    {
+        local field expected_header=""
+        for field in "${MATRIX_FIELDS[@]}"; do
+            expected_header+="${field}"$'\t'
+        done
+        printf '%s\n' "${expected_header%$'\t'}"
+        awk -F'\t' -v OFS='\t' '
+            $0 ~ /^[[:space:]]*#/ { next }
+            $1 == "subject_kind" { next }
+            $3 == "iced" { print $2, $4, $5, $6, $7, $8 }
+        ' "$UNIFIED_MATRIX"
+    } >"$output"
 }
 
 # ---------------------------------------------------------------------------
@@ -109,14 +132,13 @@ validate_matrix() {
         [ -z "${seen_tests[$test_name]+set}" ] || die "duplicate test_name: $test_name"
         seen_tests[$test_name]=1
         [ -n "$paths" ] || die "$case_id: empty paths"
-        local path path_ok
+        # The path-token vocabulary is owned by the Rust `ContractTag`
+        # conformance over the unified matrix; this gate only needs the
+        # `success` marker for the per-requirement coverage check below.
+        local path
         local IFS='|'
         for path in $paths; do
-            path_ok=0
-            for allowed in "${ALLOWED_PATHS[@]}"; do
-                if [ "$path" = "$allowed" ]; then path_ok=1; fi
-            done
-            [ "$path_ok" -eq 1 ] || die "$case_id: invalid path $path"
+            [ -n "$path" ] || die "$case_id: empty path token"
             if [ "$path" = success ]; then success_p0[$p0_id]=1; fi
         done
         unset IFS
@@ -349,16 +371,22 @@ RUN_ID="${RUN_STAMP}_${GIT_HEAD}_${WORKTREE_STATE}_$$"
 RUN_DIR="$REPO/target/iced-interaction-evidence/$RUN_ID"
 mkdir -p "$RUN_DIR"
 
+# D6: project the unified matrix's `iced` rows into this run's evidence
+# directory; the retired per-frontend file is not read.
+MATRIX="$RUN_DIR/interaction-matrix.tsv"
+project_matrix "$MATRIX"
+
 printf 'run_id=%s\n' "$RUN_ID" >"$RUN_DIR/metadata.txt"
 printf 'git_head=%s\n' "$GIT_HEAD" >>"$RUN_DIR/metadata.txt"
 printf 'worktree=%s\n' "$WORKTREE_STATE" >>"$RUN_DIR/metadata.txt"
 printf 'rust=%s\n' "$(rustc -V)" >>"$RUN_DIR/metadata.txt"
+printf 'matrix=scripts/parity/cross_frontend_matrix.tsv\n' >>"$RUN_DIR/metadata.txt"
 printf 'command=bash scripts/accept-iced-interactions.sh\n' >>"$RUN_DIR/metadata.txt"
 
 # 1) Validators prove themselves before they judge the real inputs.
 self_test | tee "$RUN_DIR/self-test.log"
 
-# 2) Matrix structure + ledger coverage + capture-scenario names.
+# 2) Projected matrix coverage + capture-scenario names.
 validate_matrix "$MATRIX" "$REQUIREMENTS" "$CAPTURE_SCENARIOS"
 printf 'case_count=%s\np0_count=%s\n' "$MATRIX_CASE_COUNT" "$MATRIX_P0_COUNT" \
     >"$RUN_DIR/matrix-summary.txt"

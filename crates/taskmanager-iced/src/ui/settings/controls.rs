@@ -21,6 +21,7 @@ use taskmanager_theme::{FontChoice, Skin, Theme, tokens};
 use super::*;
 use crate::app::ModeChoice;
 use crate::ui::components::divider;
+use taskmanager_application::i18n::t;
 
 /// Label column width of one settings row (px contract): a stable left rail
 /// for labels inside the modal panel's fixed 680px body, controls take the
@@ -168,7 +169,7 @@ pub(super) fn ui_size_choices() -> Vec<(String, usize)> {
     ]
     .into_iter()
     .enumerate()
-    .map(|(index, key)| (taskmanager_application::i18n::t(key).to_string(), index))
+    .map(|(index, key)| (t(key).to_string(), index))
     .collect()
 }
 
@@ -195,7 +196,7 @@ pub(super) fn motion_choices() -> Vec<(String, usize)> {
     ]
     .into_iter()
     .enumerate()
-    .map(|(index, key)| (taskmanager_application::i18n::t(key).to_string(), index))
+    .map(|(index, key)| (t(key).to_string(), index))
     .collect()
 }
 
@@ -282,14 +283,11 @@ pub(super) fn unit_bytes_choices(language: Language) -> Vec<(String, usize)> {
 }
 
 pub(super) fn unit_base_choices() -> Vec<(String, usize)> {
-    [
-        taskmanager_application::i18n::t("settings.base_2"),
-        taskmanager_application::i18n::t("settings.base_10"),
-    ]
-    .into_iter()
-    .enumerate()
-    .map(|(index, label)| (label.to_string(), index))
-    .collect()
+    [t("settings.base_2"), t("settings.base_10")]
+        .into_iter()
+        .enumerate()
+        .map(|(index, label)| (label.to_string(), index))
+        .collect()
 }
 
 /// The active segment of one two-state unit axis: `0` = the first (Bytes /

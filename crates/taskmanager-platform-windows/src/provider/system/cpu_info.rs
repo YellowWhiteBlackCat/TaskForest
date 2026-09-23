@@ -1,6 +1,18 @@
 //! Static CPU facts whose public APIs are safe and bounded.
 
 use taskmanager_core::CpuInstructionFeature;
+#[cfg(all(
+    windows,
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(target_env = "sgx")
+))]
+use taskmanager_windows_api::query_processor_power_information;
+#[cfg(all(
+    windows,
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(target_env = "sgx")
+))]
+use taskmanager_windows_api::query_smbios_processor_max_mhz;
 
 /// Read the advertised base and maximum processor frequencies from CPUID's
 /// frequency-information leaf. Unsupported architectures, virtual CPUs, and
@@ -25,20 +37,17 @@ pub(super) fn advertised_frequencies_mhz() -> (Option<u64>, Option<u64>) {
         // `PROCESSOR_POWER_INFORMATION.MaxMhz` reports the per-core-type base
         // frequency (P 1900 / E 1500 / LP-E 1500 on hybrid parts), never the
         // turbo ceiling — using it as the "max" row is the old bug.
-        let power_base_max = taskmanager_windows_api::query_processor_power_information()
-            .ok()
-            .and_then(|powers| {
-                powers
-                    .iter()
-                    .map(|p| p.max_mhz as u64)
-                    .max()
-                    .filter(|&m| m > 0 && m < 10_000)
-            });
+        let power_base_max = query_processor_power_information().ok().and_then(|powers| {
+            powers
+                .iter()
+                .map(|p| p.max_mhz as u64)
+                .max()
+                .filter(|&m| m > 0 && m < 10_000)
+        });
 
         // SMBIOS Type 4 `Max Speed` is the reliable non-privileged turbo source
         // on hybrid parts where CPUID leaf 0x16 is zero-filled (Panther Lake).
-        let smbios_max = taskmanager_windows_api::query_smbios_processor_max_mhz()
-            .filter(|&m| m > 0 && m < 10_000);
+        let smbios_max = query_smbios_processor_max_mhz().filter(|&m| m > 0 && m < 10_000);
 
         resolve_frequency_sources(cpuid_base, cpuid_max, power_base_max, smbios_max)
     }

@@ -16,6 +16,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
+use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{HighContrast, LightDark, Skin};
 
@@ -24,7 +25,7 @@ fn theme_for(skin: Skin, mode: LightDark) -> Theme {
         skin,
         mode,
         HighContrast::Off,
-        taskmanager_theme::ResolvedFonts::system_for(skin),
+        ResolvedFonts::system_for(skin),
     )
 }
 

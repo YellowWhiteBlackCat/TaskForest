@@ -10,6 +10,7 @@
 //! frontend.
 
 use taskmanager_core::CpuThrottleSnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One CPU thermal-throttle trigger-counter read for the host.

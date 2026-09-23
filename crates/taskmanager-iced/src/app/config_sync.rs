@@ -6,6 +6,9 @@
 use std::time::Duration;
 
 use super::*;
+use taskmanager_application::ConfigPublication;
+use taskmanager_application::ConfigRecovery;
+use taskmanager_application::ConfigStoreErrorKind;
 use taskmanager_application::{
     ConfigBootstrap, ConfigBootstrapFallback, ConfigDrain, ConfigPublicationOutcome,
     ConfigRecoveryNotice, ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
@@ -112,10 +115,7 @@ impl IcedApp {
         self.configuration.draft().clone()
     }
 
-    pub(crate) fn apply_config_publication(
-        &mut self,
-        publication: &taskmanager_application::ConfigPublication,
-    ) {
+    pub(crate) fn apply_config_publication(&mut self, publication: &ConfigPublication) {
         let failed = publication.outcome().is_failure();
         if failed || self.configuration.applied_revision() != Some(publication.revision()) {
             self.apply_config_snapshot(publication.snapshot(), false);
@@ -206,17 +206,15 @@ impl IcedApp {
     }
 }
 
-fn recovery_message(prefix: &str, recovery: taskmanager_application::ConfigRecovery) -> String {
+fn recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
     format!(
         "{prefix}: source={:?}, primary={}, backup={}",
         recovery.source(),
-        recovery.primary_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
-        recovery.backup_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
+        recovery
+            .primary_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
+        recovery
+            .backup_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
     )
 }

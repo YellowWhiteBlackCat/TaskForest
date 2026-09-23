@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_assets::product::GPUI_NAME;
 
 #[test]
 fn action_ids_map_to_the_expected_intents() {
@@ -50,7 +51,7 @@ fn branded_icon_has_visible_pixels_and_the_expected_shape() {
 fn tray_spec_carries_localized_labels_and_pause_state() {
     let spec = build_tray_spec(true).expect("spec builds from embedded catalogs");
     assert_eq!(spec.menu().node_count(), 4);
-    assert_eq!(spec.title(), Some(taskmanager_assets::product::GPUI_NAME));
+    assert_eq!(spec.title(), Some(GPUI_NAME));
     assert!(!spec.show_menu_on_left_click());
     let paused_spec = build_tray_spec(false).expect("spec builds");
     assert!(paused_spec.menu().items().len() == 4);

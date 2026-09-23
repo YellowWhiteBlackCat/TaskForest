@@ -2,6 +2,9 @@
 
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, SharedString, Styled, div};
 use taskmanager_ui::inputs::select::{SelectOption, select};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, FontRole,
@@ -64,22 +67,18 @@ fn font_choice_row(props: FontChoiceRowProps<'_>, cx: &mut Context<RootView>) ->
         .flex_row()
         .items_center()
         .justify_between()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg))
                 .child(caption.to_string()),
         )
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(font_pill(
                     FontPillProps {
                         theme,
@@ -184,9 +183,7 @@ pub(super) fn font_row(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(font_choice_row(
             FontChoiceRowProps {
                 theme,
@@ -219,18 +216,14 @@ pub(super) fn font_row(
         ))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(
-                    tokens::FONT_CAPTION,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_CAPTION))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("settings.font_hint").to_string()),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(
-                    tokens::FONT_CAPTION,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_CAPTION))
+                .text_color(hsla(theme.fg_dim))
                 .child(effective_font_summary(theme)),
         )
 }

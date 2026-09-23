@@ -8,15 +8,21 @@ use super::super::perf_devices::battery::{
 };
 use super::super::tables::ListState;
 use super::super::*;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::viewmodel::StatRow;
 
 fn with_battery_scalars(
-    mut battery: taskmanager_core::core::power::BatteryInfo,
+    mut battery: BatteryInfo,
     observed_at_ms: u64,
     capacity_pct: Option<u8>,
     voltage_uv: Option<u64>,
     power_w: Option<f32>,
     cycle_count: Option<u32>,
-) -> taskmanager_core::core::power::BatteryInfo {
+) -> BatteryInfo {
     use taskmanager_core::core::metrics::ScalarObservation;
     use taskmanager_core::core::power::BatteryScalarObservations;
 
@@ -102,10 +108,8 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
     // top of the scalar readouts.
     let mut battery = battery;
     let mut energy = *battery.scalar_observations();
-    energy.energy_full_uwh =
-        taskmanager_core::core::metrics::ScalarObservation::available(49_000_000.0, 100);
-    energy.energy_full_design_uwh =
-        taskmanager_core::core::metrics::ScalarObservation::available(56_000_000.0, 100);
+    energy.energy_full_uwh = ScalarObservation::available(49_000_000.0, 100);
+    energy.energy_full_design_uwh = ScalarObservation::available(56_000_000.0, 100);
     battery.apply_scalar_observations(energy);
     let rows = battery_summary_lines(&battery);
     // Headline capacity stays a real percentage, not a fabricated zero.
@@ -180,9 +184,9 @@ fn battery_panel_renders_honest_states_and_routes_through_the_selector() {
 
     // A snapshot that reported no battery routes to the honest empty line — the
     // canonical "no battery detected" message, not a fabricated panel.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             state: DeviceState::healthy(10),
             timestamp_ms: 10,
             batteries: Vec::new(),
@@ -196,9 +200,9 @@ fn battery_panel_renders_honest_states_and_routes_through_the_selector() {
     let _ = view(&app);
 
     // A populated snapshot renders the per-battery block; the full page composes.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             state: DeviceState::healthy(20),
             timestamp_ms: 20,
             batteries: vec![with_battery_scalars(
@@ -228,12 +232,9 @@ fn battery_panel_renders_honest_states_and_routes_through_the_selector() {
 /// Look up the value projected under one label, failing loudly if the row is
 /// absent (mirrors the table-test helper convention used by the disk/gpu
 /// tests). `None` values render the shared dash exactly like the panel.
-fn lookup<'a>(rows: &'a [taskmanager_shell::viewmodel::StatRow], label: &str) -> &'a str {
+fn lookup<'a>(rows: &'a [StatRow], label: &str) -> &'a str {
     rows.iter()
         .find(|row| row.label() == label)
-        .map(|row| {
-            row.value()
-                .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE)
-        })
+        .map(|row| row.value().unwrap_or(MISSING_VALUE))
         .expect("projected battery row must be present")
 }

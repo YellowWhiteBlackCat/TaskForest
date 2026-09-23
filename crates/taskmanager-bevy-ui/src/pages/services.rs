@@ -71,6 +71,7 @@ pub(crate) mod menu;
 mod scene;
 
 use scene::{services_body_scene, services_search_input_scene};
+use taskmanager_shell::service_cycle_members;
 
 // ---- pure core: row view model, chips, empty/notice/status copy ----
 
@@ -95,7 +96,7 @@ pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<Servic
         .projection()
         .services
         .as_deref()
-        .map(taskmanager_shell::service_cycle_members)
+        .map(service_cycle_members)
         .unwrap_or_default();
     shell
         .sorted_services()

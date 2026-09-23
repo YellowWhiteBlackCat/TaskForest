@@ -1,12 +1,13 @@
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::metrics::{DiskPartitionScalarObservations, ScalarObservation};
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 use super::{PartitionUsage, partition_usage};
 
 #[test]
 fn partition_usage_distinguishes_current_mounted_data_from_unavailable_space() {
-    let mut mounted = taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+    let mut mounted = DiskPartitionFixtureBuilder::new()
         .device_state(DeviceState::healthy(10))
         .mount_point("/data".into())
         .build();
@@ -48,7 +49,7 @@ fn partially_available_partition_observations_do_not_fold_into_current_usage() {
     // Capacity is observable for an unmounted partition while used/free
     // space is not — the fold must stay Unavailable rather than invent
     // zeros, and a fully-observed sibling of the same shape folds Current.
-    let mut partial = taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+    let mut partial = DiskPartitionFixtureBuilder::new()
         .device_state(DeviceState::healthy(10))
         .mount_point(String::new())
         .build();

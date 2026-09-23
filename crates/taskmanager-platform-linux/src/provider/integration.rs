@@ -13,6 +13,7 @@ use taskmanager_platform_provider::{
 
 use super::process_target::validate_process_identity;
 use crate::engine::process::{ProcessManager, validate_exact_start_token};
+use taskmanager_core::AlertSeverity;
 
 const SETUP_SCRIPT_PATH: &str = "/usr/share/taskforest/setup/99-taskforest.rules";
 const SETUP_HELPER_PATH: &str = "/usr/libexec/taskforest-setup-helper";
@@ -74,7 +75,7 @@ impl DesktopNotificationProvider for NativeDesktopNotificationProvider {
         &mut self,
         title: &str,
         body: &str,
-        _severity: taskmanager_core::AlertSeverity,
+        _severity: AlertSeverity,
         target: &str,
     ) -> Result<(), ProviderFailure> {
         use std::collections::HashMap;

@@ -24,11 +24,16 @@ use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::setup::SetupScriptAction;
 
+use taskmanager_core::core::SmartSelfTestKind;
+use taskmanager_core::core::history::HistoryWindow;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
     ProcessStatusFilter, ShellApp, SortCol,
 };
 use taskmanager_theme::{FontChoice, HighContrast, LightDark, Skin, Theme};
+use taskmanager_ui_contract::SemanticSnapshot;
 
 mod accessors;
 mod affinity;
@@ -408,7 +413,7 @@ pub enum Message {
     /// Request a SMART self-test on the observed disk at `index`.
     RequestSmartSelfTest {
         index: usize,
-        kind: taskmanager_core::core::SmartSelfTestKind,
+        kind: SmartSelfTestKind,
     },
     /// Confirm the pending SMART self-test request.
     ConfirmSmartSelfTest,
@@ -440,7 +445,7 @@ pub enum Message {
     /// Toggle performance history replay panel.
     ToggleHistoryReplay,
     /// Select performance history replay window.
-    SelectHistoryReplayWindow(taskmanager_core::core::history::HistoryWindow),
+    SelectHistoryReplayWindow(HistoryWindow),
     /// Refresh history replay query.
     RefreshHistoryReplay,
     /// Open the Alert Center modal.
@@ -481,7 +486,7 @@ pub struct IcedApp {
     pub shell: ShellApp,
     /// Immutable native local-time rules injected by the composition root.
     /// Renderer code never discovers host files or environment state.
-    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: LocalTimeRulesObservation,
     /// Sole owner of the platform client, singleton/tray handles and runtime
     /// cadence. View state cannot dynamically borrow or clone these resources.
     pub(crate) runtime: runtime::IcedRuntime,
@@ -508,8 +513,7 @@ pub struct IcedApp {
     pub(crate) first_run: crate::ui::first_run::FirstRunUiState,
     /// Pending first-run setup-script submissions, correlated by request id
     /// (the drained batch's answers and typed failures consume from here).
-    pub(crate) first_run_requests:
-        std::collections::HashMap<taskmanager_platform_contract::RequestId, SetupScriptAction>,
+    pub(crate) first_run_requests: std::collections::HashMap<RequestId, SetupScriptAction>,
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
@@ -553,7 +557,7 @@ pub struct IcedApp {
     /// Linked native accessibility bridge.
     pub(crate) a11y_bridge: crate::a11y::AppAccessibilityBridge,
     pub(crate) a11y_revision: u64,
-    pub(crate) a11y_snapshot: Option<taskmanager_ui_contract::SemanticSnapshot>,
+    pub(crate) a11y_snapshot: Option<SemanticSnapshot>,
 }
 
 impl IcedApp {

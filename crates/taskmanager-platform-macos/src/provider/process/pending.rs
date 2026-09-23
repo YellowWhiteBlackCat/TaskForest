@@ -9,6 +9,9 @@
 //! insight (sysinfo surfaces only the fd COUNT; the fd -> target listing has
 //! no safe accessor, so the optional facet publishes honest Unsupported).
 
+use taskmanager_core::ProcessIsolation;
+use taskmanager_core::ProcessNetworkSnapshot;
+use taskmanager_core::ResourceGroupLimitRequest;
 use taskmanager_core::{
     FrozenProcessIdentity, ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessOpenFiles,
     ProcessThreads,
@@ -29,8 +32,7 @@ impl ProcessNetworkProvider for PendingProcessNetworkProvider {
         &mut self,
         _target: &FrozenProcessIdentity,
         _observed_at_ms: u64,
-    ) -> Result<ProcessInsightSnapshot<taskmanager_core::ProcessNetworkSnapshot>, ProviderFailure>
-    {
+    ) -> Result<ProcessInsightSnapshot<ProcessNetworkSnapshot>, ProviderFailure> {
         Err(ProviderFailure::Unsupported)
     }
 }
@@ -56,7 +58,7 @@ impl ProcessIsolationProvider for PendingProcessIsolationProvider {
         &mut self,
         _target: &FrozenProcessIdentity,
         _observed_at_ms: u64,
-    ) -> Result<ProcessInsightSnapshot<taskmanager_core::ProcessIsolation>, ProviderFailure> {
+    ) -> Result<ProcessInsightSnapshot<ProcessIsolation>, ProviderFailure> {
         Err(ProviderFailure::Unsupported)
     }
 }
@@ -123,7 +125,7 @@ impl ProcessResourceControlProvider for PendingProcessResourceControlProvider {
     fn apply_limits(
         &mut self,
         _target: &FrozenProcessIdentity,
-        _limits: &taskmanager_core::ResourceGroupLimitRequest,
+        _limits: &ResourceGroupLimitRequest,
     ) -> Result<(), ProviderFailure> {
         Err(ProviderFailure::Unsupported)
     }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::app::Message;
+use taskmanager_application::AppPage;
 use taskmanager_core::core::process::ProcessLiveKey;
 
 #[test]
@@ -55,16 +56,13 @@ fn jump_to_process_selects_the_shared_route() {
     let _ = app.update(Message::JumpToProcess { identity });
 
     assert!(!app.alerts_page_open());
-    assert_eq!(
-        app.shell.page(),
-        taskmanager_application::AppPage::Applications
-    );
+    assert_eq!(app.shell.page(), AppPage::Applications);
 }
 
 #[test]
 fn shared_confirmation_from_another_domain_runs_the_common_finish_systems() {
     let mut app = crate::IcedApp::demo();
-    app.shell.application.active_page = taskmanager_application::AppPage::Applications;
+    app.shell.application.active_page = AppPage::Applications;
     assert!(app.shell.select_row(0));
     let _ = app.update(Message::OpenSettings);
     assert!(app.settings_open());

@@ -5,6 +5,10 @@
 //! exists renders (dash only for a live gap), a fact that does not exist on
 //! this host omits its row, and a section with no facts at all is omitted.
 
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_shell::presentation::health_score_for_snapshot;
+use taskmanager_shell::presentation::health_score_summary;
+use taskmanager_shell::presentation::kernel_error_summary;
 pub(crate) mod memory_inventory;
 mod npu;
 mod tiles;
@@ -121,7 +125,7 @@ pub(super) fn device_section(hw: &HardwareInfo, smbios: &SmbiosMemoryState) -> S
             truncate_cmdline(args),
         ));
     }
-    if let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hw) {
+    if let Some(errors) = kernel_error_summary(hw) {
         s.rows
             .push((i18n::t("system.kernel_errors").to_string(), errors));
     }
@@ -476,7 +480,7 @@ pub(super) fn memory_section(
 /// utilization and memory facts remain adjacent to its discovered identity.
 pub(super) fn graphics_section(
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    npu_inventory: Option<&NpuInventorySnapshot>,
     units: UnitPreferences,
 ) -> SystemSection {
     let mut s = SystemSection::new(IconId::Gpu, "system.section.graphics");
@@ -582,15 +586,15 @@ pub(super) fn storage_section(snap: &SystemSnapshot, units: UnitPreferences) -> 
 pub(super) fn build_sections(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    npu_inventory: Option<&NpuInventorySnapshot>,
     smbios: &SmbiosMemoryState,
     units: UnitPreferences,
 ) -> Vec<SystemSection> {
     let mut device = device_section(hw, smbios);
-    if let Some(score) = taskmanager_shell::presentation::health_score_for_snapshot(snap) {
+    if let Some(score) = health_score_for_snapshot(snap) {
         device.rows.push((
             i18n::t("system.health_score").to_string(),
-            taskmanager_shell::presentation::health_score_summary(&score),
+            health_score_summary(&score),
         ));
     }
     let sections = vec![

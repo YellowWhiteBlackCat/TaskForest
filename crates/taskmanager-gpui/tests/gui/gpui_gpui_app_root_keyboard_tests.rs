@@ -1,4 +1,9 @@
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
+use taskmanager_application::PendingConfirmation;
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -138,12 +143,10 @@ async fn question_is_suppressed_while_a_text_input_is_focused(cx: &mut TestAppCo
     win.update(cx, |view, _window, cx| {
         view.page = TopPage::Apps;
         view.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-                taskmanager_core::core::process::ProcessItem::default(),
-            )
-            .pid(42)
-            .name("searchable".into())
-            .build(),
+            ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+                .pid(42)
+                .name("searchable".into())
+                .build(),
         ]);
         cx.notify();
     })
@@ -186,16 +189,14 @@ async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppC
     let win = root(cx);
     win.update(cx, |view, _window, cx| {
         view.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-                taskmanager_core::core::process::ProcessItem::default(),
-            )
-            .pid(42)
-            .name("target".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
-                start_token: taskmanager_core::core::ScalarObservation::available(4_200, 1),
-                ..Default::default()
-            })
-            .build(),
+            ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+                .pid(42)
+                .name("target".into())
+                .scalar_observations(ProcessScalarObservations {
+                    start_token: ScalarObservation::available(4_200, 1),
+                    ..Default::default()
+                })
+                .build(),
         ]);
         cx.notify();
     })
@@ -224,7 +225,7 @@ async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppC
         assert!(
             matches!(
                 view.pending_confirmation(),
-                Some(taskmanager_application::PendingConfirmation::EndTask(_))
+                Some(PendingConfirmation::EndTask(_))
             ),
             "the request must stage a confirmation"
         );
@@ -317,16 +318,14 @@ async fn escape_dismisses_confirmation_modal(cx: &mut TestAppContext) {
     let win = root(cx);
     win.update(cx, |view, _window, cx| {
         view.replace_processes_for_test(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-                taskmanager_core::core::process::ProcessItem::default(),
-            )
-            .pid(42)
-            .name("target".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
-                start_token: taskmanager_core::core::ScalarObservation::available(4_200, 1),
-                ..Default::default()
-            })
-            .build(),
+            ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+                .pid(42)
+                .name("target".into())
+                .scalar_observations(ProcessScalarObservations {
+                    start_token: ScalarObservation::available(4_200, 1),
+                    ..Default::default()
+                })
+                .build(),
         ]);
         view.request_end_task_confirmation(
             ProcessLiveKey::from_parts(42, 4_200).expect("fixture identity"),

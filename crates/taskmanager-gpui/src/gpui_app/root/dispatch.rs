@@ -6,6 +6,7 @@
 
 use super::{ProcMenuAction, RootView, TopPage};
 use gpui::Entity;
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
@@ -82,35 +83,35 @@ pub fn build_proc_menu(entity: Entity<RootView>, identity: ProcessLiveKey) -> Ve
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.end_task"),
+        t("proc.end_task"),
         ProcMenuAction::EndTask,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.end_process_tree"),
+        t("proc.end_process_tree"),
         ProcMenuAction::EndProcessTree,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.kill"),
+        t("proc.kill"),
         ProcMenuAction::Kill,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.suspend"),
+        t("proc.suspend"),
         ProcMenuAction::Suspend,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.resume"),
+        t("proc.resume"),
         ProcMenuAction::Resume,
     );
     #[cfg(target_os = "linux")]
@@ -153,48 +154,46 @@ pub fn build_proc_menu(entity: Entity<RootView>, identity: ProcessLiveKey) -> Ve
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.open_location"),
+        t("proc.open_location"),
         ProcMenuAction::OpenLocation,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("proc.search_online"),
+        t("proc.search_online"),
         ProcMenuAction::SearchOnline,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("dialog.properties"),
+        t("dialog.properties"),
         ProcMenuAction::Properties,
     );
     items.push(MenuEntry::Separator);
     // Win11-TM "Copy" group: the own popup layer excludes submenus at compile
     // time for P4, so the submenu is flattened into a label + three items.
-    items.push(MenuEntry::Label(
-        taskmanager_application::i18n::t("common.copy").into(),
-    ));
+    items.push(MenuEntry::Label(t("common.copy").into()));
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("menu.copy_name"),
+        t("menu.copy_name"),
         ProcMenuAction::CopyName,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("menu.copy_pid"),
+        t("menu.copy_pid"),
         ProcMenuAction::CopyPid,
     );
     item(
         &mut items,
         &entity,
         identity,
-        taskmanager_application::i18n::t("menu.copy_command_line"),
+        t("menu.copy_command_line"),
         ProcMenuAction::CopyCmdline,
     );
     items
@@ -219,7 +218,7 @@ pub fn apply_search_online(
         return;
     };
     if name.trim().is_empty() {
-        v.show_local_feedback(taskmanager_application::i18n::t("hint.no_process_name"), cx);
+        v.show_local_feedback(t("hint.no_process_name"), cx);
         return;
     }
     v.request_open_url(search_url_for(&name), cx);

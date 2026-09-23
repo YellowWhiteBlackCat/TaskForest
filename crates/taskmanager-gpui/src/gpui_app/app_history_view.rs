@@ -6,6 +6,16 @@
 //! are shared by GPUI, Iced, TUI and Bevy.
 
 use std::rc::Rc;
+use taskmanager_application::ApplicationHistoryRow;
+use taskmanager_theme::Length;
+use taskmanager_theme::Weight;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rgba;
 
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ListSizingBehavior,
@@ -45,7 +55,7 @@ pub struct AppHistoryViewProps<'a> {
     pub scroll: &'a UniformListScrollHandle,
     pub entity: Entity<RootView>,
     pub(crate) graph_cache: GraphCacheHandle,
-    pub ui_size: taskmanager_theme::tokens::UiSize,
+    pub ui_size: tokens::UiSize,
     pub columns: AppHistoryColumns,
     /// Presentation unit preferences for the peak-memory column.
     pub units: UnitPreferences,
@@ -130,9 +140,7 @@ pub fn render_app_history(props: AppHistoryViewProps<'_>) -> Div {
         .min_h(px(0.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(header)
         .child(body)
 }
@@ -141,7 +149,7 @@ fn history_table(
     theme: &Theme,
     rows: Rc<Vec<AppHistoryRow>>,
     scroll: UniformListScrollHandle,
-    ui_size: taskmanager_theme::tokens::UiSize,
+    ui_size: tokens::UiSize,
     columns: AppHistoryColumns,
     units: UnitPreferences,
     graph_cache: GraphCacheHandle,
@@ -155,9 +163,7 @@ fn history_table(
         .flex_1()
         .min_h(px(0.0))
         .min_w(px(0.0))
-        .pr(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
+        .pr(definite_length(tokens::SPACE_16))
         .overflow_hidden()
         .child(
             div()
@@ -232,17 +238,15 @@ fn page_header(
     let mut title = div()
         .flex_1()
         .min_w(px(0.0))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_18))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(
-            tokens::FONT_WEIGHT_SEMIBOLD,
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .text_size(font_size(tokens::FONT_18))
+        .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+        .text_color(hsla(theme.fg))
         .child(i18n::t("history.application.title").to_string());
     if refreshing {
         title = title.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("history.application.refreshing").to_string()),
         );
     }
@@ -250,9 +254,7 @@ fn page_header(
         .flex()
         .items_center()
         .w_full()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .debug_selector(|| "tm-app-history-page-header".to_string())
         .child(title)
         .child(windows)
@@ -282,11 +284,7 @@ fn state_panel(theme: &Theme, title: &'static str, detail: String, tone: Color) 
         .into_any_element()
 }
 
-fn header_row(
-    theme: &Theme,
-    ui_size: taskmanager_theme::tokens::UiSize,
-    columns: AppHistoryColumns,
-) -> Div {
+fn header_row(theme: &Theme, ui_size: tokens::UiSize, columns: AppHistoryColumns) -> Div {
     row_skeleton(
         HistoryRowSpec {
             theme,
@@ -313,9 +311,7 @@ pub struct AppHistoryRow {
     cpu_samples: Rc<[f32]>,
 }
 
-pub(crate) fn projected_app_history_rows(
-    rows: &[taskmanager_application::ApplicationHistoryRow],
-) -> Vec<AppHistoryRow> {
+pub(crate) fn projected_app_history_rows(rows: &[ApplicationHistoryRow]) -> Vec<AppHistoryRow> {
     rows.iter()
         .map(|row| AppHistoryRow {
             name: row.display_name().to_owned(),
@@ -335,7 +331,7 @@ fn row_for_projected(
     theme: &Theme,
     row: &AppHistoryRow,
     row_index: usize,
-    ui_size: taskmanager_theme::tokens::UiSize,
+    ui_size: tokens::UiSize,
     columns: AppHistoryColumns,
     units: UnitPreferences,
     graph_cache: GraphCacheHandle,
@@ -375,7 +371,7 @@ fn row_for_projected(
         trend_cell_from_samples(theme, &row.cpu_samples, ui_size, graph_cache),
     );
     if row_index % 2 == 1 {
-        rendered = rendered.bg(taskmanager_ui::theme_binding::fill(theme.zebra_bg()));
+        rendered = rendered.bg(fill(theme.zebra_bg()));
     }
     rendered
         .h(px(f32::from(ui_size.body_font_size())
@@ -387,24 +383,22 @@ fn row_for_projected(
 fn trend_cell_from_samples(
     theme: &Theme,
     samples: &Rc<[f32]>,
-    ui_size: taskmanager_theme::tokens::UiSize,
+    ui_size: tokens::UiSize,
     graph_cache: GraphCacheHandle,
 ) -> Div {
     let cell = div().w(px(TREND_W)).min_w(px(0.0)).flex().items_center();
     if samples.iter().filter(|sample| sample.is_finite()).count() >= MIN_TREND_SAMPLES {
         cell.child(elements::sparkline(
             Rc::clone(samples),
-            taskmanager_ui::theme_binding::rgba(theme.accent),
+            rgba(theme.accent),
             TREND_W,
             TREND_H,
             graph_cache,
         ))
     } else {
-        cell.text_size(taskmanager_ui::theme_binding::absolute(
-            ui_size.caption_font_size(),
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-        .child(formatting::missing_value())
+        cell.text_size(absolute(ui_size.caption_font_size()))
+            .text_color(hsla(theme.fg_dim))
+            .child(formatting::missing_value())
     }
 }
 
@@ -416,7 +410,7 @@ struct HistoryRowSpec<'a> {
     /// Active theme (cell colors, zebra/border surfaces, palette).
     theme: &'a Theme,
     /// Ambient UI size selecting the header vs body font sizes.
-    ui_size: taskmanager_theme::tokens::UiSize,
+    ui_size: tokens::UiSize,
     /// Which metric columns the table currently shows.
     columns: AppHistoryColumns,
     /// Header styling (dim + bold + sidebar background) vs data-row styling.
@@ -466,16 +460,14 @@ fn row_skeleton_with_count(spec: HistoryRowSpec<'_>, trend: Div) -> Div {
         .min_w(px(0.0))
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .text_size(taskmanager_ui::theme_binding::absolute(if is_header {
+        .gap(definite_length(tokens::SPACE_6))
+        .text_size(absolute(if is_header {
             ui_size.header_font_size()
         } else {
             ui_size.body_font_size()
         }))
-        .text_color(taskmanager_ui::theme_binding::hsla(foreground))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
+        .text_color(hsla(foreground))
+        .font_weight(font_weight(weight))
         .child(
             div()
                 .flex_1()
@@ -487,10 +479,8 @@ fn row_skeleton_with_count(spec: HistoryRowSpec<'_>, trend: Div) -> Div {
         name_cell = name_cell.child(
             div()
                 .flex_shrink_0()
-                .text_size(taskmanager_ui::theme_binding::absolute(
-                    ui_size.caption_font_size(),
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(absolute(ui_size.caption_font_size()))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t(if verified {
                     "history.application.verified"
                 } else {
@@ -503,7 +493,7 @@ fn row_skeleton_with_count(spec: HistoryRowSpec<'_>, trend: Div) -> Div {
         row = row.radius(tokens::control_radius(theme));
     } else {
         row = row
-            .radius(taskmanager_theme::Length(0.0))
+            .radius(Length(0.0))
             .bottom_border(theme.border.with_alpha(0.35));
     }
     let mut row = row
@@ -538,15 +528,13 @@ fn row_skeleton(spec: HistoryRowSpec<'_>, trend: &str) -> Div {
     let trend_label = div()
         .w(px(TREND_W))
         .min_w(px(0.0))
-        .text_size(taskmanager_ui::theme_binding::absolute(
-            spec.ui_size.header_font_size(),
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(if spec.is_header {
+        .text_size(absolute(spec.ui_size.header_font_size()))
+        .text_color(hsla(if spec.is_header {
             spec.theme.fg_dim
         } else {
             spec.theme.fg
         }))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
+        .font_weight(font_weight(weight))
         .child(trend.to_owned());
     row_skeleton_with_count(spec, trend_label)
 }
@@ -555,16 +543,16 @@ fn fixed_cell(
     label: &str,
     width: f32,
     foreground: Color,
-    weight: taskmanager_theme::Weight,
-    font_size: taskmanager_theme::Length,
+    weight: Weight,
+    font_size: Length,
 ) -> Div {
     div()
         .w(px(width))
         .min_w(px(0.0))
         .flex_shrink_0()
-        .text_size(taskmanager_ui::theme_binding::absolute(font_size))
-        .text_color(taskmanager_ui::theme_binding::hsla(foreground))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
+        .text_size(absolute(font_size))
+        .text_color(hsla(foreground))
+        .font_weight(font_weight(weight))
         .child(label.to_owned())
 }
 

@@ -10,6 +10,9 @@ use super::super::super::{
     SmbiosMemoryEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
 use super::super::{PlatformEventBatch, PlatformEventContext, test_support::test_event_context};
+use taskmanager_core::MsrReadoutSnapshot;
+use taskmanager_core::RaplPowerSnapshot;
+use taskmanager_core::SmbiosMemorySnapshot;
 
 #[test]
 fn hardware_inventory_event_is_independent_from_telemetry() {
@@ -100,9 +103,12 @@ fn smbios_memory_update_lands_in_its_own_correlated_lane() {
             RequestId::new(5).expect("non-zero fixture request"),
             CapabilityId::TELEMETRY_MEMORY_SMBIOS,
         ),
-        PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(
-            taskmanager_core::SmbiosMemorySnapshot::success(4, 2, Vec::new(), None),
-        )),
+        PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(SmbiosMemorySnapshot::success(
+            4,
+            2,
+            Vec::new(),
+            None,
+        ))),
     );
 
     assert!(!batch.is_empty());
@@ -119,9 +125,10 @@ fn rapl_power_update_lands_in_its_own_correlated_lane() {
             RequestId::new(6).expect("non-zero fixture request"),
             CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
         ),
-        PlatformEvent::RaplPower(RaplPowerEvent::Update(
-            taskmanager_core::RaplPowerSnapshot::success(250, Vec::new()),
-        )),
+        PlatformEvent::RaplPower(RaplPowerEvent::Update(RaplPowerSnapshot::success(
+            250,
+            Vec::new(),
+        ))),
     );
 
     assert!(!batch.is_empty());
@@ -137,9 +144,9 @@ fn msr_readout_update_lands_in_its_own_correlated_lane() {
             RequestId::new(7).expect("non-zero fixture request"),
             CapabilityId::TELEMETRY_CPU_MSR,
         ),
-        PlatformEvent::MsrReadout(MsrReadoutEvent::Update(
-            taskmanager_core::MsrReadoutSnapshot::success(Vec::new()),
-        )),
+        PlatformEvent::MsrReadout(MsrReadoutEvent::Update(MsrReadoutSnapshot::success(
+            Vec::new(),
+        ))),
     );
 
     assert!(!batch.is_empty());

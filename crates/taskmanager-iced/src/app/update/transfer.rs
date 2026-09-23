@@ -5,6 +5,8 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::super::{IcedApp, Message};
 use super::dispatch::UpdateDispatch;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_shell::SortDir;
 
 impl IcedApp {
     pub(super) fn reduce_transfer_message(&mut self, message: Message) -> UpdateDispatch {
@@ -53,9 +55,9 @@ impl IcedApp {
                     self.shell.set_process_status_filter(preset.filter);
                     self.shell.set_sort_column(preset.sort_col);
                     self.shell.process_sort.1 = if preset.sort_asc {
-                        taskmanager_shell::SortDir::Asc
+                        SortDir::Asc
                     } else {
-                        taskmanager_shell::SortDir::Desc
+                        SortDir::Desc
                     };
                     self.process_presentation.hidden_columns = preset.hidden_cols;
                 }
@@ -73,7 +75,7 @@ impl IcedApp {
                     format!("Custom View ({count})"),
                     self.shell.process_status_filter,
                     self.shell.process_sort.0,
-                    self.shell.process_sort.1 == taskmanager_shell::SortDir::Asc,
+                    self.shell.process_sort.1 == SortDir::Asc,
                     self.process_presentation.hidden_columns.clone(),
                 );
                 custom.id = id;
@@ -125,7 +127,7 @@ impl IcedApp {
                     .as_deref()
                     .into_iter()
                     .flatten()
-                    .filter_map(taskmanager_core::core::process::ProcessItem::current_user)
+                    .filter_map(ProcessItem::current_user)
                     .collect();
                 // Fail closed: a report whose redaction could not be verified
                 // is never written to the clipboard, so no unredacted text can

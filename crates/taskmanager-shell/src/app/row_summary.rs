@@ -3,6 +3,7 @@
 use taskmanager_application::AppPage;
 
 use super::ShellApp;
+use taskmanager_application::i18n::t;
 
 impl ShellApp {
     /// Plain-text summary of the currently selected row for Ctrl+C clipboard
@@ -25,9 +26,9 @@ impl ShellApp {
             AppPage::Startup => {
                 let entry = self.data.startup_entries.as_ref()?.get(self.selected)?;
                 let state = if entry.enabled {
-                    taskmanager_application::i18n::t("common.enabled")
+                    t("common.enabled")
                 } else {
-                    taskmanager_application::i18n::t("common.disabled")
+                    t("common.disabled")
                 };
                 Some(format!("{}\t{state}", entry.name))
             }

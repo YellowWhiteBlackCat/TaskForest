@@ -2,7 +2,15 @@
 
 use super::*;
 use crate::presentation::process_batch_action_label;
+use taskmanager_application::i18n::t;
+use taskmanager_application::{
+    PersistentApplicationHistoryRecorder, ProcessEvent, RefreshRequest, RequestAttemptId,
+};
+use taskmanager_core::core::history::HistoryRecordSink;
+use taskmanager_core::core::process::ProcessBatchResult;
 use taskmanager_platform_contract::RequestId;
+use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
 impl ShellApp {
     /// Attach or detach the process-owned durable-history sink. The shell
@@ -10,16 +18,14 @@ impl ShellApp {
     /// the optional persistence mirror is swapped.
     pub fn set_history_persistence_sink(
         &mut self,
-        sink: Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>>,
+        sink: Option<std::sync::Arc<dyn HistoryRecordSink>>,
     ) {
         if self.persistent_application_history.is_some() == sink.is_some() {
             return;
         }
-        self.persistent_application_history = sink.as_ref().map(|sink| {
-            taskmanager_application::PersistentApplicationHistoryRecorder::new(
-                std::sync::Arc::clone(sink),
-            )
-        });
+        self.persistent_application_history = sink
+            .as_ref()
+            .map(|sink| PersistentApplicationHistoryRecorder::new(std::sync::Arc::clone(sink)));
         if let Some(sink) = sink {
             let ingestor = self.ensure_history_ingestor().with_record_sink(sink);
             self.history_ingestor = Some(ingestor);
@@ -80,7 +86,7 @@ impl ShellApp {
         if let Some(recorder) = self.persistent_application_history.as_mut() {
             for correlated in &output.process_events {
                 let processes = match &correlated.event {
-                    taskmanager_application::ProcessEvent::Snapshot(processes) => processes,
+                    ProcessEvent::Snapshot(processes) => processes,
                     _ => continue,
                 };
                 let _ = recorder.record_process_snapshot(
@@ -92,23 +98,16 @@ impl ShellApp {
         }
     }
 
-    pub(crate) fn ensure_history_ingestor(
-        &mut self,
-    ) -> taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor {
+    pub(crate) fn ensure_history_ingestor(&mut self) -> CorrelatedSystemTelemetryIngestor {
         if self.history_ingestor.is_none() {
-            let (history, ingestor) =
-                taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(
-                    self.history.capacity(),
-                );
+            let (history, ingestor) = LiveGraphHistory::shared(self.history.capacity());
             self.history = history;
             self.history_ingestor = Some(ingestor);
         }
         if let Some(ingestor) = self.history_ingestor.as_ref() {
             return ingestor.clone();
         }
-        let (history, ingestor) = taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(
-            self.history.capacity(),
-        );
+        let (history, ingestor) = LiveGraphHistory::shared(self.history.capacity());
         self.history = history;
         self.history_ingestor = Some(ingestor.clone());
         ingestor
@@ -127,7 +126,7 @@ impl ShellApp {
     pub(super) fn begin_process_affinity_read(
         &mut self,
         target: FrozenProcessIdentity,
-    ) -> taskmanager_application::RequestAttemptId {
+    ) -> RequestAttemptId {
         self.request_sessions.begin_affinity(target)
     }
 
@@ -191,8 +190,7 @@ impl ShellApp {
         }
         for outcome in &output.session_control_outcomes {
             if outcome.result.is_ok() {
-                self.data.session_refresh_request =
-                    Some(taskmanager_application::RefreshRequest::Sessions);
+                self.data.session_refresh_request = Some(RefreshRequest::Sessions);
             }
             let (severity, lifecycle, text) = match &outcome.result {
                 Ok(()) => (
@@ -216,8 +214,7 @@ impl ShellApp {
         }
         for outcome in &output.startup_control_outcomes {
             if outcome.result.is_ok() {
-                self.data.startup_refresh_request =
-                    Some(taskmanager_application::RefreshRequest::Startup);
+                self.data.startup_refresh_request = Some(RefreshRequest::Startup);
             }
             let intent = if outcome.enabled { "enable" } else { "disable" };
             let (severity, lifecycle, text) = match &outcome.result {
@@ -317,13 +314,13 @@ pub fn process_control_notice_text(feedback: &ProcessControlFeedback) -> (String
     let action = process_control_action_label(&feedback.kind);
     match feedback.result {
         Ok(()) => (
-            taskmanager_application::i18n::t("feedback.process_action_succeeded")
+            t("feedback.process_action_succeeded")
                 .replace("{action}", &action)
                 .replace("{pid}", &feedback.target.pid.to_string()),
             true,
         ),
         Err(kind) => (
-            taskmanager_application::i18n::t("feedback.process_action_failed")
+            t("feedback.process_action_failed")
                 .replace("{action}", &action)
                 .replace("{pid}", &feedback.target.pid.to_string())
                 .replace("{reason}", crate::presentation::control_error_detail(kind)),
@@ -332,15 +329,13 @@ pub fn process_control_notice_text(feedback: &ProcessControlFeedback) -> (String
     }
 }
 
-fn process_batch_notice_text(
-    result: &taskmanager_core::core::process::ProcessBatchResult,
-) -> (String, bool) {
+fn process_batch_notice_text(result: &ProcessBatchResult) -> (String, bool) {
     use taskmanager_core::core::process::ProcessBatchTargetResult;
 
     let action = process_batch_action_label(result.intent.action);
     let total = result.targets.len();
     let applied = result.applied_count();
-    let mut text = taskmanager_application::i18n::t("proc_control.batch_result")
+    let mut text = t("proc_control.batch_result")
         .replace("{action}", &action)
         .replace("{applied}", &applied.to_string())
         .replace("{total}", &total.to_string());
@@ -354,14 +349,10 @@ fn process_batch_notice_text(
                 crate::presentation::control_error_detail(*kind)
             }
             ProcessBatchTargetResult::IdentityUnavailable
-            | ProcessBatchTargetResult::IdentityChanged => {
-                taskmanager_application::i18n::t("feedback.target_changed")
-            }
-            ProcessBatchTargetResult::Applied => {
-                taskmanager_application::i18n::t("feedback.unknown_error")
-            }
+            | ProcessBatchTargetResult::IdentityChanged => t("feedback.target_changed"),
+            ProcessBatchTargetResult::Applied => t("feedback.unknown_error"),
         };
-        let item = taskmanager_application::i18n::t("proc_control.batch_failure_item")
+        let item = t("proc_control.batch_failure_item")
             .replace("{name}", &identity.name)
             .replace("{pid}", &identity.pid.to_string())
             .replace("{reason}", reason);
@@ -372,18 +363,11 @@ fn process_batch_notice_text(
 
 fn process_control_action_label(kind: &ProcessControlKind) -> String {
     match kind {
-        ProcessControlKind::EndTask => taskmanager_application::i18n::t("proc.end_task").to_owned(),
-        ProcessControlKind::Signal(signal) => format!(
-            "{} {signal:?}",
-            taskmanager_application::i18n::t("common.signal")
-        ),
-        ProcessControlKind::Suspend => taskmanager_application::i18n::t("proc.suspend").to_owned(),
-        ProcessControlKind::Resume => taskmanager_application::i18n::t("proc.resume").to_owned(),
-        ProcessControlKind::Affinity(_) => {
-            taskmanager_application::i18n::t("proc.affinity").to_owned()
-        }
-        ProcessControlKind::ResourceLimits(_) => {
-            taskmanager_application::i18n::t("proc_insights.resource_limits").to_owned()
-        }
+        ProcessControlKind::EndTask => t("proc.end_task").to_owned(),
+        ProcessControlKind::Signal(signal) => format!("{} {signal:?}", t("common.signal")),
+        ProcessControlKind::Suspend => t("proc.suspend").to_owned(),
+        ProcessControlKind::Resume => t("proc.resume").to_owned(),
+        ProcessControlKind::Affinity(_) => t("proc.affinity").to_owned(),
+        ProcessControlKind::ResourceLimits(_) => t("proc_insights.resource_limits").to_owned(),
     }
 }

@@ -24,14 +24,17 @@ pub fn acquire_single_instance(
 ) -> Result<InstanceRole, InstanceFailure> {
     #[cfg(target_os = "linux")]
     {
-        taskmanager_platform_linux::instance::acquire_single_instance(instance_name, events)
+        use taskmanager_platform_linux::instance::acquire_single_instance;
+        acquire_single_instance(instance_name, events)
     }
     #[cfg(target_os = "macos")]
     {
-        taskmanager_platform_macos::instance::acquire_single_instance(instance_name, events)
+        use taskmanager_platform_macos::instance::acquire_single_instance;
+        acquire_single_instance(instance_name, events)
     }
     #[cfg(target_os = "windows")]
     {
-        taskmanager_platform_windows::instance::acquire_single_instance(instance_name, events)
+        use taskmanager_platform_windows::instance::acquire_single_instance;
+        acquire_single_instance(instance_name, events)
     }
 }

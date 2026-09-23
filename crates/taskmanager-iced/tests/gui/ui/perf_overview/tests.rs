@@ -1,5 +1,13 @@
 use super::*;
+use taskmanager_core::core::metrics::CpuPackageMetrics;
 use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_core::core::metrics::PressureWindow;
+use taskmanager_core::core::metrics::ResourcePressure;
+use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_test_support::pin_english;
 
 mod graph_summary_tests {
     use super::*;
@@ -44,16 +52,10 @@ mod memory_stats_tests {
     const GIB: u64 = 1024 * 1024 * 1024;
     const MIB: u64 = 1024 * 1024;
 
-    fn flat(stats: &[taskmanager_shell::viewmodel::StatRow]) -> Vec<(&str, &str)> {
+    fn flat(stats: &[StatRow]) -> Vec<(&str, &str)> {
         stats
             .iter()
-            .map(|row| {
-                (
-                    row.label(),
-                    row.value()
-                        .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
-                )
-            })
+            .map(|row| (row.label(), row.value().unwrap_or(MISSING_VALUE)))
             .collect()
     }
 
@@ -82,7 +84,7 @@ mod memory_stats_tests {
 
     #[test]
     fn memory_rows_match_the_gpui_row_set_and_format() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         assert_eq!(
             flat(&memory_stats_rows(&rich_memory(), true, true)),
             vec![
@@ -105,7 +107,7 @@ mod memory_stats_tests {
 
     #[test]
     fn empty_metrics_keep_base_rows_honest_and_drop_gated_rows() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         assert_eq!(
             flat(&memory_stats_rows(&MemoryMetrics::default(), true, true)),
             vec![
@@ -122,7 +124,7 @@ mod memory_stats_tests {
 
     #[test]
     fn measured_zero_is_a_value_but_near_zero_rate_is_suppressed() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         let mut memory = MemoryMetricsFixtureBuilder::new()
             .current_total_bytes(8 * GIB)
             .current_used_rate_mib_per_sec(0.0)
@@ -163,7 +165,7 @@ mod memory_stats_tests {
 
     #[test]
     fn failed_commit_observation_hides_the_committed_pair() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         let mut memory = rich_memory();
         let mut optional = memory.optional_observations().clone();
         optional.virtual_memory_commit.committed_bytes =
@@ -183,7 +185,7 @@ mod memory_stats_tests {
 
     #[test]
     fn swap_throughput_rows_render_the_observed_system_rates() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         const KIB: u64 = 1024;
 
         // The kernel swap counters are a two-sample rate, so the fixture
@@ -224,7 +226,7 @@ mod memory_stats_tests {
 
     #[test]
     fn signed_rate_respects_the_unit_preferences() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         assert_eq!(
             stats::signed_memory_rate_text(1.5, true, true),
             "+1.5 MiB/s"
@@ -245,7 +247,7 @@ mod cpu_frequency_source_tests {
 
     #[test]
     fn speed_row_relabels_bogomips_and_never_fakes_a_mhz_clock() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         // The row keeps its typed missingness: an absent frequency is `None`
         // (the shared dash), never a fabricated clock.
         assert_eq!(cpu_speed_row(Some(5300), true).label(), "BogoMIPS");
@@ -261,17 +263,15 @@ mod cpu_frequency_source_tests {
 
     #[test]
     fn cpu_headline_readouts_format_every_current_metric_without_graph_selection() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         let metrics = projection::cpu_headline_metrics(Some(projection::CpuObservation {
             usage_pct: Some(37.0),
             frequency_mhz: Some(3_500),
             temperature_c: Some(54.0),
             power_w: Some(18.2),
-            pressure: Some(
-                taskmanager_core::core::metrics::ResourcePressure::some_only(
-                    taskmanager_core::core::metrics::PressureWindow::new(0.5, 0.4, 0.3, 0),
-                ),
-            ),
+            pressure: Some(ResourcePressure::some_only(PressureWindow::new(
+                0.5, 0.4, 0.3, 0,
+            ))),
         }));
         assert_eq!(
             metrics
@@ -373,14 +373,13 @@ mod cpu_throttle_tests {
         app: &mut crate::IcedApp,
         counters: &[(u32, Option<u64>, Option<u64>)],
     ) {
-        taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+        edit_snapshot(&mut app.shell, |snapshot| {
             let snapshot = snapshot.as_mut().expect("demo snapshot");
             snapshot.cpu.packages = counters
                 .iter()
                 .map(
                     |&(package_id, package_throttle_count, core_throttle_count)| {
-                        let mut package =
-                            taskmanager_core::core::metrics::CpuPackageMetrics::new(package_id);
+                        let mut package = CpuPackageMetrics::new(package_id);
                         package.package_throttle_count = package_throttle_count;
                         package.core_throttle_count = core_throttle_count;
                         package
@@ -390,9 +389,7 @@ mod cpu_throttle_tests {
         });
     }
 
-    fn throttle_row(
-        stats: &[taskmanager_shell::viewmodel::StatRow],
-    ) -> Option<&taskmanager_shell::viewmodel::StatRow> {
+    fn throttle_row(stats: &[StatRow]) -> Option<&StatRow> {
         stats
             .iter()
             .find(|row| row.label() == t("cpu.thermal_throttle"))
@@ -406,7 +403,7 @@ mod cpu_throttle_tests {
     /// zero.
     #[test]
     fn cpu_stats_render_the_thermal_throttle_counters_with_honest_absence() {
-        taskmanager_test_support::pin_english();
+        pin_english();
         let mut app = crate::IcedApp::demo();
 
         set_package_counters(&mut app, &[(0, Some(7), Some(3)), (1, Some(12), None)]);
@@ -419,7 +416,7 @@ mod cpu_throttle_tests {
                 .snapshot
                 .as_ref()
                 .expect("demo snapshot");
-            taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+            cpu_thermal_throttle_summary(&snapshot.cpu)
                 .expect("observed counters must produce the shared fold")
         };
         assert_eq!(

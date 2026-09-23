@@ -12,6 +12,7 @@ use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
 use taskmanager_ui::layout::PageScaffold;
+use taskmanager_ui::primitives::button::ButtonState;
 
 mod apps;
 mod inventory;
@@ -63,9 +64,7 @@ impl RootView {
         let content_width = px(f32::from(frame.frame.content.size.width));
         let source_retry_button = self
             .source_retry_button
-            .get_or_insert_with(|| {
-                cx.new(|cx| taskmanager_ui::primitives::button::ButtonState::new(cx))
-            })
+            .get_or_insert_with(|| cx.new(|cx| ButtonState::new(cx)))
             .clone();
         let context = PageRenderContext {
             theme: frame.theme,

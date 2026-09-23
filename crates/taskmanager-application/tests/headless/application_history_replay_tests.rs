@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use taskmanager_application::HistoryReplayTransitionError;
+use taskmanager_application::MAX_HISTORY_REPLAY_ERROR_CHARS;
 use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayCompletionOutcome,
     HistoryReplayController, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
@@ -112,22 +114,19 @@ fn failed_refresh_retains_last_good_evidence_and_close_is_terminal() {
 #[test]
 fn closed_controller_rejects_refresh_and_window_selection() {
     let mut replay = HistoryReplayController::default();
-    assert_eq!(
-        replay.refresh(),
-        Err(taskmanager_application::HistoryReplayTransitionError::Closed)
-    );
+    assert_eq!(replay.refresh(), Err(HistoryReplayTransitionError::Closed));
     assert_eq!(
         replay.select_window(HistoryWindow::TwentyFourHours),
-        Err(taskmanager_application::HistoryReplayTransitionError::Closed)
+        Err(HistoryReplayTransitionError::Closed)
     );
     assert_eq!(replay.selected_window(), HistoryWindow::OneHour);
 
     let error = HistoryReplayError::new(
         HistoryReplayErrorKind::Read,
-        "界".repeat(taskmanager_application::MAX_HISTORY_REPLAY_ERROR_CHARS + 5),
+        "界".repeat(MAX_HISTORY_REPLAY_ERROR_CHARS + 5),
     );
     assert_eq!(
         error.detail().chars().count(),
-        taskmanager_application::MAX_HISTORY_REPLAY_ERROR_CHARS
+        MAX_HISTORY_REPLAY_ERROR_CHARS
     );
 }

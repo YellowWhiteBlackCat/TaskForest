@@ -6,6 +6,7 @@ use taskmanager_core::core::services::ServiceLogEntry;
 use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 
 use crate::path_contract::is_single_filename;
+use taskmanager_core::DiagnosticSource;
 
 /// Prepare a privacy-safe service-log export using the same diagnostic bundle
 /// redaction contract as the full diagnostics surface.
@@ -16,7 +17,7 @@ pub fn prepare_service_log_bundle(
         DiagnosticBundleError::with_detail(DiagnosticBundleErrorKind::Encode, error.to_string())
     })?;
     DiagnosticBundlePlan::prepare(
-        vec![taskmanager_core::DiagnosticSource {
+        vec![DiagnosticSource {
             name: "service-logs.json".into(),
             contents,
         }],

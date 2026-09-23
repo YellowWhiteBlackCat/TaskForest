@@ -14,6 +14,7 @@ use super::{
     InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceItem, ServiceManager, ServiceStatus,
     parse_openrc_status, parse_openrc_update,
 };
+use taskmanager_core::ServiceRelationGraph;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const SYSTEMD_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("linux.service.systemd");
@@ -253,11 +254,7 @@ fn enrich_live_systemd_snapshot(
 
 fn attach_systemd_inventory_details(
     items: &mut [ServiceItem],
-    records: &[(
-        String,
-        ServiceDiagnostics,
-        taskmanager_core::ServiceRelationGraph,
-    )],
+    records: &[(String, ServiceDiagnostics, ServiceRelationGraph)],
 ) {
     for item in items {
         let native = native_unit_name(&item.name);

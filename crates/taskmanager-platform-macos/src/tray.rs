@@ -30,6 +30,8 @@ use std::time::Duration;
 use taskmanager_core::tray::TrayActionId;
 use taskmanager_core::tray::{TrayEvent, TraySpec};
 use taskmanager_platform_contract::{TrayController, TrayFailure};
+#[cfg(target_os = "macos")]
+use taskmanager_tray_muda::{RadioState, build_menu, decode_menu_id};
 
 // Only the macOS forwarding loop polls; the constant (and its Duration
 // import) is gated so non-macOS hosts see no dead code.
@@ -117,7 +119,7 @@ fn forward_tray_events(events: &Sender<TrayEvent>) {
         }
     }
     while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
-        if let Some(id) = taskmanager_tray_muda::decode_menu_id(event.id.as_ref()) {
+        if let Some(id) = decode_menu_id(event.id.as_ref()) {
             let _ = events.send(TrayEvent::MenuActivated { id });
         }
     }
@@ -127,7 +129,7 @@ fn forward_tray_events(events: &Sender<TrayEvent>) {
 #[cfg(target_os = "macos")]
 struct NativeTray {
     icon: tray_icon::TrayIcon,
-    radio: taskmanager_tray_muda::RadioState,
+    radio: RadioState,
 }
 
 #[cfg(target_os = "macos")]
@@ -140,7 +142,7 @@ impl NativeTray {
         )
         .map_err(|_| TrayFailure::Rejected)?;
 
-        let built = taskmanager_tray_muda::build_menu(spec.menu())?;
+        let built = build_menu(spec.menu())?;
 
         let mut builder = tray_icon::TrayIconBuilder::new()
             .with_icon(icon)

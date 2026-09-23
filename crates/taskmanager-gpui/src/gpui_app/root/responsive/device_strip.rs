@@ -6,6 +6,9 @@ use super::{
     SidebarDeviceOverrideConfig, StatefulInteractiveElement, Styled, SystemSnapshot, Theme, div,
     elements, i18n, ordered_indices, tokens, visible_with_override,
 };
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::hsla;
 
 pub struct DeviceStripProps<'a> {
     pub theme: &'a Theme,
@@ -143,18 +146,12 @@ pub fn device_strip(props: DeviceStripProps<'_>, cx: &mut Context<RootView>) -> 
         .w_full()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_5,
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
+        .gap(definite_length(tokens::SPACE_4))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_5))
+        .bg(fill(theme.sidebar_bg))
         .border_b_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .border_color(hsla(theme.border))
         .overflow_x_scroll();
     let keys: Vec<String> = devices.iter().map(|entry| entry.key.clone()).collect();
     for (position, index) in ordered_indices(&keys, sidebar_order)

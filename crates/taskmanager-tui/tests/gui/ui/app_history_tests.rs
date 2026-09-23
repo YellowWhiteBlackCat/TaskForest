@@ -15,6 +15,9 @@ use super::*;
 use crate::TuiColorMode;
 use crate::TuiTerminalProfile;
 use crate::ui::test_support::LANG_TEST_GUARD;
+use taskmanager_application::ApplicationHistoryStatus;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_theme::Theme;
 
 // test-intent: behavior
 /// One durable CPU series over a uniform 1 s cadence, so
@@ -60,7 +63,7 @@ fn durable_row(name: &str, cpu: Option<ApplicationHistoryMetricSeries>) -> Appli
 // test-intent: behavior
 fn ready_projection(rows: Vec<ApplicationHistoryRow>) -> ApplicationHistoryProjection {
     ApplicationHistoryProjection {
-        status: taskmanager_application::ApplicationHistoryStatus::Ready,
+        status: ApplicationHistoryStatus::Ready,
         selected_window: HistoryWindow::OneHour,
         rows_window: Some(HistoryWindow::OneHour),
         rows: Arc::from(rows),
@@ -75,10 +78,7 @@ fn ready_projection(rows: Vec<ApplicationHistoryRow>) -> ApplicationHistoryProje
 // test-intent: behavior
 /// Resolve a terminal capability profile onto the page's palette.
 fn profile(color: TuiColorMode, glyphs: TuiGlyphMode) -> TuiTheme {
-    TuiTheme::from_theme_with_profile(
-        &taskmanager_theme::Theme::dark(),
-        TuiTerminalProfile { color, glyphs },
-    )
+    TuiTheme::from_theme_with_profile(&Theme::dark(), TuiTerminalProfile { color, glyphs })
 }
 
 // test-intent: behavior
@@ -87,7 +87,7 @@ fn profile(color: TuiColorMode, glyphs: TuiGlyphMode) -> TuiTheme {
 /// guard so the assertions cannot depend on the host locale.
 fn page_frame(theme: TuiTheme, projection: &ApplicationHistoryProjection) -> String {
     let _guard = LANG_TEST_GUARD.lock().expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(140, 48);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -123,7 +123,7 @@ const RISING_EIGHT: [f32; 8] = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
 #[test]
 fn unicode_trend_stays_byte_identical_to_the_pre_migration_ramp() {
     let _guard = LANG_TEST_GUARD.lock().expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     assert_eq!(
         history_trend_in(TuiGlyphMode::Unicode, &RISING_EIGHT),
         "▁▂▃▄▅▆▇█"
@@ -210,7 +210,7 @@ fn ascii_trend_paints_the_ladder_with_unicode_aligned_semantics() {
         "both repertoires bound the trend to the same recent window"
     );
     let _guard = LANG_TEST_GUARD.lock().expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     assert_eq!(
         history_trend_in(TuiGlyphMode::Ascii, &[f32::NAN, f32::NAN]),
         history_trend_in(TuiGlyphMode::Unicode, &[f32::NAN, f32::NAN]),

@@ -48,6 +48,15 @@ use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskmanager_application::AlertRuleImportMode;
+use taskmanager_application::ManagedAlertRuleEditOutcome;
+use taskmanager_core::core::alerts::AlertRuleTransferEntry;
+use taskmanager_core::core::alerts::AlertRuleTransferError;
+use taskmanager_core::core::alerts::export_alert_rules_json;
+use taskmanager_core::core::alerts::import_alert_rules_json;
+use taskmanager_platform_contract::RequestEnvelope;
+use taskmanager_ui_contract::ProductIntent;
+use taskmanager_ui_contract::SurfaceDecision;
 
 /// Create a new managed alert rule.
 fn create_alert_rule(
@@ -57,10 +66,7 @@ fn create_alert_rule(
     severity: AlertSeverity,
     threshold: f32,
     hysteresis: f32,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
+) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
     let rule = AlertRule::new(
         id,
         metric,
@@ -80,10 +86,7 @@ fn edit_alert_rule(
     severity: AlertSeverity,
     threshold: f32,
     hysteresis: f32,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
+) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
     let enabled = shell
         .projection()
         .alert_center
@@ -106,29 +109,24 @@ fn edit_alert_rule(
 }
 
 /// Export the managed alert rules through the canonical core transfer codec.
-fn export_alert_rules(
-    shell: &ShellApp,
-) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
-    let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = shell
+fn export_alert_rules(shell: &ShellApp) -> Result<String, AlertRuleTransferError> {
+    let entries: Vec<AlertRuleTransferEntry> = shell
         .projection()
         .alert_center
         .managed_rules()
         .iter()
-        .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
+        .map(AlertRuleTransferEntry::from)
         .collect();
-    taskmanager_core::core::alerts::export_alert_rules_json(&entries)
+    export_alert_rules_json(&entries)
 }
 
 /// Import managed alert rules through the canonical core transfer codec.
 fn import_alert_rules(
     shell: &mut ShellApp,
     json: &str,
-    mode: taskmanager_application::AlertRuleImportMode,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
-    let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
+    mode: AlertRuleImportMode,
+) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    let entries = import_alert_rules_json(json)?;
     let rules: Vec<ManagedAlertRule> = entries.into_iter().map(ManagedAlertRule::from).collect();
     shell.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
 }
@@ -158,10 +156,7 @@ struct QuietRequests;
 impl RequestPort for QuietRequests {
     type Request = HostTelemetryRequest;
 
-    fn try_submit(
-        &self,
-        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), SubmissionError> {
+    fn try_submit(&self, _request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         Ok(())
     }
 }
@@ -315,7 +310,7 @@ fn alerts_summary_counts_participation_through_the_canonical_edit_entry() {
         "a fresh shell reports the honest zero"
     );
     shell
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: "cpu-high".to_owned(),
         })
         .expect("the default rule id resolves");
@@ -340,7 +335,7 @@ fn managed_rule_line_labels_disabled_rules_as_present_not_deleted() {
     );
     assert_eq!(cpu_line, "Warning · ≥ 90.0% — enabled");
     shell
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: "cpu-high".to_owned(),
         })
         .expect("the toggle applies");
@@ -580,8 +575,6 @@ fn event_history_renders_recent_events() {
 
 #[test]
 fn alert_rule_export_and_import_round_trip() {
-    use taskmanager_application::AlertRuleImportMode;
-
     let mut shell = ShellApp::new();
     let json = export_alert_rules(&shell).expect("export rules");
     assert!(json.contains("cpu"));
@@ -594,17 +587,12 @@ fn alert_rule_export_and_import_round_trip() {
         std::time::Duration::from_secs(5),
         2.0,
     );
-    let entries = [taskmanager_core::core::alerts::AlertRuleTransferEntry::new(
-        custom, true,
-    )];
-    let custom_json = taskmanager_core::core::alerts::export_alert_rules_json(&entries).unwrap();
+    let entries = [AlertRuleTransferEntry::new(custom, true)];
+    let custom_json = export_alert_rules_json(&entries).unwrap();
 
     let outcome =
         import_alert_rules(&mut shell, &custom_json, AlertRuleImportMode::Replace).expect("import");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
     assert_eq!(shell.projection().alert_center.managed_rules().len(), 1);
 }
 
@@ -623,10 +611,7 @@ fn alert_rule_authoring_creates_and_edits_rules() {
         4.0,
     )
     .expect("create rule");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
     let rules = shell.projection().alert_center.managed_rules();
     assert_eq!(rules.len(), initial_count + 1);
     let created = rules
@@ -646,10 +631,7 @@ fn alert_rule_authoring_creates_and_edits_rules() {
         5.0,
     )
     .expect("edit rule");
-    assert_eq!(
-        edit_outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(edit_outcome, ManagedAlertRuleEditOutcome::Applied);
     let updated_rules = shell.projection().alert_center.managed_rules();
     let updated = updated_rules
         .iter()
@@ -672,11 +654,11 @@ fn alert_rule_authoring_intent_declared() {
     let entry = declaration
         .entries
         .iter()
-        .find(|e| e.intent == taskmanager_ui_contract::ProductIntent::AlertRuleAuthoring)
+        .find(|e| e.intent == ProductIntent::AlertRuleAuthoring)
         .expect("AlertRuleAuthoring declared");
     assert_eq!(
         entry.decision,
-        taskmanager_ui_contract::SurfaceDecision::Local {
+        SurfaceDecision::Local {
             route: "alerts.page.authoring",
         }
     );

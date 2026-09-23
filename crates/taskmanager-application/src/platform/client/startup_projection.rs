@@ -8,14 +8,15 @@ use crate::platform::{
 };
 
 use super::PlatformClient;
+use taskmanager_core::FailureKind;
 
 pub(super) struct StartupEvidenceDrainOutcome {
     pub(super) projection: Option<StartupEvidenceProjectionApplyResult>,
-    pub(super) diagnostic: Option<taskmanager_core::FailureKind>,
+    pub(super) diagnostic: Option<FailureKind>,
 }
 
 impl StartupEvidenceDrainOutcome {
-    fn discarded(failure: taskmanager_core::FailureKind) -> Self {
+    fn discarded(failure: FailureKind) -> Self {
         Self {
             projection: None,
             diagnostic: Some(failure),
@@ -32,10 +33,10 @@ impl PlatformClient {
         observed_at_ms: u64,
     ) -> StartupEvidenceDrainOutcome {
         let Some(revision) = self.startup_evidence_requests.remove(&request_id) else {
-            return StartupEvidenceDrainOutcome::discarded(taskmanager_core::FailureKind::Rejected);
+            return StartupEvidenceDrainOutcome::discarded(FailureKind::Rejected);
         };
         if capability != &CapabilityId::STARTUP_EVIDENCE || !event.accepts_capability(capability) {
-            let failure = taskmanager_core::FailureKind::ProviderFault;
+            let failure = FailureKind::ProviderFault;
             return StartupEvidenceDrainOutcome {
                 projection: Some(self.startup_evidence_projection.apply_failure(
                     revision,
@@ -56,11 +57,9 @@ impl PlatformClient {
             };
         };
         let failure = match rejection {
-            StartupEvidenceProjectionRejection::NoActiveRequest => {
-                taskmanager_core::FailureKind::Rejected
-            }
+            StartupEvidenceProjectionRejection::NoActiveRequest => FailureKind::Rejected,
             StartupEvidenceProjectionRejection::StaleOrUnexpectedRevision => {
-                taskmanager_core::FailureKind::IdentityChanged
+                FailureKind::IdentityChanged
             }
         };
         StartupEvidenceDrainOutcome {

@@ -70,8 +70,10 @@
 # schema and declaration files are dev-only evidence machinery whose channel is
 # the headless evidence chain, so they demand the headless route and never a
 # pixel receipt - the same class as the ui-contract declaration/test layers.
-# The legacy per-frontend matrices and accept scripts stay routed while they
-# remain compatibility assets (D6/S5 retirement window).
+# The per-frontend accept scripts stay routed: they remain the authoritative
+# per-frontend runners and receipt writers.  The retired per-frontend matrices
+# are gone (D6); the unified matrix's own arm above maps a row change to the
+# frontend whose contract moved, so nothing is lost by dropping those arms.
 #
 # Usage:
 #   bash scripts/quality/ui-evidence-route.sh [--base <ref>] [--with-gui]
@@ -264,7 +266,6 @@ while IFS= read -r path; do
     crates/taskmanager-gpui/* | crates/taskmanager-ui/* | \
         scripts/capture-niri.sh | scripts/capture-windows.sh | \
         scripts/accept-gpui-interactions.sh | scripts/windows/accept-gpui-interactions.sh | \
-        scripts/gpui_interaction_matrix.tsv | \
         scripts/capture_scenarios.tsv)
         ui_touched=1
         gpui_touched=1
@@ -280,8 +281,7 @@ while IFS= read -r path; do
         iced_touched=1
         ;;
     crates/taskmanager-bevy-ui/* | scripts/capture-bevy.sh | scripts/capture_bevy_scenarios.tsv | \
-        scripts/validate_bevy_matrix.py | scripts/accept-bevy-interactions.sh | \
-        scripts/bevy_interaction_matrix.tsv)
+        scripts/validate_bevy_matrix.py | scripts/accept-bevy-interactions.sh)
         ui_touched=1
         bevy_touched=1
         ;;
@@ -314,7 +314,6 @@ while IFS= read -r path; do
         scripts/parity/test_resolve_frontend_evidence.py | \
         scripts/parity/cross_frontend_manifest.tsv | \
         scripts/parity/feature_evidence.tsv | \
-        scripts/parity/feature_evidence_co_anchors.tsv | \
         scripts/parity/run_manifest.schema.json | \
         scripts/parity/README.md | \
         scripts/quality/cross_frontend_manifest.py)

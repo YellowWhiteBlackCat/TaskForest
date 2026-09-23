@@ -5,6 +5,13 @@ use ratatui::backend::TestBackend;
 use taskmanager_core::core::metrics::{MemoryScalarObservations, ScalarObservation};
 
 use crate::demo_app;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AlertRuleImportMode, ManagedAlertRuleEdit};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRule, AlertRuleConflictPolicy,
+    AlertSeverity,
+};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -13,7 +20,7 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -43,13 +50,10 @@ fn health_overlay_renders_domain_summary_and_alert_rules() {
 #[test]
 fn health_overlay_renders_honest_empty_state_without_a_snapshot() {
     let mut app = demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Hardware((None).map(Box::new)),
+        ProjectionSeedFact::Hardware((None).map(Box::new)),
     );
     let text = frame_text(&app, 120, 40);
     assert!(text.contains("collecting"));
@@ -68,9 +72,9 @@ fn health_overlay_marks_high_memory_usage_as_failed() {
         },
         snapshot.memory.optional_observations().clone(),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     let text = frame_text(&app, 120, 40);
     let memory_line = text
@@ -84,7 +88,7 @@ fn health_overlay_marks_high_memory_usage_as_failed() {
 fn health_overlay_keeps_a_disabled_canonical_rule_visible() {
     let mut app = TuiApp::new();
     app.shell
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: "cpu-high".into(),
         })
         .unwrap();
@@ -159,9 +163,9 @@ fn health_overlay_renders_provider_diagnostics_tokens() {
         ],
         ..SystemSnapshot::default()
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     let text = frame_text(&app, 120, 40);
     let provider_row = text
@@ -228,7 +232,7 @@ fn tui_app_alert_rule_helpers_operate_on_canonical_rules() {
 
     // Toggle back via edit_alert_rules.
     let outcome = app
-        .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: "cpu-high".into(),
         })
         .expect("toggle outcome");
@@ -254,15 +258,15 @@ fn health_overlay_renders_event_history_empty_and_populated() {
     assert!(text.contains("No events match this filter."), "{text}");
 
     // 2. Inject alert events: verify rendering
-    let event = taskmanager_core::core::alerts::AlertEvent {
+    let event = AlertEvent {
         id: 1,
         observed_at_ms: 5000,
-        kind: taskmanager_core::core::alerts::AlertEventKind::Activated,
-        alert: taskmanager_core::core::alerts::Alert {
+        kind: AlertEventKind::Activated,
+        alert: Alert {
             instance_id: "cpu-high:system-wide".into(),
             rule_id: "cpu-high".into(),
-            severity: taskmanager_core::core::alerts::AlertSeverity::Critical,
-            metric: taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
+            severity: AlertSeverity::Critical,
+            metric: AlertMetric::CpuUsagePercent,
             target: "system-wide".into(),
             value: 94.2,
             threshold: 90.0,
@@ -287,10 +291,10 @@ fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
     let mut app = TuiApp::new();
 
     // 1. Add a new alert rule
-    let custom_rule = taskmanager_core::core::alerts::AlertRule::new(
+    let custom_rule = AlertRule::new(
         "custom-cpu-alert",
-        taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
-        taskmanager_core::core::alerts::AlertSeverity::Warning,
+        AlertMetric::CpuUsagePercent,
+        AlertSeverity::Warning,
         85.0,
         std::time::Duration::from_secs(5),
         5.0,
@@ -324,7 +328,7 @@ fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
 
     // 4. Import rules back in Replace mode
     let import_outcome = app
-        .import_alert_rules(&json, taskmanager_application::AlertRuleImportMode::Replace)
+        .import_alert_rules(&json, AlertRuleImportMode::Replace)
         .expect("import rules");
     assert!(import_outcome.changed());
     assert!(
@@ -339,9 +343,7 @@ fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
     assert!(
         app.import_alert_rules(
             "not-json",
-            taskmanager_application::AlertRuleImportMode::Merge(
-                taskmanager_core::core::alerts::AlertRuleConflictPolicy::KeepExisting
-            )
+            AlertRuleImportMode::Merge(AlertRuleConflictPolicy::KeepExisting)
         )
         .is_err()
     );
@@ -352,19 +354,19 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = TuiTheme::default();
 
     // Activated with empty target defaults to metric label
-    let activated = taskmanager_core::core::alerts::AlertEvent {
+    let activated = AlertEvent {
         id: 1,
         observed_at_ms: 1200,
-        kind: taskmanager_core::core::alerts::AlertEventKind::Activated,
-        alert: taskmanager_core::core::alerts::Alert {
+        kind: AlertEventKind::Activated,
+        alert: Alert {
             instance_id: "mem:".into(),
             rule_id: "mem-high".into(),
-            severity: taskmanager_core::core::alerts::AlertSeverity::Warning,
-            metric: taskmanager_core::core::alerts::AlertMetric::MemoryUsagePercent,
+            severity: AlertSeverity::Warning,
+            metric: AlertMetric::MemoryUsagePercent,
             target: "".into(),
             value: 88.0,
             threshold: 80.0,
@@ -380,15 +382,15 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     assert!(s1.contains("thresh: 80.0%"), "{s1}");
 
     // Cleared with custom target
-    let cleared = taskmanager_core::core::alerts::AlertEvent {
+    let cleared = AlertEvent {
         id: 2,
         observed_at_ms: 2400,
-        kind: taskmanager_core::core::alerts::AlertEventKind::Cleared,
-        alert: taskmanager_core::core::alerts::Alert {
+        kind: AlertEventKind::Cleared,
+        alert: Alert {
             instance_id: "disk:/data".into(),
             rule_id: "disk-temp".into(),
-            severity: taskmanager_core::core::alerts::AlertSeverity::Critical,
-            metric: taskmanager_core::core::alerts::AlertMetric::DiskTemperatureC,
+            severity: AlertSeverity::Critical,
+            metric: AlertMetric::DiskTemperatureC,
             target: "disk:/data".into(),
             value: 70.0,
             threshold: 90.0,

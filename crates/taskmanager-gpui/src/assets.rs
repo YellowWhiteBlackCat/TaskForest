@@ -2,6 +2,8 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeSet;
+use taskmanager_assets::all_asset_paths;
+use taskmanager_assets::asset_bytes;
 
 use gpui::{AssetSource, Result, SharedString};
 
@@ -10,7 +12,7 @@ pub(crate) struct TaskManagerAssets;
 
 impl AssetSource for TaskManagerAssets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        Ok(taskmanager_assets::asset_bytes(path).map(Cow::Borrowed))
+        Ok(asset_bytes(path).map(Cow::Borrowed))
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
@@ -21,7 +23,7 @@ impl AssetSource for TaskManagerAssets {
             format!("{directory}/")
         };
         let mut children = BTreeSet::new();
-        for asset_path in taskmanager_assets::all_asset_paths() {
+        for asset_path in all_asset_paths() {
             let Some(remainder) = asset_path.strip_prefix(&prefix) else {
                 continue;
             };

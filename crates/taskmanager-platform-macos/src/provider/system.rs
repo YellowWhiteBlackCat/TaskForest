@@ -51,6 +51,10 @@ use taskmanager_platform_runtime::{
 };
 
 use crate::provider::process_facts::ProcessFactsCache;
+use taskmanager_core::CpuInstructionFeature;
+use taskmanager_core::CpuScalarObservations;
+use taskmanager_core::MemoryOptionalObservations;
+use taskmanager_core::metrics::MemoryScalarObservations;
 use taskmanager_platform_portable::run_with_timeout;
 
 type HostRegistration = ProviderRegistration<HostTelemetryRequest, Box<dyn HostTelemetryProvider>>;
@@ -248,9 +252,9 @@ impl CpuScalarObservationFactory {
         core_usages: &[f32],
         frequency_mhz: Option<u64>,
         observed_at_ms: u64,
-    ) -> taskmanager_core::CpuScalarObservations {
+    ) -> CpuScalarObservations {
         let global = core_usages.iter().sum::<f32>() / core_usages.len() as f32;
-        taskmanager_core::CpuScalarObservations {
+        CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(global, observed_at_ms),
             core_usage_group: ScalarObservationGroup::available(
                 core_usages.to_vec(),
@@ -324,7 +328,7 @@ impl MemoryTelemetryProvider for MacMemoryTelemetryProvider {
         // honest None on the first sample.
         let used_rate = used_rate_mib_per_sec(self.prev_used, used, observed_at_ms);
         self.prev_used = Some((used, observed_at_ms));
-        let scalar_observations = taskmanager_core::metrics::MemoryScalarObservations {
+        let scalar_observations = MemoryScalarObservations {
             total_bytes: ScalarObservation::available(total, observed_at_ms),
             used_bytes: ScalarObservation::available(used, observed_at_ms),
             available_bytes: ScalarObservation::available(available, observed_at_ms),
@@ -339,7 +343,7 @@ impl MemoryTelemetryProvider for MacMemoryTelemetryProvider {
         };
         let metrics = MemoryMetrics::from_observations(
             scalar_observations,
-            taskmanager_core::MemoryOptionalObservations::unavailable(FailureKind::Unsupported),
+            MemoryOptionalObservations::unavailable(FailureKind::Unsupported),
         );
         Ok(MemoryTelemetryObservation::current(
             metrics,
@@ -459,12 +463,12 @@ fn macos_base_frequency_mhz() -> Option<u64> {
 /// single mapping table for this adapter. Features macOS has no
 /// `hw.optional` key for stay `None` (never guessed from the CPU brand).
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
-fn sysctl_optional_key(feature: taskmanager_core::CpuInstructionFeature) -> Option<&'static str> {
+fn sysctl_optional_key(feature: CpuInstructionFeature) -> Option<&'static str> {
     match feature {
-        taskmanager_core::CpuInstructionFeature::Avx2 => Some("hw.optional.avx2_1"),
-        taskmanager_core::CpuInstructionFeature::Avx512F => Some("hw.optional.avx512f"),
-        taskmanager_core::CpuInstructionFeature::Neon => Some("hw.optional.neon"),
-        taskmanager_core::CpuInstructionFeature::Sve => Some("hw.optional.sve"),
+        CpuInstructionFeature::Avx2 => Some("hw.optional.avx2_1"),
+        CpuInstructionFeature::Avx512F => Some("hw.optional.avx512f"),
+        CpuInstructionFeature::Neon => Some("hw.optional.neon"),
+        CpuInstructionFeature::Sve => Some("hw.optional.sve"),
         _ => None,
     }
 }
@@ -473,10 +477,10 @@ fn sysctl_optional_key(feature: taskmanager_core::CpuInstructionFeature) -> Opti
 /// probe is one bounded subprocess (`0`/`1` answer); an unknown oid or a
 /// failed call contributes nothing. Non-macOS targets return an honest empty
 /// list (the sysctl MIB is macOS-specific).
-fn sysctl_instruction_features() -> Vec<taskmanager_core::CpuInstructionFeature> {
+fn sysctl_instruction_features() -> Vec<CpuInstructionFeature> {
     #[cfg(target_os = "macos")]
     {
-        taskmanager_core::CpuInstructionFeature::ALL
+        CpuInstructionFeature::ALL
             .iter()
             .copied()
             .filter(|feature| {

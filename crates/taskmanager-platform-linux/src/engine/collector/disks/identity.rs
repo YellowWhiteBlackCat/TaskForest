@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::DiskPartition;
 use taskmanager_core::core::metrics::{DiskMetrics, StorageIdentityStability};
 use taskmanager_core::core::source::SourceOutcome;
 
@@ -48,10 +49,7 @@ pub(crate) fn reconcile_storage_identity(
         metric.device_id = selected.as_str().to_string();
         for partition in &mut metric.partitions {
             partition.parent_device_id = selected.as_str().to_string();
-            partition.device_id = taskmanager_core::core::metrics::DiskPartition::stable_id(
-                selected.as_str(),
-                &partition.name,
-            );
+            partition.device_id = DiskPartition::stable_id(selected.as_str(), &partition.name);
         }
         metric.identity_stability = if disk_identity_rank(selected.as_str()) > 1 {
             StorageIdentityStability::Persistent

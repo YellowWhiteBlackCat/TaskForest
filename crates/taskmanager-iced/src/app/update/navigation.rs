@@ -21,15 +21,13 @@ impl IcedApp {
     pub(super) fn toggle_group_expansion_message(
         &mut self,
         name: String,
-        row_key: Option<taskmanager_shell::ProcessRowId>,
+        row_key: Option<ProcessRowId>,
     ) {
         if !self.process_presentation.expanded_groups.remove(&name) {
             self.process_presentation.expanded_groups.insert(name);
         }
-        if let Some(taskmanager_shell::ProcessRowId::Application(root)) = row_key {
-            let _ = self
-                .shell
-                .select_row_id(taskmanager_shell::ProcessRowId::Application(root));
+        if let Some(ProcessRowId::Application(root)) = row_key {
+            let _ = self.shell.select_row_id(ProcessRowId::Application(root));
         }
         let row_count = self.shell.table_row_count().unwrap_or(0);
         if self.shell.selected >= row_count {

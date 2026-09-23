@@ -12,6 +12,7 @@ use taskmanager_core::core::metrics::{
     MemoryTelemetryObservation, NetworkTelemetryObservation, StorageTelemetryObservation,
 };
 use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{
     CapabilityId, CompositeSourceSnapshot, RequestId, RequestPort, SubmissionError,
 };

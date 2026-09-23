@@ -4,6 +4,8 @@ use taskmanager_core::core::process_telemetry::ProcessResourceObservations;
 use taskmanager_platform_contract::DeviceDiscovery;
 
 use super::*;
+use taskmanager_core::CpuMetrics;
+use taskmanager_core::core::process_telemetry::ProcessIdentity;
 
 fn source(outcome: SourceOutcome) -> SourceStatus {
     SourceStatus {
@@ -16,7 +18,7 @@ fn source(outcome: SourceOutcome) -> SourceStatus {
 #[test]
 fn process_resource_health_uses_published_sources_not_coarse_state() {
     let snapshot = ProcessInsightSnapshot {
-        identity: taskmanager_core::core::process_telemetry::ProcessIdentity {
+        identity: ProcessIdentity {
             pid: 42,
             start_token: 900,
         },
@@ -38,7 +40,7 @@ fn process_resource_health_uses_published_sources_not_coarse_state() {
 #[test]
 fn partial_system_value_remains_degraded_when_a_contributing_source_failed() {
     let observation = CpuTelemetryObservation::partial(
-        taskmanager_core::CpuMetrics::default(),
+        CpuMetrics::default(),
         10,
         FailureKind::PermissionDenied,
         vec![source(SourceOutcome::Unavailable(

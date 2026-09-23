@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::process::PriorityTier;
 
 #[test]
@@ -17,7 +19,7 @@ fn priority_choice_maps_to_typed_priority_tiers_and_localizes() {
     }
     assert_eq!(PriorityChoice::ALL.len(), expected.len());
     // The pick_list labels resolve through the shared catalog.
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     assert_eq!(PriorityChoice::High.to_string(), "High");
     assert_eq!(PriorityChoice::Normal.to_string(), "Normal");
     assert_eq!(PriorityChoice::Low.to_string(), "Low");
@@ -28,7 +30,7 @@ fn selection_hint_surfaces_the_multi_select_count_only_past_one() {
     // Localized copy: pin English so the assertion is identical on every
     // runner regardless of the host locale (the shared t() auto-seeds
     // from the host language otherwise).
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     // Zero / one selection keeps the legacy single-row note; a batch of two
     // or more surfaces the count so the user knows a verb reaches N rows.
     assert_eq!(selection_hint(0), "Delete confirms");

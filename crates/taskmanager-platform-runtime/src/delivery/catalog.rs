@@ -28,13 +28,14 @@ use crate::config::{CapabilityRoute, RuntimeBudgets};
 use crate::delivery::event_queue::EventQueueState;
 use crate::ecs::{CompletionRejection, CompletionVerdict, StalledSubject};
 use crate::health::CapabilityHealth;
+use taskmanager_platform_contract::RequestId;
 
 /// Lane and request context for one isolated provider call, consumed by
 /// [`ProviderPanicLedger::record`] only when that call panics.
 pub(crate) struct ProviderPanicContext {
     pub(crate) lane: String,
     pub(crate) capability: CapabilityId,
-    pub(crate) request_id: taskmanager_platform_contract::RequestId,
+    pub(crate) request_id: RequestId,
 }
 
 /// Bounded memo of provider panics caught by the worker isolation seam.
@@ -249,11 +250,7 @@ impl RuntimeCapabilityCatalog {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    pub(super) fn renew_target_lease(
-        &self,
-        capability: &CapabilityId,
-        request_id: taskmanager_platform_contract::RequestId,
-    ) {
+    pub(super) fn renew_target_lease(&self, capability: &CapabilityId, request_id: RequestId) {
         let renewed_at_monotonic_ms = self.scheduler.now_ms();
         if let Ok(mut scheduler) = self.scheduler.lock() {
             let _renewal =
@@ -266,7 +263,7 @@ impl RuntimeCapabilityCatalog {
         capability: &CapabilityId,
         health: CapabilityHealth,
         observed_at_wall_ms: u64,
-        request_id: taskmanager_platform_contract::RequestId,
+        request_id: RequestId,
     ) -> CompletionVerdict {
         let verdict = match self.scheduler.lock() {
             Ok(mut scheduler) => {
@@ -321,7 +318,7 @@ impl RuntimeCapabilityCatalog {
     pub(super) fn claim_terminal_delivery(
         &self,
         capability: &CapabilityId,
-        request_id: taskmanager_platform_contract::RequestId,
+        request_id: RequestId,
     ) -> CompletionVerdict {
         self.scheduler
             .lock()
@@ -331,11 +328,7 @@ impl RuntimeCapabilityCatalog {
             ))
     }
 
-    pub(super) fn abort_terminal_delivery(
-        &self,
-        capability: &CapabilityId,
-        request_id: taskmanager_platform_contract::RequestId,
-    ) {
+    pub(super) fn abort_terminal_delivery(&self, capability: &CapabilityId, request_id: RequestId) {
         if let Ok(mut scheduler) = self.scheduler.lock() {
             let _ = scheduler.abort_terminal_delivery(capability, request_id);
         }
@@ -344,7 +337,7 @@ impl RuntimeCapabilityCatalog {
     pub(super) fn acknowledge_terminal_delivery(
         &self,
         capability: &CapabilityId,
-        request_id: taskmanager_platform_contract::RequestId,
+        request_id: RequestId,
     ) {
         let mut scheduler = self
             .scheduler

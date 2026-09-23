@@ -4,6 +4,7 @@
 //! behavior remains in the shared application/shell contracts; these routes
 //! only make the reference surface explicit and keep new intents exhaustive.
 
+use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::{
     FrontendFunctionalDeclaration, FunctionalEntry, ProductIntent, SurfaceDecision,
 };
@@ -12,7 +13,7 @@ use taskmanager_ui_contract::{
 #[must_use]
 pub fn functional_declaration() -> FrontendFunctionalDeclaration {
     FrontendFunctionalDeclaration {
-        frontend: taskmanager_ui_contract::FrontendShape::Gpui,
+        frontend: FrontendShape::Gpui,
         entries: ProductIntent::ALL
             .into_iter()
             .map(|intent| FunctionalEntry {

@@ -13,6 +13,7 @@
 //! tail stays outside the fuzzed region (which keeps the fd-provenance
 //! oracle below sound).
 use libfuzzer_sys::fuzz_target;
+use taskmanager_fd_bridge::find_scm_rights_in_control;
 
 /// Slab capacity of `find_scm_rights_in_control` (96 bytes on x86-64: six
 /// cmsghdrs). The harness must not claim bytes beyond the input it supplied.
@@ -27,7 +28,7 @@ fuzz_target!(|data: &[u8]| {
     let control = &control[..control.len().min(CONTROL_SLAB)];
     let reported = usize::from_le_bytes(tail.try_into().expect("eight-byte length suffix"));
     let controllen = reported.min(control.len());
-    let fds = taskmanager_fd_bridge::find_scm_rights_in_control(control, controllen);
+    let fds = find_scm_rights_in_control(control, controllen);
     let Some(fds) = fds else { return };
     // Found-fd contract: the walk never returns an empty list (that outcome
     // is `None`), never more fds than the walked window could hold, and

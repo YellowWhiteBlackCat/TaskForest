@@ -20,6 +20,7 @@ use super::sysfs::{
     SYSFS_BLOCK_METADATA_PROVIDER, SYSFS_BLOCK_PROVIDER, SysfsBlockInventory,
     read_sysfs_block_inventory, sysfs_partition_parent,
 };
+use taskmanager_core::ScalarAvailability;
 
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -245,7 +246,7 @@ fn mount_partial_failure_keeps_available_bytes_current_but_typed_partial() {
     assert_eq!(disk.current_available_bytes(), Some(0));
     assert_eq!(
         disk.scalar_observations().available_bytes.availability(),
-        taskmanager_core::ScalarAvailability::Partial(FailureKind::PermissionDenied)
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
     );
     assert_eq!(
         disk.scalar_observations().available_bytes.last_success_ms(),
@@ -280,14 +281,14 @@ fn partition_mount_failure_recovers_without_changing_stable_child_identity() {
             .scalar_observations()
             .used_bytes
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
     assert_eq!(
         failed_partition
             .scalar_observations()
             .free_bytes
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
 
     let recovered = merge_disk_inventory(
@@ -422,7 +423,7 @@ fn missing_size_is_stale_but_keeps_the_discovered_device() {
     assert_eq!(disk.current_capacity_bytes(), None);
     assert_eq!(
         disk.scalar_observations().capacity_bytes.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+        ScalarAvailability::Unavailable(FailureKind::ProviderFault)
     );
     assert_eq!(disk.device_state.status, DeviceStatus::Stale);
     assert_eq!(disk.device_state.last_success_ms, None);

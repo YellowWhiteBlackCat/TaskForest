@@ -14,6 +14,10 @@ use super::seam_support::{apply_terminal_event, run_event_loop};
 use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event_with_plan};
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
 
 /// A scripted source: pops the queued items; once empty, `poll` fails
 /// with a typed error instead of blocking forever, so a regression that
@@ -151,7 +155,7 @@ fn bare_wheel_pages_the_table_through_the_keyboard_paging_path() {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     let start = app.selected;
     let expected = start
-        .saturating_add(taskmanager_shell::PAGE_STEP)
+        .saturating_add(PAGE_STEP)
         .min(app.visual_row_count().saturating_sub(1));
     let outcome = drive(
         &mut app,
@@ -311,7 +315,7 @@ fn painted_highlight_row(app: &TuiApp, width: u16, height: u16) -> Option<u16> {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -452,10 +456,10 @@ fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
         .and_then(|sessions| sessions.first())
         .cloned()
         .expect("demo sessions");
-    assert!(app.shell.select_session_control(
-        &session,
-        taskmanager_core::core::session::SessionControlAction::Lock
-    ));
+    assert!(
+        app.shell
+            .select_session_control(&session, SessionControlAction::Lock)
+    );
     let frame = Rect::new(0, 0, 120, 40);
     let panel = crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame)
         .expect("users");
@@ -597,7 +601,7 @@ fn refresh_pacing_only_owns_visible_gpu_engine_rows() {
     let mut gpu_app = crate::demo_app();
     let _ = gpu_app
         .shell
-        .begin_gpu_engine_rows_request(taskmanager_core::core::identity::DeviceId::new("gpu:0"));
+        .begin_gpu_engine_rows_request(DeviceId::new("gpu:0"));
     gpu_app.perf_device = crate::PerfDevice::Gpu;
     assert_eq!(
         gpu_app.apply_action(AppAction::SelectPage(AppPage::Performance)),
@@ -688,9 +692,9 @@ fn event_bursts_drain_in_bounded_batches_per_cycle() {
 fn seam_event_loop_expires_timed_feedback_notice() {
     let mut app = crate::demo_app();
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::Timed(Duration::from_millis(40)),
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::Timed(Duration::from_millis(40)),
         "Expiring in loop",
     );
     assert!(app.shell.feedback_notice().is_some());
@@ -709,9 +713,9 @@ fn seam_event_loop_expires_timed_feedback_notice() {
 fn seam_event_loop_esc_dismisses_feedback_notice() {
     let mut app = crate::demo_app();
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Notice to dismiss in loop",
     );
     assert!(app.shell.feedback_notice().is_some());

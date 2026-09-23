@@ -15,6 +15,12 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::{NavOrientation, RootView};
 
@@ -686,36 +692,30 @@ pub fn disconnected_device(theme: &Theme, stable_id: Option<&str>) -> impl IntoE
     let mut card = div()
         .max_w(px(460.0))
         .p(px(18.0))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::card_radius(theme),
-        ))
+        .rounded(absolute(tokens::card_radius(theme)))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+        .border_color(hsla(theme.gpu))
+        .bg(fill(theme.sidebar_card_bg))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_SEMIBOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+                .text_color(hsla(theme.fg))
                 .child(i18n::t("device.disconnected")),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("device.reconnect_hint")),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_size(font_size(tokens::FONT_11))
                 .font(mono_font_with_fallback(theme))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_color(hsla(theme.fg_dim))
                 .child(
                     stable_id.map_or_else(crate::gpui_app::formatting::missing_value, String::from),
                 ),

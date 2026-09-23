@@ -2,6 +2,7 @@ use super::{
     PerfDevice, append_device_marker, append_marker, device_name, marker_line, page_name,
     target_marker_line,
 };
+use taskmanager_application::AppPage;
 
 #[must_use]
 pub(crate) fn device_marker_line(device: PerfDevice) -> String {
@@ -25,7 +26,7 @@ fn marker_line_has_typed_capture_identity() {
         &path,
         "frame_ready",
         "demo",
-        page_name(taskmanager_application::AppPage::Applications),
+        page_name(AppPage::Applications),
     );
     append_device_marker(&path, PerfDevice::Gpu(0));
     let text = std::fs::read_to_string(&path).expect("the appended marker file");
@@ -55,10 +56,7 @@ fn marker_line_has_typed_capture_identity() {
 
 #[test]
 fn page_names_follow_the_shared_page_set() {
-    let names: Vec<_> = taskmanager_application::AppPage::ALL
-        .into_iter()
-        .map(page_name)
-        .collect();
+    let names: Vec<_> = AppPage::ALL.into_iter().map(page_name).collect();
     assert_eq!(
         names,
         [

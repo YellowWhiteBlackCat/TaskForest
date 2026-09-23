@@ -1,9 +1,14 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorScale,
 };
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::missing_value;
 
 /// Build a fan `SensorReading` from its canonical measurement observation.
@@ -28,28 +33,18 @@ fn fan_reading(label: &str, device_id: &str, rpm: u32) -> SensorReading {
 fn fan_trend_line_matches_that_fans_own_history_window() {
     // Record two sensor snapshots for "CPU Fan"/"hwmon1" so its window has
     // >=2 samples. Fans live on the sensor event, not the system snapshot.
-    let mut shell = taskmanager_shell::ShellApp::new();
+    let mut shell = ShellApp::new();
     let snapshot = SensorCenterSnapshot {
         timestamp_ms: 10,
         readings: vec![fan_reading("CPU Fan", "hwmon1", 1500)],
         ..SensorCenterSnapshot::default()
     };
-    let system = taskmanager_core::core::metrics::SystemSnapshot {
+    let system = SystemSnapshot {
         timestamp_ms: snapshot.timestamp_ms,
         ..Default::default()
     };
-    taskmanager_shell::fixture::record_demo_history_frame(
-        &mut shell,
-        &system,
-        None,
-        Some(&snapshot),
-    );
-    taskmanager_shell::fixture::record_demo_history_frame(
-        &mut shell,
-        &system,
-        None,
-        Some(&snapshot),
-    );
+    record_demo_history_frame(&mut shell, &system, None, Some(&snapshot));
+    record_demo_history_frame(&mut shell, &system, None, Some(&snapshot));
     let history = &shell.history;
     // A constant RPM window resolves and trends to a flat mid-ramp.
     let window = history.fan_rpm_for("hwmon1:CPU Fan");
@@ -114,10 +109,9 @@ fn zone_reading(
             1_000,
         )
         .expect("valid thermal-zone fixture"),
-        None => SensorMeasurementObservation::unavailable(
-            descriptor,
-            taskmanager_core::core::failure::FailureKind::PermissionDenied,
-        ),
+        None => {
+            SensorMeasurementObservation::unavailable(descriptor, FailureKind::PermissionDenied)
+        }
     };
     SensorReading::from_measurement_observation(
         DeviceId::new(device_id),
@@ -155,8 +149,16 @@ fn thermal_zone_lines_traverse_every_temperature_reading_and_name_its_source() {
 
     assert_eq!(
         text[0],
-        taskmanager_application::i18n::t("common.temperature"),
-        "the group is headed by the shared temperature label: {text:?}"
+        t("common.thermal_zones"),
+        "the group is headed by its own thermal-zone surface label: {text:?}"
+    );
+    // The heading must NOT be the same catalog word the fan block uses for its
+    // same-device temperature channel, or the page would label the device row
+    // and the system group with one duplicated word.
+    assert_ne!(
+        t("common.thermal_zones"),
+        t("common.temperature"),
+        "the system group and the device temperature row must not share one label"
     );
     assert_eq!(
         &text[1..],
@@ -183,7 +185,7 @@ fn system_thermal_group_reaches_foreign_devices_the_fan_rows_cannot() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let sensors = SensorCenterSnapshot {
         readings: vec![
@@ -194,7 +196,7 @@ fn system_thermal_group_reaches_foreign_devices_the_fan_rows_cannot() {
         ],
         ..SensorCenterSnapshot::default()
     };
-    let shell = taskmanager_shell::ShellApp::new();
+    let shell = ShellApp::new();
 
     let device_rows: Vec<String> = fan_lines(&sensors, &shell, TuiTheme::default(), 60)
         .iter()

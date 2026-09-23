@@ -5,10 +5,11 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity};
 use super::*;
 use crate::ui::current_window_capture_btn;
 use crate::ui::view;
+use taskmanager_test_support::pin_english;
 
 #[test]
 fn window_capture_without_installed_client_reports_unavailable() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = IcedApp::demo();
 
     let result = app.request_current_window_capture();
@@ -22,7 +23,7 @@ fn window_capture_without_installed_client_reports_unavailable() {
 
 #[test]
 fn window_capture_message_routes_to_request_current_window_capture() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = IcedApp::demo();
 
     let _ = app.update(Message::RequestCurrentWindowCapture);

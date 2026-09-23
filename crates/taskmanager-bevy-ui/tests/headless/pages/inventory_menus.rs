@@ -22,6 +22,20 @@ use taskmanager_shell::ShellApp;
 use crate::menu_modal::ActionMenuContext;
 use crate::pages::sessions::menu::SessionMenuModal;
 use crate::pages::startup::menu::StartupMenuModal;
+use taskmanager_application::ConfirmationKind;
+use taskmanager_application::CorrelatedSessionEvent;
+use taskmanager_application::CorrelatedStartupEvent;
+use taskmanager_application::PlatformEventBatch;
+use taskmanager_application::RefreshRequest;
+use taskmanager_application::SessionControlOutcome;
+use taskmanager_application::SessionEvent;
+use taskmanager_application::StartupControlOutcome;
+use taskmanager_application::StartupEvent;
+use taskmanager_core::core::startup::StartupControlPolicy;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::EventSequence;
+use taskmanager_platform_contract::PartialSourceSnapshot;
+use taskmanager_platform_contract::RequestId;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -33,7 +47,7 @@ fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
         enabled,
         source: StartupSource::UserService,
         scope: StartupScope::User,
-        control_policy: taskmanager_core::core::startup::StartupControlPolicy::Direct,
+        control_policy: StartupControlPolicy::Direct,
         locator: StartupEntryLocator::new(format!("user/{id}")),
         impact: StartupImpact::Low,
         impact_evidence: StartupImpactEvidence::Unknown {
@@ -56,21 +70,19 @@ fn session_item(id: &str, user: &str) -> SessionItem {
 
 fn shelved_startup(entries: Vec<StartupEntry>) -> ShellApp {
     let mut shell = ShellApp::new();
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
-        startup_events: vec![taskmanager_application::CorrelatedStartupEvent {
-            request_id: taskmanager_platform_contract::RequestId::MIN,
-            capability: taskmanager_platform_contract::CapabilityId::STARTUP,
+    shell.apply_platform_batch(PlatformEventBatch {
+        startup_events: vec![CorrelatedStartupEvent {
+            request_id: RequestId::MIN,
+            capability: CapabilityId::STARTUP,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(1),
+            sequence: EventSequence::new(1),
             observed_at_ms: 1,
-            event: taskmanager_application::StartupEvent::Snapshot(
-                taskmanager_platform_contract::PartialSourceSnapshot {
-                    items: entries,
-                    sources: Vec::new(),
-                },
-            ),
+            event: StartupEvent::Snapshot(PartialSourceSnapshot {
+                items: entries,
+                sources: Vec::new(),
+            }),
         }],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Startup));
     shell
@@ -78,21 +90,19 @@ fn shelved_startup(entries: Vec<StartupEntry>) -> ShellApp {
 
 fn shelved_sessions(items: Vec<SessionItem>) -> ShellApp {
     let mut shell = ShellApp::new();
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
-        session_events: vec![taskmanager_application::CorrelatedSessionEvent {
-            request_id: taskmanager_platform_contract::RequestId::MIN,
-            capability: taskmanager_platform_contract::CapabilityId::SESSIONS,
+    shell.apply_platform_batch(PlatformEventBatch {
+        session_events: vec![CorrelatedSessionEvent {
+            request_id: RequestId::MIN,
+            capability: CapabilityId::SESSIONS,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(1),
+            sequence: EventSequence::new(1),
             observed_at_ms: 1,
-            event: taskmanager_application::SessionEvent::Snapshot(
-                taskmanager_platform_contract::PartialSourceSnapshot {
-                    items,
-                    sources: Vec::new(),
-                },
-            ),
+            event: SessionEvent::Snapshot(PartialSourceSnapshot {
+                items,
+                sources: Vec::new(),
+            }),
         }],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Users));
     shell
@@ -247,10 +257,7 @@ fn startup_bidirectional_control_channel_flow() {
     assert!(!pending.enabled, "disable requested");
 
     // Confirm the armed gate
-    let effect = crate::confirmation::confirm_armed(
-        &mut shell,
-        taskmanager_application::ConfirmationKind::StartupControl,
-    );
+    let effect = crate::confirmation::confirm_armed(&mut shell, ConfirmationKind::StartupControl);
     let Some(PlatformEffect::StartupControl(request)) = effect else {
         panic!("expected StartupControl platform effect, got {effect:?}");
     };
@@ -258,24 +265,22 @@ fn startup_bidirectional_control_channel_flow() {
     assert!(!request.enabled);
 
     // 2. Inbound: platform returns completed outcome
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
-        startup_events: vec![taskmanager_application::CorrelatedStartupEvent {
-            request_id: taskmanager_platform_contract::RequestId::MIN,
-            capability: taskmanager_platform_contract::CapabilityId::STARTUP,
+    shell.apply_platform_batch(PlatformEventBatch {
+        startup_events: vec![CorrelatedStartupEvent {
+            request_id: RequestId::MIN,
+            capability: CapabilityId::STARTUP,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(2),
+            sequence: EventSequence::new(2),
             observed_at_ms: 10,
-            event: taskmanager_application::StartupEvent::Control(
-                taskmanager_application::StartupControlOutcome {
-                    request_id: request.request_id,
-                    target_id: entry.id.clone(),
-                    target_name: entry.name.clone(),
-                    enabled: false,
-                    result: Ok(()),
-                },
-            ),
+            event: StartupEvent::Control(StartupControlOutcome {
+                request_id: request.request_id,
+                target_id: entry.id.clone(),
+                target_name: entry.name.clone(),
+                enabled: false,
+                result: Ok(()),
+            }),
         }],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
 
     // Verify feedback notice
@@ -291,9 +296,7 @@ fn startup_bidirectional_control_channel_flow() {
     let refresh = shell.take_startup_refresh_request();
     assert_eq!(
         refresh,
-        Some(PlatformEffect::Refresh(
-            taskmanager_application::RefreshRequest::Startup
-        )),
+        Some(PlatformEffect::Refresh(RefreshRequest::Startup)),
         "startup refresh queued after control outcome"
     );
 }
@@ -313,10 +316,7 @@ fn session_bidirectional_control_channel_flow() {
     assert_eq!(pending.action, SessionControlAction::Disconnect);
 
     // Confirm the armed gate
-    let effect = crate::confirmation::confirm_armed(
-        &mut shell,
-        taskmanager_application::ConfirmationKind::SessionControl,
-    );
+    let effect = crate::confirmation::confirm_armed(&mut shell, ConfirmationKind::SessionControl);
     let Some(PlatformEffect::SessionControl(target)) = effect else {
         panic!("expected SessionControl platform effect, got {effect:?}");
     };
@@ -324,23 +324,21 @@ fn session_bidirectional_control_channel_flow() {
     assert_eq!(target.action, SessionControlAction::Disconnect);
 
     // 2. Inbound: platform returns completed outcome
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
-        session_events: vec![taskmanager_application::CorrelatedSessionEvent {
-            request_id: taskmanager_platform_contract::RequestId::MIN,
-            capability: taskmanager_platform_contract::CapabilityId::SESSIONS,
+    shell.apply_platform_batch(PlatformEventBatch {
+        session_events: vec![CorrelatedSessionEvent {
+            request_id: RequestId::MIN,
+            capability: CapabilityId::SESSIONS,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(2),
+            sequence: EventSequence::new(2),
             observed_at_ms: 10,
-            event: taskmanager_application::SessionEvent::Control(
-                taskmanager_application::SessionControlOutcome {
-                    request_id: target.request_id,
-                    session_id: target.session_id.clone(),
-                    action: target.action,
-                    result: Ok(()),
-                },
-            ),
+            event: SessionEvent::Control(SessionControlOutcome {
+                request_id: target.request_id,
+                session_id: target.session_id.clone(),
+                action: target.action,
+                result: Ok(()),
+            }),
         }],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
 
     // Verify feedback notice
@@ -356,9 +354,7 @@ fn session_bidirectional_control_channel_flow() {
     let refresh = shell.take_session_refresh_request();
     assert_eq!(
         refresh,
-        Some(PlatformEffect::Refresh(
-            taskmanager_application::RefreshRequest::Sessions
-        )),
+        Some(PlatformEffect::Refresh(RefreshRequest::Sessions)),
         "session refresh queued after control outcome"
     );
 }

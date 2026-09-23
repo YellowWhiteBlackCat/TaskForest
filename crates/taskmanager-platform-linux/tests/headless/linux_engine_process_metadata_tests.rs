@@ -3,6 +3,11 @@ use std::path::Path;
 use taskmanager_core::ProcessMetadataAvailability;
 
 use super::*;
+use taskmanager_core::FailureKind;
+use taskmanager_core::ProcessItem;
+use taskmanager_core::ProcessScalarObservations;
+use taskmanager_core::ScalarObservation;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn owner(uid: u32, label: Option<&str>, observed_at_ms: u64) -> ProcessOwner {
     let mut labels = HashMap::new();
@@ -62,7 +67,7 @@ fn missing_label_and_failed_label_source_remain_distinct() {
     assert_eq!(failed.last_success_ms(), Some(20));
     assert_eq!(
         label_outcome(&Ok(4242), &Err(ProcessMetadataFailure::PermissionDenied)),
-        SourceOutcome::Unavailable(taskmanager_core::FailureKind::PermissionDenied)
+        SourceOutcome::Unavailable(FailureKind::PermissionDenied)
     );
 }
 
@@ -88,7 +93,7 @@ fn executable_io_distinguishes_absence_race_and_failures() {
     );
     assert_eq!(
         observation_outcome(&raced),
-        SourceOutcome::Unavailable(taskmanager_core::FailureKind::IdentityChanged)
+        SourceOutcome::Unavailable(FailureKind::IdentityChanged)
     );
 
     for (kind, failure) in [
@@ -122,12 +127,12 @@ fn metadata_failure_recovery_retains_only_the_same_identity() {
             10,
         ),
     };
-    let previous_item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous_item = ProcessItemFixtureBuilder::new()
         .metadata_observations(previous)
-        .scalar_observations(taskmanager_core::ProcessScalarObservations {
-            start_token: taskmanager_core::ScalarObservation::available(600, 10),
-            start_time_secs: taskmanager_core::ScalarObservation::available(1_720_000_000, 10),
-            ..taskmanager_core::ProcessScalarObservations::default()
+        .scalar_observations(ProcessScalarObservations {
+            start_token: ScalarObservation::available(600, 10),
+            start_time_secs: ScalarObservation::available(1_720_000_000, 10),
+            ..ProcessScalarObservations::default()
         })
         .build();
     let failed = observations_from_results(
@@ -190,7 +195,7 @@ fn unconfirmed_start_token_blocks_all_metadata_reads_and_current_evidence() {
         &Ok(HashMap::from([(1000, "alice".to_owned())])),
         20,
         Err(FailureKind::IdentityChanged),
-        None::<&taskmanager_core::ProcessItem>,
+        None::<&ProcessItem>,
     );
 
     assert_eq!(

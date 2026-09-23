@@ -3,7 +3,9 @@
 //! generation reset, and per-device/per-field isolation.
 
 use super::*;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_telemetry_store::GpuMetricPoint;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
 const GIB: u64 = 1024 * 1024 * 1024;
 const MIB: u64 = 1024 * 1024;
@@ -354,18 +356,14 @@ fn chart_metric_utilization_window_matches_the_usage_ring() {
     use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
     const DEVICE: &str = "gpu:anchor:utilization";
-    let (history, ingestor) = taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(64);
+    let (history, ingestor) = LiveGraphHistory::shared(64);
 
     let observation = |utilization: Option<f32>, observed_at_ms: u64| {
         let mut gpu = GpuMetrics::new(DEVICE, "Anchor GPU");
         gpu.device_generation = DeviceGeneration::new(1);
         gpu.device_state = DeviceState::healthy(observed_at_ms);
         let utilization = utilization.map_or_else(
-            || {
-                ScalarObservation::unavailable(
-                    taskmanager_core::core::failure::FailureKind::Unsupported,
-                )
-            },
+            || ScalarObservation::unavailable(FailureKind::Unsupported),
             |value| ScalarObservation::available(value, observed_at_ms),
         );
         gpu.apply_scalar_observations(GpuScalarObservations {

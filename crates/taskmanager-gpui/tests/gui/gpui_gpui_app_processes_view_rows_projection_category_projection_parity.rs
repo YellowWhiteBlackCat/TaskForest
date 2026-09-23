@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use taskmanager_core::core::units::UnitPreferences;
 
 use super::{SortCol, Toggle, category_tree_rows};
 use taskmanager_application::process_category_projection::category_expansion_key;
@@ -29,7 +30,7 @@ fn category_rows_match_neutral_buckets_on_the_shared_fixture() {
         false,
         &HashSet::new(),
         &HashSet::new(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(
         rows.len(),
@@ -101,7 +102,7 @@ fn expanded_category_members_match_neutral_bucket_order() {
         false,
         &expanded,
         &HashSet::new(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     let mut cursor = 0;
     for bucket in &buckets {
@@ -166,7 +167,7 @@ fn empty_neutral_bucket_renders_no_header() {
         false,
         &HashSet::new(),
         &HashSet::new(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(
         rows.len(),

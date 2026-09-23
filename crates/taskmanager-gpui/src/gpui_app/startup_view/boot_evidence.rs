@@ -7,6 +7,15 @@
 //! [`StartupBootEvidenceSnapshot`] arrives as a render param.
 
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
+use taskmanager_core::core::BootSegmentDelta;
+use taskmanager_core::core::segment_deltas;
+use taskmanager_core::core::startup::StartupCriticalChainNode;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
 use taskmanager_application::i18n;
@@ -57,7 +66,7 @@ fn critical_chain_summary(evidence: &StartupBootEvidenceSnapshot) -> Option<Stri
     if evidence.critical_chain_failure.is_some() {
         return Some(i18n::t("startup.evidence_unavailable").to_string());
     }
-    let measured: Vec<&taskmanager_core::core::startup::StartupCriticalChainNode> = evidence
+    let measured: Vec<&StartupCriticalChainNode> = evidence
         .critical_chain
         .iter()
         .filter(|node| node.duration_ms.is_some())
@@ -108,40 +117,30 @@ pub(super) fn boot_evidence_strip(
             .flex()
             .flex_row()
             .items_center()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_2,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::card_radius(theme),
-            ))
+            .gap(definite_length(tokens::SPACE_3))
+            .px(definite_length(tokens::SPACE_3))
+            .py(definite_length(tokens::SPACE_2))
+            .rounded(absolute(tokens::card_radius(theme)))
             .border(px(1.0))
-            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-            .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
+            .border_color(hsla(theme.border))
+            .bg(fill(theme.card_surface()))
             .child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(theme.fg_dim))
                     .child(label.to_string()),
             )
             .child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(value_color))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(value_color))
                     .child(value.to_string()),
             )
     };
     div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .child(if let Some(failed) = failed {
             pill(
                 "startup-evidence-failed",
@@ -206,17 +205,16 @@ pub(super) fn format_delta_ms(delta_ms: i64) -> String {
 pub(super) fn boot_timeline_block(
     theme: &Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
-    baseline: Option<&taskmanager_core::core::BootTimeline>,
+    baseline: Option<&BootTimeline>,
     row_limit: usize,
 ) -> Option<Div> {
     let evidence = evidence?;
     let timeline = boot_timeline_rows(evidence)?;
     let deltas = baseline.map(|baseline| {
-        taskmanager_core::core::segment_deltas(&timeline, baseline)
+        segment_deltas(&timeline, baseline)
             .into_iter()
             .map(|delta| (delta.unit.clone(), delta))
-            .collect::<std::collections::HashMap<String, taskmanager_core::core::BootSegmentDelta>>(
-            )
+            .collect::<std::collections::HashMap<String, BootSegmentDelta>>()
     });
     let mut rows: Vec<Div> = timeline
         .segments
@@ -229,15 +227,13 @@ pub(super) fn boot_timeline_block(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
                         .w(px(160.0))
                         .overflow_hidden()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg))
                         .child(segment.unit.clone()),
                 )
                 .child(
@@ -247,22 +243,22 @@ pub(super) fn boot_timeline_block(
                         .h(px(8.0))
                         .rounded(px(4.0))
                         .overflow_hidden()
-                        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
+                        .bg(fill(theme.card_surface()))
                         .child(
                             div()
                                 .w(relative(fraction.clamp(0.0, 1.0)))
                                 .min_w(px(TIMELINE_MIN_BAR_PX))
                                 .h(px(8.0))
                                 .rounded(px(4.0))
-                                .bg(taskmanager_ui::theme_binding::fill(theme.accent))
+                                .bg(fill(theme.accent))
                                 .child(div()),
                         ),
                 )
                 .child(
                     div()
                         .w(px(64.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(format!("{} ms", segment.duration_ms)),
                 )
                 .children(deltas.as_ref().and_then(|deltas| {
@@ -277,8 +273,8 @@ pub(super) fn boot_timeline_block(
                     Some(
                         div()
                             .w(px(72.0))
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                            .text_color(taskmanager_ui::theme_binding::hsla(color))
+                            .text_size(font_size(tokens::FONT_11))
+                            .text_color(hsla(color))
                             .debug_selector(move || format!("timeline-delta-{}", delta.unit))
                             .child(format_delta_ms(delta.delta_ms)),
                     )
@@ -292,20 +288,18 @@ pub(super) fn boot_timeline_block(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
                         .w(px(160.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(i18n::t("startup.timeline_untimed")),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(format!(
                             "{} · {}",
                             timeline.untimed_count,
@@ -322,8 +316,8 @@ pub(super) fn boot_timeline_block(
         rows.push(
             div()
                 .debug_selector(|| "timeline-collapsed".to_string())
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(format!("+{collapsed_count}")),
         );
     }
@@ -332,21 +326,13 @@ pub(super) fn boot_timeline_block(
             .debug_selector(|| "boot-timeline".to_string())
             .flex()
             .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ))
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::card_radius(theme),
-            ))
+            .gap(definite_length(tokens::SPACE_4))
+            .px(definite_length(tokens::SPACE_4))
+            .py(definite_length(tokens::SPACE_3))
+            .rounded(absolute(tokens::card_radius(theme)))
             .border(px(1.0))
-            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-            .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
+            .border_color(hsla(theme.border))
+            .bg(fill(theme.card_surface()))
             .child(
                 div()
                     .flex()
@@ -357,34 +343,26 @@ pub(super) fn boot_timeline_block(
                         div()
                             .flex()
                             .flex_row()
-                            .gap(taskmanager_ui::theme_binding::definite_length(
-                                tokens::SPACE_4,
-                            ))
+                            .gap(definite_length(tokens::SPACE_4))
                             .child(
                                 div()
-                                    .text_size(taskmanager_ui::theme_binding::font_size(
-                                        tokens::FONT_12,
-                                    ))
-                                    .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                        tokens::FONT_WEIGHT_SEMIBOLD,
-                                    ))
-                                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                                    .text_size(font_size(tokens::FONT_12))
+                                    .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+                                    .text_color(hsla(theme.fg))
                                     .child(i18n::t("startup.timeline")),
                             )
                             .children((deltas.is_some()).then(|| {
                                 div()
-                                    .text_size(taskmanager_ui::theme_binding::font_size(
-                                        tokens::FONT_11,
-                                    ))
-                                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                                    .text_size(font_size(tokens::FONT_11))
+                                    .text_color(hsla(theme.fg_dim))
                                     .debug_selector(|| "timeline-delta-legend".to_string())
                                     .child(i18n::t("startup.timeline_vs_previous"))
                             })),
                     )
                     .child(
                         div()
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                            .text_size(font_size(tokens::FONT_11))
+                            .text_color(hsla(theme.fg_dim))
                             .child(format!("{} ms", timeline.total_ms)),
                     ),
             )

@@ -1,4 +1,10 @@
 use super::*;
+// Linux-only dependency (declared under the target gate in Cargo.toml); the
+// pidfd assertions below ride that gate.
+#[cfg(target_os = "linux")]
+use taskmanager_fd_bridge::is_pidfd_unsupported;
+#[cfg(target_os = "linux")]
+use taskmanager_fd_bridge::pidfd_open;
 
 #[test]
 fn operation_parser_accepts_only_fixed_actions() {
@@ -134,9 +140,9 @@ mod signal_identity {
 
     #[test]
     fn pidfd_signal_path_stops_and_resumes_a_live_own_child() {
-        if let Err(error) = taskmanager_fd_bridge::pidfd_open(std::process::id()) {
+        if let Err(error) = pidfd_open(std::process::id()) {
             assert!(
-                taskmanager_fd_bridge::is_pidfd_unsupported(&error),
+                is_pidfd_unsupported(&error),
                 "unexpected pidfd_open failure: {error}"
             );
             eprintln!("skipping: this kernel has no pidfd (Linux < 5.1)");

@@ -4,6 +4,7 @@
 //! operations. No filesystem access or blocking worker runs on the UI thread.
 
 use gpui::{ClipboardItem, Div, Entity, ParentElement, Styled, div};
+use taskmanager_ui::theme_binding::definite_length;
 use tracing::warn;
 
 use crate::gpui_app::elements;
@@ -62,7 +63,7 @@ pub(super) fn render_transfer_actions(
         .flex_row()
         .flex_wrap()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(tokens::SPACE_6))
+        .gap(definite_length(tokens::SPACE_6))
         .child(elements::pill(
             theme,
             "alert-rules-export",

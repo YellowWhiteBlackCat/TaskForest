@@ -28,6 +28,7 @@ use taskmanager_theme::tokens;
 
 use super::components::IcedElement;
 use super::overlays::modal_overlay;
+use taskmanager_theme::Theme;
 
 /// TaskForest's documentation destination. Opening it stays a typed intent
 /// ([`FirstRunMessage::OpenDocumentation`]) routed through the URL-open port at
@@ -180,7 +181,7 @@ pub enum FirstRunMessage {
 /// typed failure), never a fabricated script; pending actions disable the
 /// action row exactly like GPUI's pills.
 pub(crate) fn render_first_run<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: &'a FirstRunUiState,
     appear: f32,
 ) -> IcedElement<'a> {
@@ -197,10 +198,7 @@ pub(crate) fn render_first_run<'a>(
     )
 }
 
-fn discovering_body<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    state: &'a FirstRunUiState,
-) -> IcedElement<'a> {
+fn discovering_body<'a>(theme_snapshot: &'a Theme, state: &'a FirstRunUiState) -> IcedElement<'a> {
     let muted = theme::muted_text_color(theme_snapshot);
     let danger = crate::theme_binding::color(theme_snapshot.palette().danger);
     let line = if let FirstRunPhase::Failed(kind) = state.phase {
@@ -219,7 +217,7 @@ fn discovering_body<'a>(
 }
 
 fn info_body<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: &'a FirstRunUiState,
     info: &'a SetupScriptInfo,
 ) -> IcedElement<'a> {
@@ -274,7 +272,7 @@ fn info_body<'a>(
 /// the descriptor row's stable focus position (location / run command /
 /// revert command).
 fn info_row<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     label: &'static str,
     value: String,
     copy_label: &'static str,
@@ -308,7 +306,7 @@ fn info_row<'a>(
 }
 
 fn action_row<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: &'a FirstRunUiState,
     pending: bool,
 ) -> IcedElement<'a> {
@@ -393,7 +391,7 @@ impl FocusSlot {
 }
 
 fn action_button<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: crate::app::FocusTarget,
     label: String,
     message: Message,

@@ -8,6 +8,7 @@
 //! failure (denied / helper unavailable / unsupported) otherwise.
 
 use taskmanager_core::{DeviceId, GpuEngineRowsSnapshot};
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One per-engine read for `device_id`. The frontend chooses the device (it

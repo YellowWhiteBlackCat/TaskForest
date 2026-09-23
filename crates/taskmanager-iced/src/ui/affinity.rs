@@ -12,6 +12,7 @@ use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message};
 use crate::{IcedApp, focus, theme};
+use taskmanager_shell::presentation::missing_value;
 
 /// Render the process-affinity editor from the frozen identity and the latest
 /// correlated shell read. A missing or failed read never becomes a guessed
@@ -83,7 +84,7 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
             format!("0x{:032X}", mask)
         }
     } else {
-        taskmanager_shell::presentation::missing_value()
+        missing_value()
     };
 
     let preset_bar: Element<'_, Message, iced::Theme, iced::Renderer> =

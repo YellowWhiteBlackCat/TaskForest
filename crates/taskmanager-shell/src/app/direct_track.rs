@@ -49,6 +49,23 @@ mod process_selection;
 mod process_viewing;
 
 pub use process_selection::identity_range;
+use taskmanager_application::{
+    AlertEvaluation, ControlRequestId, DesktopNotificationRequest, GpuEngineRowsState,
+    ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome, MsrReadoutState, NetworkEscalationState,
+    PersistentApplicationHistoryRecorder, PlatformEventBatch, ProcessAffinityState,
+    ProcessBatchState, ProcessEvent, RaplPowerState, RequestAttemptId, ShellUiActionIntent,
+    ShellUiActionState, SmartSelfTestState, SmbiosMemoryState,
+};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
+};
+use taskmanager_core::core::history::HistoryRecordSink;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::CapabilityId;
 
 /// The Applications-table viewing state for a direct-track window: the active
 /// sort, the status bucket, and the search query — the same authoritative
@@ -207,8 +224,7 @@ pub struct DirectTrackState {
     pub(crate) gpu_chart_metric: crate::presentation::gpu_chart_metric::GpuChartMetricSelection,
     /// Optional durable application-history fan-out owned by this frontend
     /// track while the history preference is enabled.
-    persistent_application_history:
-        Option<taskmanager_application::PersistentApplicationHistoryRecorder>,
+    persistent_application_history: Option<PersistentApplicationHistoryRecorder>,
 }
 
 impl DirectTrackState {
@@ -274,7 +290,7 @@ impl DirectTrackState {
             self.selection.active_row(),
             &selected,
             self.projection
-                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+                .capability_status(&CapabilityId::PROCESS_CONTROL),
         )
     }
 
@@ -282,7 +298,7 @@ impl DirectTrackState {
     pub fn process_control_capability_allowed(&self) -> bool {
         super::process_control::process_control_capability_allowed(
             self.projection
-                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+                .capability_status(&CapabilityId::PROCESS_CONTROL),
         )
     }
 
@@ -297,10 +313,7 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub fn process_control_intent(
-        &self,
-        action: taskmanager_core::core::process::ProcessBatchAction,
-    ) -> Option<taskmanager_core::core::process::ProcessBatchIntent> {
+    pub fn process_control_intent(&self, action: ProcessBatchAction) -> Option<ProcessBatchIntent> {
         let selected: Vec<_> = self.selection.rows().iter().copied().collect();
         super::process_control::process_control_intent(
             self.projection.processes_slice(),
@@ -331,7 +344,7 @@ impl DirectTrackState {
     #[must_use]
     pub fn apply_platform_batch(
         &mut self,
-        mut batch: taskmanager_application::PlatformEventBatch,
+        mut batch: PlatformEventBatch,
     ) -> super::BatchFoldOutput {
         self.request_sessions.filter_platform_terminals(&mut batch);
         let mut output = self.projection.apply_platform_batch(batch);
@@ -344,16 +357,14 @@ impl DirectTrackState {
     /// exposing persistence handles to the renderer.
     pub fn set_history_persistence_sink(
         &mut self,
-        sink: Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>>,
+        sink: Option<std::sync::Arc<dyn HistoryRecordSink>>,
     ) {
         if self.persistent_application_history.is_some() == sink.is_some() {
             return;
         }
-        self.persistent_application_history = sink.as_ref().map(|sink| {
-            taskmanager_application::PersistentApplicationHistoryRecorder::new(
-                std::sync::Arc::clone(sink),
-            )
-        });
+        self.persistent_application_history = sink
+            .as_ref()
+            .map(|sink| PersistentApplicationHistoryRecorder::new(std::sync::Arc::clone(sink)));
     }
 
     fn record_persistent_application_history(&mut self, output: &super::BatchFoldOutput) {
@@ -362,7 +373,7 @@ impl DirectTrackState {
         };
         for correlated in &output.process_events {
             let processes = match &correlated.event {
-                taskmanager_application::ProcessEvent::Snapshot(processes) => processes,
+                ProcessEvent::Snapshot(processes) => processes,
                 _ => continue,
             };
             let _ = recorder.record_process_snapshot(
@@ -375,15 +386,12 @@ impl DirectTrackState {
 
     pub fn edit_alert_rules(
         &mut self,
-        edit: taskmanager_application::ManagedAlertRuleEdit,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
+        edit: ManagedAlertRuleEdit,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
         self.projection.alert_center.edit_rules(edit)
     }
 
-    pub fn set_alert_policy(&mut self, policy: taskmanager_core::core::alerts::NotificationPolicy) {
+    pub fn set_alert_policy(&mut self, policy: NotificationPolicy) {
         self.projection.alert_center.set_policy(policy);
     }
 
@@ -396,19 +404,16 @@ impl DirectTrackState {
     /// Install deterministic alert transition history through the direct
     /// track's fixture boundary; production events still come only from the
     /// shared evaluator.
-    pub fn replace_alert_event_history(
-        &mut self,
-        events: Vec<taskmanager_core::core::alerts::AlertEvent>,
-    ) {
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
         self.projection.alert_center.replace_event_history(events);
     }
 
     #[must_use]
     pub fn evaluate_alerts(
         &mut self,
-        snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
+        snapshot: &SystemSnapshot,
         observed_at_ms: u64,
-    ) -> taskmanager_application::AlertEvaluation {
+    ) -> AlertEvaluation {
         self.projection
             .alert_center
             .evaluate(snapshot, observed_at_ms)
@@ -416,10 +421,7 @@ impl DirectTrackState {
 
     /// Commit a synchronous alert-rule evaluation through a named reducer.
     /// Returns the new revision used by renderer materialization.
-    pub fn accept_alert_evaluation(
-        &mut self,
-        active: Vec<taskmanager_core::core::alerts::Alert>,
-    ) -> u64 {
+    pub fn accept_alert_evaluation(&mut self, active: Vec<Alert>) -> u64 {
         self.projection.alert_active = active;
         self.projection.refresh_count = self.projection.refresh_count.saturating_add(1);
         self.projection.refresh_count
@@ -428,7 +430,7 @@ impl DirectTrackState {
     pub fn begin_process_control(
         &mut self,
         request_id: RequestId,
-        target: taskmanager_core::core::process::FrozenProcessIdentity,
+        target: FrozenProcessIdentity,
         kind: super::ProcessControlKind,
     ) {
         self.projection
@@ -438,14 +440,14 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_process_affinity_read(
         &mut self,
-        target: taskmanager_core::core::process::FrozenProcessIdentity,
-    ) -> taskmanager_application::RequestAttemptId {
+        target: FrozenProcessIdentity,
+    ) -> RequestAttemptId {
         self.request_sessions.begin_affinity(target)
     }
 
     pub fn accept_process_affinity_read(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions.accept_affinity(attempt, request_id)
@@ -453,7 +455,7 @@ impl DirectTrackState {
 
     pub fn reject_process_affinity_read(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_affinity(attempt, failure)
@@ -464,21 +466,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn process_affinity_state(&self) -> &taskmanager_application::ProcessAffinityState {
+    pub const fn process_affinity_state(&self) -> &ProcessAffinityState {
         self.request_sessions.affinity()
     }
 
     #[must_use]
-    pub fn begin_process_batch(
-        &mut self,
-        intent: taskmanager_core::core::process::ProcessBatchIntent,
-    ) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_process_batch(&mut self, intent: ProcessBatchIntent) -> RequestAttemptId {
         self.request_sessions.begin_batch(intent)
     }
 
     pub fn accept_process_batch(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions.accept_batch(attempt, request_id)
@@ -486,7 +485,7 @@ impl DirectTrackState {
 
     pub fn reject_process_batch(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_batch(attempt, failure)
@@ -497,21 +496,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn process_batch_state(&self) -> &taskmanager_application::ProcessBatchState {
+    pub const fn process_batch_state(&self) -> &ProcessBatchState {
         self.request_sessions.batch()
     }
 
     #[must_use]
-    pub fn begin_smart_self_test(
-        &mut self,
-        intent: taskmanager_core::core::system_health::SmartSelfTestIntent,
-    ) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_smart_self_test(&mut self, intent: SmartSelfTestIntent) -> RequestAttemptId {
         self.request_sessions.begin_smart_self_test(intent)
     }
 
     pub fn accept_smart_self_test(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -520,7 +516,7 @@ impl DirectTrackState {
 
     pub fn reject_smart_self_test(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions
@@ -532,21 +528,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn smart_self_test_state(&self) -> &taskmanager_application::SmartSelfTestState {
+    pub const fn smart_self_test_state(&self) -> &SmartSelfTestState {
         self.request_sessions.smart_self_test()
     }
 
     #[must_use]
-    pub fn begin_gpu_engine_rows_request(
-        &mut self,
-        device_id: taskmanager_core::core::identity::DeviceId,
-    ) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_gpu_engine_rows_request(&mut self, device_id: DeviceId) -> RequestAttemptId {
         self.request_sessions.begin_gpu_engine_rows(device_id)
     }
 
     pub fn accept_gpu_engine_rows_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -555,7 +548,7 @@ impl DirectTrackState {
 
     pub fn reject_gpu_engine_rows_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions
@@ -567,18 +560,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn gpu_engine_rows_state(&self) -> &taskmanager_application::GpuEngineRowsState {
+    pub const fn gpu_engine_rows_state(&self) -> &GpuEngineRowsState {
         self.request_sessions.gpu_engine_rows()
     }
 
     #[must_use]
-    pub fn begin_smbios_memory_request(&mut self) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_smbios_memory_request(&mut self) -> RequestAttemptId {
         self.request_sessions.begin_smbios_memory()
     }
 
     pub fn accept_smbios_memory_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -587,7 +580,7 @@ impl DirectTrackState {
 
     pub fn reject_smbios_memory_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_smbios_memory(attempt, failure)
@@ -598,18 +591,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn smbios_memory_state(&self) -> &taskmanager_application::SmbiosMemoryState {
+    pub const fn smbios_memory_state(&self) -> &SmbiosMemoryState {
         self.request_sessions.smbios_memory()
     }
 
     #[must_use]
-    pub fn begin_rapl_power_request(&mut self) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_rapl_power_request(&mut self) -> RequestAttemptId {
         self.request_sessions.begin_rapl_power()
     }
 
     pub fn accept_rapl_power_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions.accept_rapl_power(attempt, request_id)
@@ -617,7 +610,7 @@ impl DirectTrackState {
 
     pub fn reject_rapl_power_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_rapl_power(attempt, failure)
@@ -628,18 +621,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn rapl_power_state(&self) -> &taskmanager_application::RaplPowerState {
+    pub const fn rapl_power_state(&self) -> &RaplPowerState {
         self.request_sessions.rapl_power()
     }
 
     #[must_use]
-    pub fn begin_msr_readout_request(&mut self) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_msr_readout_request(&mut self) -> RequestAttemptId {
         self.request_sessions.begin_msr_readout()
     }
 
     pub fn accept_msr_readout_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -648,7 +641,7 @@ impl DirectTrackState {
 
     pub fn reject_msr_readout_request(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_msr_readout(attempt, failure)
@@ -659,7 +652,7 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn msr_readout_state(&self) -> &taskmanager_application::MsrReadoutState {
+    pub const fn msr_readout_state(&self) -> &MsrReadoutState {
         self.request_sessions.msr_readout()
     }
 
@@ -701,16 +694,13 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub fn begin_shell_ui_action(
-        &mut self,
-        intent: taskmanager_application::ShellUiActionIntent,
-    ) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_shell_ui_action(&mut self, intent: ShellUiActionIntent) -> RequestAttemptId {
         self.request_sessions.begin_shell_ui_action(intent)
     }
 
     pub fn accept_shell_ui_action(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -719,7 +709,7 @@ impl DirectTrackState {
 
     pub fn reject_shell_ui_action(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions
@@ -731,18 +721,18 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn shell_ui_action_state(&self) -> &taskmanager_application::ShellUiActionState {
+    pub const fn shell_ui_action_state(&self) -> &ShellUiActionState {
         self.request_sessions.shell_ui_action()
     }
 
     #[must_use]
-    pub fn begin_network_escalation(&mut self) -> taskmanager_application::RequestAttemptId {
+    pub fn begin_network_escalation(&mut self) -> RequestAttemptId {
         self.request_sessions.begin_network_escalation()
     }
 
     pub fn accept_network_escalation(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         request_id: RequestId,
     ) -> bool {
         self.request_sessions
@@ -751,7 +741,7 @@ impl DirectTrackState {
 
     pub fn reject_network_escalation(
         &mut self,
-        attempt: taskmanager_application::RequestAttemptId,
+        attempt: RequestAttemptId,
         failure: FailureKind,
     ) -> bool {
         self.request_sessions
@@ -763,44 +753,36 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub const fn network_escalation_state(
-        &self,
-    ) -> &taskmanager_application::NetworkEscalationState {
+    pub const fn network_escalation_state(&self) -> &NetworkEscalationState {
         self.request_sessions.network_escalation()
     }
 
     #[must_use]
-    pub fn begin_startup_control(&mut self) -> taskmanager_application::ControlRequestId {
+    pub fn begin_startup_control(&mut self) -> ControlRequestId {
         self.projection.startup_control_requests.begin()
     }
 
     #[must_use]
-    pub fn accept_startup_control(
-        &mut self,
-        request_id: taskmanager_application::ControlRequestId,
-    ) -> bool {
+    pub fn accept_startup_control(&mut self, request_id: ControlRequestId) -> bool {
         self.projection.startup_control_requests.accept(request_id)
     }
 
     #[must_use]
-    pub fn begin_session_control(&mut self) -> taskmanager_application::ControlRequestId {
+    pub fn begin_session_control(&mut self) -> ControlRequestId {
         self.projection.session_control_requests.begin()
     }
 
     #[must_use]
-    pub fn accept_session_control(
-        &mut self,
-        request_id: taskmanager_application::ControlRequestId,
-    ) -> bool {
+    pub fn accept_session_control(&mut self, request_id: ControlRequestId) -> bool {
         self.projection.session_control_requests.accept(request_id)
     }
 
     #[must_use]
     pub fn begin_service_control(
         &mut self,
-        service_id: taskmanager_core::core::target::ServiceId,
-        action: taskmanager_core::core::services::ServiceAction,
-    ) -> taskmanager_application::ControlRequestId {
+        service_id: ServiceId,
+        action: ServiceAction,
+    ) -> ControlRequestId {
         self.projection
             .service_control_requests
             .begin(service_id, action)
@@ -809,9 +791,9 @@ impl DirectTrackState {
     #[must_use]
     pub fn accept_service_control(
         &mut self,
-        request_id: taskmanager_application::ControlRequestId,
-        service_id: &taskmanager_core::core::target::ServiceId,
-        action: taskmanager_core::core::services::ServiceAction,
+        request_id: ControlRequestId,
+        service_id: &ServiceId,
+        action: ServiceAction,
     ) -> bool {
         self.projection
             .service_control_requests
@@ -819,9 +801,7 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub fn drain_alert_notifications(
-        &mut self,
-    ) -> Vec<taskmanager_application::DesktopNotificationRequest> {
+    pub fn drain_alert_notifications(&mut self) -> Vec<DesktopNotificationRequest> {
         self.projection.drain_alert_notifications()
     }
 

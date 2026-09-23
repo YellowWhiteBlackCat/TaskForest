@@ -69,6 +69,8 @@ use crate::widgets::table::{
     visible_columns,
 };
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_shell::presentation::process_anomaly_summary;
+use taskmanager_shell::presentation::uninterruptible_process_summary;
 
 pub(crate) mod affinity;
 pub(crate) mod details;
@@ -218,8 +220,8 @@ fn count_line_text_for_shell(shell: &ShellApp, visible: usize, query: &str) -> S
         .as_ref()
         .map(|items| items.as_slice());
     [
-        taskmanager_shell::presentation::uninterruptible_process_summary(processes),
-        taskmanager_shell::presentation::process_anomaly_summary(processes),
+        uninterruptible_process_summary(processes),
+        process_anomaly_summary(processes),
     ]
     .into_iter()
     .flatten()

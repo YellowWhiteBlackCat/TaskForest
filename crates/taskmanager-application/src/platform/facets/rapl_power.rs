@@ -11,6 +11,7 @@
 //! [`super::system::HardwareInventoryRequest`].
 
 use taskmanager_core::RaplPowerSnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One CPU package-power read for the host.

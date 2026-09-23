@@ -14,6 +14,7 @@ use super::{
     batch_menu, pages, process_menu, process_properties::ProcessDetailsSection, process_table,
     service_menu, session_menu, startup_menu,
 };
+use taskmanager_application::{ConfirmationKind, SurfaceKind};
 
 /// Rows occupied by the table border, header, and the header's bottom margin
 /// before the first data row. The hit-test rule belongs to the frame plan so
@@ -156,7 +157,7 @@ pub(crate) enum TuiFocusTarget {
     Search,
     ApplicationsTable,
     ApplicationsDetails,
-    SharedSurface(taskmanager_application::SurfaceKind),
+    SharedSurface(SurfaceKind),
     LocalSurface(crate::TuiSurfaceKind),
     ServiceLog,
     Help,
@@ -307,15 +308,11 @@ impl TuiFocusPlan {
             },
             TuiInputScope::SharedSurface(surface) => {
                 let control = match surface {
-                    taskmanager_application::SurfaceKind::ProcessProperties => {
-                        TuiFocusControl::PropertiesTab(
-                            app.process_properties()
-                                .map_or(ProcessDetailsSection::default(), |target| target.section),
-                        )
-                    }
-                    taskmanager_application::SurfaceKind::Confirmation(_) => {
-                        TuiFocusControl::ConfirmationChoice
-                    }
+                    SurfaceKind::ProcessProperties => TuiFocusControl::PropertiesTab(
+                        app.process_properties()
+                            .map_or(ProcessDetailsSection::default(), |target| target.section),
+                    ),
+                    SurfaceKind::Confirmation(_) => TuiFocusControl::ConfirmationChoice,
                 };
                 Self {
                     target: TuiFocusTarget::SharedSurface(surface),
@@ -726,8 +723,8 @@ fn overlay_controls(
 pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
     let size = match scope {
         TuiInputScope::SharedSurface(surface) => match surface {
-            taskmanager_application::SurfaceKind::ProcessProperties => (96, 30),
-            taskmanager_application::SurfaceKind::Confirmation(kind) => confirmation_size(kind),
+            SurfaceKind::ProcessProperties => (96, 30),
+            SurfaceKind::Confirmation(kind) => confirmation_size(kind),
         },
         TuiInputScope::LocalSurface(surface) => match surface {
             crate::TuiSurfaceKind::Settings => (68, 32),
@@ -758,13 +755,13 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
     Some(centered_popup(area, size.0, size.1))
 }
 
-const fn confirmation_size(kind: taskmanager_application::ConfirmationKind) -> (u16, u16) {
+const fn confirmation_size(kind: ConfirmationKind) -> (u16, u16) {
     match kind {
-        taskmanager_application::ConfirmationKind::EndTask => (58, 9),
-        taskmanager_application::ConfirmationKind::ServiceControl
-        | taskmanager_application::ConfirmationKind::StartupControl
-        | taskmanager_application::ConfirmationKind::SessionControl => (60, 9),
-        taskmanager_application::ConfirmationKind::SmartSelfTest => (62, 9),
-        taskmanager_application::ConfirmationKind::ProcessBatch => (64, 15),
+        ConfirmationKind::EndTask => (58, 9),
+        ConfirmationKind::ServiceControl
+        | ConfirmationKind::StartupControl
+        | ConfirmationKind::SessionControl => (60, 9),
+        ConfirmationKind::SmartSelfTest => (62, 9),
+        ConfirmationKind::ProcessBatch => (64, 15),
     }
 }

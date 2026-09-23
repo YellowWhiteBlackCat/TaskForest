@@ -7,6 +7,10 @@ use taskmanager_application::{
     PlatformClient, PlatformEffect, ProcessControlRequest, ServiceControlRequest,
     SessionControlRequest, ShellUiActionIntent,
 };
+use taskmanager_application::{
+    SmartControlRequest, request_submission_failure, service_submission_failure,
+};
+use taskmanager_core::core::services::{ServiceLogErrorKind, ServiceLogFailure};
 use taskmanager_platform_contract::{RequestId, SubmissionError, SubmissionErrorKind};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -123,10 +127,8 @@ pub fn queue_effect_result(
                     app.request_sessions.accept_batch(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.request_sessions.reject_batch(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.request_sessions
+                        .reject_batch(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
@@ -179,10 +181,7 @@ pub fn queue_effect_result(
                     app.accept_shell_ui_action(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_shell_ui_action(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_shell_ui_action(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
@@ -195,10 +194,7 @@ pub fn queue_effect_result(
                     app.accept_shell_ui_action(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_shell_ui_action(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_shell_ui_action(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
@@ -230,10 +226,7 @@ pub fn queue_effect_result(
                     app.accept_network_escalation(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_network_escalation(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_network_escalation(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
@@ -253,10 +246,10 @@ pub fn queue_effect_result(
                     Err(error) => {
                         open.lifecycle.reject_attempt(
                             attempt_id,
-                            taskmanager_core::core::services::ServiceLogFailure::with_detail(
-                                taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
-                                    taskmanager_application::service_submission_failure(error.kind),
-                                ),
+                            ServiceLogFailure::with_detail(
+                                ServiceLogErrorKind::from_failure(service_submission_failure(
+                                    error.kind,
+                                )),
                                 "service log request submission failed",
                             ),
                         );
@@ -284,7 +277,7 @@ pub fn queue_effect_result(
                 Err(error) => {
                     app.reject_gpu_engine_rows_request(
                         attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
+                        request_submission_failure(error.kind),
                     );
                 }
             }
@@ -303,7 +296,7 @@ pub fn queue_effect_result(
                 Err(error) => {
                     app.reject_smbios_memory_request(
                         attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
+                        request_submission_failure(error.kind),
                     );
                 }
             }
@@ -317,10 +310,7 @@ pub fn queue_effect_result(
                     app.accept_rapl_power_request(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_rapl_power_request(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_rapl_power_request(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
@@ -333,20 +323,17 @@ pub fn queue_effect_result(
                     app.accept_msr_readout_request(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_msr_readout_request(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_msr_readout_request(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]
         }
         PlatformEffect::SmartControl(request) => {
             let attempt = match request {
-                taskmanager_application::SmartControlRequest::StartSelfTest(intent) => {
+                SmartControlRequest::StartSelfTest(intent) => {
                     Some(app.request_sessions.begin_smart_self_test(intent.clone()))
                 }
-                taskmanager_application::SmartControlRequest::StopTracking(_) => None,
+                SmartControlRequest::StopTracking(_) => None,
             };
             let submission = platform.submit_smart_control(request.clone(), now_ms);
             if let Some(attempt) = attempt {
@@ -358,7 +345,7 @@ pub fn queue_effect_result(
                     Err(error) => {
                         app.request_sessions.reject_smart_self_test(
                             attempt,
-                            taskmanager_application::request_submission_failure(error.kind),
+                            request_submission_failure(error.kind),
                         );
                     }
                 }
@@ -374,10 +361,9 @@ pub fn queue_effect_result(
                 Ok(request_id) => app
                     .service_dependencies
                     .accept_attempt(attempt_id, *request_id),
-                Err(error) => app.service_dependencies.reject_attempt(
-                    attempt_id,
-                    taskmanager_application::service_submission_failure(error.kind),
-                ),
+                Err(error) => app
+                    .service_dependencies
+                    .reject_attempt(attempt_id, service_submission_failure(error.kind)),
             };
             vec![submission]
         }
@@ -406,10 +392,8 @@ pub fn queue_effect_result(
                     vec![Ok(request_id)]
                 }
                 Err(error) => {
-                    app.request_sessions.reject_affinity(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.request_sessions
+                        .reject_affinity(attempt, request_submission_failure(error.kind));
                     vec![Err(error)]
                 }
             }
@@ -435,10 +419,7 @@ pub fn queue_effect_result(
                     app.accept_shell_ui_action(attempt, *request_id);
                 }
                 Err(error) => {
-                    app.reject_shell_ui_action(
-                        attempt,
-                        taskmanager_application::request_submission_failure(error.kind),
-                    );
+                    app.reject_shell_ui_action(attempt, request_submission_failure(error.kind));
                 }
             }
             vec![submission]

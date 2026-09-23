@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_application::AppAction;
+use taskmanager_core::SystemLoadAverage;
 use taskmanager_core::core::metrics::{
     CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, NetworkAdapterType, NetworkMetrics,
 };
@@ -76,10 +78,7 @@ fn every_shared_page_has_typed_presentation_and_shortcut() {
         assert!(!page.label.is_empty());
         assert!(!page.description.is_empty());
         assert!(!page.shortcut.is_empty());
-        assert_eq!(
-            page.command.action(),
-            taskmanager_application::AppAction::SelectPage(page.page)
-        );
+        assert_eq!(page.command.action(), AppAction::SelectPage(page.page));
     }
 }
 
@@ -98,8 +97,7 @@ fn byte_and_duration_formatting_is_binary_and_deterministic() {
 #[test]
 fn normalized_load_summary_uses_the_shared_typed_fact() {
     i18n::set_language(i18n::Language::En);
-    let load = taskmanager_core::SystemLoadAverage::from_raw(8.0, 4.0, 2.0, 4)
-        .expect("fixture load is valid");
+    let load = SystemLoadAverage::from_raw(8.0, 4.0, 2.0, 4).expect("fixture load is valid");
     assert_eq!(
         load_average_summary(&load),
         "Load 1m 2.00× · 5m 1.00× · 15m 0.50×"

@@ -17,6 +17,7 @@ use gpui::{
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Window, div, linear_color_stop, linear_gradient, point, px,
 };
+use taskmanager_theme::Color;
 
 /// The pressed-state shadow: a tighter, fainter drop than the resting state
 /// so the button visually sinks under the pointer (Mission-Center-style
@@ -172,11 +173,7 @@ fn primary_fill(palette: &Palette) -> Fill {
 /// transform (`hover_fill` brightens dark accents / deepens light ones,
 /// `active_fill` always sinks). Keeping both stops means the gradient shape
 /// survives the state change — hover/active stay gradient buttons.
-fn primary_state_fill(
-    from: taskmanager_theme::Color,
-    to: taskmanager_theme::Color,
-    map: impl Fn(taskmanager_theme::Color) -> taskmanager_theme::Color,
-) -> Fill {
+fn primary_state_fill(from: Color, to: Color, map: impl Fn(Color) -> Color) -> Fill {
     Fill::from(linear_gradient(
         90.0,
         linear_color_stop(crate::theme_binding::hsla(map(from)), 0.0),

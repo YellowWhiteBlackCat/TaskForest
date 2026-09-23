@@ -51,9 +51,10 @@ pub mod instance;
 pub use config::{user_config_path, user_history_dir};
 pub use provider::capability_surface;
 pub use provider::{MacOsProviderRegistry, MacOsProviderRegistryParams};
+use taskmanager_core::core::time::unix_millis;
 
 fn wall_clock_ms() -> u64 {
-    taskmanager_core::core::time::unix_millis(std::time::SystemTime::now())
+    unix_millis(std::time::SystemTime::now())
 }
 
 /// Composition entry point for the second-OS macOS runtime.

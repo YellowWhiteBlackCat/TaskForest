@@ -22,8 +22,10 @@
 //! behaviour below 2^53 is identical to the old `as f64 / unit` expressions.
 
 use crate::gpui_app::graph::GraphSettings;
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_core::core::units::{self, QuantityFamily, UnitPreferences};
+use taskmanager_shell::presentation::gpu_display_identity;
 
 const MIB_BYTES: u64 = 1024 * 1024;
 
@@ -32,7 +34,9 @@ const MIB_BYTES: u64 = 1024 * 1024;
 /// Views that prefer omitting a row entirely just do not push it.
 #[must_use]
 pub fn missing_value() -> String {
-    taskmanager_shell::presentation::missing_value()
+    use taskmanager_shell::presentation::missing_value;
+
+    missing_value()
 }
 
 /// `{:.2} GHz` from a megahertz count — the single CPU-frequency readout
@@ -64,11 +68,10 @@ pub fn optional_ghz(mhz: Option<u64>) -> String {
 /// `taskmanager-shell`.
 #[must_use]
 pub(crate) fn gpu_identity_text(gpu: &GpuMetrics, index: usize) -> (String, String) {
-    let identity = taskmanager_shell::presentation::gpu_display_identity(gpu);
-    let title = identity.headline.map_or_else(
-        || format!("{} {index}", taskmanager_application::i18n::t("common.gpu")),
-        str::to_owned,
-    );
+    let identity = gpu_display_identity(gpu);
+    let title = identity
+        .headline
+        .map_or_else(|| format!("{} {index}", t("common.gpu")), str::to_owned);
     let subtitle = identity.qualifier.unwrap_or_default().to_owned();
     (title, subtitle)
 }

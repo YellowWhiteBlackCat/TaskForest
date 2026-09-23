@@ -4,11 +4,16 @@
 //! untouched.
 
 use super::*;
+use taskmanager_application::{
+    CorrelatedGpuEngineRowsEvent, GpuEngineRowsEvent, GpuEngineRowsRequestFailure,
+    GpuEngineRowsState,
+};
+use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
 
 fn gpu_engine_rows_event(
     sequence: u64,
-    snapshot: taskmanager_core::core::metrics::GpuEngineRowsSnapshot,
-) -> taskmanager_application::CorrelatedGpuEngineRowsEvent {
+    snapshot: GpuEngineRowsSnapshot,
+) -> CorrelatedGpuEngineRowsEvent {
     CorrelatedEvent::new(
         PlatformEventContext {
             request_id: RequestId::new(sequence).expect("non-zero fixture request id"),
@@ -17,13 +22,13 @@ fn gpu_engine_rows_event(
             sequence: EventSequence::new(sequence),
             observed_at_ms: 10,
         },
-        taskmanager_application::GpuEngineRowsEvent::Update(snapshot),
+        GpuEngineRowsEvent::Update(snapshot),
     )
 }
 
 #[test]
 fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
-    use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
+    use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric};
     let mut app = ShellApp::new();
     let attempt = app.begin_gpu_engine_rows_request(DeviceId::new("gpu:0"));
     assert!(app.accept_gpu_engine_rows_request(
@@ -55,21 +60,18 @@ fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
 
     assert!(matches!(
         app.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Failed(failed)
+        GpuEngineRowsState::Failed(failed)
             if failed.device_id == DeviceId::new("gpu:0")
                 && matches!(
                     &failed.failure,
-                    taskmanager_application::GpuEngineRowsRequestFailure::Provider(failure)
+                    GpuEngineRowsRequestFailure::Provider(failure)
                         if failure.kind == FailureKind::PermissionDenied
                 )
     ));
 
     app.apply_platform_batch(PlatformEventBatch::default());
     assert!(
-        matches!(
-            app.gpu_engine_rows_state(),
-            taskmanager_application::GpuEngineRowsState::Failed(_)
-        ),
+        matches!(app.gpu_engine_rows_state(), GpuEngineRowsState::Failed(_)),
         "an empty-events batch must leave the request lifecycle untouched"
     );
 }

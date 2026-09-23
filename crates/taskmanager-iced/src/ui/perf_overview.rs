@@ -4,6 +4,14 @@
 //! without duplicating it (the history graph already carries both series).
 
 use super::*;
+use taskmanager_shell::presentation::cpu_idle_state_summary;
+use taskmanager_shell::presentation::cpu_interrupt_compact_summary;
+use taskmanager_shell::presentation::cpu_power_limits_summary;
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::presentation::cpu_topology_summary;
+use taskmanager_shell::presentation::load_average_basis_summary;
+use taskmanager_shell::presentation::load_average_summary;
+use taskmanager_theme::Theme;
 
 mod cpu;
 pub(crate) use cpu::*;
@@ -140,7 +148,7 @@ fn cpu_detail(
         .and_then(|snapshot| snapshot.load_average.as_ref())
     {
         left.push(
-            text(taskmanager_shell::presentation::load_average_summary(load))
+            text(load_average_summary(load))
                 .size(f32::from(tokens::FONT_12))
                 .into(),
         );
@@ -392,30 +400,26 @@ pub(crate) fn cpu_memory_header_and_stats(
                 Some(format_cache_kb(l3)),
             ));
         }
-        if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+        if let Some(topology) = cpu_topology_summary(cpu) {
             stats.push(StatRow::text(t("cpu.topology"), Some(topology)));
         }
-        if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+        if let Some(idle_states) = cpu_idle_state_summary(cpu) {
             stats.push(StatRow::text(t("cpu.idle_states"), Some(idle_states)));
         }
-        if let Some(interrupts) =
-            taskmanager_shell::presentation::cpu_interrupt_compact_summary(cpu)
-        {
+        if let Some(interrupts) = cpu_interrupt_compact_summary(cpu) {
             stats.push(StatRow::text(t("cpu.interrupts"), Some(interrupts)));
         }
         // Cumulative thermal-throttle trigger counters (`power.thermal-throttle-events`).
         // The whole row is omitted when no package observed a counter; the
         // shared shell fold keeps an unobserved sibling counter a labeled dash,
         // never a zero.
-        if let Some(throttle) = taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu) {
+        if let Some(throttle) = cpu_thermal_throttle_summary(cpu) {
             stats.push(StatRow::text(t("cpu.thermal_throttle"), Some(throttle)));
         }
         if let Some(load) = snapshot.load_average.as_ref() {
             stats.push(StatRow::text(
                 t("system.load_basis"),
-                Some(taskmanager_shell::presentation::load_average_basis_summary(
-                    load,
-                )),
+                Some(load_average_basis_summary(load)),
             ));
         }
         if let Some(driver) = cpu.performance_policy.frequency_implementation.as_deref() {
@@ -436,7 +440,7 @@ pub(crate) fn cpu_memory_header_and_stats(
                 Some(preference.to_string()),
             ));
         }
-        if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+        if let Some(power_limits) = cpu_power_limits_summary(cpu) {
             stats.push(StatRow::text(t("cpu.power_limits"), Some(power_limits)));
         }
         cpu::append_rapl_and_msr_stats(&app.shell, &mut stats);
@@ -445,7 +449,7 @@ pub(crate) fn cpu_memory_header_and_stats(
 }
 
 pub(crate) fn performance_graph_resolution_selector<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     current_points: usize,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let options = [60u32, 120, 300];
@@ -489,7 +493,7 @@ pub(crate) fn format_cache_kb(kb: u64) -> String {
 /// polyline (its caption stays) — never a fabricated flat line.
 fn trend_strip_panel(
     app: &crate::IcedApp,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     // Disk / network are raw bytes/sec: auto-scale each to its own finite peak
     // so traffic actually moves the line; the three percentage series pin max
@@ -552,7 +556,7 @@ fn trend_strip_panel(
 /// chart shows a "collecting" placeholder instead of a fabricated flat line.
 fn cpu_performance_chart(
     app: &crate::IcedApp,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     height: Length,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let cpu = app.cached_metric_series(TrendSeries::CpuUsagePercent);
@@ -582,7 +586,7 @@ fn cpu_performance_chart(
 
 fn memory_performance_chart(
     app: &crate::IcedApp,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     height: Length,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let memory = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
@@ -614,7 +618,7 @@ fn memory_performance_chart(
 /// and hover mapping already share the same oldest-left/newest-right helper;
 /// these quiet edge labels keep a still frame from looking directionless.
 fn chart_time_axis(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     row![

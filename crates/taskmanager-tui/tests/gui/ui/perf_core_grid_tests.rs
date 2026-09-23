@@ -6,13 +6,17 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::CpuType;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservationGroup, SystemSnapshot,
 };
-use taskmanager_shell::fixture::{edit_snapshot, record_demo_history_frame};
+use taskmanager_shell::fixture::{edit_hardware, edit_snapshot, record_demo_history_frame};
 
 use super::*;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::{CpuClusterSpec, CpuTopologySpec};
 
 /// Render ONLY the per-core grid into a `width × height` TestBackend, pinned
 /// to English and serialized against the language-flipping i18n test.
@@ -167,7 +171,7 @@ fn tier_color_tracks_the_load_band() {
 /// old 4-value vector contradicting the declared 16-physical/22-logical host.
 #[test]
 fn demo_core_vectors_match_the_declared_topology() {
-    let app = taskmanager_shell::demo_app();
+    let app = demo_app();
     let snapshot = app.projection().snapshot.as_ref().expect("demo snapshot");
     let hardware = app.projection().hardware.as_ref().expect("demo hardware");
     let declared = snapshot.cpu.logical_cores.expect("logical cores");
@@ -262,9 +266,8 @@ fn missing_cpu_types_falls_back_to_the_flat_layout() {
 #[test]
 fn lanes_past_a_stale_inventory_group_as_unknown() {
     let mut app = flat_app(&[30.0, 60.0, 90.0]);
-    taskmanager_shell::fixture::edit_hardware(&mut app.shell, |hardware| {
-        let info =
-            hardware.get_or_insert_with(taskmanager_core::core::hardware::HardwareInfo::default);
+    edit_hardware(&mut app.shell, |hardware| {
+        let info = hardware.get_or_insert_with(HardwareInfo::default);
         info.cpu_types = vec![CpuType::Performance];
     });
     let text = grid_text(&app, TuiTheme::default(), 120, 40);
@@ -345,9 +348,7 @@ fn narrow_grouped_grid_scrolls_to_the_last_core() {
 fn seeded_demo_main_graphs_never_stay_on_the_collecting_placeholder() {
     for device in [crate::PerfDevice::Cpu, crate::PerfDevice::Memory] {
         let mut app = crate::demo_app();
-        let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-            taskmanager_application::AppPage::Performance,
-        ));
+        let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));
         app.select_perf_device(device);
         let text = perf_page_text(&app, 120, 40);
         assert!(
@@ -387,14 +388,14 @@ fn an_alternative_topology_seeds_a_self_consistent_grouped_grid() {
     };
     use taskmanager_shell::fixture::{edit_hardware, edit_snapshot, record_demo_history_frame};
 
-    let topology = taskmanager_shell::fixture::CpuTopologySpec {
+    let topology = CpuTopologySpec {
         clusters: vec![
-            taskmanager_shell::fixture::CpuClusterSpec {
+            CpuClusterSpec {
                 kind: CpuType::Performance,
                 physical_cores: 4,
                 threads_per_core: 1,
             },
-            taskmanager_shell::fixture::CpuClusterSpec {
+            CpuClusterSpec {
                 kind: CpuType::Efficient,
                 physical_cores: 12,
                 threads_per_core: 1,
@@ -440,10 +441,10 @@ fn an_alternative_topology_seeds_a_self_consistent_grouped_grid() {
     edit_hardware(&mut app.shell, |hardware| {
         // A fresh app owns no fixture hardware: seed the topology's own
         // hardware facts (the grid groups fail closed without `cpu_types`).
-        *hardware = Some(taskmanager_core::core::hardware::HardwareInfo {
+        *hardware = Some(HardwareInfo {
             cpu_types: topology.cpu_types(),
             cpu_cores: Some(topology.logical_cores()),
-            ..taskmanager_core::core::hardware::HardwareInfo::default()
+            ..HardwareInfo::default()
         });
     });
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));

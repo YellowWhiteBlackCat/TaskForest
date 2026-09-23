@@ -5,6 +5,7 @@
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 
 use super::details_modal::{ServiceDetailsModalState, service_details_modal_scene};
+use taskmanager_theme::Theme;
 
 fn dummy_service() -> ServiceItem {
     ServiceItem::from_inventory(
@@ -34,7 +35,7 @@ fn service_details_modal_state_open_and_close() {
 #[test]
 fn service_details_modal_scene_renders_without_panic() {
     let service = dummy_service();
-    let theme = taskmanager_theme::Theme::default();
+    let theme = Theme::default();
     let palette = crate::palette::ui_palette(&theme);
     let _scene = service_details_modal_scene(&service, &palette);
 }

@@ -11,6 +11,9 @@ use taskmanager_core::{
 
 use super::{parse_limit_value, parse_proc_cgroup, parse_proc_limits};
 use crate::engine::process::telemetry::{parse_start_time_ticks, safe_cgroup_path};
+use taskmanager_core::DeviceState;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::ResourceLimit;
 
 const LIMITS_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.limits");
 const MEMBERSHIP_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.cgroup.membership");
@@ -102,10 +105,7 @@ pub(in crate::engine::process::telemetry) fn collect_from_roots(
     snapshot
 }
 
-fn observe_limits(
-    path: PathBuf,
-    now_ms: u64,
-) -> ResourceObservation<Vec<taskmanager_core::ResourceLimit>> {
+fn observe_limits(path: PathBuf, now_ms: u64) -> ResourceObservation<Vec<ResourceLimit>> {
     match fs::read_to_string(path) {
         Ok(text) => {
             let values = parse_proc_limits(&text);
@@ -595,7 +595,7 @@ const fn failure_priority(failure: FailureKind) -> u8 {
     }
 }
 
-fn source_state(sources: &[SourceStatus], now_ms: u64) -> taskmanager_core::DeviceState {
+fn source_state(sources: &[SourceStatus], now_ms: u64) -> DeviceState {
     let failure = sources
         .iter()
         .filter_map(|source| match source.outcome {
@@ -604,7 +604,7 @@ fn source_state(sources: &[SourceStatus], now_ms: u64) -> taskmanager_core::Devi
         })
         .max_by_key(|failure| failure_priority(*failure));
     let status = match failure {
-        Some(FailureKind::PermissionDenied) => taskmanager_core::DeviceStatus::PermissionDenied,
+        Some(FailureKind::PermissionDenied) => DeviceStatus::PermissionDenied,
         Some(FailureKind::Unsupported)
             if sources.iter().all(|source| {
                 matches!(
@@ -613,12 +613,12 @@ fn source_state(sources: &[SourceStatus], now_ms: u64) -> taskmanager_core::Devi
                 )
             }) =>
         {
-            taskmanager_core::DeviceStatus::Unsupported
+            DeviceStatus::Unsupported
         }
-        Some(_) => taskmanager_core::DeviceStatus::Stale,
-        None => taskmanager_core::DeviceStatus::Healthy,
+        Some(_) => DeviceStatus::Stale,
+        None => DeviceStatus::Healthy,
     };
-    taskmanager_core::DeviceState {
+    DeviceState {
         status,
         last_success_ms: sources
             .iter()

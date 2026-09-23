@@ -1,5 +1,6 @@
 use super::*;
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::{
     DmiIdentityFacts, SmbiosHelperError, SmbiosHelperErrorKind, SmbiosMemorySuccess,
     SmbiosModuleReading,
@@ -116,23 +117,23 @@ fn helper_error_maps_to_provider_health_not_an_ok_failure_snapshot() {
 fn unavailable_reasons_map_to_their_typed_kinds() {
     let cases = [
         (
-            taskmanager_escalation::EscalationDenialReason::PermissionDenied,
+            EscalationDenialReason::PermissionDenied,
             FailureKind::PermissionDenied,
         ),
         (
-            taskmanager_escalation::EscalationDenialReason::HelperUnavailable,
+            EscalationDenialReason::HelperUnavailable,
             FailureKind::MissingDependency,
         ),
         (
-            taskmanager_escalation::EscalationDenialReason::AuthorizationUnavailable,
+            EscalationDenialReason::AuthorizationUnavailable,
             FailureKind::TemporarilyUnavailable,
         ),
         (
-            taskmanager_escalation::EscalationDenialReason::HelperProtocolViolation,
+            EscalationDenialReason::HelperProtocolViolation,
             FailureKind::ProviderFault,
         ),
         (
-            taskmanager_escalation::EscalationDenialReason::Unsupported,
+            EscalationDenialReason::Unsupported,
             FailureKind::Unsupported,
         ),
     ];

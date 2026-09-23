@@ -18,6 +18,11 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsPresentation, present_gpu_engine_rows,
 };
 use taskmanager_theme::{Theme, tokens};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
@@ -134,25 +139,17 @@ pub(crate) fn render_privilege_center(
         .debug_selector(|| "tm-settings-privilege-center".to_string())
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
+        .gap(definite_length(tokens::SPACE_8))
+        .px(definite_length(tokens::SPACE_10))
+        .py(definite_length(tokens::SPACE_8))
+        .rounded(absolute(tokens::control_radius(theme)))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+        .border_color(hsla(theme.border))
+        .bg(fill(theme.sidebar_card_bg))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("settings.privileges_hint")),
         );
     for row in rows {
@@ -168,24 +165,22 @@ fn render_row(theme: &Theme, row: PrivilegeRow, entity: Entity<RootView>) -> Div
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .w_full()
         .min_w(gpui::px(0.0))
         .child(
             div()
                 .flex_1()
                 .min_w(gpui::px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg))
                 .child(i18n::t(row.label_key)),
         )
         .child(
             div()
                 .flex_none()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(
                     if matches!(state, PrivilegeRowState::Denied | PrivilegeRowState::Failed) {
                         theme.warning
                     } else {

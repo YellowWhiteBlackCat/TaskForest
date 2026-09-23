@@ -22,7 +22,7 @@
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
 #              matrix + release/package smoke + the diff-scoped P4
 #              `parity-evidence` anchor resolver (facet manifest + unified
-#              interaction matrix + feature evidence/co-anchors) + (with
+#              interaction matrix + feature evidence) + (with
 #              --with-gui) the GPUI/Bevy headless interaction acceptance
 #              through the unified S5 driver
 #              (scripts/parity/accept-frontend-interactions.sh, which still
@@ -579,6 +579,15 @@ fi
 if maybe allow-ceiling; then
     run_stage allow-ceiling quick run_py scripts/quality/allow_ceiling_guard.py
 fi
+if maybe inline-path-self; then
+    # Owner types are imported at the module boundary, never spelled inline and
+    # never aliased (`rust-surface-guard` owns the alias half). The self-test
+    # proves this guard goes red on a new inline owner path.
+    run_stage inline-path-self quick run_py scripts/quality/inline_path_guard.py --self-test
+fi
+if maybe inline-path; then
+    run_stage inline-path quick run_py scripts/quality/inline_path_guard.py
+fi
 if maybe production-config-wiring-self; then
     # clippy-parity proves the clippy *command* is the same on both hosts; this
     # guard proves the production-config helper is still *wired into* both hosts
@@ -647,7 +656,8 @@ if maybe parity-evidence; then
     # manifest and the unified S4 interaction matrix, so a renamed or deleted
     # interaction test is dangling here too.  The P5 feature table and its
     # sparse feature co-anchor side table are consumed by default
-    # (`--feature-evidence` / `--co-anchors` default to the committed files),
+    # (`--feature-evidence` defaults to the committed file; a co-anchor is the
+    # feature table's sixth column),
     # so a renamed feature anchor or co-anchor is dangling in the same pass.
     # `--requirements` keeps the
     # per-frontend P0-MC coverage report visible in the stage output/JSON

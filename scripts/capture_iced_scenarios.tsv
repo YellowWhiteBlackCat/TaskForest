@@ -1,35 +1,36 @@
-name	device	window_size
-applications	applications	1180x780
-cpu	cpu	1180x780
-memory	memory	1180x780
-disk	disk	1180x780
-network	network	1180x780
-gpu	gpu	1180x780
-npu	npu	1180x780
-battery	battery	1180x780
-fan	fan	1180x780
-service-details	service-details	1180x780
-health-modal	health	1180x780
-cpu-compact	cpu	720x480
-applications-compact	applications	720x480
-services	services	1180x780
-services-compact	services	720x480
-startup	startup	1180x780
-startup-compact	startup	720x480
-users	users	1180x780
-users-compact	users	720x480
-system	system	1180x780
-system-compact	system	720x480
-app-history	app-history	1180x780
-app-history-compact	app-history	720x480
-memory-compact	memory	720x480
-disk-compact	disk	720x480
-network-compact	network	720x480
-gpu-compact	gpu	720x480
-npu-compact	npu	720x480
-battery-compact	battery	720x480
-fan-compact	fan	720x480
-service-details-compact	service-details	720x480
-applications-zh	applications	1180x780
-cpu-zh	cpu	1180x780
-services-zh	services	1180x780
+name	device	window_size	skin
+applications	applications	1180x780	gnome-dark
+cpu	cpu	1180x780	gnome-dark
+memory	memory	1180x780	gnome-dark
+disk	disk	1180x780	gnome-dark
+network	network	1180x780	gnome-dark
+gpu	gpu	1180x780	gnome-dark
+npu	npu	1180x780	gnome-dark
+battery	battery	1180x780	gnome-dark
+fan	fan	1180x780	gnome-dark
+service-details	service-details	1180x780	gnome-dark
+health-modal	health	1180x780	gnome-dark
+cpu-compact	cpu	720x480	gnome-dark
+applications-compact	applications	720x480	gnome-dark
+services	services	1180x780	gnome-dark
+services-compact	services	720x480	gnome-dark
+startup	startup	1180x780	gnome-dark
+startup-compact	startup	720x480	gnome-dark
+users	users	1180x780	gnome-dark
+users-compact	users	720x480	gnome-dark
+system	system	1180x780	gnome-dark
+system-compact	system	720x480	gnome-dark
+app-history	app-history	1180x780	gnome-dark
+app-history-compact	app-history	720x480	gnome-dark
+memory-compact	memory	720x480	gnome-dark
+disk-compact	disk	720x480	gnome-dark
+network-compact	network	720x480	gnome-dark
+gpu-compact	gpu	720x480	gnome-dark
+npu-compact	npu	720x480	gnome-dark
+battery-compact	battery	720x480	gnome-dark
+fan-compact	fan	720x480	gnome-dark
+service-details-compact	service-details	720x480	gnome-dark
+applications-zh	applications	1180x780	gnome-dark
+cpu-zh	cpu	1180x780	gnome-dark
+services-zh	services	1180x780	gnome-dark
+cpu-light	cpu	1180x780	gnome-light

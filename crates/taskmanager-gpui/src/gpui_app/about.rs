@@ -8,6 +8,11 @@
 //! seam.
 
 use gpui::{App, ClipboardItem, Div, Entity, ParentElement, Styled, Window, div, px};
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
@@ -44,23 +49,21 @@ fn metadata_row(theme: &Theme, label: &'static str, value: impl Into<String>) ->
     div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .items_start()
         .child(
             div()
                 .w(px(94.0))
                 .flex_shrink_0()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t(label)),
         )
         .child(
             div()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg))
                 .child(value.into()),
         )
 }
@@ -76,47 +79,35 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
         .max_w(px(430.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
+        .gap(definite_length(tokens::SPACE_16))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(
-                    taskmanager_ui::icons_binding::icon(IconId::System)
+                    icon(IconId::System)
                         .size(px(38.0))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.accent)),
+                        .text_color(hsla(theme.accent)),
                 )
                 .child(
                     div()
                         .flex()
                         .flex_col()
-                        .gap(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_4,
-                        ))
+                        .gap(definite_length(tokens::SPACE_4))
                         .min_w(px(0.0))
                         .child(
                             div()
-                                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                    tokens::FONT_WEIGHT_HEADER,
-                                ))
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_18,
-                                ))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                                .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+                                .text_size(font_size(tokens::FONT_18))
+                                .text_color(hsla(theme.fg))
                                 .child(product_name()),
                         )
                         .child(
                             div()
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_12,
-                                ))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                                .text_size(font_size(tokens::FONT_12))
+                                .text_color(hsla(theme.fg_dim))
                                 .child(i18n::t("about.description")),
                         ),
                 ),
@@ -125,9 +116,7 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(metadata_row(theme, "about.version", VERSION))
                 .child(metadata_row(theme, "about.license", "Apache-2.0"))
                 .child(metadata_row(theme, "about.repository", REPOSITORY_URL)),
@@ -137,9 +126,7 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(elements::pill(
                     theme,
                     "about-open-repository",

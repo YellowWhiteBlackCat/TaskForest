@@ -7,6 +7,8 @@ use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_core::core::units::QuantityFamily;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_core::core::{DeviceState, FailureKind, ScalarObservation};
 
 fn sample_container(cpu: Option<f32>, mem: Option<u64>) -> ContainerSummary {
@@ -78,7 +80,7 @@ fn runtime_label_covers_every_isolation_variant() {
 fn first_sample_gap_cpu_folds_to_the_shared_dash() {
     let vm = container_row_vm(
         &sample_container(None, Some(100)),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(vm.cpu, formatting::missing_value());
 }
@@ -87,7 +89,7 @@ fn first_sample_gap_cpu_folds_to_the_shared_dash() {
 fn present_cpu_folds_to_one_decimal_percent() {
     let vm = container_row_vm(
         &sample_container(Some(12.34), None),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(vm.cpu, "12.3%");
 }
@@ -97,11 +99,7 @@ fn empty_member_pids_fold_to_the_shared_dash() {
     let mut container = sample_container(Some(5.0), None);
     container.member_pids.clear();
     assert_eq!(
-        container_row_vm(
-            &container,
-            taskmanager_core::core::units::UnitPreferences::default()
-        )
-        .processes,
+        container_row_vm(&container, UnitPreferences::default()).processes,
         formatting::missing_value()
     );
 }
@@ -110,7 +108,7 @@ fn empty_member_pids_fold_to_the_shared_dash() {
 fn member_pid_count_folds_to_the_count_string() {
     let vm = container_row_vm(
         &sample_container(Some(5.0), None),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(vm.name, "abc");
     assert_eq!(vm.processes, "2");
@@ -121,11 +119,7 @@ fn missing_runtime_folds_to_the_shared_dash() {
     let mut container = sample_container(Some(5.0), Some(64));
     container.runtime = None;
     assert_eq!(
-        container_row_vm(
-            &container,
-            taskmanager_core::core::units::UnitPreferences::default()
-        )
-        .runtime,
+        container_row_vm(&container, UnitPreferences::default()).runtime,
         formatting::missing_value()
     );
 }
@@ -134,7 +128,7 @@ fn missing_runtime_folds_to_the_shared_dash() {
 fn present_runtime_uses_the_friendly_label() {
     let vm = container_row_vm(
         &sample_container(Some(5.0), None),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(vm.runtime, "Docker");
 }
@@ -143,18 +137,18 @@ fn present_runtime_uses_the_friendly_label() {
 fn memory_folds_dash_for_gap_and_formatter_output_when_present() {
     let gap = container_row_vm(
         &sample_container(Some(5.0), None),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(gap.memory, formatting::missing_value());
     let present = container_row_vm(
         &sample_container(Some(5.0), Some(100 * 1024 * 1024)),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(
         present.memory,
-        taskmanager_core::core::units::UnitPreferences::default().format_quantity(
+        UnitPreferences::default().format_quantity(
             100 * 1024 * 1024,
-            taskmanager_core::core::units::QuantityFamily::Memory,
+            QuantityFamily::Memory,
             false
         )
     );

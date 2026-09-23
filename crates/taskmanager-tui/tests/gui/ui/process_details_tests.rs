@@ -8,9 +8,12 @@ use taskmanager_application::process_details_vm::{
 };
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(4242)
         .parent_pid(Some(1))
         .name("sample".to_owned())
@@ -20,13 +23,11 @@ fn fixture() -> ProcessItem {
         .current_disk_read_bytes_per_sec(1536)
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                Some(PathBuf::from("/usr/bin/sample")),
-                42,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            Some(PathBuf::from("/usr/bin/sample")),
+            42,
+        ))
         .current_threads(8)
         .current_start_time_secs(1_600_000_000)
         .current_cpu_time_secs(3_690)
@@ -45,7 +46,7 @@ fn fixture() -> ProcessItem {
     item
 }
 
-fn vm(field: taskmanager_application::process_details_vm::ProcessDetailsField) -> String {
+fn vm(field: ProcessDetailsField) -> String {
     let rows = process_details_rows(&fixture(), &UnitPreferences::default());
     match detail_value(&rows, field) {
         DetailValue::Text(text) => text.clone(),
@@ -58,7 +59,7 @@ fn panel_rows_join_neutral_vm_values() {
     let pairs = detail_panel_pairs_with_local_time(
         &fixture(),
         None,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(pairs.len(), 18);
     use taskmanager_application::process_details_vm::ProcessDetailsField;
@@ -111,10 +112,7 @@ fn verified_start_wraps_the_vm_timestamp() {
     let pairs = detail_panel_pairs_with_local_time(
         &fixture(),
         None,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        ),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
     assert_eq!(pairs[15].1, "2020-09-13 12:26:40");
     // Without a frozen identity there is no verification note.
@@ -126,7 +124,7 @@ fn missing_observations_render_dashes_never_fabricated_values() {
     let pairs = detail_panel_pairs_with_local_time(
         &ProcessItem::default(),
         None,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(pairs.len(), 18);
     for (index, expected) in [(4, "— / —"), (5, "— / —"), (9, "— / —")] {

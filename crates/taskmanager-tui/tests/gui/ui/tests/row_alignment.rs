@@ -25,6 +25,8 @@ use taskmanager_ui_contract::SemanticRole;
 use crate::runtime::runtime_support::apply_terminal_event_with_plan;
 use crate::ui::frame_plan::TABLE_DATA_ROW_OFFSET;
 use crate::ui::{TuiFramePlan, TuiHitTarget, render_with_plan};
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::process_semantic_key;
 
 const FRAME: Rect = Rect::new(0, 0, 120, 40);
 /// A taller frame for the resize scenario: the Applications table gains six
@@ -62,7 +64,7 @@ fn painted(app: &crate::TuiApp, area: Rect) -> (Vec<String>, TuiFramePlan) {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let plan = TuiFramePlan::build(app, area);
     let backend = TestBackend::new(area.width, area.height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
@@ -150,7 +152,7 @@ fn row_identity_needle(app: &crate::TuiApp, page: AppPage, index: usize) -> Stri
 fn expected_semantic_id(app: &crate::TuiApp, index: usize) -> String {
     let rows = app.process_rows_snapshot();
     if let Some(process) = crate::process_view::process_at(&rows, index) {
-        return format!("row:{}", taskmanager_shell::process_semantic_key(process));
+        return format!("row:{}", process_semantic_key(process));
     }
     let name = crate::process_view::group_name_at(&rows, index)
         .unwrap_or_else(|| panic!("visual row {index} is outside the Applications projection"));

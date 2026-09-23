@@ -36,7 +36,7 @@ mod process;
 /// the established pattern. Language-flipping tests are rare; plain English
 /// assertions just call this once at test start.
 pub fn pin_english() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 }
 
 /// Initial typestate for an optional whole observation group. Only this
@@ -60,3 +60,5 @@ pub use process::{
     fixture_start_token, mixed_availability_category_fixture, sort_fixture_row,
     sort_parity_fixture,
 };
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;

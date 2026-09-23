@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::PowerSupplyRequest;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
@@ -59,32 +56,28 @@ fn shared_power_runtime_reports_typed_provider_failure() {
         })
         .expect("power request accepted");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            assert_eq!(event.provider, Some(ProviderId::borrowed("fixture.power")));
-            assert!(matches!(
-                event.outcome,
-                Err(ref failure) if failure.kind == FailureKind::Unsupported
-            ));
-            assert_eq!(
-                handle
-                    .capabilities()
-                    .snapshot()
-                    .get(&CapabilityId::POWER_SUPPLIES)
-                    .map(|descriptor| descriptor.status),
-                Some(CapabilityStatus::Unsupported)
-            );
-            assert_eq!(
-                handle
-                    .capabilities()
-                    .snapshot()
-                    .get(&CapabilityId::POWER_SUPPLIES)
-                    .map(|descriptor| descriptor.providers.clone()),
-                Some(vec![ProviderId::borrowed("fixture.power")])
-            );
-            return;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("power runtime failure did not arrive");
+    let event = crate::wait_for!("power runtime failure", || {
+        handle.events().try_recv().expect("connected event port")
+    });
+    assert_eq!(event.provider, Some(ProviderId::borrowed("fixture.power")));
+    assert!(matches!(
+        event.outcome,
+        Err(ref failure) if failure.kind == FailureKind::Unsupported
+    ));
+    assert_eq!(
+        handle
+            .capabilities()
+            .snapshot()
+            .get(&CapabilityId::POWER_SUPPLIES)
+            .map(|descriptor| descriptor.status),
+        Some(CapabilityStatus::Unsupported)
+    );
+    assert_eq!(
+        handle
+            .capabilities()
+            .snapshot()
+            .get(&CapabilityId::POWER_SUPPLIES)
+            .map(|descriptor| descriptor.providers.clone()),
+        Some(vec![ProviderId::borrowed("fixture.power")])
+    );
 }

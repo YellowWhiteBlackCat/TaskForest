@@ -16,6 +16,13 @@
 //! `RootView.startup_state.query` so [`filter_startup`] keeps working.
 
 use std::rc::Rc;
+use taskmanager_core::core::BootTimeline;
+use taskmanager_core::core::text::contains_ascii_ci;
+use taskmanager_shell::InfoTable;
+use taskmanager_shell::order_startup_rows;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
@@ -129,7 +136,7 @@ pub fn sorted_startup(
     sort: Option<(InfoSortCol, SortDir)>,
 ) -> Vec<StartupEntry> {
     let mut filtered = filter_startup(entries, filter, query);
-    taskmanager_shell::order_startup_rows(&mut filtered, sort);
+    order_startup_rows(&mut filtered, sort);
     filtered
 }
 
@@ -143,9 +150,7 @@ pub fn filter_startup(
         .iter()
         .filter(|e| {
             filter.matches(e.enabled)
-                && (q.is_empty()
-                    || taskmanager_core::core::text::contains_ascii_ci(&e.name, q)
-                    || taskmanager_core::core::text::contains_ascii_ci(&e.exec, q))
+                && (q.is_empty() || contains_ascii_ci(&e.name, q) || contains_ascii_ci(&e.exec, q))
         })
         .cloned()
         .collect()
@@ -161,11 +166,9 @@ pub fn filter_startup(
 /// `RootView` that renders the Startup page. A shared entity would cross window
 /// boundaries and re-enter `root.update` from the Change subscription, so the
 /// owner remains the individual RootView.
-pub(crate) fn init_search_entity(
-    cx: &mut Context<RootView>,
-) -> gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState> {
+pub(crate) fn init_search_entity(cx: &mut Context<RootView>) -> gpui::Entity<TextInputState> {
     let entity = cx.new(|cx| {
-        let mut state = taskmanager_ui::inputs::text_input::TextInputState::new(cx);
+        let mut state = TextInputState::new(cx);
         state.set_placeholder(i18n::t("search.startup"), cx);
         state
     });
@@ -383,8 +386,8 @@ impl TableDelegate for StartupDelegate {
             0 => {
                 let color = if e.enabled { theme.disk } else { theme.fg_dim };
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(color))
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(color))
                     .child(if e.enabled {
                         i18n::t("common.enabled")
                     } else {
@@ -394,8 +397,8 @@ impl TableDelegate for StartupDelegate {
             1 => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg))
                 .child(div().flex_1().min_w(px(0.0)).truncate().child(
                     crate::gpui_app::elements::highlighted_text(&e.name, &self.query, &self.theme),
                 )),
@@ -418,19 +421,19 @@ impl TableDelegate for StartupDelegate {
                     }
                 };
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(color))
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(color))
                     .child(label)
             }
             3 => div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(e.source.as_str().to_string()),
             _ => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex_1()
@@ -466,7 +469,7 @@ pub(crate) fn init_table_entity(
         }
         TableEvent::SortChanged { col_ix, sort } => {
             let column = state_ent.read(cx).delegate().info_sort_column(*col_ix);
-            this.apply_table_sort(taskmanager_shell::InfoTable::Startup, column, *sort);
+            this.apply_table_sort(InfoTable::Startup, column, *sort);
             cx.notify();
         }
         _ => {}
@@ -496,9 +499,9 @@ pub struct StartupViewProps<'a> {
     /// The previous boot's waterfall (opt-in boot history, roadmap #5) —
     /// `None` without persistence or before any comparison exists, in which
     /// case the waterfall renders exactly as before.
-    pub boot_baseline: Option<&'a taskmanager_core::core::BootTimeline>,
+    pub boot_baseline: Option<&'a BootTimeline>,
     pub feedback: Option<ActionFeedback>,
-    pub search_input: gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState>,
+    pub search_input: gpui::Entity<TextInputState>,
     pub table_entity: Entity<TableState<StartupDelegate>>,
     pub evidence: Option<&'a StartupBootEvidenceSnapshot>,
     pub retry_button: Entity<ButtonState>,
@@ -563,9 +566,7 @@ pub fn render_startup(
         .debug_selector(|| "tm-startup-chrome".to_string())
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(action_bar(
             &theme,
             entries,
@@ -619,9 +620,7 @@ pub fn render_startup(
             .min_h(px(0.0))
             .flex()
             .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_8,
-            ));
+            .gap(definite_length(tokens::SPACE_8));
         let source_detail = startup_source_detail(sources);
         if let Some(notice) = list_view::source_notice_with_detail_presentation(
             &theme,

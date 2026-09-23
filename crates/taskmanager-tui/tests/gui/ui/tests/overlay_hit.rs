@@ -17,6 +17,11 @@ use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::ui::{TuiFramePlan, TuiHitTarget};
+use taskmanager_application::PendingConfirmation;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_shell::SortCol;
 
 const FRAME: Rect = Rect::new(0, 0, 120, 40);
 
@@ -36,7 +41,7 @@ fn painted_frame(app: &crate::TuiApp) -> (String, TuiFramePlan) {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let plan = TuiFramePlan::build(app, FRAME);
     let backend = TestBackend::new(FRAME.width, FRAME.height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
@@ -147,7 +152,7 @@ fn service_menu_row_click_walks_the_keyboard_confirmation_gate() {
         .expect("the click must arm the same gated confirmation as Enter");
     assert_eq!(
         pending.action,
-        taskmanager_core::core::services::ServiceAction::Stop,
+        ServiceAction::Stop,
         "the clicked row's action is what the gate froze"
     );
 }
@@ -200,7 +205,7 @@ fn process_menu_click_routes_control_and_gated_rows_like_enter() {
     assert!(
         matches!(
             app.shell.pending_confirmation(),
-            Some(taskmanager_application::PendingConfirmation::EndTask(_))
+            Some(PendingConfirmation::EndTask(_))
         ),
         "the gated row must arm the identity-frozen end-task gate"
     );
@@ -228,10 +233,7 @@ fn session_menu_row_click_arms_the_session_gate() {
         .shell
         .pending_session()
         .expect("the click must arm the shared session gate");
-    assert_eq!(
-        pending.action,
-        taskmanager_core::core::session::SessionControlAction::Lock
-    );
+    assert_eq!(pending.action, SessionControlAction::Lock);
     assert!(
         reaction.effect.is_none(),
         "the session request is only emitted by the y confirmation"
@@ -287,7 +289,7 @@ fn column_menu_row_click_toggles_that_column() {
     );
     assert!(reaction.dirty);
     assert!(
-        !app.column_visible(taskmanager_shell::SortCol::Cpu),
+        !app.column_visible(SortCol::Cpu),
         "clicking the CPU row must hide it, like Enter/Space on the cursor"
     );
     assert_eq!(
@@ -304,7 +306,7 @@ fn command_palette_row_click_runs_the_selected_command() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
@@ -444,7 +446,7 @@ fn confirmation_and_viewport_popups_stay_blocked_no_ops() {
     assert!(
         matches!(
             app.shell.pending_confirmation(),
-            Some(taskmanager_application::PendingConfirmation::EndTask(_))
+            Some(PendingConfirmation::EndTask(_))
         ),
         "the click must neither submit nor dismiss the gate"
     );

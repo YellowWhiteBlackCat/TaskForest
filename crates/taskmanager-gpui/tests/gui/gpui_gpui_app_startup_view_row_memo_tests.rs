@@ -3,9 +3,15 @@ use crate::gpui_app::root::RootView;
 use gpui::TestAppContext;
 use std::rc::Rc;
 use taskmanager_application::i18n;
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::ProviderId;
+use taskmanager_core::core::SourceOutcome;
+use taskmanager_core::core::SourceStatus;
 use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::startup::StartupImpactEvidence;
 use taskmanager_shell::{InfoSortCol, InfoTable, SortDir};
 use taskmanager_theme::Theme;
+use taskmanager_ui::data::table::SortState;
 
 fn entry(name: &str, enabled: bool) -> StartupEntry {
     use taskmanager_core::core::startup::{
@@ -22,9 +28,7 @@ fn entry(name: &str, enabled: bool) -> StartupEntry {
         control_policy: StartupControlPolicy::Direct,
         locator: format!("{name}.desktop").into(),
         impact: StartupImpact::Low,
-        impact_evidence: taskmanager_core::core::startup::StartupImpactEvidence::Measured {
-            duration_ms: 10,
-        },
+        impact_evidence: StartupImpactEvidence::Measured { duration_ms: 10 },
     }
 }
 
@@ -62,7 +66,7 @@ fn startup_rows_reuse_the_projection_until_an_input_changes(cx: &mut TestAppCont
         view.apply_table_sort(
             InfoTable::Startup,
             Some(InfoSortCol::Status),
-            taskmanager_ui::data::table::SortState::Ascending,
+            SortState::Ascending,
         );
         let ordered = view.startup_rows();
         assert!(!Rc::ptr_eq(&rebuilt, &ordered));
@@ -102,11 +106,9 @@ fn header_sort_click_flows_through_the_shell_slot_and_reorders_the_memo(cx: &mut
 
 #[test]
 fn startup_source_detail_names_the_missing_blame_facet() {
-    let detail = startup_source_detail(&[taskmanager_core::core::SourceStatus {
-        provider: taskmanager_core::core::ProviderId::borrowed("linux.startup.systemd-blame"),
-        outcome: taskmanager_core::core::SourceOutcome::Partial(
-            taskmanager_core::core::FailureKind::ProviderFault,
-        ),
+    let detail = startup_source_detail(&[SourceStatus {
+        provider: ProviderId::borrowed("linux.startup.systemd-blame"),
+        outcome: SourceOutcome::Partial(FailureKind::ProviderFault),
         item_count: 3,
     }])
     .expect("failed startup source should explain its scope");
@@ -117,11 +119,9 @@ fn startup_source_detail_names_the_missing_blame_facet() {
 
 #[test]
 fn startup_source_detail_does_not_claim_complete_rows_for_inventory_failure() {
-    let detail = startup_source_detail(&[taskmanager_core::core::SourceStatus {
-        provider: taskmanager_core::core::ProviderId::borrowed("linux.startup.systemd-user"),
-        outcome: taskmanager_core::core::SourceOutcome::Unavailable(
-            taskmanager_core::core::FailureKind::Rejected,
-        ),
+    let detail = startup_source_detail(&[SourceStatus {
+        provider: ProviderId::borrowed("linux.startup.systemd-user"),
+        outcome: SourceOutcome::Unavailable(FailureKind::Rejected),
         item_count: 0,
     }])
     .expect("failed startup inventory should explain its scope");

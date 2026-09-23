@@ -1,5 +1,12 @@
 //! Rendering for the root application shell.
 
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_theme::Theme;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::pixels;
 /// Debug-selector identity of the telemetry-ready viewport wrapper.
 ///
 /// Lives on the shared `page_viewport` wrapper, never on the page body: the
@@ -66,9 +73,9 @@ fn schedule_system_npu_capture(
     let inventory_visible = system_view::memory_inventory_card_is_visible(
         &system_view::MemoryInventoryInputs {
             state: view.shell.smbios_memory_state(),
-            capability: view.projection().capability_status(
-                &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
-            ),
+            capability: view
+                .projection()
+                .capability_status(&CapabilityId::TELEMETRY_MEMORY_SMBIOS),
         },
         view.display_units(),
     );
@@ -149,9 +156,7 @@ impl Render for RootView {
         // All FONT_* tokens resolve from this root-relative scale, including
         // older pages with explicit sizes. Native compositor DPI remains an
         // independent multiplier; row density remains whitespace-only.
-        window.set_rem_size(taskmanager_ui::theme_binding::pixels(
-            ui_size.body_font_size(),
-        ));
+        window.set_rem_size(pixels(ui_size.body_font_size()));
         if matches!(self.input_scope(), super::GpuiInputScope::Content) {
             // Content buttons often close their typed modal state directly. This
             // render-edge cleanup gives those paths the same exact trigger-focus
@@ -458,15 +463,11 @@ impl Render for RootView {
         let root = div()
             .id("root")
             .size_full()
-            .bg(taskmanager_ui::theme_binding::fill(t.window_bg))
-            .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+            .bg(fill(t.window_bg))
+            .text_color(hsla(t.fg))
             .font(ui_font_with_fallback(&t))
-            .font_weight(taskmanager_ui::theme_binding::font_weight(
-                tokens::FONT_WEIGHT_BODY,
-            ))
-            .text_size(taskmanager_ui::theme_binding::absolute(
-                ui_size.body_font_size(),
-            ))
+            .font_weight(font_weight(tokens::FONT_WEIGHT_BODY))
+            .text_size(absolute(ui_size.body_font_size()))
             .flex()
             .flex_col()
             .on_mouse_move(cx.listener(move |v, _ev: &MouseMoveEvent, window, cx| {
@@ -559,24 +560,20 @@ impl Render for RootView {
 /// pages, dialogs, and existing responsive policy unchanged.
 fn render_widget_surface(
     view: &mut RootView,
-    theme: &taskmanager_theme::Theme,
+    theme: &Theme,
     snapshot: &SystemSnapshot,
-    ui_size: taskmanager_theme::tokens::UiSize,
+    ui_size: tokens::UiSize,
     _window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
     div()
         .id("root")
         .size_full()
-        .bg(taskmanager_ui::theme_binding::fill(theme.window_bg))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .bg(fill(theme.window_bg))
+        .text_color(hsla(theme.fg))
         .font(crate::gpui_app::theme::ui_font_with_fallback(theme))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(
-            taskmanager_theme::tokens::FONT_WEIGHT_BODY,
-        ))
-        .text_size(taskmanager_ui::theme_binding::absolute(
-            ui_size.body_font_size(),
-        ))
+        .font_weight(font_weight(tokens::FONT_WEIGHT_BODY))
+        .text_size(absolute(ui_size.body_font_size()))
         .flex()
         .flex_col()
         .capture_any_mouse_down(cx.listener(RootView::capture_input_modality_mouse_down))

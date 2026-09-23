@@ -10,6 +10,8 @@ use super::procfs::{
     read_proc_oom_score, read_proc_stat, read_proc_status_memory,
 };
 use super::rates::{ProcessRateInput, ProcessRateState};
+use taskmanager_core::ProcessMetadataFailure;
+use taskmanager_core::ProcessSchedulingPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ProcessScalarEvidence {
@@ -18,7 +20,7 @@ pub(super) struct ProcessScalarEvidence {
     pub(super) memory: SourceOutcome,
     pub(super) io: SourceOutcome,
     pub(super) rates: SourceOutcome,
-    pub(super) policy: Option<taskmanager_core::ProcessSchedulingPolicy>,
+    pub(super) policy: Option<ProcessSchedulingPolicy>,
     pub(super) minflt: Option<u64>,
     pub(super) majflt: Option<u64>,
     pub(super) oom_score: Option<u32>,
@@ -101,8 +103,7 @@ pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
 }
 
 pub(super) fn mark_retained_item_stale(item: &mut ProcessItem, failure: FailureKind) {
-    let metadata_failure =
-        taskmanager_core::ProcessMetadataFailure::from_inventory_failure(failure);
+    let metadata_failure = ProcessMetadataFailure::from_inventory_failure(failure);
     item.apply_metadata_observations(
         item.metadata_observations()
             .clone()

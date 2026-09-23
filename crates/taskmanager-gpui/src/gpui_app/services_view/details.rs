@@ -3,6 +3,12 @@
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{ClipboardItem, Context, Div, ParentElement, Styled, div, prelude::FluentBuilder, px};
+use taskmanager_shell::presentation::service_diagnostics_rows;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 use taskmanager_ui_contract::IconId;
 
@@ -98,9 +104,7 @@ pub fn render_details(
         .flex_row()
         .flex_wrap()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(
             elements::Pill::new(
                 "service-logs-refresh",
@@ -221,9 +225,7 @@ pub fn render_details(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .w(px(430.0))
         .child(prop_row(theme, i18n::t("common.name"), item.name.clone()))
         .child(prop_row(
@@ -252,7 +254,7 @@ pub fn render_details(
             item.sub_state.clone(),
         ))
         .children(
-            taskmanager_shell::presentation::service_diagnostics_rows(item.diagnostics())
+            service_diagnostics_rows(item.diagnostics())
                 .into_iter()
                 .map(|(label, value)| prop_row(theme, &label, value)),
         )
@@ -279,25 +281,23 @@ pub fn render_details(
         .when(dependencies_loading, |column| {
             column.child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(theme.fg_dim))
                     .child(i18n::t("svc.details_loading")),
             )
         })
         .child(
             div()
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+                .mt(length(tokens::SPACE_8))
                 .flex()
                 .flex_row()
                 .items_center()
                 .justify_between()
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                            tokens::FONT_WEIGHT_HEADER,
-                        ))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+                        .text_color(hsla(theme.fg))
                         .child(i18n::t("svc.logs")),
                 )
                 .child(actions),
@@ -310,8 +310,8 @@ pub fn render_details(
             };
             column.child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(color))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(color))
                     .child(text),
             )
         })
@@ -337,20 +337,16 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
         .render()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_3,
-        ))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+        .gap(definite_length(tokens::SPACE_3))
+        .text_size(font_size(tokens::FONT_11))
         .font(mono_font_with_fallback(theme))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg));
+        .text_color(hsla(theme.fg));
     match state {
         ServiceLogState::Ready(lines) => panel.child(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_2,
-                ))
+                .gap(definite_length(tokens::SPACE_2))
                 .children(lines.iter().cloned().enumerate().map(|(index, line)| {
                     let color = match line.trim_start() {
                         text if text.starts_with("[Error]") => theme.danger,
@@ -361,7 +357,7 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                     let row = div()
                         .min_w(px(0.0))
                         .whitespace_normal()
-                        .text_color(taskmanager_ui::theme_binding::hsla(color))
+                        .text_color(hsla(color))
                         .child(line);
                     // One selector per painted stream line: a frame test can
                     // count the rows that survived the shared level filter.
@@ -369,36 +365,34 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                 })),
         ),
         ServiceLogState::Loading => panel
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_color(hsla(theme.fg_dim))
             .child(i18n::t("svc.logs_loading")),
         ServiceLogState::Empty => panel
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_color(hsla(theme.fg_dim))
             .child(i18n::t("svc.logs_empty")),
-        ServiceLogState::Unavailable(failure) => match failure.kind {
-            ServiceLogErrorKind::TimedOut => panel
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
-                .child(i18n::t("svc.logs_timeout")),
-            ServiceLogErrorKind::PermissionDenied => panel
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
-                .child(with_diagnostic(
-                    i18n::t("svc.logs_permission_denied"),
-                    failure.detail.as_deref(),
-                )),
-            ServiceLogErrorKind::MissingTool | ServiceLogErrorKind::Unsupported => panel
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .child(with_diagnostic(
-                    i18n::t("svc.logs_unsupported"),
-                    failure.detail.as_deref(),
-                )),
-            ServiceLogErrorKind::TemporarilyUnavailable | ServiceLogErrorKind::ProviderFailed => {
-                panel
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
-                    .child(with_diagnostic(
-                        i18n::t("svc.logs_failed"),
+        ServiceLogState::Unavailable(failure) => {
+            match failure.kind {
+                ServiceLogErrorKind::TimedOut => panel
+                    .text_color(hsla(theme.gpu))
+                    .child(i18n::t("svc.logs_timeout")),
+                ServiceLogErrorKind::PermissionDenied => {
+                    panel.text_color(hsla(theme.gpu)).child(with_diagnostic(
+                        i18n::t("svc.logs_permission_denied"),
                         failure.detail.as_deref(),
                     ))
+                }
+                ServiceLogErrorKind::MissingTool | ServiceLogErrorKind::Unsupported => {
+                    panel.text_color(hsla(theme.fg_dim)).child(with_diagnostic(
+                        i18n::t("svc.logs_unsupported"),
+                        failure.detail.as_deref(),
+                    ))
+                }
+                ServiceLogErrorKind::TemporarilyUnavailable
+                | ServiceLogErrorKind::ProviderFailed => panel.text_color(hsla(theme.gpu)).child(
+                    with_diagnostic(i18n::t("svc.logs_failed"), failure.detail.as_deref()),
+                ),
             }
-        },
+        }
     }
 }
 

@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::config::Config;
 
 #[test]
 fn form_navigation_wraps_at_edges_and_changes_values() {
@@ -29,7 +31,7 @@ fn form_navigation_wraps_at_edges_and_changes_values() {
     form.field = 29;
     form.step_value(1);
     assert!(form.history_persistence);
-    let mut config = taskmanager_core::core::config::Config::default();
+    let mut config = Config::default();
     let mut theme = crate::ThemeParams::default();
     apply_settings_to_config(&form, &mut config, &mut theme);
     assert!(config.history_persistence);
@@ -105,15 +107,15 @@ fn language_tokens_round_trip_with_unknown_falling_back_to_english() {
     // unrecorded one keeps the host-detected locale (None).
     assert_eq!(
         SettingsForm::language_for_token(Some("zh")),
-        Some(taskmanager_application::i18n::Language::Zh)
+        Some(Language::Zh)
     );
     assert_eq!(
         SettingsForm::language_for_token(Some("en")),
-        Some(taskmanager_application::i18n::Language::En)
+        Some(Language::En)
     );
     assert_eq!(
         SettingsForm::language_for_token(Some("fr")),
-        Some(taskmanager_application::i18n::Language::En)
+        Some(Language::En)
     );
     assert_eq!(SettingsForm::language_for_token(None), None);
 }
@@ -126,7 +128,7 @@ fn overlay_labels_resolve_through_the_shared_catalog() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     app.toggle_settings();
 
@@ -168,7 +170,7 @@ fn settings_save_reconciles_the_perf_device_selection_immediately() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     assert!(
         app.visible_perf_devices()

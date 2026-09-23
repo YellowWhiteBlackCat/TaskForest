@@ -188,7 +188,7 @@ impl GpuProviderRegistry {
                             failure
                                 .status
                                 .failure()
-                                .unwrap_or(taskmanager_core::FailureKind::ProviderFault),
+                                .unwrap_or(FailureKind::ProviderFault),
                         ),
                         item_count: 0,
                     });

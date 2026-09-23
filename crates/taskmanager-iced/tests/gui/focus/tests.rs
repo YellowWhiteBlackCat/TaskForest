@@ -1,6 +1,7 @@
 use iced::advanced::widget::operation::Focusable;
 
 use super::*;
+use taskmanager_application::AppPage;
 
 #[test]
 fn adapter_state_obeys_iced_focusable_contract() {
@@ -25,15 +26,15 @@ fn every_declared_focus_target_has_a_unique_operation_id() {
 #[test]
 fn table_row_operation_ids_are_stable_and_page_bound() {
     let first = focus_id(FocusTarget::TableRow {
-        page: taskmanager_application::AppPage::Applications,
+        page: AppPage::Applications,
         index: 0,
     });
     let second = focus_id(FocusTarget::TableRow {
-        page: taskmanager_application::AppPage::Applications,
+        page: AppPage::Applications,
         index: 1,
     });
     let other_page = focus_id(FocusTarget::TableRow {
-        page: taskmanager_application::AppPage::Services,
+        page: AppPage::Services,
         index: 0,
     });
     assert_eq!(first, "iced-table-row-applications-0");

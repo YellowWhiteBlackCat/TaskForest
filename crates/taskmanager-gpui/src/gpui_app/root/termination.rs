@@ -17,6 +17,9 @@ use taskmanager_application::{
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 impl RootView {
     /// Resolve one live identity and arm the application-owned EndTask
@@ -92,14 +95,12 @@ pub(super) fn render_end_task_confirmation_dialog(
         .w(px(420.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_14,
-        ))
+        .gap(definite_length(tokens::SPACE_14))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_size(font_size(tokens::FONT_13))
                 .line_height(relative(1.45))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_color(hsla(theme.fg))
                 .child(message),
         )
         .child(
@@ -107,9 +108,7 @@ pub(super) fn render_end_task_confirmation_dialog(
                 .flex()
                 .flex_row()
                 .justify_end()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(elements::pill(
                     theme,
                     "end-task-confirmation-cancel",

@@ -5,27 +5,26 @@ use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers};
 
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
 use taskmanager_shell::ShellKeyEvent;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
-fn grouped_fixture(
-    pid: u32,
-    name: &str,
-    cpu: f32,
-    memory_bytes: u64,
-) -> taskmanager_core::core::process::ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+fn grouped_fixture(pid: u32, name: &str, cpu: f32, memory_bytes: u64) -> ProcessItem {
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .current_cpu_percentage(cpu)
         .current_memory_bytes(memory_bytes)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("devuser"),
+            None,
+            1,
+        ))
         .build()
 }
 
@@ -34,9 +33,9 @@ fn visual_navigation_walks_the_category_projection() {
     let mib = 1024 * 1024_u64;
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             grouped_fixture(100, "zed", 24.8, 2_640 * mib),
             grouped_fixture(101, "zed-worker", 11.2, 1_000 * mib),
             grouped_fixture(102, "gnome-shell", 9.6, 1_120 * mib),
@@ -92,9 +91,9 @@ fn visual_left_right_toggles_category_headers() {
     let mib = 1024 * 1024_u64;
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             grouped_fixture(100, "zed", 24.8, 2_640 * mib),
             grouped_fixture(101, "zed-worker", 11.2, 1_000 * mib),
             grouped_fixture(102, "gnome-shell", 9.6, 1_120 * mib),
@@ -125,11 +124,9 @@ fn visual_left_right_toggles_category_tree_subtrees_and_left_goes_up_to_parent()
     child.parent_pid = Some(100);
     let mut grandchild = grouped_fixture(102, "grandchild-app", 5.0, 30);
     grandchild.parent_pid = Some(101);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
-            root, child, grandchild,
-        ])),
+        ProjectionSeedFact::Processes(Some(vec![root, child, grandchild])),
     );
     let key = |code| Message::Key(IcedKey::Fixed(ShellKeyEvent::new(code, Modifiers::NONE)));
 

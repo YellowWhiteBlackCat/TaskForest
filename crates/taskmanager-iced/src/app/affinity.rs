@@ -10,6 +10,8 @@ use super::{IcedApp, Message, PlatformEffect};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ProcessAffinityReady, ProcessAffinityState};
 
+use taskmanager_core::core::hardware::CpuType;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 impl IcedApp {
@@ -193,7 +195,7 @@ impl IcedApp {
         cpus.clear();
         if let Some(types) = cpu_types {
             for (idx, cpu_type) in types.iter().enumerate() {
-                if *cpu_type == taskmanager_core::core::hardware::CpuType::Performance
+                if *cpu_type == CpuType::Performance
                     && let Ok(cpu_id) = u32::try_from(idx)
                 {
                     cpus.insert(cpu_id);
@@ -228,11 +230,8 @@ impl IcedApp {
         cpus.clear();
         if let Some(types) = cpu_types {
             for (idx, cpu_type) in types.iter().enumerate() {
-                if matches!(
-                    *cpu_type,
-                    taskmanager_core::core::hardware::CpuType::Efficient
-                        | taskmanager_core::core::hardware::CpuType::LowPower
-                ) && let Ok(cpu_id) = u32::try_from(idx)
+                if matches!(*cpu_type, CpuType::Efficient | CpuType::LowPower)
+                    && let Ok(cpu_id) = u32::try_from(idx)
                 {
                     cpus.insert(cpu_id);
                 }
@@ -322,7 +321,7 @@ impl IcedApp {
 
 fn affinity_last_good<'a>(
     state: &'a ProcessAffinityState,
-    target: &taskmanager_core::core::process::FrozenProcessIdentity,
+    target: &FrozenProcessIdentity,
 ) -> Option<&'a ProcessAffinityReady> {
     match state {
         ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),

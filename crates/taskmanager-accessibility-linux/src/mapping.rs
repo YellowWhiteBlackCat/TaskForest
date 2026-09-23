@@ -21,6 +21,7 @@
 //!   so this is the simple, correct path and matches the accesskit_winit model.
 
 use accesskit::{Action, Live, Node, NodeId, Role, Tree, TreeId, TreeUpdate};
+use taskmanager_ui_contract::SemanticState;
 use taskmanager_ui_contract::{
     SemanticAction, SemanticLiveRegion, SemanticNode, SemanticNodeId, SemanticRole,
     SemanticSnapshot,
@@ -282,7 +283,7 @@ trait ReadOnlyForAt {
     fn read_only_for_at(&self) -> bool;
 }
 
-impl ReadOnlyForAt for taskmanager_ui_contract::SemanticState {
+impl ReadOnlyForAt for SemanticState {
     fn read_only_for_at(&self) -> bool {
         // A disabled node is already covered by `set_disabled`; this is a
         // placeholder for future read-only text/field roles. Today no canonical

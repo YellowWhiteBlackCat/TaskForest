@@ -4,6 +4,9 @@ use gpui::{
     AnyElement, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement, Styled, div,
 };
 use std::collections::HashMap;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
@@ -27,16 +30,12 @@ pub(crate) fn text_rendering_row(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(text_rendering_pill(
                     TextRenderingPillProps {
                         theme: t,
@@ -79,10 +78,8 @@ pub(crate) fn text_rendering_row(
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(
-                    tokens::FONT_CAPTION,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                .text_size(font_size(tokens::FONT_CAPTION))
+                .text_color(hsla(t.fg_dim))
                 .child(i18n::t("settings.text_rendering_unavailable")),
         )
 }
@@ -157,8 +154,8 @@ pub(crate) fn hc_row(
         .justify_between()
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(t.fg))
                 .child(i18n::t("settings.high_contrast")),
         )
         .child(

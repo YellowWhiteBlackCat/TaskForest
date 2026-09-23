@@ -20,6 +20,11 @@ use crate::app::Message;
 use crate::focus;
 use crate::ui::components::key_value_rows;
 use crate::ui::device_chart;
+use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
+use taskmanager_application::process_details_vm::render_environment_value;
+use taskmanager_application::process_details_vm::render_environment_variable;
+use taskmanager_shell::presentation::command_identity_summary;
+use taskmanager_theme::Theme;
 
 /// One VM value as this overlay's display string: the folded text, or the
 /// shared dash for [`DetailValue::Missing`].
@@ -167,7 +172,7 @@ fn command_rows_with_local_time(
     );
     let cmdline = vm_text(&vm, ProcessDetailsField::Cmdline);
     push_property(&mut rows, t("prop.command_line"), Some(cmdline.as_str()));
-    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+    if let Some(summary) = command_identity_summary(process) {
         push_property(
             &mut rows,
             t("proc_insights.command_identity"),
@@ -198,7 +203,7 @@ pub(crate) fn environment_facet<'a>(
 pub(crate) fn filtered_environment_rows<'a>(
     entries: &'a [ProcessEnvironmentEntry],
     filter: &str,
-) -> Vec<&'a taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry> {
+) -> Vec<&'a ProcessEnvironmentEntry> {
     let needle = filter.trim().to_lowercase();
     entries
         .iter()
@@ -285,7 +290,7 @@ pub(crate) fn working_directory_value(shell: &ShellApp, target: &FrozenProcessId
 /// filter, per-row copy, copy-all, and an honest Pending / Unavailable state
 /// when the platform cannot (or has not yet) provided the data.
 fn environment_section<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: Option<&ProcessInsightFacetState<ProcessEnvironment>>,
     filter: &str,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -313,38 +318,30 @@ fn environment_section<'a>(
             let mut rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = visible
                 .iter()
                 .map(|entry| {
-                    {
-                        let value = taskmanager_application::process_details_vm::render_environment_value(
-                            &entry.key,
-                            &entry.value,
-                        );
-                        row![
-                            text(entry.key.clone())
-                                .width(Length::Fixed(220.0))
-                                .size(f32::from(tokens::FONT_12)),
-                            text(value)
-                                .width(Length::Fill)
-                                .size(f32::from(tokens::FONT_12))
-                                .color(muted),
-                            focus::dynamic_button(
-                                theme_snapshot,
-                                crate::app::FocusTarget::AboutCopyDetails,
-                                t("common.copy").to_string(),
-                                Message::CopyTextToClipboard {
-                                    label: format!("Environment {}", entry.key),
-                                    text: taskmanager_application::process_details_vm::render_environment_variable(
-                                        &entry.key,
-                                        &entry.value,
-                                    ),
-                                },
-                                false,
-                            ),
-                        ]
-                        .spacing(8)
-                        .padding(2)
-                        .width(Length::Fill)
-                        .into()
-                    }
+                    let value = render_environment_value(&entry.key, &entry.value);
+                    row![
+                        text(entry.key.clone())
+                            .width(Length::Fixed(220.0))
+                            .size(f32::from(tokens::FONT_12)),
+                        text(value)
+                            .width(Length::Fill)
+                            .size(f32::from(tokens::FONT_12))
+                            .color(muted),
+                        focus::dynamic_button(
+                            theme_snapshot,
+                            crate::app::FocusTarget::AboutCopyDetails,
+                            t("common.copy").to_string(),
+                            Message::CopyTextToClipboard {
+                                label: format!("Environment {}", entry.key),
+                                text: render_environment_variable(&entry.key, &entry.value,),
+                            },
+                            false,
+                        ),
+                    ]
+                    .spacing(8)
+                    .padding(2)
+                    .width(Length::Fill)
+                    .into()
                 })
                 .collect();
             if visible.is_empty() && !environment.entries.is_empty() {
@@ -383,12 +380,7 @@ fn environment_section<'a>(
                         label: "Environment".to_string(),
                         text: visible
                             .iter()
-                            .map(|entry| {
-                                taskmanager_application::process_details_vm::render_environment_variable(
-                                    &entry.key,
-                                    &entry.value,
-                                )
-                            })
+                            .map(|entry| render_environment_variable(&entry.key, &entry.value))
                             .collect::<Vec<_>>()
                             .join("\n"),
                     },
@@ -564,11 +556,7 @@ pub(crate) fn properties_target(shell: &ShellApp) -> Option<&FrozenProcessIdenti
 
 #[must_use]
 pub(crate) fn property_rows(identity: ProcessLiveKey, shell: &ShellApp) -> Vec<(String, String)> {
-    property_rows_with_local_time(
-        identity,
-        shell,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
-    )
+    property_rows_with_local_time(identity, shell, &LocalTimeRulesObservation::unsupported(0))
 }
 
 fn property_rows_with_local_time(
@@ -661,11 +649,7 @@ fn details_vm(
     process: &ProcessItem,
     local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<ProcessDetailsRowVm> {
-    taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        process,
-        &UnitPreferences::default(),
-        local_time_rules,
-    )
+    process_details_rows_with_local_time(process, &UnitPreferences::default(), local_time_rules)
 }
 
 fn push_property(rows: &mut Vec<(String, String)>, label: &str, value: Option<&str>) {

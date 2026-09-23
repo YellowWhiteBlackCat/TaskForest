@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 
 fn gpu_observation_from_profiler(
     profiler_result: Result<Vec<MacGpuAdapter>, FailureKind>,
@@ -91,7 +92,7 @@ fn inventory_only_gpu_marks_live_throttle_capability_unavailable() {
     assert_eq!(gpu.current_throttle_reasons(), None);
     assert_eq!(
         gpu.throttle_observation().availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
 }
 

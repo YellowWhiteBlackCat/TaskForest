@@ -8,6 +8,8 @@
 use super::super::*;
 use ratatui::crossterm::event::KeyModifiers;
 use taskmanager_application::AppPage;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn app_on_processes() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -28,10 +30,7 @@ fn search_matches_the_command_line() {
     first.name = "smd".to_owned();
     let mut updated = processes.as_ref().clone();
     updated[0] = first;
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(updated)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(updated)));
 
     // A query that only matches the command line must still surface the row.
     app.query = "daemonize".to_owned();
@@ -127,10 +126,7 @@ fn enter_jumps_to_the_row_a_structured_token_query_filtered_to() {
     first.name = "smd".to_owned();
     let mut updated = processes.as_ref().clone();
     updated[0] = first;
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(updated)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(updated)));
 
     app.query = "cmd:daemonize".to_owned();
     app.open_search();
@@ -233,7 +229,7 @@ fn the_search_box_renders_the_match_counter() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(

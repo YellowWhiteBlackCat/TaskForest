@@ -10,6 +10,7 @@ use super::blocks::gpu_block_title;
 use super::chart::chart_grid_scene;
 use bevy::ui_widgets::ScrollArea;
 use cpu::device_button_scene;
+use taskmanager_ui_contract::IconId;
 
 /// One label→value line; the value is the rewritable fact. Both columns are
 /// strictly single-line: a long value clips at the rail edge instead of
@@ -216,7 +217,7 @@ fn activity_graph_scene(
 }
 
 fn sidebar_activity_scene(
-    icon: taskmanager_ui_contract::IconId,
+    icon: IconId,
     samples: &[f32],
     color: bevy::color::Color,
     palette: &UiPalette,
@@ -247,7 +248,7 @@ fn sidebar_activity_scene(
 }
 
 fn sidebar_curve_scene(
-    icon: taskmanager_ui_contract::IconId,
+    icon: IconId,
     curve: SystemCurve,
     shell: &ShellApp,
     palette: &UiPalette,
@@ -275,12 +276,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
         PerformanceDeviceTarget::Cpu,
         Box::new(device_row_with_accessory_scene(
             t("common.cpu").to_owned(),
-            sidebar_curve_scene(
-                taskmanager_ui_contract::IconId::Cpu,
-                SystemCurve::Cpu,
-                shell,
-                palette,
-            ),
+            sidebar_curve_scene(IconId::Cpu, SystemCurve::Cpu, shell, palette),
             cpu_device_caption_scene(shell),
             true,
             palette,
@@ -290,12 +286,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
         PerformanceDeviceTarget::Memory,
         Box::new(device_row_with_accessory_scene(
             t("common.memory").to_owned(),
-            sidebar_curve_scene(
-                taskmanager_ui_contract::IconId::Memory,
-                SystemCurve::Memory,
-                shell,
-                palette,
-            ),
+            sidebar_curve_scene(IconId::Memory, SystemCurve::Memory, shell, palette),
             marked_text_scene(
                 summary_value(shell, SummaryField::Memory),
                 Role::Caption,
@@ -319,12 +310,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 PerformanceDeviceTarget::Disk(disk.device_id.clone()),
                 Box::new(device_row_with_accessory_scene(
                     disk_sidebar_title(disk),
-                    sidebar_activity_scene(
-                        taskmanager_ui_contract::IconId::Disk,
-                        &samples,
-                        palette.accent,
-                        palette,
-                    ),
+                    sidebar_activity_scene(IconId::Disk, &samples, palette.accent, palette),
                     super::disk_caption_scene(disk, palette),
                     false,
                     palette,
@@ -346,12 +332,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                     } else {
                         (*nic.interface_name).to_owned()
                     },
-                    sidebar_activity_scene(
-                        taskmanager_ui_contract::IconId::Network,
-                        &samples,
-                        palette.accent,
-                        palette,
-                    ),
+                    sidebar_activity_scene(IconId::Network, &samples, palette.accent, palette),
                     marked_text_scene(
                         nic_fact_line(nic),
                         Role::Mono,
@@ -376,12 +357,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 PerformanceDeviceTarget::Gpu(key.clone()),
                 Box::new(device_row_with_accessory_scene(
                     gpu_block_title(gpu),
-                    sidebar_activity_scene(
-                        taskmanager_ui_contract::IconId::Gpu,
-                        &samples,
-                        palette.accent,
-                        palette,
-                    ),
+                    sidebar_activity_scene(IconId::Gpu, &samples, palette.accent, palette),
                     marked_text_scene(
                         gpu_fact_line(gpu),
                         Role::Mono,
@@ -405,12 +381,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 PerformanceDeviceTarget::Battery(key.clone()),
                 Box::new(device_row_with_accessory_scene(
                     title,
-                    sidebar_activity_scene(
-                        taskmanager_ui_contract::IconId::Performance,
-                        &[],
-                        palette.accent,
-                        palette,
-                    ),
+                    sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
                     marked_text_scene(
                         caption,
                         Role::Mono,

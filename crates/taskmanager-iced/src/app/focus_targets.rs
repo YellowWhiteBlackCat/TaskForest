@@ -11,6 +11,7 @@ use taskmanager_shell::SortCol;
 use super::DetailsSection;
 use super::selectors::PerfDevice;
 use crate::ui::system_table::ResourceHistoryWindow;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::ProcessStatusFilter;
 
 /// Focus targets that remain local to the Iced adapter.
@@ -242,7 +243,7 @@ pub enum FocusTarget {
     SavedViewImport,
     /// History replay controls.
     HistoryReplayToggle,
-    HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow),
+    HistoryReplayWindow(HistoryWindow),
     HistoryReplayRefresh,
     /// Resource history window choice (1m, 5m, 15m, 60m).
     ResourceHistoryWindow(ResourceHistoryWindow),
@@ -419,7 +420,7 @@ impl FocusTarget {
         Self::SavedViewExport,
         Self::SavedViewImport,
         Self::HistoryReplayToggle,
-        Self::HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow::OneHour),
+        Self::HistoryReplayWindow(HistoryWindow::OneHour),
         Self::HistoryReplayRefresh,
         Self::ResourceHistoryWindow(ResourceHistoryWindow::OneMinute),
         Self::ResourceHistoryWindow(ResourceHistoryWindow::FiveMinutes),

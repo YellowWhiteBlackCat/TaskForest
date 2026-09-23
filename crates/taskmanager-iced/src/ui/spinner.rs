@@ -19,6 +19,7 @@ use iced::widget::canvas::{self, Geometry, Path, Stroke};
 use iced::{Color, Point, Radians, Rectangle};
 
 use crate::app::Message;
+use taskmanager_theme::Theme;
 
 /// The spinner's square canvas side (the warm-up card's glyph slot). A
 /// cross-frontend layout contract, not a spacing token: the canvas extent
@@ -43,7 +44,7 @@ impl WarmupSpinner {
     /// revolution phase (`None` = static arc). Both stroke colors are
     /// palette-token-bound — the accent token for the arc, the border token
     /// for the faint track — so every skin restyles the spinner for free.
-    pub(crate) fn new(theme: &taskmanager_theme::Theme, phase: Option<f32>) -> Self {
+    pub(crate) fn new(theme: &Theme, phase: Option<f32>) -> Self {
         Self {
             accent: crate::theme_binding::color(theme.palette().accent),
             track: crate::theme_binding::color(theme.palette().border),
@@ -106,10 +107,7 @@ pub(crate) fn arc_span(phase: f32) -> (f32, f32) {
 
 /// The fixed square `Canvas` for the warm-up card. Kept beside the program so
 /// the warm-up body assembles one spinner, never ad-hoc canvas literals.
-pub(crate) fn canvas_view(
-    theme: &taskmanager_theme::Theme,
-    phase: Option<f32>,
-) -> iced::Element<'_, Message> {
+pub(crate) fn canvas_view(theme: &Theme, phase: Option<f32>) -> iced::Element<'_, Message> {
     canvas::Canvas::new(WarmupSpinner::new(theme, phase))
         .width(SPINNER_SIZE)
         .height(SPINNER_SIZE)

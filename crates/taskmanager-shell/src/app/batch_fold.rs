@@ -6,6 +6,8 @@
 
 use super::*;
 use std::marker::PhantomData;
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_platform_contract::OperationFailure;
 
 mod frontend_facts;
@@ -326,10 +328,7 @@ impl SystemProjectionStore {
     #[must_use]
     pub fn storage_health_projection(
         &self,
-    ) -> Option<(
-        &taskmanager_core::core::storage_health::FilesystemHealthSnapshot,
-        &[SourceStatus],
-    )> {
+    ) -> Option<(&FilesystemHealthSnapshot, &[SourceStatus])> {
         Some((
             self.storage_health.as_ref()?,
             self.storage_health_source.as_deref().unwrap_or_default(),
@@ -339,10 +338,7 @@ impl SystemProjectionStore {
     #[must_use]
     pub const fn smart_projection(
         &self,
-    ) -> (
-        &SmartObservationProjection,
-        Option<&taskmanager_core::core::storage::StorageDeviceTarget>,
-    ) {
+    ) -> (&SmartObservationProjection, Option<&StorageDeviceTarget>) {
         (&self.smart_observations, self.smart_subject.as_ref())
     }
 

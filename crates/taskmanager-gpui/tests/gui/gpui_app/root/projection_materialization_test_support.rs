@@ -17,6 +17,8 @@ use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
+use taskmanager_shell::fixture::DirectTrackSeedFact;
+use taskmanager_shell::fixture::seed_direct_track_fact;
 
 impl RootView {
     pub fn replace_process_insights_for_test(&mut self, state: ProcessInsightsState) {
@@ -118,9 +120,9 @@ impl RootView {
 
     pub fn replace_processes_for_test(&mut self, processes: Vec<ProcessItem>) {
         let revision = self.processes_generation().saturating_add(1);
-        taskmanager_shell::fixture::seed_direct_track_fact(
+        seed_direct_track_fact(
             &mut self.shell,
-            taskmanager_shell::fixture::DirectTrackSeedFact::Processes(processes.clone()),
+            DirectTrackSeedFact::Processes(processes.clone()),
         );
         self.materialized.replace_processes(
             revision,

@@ -13,13 +13,18 @@ use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::metrics::ScalarObservationGroup;
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
 use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
 
 impl TuiApp {
     /// A deterministic full-surface demo frame: the shared demo snapshot plus
@@ -27,14 +32,12 @@ impl TuiApp {
     /// settings can update local presentation but never touch a host file.
     #[must_use]
     pub fn demo() -> Self {
-        let mut app = Self::from_shell(taskmanager_shell::demo_app());
-        app.local_time_rules = taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        );
-        taskmanager_shell::fixture::seed_projection_fact(
+        use taskmanager_shell::demo_app;
+        let mut app = Self::from_shell(demo_app());
+        app.local_time_rules = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Containers(Some(ContainerRollup {
+            ProjectionSeedFact::Containers(Some(ContainerRollup {
                 state: DeviceState::healthy(1_785_292_800_000),
                 containers: vec![
                     ContainerSummary {
@@ -64,23 +67,26 @@ impl TuiApp {
                 ],
             })),
         );
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(
-                demo_boot_evidence(),
-            )),
+            ProjectionSeedFact::StartupBootEvidence(Some(demo_boot_evidence())),
         );
         // Seed the SHARED slot the Disk panel renders (SystemProjectionStore, latest-wins
         // from `directory_usage_events`) — the same field a live platform
         // batch fills through the shell fold.
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(Some(
-                demo_directory_usage(),
-            )),
+            ProjectionSeedFact::DirectoryUsage(Some(demo_directory_usage())),
         );
         seed_demo_npu_inventory(&mut app);
         seed_demo_history(&mut app);
+        // The demo boot has no persisted appearance preference, so the shared
+        // `TM_SKIN` testing override is the only appearance input here. When it
+        // is unset/invalid the `ThemeParams::default()` (GNOME dark) set by
+        // `from_shell` is preserved verbatim; production never reads it.
+        if let Some(forced) = crate::theme::forced_theme_params_from_env() {
+            app.theme_params = forced;
+        }
         apply_capture_overrides(&mut app);
         app
     }
@@ -131,10 +137,7 @@ fn seed_demo_history(app: &mut TuiApp) {
                 })
                 .collect();
             cpu_observations.core_usage_group =
-                taskmanager_core::core::metrics::ScalarObservationGroup::available(
-                    varied,
-                    frame.timestamp_ms,
-                );
+                ScalarObservationGroup::available(varied, frame.timestamp_ms);
         }
         if let Some(global) = cpu_observations.global_usage_pct.current_value() {
             let varied = f64::from(*global) + 14.0 * wave(17.0, 0.9);
@@ -200,7 +203,7 @@ fn seed_demo_history(app: &mut TuiApp) {
             network.apply_observations(network.adapter_type(), scalar, wireless);
         }
 
-        taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &frame, None, None);
+        record_demo_history_frame(&mut app.shell, &frame, None, None);
     }
 }
 
@@ -261,17 +264,17 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         },
     };
     match page {
-        AppPage::Services => taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Services => seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::ServicesSource(Some(vec![status])),
+            ProjectionSeedFact::ServicesSource(Some(vec![status])),
         ),
-        AppPage::Startup => taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Startup => seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::StartupSource(Some(vec![status])),
+            ProjectionSeedFact::StartupSource(Some(vec![status])),
         ),
-        AppPage::Users => taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Users => seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::SessionsSource(Some(vec![status])),
+            ProjectionSeedFact::SessionsSource(Some(vec![status])),
         ),
         _ => {}
     }
@@ -398,16 +401,11 @@ fn seed_gpu_capture_history(app: &mut TuiApp) {
         gpu.apply_scalar_observations(observations);
         gpu.engines[0].usage_pct = render;
         gpu.engines[1].usage_pct = video;
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 }
 
@@ -469,9 +467,9 @@ pub(crate) fn seed_fan_capture_sensors(app: &mut TuiApp) {
             ),
         ),
     ];
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(OBSERVED_AT_MS),
             timestamp_ms: OBSERVED_AT_MS,
             readings,
@@ -515,7 +513,7 @@ fn demo_directory_usage() -> DirectoryUsageSnapshot {
         // as a "0 B" stand-in or leaks the untrustworthy number.
         size_bytes: ScalarObservation::available(7 * 1024 * 1024 * 1024, observed_at_ms),
         file_count: ScalarObservation::available(900, observed_at_ms),
-        unreadable: Some(taskmanager_core::core::failure::FailureKind::PermissionDenied),
+        unreadable: Some(FailureKind::PermissionDenied),
     };
     DirectoryUsageSnapshot {
         scan_id: DirectoryScanId::new(1),

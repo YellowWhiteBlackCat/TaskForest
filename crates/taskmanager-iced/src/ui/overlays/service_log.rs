@@ -13,6 +13,7 @@ use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::focus;
+use taskmanager_theme::Theme;
 
 /// Render the shared service-log feed as an Iced modal.
 pub(crate) fn service_log_overlay<'a>(
@@ -117,7 +118,7 @@ pub(crate) fn service_log_overlay<'a>(
     )
 }
 
-fn log_level_color(theme: &taskmanager_theme::Theme, level: ServiceLogLevel) -> iced::Color {
+fn log_level_color(theme: &Theme, level: ServiceLogLevel) -> iced::Color {
     let palette = theme.palette();
     crate::theme_binding::color(match level {
         ServiceLogLevel::Error => palette.danger,

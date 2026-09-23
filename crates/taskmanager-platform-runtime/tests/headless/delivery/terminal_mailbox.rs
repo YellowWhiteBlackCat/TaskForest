@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use crossbeam_channel::bounded;
 use taskmanager_application::{
@@ -13,9 +14,24 @@ use super::worker::{WorkerQuota, WorkerRuntime};
 use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPublisher, spawn_lane};
 use crate::Queued;
 use crate::config::{CapabilityRoute, DeliveryClass, RuntimeBudgets, RuntimeDomain};
+use taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES;
+use taskmanager_platform_contract::RequestTracking;
+use taskmanager_platform_contract::SidebandPolicy;
 
 fn fixed_clock() -> u64 {
     42
+}
+
+/// Signals from the provider lane thread when its owned closure is dropped:
+/// after the lane loop published its terminal result and observed the
+/// disconnected request port. Blocking on this receiver turns "the terminal
+/// was transferred" into an observed fact instead of a scheduler-turn count.
+struct LaneLoopDone(crossbeam_channel::Sender<()>);
+
+impl Drop for LaneLoopDone {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
 }
 
 fn request_id(value: u64) -> RequestId {
@@ -49,12 +65,7 @@ fn reserve(
         .ecs_scheduler_handle()
         .lock()
         .expect("scheduler lock")
-        .admit_submission_with_tracking(
-            capability,
-            request,
-            0,
-            taskmanager_platform_contract::RequestTracking::Capability,
-        )
+        .admit_submission_with_tracking(capability, request, 0, RequestTracking::Capability)
 }
 
 #[test]
@@ -64,7 +75,7 @@ fn terminal_backlog_is_bounded_and_one_drain_reopens_admission() {
         active_target_limit: 1,
         active_target_limit_per_capability: 1,
         active_target_limit_per_domain: 1,
-        target_scope_byte_limit: taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES,
+        target_scope_byte_limit: MAX_REQUEST_SCOPE_BYTES,
         pending_delivery_limit: 3,
         control_delivery_reserve: 1,
         max_stalled_lifetime_ms: RuntimeBudgets::DEFAULT.max_stalled_lifetime_ms,
@@ -75,7 +86,7 @@ fn terminal_backlog_is_bounded_and_one_drain_reopens_admission() {
         delivery: DeliveryClass::Observation,
         domain: RuntimeDomain::System,
         cadence_ms: None,
-        sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+        sideband_policy: SidebandPolicy::Denied,
     }];
     let queues = Arc::new(EventQueueState::new(budgets.pending_delivery_limit));
     let catalog = Arc::new(RuntimeCapabilityCatalog::with_resources(
@@ -155,7 +166,7 @@ fn primary_refill_cannot_overtake_an_older_retained_terminal() {
         delivery: DeliveryClass::Observation,
         domain: RuntimeDomain::System,
         cadence_ms: None,
-        sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+        sideband_policy: SidebandPolicy::Denied,
     }];
     let queues = Arc::new(EventQueueState::new(
         RuntimeBudgets::DEFAULT.pending_delivery_limit,
@@ -245,7 +256,7 @@ fn observation_backlog_cannot_consume_the_control_delivery_reserve() {
             delivery: DeliveryClass::Observation,
             domain: RuntimeDomain::System,
             cadence_ms: None,
-            sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+            sideband_policy: SidebandPolicy::Denied,
         },
         CapabilityRoute {
             capability: CapabilityId::PROCESS_CONTROL,
@@ -253,7 +264,7 @@ fn observation_backlog_cannot_consume_the_control_delivery_reserve() {
             delivery: DeliveryClass::Control,
             domain: RuntimeDomain::Process,
             cadence_ms: None,
-            sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+            sideband_policy: SidebandPolicy::Denied,
         },
     ];
     let budgets = RuntimeBudgets {
@@ -261,7 +272,7 @@ fn observation_backlog_cannot_consume_the_control_delivery_reserve() {
         active_target_limit: 1,
         active_target_limit_per_capability: 1,
         active_target_limit_per_domain: 1,
-        target_scope_byte_limit: taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES,
+        target_scope_byte_limit: MAX_REQUEST_SCOPE_BYTES,
         pending_delivery_limit: 4,
         control_delivery_reserve: 1,
         max_stalled_lifetime_ms: RuntimeBudgets::DEFAULT.max_stalled_lifetime_ms,
@@ -350,7 +361,7 @@ fn retained_control_and_observation_terminals_remain_fair_and_fifo() {
             delivery: DeliveryClass::Control,
             domain: RuntimeDomain::Process,
             cadence_ms: None,
-            sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+            sideband_policy: SidebandPolicy::Denied,
         },
         CapabilityRoute {
             capability: CapabilityId::TELEMETRY_CPU,
@@ -358,7 +369,7 @@ fn retained_control_and_observation_terminals_remain_fair_and_fifo() {
             delivery: DeliveryClass::Observation,
             domain: RuntimeDomain::System,
             cadence_ms: None,
-            sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+            sideband_policy: SidebandPolicy::Denied,
         },
     ];
     let budgets = RuntimeBudgets {
@@ -368,7 +379,7 @@ fn retained_control_and_observation_terminals_remain_fair_and_fifo() {
         active_target_limit: 6,
         active_target_limit_per_capability: 2,
         active_target_limit_per_domain: 3,
-        target_scope_byte_limit: 6 * taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES,
+        target_scope_byte_limit: 6 * MAX_REQUEST_SCOPE_BYTES,
         max_stalled_lifetime_ms: RuntimeBudgets::DEFAULT.max_stalled_lifetime_ms,
     };
     let queues = Arc::new(EventQueueState::new(budgets.pending_delivery_limit));
@@ -446,7 +457,7 @@ fn undrained_terminal_does_not_pin_a_worker_quota_after_lane_shutdown() {
         delivery: DeliveryClass::Observation,
         domain: RuntimeDomain::System,
         cadence_ms: None,
-        sideband_policy: taskmanager_platform_contract::SidebandPolicy::Denied,
+        sideband_policy: SidebandPolicy::Denied,
     }];
     let queues = Arc::new(EventQueueState::new(
         RuntimeBudgets::DEFAULT.pending_delivery_limit,
@@ -493,8 +504,13 @@ fn undrained_terminal_does_not_pin_a_worker_quota_after_lane_shutdown() {
     let quota = Arc::new(WorkerQuota::new(1));
     let workers = WorkerRuntime::with_quota(1, quota.clone());
     let (request_tx, request_rx) = bounded(1);
-    spawn_lane(&workers, request_rx, publisher, |()| Ok(cpu_event(1)))
-        .expect("provider lane starts");
+    let (lane_done_tx, lane_done_rx) = bounded(1);
+    let lane_done = LaneLoopDone(lane_done_tx);
+    spawn_lane(&workers, request_rx, publisher, move |()| {
+        let _lane_done = &lane_done;
+        Ok(cpu_event(1))
+    })
+    .expect("provider lane starts");
     let request = request_id(99);
     assert_eq!(
         reserve(&catalog, &CapabilityId::TELEMETRY_CPU, request),
@@ -510,30 +526,20 @@ fn undrained_terminal_does_not_pin_a_worker_quota_after_lane_shutdown() {
         .expect("queued provider work");
     drop(request_tx);
 
-    let mut terminal_visible = false;
-    for _ in 0..10_000 {
-        if CapabilityScheduler::scheduling_snapshot(catalog.as_ref())
-            .event_queues
-            .terminal_mailbox_pending
-            == 1
-        {
-            terminal_visible = true;
-            break;
-        }
-        std::thread::yield_now();
-    }
+    lane_done_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("provider lane must finish after transferring its terminal result");
+    let terminal_visible = CapabilityScheduler::scheduling_snapshot(catalog.as_ref())
+        .event_queues
+        .terminal_mailbox_pending
+        == 1;
     assert!(
         terminal_visible,
         "provider must transfer its terminal result"
     );
-    let mut worker_reaped = false;
-    for _ in 0..10_000 {
-        if workers.reap_finished() == 1 {
-            worker_reaped = true;
-            break;
-        }
-        std::thread::yield_now();
-    }
+    let worker_reaped = crate::wait_for!("disconnected idle lane to terminate", || {
+        (workers.reap_finished() == 1).then_some(true)
+    });
     assert!(worker_reaped, "disconnected idle lane must terminate");
     let challenger = WorkerRuntime::with_quota(1, quota);
     challenger

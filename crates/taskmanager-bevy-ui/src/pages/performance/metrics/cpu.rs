@@ -1,6 +1,14 @@
 //! CPU detail-field projection over the cached shell snapshot.
 
 use super::*;
+use taskmanager_shell::presentation::cpu_idle_state_summary;
+use taskmanager_shell::presentation::cpu_interrupt_summary;
+use taskmanager_shell::presentation::cpu_power_limits_summary;
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::presentation::cpu_topology_summary;
+use taskmanager_shell::presentation::load_average_basis_summary;
+use taskmanager_shell::presentation::load_average_values_summary;
+use taskmanager_shell::presentation::pressure_summary;
 
 pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
     if let CpuField::Load = field {
@@ -12,8 +20,8 @@ pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> Str
             .map_or_else(missing_value, |load| {
                 format!(
                     "{} · {}",
-                    taskmanager_shell::presentation::load_average_values_summary(load),
-                    taskmanager_shell::presentation::load_average_basis_summary(load),
+                    load_average_values_summary(load),
+                    load_average_basis_summary(load),
                 )
             });
     }
@@ -49,25 +57,16 @@ pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> Str
             .as_ref()
             .and_then(|s| s.pressure.as_ref())
             .and_then(|p| p.cpu.current_value())
-            .map_or_else(
-                missing_value,
-                taskmanager_shell::presentation::pressure_summary,
-            ),
-        CpuField::Topology => {
-            taskmanager_shell::presentation::cpu_topology_summary(cpu).unwrap_or_else(missing_value)
-        }
-        CpuField::IdleStates => taskmanager_shell::presentation::cpu_idle_state_summary(cpu)
-            .unwrap_or_else(missing_value),
-        CpuField::PowerLimits => taskmanager_shell::presentation::cpu_power_limits_summary(cpu)
-            .unwrap_or_else(missing_value),
-        CpuField::Interrupts => taskmanager_shell::presentation::cpu_interrupt_summary(cpu)
-            .unwrap_or_else(missing_value),
+            .map_or_else(missing_value, pressure_summary),
+        CpuField::Topology => cpu_topology_summary(cpu).unwrap_or_else(missing_value),
+        CpuField::IdleStates => cpu_idle_state_summary(cpu).unwrap_or_else(missing_value),
+        CpuField::PowerLimits => cpu_power_limits_summary(cpu).unwrap_or_else(missing_value),
+        CpuField::Interrupts => cpu_interrupt_summary(cpu).unwrap_or_else(missing_value),
         // The always-mounted diagnostic row keeps the shared dash while no
         // package observed a counter (the renderer's fixed-row discipline);
         // the value itself is the shared shell fold.
         CpuField::ThermalThrottle => {
-            taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu)
-                .unwrap_or_else(missing_value)
+            cpu_thermal_throttle_summary(cpu).unwrap_or_else(missing_value)
         }
         CpuField::Load => missing_value(),
         CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),

@@ -25,6 +25,8 @@ use taskmanager_ui_contract::IconId;
 
 use crate::ThemeParams;
 use crate::TuiTheme;
+use taskmanager_application::i18n::Language;
+use taskmanager_core::core::alerts::{NotificationPolicy, QuietHours};
 
 /// Number of settings fields (row count of the form): 0 skin, 1 mode,
 /// 2 high contrast, 3 UI font, 4 mono font, 5 density, 6 language,
@@ -218,15 +220,13 @@ impl SettingsForm {
     /// The notification policy for the current form state (BN-07). Equal
     /// quiet hours mean "no quiet hours".
     #[must_use]
-    pub fn notification_policy(&self) -> taskmanager_core::core::alerts::NotificationPolicy {
-        taskmanager_core::core::alerts::NotificationPolicy {
+    pub fn notification_policy(&self) -> NotificationPolicy {
+        NotificationPolicy {
             enabled: self.notify_enabled,
-            cooldown_ms: taskmanager_core::core::alerts::NotificationPolicy::default().cooldown_ms,
-            quiet_hours: (self.quiet_start != self.quiet_end).then(|| {
-                taskmanager_core::core::alerts::QuietHours {
-                    start_minutes: u16::from(self.quiet_start) * 60,
-                    end_minutes: u16::from(self.quiet_end) * 60,
-                }
+            cooldown_ms: NotificationPolicy::default().cooldown_ms,
+            quiet_hours: (self.quiet_start != self.quiet_end).then(|| QuietHours {
+                start_minutes: u16::from(self.quiet_start) * 60,
+                end_minutes: u16::from(self.quiet_end) * 60,
             }),
         }
     }
@@ -349,15 +349,13 @@ impl SettingsForm {
     /// preference is recorded (the caller keeps the host-detected locale,
     /// per the `Config::language` contract).
     #[must_use]
-    pub fn language_for_token(
-        token: Option<&str>,
-    ) -> Option<taskmanager_application::i18n::Language> {
+    pub fn language_for_token(token: Option<&str>) -> Option<Language> {
         // Map through the parallel token table (single source with the form
         // indices) so an unknown spelling can never resolve to a language.
         let index = Self::language_index_for(token);
         token.map(|_| match index {
-            1 => taskmanager_application::i18n::Language::Zh,
-            _ => taskmanager_application::i18n::Language::En,
+            1 => Language::Zh,
+            _ => Language::En,
         })
     }
 }

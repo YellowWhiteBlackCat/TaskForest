@@ -23,6 +23,11 @@
 //! §8.1) — `render_td` only styles and paints the pre-folded strings.
 
 use std::rc::Rc;
+use taskmanager_shell::InfoTable;
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
@@ -265,8 +270,8 @@ impl TableDelegate for UsersDelegate {
             0 => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg))
                 .child(
                     div()
                         .flex_1()
@@ -278,33 +283,33 @@ impl TableDelegate for UsersDelegate {
                 div()
                     .flex()
                     .min_w(px(0.0))
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(theme.fg))
                     .child(div().flex_1().min_w(px(0.0)).truncate().child(
                         elements::highlighted_text(&vm.user, &self.query, &self.theme),
                     ))
             }
             2 => div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(vm.seat.clone()),
             3 => div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(vm.tty.clone()),
             // Remote: accent CPU token when remote (so it stands out), else dim.
             4 => {
                 let color = if remote { theme.cpu } else { theme.fg_dim };
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(color))
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(color))
                     .child(vm.remote_label)
             }
             _ => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex_1()
@@ -341,7 +346,7 @@ pub(crate) fn init_table_entity(
         }
         TableEvent::SortChanged { col_ix, sort } => {
             let column = state_ent.read(cx).delegate().info_sort_column(*col_ix);
-            this.apply_table_sort(taskmanager_shell::InfoTable::Users, column, *sort);
+            this.apply_table_sort(InfoTable::Users, column, *sort);
             cx.notify();
         }
         _ => {}
@@ -401,9 +406,7 @@ pub fn render_users(
     let header = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(action_bar(
             &theme,
             selected.as_ref(),
@@ -416,12 +419,10 @@ pub fn render_users(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .child(taskmanager_ui::icons_binding::icon(IconId::Users).size(px(14.0)))
+                .gap(definite_length(tokens::SPACE_6))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
+                .child(icon(IconId::Users).size(px(14.0)))
                 .child(format!("{} {}", count, i18n::t("users.sessions"))),
         );
     let body = if rows.is_empty() {
@@ -455,9 +456,12 @@ pub fn render_users(
             });
             // Table is size_full internally; wrap so it expands to fill the
             // remaining vertical space below the action bar + count header.
-            let mut body = div().flex_1().min_h(px(0.0)).flex().flex_col().gap(
-                taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8),
-            );
+            let mut body = div()
+                .flex_1()
+                .min_h(px(0.0))
+                .flex()
+                .flex_col()
+                .gap(definite_length(tokens::SPACE_8));
             if let Some(notice) = list_view::source_notice(
                 &theme,
                 sources,

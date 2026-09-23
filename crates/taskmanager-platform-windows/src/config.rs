@@ -1,6 +1,10 @@
 //! Windows selection of the user configuration path.
 
 use std::path::PathBuf;
+#[cfg(windows)]
+use taskmanager_windows_api::KnownFolder;
+#[cfg(windows)]
+use taskmanager_windows_api::known_folder_path;
 
 /// Build a persistent Windows AppData directory from `USERPROFILE` only when
 /// the profile is absolute. This is a compatibility fallback for restricted
@@ -29,27 +33,25 @@ fn absolute_directory(path: PathBuf) -> Option<PathBuf> {
 pub fn user_config_path() -> PathBuf {
     #[cfg(windows)]
     {
-        let base = taskmanager_windows_api::known_folder_path(
-            taskmanager_windows_api::KnownFolder::RoamingAppData,
-        )
-        .ok()
-        .or_else(|| {
-            std::env::var_os("APPDATA")
-                .map(PathBuf::from)
-                .and_then(absolute_directory)
-        })
-        .or_else(|| {
-            std::env::var_os("LOCALAPPDATA")
-                .map(PathBuf::from)
-                .and_then(absolute_directory)
-        })
-        .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .map(PathBuf::from)
-                .and_then(|profile| profile_app_data_directory(profile, "Roaming"))
-                .and_then(absolute_directory)
-        })
-        .unwrap_or_else(std::env::temp_dir);
+        let base = known_folder_path(KnownFolder::RoamingAppData)
+            .ok()
+            .or_else(|| {
+                std::env::var_os("APPDATA")
+                    .map(PathBuf::from)
+                    .and_then(absolute_directory)
+            })
+            .or_else(|| {
+                std::env::var_os("LOCALAPPDATA")
+                    .map(PathBuf::from)
+                    .and_then(absolute_directory)
+            })
+            .or_else(|| {
+                std::env::var_os("USERPROFILE")
+                    .map(PathBuf::from)
+                    .and_then(|profile| profile_app_data_directory(profile, "Roaming"))
+                    .and_then(absolute_directory)
+            })
+            .unwrap_or_else(std::env::temp_dir);
         base.join("TaskForest").join("config.json")
     }
 
@@ -84,22 +86,20 @@ pub fn user_config_path() -> PathBuf {
 pub fn user_history_dir() -> PathBuf {
     #[cfg(windows)]
     {
-        let base = taskmanager_windows_api::known_folder_path(
-            taskmanager_windows_api::KnownFolder::LocalAppData,
-        )
-        .ok()
-        .or_else(|| {
-            std::env::var_os("LOCALAPPDATA")
-                .map(PathBuf::from)
-                .and_then(absolute_directory)
-        })
-        .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .map(PathBuf::from)
-                .and_then(|profile| profile_app_data_directory(profile, "Local"))
-                .and_then(absolute_directory)
-        })
-        .unwrap_or_else(std::env::temp_dir);
+        let base = known_folder_path(KnownFolder::LocalAppData)
+            .ok()
+            .or_else(|| {
+                std::env::var_os("LOCALAPPDATA")
+                    .map(PathBuf::from)
+                    .and_then(absolute_directory)
+            })
+            .or_else(|| {
+                std::env::var_os("USERPROFILE")
+                    .map(PathBuf::from)
+                    .and_then(|profile| profile_app_data_directory(profile, "Local"))
+                    .and_then(absolute_directory)
+            })
+            .unwrap_or_else(std::env::temp_dir);
         base.join("TaskForest").join("history")
     }
 
@@ -128,7 +128,8 @@ pub fn user_history_dir() -> PathBuf {
 /// typed absence rather than silently changing an existing preference.
 #[must_use]
 pub fn user_locale_name() -> Option<String> {
-    taskmanager_windows_api::user_locale_name().ok()
+    use taskmanager_windows_api::user_locale_name;
+    user_locale_name().ok()
 }
 
 #[cfg(test)]

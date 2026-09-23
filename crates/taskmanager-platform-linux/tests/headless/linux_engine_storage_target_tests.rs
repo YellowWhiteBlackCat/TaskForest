@@ -1,9 +1,10 @@
 use taskmanager_core::{DeviceGeneration, StorageDeviceKind, StorageInterconnect, StorageProtocol};
 
 use super::*;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn disk(id: &str, generation: u64, locator: &str) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id(id.into())
         .device_generation(DeviceGeneration::new(generation))
         .name(locator.into())

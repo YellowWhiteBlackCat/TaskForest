@@ -9,6 +9,33 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+// Linux-only dependency: the bridge exists only on Linux, and the type alias
+// below is the only consumer.
+#[cfg(target_os = "linux")]
+use taskmanager_accessibility_linux::LinuxAccessKitBridge;
+use taskmanager_application::AlertSuggestionWindow;
+use taskmanager_core::core::config::MOTION_NORMAL;
+use taskmanager_core::core::time::LocalTimeRules;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_core::core::tray::TrayEvent;
+use taskmanager_platform_contract::InstanceEvent;
+use taskmanager_platform_contract::InstanceGuard;
+use taskmanager_platform_contract::TrayController;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::SortDir;
+use taskmanager_shell::SystemProjectionStore;
+use taskmanager_shell::fixture::demo_direct_track;
+use taskmanager_shell::fixture::demo_telemetry;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
+use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
+use taskmanager_ui::inputs::switch::SwitchState;
+use taskmanager_ui::overlays::toast::ToastState;
+#[cfg(not(target_os = "linux"))]
+use taskmanager_ui_contract::DetachedAccessibilityBridge;
+use taskmanager_ui_contract::SemanticSnapshot;
 
 use taskmanager_ui::data::table::TableState;
 use taskmanager_ui::inputs::slider::SliderState;
@@ -54,9 +81,9 @@ use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetrySt
 /// is the real `accesskit_unix` adapter; elsewhere it is the contract's honest
 /// detached bridge. Both implement `AccessibilityBridge`.
 #[cfg(target_os = "linux")]
-type AppAccessibilityBridge = taskmanager_accessibility_linux::LinuxAccessKitBridge;
+type AppAccessibilityBridge = LinuxAccessKitBridge;
 #[cfg(not(target_os = "linux"))]
-type AppAccessibilityBridge = taskmanager_ui_contract::DetachedAccessibilityBridge;
+type AppAccessibilityBridge = DetachedAccessibilityBridge;
 
 mod a11y;
 pub mod alert_ui;
@@ -162,7 +189,7 @@ pub struct RootView {
     pub(crate) command_router: Option<CommandRouter>,
     /// Immutable native local-time rules injected at composition startup.
     /// Projection/render paths never discover host files or environment state.
-    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: LocalTimeRulesObservation,
     /// The selected surface role is frontend composition state, not business
     /// state. Standalone is the default so existing desktop launches retain
     /// the complete application shell; the compact widget branch is only
@@ -213,8 +240,7 @@ pub struct RootView {
     /// `Entity<SwitchState>` owns the `on` flag and focus handle, so two
     /// windows' toggles never share state (same ownership rule as
     /// `settings_slider`).
-    pub settings_switches:
-        HashMap<&'static str, Entity<taskmanager_ui::inputs::switch::SwitchState>>,
+    pub settings_switches: HashMap<&'static str, Entity<SwitchState>>,
     /// Stable per-window handles for every long-form modal body. The dialogs
     /// share one bounded viewport + pinned-rail component but never share
     /// scroll position with each other or with another window.
@@ -259,8 +285,7 @@ pub struct RootView {
     /// visible tail at the graph element, so sliding and the y-ceiling keep
     /// reading the full retained window exactly as before the single-track
     /// convergence (ADR-034 GPU chart-metric sampling).
-    pub(in crate::gpui_app) live_graph_history:
-        taskmanager_telemetry_store::live_graph::LiveGraphHistory,
+    pub(in crate::gpui_app) live_graph_history: LiveGraphHistory,
     /// Frontend-retained write capability. Native providers never receive it.
     pub(crate) telemetry_ingestor: CorrelatedSystemTelemetryIngestor,
     /// Next-start preference plus this process's typed, boot-fixed history
@@ -277,14 +302,12 @@ pub struct RootView {
     pub telemetry_refresh_policy: TelemetryRefreshPolicy,
     /// The spawned system tray (ADR-032); `None` when the platform cannot
     /// host one (typed failure at spawn) or the tray was not started.
-    pub(crate) tray_controller: Option<Box<dyn taskmanager_platform_contract::TrayController>>,
+    pub(crate) tray_controller: Option<Box<dyn TrayController>>,
     /// The primary single-instance guard (ADR-032 follow-up); `Some` only
     /// when this process owns the instance. Held for the process lifetime.
-    pub(crate) instance_guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
-    pub(crate) instance_rx:
-        Option<std::sync::mpsc::Receiver<taskmanager_platform_contract::InstanceEvent>>,
-    pub(crate) tray_events_rx:
-        Option<std::sync::mpsc::Receiver<taskmanager_core::core::tray::TrayEvent>>,
+    pub(crate) instance_guard: Option<Box<dyn InstanceGuard>>,
+    pub(crate) instance_rx: Option<std::sync::mpsc::Receiver<InstanceEvent>>,
+    pub(crate) tray_events_rx: Option<std::sync::mpsc::Receiver<TrayEvent>>,
     materialized: projection_materialization::ProjectionMaterialization,
     pub selected: SelectedDevice,
     /// Stable hardware identity behind an index-based view selection. The ID is
@@ -306,7 +329,7 @@ pub struct RootView {
     /// Narrow renderer-neutral evidence window for alert and SMART suggestions.
     /// Live graph facts are read from the correlated `TelemetryStore`; this
     /// window must not become a second chart-history authority (ADR-027).
-    pub smart_history: taskmanager_application::AlertSuggestionWindow,
+    pub smart_history: AlertSuggestionWindow,
     /// Private owner of every revision/fingerprint-keyed renderer projection.
     /// Callers receive immutable `Rc` snapshots; no `RefCell` guard escapes.
     projection_caches: projection_caches::GpuiProjectionCaches,
@@ -373,7 +396,7 @@ pub struct RootView {
     /// action (e.g. `"Location unavailable"` from "Open file location" when the exe
     /// path can't be resolved). Rendered as a deferred top-center toast (mirrors the
     /// Paused badge); cleared at the start of the next `apply_proc_action`.
-    pub local_feedback_toast: Option<Entity<taskmanager_ui::overlays::toast::ToastState>>,
+    pub local_feedback_toast: Option<Entity<ToastState>>,
     /// Dismiss subscription for the current feedback toast (cleared when it
     /// auto-dismisses or is replaced).
     pub local_feedback_subscription: Option<Subscription>,
@@ -490,13 +513,13 @@ pub struct RootView {
     /// The exact semantic snapshot most recently accepted by the linked
     /// accessibility bridge. Inbound AT actions validate against this frozen
     /// revision before they can touch selection or surfaces.
-    pub(crate) a11y_snapshot: Option<taskmanager_ui_contract::SemanticSnapshot>,
+    pub(crate) a11y_snapshot: Option<SemanticSnapshot>,
 }
 
 impl RootView {
     /// Immutable canonical facts owned by the shell direct-track component.
     #[must_use]
-    pub(crate) const fn projection(&self) -> &taskmanager_shell::SystemProjectionStore {
+    pub(crate) const fn projection(&self) -> &SystemProjectionStore {
         self.shell.projection()
     }
 
@@ -518,7 +541,7 @@ impl RootView {
         String,
     ) {
         let (sort_col, sort_dir) = self.shell.processes.sort();
-        let sort_asc = matches!(sort_dir, taskmanager_shell::SortDir::Asc);
+        let sort_asc = matches!(sort_dir, SortDir::Asc);
         let filter = self.shell.processes.status_filter();
         let query = self.shell.processes.query().trim().to_owned();
         let units = self.display_units();
@@ -558,7 +581,7 @@ impl RootView {
         let process_identities = std::rc::Rc::new(
             rows.iter()
                 .filter_map(|row| match row.selection_key {
-                    Some(taskmanager_shell::ProcessRowId::Process(identity)) => Some(identity),
+                    Some(ProcessRowId::Process(identity)) => Some(identity),
                     _ => None,
                 })
                 .collect::<Vec<_>>(),
@@ -587,9 +610,8 @@ impl RootView {
         self.projection_caches.application_count()
     }
     pub fn new(theme: Theme, cx: &mut Context<Self>) -> Self {
-        let (telemetry, telemetry_ingestor) = TelemetryStore::shared_with_correlated_ingestion(
-            taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
-        );
+        let (telemetry, telemetry_ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
         Self::new_inner(
             theme,
             telemetry,
@@ -607,7 +629,7 @@ impl RootView {
     /// platform client, configuration worker, history writer, tray or helper
     /// is created by this constructor.
     pub(crate) fn new_demo(theme: Theme, cx: &mut Context<Self>) -> Self {
-        let (telemetry, telemetry_ingestor) = taskmanager_shell::fixture::demo_telemetry();
+        let (telemetry, telemetry_ingestor) = demo_telemetry();
         let mut view = Self::new_inner(
             theme,
             telemetry,
@@ -617,21 +639,18 @@ impl RootView {
             crate::window_presentation::GpuiSurfaceRole::Standalone,
             cx,
         );
-        view.shell = taskmanager_shell::fixture::demo_direct_track();
+        view.shell = demo_direct_track();
         let projection = view.shell.projection().clone();
         view.materialized.seed_from_projection(&projection);
         view.telemetry_frame_state = TelemetryFrameState::Ready;
-        view.local_time_rules = taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        );
+        view.local_time_rules = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
         if let Some(snapshot) = projection.snapshot.as_ref() {
             view.smart_history.record_snapshot(snapshot);
         }
         view.shell.report_notice(
-            taskmanager_shell::FeedbackSource::Demo,
-            taskmanager_shell::FeedbackSeverity::Info,
-            taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+            FeedbackSource::Demo,
+            FeedbackSeverity::Info,
+            FeedbackLifecycle::UntilReplaced,
             i18n::t("demo.no_host_actions"),
         );
         view
@@ -691,16 +710,15 @@ impl RootView {
         surface_role: crate::window_presentation::GpuiSurfaceRole,
         cx: &mut Context<Self>,
     ) -> Self {
+        use taskmanager_ui::init;
+
         let live_graph_history =
-            taskmanager_telemetry_store::live_graph::LiveGraphHistory::from_store(
-                telemetry.clone(),
-                taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
-            );
+            LiveGraphHistory::from_store(telemetry.clone(), MAX_HISTORY_CAPACITY);
         // Own UI layer bootstrap: focus registry + input/dialog/popup/table/tree
         // keymaps. The startup path already ran it; tests constructing RootView
         // directly get it here. Idempotent (P6: replaces the old
         // `gpui_component::init`).
-        taskmanager_ui::init(cx);
+        init(cx);
         let capture_evidence = CaptureEvidence::from_environment();
         capture_evidence.mark_theme(&theme);
         // Linux/Wayland: the window surface is transparent and the chrome
@@ -716,9 +734,7 @@ impl RootView {
         Self {
             theme,
             command_router: default_router().ok(),
-            local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
-                0,
-            ),
+            local_time_rules: LocalTimeRulesObservation::unsupported(0),
             surface_role,
             presentation: presentation_preferences::PresentationPreferences::default(),
             nav_orientation: NavOrientation::Horizontal,
@@ -742,7 +758,7 @@ impl RootView {
             live_graph_history,
             telemetry_ingestor,
             history_runtime: history_runtime::HistoryRuntimeState::default(),
-            motion_token: taskmanager_core::core::config::MOTION_NORMAL.to_string(),
+            motion_token: MOTION_NORMAL.to_string(),
             projection_caches: projection_caches::GpuiProjectionCaches::default(),
             graph_cache: graph::new_graph_cache(),
             system_history_ingestion_diagnostics: Vec::new(),
@@ -760,7 +776,7 @@ impl RootView {
             platform,
             platform_failures: Vec::new(),
             process_tooltip_index: ProcessTooltipIndex::default(),
-            smart_history: taskmanager_application::AlertSuggestionWindow::new(),
+            smart_history: AlertSuggestionWindow::new(),
             cpu_core_history: CpuHistoryCache::new(),
             memory_history: MemoryHistoryCache::new(),
             shell,

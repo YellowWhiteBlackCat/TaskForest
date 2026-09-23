@@ -17,6 +17,16 @@ use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::NetworkTelemetryProvider;
 
 use super::{NETWORK_TELEMETRY_PROVIDER, available_source, unavailable_source};
+use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskmanager_core::DeviceId;
+use taskmanager_core::DeviceLifecycleRegistry;
+use taskmanager_core::DeviceRefreshOutcome;
+use taskmanager_core::DeviceState;
+use taskmanager_core::DeviceStatus;
+use taskmanager_windows_api::WindowsAdapterType;
+use taskmanager_windows_api::WindowsApiError;
+use taskmanager_windows_api::WindowsNetworkAdapter;
+use taskmanager_windows_api::enumerate_network_adapters;
 
 /// Network throughput and adapter metadata from safe sysinfo/native sources.
 /// Per-interface rates are counter deltas over the refresh interval. Wireless
@@ -27,7 +37,7 @@ pub struct WinNetworkTelemetryProvider {
     networks: sysinfo::Networks,
     rate_counters: HashMap<String, (CumulativeCounter, CumulativeCounter)>,
     rate_started_at: Instant,
-    lifecycles: taskmanager_core::DeviceLifecycleRegistry,
+    lifecycles: DeviceLifecycleRegistry,
 }
 
 impl WinNetworkTelemetryProvider {
@@ -36,9 +46,7 @@ impl WinNetworkTelemetryProvider {
             networks: sysinfo::Networks::new_with_refreshed_list(),
             rate_counters: HashMap::new(),
             rate_started_at: Instant::now(),
-            lifecycles: taskmanager_core::DeviceLifecycleRegistry::new(
-                taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS,
-            ),
+            lifecycles: DeviceLifecycleRegistry::new(DEFAULT_DEVICE_ABSENCE_RETENTION_MS),
         }
     }
 }
@@ -50,22 +58,19 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
     ) -> Result<NetworkTelemetryObservation, ProviderFailure> {
         self.networks.refresh(true);
         self.lifecycles.begin_refresh();
-        let (adapter_facts, adapter_failure) =
-            match taskmanager_windows_api::enumerate_network_adapters() {
-                Ok(adapters) => (
-                    Some(
-                        adapters
-                            .into_iter()
-                            .map(|adapter| (adapter.name.clone(), adapter))
-                            .collect::<HashMap<_, _>>(),
-                    ),
-                    None,
+        let (adapter_facts, adapter_failure) = match enumerate_network_adapters() {
+            Ok(adapters) => (
+                Some(
+                    adapters
+                        .into_iter()
+                        .map(|adapter| (adapter.name.clone(), adapter))
+                        .collect::<HashMap<_, _>>(),
                 ),
-                Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
-                    (None, Some(FailureKind::Unsupported))
-                }
-                Err(_) => (None, Some(FailureKind::TemporarilyUnavailable)),
-            };
+                None,
+            ),
+            Err(WindowsApiError::Unsupported) => (None, Some(FailureKind::Unsupported)),
+            Err(_) => (None, Some(FailureKind::TemporarilyUnavailable)),
+        };
         let counter_at_ms =
             u64::try_from(self.rate_started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
         let mut metrics = Vec::new();
@@ -75,7 +80,7 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
                 continue;
             }
             let device_id = format!("windows:nic:{name}");
-            let device_state = taskmanager_core::DeviceState::healthy(observed_at_ms);
+            let device_state = DeviceState::healthy(observed_at_ms);
             let lifecycle =
                 self.lifecycles
                     .observe(device_id.as_str(), device_state, observed_at_ms);
@@ -106,17 +111,13 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
                             || a.description.contains(&name)
                             || name.contains(&a.name)
                             || (name.to_lowercase().contains("wi-fi")
-                                && a.adapter_type
-                                    == taskmanager_windows_api::WindowsAdapterType::WiFi)
+                                && a.adapter_type == WindowsAdapterType::WiFi)
                             || (name.to_lowercase().contains("wlan")
-                                && a.adapter_type
-                                    == taskmanager_windows_api::WindowsAdapterType::WiFi)
+                                && a.adapter_type == WindowsAdapterType::WiFi)
                             || (name.to_lowercase().contains("ethernet")
-                                && a.adapter_type
-                                    == taskmanager_windows_api::WindowsAdapterType::Ethernet)
+                                && a.adapter_type == WindowsAdapterType::Ethernet)
                             || (name.contains("以太网")
-                                && a.adapter_type
-                                    == taskmanager_windows_api::WindowsAdapterType::Ethernet)
+                                && a.adapter_type == WindowsAdapterType::Ethernet)
                     })
                 })
             });
@@ -138,20 +139,12 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
             let (ipv4_addr, ipv6_addr) = addresses(data.ip_networks());
 
             let adapter_type = match adapter.map(|a| a.adapter_type) {
-                Some(taskmanager_windows_api::WindowsAdapterType::WiFi) => NetworkAdapterType::WiFi,
-                Some(taskmanager_windows_api::WindowsAdapterType::Ethernet) => {
-                    NetworkAdapterType::Ethernet
-                }
-                Some(taskmanager_windows_api::WindowsAdapterType::Vpn) => NetworkAdapterType::Vpn,
-                Some(taskmanager_windows_api::WindowsAdapterType::Virtual) => {
-                    NetworkAdapterType::Virtual
-                }
-                Some(taskmanager_windows_api::WindowsAdapterType::Loopback) => {
-                    NetworkAdapterType::Loopback
-                }
-                Some(taskmanager_windows_api::WindowsAdapterType::Other) => {
-                    NetworkAdapterType::Other
-                }
+                Some(WindowsAdapterType::WiFi) => NetworkAdapterType::WiFi,
+                Some(WindowsAdapterType::Ethernet) => NetworkAdapterType::Ethernet,
+                Some(WindowsAdapterType::Vpn) => NetworkAdapterType::Vpn,
+                Some(WindowsAdapterType::Virtual) => NetworkAdapterType::Virtual,
+                Some(WindowsAdapterType::Loopback) => NetworkAdapterType::Loopback,
+                Some(WindowsAdapterType::Other) => NetworkAdapterType::Other,
                 None => NetworkAdapterType::Unknown,
             };
 
@@ -193,17 +186,15 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
         }
 
         let outcome = if metrics.is_empty() {
-            taskmanager_core::DeviceRefreshOutcome::Unavailable(
-                taskmanager_core::DeviceStatus::Stale,
-            )
+            DeviceRefreshOutcome::Unavailable(DeviceStatus::Stale)
         } else {
-            taskmanager_core::DeviceRefreshOutcome::Complete
+            DeviceRefreshOutcome::Complete
         };
         let _delta = self.lifecycles.finish_refresh(outcome, observed_at_ms);
         let lifecycles = self
             .lifecycles
             .iter()
-            .map(|(id, l)| (taskmanager_core::DeviceId::new(id), *l))
+            .map(|(id, l)| (DeviceId::new(id), *l))
             .collect::<std::collections::BTreeMap<_, _>>();
 
         let sources = if metrics.is_empty() {
@@ -224,9 +215,7 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
     }
 }
 
-fn adapter_link_speed_mbps(
-    adapter: &taskmanager_windows_api::WindowsNetworkAdapter,
-) -> Option<u64> {
+fn adapter_link_speed_mbps(adapter: &WindowsNetworkAdapter) -> Option<u64> {
     let bits_per_sec = adapter
         .receive_link_speed_bps
         .into_iter()

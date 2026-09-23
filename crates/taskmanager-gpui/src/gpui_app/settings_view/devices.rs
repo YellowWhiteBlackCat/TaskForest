@@ -4,6 +4,9 @@
 //! while the presentation layer controls visibility.
 
 use std::collections::HashMap;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{Context, Div, Entity, InteractiveElement, IntoElement, ParentElement, Styled, div};
 
@@ -50,9 +53,7 @@ pub(super) fn devices_row(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(device_toggle(
             t,
             ent.clone(),
@@ -120,9 +121,7 @@ fn network_visibility_group(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .child(device_toggle(
             t,
             ent.clone(),
@@ -171,9 +170,7 @@ fn network_visibility_group(
             .into_iter()
             .map(|(id, device, label, on)| {
                 div()
-                    .pl(taskmanager_ui::theme_binding::definite_length(
-                        tokens::SPACE_16,
-                    ))
+                    .pl(definite_length(tokens::SPACE_16))
                     .child(device_toggle(
                         t,
                         ent.clone(),
@@ -211,8 +208,8 @@ fn device_toggle(
         .justify_between()
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(t.fg))
                 .child(spec.label),
         )
         .child(

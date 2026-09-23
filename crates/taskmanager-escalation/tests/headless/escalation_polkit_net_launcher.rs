@@ -9,6 +9,7 @@ use std::io::Read;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{SocketAddr, UnixStream};
 use std::time::{Duration, Instant};
+use taskmanager_fd_bridge::peer_credentials;
 
 /// This process's uid, learned through the same kernel seam production uses
 /// (`SO_PEERCRED` on a self-connected pair). fd-bridge's own tests anchor that
@@ -17,9 +18,7 @@ use std::time::{Duration, Instant};
 /// oracle here.
 fn own_uid() -> u32 {
     let (ours, _theirs) = UnixStream::pair().expect("unix pair");
-    taskmanager_fd_bridge::peer_credentials(&ours)
-        .expect("self credentials")
-        .uid
+    peer_credentials(&ours).expect("self credentials").uid
 }
 
 /// Spawn `sleep`-style stuck child, or `None` when the host lacks the binary

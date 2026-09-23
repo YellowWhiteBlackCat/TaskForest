@@ -6,7 +6,11 @@ use super::super::*;
 
 use crate::ui::process_menu::ProcessMenuAction;
 use taskmanager_application::AppAction;
+use taskmanager_application::PendingConfirmation;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::fixture_start_token;
 
 fn open_process_menu(app: &mut TuiApp) {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
@@ -22,7 +26,7 @@ fn open_process_menu(app: &mut TuiApp) {
 
 #[test]
 fn process_menu_offers_the_batch_control_vocabulary() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     open_process_menu(&mut app);
     let labels: Vec<&'static str> = crate::ui::process_menu::MENU_ACTIONS
@@ -178,9 +182,9 @@ fn end_process_tree_gates_the_shared_pending_batch_with_a_frozen_tree() {
             _ => {}
         }
     }
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(processes)),
+        ProjectionSeedFact::Processes(Some(processes)),
     );
 
     let index = crate::ui::process_menu::MENU_ACTIONS
@@ -323,11 +327,8 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
     );
     assert!(
         !app.shell.selected_identities().contains(
-            &ProcessLiveKey::from_parts(
-                expected,
-                taskmanager_test_support::fixture_start_token(expected)
-            )
-            .expect("non-zero parts")
+            &ProcessLiveKey::from_parts(expected, fixture_start_token(expected))
+                .expect("non-zero parts")
         )
     );
 }
@@ -452,7 +453,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
 
 #[test]
 fn b_key_opens_the_batch_menu_over_the_marked_set() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
 
@@ -515,7 +516,7 @@ fn b_key_opens_the_batch_menu_over_the_marked_set() {
 
 #[test]
 fn batch_menu_actions_route_through_the_shared_batch_path() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     use crate::ui::batch_menu::BatchMenuAction;
     // Suspend over a marked set uses the shared confirmation gate before it
     // emits the atomic ExecuteBatch intent.
@@ -674,7 +675,7 @@ fn overlay_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = ratatui::backend::TestBackend::new(width, height);
     let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
     terminal
@@ -861,7 +862,7 @@ fn end_task_arms_the_frozen_menu_row_not_the_flat_neighbor() {
     // emission, which the pending-gate assertion below is the oracle for.
     let _ = app.process_menu_select();
     match app.shell.pending_confirmation() {
-        Some(taskmanager_application::PendingConfirmation::EndTask(target)) => {
+        Some(PendingConfirmation::EndTask(target)) => {
             assert_eq!(
                 (target.name.as_str(), target.pid),
                 (frozen.0.as_str(), frozen.1),

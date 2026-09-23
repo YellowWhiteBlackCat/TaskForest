@@ -51,6 +51,7 @@ use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::window::{Role, TextRole};
+use taskmanager_shell::queue_effect;
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the
 /// observer component, so the observer's lifetime equals the page content's
@@ -111,7 +112,7 @@ fn alerts_fold_observer(
 ) {
     let mut client = runtime.shared.lock_client();
     for request in track.shell.drain_alert_notifications() {
-        taskmanager_shell::queue_effect(
+        queue_effect(
             &mut track.shell,
             &mut client,
             PlatformEffect::DesktopNotification(request),

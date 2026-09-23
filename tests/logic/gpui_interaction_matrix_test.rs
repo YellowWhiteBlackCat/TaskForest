@@ -8,10 +8,10 @@
 //! executable tests through nextest and verifies every discovered case received
 //! an `ok` event.
 //!
-//! Since the S5 retirement preparation the structural authority is the unified
+//! Since the S5 retirement the structural authority is the unified
 //! `scripts/parity/cross_frontend_matrix.tsv`, filtered to `frontend == "gpui"`.
-//! The per-frontend `scripts/gpui_interaction_matrix.tsv` stays committed as a
-//! compatibility view for the accept script only and is no longer read here.
+//! The per-frontend `scripts/gpui_interaction_matrix.tsv` is gone: the accept
+//! chain reads the unified matrix too (D6 phases 3-4).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

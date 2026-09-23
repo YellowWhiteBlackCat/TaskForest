@@ -4,9 +4,11 @@
 //! sidebar (`sidebar.rs` + `sidebar/captions.rs`).
 
 use super::*;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::metrics::{GpuMetrics, NetworkAdapterType};
 use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_core::core::units::format_quantity_with;
+use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::trend;
 use taskmanager_shell::presentation::{gpu_display_identity, missing_value};
 
@@ -108,9 +110,7 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                         .gpu_usage_pct_for(&gpu.device_id, gpu.device_generation.get()),
                     window,
                 );
-                let heading = gpu_display_identity(gpu)
-                    .headline
-                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE);
+                let heading = gpu_display_identity(gpu).headline.unwrap_or(MISSING_VALUE);
                 selector_instance(
                     IconId::Gpu,
                     heading,
@@ -238,7 +238,7 @@ fn selector_network_visible(show: &[bool; 10], adapter_type: NetworkAdapterType)
 fn cpu_selector_instance(
     app: &TuiApp,
     theme: TuiTheme,
-    snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
+    snapshot: &SystemSnapshot,
     glyphs: crate::TuiGlyphMode,
     window: usize,
 ) -> SelectorInstance {
@@ -268,7 +268,7 @@ fn cpu_selector_instance(
 fn memory_selector_instance(
     app: &TuiApp,
     theme: TuiTheme,
-    snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
+    snapshot: &SystemSnapshot,
     glyphs: crate::TuiGlyphMode,
     window: usize,
 ) -> SelectorInstance {

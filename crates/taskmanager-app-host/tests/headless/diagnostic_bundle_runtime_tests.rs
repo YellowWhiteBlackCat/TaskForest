@@ -4,6 +4,7 @@ use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
 
 use super::*;
+use taskmanager_application::DiagnosticBundleCompletion;
 
 fn plan(contents: &str) -> DiagnosticBundlePlan {
     DiagnosticBundlePlan::prepare(
@@ -22,7 +23,7 @@ fn test_directory(label: &str) -> PathBuf {
 
 fn wait_for_completion(
     session: &mut DiagnosticBundleSession<DiagnosticBundleClient>,
-) -> taskmanager_application::DiagnosticBundleCompletion {
+) -> DiagnosticBundleCompletion {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
         if let Some(completion) = session.drain().into_iter().next() {

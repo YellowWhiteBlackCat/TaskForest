@@ -24,6 +24,7 @@ use serde_json::json;
 use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::EscalationFeature;
 use taskmanager_escalation::polkit::PerfHelperOutcome;
+use taskmanager_escalation::polkit::invoke_perf_helper;
 
 /// Run the `--gpu-engines` mode against stdout: invoke the privileged helper
 /// through the per-feature gate and print the typed outcome as JSON. Returns
@@ -31,7 +32,7 @@ use taskmanager_escalation::polkit::PerfHelperOutcome;
 /// typed denial) is carried in the printed JSON, not in the process exit code,
 /// so a denial is honest output rather than a runtime error.
 pub fn run_gpu_engines() -> io::Result<()> {
-    let outcome = taskmanager_escalation::polkit::invoke_perf_helper();
+    let outcome = invoke_perf_helper();
     let document = render_outcome(&outcome);
     let stdout = io::stdout();
     let mut handle = stdout.lock();

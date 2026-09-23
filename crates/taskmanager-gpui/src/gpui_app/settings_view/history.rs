@@ -1,6 +1,9 @@
 //! Continuous durable-history preference row.
 
 use std::collections::HashMap;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div};
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
@@ -28,19 +31,17 @@ pub(super) fn history_persistence_row(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(theme.fg))
                         .child(i18n::t("settings.history_persistence")),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(i18n::t("settings.history_persistence_detail")),
                 ),
         )

@@ -38,6 +38,7 @@ use taskmanager_theme::{Theme, tokens};
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_runs};
 use crate::theme;
+use taskmanager_core::core::hardware::CpuType;
 
 /// Cells per row in the grid.
 const CELLS_PER_ROW: usize = 6;
@@ -163,12 +164,12 @@ fn core_grid_cell(
     index: usize,
     samples: Rc<[f32]>,
     theme_snapshot: &Theme,
-    core_type: Option<taskmanager_core::core::hardware::CpuType>,
+    core_type: Option<CpuType>,
 ) -> Elem<'static> {
     let type_suffix = match core_type {
-        Some(taskmanager_core::core::hardware::CpuType::Performance) => " (P)",
-        Some(taskmanager_core::core::hardware::CpuType::Efficient) => " (E)",
-        Some(taskmanager_core::core::hardware::CpuType::LowPower) => " (LP)",
+        Some(CpuType::Performance) => " (P)",
+        Some(CpuType::Efficient) => " (E)",
+        Some(CpuType::LowPower) => " (LP)",
         _ => "",
     };
     let label = format!("C{index:02}{type_suffix}");

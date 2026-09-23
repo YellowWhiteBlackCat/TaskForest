@@ -30,6 +30,7 @@ use taskmanager_shell::presentation::missing_value;
 // per ARCH.md §8.1; re-exported here so the segment module and its mounted
 // tests read one import surface.
 pub(crate) use super::system_dashboard_model::{DashboardSummaryModel, summary_model};
+use taskmanager_theme::Theme;
 
 /// The System-page dashboard segment's typed message vocabulary, carried by
 /// [`crate::app::Message::SystemDashboard`].
@@ -64,10 +65,7 @@ pub(crate) fn render_system_dashboard(
 
 /// The four summary value columns (CPU / memory / processes / active alerts),
 /// GPUI `summary_card` parity in one titled card.
-fn summary_card<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    model: &DashboardSummaryModel,
-) -> IcedElement<'a> {
+fn summary_card<'a>(theme_snapshot: &'a Theme, model: &DashboardSummaryModel) -> IcedElement<'a> {
     let muted = theme::muted_text_color(theme_snapshot);
     let alert_color = if model.active_alerts == 0 {
         muted
@@ -114,7 +112,7 @@ fn summary_card<'a>(
 /// The history-window selector: one choice pill per shared window, the
 /// selected window wearing the active pill.
 fn window_card<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     selected_window: ResourceHistoryWindow,
 ) -> IcedElement<'a> {
     let mut pills = row![].spacing(f32::from(tokens::SPACE_4));
@@ -138,10 +136,7 @@ fn window_card<'a>(
 /// projection, so the card lists the live active-alert mirror (real current
 /// facts) and renders the honest empty state otherwise — it never fabricates
 /// historical events.
-fn events_card<'a>(
-    app: &crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
-) -> IcedElement<'a> {
+fn events_card<'a>(app: &crate::IcedApp, theme_snapshot: &'a Theme) -> IcedElement<'a> {
     let muted = theme::muted_text_color(theme_snapshot);
     let lines = active_alert_lines(app);
     let mut list = column![].spacing(f32::from(tokens::SPACE_4));

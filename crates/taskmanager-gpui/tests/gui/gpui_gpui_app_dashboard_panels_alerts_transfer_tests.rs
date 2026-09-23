@@ -1,4 +1,5 @@
 use std::time::Duration;
+use taskmanager_core::core::alerts::AlertRuleConflictPolicy;
 
 use taskmanager_application::{
     AlertCenter, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
@@ -31,9 +32,7 @@ fn clipboard_adapter_round_trips_enabled_rules_and_replaces_id_conflicts() {
     center
         .edit_rules(ManagedAlertRuleEdit::Import {
             rules: managed_rules(imported),
-            mode: AlertRuleImportMode::Merge(
-                taskmanager_core::core::alerts::AlertRuleConflictPolicy::ReplaceExisting,
-            ),
+            mode: AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
         })
         .unwrap();
 

@@ -3,6 +3,7 @@ use gpui::{
     TestAppContext, VisualTestContext, Window, div, point, px, size,
 };
 use taskmanager_theme::Theme;
+use taskmanager_ui::init;
 use taskmanager_ui::primitives::selectable_text::SelectableText;
 
 const SAMPLE: &str = "alpha beta gamma";
@@ -21,7 +22,7 @@ impl Render for Harness {
 }
 
 fn mounted(cx: &mut TestAppContext) -> (gpui::WindowHandle<Harness>, VisualTestContext) {
-    cx.update(taskmanager_ui::init);
+    cx.update(init);
     let window = cx.add_window(|_window, _cx| Harness);
     cx.simulate_window_resize(window.into(), size(px(320.0), px(120.0)));
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
@@ -52,7 +53,7 @@ impl Render for SingleLineHarness {
 async fn single_line_readout_stays_bounded_but_select_all_copies_full_truth(
     cx: &mut TestAppContext,
 ) {
-    cx.update(taskmanager_ui::init);
+    cx.update(init);
     let window = cx.add_window(|_window, _cx| SingleLineHarness);
     cx.simulate_window_resize(window.into(), size(px(180.0), px(80.0)));
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
@@ -143,7 +144,7 @@ impl Render for MultiHarness {
 
 #[gpui::test]
 async fn a_window_paints_only_one_text_selection_at_a_time(cx: &mut TestAppContext) {
-    cx.update(taskmanager_ui::init);
+    cx.update(init);
     let window = cx.add_window(|_window, _cx| MultiHarness);
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();

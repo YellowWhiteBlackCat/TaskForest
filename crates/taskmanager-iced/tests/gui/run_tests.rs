@@ -1,4 +1,8 @@
 use super::*;
+// The desktop application id is asserted only under the Linux gate below.
+#[cfg(target_os = "linux")]
+use taskmanager_assets::product::ICED_APP_ID;
+use taskmanager_assets::product::ICED_NAME;
 
 #[test]
 fn demo_shape_is_available_without_a_platform_client() {
@@ -11,10 +15,7 @@ fn demo_shape_is_available_without_a_platform_client() {
 
 #[test]
 fn iced_uses_its_own_desktop_identity() {
-    assert_eq!(taskmanager_assets::product::ICED_NAME, "TaskForestI");
+    assert_eq!(ICED_NAME, "TaskForestI");
     #[cfg(target_os = "linux")]
-    assert_eq!(
-        platform_specific_settings().application_id,
-        taskmanager_assets::product::ICED_APP_ID
-    );
+    assert_eq!(platform_specific_settings().application_id, ICED_APP_ID);
 }

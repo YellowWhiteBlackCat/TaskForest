@@ -13,6 +13,9 @@ use taskmanager_core::core::sensors::{
 use taskmanager_shell::presentation::missing_value;
 
 use super::frame_text;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 /// A typed temperature reading in the wire shape the sensor-center provider
 /// publishes: an observed value or an explicit typed failure — never a
@@ -31,10 +34,9 @@ fn thermal_zone_reading(
             1_000,
         )
         .expect("valid thermal-zone fixture"),
-        None => SensorMeasurementObservation::unavailable(
-            descriptor,
-            taskmanager_core::core::failure::FailureKind::PermissionDenied,
-        ),
+        None => {
+            SensorMeasurementObservation::unavailable(descriptor, FailureKind::PermissionDenied)
+        }
     };
     SensorReading::from_measurement_observation(
         DeviceId::new(device_id),
@@ -69,9 +71,9 @@ fn fan_zone_reading(device_id: &str, channel: &str, label: &str, rpm: u64) -> Se
 fn fan_panel_traverses_every_thermal_zone_reading_and_names_its_source() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Fan;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![
@@ -117,16 +119,14 @@ fn fan_panel_traverses_every_thermal_zone_reading_and_names_its_source() {
 /// host — and the panel still states the fan absence honestly.
 #[test]
 fn fan_resource_stays_reachable_and_honest_from_thermal_zones_alone() {
-    let mut app = crate::TuiApp::from_shell(taskmanager_shell::ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut app = crate::TuiApp::from_shell(ShellApp::new());
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(
-            SystemSnapshot::default(),
-        ))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(SystemSnapshot::default()))),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![
@@ -173,9 +173,9 @@ fn fan_resource_stays_reachable_and_honest_from_thermal_zones_alone() {
 fn fan_panel_admits_the_system_thermal_group_only_as_a_whole_group() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Fan;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![

@@ -46,10 +46,7 @@ fn independent_targets_coexist_and_commit_without_cross_device_overwrite() {
         SmartCommitStatus::Applied
     );
     let snapshot = state.snapshot();
-    assert_eq!(
-        snapshot.revision,
-        taskmanager_application::SmartStateRevision::new(3)
-    );
+    assert_eq!(snapshot.revision, SmartStateRevision::new(3));
     assert_eq!(snapshot.jobs.len(), 2);
     assert_eq!(
         snapshot
@@ -90,7 +87,7 @@ fn restarting_one_target_invalidates_only_that_targets_inflight_poll() {
     assert_eq!(snapshot.jobs.len(), 2);
     assert_eq!(
         snapshot.revision,
-        taskmanager_application::SmartStateRevision::new(3),
+        SmartStateRevision::new(3),
         "superseded commit must not advance the authoritative projection"
     );
 }
@@ -185,10 +182,7 @@ fn exhausted_job_generation_fails_closed_without_retiring_current_jobs() {
         .install_started(observation("a", 1, "sda"), 2)
         .expect_err("generation exhaustion must reject installation");
 
-    assert_eq!(
-        error,
-        taskmanager_platform_contract::ProviderFailure::ProviderFault
-    );
+    assert_eq!(error, ProviderFailure::ProviderFault);
     assert!(state.contains(&current.installed.token));
     assert_eq!(state.snapshot().jobs.len(), 1);
 }
@@ -200,26 +194,26 @@ fn exhausted_projection_revision_rejects_every_mutation_without_partial_state_ch
         .install_started(observation("a", 1, "sda"), 1)
         .expect("current job");
     let original = state.snapshot();
-    state.revision = taskmanager_application::SmartStateRevision::new(u64::MAX);
+    state.revision = SmartStateRevision::new(u64::MAX);
     let saturated = state.snapshot();
     let mut refreshed = current.installed.observation.clone();
     refreshed.report.phase = SmartSelfTestPhase::Completed;
 
     assert_eq!(
         state.commit_observation(&current.installed.token, refreshed, 2),
-        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
+        Err(ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.stop_tracking(&current.installed.observation.target()),
-        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
+        Err(ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.prune_expired(100),
-        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
+        Err(ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.install_started(observation("a", 2, "sdb"), 3),
-        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
+        Err(ProviderFailure::ProviderFault)
     );
     assert_eq!(state.snapshot(), saturated);
     assert_eq!(state.snapshot().jobs, original.jobs);
@@ -238,7 +232,7 @@ fn tracked_job_limit_rejects_new_identity_but_allows_same_device_replacement() {
 
     assert_eq!(
         state.install_started(observation("c", 1, "sdc"), 2),
-        Err(taskmanager_platform_contract::ProviderFailure::Rejected)
+        Err(ProviderFailure::Rejected)
     );
     assert_eq!(state.snapshot().jobs.len(), 2);
 
@@ -249,3 +243,5 @@ fn tracked_job_limit_rejects_new_identity_but_allows_same_device_replacement() {
     assert_eq!(state.snapshot().jobs.len(), 2);
 }
 use std::sync::Mutex;
+use taskmanager_application::SmartStateRevision;
+use taskmanager_platform_contract::ProviderFailure;

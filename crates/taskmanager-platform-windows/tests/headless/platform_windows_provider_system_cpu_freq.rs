@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 
 #[test]
 fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
@@ -17,7 +18,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
     );
     assert_eq!(
         full.per_core_frequency_group.availability(),
-        taskmanager_core::ScalarAvailability::Available
+        ScalarAvailability::Available
     );
     assert_eq!(full.frequency_mhz.current_value().copied(), Some(2700));
     assert_eq!(full.max_frequency_mhz.current_value().copied(), Some(5_000));
@@ -26,7 +27,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
         full.per_core_frequency_group
             .last_known_observations()
             .iter()
-            .all(|obs| obs.availability() == taskmanager_core::ScalarAvailability::Available)
+            .all(|obs| obs.availability() == ScalarAvailability::Available)
     );
 
     let partial = CpuScalarObservationFactory::build(
@@ -38,7 +39,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
     );
     assert!(matches!(
         partial.per_core_frequency_group.availability(),
-        taskmanager_core::ScalarAvailability::Partial(_)
+        ScalarAvailability::Partial(_)
     ));
     assert_eq!(partial.frequency_mhz.current_value().copied(), Some(2700));
 
@@ -48,7 +49,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
         CpuScalarObservationFactory::build(usages, &[None, None, None, None], None, 1_000, true);
     assert_eq!(
         none.per_core_frequency_group.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
     assert_eq!(none.frequency_mhz.current_value(), None);
 }
@@ -70,7 +71,7 @@ fn live_win_cpu_provider_refresh() {
                 .scalar_observations()
                 .global_usage_pct
                 .availability(),
-            taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+            ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
         ),
         "usage before the second sample is honestly unavailable"
     );
@@ -100,7 +101,7 @@ fn live_win_cpu_provider_refresh() {
             .scalar_observations()
             .global_usage_pct
             .availability(),
-        taskmanager_core::ScalarAvailability::Available
+        ScalarAvailability::Available
     );
     // The power overlay is a Windows-only native source: off-Windows the
     // energy preference must be an honest None, never a fabricated default.

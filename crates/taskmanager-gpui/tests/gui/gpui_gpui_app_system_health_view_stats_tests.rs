@@ -1,8 +1,11 @@
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::storage_health::FilesystemBackingKind;
 use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthStatus, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 use super::{SensorGroup, SystemHealthText, filesystem_capacity, sensor_rows, sensor_value_vm};
 
@@ -181,7 +184,7 @@ fn sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source() {
 #[test]
 fn filesystem_capacity_folds_matching_disk_and_reports_missing_states() {
     let now = 1_700_000_000_000;
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .device_id("disk:stats".into())
         .device_state(DeviceState::healthy(now))
         .name("sda".into())
@@ -193,7 +196,7 @@ fn filesystem_capacity_folds_matching_disk_and_reports_missing_states() {
         mount_point: mount.into(),
         source: None,
         fs_type: "ext4".into(),
-        backing_kind: taskmanager_core::core::storage_health::FilesystemBackingKind::PhysicalBlock,
+        backing_kind: FilesystemBackingKind::PhysicalBlock,
         read_only: None,
         error_count: None,
         inode_used: None,
@@ -216,7 +219,7 @@ fn filesystem_capacity_folds_matching_disk_and_reports_missing_states() {
 
     let mut zeroed = disk.clone();
     let mut observations = *zeroed.scalar_observations();
-    observations.capacity_bytes = taskmanager_core::core::ScalarObservation::available(0, now);
+    observations.capacity_bytes = ScalarObservation::available(0, now);
     zeroed.apply_scalar_observations(observations);
     assert_eq!(filesystem_capacity(&filesystem("/"), Some(&zeroed)), None);
 

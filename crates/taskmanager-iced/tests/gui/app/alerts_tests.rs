@@ -1,6 +1,13 @@
 use super::*;
 use crate::app::Message;
+use taskmanager_application::AppPage;
+use taskmanager_application::ManagedAlertRuleEditOutcome;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::alerts::AlertMetric;
+use taskmanager_core::core::alerts::import_alert_rules_json;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 #[test]
 fn opening_the_page_reads_rows_from_the_shared_alert_center() {
@@ -95,9 +102,7 @@ fn selecting_a_shared_page_closes_the_alerts_route() {
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
 
-    let _ = app.update(Message::SelectPage(
-        taskmanager_application::AppPage::System,
-    ));
+    let _ = app.update(Message::SelectPage(AppPage::System));
 
     assert!(!app.alerts_page_open());
 }
@@ -277,8 +282,7 @@ fn focusing_an_alerts_stop_updates_the_tracked_control() {
 fn export_alert_rules_returns_valid_json_matching_canonical_rules() {
     let app = crate::IcedApp::demo();
     let json = app.export_alert_rules().expect("export should succeed");
-    let imported = taskmanager_core::core::alerts::import_alert_rules_json(&json)
-        .expect("exported JSON must be valid");
+    let imported = import_alert_rules_json(&json).expect("exported JSON must be valid");
     let current_rules = app.alerts_rules();
     assert_eq!(imported.len(), current_rules.len());
     for (entry, managed) in imported.iter().zip(current_rules.iter()) {
@@ -311,10 +315,7 @@ fn import_alert_rules_replaces_rules_correctly() {
     let outcome = app
         .import_alert_rules(&json, AlertRuleImportMode::Replace)
         .expect("import should succeed");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
 
     let managed = app.alerts_rules();
     assert_eq!(managed.len(), 1);
@@ -362,10 +363,7 @@ fn import_alert_rules_merges_with_replace_existing_policy() {
             AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
         )
         .expect("merge import should succeed");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
 
     let managed = app.alerts_rules();
     assert_eq!(managed.len(), initial_count + 1);
@@ -398,26 +396,20 @@ fn import_alert_rules_rejects_invalid_json() {
 
 #[test]
 fn export_rules_message_reports_clipboard_notice() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     let _ = app.update(Message::Alerts(AlertsMessage::ExportRules));
 
     let notice = app.shell.feedback_notice().expect("notice was reported");
-    assert_eq!(
-        notice.source(),
-        taskmanager_shell::FeedbackSource::Clipboard
-    );
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.source(), FeedbackSource::Clipboard);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(app.shell.feedback_text().contains("Alert rules"));
 }
 
 #[test]
 fn import_rules_message_applies_and_reports_notice() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     use taskmanager_application::AlertRuleImportMode;
     use taskmanager_core::core::alerts::{
         AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
@@ -445,14 +437,8 @@ fn import_rules_message_applies_and_reports_notice() {
     assert_eq!(app.alerts_rules()[0].rule.id, "imported-cpu");
 
     let notice = app.shell.feedback_notice().expect("notice was reported");
-    assert_eq!(
-        notice.source(),
-        taskmanager_shell::FeedbackSource::Clipboard
-    );
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.source(), FeedbackSource::Clipboard);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(app.shell.feedback_text().contains("succeeded"));
 
     let _ = app.update(Message::Alerts(AlertsMessage::ImportRules {
@@ -460,10 +446,7 @@ fn import_rules_message_applies_and_reports_notice() {
         mode: AlertRuleImportMode::Replace,
     }));
     let err_notice = app.shell.feedback_notice().expect("error notice reported");
-    assert_eq!(
-        err_notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Error
-    );
+    assert_eq!(err_notice.severity(), FeedbackSeverity::Error);
 }
 
 #[test]
@@ -482,10 +465,7 @@ fn add_alert_rule_appends_new_rule_and_enables_it() {
         2.0,
     );
     let outcome = app.add_alert_rule(rule.clone()).expect("add succeeds");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
     assert_eq!(app.alerts_rules().len(), initial_count + 1);
     let added = app
         .alerts_rules()
@@ -496,10 +476,7 @@ fn add_alert_rule_appends_new_rule_and_enables_it() {
     assert!(added.enabled);
 
     let dup_res = app.add_alert_rule(rule);
-    assert!(matches!(
-        dup_res,
-        Err(taskmanager_core::core::alerts::AlertRuleTransferError::Conflict(_))
-    ));
+    assert!(matches!(dup_res, Err(AlertRuleTransferError::Conflict(_))));
 }
 
 #[test]
@@ -528,10 +505,7 @@ fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
         3.0,
     );
     let outcome = app.update_alert_rule(updated).expect("update succeeds");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
     let managed = app
         .alerts_rules()
         .iter()
@@ -555,10 +529,7 @@ fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
     let missing_outcome = app
         .update_alert_rule(non_existent)
         .expect("update call succeeds");
-    assert_eq!(
-        missing_outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::MissingTarget
-    );
+    assert_eq!(missing_outcome, ManagedAlertRuleEditOutcome::MissingTarget);
 }
 
 #[test]
@@ -569,24 +540,18 @@ fn remove_alert_rule_deletes_rule_by_id() {
     let outcome = app
         .remove_alert_rule("cpu-high".into())
         .expect("remove succeeds");
-    assert_eq!(
-        outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
-    );
+    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
     assert!(app.alerts_rules().iter().all(|m| m.rule.id != "cpu-high"));
 
     let missing_outcome = app
         .remove_alert_rule("cpu-high".into())
         .expect("remove call succeeds");
-    assert_eq!(
-        missing_outcome,
-        taskmanager_application::ManagedAlertRuleEditOutcome::MissingTarget
-    );
+    assert_eq!(missing_outcome, ManagedAlertRuleEditOutcome::MissingTarget);
 }
 
 #[test]
 fn add_rule_message_applies_and_reports_notice() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut app = crate::IcedApp::demo();
@@ -610,31 +575,19 @@ fn add_rule_message_applies_and_reports_notice() {
     );
 
     let notice = app.shell.feedback_notice().expect("success notice");
-    assert_eq!(
-        notice.source(),
-        taskmanager_shell::FeedbackSource::Interaction
-    );
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.source(), FeedbackSource::Interaction);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(app.shell.feedback_text().contains("succeeded"));
 
     let _ = app.update(Message::Alerts(AlertsMessage::AddRule { rule }));
     let err_notice = app.shell.feedback_notice().expect("error notice");
-    assert_eq!(
-        err_notice.source(),
-        taskmanager_shell::FeedbackSource::Interaction
-    );
-    assert_eq!(
-        err_notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Error
-    );
+    assert_eq!(err_notice.source(), FeedbackSource::Interaction);
+    assert_eq!(err_notice.severity(), FeedbackSeverity::Error);
 }
 
 #[test]
 fn remove_rule_message_applies_and_reports_notice() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
 
@@ -644,26 +597,14 @@ fn remove_rule_message_applies_and_reports_notice() {
     assert!(app.alerts_rules().iter().all(|m| m.rule.id != "cpu-high"));
 
     let notice = app.shell.feedback_notice().expect("success notice");
-    assert_eq!(
-        notice.source(),
-        taskmanager_shell::FeedbackSource::Interaction
-    );
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.source(), FeedbackSource::Interaction);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(app.shell.feedback_text().contains("succeeded"));
 
     let _ = app.update(Message::Alerts(AlertsMessage::RemoveRule {
         rule_id: "missing-rule".into(),
     }));
     let warn_notice = app.shell.feedback_notice().expect("warning notice");
-    assert_eq!(
-        warn_notice.source(),
-        taskmanager_shell::FeedbackSource::Interaction
-    );
-    assert_eq!(
-        warn_notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Warning
-    );
+    assert_eq!(warn_notice.source(), FeedbackSource::Interaction);
+    assert_eq!(warn_notice.severity(), FeedbackSeverity::Warning);
 }

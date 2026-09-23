@@ -2,6 +2,17 @@
 //! resource-digit selector.
 
 use super::super::*;
+use taskmanager_application::GpuEngineRowsState;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskmanager_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
+};
+use taskmanager_shell::ShellKeyEvent;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]
 fn crossterm_keys_normalize_into_shared_command_vocabulary() {
@@ -11,10 +22,7 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     );
     assert_eq!(
         key_to_terminal(alt_two),
-        Some(taskmanager_shell::ShellKeyEvent::new(
-            KeyCode::Digit2,
-            Modifiers::ALT
-        ))
+        Some(ShellKeyEvent::new(KeyCode::Digit2, Modifiers::ALT))
     );
     let back_tab = KeyEvent::new(
         ratatui::crossterm::event::KeyCode::BackTab,
@@ -22,10 +30,7 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     );
     assert_eq!(
         key_to_terminal(back_tab),
-        Some(taskmanager_shell::ShellKeyEvent::new(
-            KeyCode::Tab,
-            Modifiers::SHIFT
-        ))
+        Some(ShellKeyEvent::new(KeyCode::Tab, Modifiers::SHIFT))
     );
     // Home / End reach the shared vocabulary so the router's jump bindings
     // fire from the terminal.
@@ -34,20 +39,14 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
             ratatui::crossterm::event::KeyCode::Home,
             KeyModifiers::NONE
         )),
-        Some(taskmanager_shell::ShellKeyEvent::new(
-            KeyCode::Home,
-            Modifiers::NONE
-        ))
+        Some(ShellKeyEvent::new(KeyCode::Home, Modifiers::NONE))
     );
     assert_eq!(
         key_to_terminal(KeyEvent::new(
             ratatui::crossterm::event::KeyCode::End,
             KeyModifiers::NONE
         )),
-        Some(taskmanager_shell::ShellKeyEvent::new(
-            KeyCode::End,
-            Modifiers::NONE
-        ))
+        Some(ShellKeyEvent::new(KeyCode::End, Modifiers::NONE))
     );
     // The full fixed-key surface normalizes onto the shared vocabulary: page
     // keys, refresh, navigation, search/quit/sort chords, dialog keys and the
@@ -135,7 +134,7 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     for (crossterm, key, shared, crossterm_modifiers) in cases {
         assert_eq!(
             key_to_terminal(KeyEvent::new(crossterm, crossterm_modifiers)),
-            Some(taskmanager_shell::ShellKeyEvent::new(key, shared)),
+            Some(ShellKeyEvent::new(key, shared)),
             "crossterm key {crossterm:?} must normalize to {key:?}"
         );
     }
@@ -194,7 +193,7 @@ fn alt_page_chords_cover_the_four_middle_routes() {
 
 #[test]
 fn prefix_jump_moves_the_canonical_cursor_to_the_first_name_match_and_extends_within_the_window() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     let _ = handle_key(
         &mut app,
@@ -437,10 +436,7 @@ fn f1_toggles_the_help_overlay_like_the_question_mark_binding() {
             ratatui::crossterm::event::KeyCode::F(1),
             KeyModifiers::NONE
         )),
-        Some(taskmanager_shell::ShellKeyEvent::new(
-            KeyCode::F1,
-            Modifiers::NONE
-        ))
+        Some(ShellKeyEvent::new(KeyCode::F1, Modifiers::NONE))
     );
 }
 
@@ -560,51 +556,40 @@ fn performance_digit_keys_select_a_resource_without_colliding_with_pages() {
     // The digit rail follows the VISIBLE devices: seed the demo with a
     // battery and a fan so the full seven-resource rail renders (the same
     // fixture enrichment iced's capture demo does).
-    let mut battery = taskmanager_core::core::power::BatteryInfo::new(
-        "battery:demo:BAT0",
-        taskmanager_core::core::device_state::DeviceState::healthy(1),
-    );
+    let mut battery = BatteryInfo::new("battery:demo:BAT0", DeviceState::healthy(1));
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
-        voltage_uv: taskmanager_core::core::metrics::ScalarObservation::available(12_000_000, 1),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(80, 1),
+        voltage_uv: ScalarObservation::available(12_000_000, 1),
         ..Default::default()
     });
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(
-            taskmanager_core::core::power::PowerSupplySnapshot {
-                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
-                timestamp_ms: 1,
-                batteries: vec![battery],
-                ..Default::default()
-            },
-        )),
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+            state: DeviceState::healthy(1),
+            timestamp_ms: 1,
+            batteries: vec![battery],
+            ..Default::default()
+        })),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(
-            taskmanager_core::core::sensors::SensorCenterSnapshot {
-                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
-                timestamp_ms: 1,
-                readings: vec![
-                    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
-                        "hwmon:demo:cpu".into(),
-                        "fan1".into(),
-                        "CPU Fan".into(),
-                        taskmanager_core::core::sensors::SensorMeasurementObservation::available(
-                            taskmanager_core::core::sensors::SensorDescriptor::fan_speed(
-                                taskmanager_core::core::sensors::SensorScale::IDENTITY,
-                            ),
-                            taskmanager_core::core::sensors::SensorMagnitude::Unsigned(1200),
-                            1,
-                        )
-                        .expect("valid fan fixture"),
-                    ),
-                ],
-                ..Default::default()
-            },
-        )),
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+            state: DeviceState::healthy(1),
+            timestamp_ms: 1,
+            readings: vec![SensorReading::from_measurement_observation(
+                "hwmon:demo:cpu".into(),
+                "fan1".into(),
+                "CPU Fan".into(),
+                SensorMeasurementObservation::available(
+                    SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+                    SensorMagnitude::Unsigned(1200),
+                    1,
+                )
+                .expect("valid fan fixture"),
+            )],
+            ..Default::default()
+        })),
     );
     assert_eq!(app.page(), AppPage::Performance);
     assert_eq!(app.perf_device, crate::PerfDevice::Cpu);
@@ -806,7 +791,7 @@ fn e_key_toggles_the_per_engine_gpu_session_on_the_gpu_device() {
     assert_eq!(app.perf_device, crate::PerfDevice::Cpu);
     assert!(matches!(
         app.shell.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Closed
+        GpuEngineRowsState::Closed
     ));
 
     // Select the Gpu resource (digit 5), then `e` enables the session and
@@ -837,7 +822,7 @@ fn e_key_toggles_the_per_engine_gpu_session_on_the_gpu_device() {
     let _ = app.shell.begin_gpu_engine_rows_request(requested_device);
     assert!(matches!(
         app.shell.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Loading { .. }
+        GpuEngineRowsState::Loading { .. }
     ));
 
     // A second `e` stops the session and produces no request.
@@ -851,7 +836,7 @@ fn e_key_toggles_the_per_engine_gpu_session_on_the_gpu_device() {
     assert!(effect.is_none());
     assert!(matches!(
         app.shell.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Closed
+        GpuEngineRowsState::Closed
     ));
 
     // Off the Gpu device the toggle is a no-op.
@@ -871,7 +856,7 @@ fn e_key_toggles_the_per_engine_gpu_session_on_the_gpu_device() {
     );
     assert!(matches!(
         app.shell.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Closed
+        GpuEngineRowsState::Closed
     ));
 }
 

@@ -265,7 +265,7 @@ pub fn source_status_from_operation_failure(
         provider: failure
             .provider
             .clone()
-            .unwrap_or_else(|| taskmanager_core::ProviderId::borrowed("platform.runtime")),
+            .unwrap_or_else(|| ProviderId::borrowed("platform.runtime")),
         outcome: SourceOutcome::Unavailable(failure.kind),
         item_count,
     }

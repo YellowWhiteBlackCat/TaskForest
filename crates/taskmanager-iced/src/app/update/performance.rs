@@ -8,6 +8,7 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 
 use super::super::{IcedApp, Message, PerfDevice};
 use super::dispatch::UpdateDispatch;
+use taskmanager_platform_contract::CapabilityId;
 
 impl IcedApp {
     pub(super) fn reduce_performance_message(&mut self, message: Message) -> UpdateDispatch {
@@ -40,9 +41,9 @@ impl IcedApp {
                     present_gpu_engine_rows(
                         self.shell.gpu_engine_rows_state(),
                         id,
-                        self.shell.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
-                        ),
+                        self.shell
+                            .projection()
+                            .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
                     )
                     .action()
                 });

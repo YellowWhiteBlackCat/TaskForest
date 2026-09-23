@@ -1,6 +1,11 @@
 //! Apps page overview and control-band composition.
 
 use std::collections::HashSet;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px};
 use taskmanager_shell::ProcessStatusFilter;
@@ -50,20 +55,14 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
         .flex_col()
         .flex_1()
         .min_w(px(0.0))
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
+        .gap(definite_length(tokens::SPACE_2))
         .child(
             div()
                 .debug_selector(|| "tm-proc-overview-title".to_string())
                 .truncate()
-                .text_size(taskmanager_ui::theme_binding::absolute(
-                    ui_size.page_title_font_size(),
-                ))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(absolute(ui_size.page_title_font_size()))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(title),
         );
     identity = match presentation.overview() {
@@ -71,10 +70,8 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
             div()
                 .debug_selector(|| "tm-proc-overview-subtitle".to_string())
                 .truncate()
-                .text_size(taskmanager_ui::theme_binding::absolute(
-                    ui_size.header_font_size(),
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(absolute(ui_size.header_font_size()))
+                .text_color(hsla(theme.fg_dim))
                 .child({
                     let subtitle = i18n::t("proc.processes_running_subtitle")
                         .replace("{count}", &process_count.to_string());
@@ -96,9 +93,7 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
         .items_center()
         .w_full()
         .min_w(px(0.0))
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
+        .gap(definite_length(tokens::SPACE_16))
         .debug_selector(|| "tm-proc-overview".to_string())
         .child(identity)
         .child(
@@ -174,21 +169,13 @@ pub(super) fn process_control_chrome(
             .items_center()
             .w_full()
             .min_w(px(0.0))
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                presentation.control_gap(),
-            ))
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_2,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::card_radius(theme),
-            ))
+            .gap(definite_length(presentation.control_gap()))
+            .px(definite_length(tokens::SPACE_4))
+            .py(definite_length(tokens::SPACE_2))
+            .rounded(absolute(tokens::card_radius(theme)))
             .border_1()
-            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-            .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
+            .border_color(hsla(theme.border))
+            .bg(fill(theme.card_surface()))
             .debug_selector(|| "tm-proc-unified-controls".to_string())
             .child(actions)
             .child(secondary_controls()),
@@ -197,9 +184,7 @@ pub(super) fn process_control_chrome(
             .flex_col()
             .w_full()
             .min_w(px(0.0))
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                presentation.band_gap(),
-            ))
+            .gap(definite_length(presentation.band_gap()))
             .debug_selector(|| "tm-proc-stacked-controls".to_string())
             .child(actions)
             .child(secondary_controls()),

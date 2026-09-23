@@ -10,6 +10,7 @@ use taskmanager_theme::Theme;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::Message;
+use taskmanager_icons::asset_bytes;
 
 /// Render one semantic icon using the embedded SVG asset and a theme-derived
 /// tint. Missing optional assets degrade to a visible text marker rather than
@@ -20,7 +21,7 @@ pub(crate) fn icon<'a>(
     size: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let tint = crate::theme_binding::color(theme_snapshot.palette().fg);
-    let Some(bytes) = taskmanager_icons::asset_bytes(id) else {
+    let Some(bytes) = asset_bytes(id) else {
         return text("·")
             .size(size)
             .style(move |_theme| iced::widget::text::Style { color: Some(tint) })

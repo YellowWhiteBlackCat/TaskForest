@@ -7,6 +7,13 @@ use gpui::{
 };
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::fraction;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements::{self};
 use crate::gpui_app::root::{Hover, RootView};
@@ -120,24 +127,16 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
         .id("proc-sort-header")
         .flex()
         .items_center()
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            density.header_padding_y(),
-        ))
-        .text_size(taskmanager_ui::theme_binding::absolute(
-            ui_size.header_font_size(),
-        ))
-        .line_height(taskmanager_ui::theme_binding::fraction(
-            tokens::LINE_HEIGHT_HEADER,
-        ))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(density.header_padding_y()))
+        .text_size(absolute(ui_size.header_font_size()))
+        .line_height(fraction(tokens::LINE_HEIGHT_HEADER))
         .relative()
         // One hairline under the header separates chrome from primary content
         // (the shared taskmanager-ui Table paints the same border_b_1 under its
         // live header); without it body row 0 sits flush against the header.
         .border_b_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .border_color(hsla(theme.border))
         // Name: identity column — always visible (never in hidden_cols by
         // contract) and fixed as the leading navigation anchor.
         .child(name_header);
@@ -280,16 +279,10 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
                     // "CPU▼" and "Trend" don't visually touch (BorderBox keeps
                     // the outer 56px column boundary — and header/body
                     // alignment — unchanged).
-                    .pl(taskmanager_ui::theme_binding::definite_length(
-                        tokens::SPACE_4,
-                    ))
-                    .text_size(taskmanager_ui::theme_binding::font_size(
-                        tokens::FONT_CAPTION,
-                    ))
-                    .font_weight(taskmanager_ui::theme_binding::font_weight(
-                        tokens::FONT_WEIGHT_STRONG,
-                    ))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .pl(definite_length(tokens::SPACE_4))
+                    .text_size(font_size(tokens::FONT_CAPTION))
+                    .font_weight(font_weight(tokens::FONT_WEIGHT_STRONG))
+                    .text_color(hsla(theme.fg_dim))
                     .child(i18n::t("proc.trend")),
             );
     }
@@ -504,7 +497,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
                 .bottom_0()
                 .h(px(2.0))
                 .w(cursor_width)
-                .bg(taskmanager_ui::theme_binding::fill(theme.accent))
+                .bg(fill(theme.accent))
                 .opacity(0.8),
         );
     }
@@ -571,12 +564,8 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
         // Column gutter (owner-directed 2026-08-15): every header cell carries
         // the same inner padding as its body cells (`cells.rs`), so labels sit
         // over their column's content and adjacent columns read apart.
-        .pl(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .pr(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .pl(definite_length(tokens::SPACE_8))
+        .pr(definite_length(tokens::SPACE_8))
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
@@ -627,14 +616,10 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
         })
         .flex()
         .items_center()
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::small_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(bg))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(
-            tokens::FONT_WEIGHT_HEADER,
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(fg));
+        .rounded(absolute(tokens::small_radius(theme)))
+        .bg(fill(bg))
+        .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+        .text_color(hsla(fg));
     let cell = if numeric {
         cell.justify_end().font(mono_font_with_fallback(theme))
     } else {

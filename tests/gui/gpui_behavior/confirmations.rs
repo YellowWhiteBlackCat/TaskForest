@@ -14,6 +14,7 @@ use taskmanager_gpui::gpui_app::system_health_view::SmartSelfTestConfirmationReq
 use taskmanager_theme::Theme;
 
 use super::proc;
+use taskmanager_core::core::process::{ProcessBatchResult, ProcessBatchTargetResult};
 
 fn end_task_target() -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_process(&proc(4242, "important-worker"))
@@ -143,16 +144,13 @@ async fn completed_process_batch_history_exports_to_clipboard(cx: &mut TestAppCo
     win.update(cx, |view, _window, cx| {
         view.process_batch_history.record_result(
             123_456,
-            taskmanager_core::core::process::ProcessBatchResult {
+            ProcessBatchResult {
                 intent: ProcessBatchIntent {
                     action: ProcessBatchAction::Suspend,
                     targets: vec![identity.clone()],
                     scope: Default::default(),
                 },
-                targets: vec![(
-                    identity,
-                    taskmanager_core::core::process::ProcessBatchTargetResult::Applied,
-                )],
+                targets: vec![(identity, ProcessBatchTargetResult::Applied)],
             },
         );
         view.copy_process_batch_history(cx);

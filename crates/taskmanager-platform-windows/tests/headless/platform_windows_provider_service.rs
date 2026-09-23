@@ -1,7 +1,11 @@
 use super::*;
+use taskmanager_core::ServiceLogLevel;
+use taskmanager_core::ServiceLogLevelFilter;
 #[cfg(windows)]
 use taskmanager_core::ServiceLogState;
+use taskmanager_core::ServiceLogTimeFilter;
 use taskmanager_core::core::services::ServiceLogQuery;
+use taskmanager_windows_api::WindowsEventLogEntry;
 
 #[test]
 fn non_windows_service_inventory_is_isolated_and_typed() {
@@ -65,8 +69,8 @@ fn event_log_lanes_never_fabricate_messages() {
     let mut stream = WinServiceLogStreamProvider;
     let query = ServiceLogQuery {
         service_id: ServiceId::new("x"),
-        level: taskmanager_core::ServiceLogLevelFilter::All,
-        time: taskmanager_core::ServiceLogTimeFilter::All,
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
         after_cursor: None,
     };
     #[cfg(not(windows))]
@@ -124,27 +128,20 @@ fn windows_levels_map_onto_the_syslog_priority_scale_without_defaults() {
     assert_eq!(windows_level_priority(Some(99)), None);
     assert_eq!(
         priority_log_level(windows_level_priority(Some(4))),
-        taskmanager_core::ServiceLogLevel::Info
+        ServiceLogLevel::Info
     );
     assert_eq!(
         priority_log_level(windows_level_priority(None)),
-        taskmanager_core::ServiceLogLevel::Unknown
+        ServiceLogLevel::Unknown
     );
     // The level filters see the remapped priorities exactly like journalctl's.
-    assert!(
-        taskmanager_core::ServiceLogLevelFilter::Errors.matches(windows_level_priority(Some(2)))
-    );
-    assert!(
-        !taskmanager_core::ServiceLogLevelFilter::Errors.matches(windows_level_priority(Some(4)))
-    );
-    assert!(
-        taskmanager_core::ServiceLogLevelFilter::WarningsAndErrors
-            .matches(windows_level_priority(Some(3)))
-    );
+    assert!(ServiceLogLevelFilter::Errors.matches(windows_level_priority(Some(2))));
+    assert!(!ServiceLogLevelFilter::Errors.matches(windows_level_priority(Some(4))));
+    assert!(ServiceLogLevelFilter::WarningsAndErrors.matches(windows_level_priority(Some(3))));
 }
 
-fn sample_entry(message: &str, level: Option<u8>) -> taskmanager_windows_api::WindowsEventLogEntry {
-    taskmanager_windows_api::WindowsEventLogEntry {
+fn sample_entry(message: &str, level: Option<u8>) -> WindowsEventLogEntry {
+    WindowsEventLogEntry {
         record_id: 4242,
         timestamp_ms: Some(1_767_236_645_123),
         provider: Some("W32Time".to_string()),
@@ -166,7 +163,7 @@ fn event_entries_use_record_id_cursors_and_honest_message_fallbacks() {
         formatted[0].realtime_timestamp_micros,
         Some(1_767_236_645_123_000)
     );
-    assert_eq!(formatted[0].level, taskmanager_core::ServiceLogLevel::Info);
+    assert_eq!(formatted[0].level, ServiceLogLevel::Info);
 
     // Without a formatted message the rendered event data is shown verbatim;
     // with neither, an identification line — never invented content.

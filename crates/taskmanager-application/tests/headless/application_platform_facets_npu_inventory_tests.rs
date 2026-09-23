@@ -2,6 +2,7 @@ use taskmanager_core::DeviceId;
 use taskmanager_platform_contract::CapabilityRequest;
 
 use super::*;
+use taskmanager_core::NpuDevice;
 
 #[test]
 fn npu_inventory_request_owns_the_accelerator_npu_capability() {
@@ -14,10 +15,10 @@ fn npu_inventory_request_owns_the_accelerator_npu_capability() {
 #[test]
 fn update_events_only_accept_the_accelerator_npu_capability() {
     let update = NpuInventoryEvent::Update(NpuInventorySnapshot::discovered(
-        vec![taskmanager_core::NpuDevice {
+        vec![NpuDevice {
             device_id: DeviceId::new("accel0"),
             driver: Some("intel_vpu".to_owned()),
-            ..taskmanager_core::NpuDevice::default()
+            ..NpuDevice::default()
         }],
         7,
     ));

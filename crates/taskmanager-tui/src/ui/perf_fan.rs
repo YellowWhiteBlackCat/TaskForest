@@ -219,16 +219,20 @@ fn fan_lines(
     lines
 }
 
-/// The system thermal-zone group lines: the shared `common.temperature`
+/// The system thermal-zone group lines: the shared `common.thermal_zones`
 /// heading followed by exactly one row per `Temperature` reading in the shared
-/// sensor center, in projection order. Each row names the reading's own source
-/// label and renders the observed value through the shared
-/// [`temperature_c_precise`] spelling; an unread/failed zone keeps its named
-/// row with the shared dash, so a denied or cold channel never reads as a
-/// fabricated `0.0 °C`. A snapshot with no temperature channel folds to an
-/// empty list (the caller omits the whole group). This is the TUI twin of
-/// GPUI's health-page `sensor_rows(readings, SensorGroup::Temperature, ..)`
-/// and iced's `thermal_zone_rows` over the same typed facts.
+/// sensor center, in projection order. The heading deliberately does NOT reuse
+/// `common.temperature`: the fan block above already labels its same-device
+/// temperature channel with that quantity word (`Temperature Package`), so the
+/// system group names the surface it actually is instead of duplicating the
+/// quantity. Each row names the reading's own source label and renders the
+/// observed value through the shared [`temperature_c_precise`] spelling; an
+/// unread/failed zone keeps its named row with the shared dash, so a denied or
+/// cold channel never reads as a fabricated `0.0 °C`. A snapshot with no
+/// temperature channel folds to an empty list (the caller omits the whole
+/// group). This is the TUI twin of GPUI's health-page
+/// `sensor_rows(readings, SensorGroup::Temperature, ..)` and iced's
+/// `thermal_zone_rows` over the same typed facts.
 fn thermal_zone_lines(
     sensors: &SensorCenterSnapshot,
     theme: TuiTheme,
@@ -248,7 +252,7 @@ fn thermal_zone_lines(
         return rows;
     }
     let mut lines = vec![ratatui::text::Line::from(Span::styled(
-        t("common.temperature"),
+        t("common.thermal_zones"),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     ))];
     lines.append(&mut rows);

@@ -12,6 +12,7 @@ use taskmanager_platform_contract::{
 };
 
 use super::*;
+use taskmanager_application::window_capture::WindowCaptureRequest;
 
 static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
@@ -27,9 +28,7 @@ fn test_directory(label: &str) -> std::path::PathBuf {
         .join(format!("taskforest-window-capture-{label}-{sequence}"))
 }
 
-fn request(
-    path: std::path::PathBuf,
-) -> taskmanager_application::window_capture::WindowCaptureRequest {
+fn request(path: std::path::PathBuf) -> WindowCaptureRequest {
     let mut controller = WindowCaptureController::new();
     controller
         .begin(WindowCaptureTarget::path(path))

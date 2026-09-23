@@ -3,20 +3,29 @@
 //! keep both files under the source-line ceiling.
 
 use super::*;
+use taskmanager_application::AppAction;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedDomain;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn process_details_overlay_projects_frozen_and_live_facts() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::IcedApp::demo();
     app.shell.application.active_page = AppPage::Applications;
     assert!(app.shell.select_row(0));
-    let _ = app
-        .shell
-        .apply_action(taskmanager_application::AppAction::OpenProperties);
+    let _ = app.shell.apply_action(AppAction::OpenProperties);
     let _view = view(&app);
 
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let identity = shell
         .projection()
         .processes
@@ -67,8 +76,8 @@ fn process_details_overlay_projects_frozen_and_live_facts() {
 /// a real value.
 #[test]
 fn process_details_rows_read_canonical_observations() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
-    let shell = taskmanager_shell::demo_app();
+    set_language(Language::En);
+    let shell = demo_app();
     let zed = &shell
         .projection()
         .processes
@@ -96,16 +105,14 @@ fn process_details_rows_read_canonical_observations() {
 
     // Typed observations remain authoritative even when the provider-native
     // start token is unavailable.
-    let bare = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let bare = ProcessItemFixtureBuilder::new()
         .name("token-unavailable".into())
         .pid(4_242)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            None,
+            1,
+        ))
         .status("Sleeping".into())
         .current_cpu_percentage(11.0)
         .current_memory_bytes(512 * 1024 * 1024)
@@ -114,19 +121,17 @@ fn process_details_rows_read_canonical_observations() {
         .current_threads(9)
         .current_cpu_time_secs(120)
         .build();
-    let mut shell_bare = taskmanager_shell::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut shell_bare = demo_app();
+    seed_projection_fact(
         &mut shell_bare,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![bare.clone()])),
+        ProjectionSeedFact::Processes(Some(vec![bare.clone()])),
     );
     // The visible-projection memo keys on process_revision + source length;
     // replacing the list changes the length, and the explicit bump documents
     // the intent regardless of future memo-key changes.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell_bare,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
     let bare_identity = ProcessLiveKey::from_process(&bare).expect("bare identity");
     let bare_rows = overlays::property_rows(bare_identity, &shell_bare);
@@ -158,7 +163,7 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
         crate::app::FocusTarget::CancelServiceControl,
         crate::app::FocusTarget::ServiceAction {
             index: 3,
-            action: taskmanager_core::core::services::ServiceAction::Stop,
+            action: ServiceAction::Stop,
         },
         crate::app::FocusTarget::SettingsChoice {
             section: "mode",
@@ -177,7 +182,7 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
     assert_eq!(
         crate::focus::focus_id(crate::app::FocusTarget::ServiceAction {
             index: 3,
-            action: taskmanager_core::core::services::ServiceAction::Stop,
+            action: ServiceAction::Stop,
         }),
         "iced-service-action-3-Stop"
     );
@@ -190,9 +195,9 @@ fn info_header_sort_message_routes_to_the_shared_shell_sort_slot() {
     use taskmanager_shell::{InfoSortCol, InfoTable};
 
     let mut app = crate::IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             ServiceItem::from_inventory("", "zed.service", ServiceStatus::Inactive, "", "", "", ""),
             ServiceItem::from_inventory(
                 "",

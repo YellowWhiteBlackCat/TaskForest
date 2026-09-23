@@ -1,4 +1,29 @@
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window, px, size};
+use taskmanager_application::CorrelatedEvent;
+use taskmanager_application::NetworkEscalationReady;
+use taskmanager_application::PlatformEvent;
+use taskmanager_application::PlatformEventBatch;
+use taskmanager_application::PlatformEventContext;
+use taskmanager_application::ProcessEvent;
+use taskmanager_application::ProcessNetworkEscalationRequest;
+use taskmanager_application::TelemetryRefreshPolicy;
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_platform_contract::CapabilityCatalog;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::CapabilitySnapshot;
+use taskmanager_platform_contract::EventEnvelope;
+use taskmanager_platform_contract::EventPort;
+use taskmanager_platform_contract::EventPortError;
+use taskmanager_platform_contract::EventSequence;
+use taskmanager_platform_contract::OperationFailure;
+use taskmanager_platform_contract::RequestEnvelope;
+use taskmanager_platform_contract::RequestId;
+use taskmanager_platform_contract::RequestPort;
+use taskmanager_platform_contract::RetryDisposition;
+use taskmanager_platform_contract::SubmissionError;
+use taskmanager_telemetry_store::TelemetryStore;
 
 use taskmanager_application::NetworkEscalationState;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
@@ -40,7 +65,7 @@ impl Render for FixtureView {
             available,
             self.net_escalation,
             self.entity.clone(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         )
     }
 }
@@ -184,40 +209,30 @@ async fn escalation_pill_renders_for_requires_escalation_and_submits_on_click(
 
 /// Capability catalog stub: reports an empty snapshot, never a real catalog.
 struct NoCapabilities;
-impl taskmanager_platform_contract::CapabilityCatalog for NoCapabilities {
-    fn snapshot(&self) -> taskmanager_platform_contract::CapabilitySnapshot {
-        taskmanager_platform_contract::CapabilitySnapshot::default()
+impl CapabilityCatalog for NoCapabilities {
+    fn snapshot(&self) -> CapabilitySnapshot {
+        CapabilitySnapshot::default()
     }
 }
 
 /// Event-port stub: the runtime lane never delivers events itself here; the
 /// tests feed correlated batches directly.
 struct NoEvents;
-impl taskmanager_platform_contract::EventPort for NoEvents {
-    type Event = taskmanager_application::PlatformEvent;
+impl EventPort for NoEvents {
+    type Event = PlatformEvent;
 
-    fn try_recv(
-        &self,
-    ) -> Result<
-        Option<taskmanager_platform_contract::EventEnvelope<Self::Event>>,
-        taskmanager_platform_contract::EventPortError,
-    > {
+    fn try_recv(&self) -> Result<Option<EventEnvelope<Self::Event>>, EventPortError> {
         Ok(None)
     }
 }
 
 /// Escalation-port stub: accepts every submission and records the correlated
 /// request ids so the tests can assert re-submission behavior.
-struct AcceptingEscalation(
-    std::sync::Arc<std::sync::Mutex<Vec<taskmanager_platform_contract::RequestId>>>,
-);
-impl taskmanager_platform_contract::RequestPort for AcceptingEscalation {
-    type Request = taskmanager_application::ProcessNetworkEscalationRequest;
+struct AcceptingEscalation(std::sync::Arc<std::sync::Mutex<Vec<RequestId>>>);
+impl RequestPort for AcceptingEscalation {
+    type Request = ProcessNetworkEscalationRequest;
 
-    fn try_submit(
-        &self,
-        request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), taskmanager_platform_contract::SubmissionError> {
+    fn try_submit(&self, request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         if let Ok(mut submitted) = self.0.lock() {
             submitted.push(request.id);
         }
@@ -229,7 +244,7 @@ fn root_with_escalation_platform(
     cx: &mut gpui::TestAppContext,
 ) -> (
     gpui::Entity<crate::gpui_app::root::RootView>,
-    std::sync::Arc<std::sync::Mutex<Vec<taskmanager_platform_contract::RequestId>>>,
+    std::sync::Arc<std::sync::Mutex<Vec<RequestId>>>,
 ) {
     use taskmanager_application::{PlatformClient, PlatformFacets, PlatformHandle, ProcessFacets};
 
@@ -243,14 +258,13 @@ fn root_with_escalation_platform(
         std::sync::Arc::new(NoEvents),
         facets,
     ));
-    let (telemetry, ingestor) =
-        taskmanager_telemetry_store::TelemetryStore::shared_with_correlated_ingestion(60);
+    let (telemetry, ingestor) = TelemetryStore::shared_with_correlated_ingestion(60);
     let view = cx.new(|cx| {
         crate::gpui_app::root::RootView::new_with_platform(
-            taskmanager_theme::Theme::dark(),
+            Theme::dark(),
             telemetry,
             ingestor,
-            taskmanager_application::TelemetryRefreshPolicy::default(),
+            TelemetryRefreshPolicy::default(),
             client,
             cx,
         )
@@ -258,41 +272,32 @@ fn root_with_escalation_platform(
     (view, submitted)
 }
 
-fn escalation_failure_batch(
-    request_id: taskmanager_platform_contract::RequestId,
-    kind: taskmanager_core::core::FailureKind,
-) -> taskmanager_application::PlatformEventBatch {
-    taskmanager_application::PlatformEventBatch {
-        failures: vec![taskmanager_platform_contract::OperationFailure {
+fn escalation_failure_batch(request_id: RequestId, kind: FailureKind) -> PlatformEventBatch {
+    PlatformEventBatch {
+        failures: vec![OperationFailure {
             request_id,
-            capability: taskmanager_platform_contract::CapabilityId::PROCESS_NETWORK_ESCALATION,
-            sequence: taskmanager_platform_contract::EventSequence::new(1),
+            capability: CapabilityId::PROCESS_NETWORK_ESCALATION,
+            sequence: EventSequence::new(1),
             kind,
-            retry: taskmanager_platform_contract::RetryDisposition::AfterCapabilityChange,
-            provider: Some(taskmanager_core::core::identity::ProviderId::borrowed(
-                "linux.net-launcher",
-            )),
+            retry: RetryDisposition::AfterCapabilityChange,
+            provider: Some(ProviderId::borrowed("linux.net-launcher")),
             observed_at_ms: 1_001,
         }],
         ..Default::default()
     }
 }
 
-fn escalated_batch(
-    request_id: taskmanager_platform_contract::RequestId,
-) -> taskmanager_application::PlatformEventBatch {
-    taskmanager_application::PlatformEventBatch {
-        process_events: vec![taskmanager_application::CorrelatedEvent::new(
-            taskmanager_application::PlatformEventContext {
+fn escalated_batch(request_id: RequestId) -> PlatformEventBatch {
+    PlatformEventBatch {
+        process_events: vec![CorrelatedEvent::new(
+            PlatformEventContext {
                 request_id,
-                capability: taskmanager_platform_contract::CapabilityId::PROCESS_NETWORK_ESCALATION,
-                provider: Some(taskmanager_core::core::identity::ProviderId::borrowed(
-                    "linux.net-launcher",
-                )),
-                sequence: taskmanager_platform_contract::EventSequence::new(2),
+                capability: CapabilityId::PROCESS_NETWORK_ESCALATION,
+                provider: Some(ProviderId::borrowed("linux.net-launcher")),
+                sequence: EventSequence::new(2),
                 observed_at_ms: 1_002,
             },
-            taskmanager_application::ProcessEvent::NetworkCaptureEscalated,
+            ProcessEvent::NetworkCaptureEscalated,
         )],
         ..Default::default()
     }
@@ -330,7 +335,7 @@ async fn declined_prompt_transitions_the_pill_and_retry_resubmits(cx: &mut gpui:
     let stale = RequestId::new(999_999).expect("stale fixture request");
     view.update(cx, |view, cx| {
         view.apply_platform_event_batch(
-            escalation_failure_batch(stale, taskmanager_core::core::FailureKind::PermissionDenied),
+            escalation_failure_batch(stale, FailureKind::PermissionDenied),
             cx,
         );
         assert_eq!(
@@ -344,14 +349,14 @@ async fn declined_prompt_transitions_the_pill_and_retry_resubmits(cx: &mut gpui:
     // for the correlated id → the pill shows the typed failure + retry.
     view.update(cx, |view, cx| {
         view.apply_platform_event_batch(
-            escalation_failure_batch(first, taskmanager_core::core::FailureKind::PermissionDenied),
+            escalation_failure_batch(first, FailureKind::PermissionDenied),
             cx,
         );
         assert_eq!(
             *view.shell.network_escalation_state(),
             NetworkEscalationState::Failed(NetworkEscalationFailed {
                 correlation: RequestCorrelation::Request(first),
-                failure: taskmanager_core::core::FailureKind::PermissionDenied,
+                failure: FailureKind::PermissionDenied,
             }),
             "the declined prompt must land in the typed provider-failure state"
         );
@@ -387,9 +392,7 @@ async fn declined_prompt_transitions_the_pill_and_retry_resubmits(cx: &mut gpui:
         view.apply_platform_event_batch(escalated_batch(second), cx);
         assert_eq!(
             *view.shell.network_escalation_state(),
-            NetworkEscalationState::Ready(taskmanager_application::NetworkEscalationReady {
-                request_id: second,
-            })
+            NetworkEscalationState::Ready(NetworkEscalationReady { request_id: second })
         );
     });
 }
@@ -401,10 +404,7 @@ async fn declined_prompt_transitions_the_pill_and_retry_resubmits(cx: &mut gpui:
 async fn helper_missing_and_timeout_lane_failures_carry_typed_kinds(cx: &mut gpui::TestAppContext) {
     use taskmanager_application::{NetworkEscalationFailed, RequestCorrelation};
 
-    for kind in [
-        taskmanager_core::core::FailureKind::MissingDependency,
-        taskmanager_core::core::FailureKind::TimedOut,
-    ] {
+    for kind in [FailureKind::MissingDependency, FailureKind::TimedOut] {
         let (view, submitted) = root_with_escalation_platform(cx);
         view.update(cx, |view, cx| {
             view.request_process_network_escalation(cx);

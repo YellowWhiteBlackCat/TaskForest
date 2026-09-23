@@ -2,6 +2,11 @@
 
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use taskmanager_application::ProcessAffinityState;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     Context, Div, InteractiveElement, IntoElement, IsZero, ParentElement, Pixels, ScrollHandle,
@@ -52,7 +57,7 @@ pub struct ProcessesViewProps<'a> {
     pub sort_asc: bool,
     pub filter: ProcessStatusFilter,
     pub affinity_identity: Option<ProcessLiveKey>,
-    pub affinity_state: &'a taskmanager_application::ProcessAffinityState,
+    pub affinity_state: &'a ProcessAffinityState,
     pub affinity_cpus: &'a HashSet<u32>,
     pub affinity_hover: Option<usize>,
     pub hidden_cols: &'a HashSet<SortCol>,
@@ -242,10 +247,8 @@ pub fn render_processes(
             .flex()
             .items_center()
             .justify_center()
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-            .text_size(taskmanager_ui::theme_binding::absolute(
-                ui_size.body_font_size(),
-            ))
+            .text_color(hsla(theme.fg_dim))
+            .text_size(absolute(ui_size.body_font_size()))
             .child(message);
         // Positive empty-state marker: the test harness keeps debug bounds
         // across frames, so "row selector absent" cannot prove a later frame
@@ -396,9 +399,7 @@ pub fn render_processes(
                     .right_0()
                     .bottom_0()
                     .h(px(1.0))
-                    .bg(taskmanager_ui::theme_binding::fill(
-                        theme.border.with_alpha(0.18),
-                    )),
+                    .bg(fill(theme.border.with_alpha(0.18))),
             )
             .child(
                 Scrollbar::horizontal(
@@ -427,9 +428,7 @@ pub fn render_processes(
     let view = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            presentation.band_gap(),
-        ))
+        .gap(definite_length(presentation.band_gap()))
         .size_full()
         .child(process_overview(ProcessOverviewProps {
             theme: &theme,

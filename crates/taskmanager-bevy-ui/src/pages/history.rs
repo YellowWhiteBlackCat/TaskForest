@@ -43,6 +43,10 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::palette::{UiPalette, space_2, space_8, space_24};
 use crate::window::{Role, TextRole};
+use taskmanager_application::ApplicationHistoryRow;
+use taskmanager_application::ApplicationHistoryUnavailableReason;
+use taskmanager_application::HistoryReplayRequest;
+use taskmanager_core::core::history::HistoryRecordSink;
 
 pub(crate) mod scene;
 
@@ -106,7 +110,7 @@ pub(crate) struct HistoryRowModel {
 }
 
 impl HistoryRowModel {
-    fn from_application_row(row: &taskmanager_application::ApplicationHistoryRow) -> Self {
+    fn from_application_row(row: &ApplicationHistoryRow) -> Self {
         Self {
             identity: row.identity.clone(),
             display_name: row.display_name().to_owned(),
@@ -312,7 +316,7 @@ fn row_annotation(row: &HistoryRowModel) -> String {
 enum HistoryResources {
     Disabled,
     Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(taskmanager_application::ApplicationHistoryUnavailableReason),
+    Unavailable(ApplicationHistoryUnavailableReason),
     Active(HistoryFrontendSession),
 }
 
@@ -377,7 +381,7 @@ impl HistoryRuntime {
         }
         let Some(connector) = self.connector.as_mut() else {
             self.resources = HistoryResources::Unavailable(
-                taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStopped,
+                ApplicationHistoryUnavailableReason::ConnectorStopped,
             );
             return;
         };
@@ -440,7 +444,7 @@ impl HistoryRuntime {
         }
     }
 
-    fn submit(&mut self, request: taskmanager_application::HistoryReplayRequest) {
+    fn submit(&mut self, request: HistoryReplayRequest) {
         let error = match &mut self.resources {
             HistoryResources::Active(session) => session.replay.try_request(request).err(),
             HistoryResources::Disabled
@@ -452,9 +456,7 @@ impl HistoryRuntime {
         }
     }
 
-    pub(crate) fn record_sink(
-        &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
+    pub(crate) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
         match &self.resources {
             HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
             HistoryResources::Disabled

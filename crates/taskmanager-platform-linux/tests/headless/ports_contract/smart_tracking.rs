@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::SmartSelfTestFailure;
+use taskmanager_core::SmartSelfTestKind;
 
 #[test]
 fn slow_smart_control_does_not_block_status_observation() {
@@ -20,7 +23,7 @@ fn slow_smart_control_does_not_block_status_observation() {
                 device_generation: DeviceGeneration::INITIAL,
                 device_key: "slow-control".into(),
                 display_name: "Slow control".into(),
-                kind: taskmanager_core::SmartSelfTestKind::Short,
+                kind: SmartSelfTestKind::Short,
             }),
         })
         .expect("SMART control accepted");
@@ -83,7 +86,7 @@ fn concurrent_smart_poll_keeps_new_job_on_another_target() {
                 device_generation: DeviceGeneration::INITIAL,
                 device_key: "old".into(),
                 display_name: "Old".into(),
-                kind: taskmanager_core::SmartSelfTestKind::Short,
+                kind: SmartSelfTestKind::Short,
             }),
         })
         .expect("old SMART control accepted");
@@ -124,7 +127,7 @@ fn concurrent_smart_poll_keeps_new_job_on_another_target() {
                 device_generation: DeviceGeneration::INITIAL,
                 device_key: "new".into(),
                 display_name: "New".into(),
-                kind: taskmanager_core::SmartSelfTestKind::Extended,
+                kind: SmartSelfTestKind::Extended,
             }),
         })
         .expect("new SMART control accepted");
@@ -160,7 +163,7 @@ fn stop_tracking_invalidates_an_inflight_poll_without_claiming_drive_abort() {
         device_generation: DeviceGeneration::new(4),
         device_key: "cancel".into(),
         display_name: "Cancel tracking".into(),
-        kind: taskmanager_core::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     };
     let target = intent.target();
     let start_id = ids.next_id();
@@ -258,7 +261,7 @@ fn target_timeout_is_degraded_and_identity_change_removes_only_that_disk() {
         device_generation: DeviceGeneration::INITIAL,
         device_key: device.into(),
         display_name: device.into(),
-        kind: taskmanager_core::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     });
     for intent in intents.clone() {
         let request_id = ids.next_id();
@@ -338,10 +341,10 @@ fn target_timeout_is_degraded_and_identity_change_removes_only_that_disk() {
 fn typed_smart_report_failures_do_not_become_outer_success_health() {
     let missing_tool = SmartSelfTestReport {
         state: DeviceState {
-            status: taskmanager_core::DeviceStatus::MissingTool,
+            status: DeviceStatus::MissingTool,
             last_success_ms: None,
         },
-        failure: Some(taskmanager_core::SmartSelfTestFailure::MissingTool),
+        failure: Some(SmartSelfTestFailure::MissingTool),
         ..SmartSelfTestReport::default()
     };
     let control_handle = spawn_complete(fake_registry(FakeProvider {
@@ -362,7 +365,7 @@ fn typed_smart_report_failures_do_not_become_outer_success_health() {
                 device_generation: DeviceGeneration::INITIAL,
                 device_key: "missing-tool".into(),
                 display_name: "Missing tool".into(),
-                kind: taskmanager_core::SmartSelfTestKind::Short,
+                kind: SmartSelfTestKind::Short,
             }),
         })
         .expect("SMART control accepted");
@@ -375,7 +378,7 @@ fn typed_smart_report_failures_do_not_become_outer_success_health() {
                 issue.failure == FailureKind::MissingDependency)
                 && batch.observations.iter().any(|observation|
                     observation.report.failure
-                        == Some(taskmanager_core::SmartSelfTestFailure::MissingTool))
+                        == Some(SmartSelfTestFailure::MissingTool))
     ));
     let control_capability = control_handle
         .capabilities()
@@ -391,10 +394,10 @@ fn typed_smart_report_failures_do_not_become_outer_success_health() {
 
     let permission_report = SmartSelfTestReport {
         state: DeviceState {
-            status: taskmanager_core::DeviceStatus::PermissionDenied,
+            status: DeviceStatus::PermissionDenied,
             last_success_ms: None,
         },
-        failure: Some(taskmanager_core::SmartSelfTestFailure::PermissionDenied),
+        failure: Some(SmartSelfTestFailure::PermissionDenied),
         ..SmartSelfTestReport::default()
     };
     let refresh_reports = Arc::new(Mutex::new(vec![(
@@ -410,7 +413,7 @@ fn typed_smart_report_failures_do_not_become_outer_success_health() {
         device_generation: DeviceGeneration::INITIAL,
         device_key: "permission".into(),
         display_name: "Permission".into(),
-        kind: taskmanager_core::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     };
     let target = intent.target();
     let start_id = ids.next_id();
@@ -446,7 +449,7 @@ fn typed_smart_report_failures_do_not_become_outer_success_health() {
                 issue.failure == FailureKind::PermissionDenied)
                 && batch.observations.iter().any(|observation|
                     observation.report.failure
-                        == Some(taskmanager_core::SmartSelfTestFailure::PermissionDenied))
+                        == Some(SmartSelfTestFailure::PermissionDenied))
     ));
     let observation_capability = observation_handle
         .capabilities()

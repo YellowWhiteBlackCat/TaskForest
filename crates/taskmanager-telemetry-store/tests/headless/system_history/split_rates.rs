@@ -17,6 +17,10 @@ use taskmanager_core::{
 
 use super::*;
 use crate::TelemetryStore;
+use taskmanager_core::DevicePresence;
+use taskmanager_core::DiskScalarObservations;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 /// A disk whose read/write rates are set independently, so one direction can
 /// be left `Unknown` (an explicit gap) while the other stays measured.
@@ -27,11 +31,11 @@ fn split_disk(
     write: ScalarObservation<u64>,
     observed_at_ms: u64,
 ) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(generation))
         .device_state(DeviceState::healthy(observed_at_ms))
-        .scalar_observations(taskmanager_core::DiskScalarObservations {
+        .scalar_observations(DiskScalarObservations {
             read_bytes_per_sec: read,
             write_bytes_per_sec: write,
             ..Default::default()
@@ -57,11 +61,7 @@ fn storage_observation(
         observed_at_ms,
         Vec::new(),
         Vec::new(),
-        lifecycles(
-            device_id,
-            taskmanager_core::DevicePresence::Present,
-            generation,
-        ),
+        lifecycles(device_id, DevicePresence::Present, generation),
     )
 }
 
@@ -72,7 +72,7 @@ fn split_network(
     tx: ScalarObservation<u64>,
     observed_at_ms: u64,
 ) -> NetworkTelemetryObservation {
-    let network = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let network = NetworkMetricsFixtureBuilder::new()
         .device_id(std::sync::Arc::from(device_id))
         .device_generation(DeviceGeneration::new(generation))
         .device_state(DeviceState::healthy(observed_at_ms))
@@ -87,11 +87,7 @@ fn split_network(
         observed_at_ms,
         Vec::new(),
         Vec::new(),
-        lifecycles(
-            device_id,
-            taskmanager_core::DevicePresence::Present,
-            generation,
-        ),
+        lifecycles(device_id, DevicePresence::Present, generation),
     )
 }
 

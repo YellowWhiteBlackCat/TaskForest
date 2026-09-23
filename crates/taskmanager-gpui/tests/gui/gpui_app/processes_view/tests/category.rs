@@ -2,7 +2,12 @@
 
 use super::*;
 use std::collections::HashSet;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 
 /// A primary click on a category aggregate row's chevron must expand and
 /// collapse the same stable-keyed bucket that the row double-click branch and
@@ -16,10 +21,10 @@ use taskmanager_core::core::process::ProcessLiveKey;
 /// collapsed, members revealed only while expanded.
 #[gpui::test]
 async fn category_group_chevron_click_expands_and_collapses_the_row(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (win, view) = wrapped_root(cx);
     let background = |pid: u32, name: &str, cpu: f32| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.into())
             .current_cpu_percentage(cpu)
@@ -30,7 +35,7 @@ async fn category_group_chevron_click_expands_and_collapses_the_row(cx: &mut Tes
             .build()
     };
     let unknown = |pid: u32, name: &str, cpu: f32| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.into())
             .current_cpu_percentage(cpu)
@@ -139,13 +144,13 @@ async fn category_group_chevron_click_expands_and_collapses_the_row(cx: &mut Tes
 /// not a native multi-click sequence.
 #[gpui::test]
 async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (win, view) = wrapped_root(cx);
     let identity =
         ProcessApplicationIdentity::new("org.example.MissionCenter", "Mission Center", None)
             .expect("fixture identity must be non-empty");
     let process = |pid: u32, name: &str, cpu: f32, parent_pid: Option<u32>| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .parent_pid(parent_pid)
             .name(name.into())
@@ -235,9 +240,9 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     });
 }
 
-fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Application(
-        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+fn application_row_id(pid: u32) -> ProcessRowId {
+    ProcessRowId::Application(
+        ProcessLiveKey::from_parts(pid, fixture_start_token(pid))
             .expect("fixture pid and token are non-zero"),
     )
 }

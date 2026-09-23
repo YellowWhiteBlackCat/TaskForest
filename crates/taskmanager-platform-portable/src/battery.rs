@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use taskmanager_core::DeviceGeneration;
 use taskmanager_core::{
     BatteryInfo, BatteryScalarObservations, DeviceId, DeviceState, DeviceStatus, FailureKind,
     PowerSupplyKind, PowerSupplySnapshot, ProviderId, ScalarObservation,
@@ -92,7 +93,7 @@ pub fn collect_battery_snapshot(
         let mut row = BatteryInfo::new(id.clone(), DeviceState::healthy(observed_at_ms));
         row.kind = PowerSupplyKind::Battery;
         row.display_name = battery.model().unwrap_or("Battery").to_string();
-        row.device_generation = taskmanager_core::DeviceGeneration::INITIAL;
+        row.device_generation = DeviceGeneration::INITIAL;
         row.status = status_label(battery.state()).to_string();
         row.technology = format!("{:?}", battery.technology());
         row.model_name = battery.model().unwrap_or_default().to_string();

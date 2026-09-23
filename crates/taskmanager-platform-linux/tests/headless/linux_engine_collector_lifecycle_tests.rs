@@ -1,12 +1,14 @@
 use super::*;
 use taskmanager_core::DeviceGeneration;
 use taskmanager_core::core::device_state::{DevicePresence, DeviceRefreshOutcome, DeviceStatus};
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 #[test]
 fn fixture_add_stale_absent_readd_preserves_identity_and_unknowns() {
     let mut registry = DeviceLifecycleRegistry::new(100);
     let mut disks = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:wwid:fixture".into())
             .device_state(DeviceState::healthy(10))
             .smart_temperature_c(Some(41.0))
@@ -61,7 +63,7 @@ fn fixture_add_stale_absent_readd_preserves_identity_and_unknowns() {
     );
 
     disks.push(
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:wwid:fixture".into())
             .device_state(DeviceState::healthy(40))
             .smart_temperature_c(Some(42.0))
@@ -97,7 +99,7 @@ fn fixture_add_stale_absent_readd_preserves_identity_and_unknowns() {
 fn network_readd_preserves_stable_identity_and_advances_generation() {
     let mut registry = DeviceLifecycleRegistry::new(100);
     let mut networks = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id("net:mac:fixture".into())
             .device_state(DeviceState::healthy(10))
             .build(),
@@ -124,7 +126,7 @@ fn network_readd_preserves_stable_identity_and_advances_generation() {
     );
 
     networks.push(
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id("net:mac:fixture".into())
             .device_state(DeviceState::healthy(30))
             .build(),
@@ -153,7 +155,7 @@ fn network_readd_preserves_stable_identity_and_advances_generation() {
 fn provider_unavailable_and_ttl_history_cleanup_are_deterministic() {
     let mut registry = DeviceLifecycleRegistry::new(100);
     let mut networks = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id("net:mac:aa:bb".into())
             .device_state(DeviceState::healthy(10))
             .build(),
@@ -214,7 +216,7 @@ fn retained_rows_are_not_reobserved_as_present_after_discovery_failure() {
     let mut networks = ["net:mac:aa", "net:mac:bb"]
         .into_iter()
         .map(|device_id| {
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id(device_id.into())
                 .device_state(DeviceState::healthy(10))
                 .build()
@@ -259,7 +261,7 @@ fn retained_rows_are_not_reobserved_as_present_after_discovery_failure() {
 fn disk_network_and_gpu_share_one_reconciliation_contract() {
     let mut network_registry = DeviceLifecycleRegistry::new(1);
     let mut networks = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id("net:mac:01".into())
             .device_state(DeviceState::healthy(5))
             .build(),

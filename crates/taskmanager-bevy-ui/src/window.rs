@@ -62,6 +62,12 @@ use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout}
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
+use taskmanager_app_host::acquire_single_instance;
+use taskmanager_application::i18n::t;
+use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
+use taskmanager_assets::embedded_fonts;
+use taskmanager_platform_contract::InstanceRole;
+use taskmanager_shell::ShellApp;
 
 /// The resolved token palette, injected as a resource for spawn systems.
 #[derive(Resource)]
@@ -131,12 +137,75 @@ pub(crate) fn run_demo(shared: &'static SharedRuntime) -> ExitCode {
     run_with_mode(shared, true)
 }
 
+/// The light reference skin the capture gate has always rendered, and the
+/// fallback whenever no appearance override is present.
+fn reference_demo_theme() -> Theme {
+    Theme::build(
+        Skin::Gnome,
+        LightDark::Light,
+        HighContrast::Off,
+        ResolvedFonts::system_for(Skin::Gnome),
+    )
+}
+
+/// Parse the shared testing/developer appearance override GPUI owns
+/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
+/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
+/// `None` for an unset or syntactically invalid value. This is the SAME
+/// vocabulary (and env name) GPUI's
+/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
+/// vocabulary would let the capture harness and the frontends drift.
+fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
+    let (skin_token, mode_token) = value.split_once('-')?;
+    let skin = match skin_token.to_ascii_lowercase().as_str() {
+        "gnome" => Skin::Gnome,
+        "kde" => Skin::Kde,
+        "win" | "windows" => Skin::Windows,
+        "mac" | "macos" => Skin::Macos,
+        _ => return None,
+    };
+    let mode = match mode_token.to_ascii_lowercase().as_str() {
+        "dark" => LightDark::Dark,
+        "light" => LightDark::Light,
+        "eyeforest" | "eye-forest" => LightDark::EyeForest,
+        _ => return None,
+    };
+    Some((skin, mode))
+}
+
+/// Resolve the demo/capture theme. The override is a FALLBACK: an explicit
+/// appearance preference (the persisted config, in production) always wins and
+/// the demo path has none, so `TM_SKIN` is the only input here. An unset or
+/// invalid value resolves the unchanged light reference skin.
+fn resolve_demo_theme(value: Option<&str>, high_contrast: bool) -> Theme {
+    let Some((skin, mode)) = value.and_then(parse_tm_skin) else {
+        return reference_demo_theme();
+    };
+    Theme::build(
+        skin,
+        mode,
+        if high_contrast {
+            HighContrast::On
+        } else {
+            HighContrast::Off
+        },
+        ResolvedFonts::system_for(skin),
+    )
+}
+
+/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override for the demo/capture boot.
+fn demo_theme_from_env() -> Theme {
+    let value = std::env::var("TM_SKIN").ok();
+    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
+    resolve_demo_theme(value.as_deref(), high_contrast)
+}
+
 fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     let _instance_guard = if !demo {
         let (tx, _rx) = std::sync::mpsc::channel();
-        match taskmanager_app_host::acquire_single_instance(product::BEVY_NAME, tx) {
-            Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => Some(guard),
-            Ok(taskmanager_platform_contract::InstanceRole::Secondary) => {
+        match acquire_single_instance(product::BEVY_NAME, tx) {
+            Ok(InstanceRole::Primary(guard)) => Some(guard),
+            Ok(InstanceRole::Secondary) => {
                 eprintln!("taskforest-b: already running, waking existing instance");
                 return ExitCode::SUCCESS;
             }
@@ -152,14 +221,10 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     // Production keeps the cold-start dark theme until the native appearance
     // seam arrives. Capture uses the light reference skin so the visual gate
     // compares the actual product structure and typography, not a fixture-only
-    // color inversion.
+    // color inversion; the shared `TM_SKIN` testing override can select another
+    // skin/mode there (unset keeps the light reference skin byte-for-byte).
     let theme = if demo {
-        Theme::build(
-            Skin::Gnome,
-            LightDark::Light,
-            HighContrast::Off,
-            ResolvedFonts::system_for(Skin::Gnome),
-        )
+        demo_theme_from_env()
     } else {
         Theme::dark()
     };
@@ -253,7 +318,7 @@ fn capture_wants_service_logs() -> bool {
 /// Capture fixture: open the log stream for the first demo service and
 /// pre-fill the feed with a bounded, deterministic journal excerpt. The
 /// scenario renders the real panel over this state; production never runs it.
-fn seed_service_log_fixture(shell: &mut taskmanager_shell::ShellApp) {
+fn seed_service_log_fixture(shell: &mut ShellApp) {
     use taskmanager_core::core::services::{
         ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
         ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
@@ -382,7 +447,7 @@ impl Plugin for FrontendWindowPlugin {
                 }
                 shell
             } else {
-                taskmanager_shell::ShellApp::new()
+                ShellApp::new()
             },
             initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
             process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
@@ -440,7 +505,7 @@ impl Plugin for FrontendWindowPlugin {
 /// bevy font store. `embedded_fonts()` yields MiSans VF followed by Roboto
 /// Mono, the same UI/metric-role order used by GPUI and Iced.
 fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<PlaceholderFonts>) {
-    let mut embedded = taskmanager_assets::embedded_fonts().into_iter();
+    let mut embedded = embedded_fonts().into_iter();
     handles.ui = embedded
         .next()
         .map(|bytes| fonts.add(Font::from_bytes(bytes.into_owned())));
@@ -451,20 +516,14 @@ fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<
         eprintln!(
             "taskforest-b: embedded font table empty (expected the {} face); \
              text falls back to the default font source",
-            taskmanager_assets::EMBEDDED_FONT_FAMILIES
-                .first()
-                .copied()
-                .unwrap_or("ui")
+            EMBEDDED_FONT_FAMILIES.first().copied().unwrap_or("ui")
         );
     }
     if handles.mono.is_none() {
         eprintln!(
             "taskforest-b: embedded mono face missing (expected the {} face); \
              metric text falls back to the UI face",
-            taskmanager_assets::EMBEDDED_FONT_FAMILIES
-                .get(1)
-                .copied()
-                .unwrap_or("mono")
+            EMBEDDED_FONT_FAMILIES.get(1).copied().unwrap_or("mono")
         );
     }
 }
@@ -672,9 +731,9 @@ fn spawn_app_shell(
 ) {
     commands.spawn(Camera2d);
     let summary = if demo.is_some() {
-        taskmanager_application::i18n::t("status.demo_snapshot").to_owned()
+        t("status.demo_snapshot").to_owned()
     } else {
-        taskmanager_application::i18n::t("status.waiting_for_snapshot").to_owned()
+        t("status.waiting_for_snapshot").to_owned()
     };
     commands.spawn_scene(app_shell_scene(&palette.inner, route.page, summary));
 }

@@ -21,6 +21,7 @@ use super::responsive::{
 };
 use crate::app::Message;
 use crate::theme;
+use taskmanager_theme::Theme;
 
 type Elem<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -28,7 +29,7 @@ type Elem<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 /// this above their single aggregate chart so narrowing the viewport never
 /// turns scalar facts into hidden selector state or a scrolling sub-surface.
 pub(super) fn headline_readouts(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     items: impl IntoIterator<Item = (String, String)>,
 ) -> Elem<'static> {
     let label_color = theme::muted_text_color(theme_snapshot);
@@ -136,7 +137,7 @@ pub(super) struct DetailBody<'a> {
 /// pre-folded shell [`StatRow`]s (missing values render the shared dash
 /// dimmed) and the optional rail footer.
 pub(super) fn main_with_stats<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     header: DetailHeader,
     body: DetailBody<'a>,
     budget: PerformancePageBudget,
@@ -259,7 +260,7 @@ struct StatsRail<'a> {
 /// pre-folded rows plus the optional footer, inside the rail's own vertical
 /// scroll boundary so a long inventory never clips silently (GPUI parity —
 /// its stats rail scrolls through `scroll_region_with_rail`).
-fn stats_rail<'a>(theme_snapshot: &'a taskmanager_theme::Theme, rail: StatsRail<'a>) -> Elem<'a> {
+fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
     let StatsRail {
         stats,
         footer,
@@ -317,7 +318,7 @@ fn stats_rail<'a>(theme_snapshot: &'a taskmanager_theme::Theme, rail: StatsRail<
 /// shared dash in the dim foreground so an uncollected field reads quieter
 /// than present data.
 pub(super) fn stats_panel(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     stats: Vec<StatRow>,
     compact: bool,
 ) -> Elem<'static> {
@@ -399,7 +400,7 @@ pub(super) fn bounded_heading(value: &str, max_chars: usize) -> String {
 /// A nested graph card keeps the main plot visually distinct from the outer
 /// device card while still using the same theme surface and border tokens.
 pub(super) fn graph_card<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     content: Elem<'static>,
     extent: DetailExtent,
 ) -> Elem<'a> {

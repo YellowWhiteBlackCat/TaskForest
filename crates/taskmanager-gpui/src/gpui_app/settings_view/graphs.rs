@@ -3,6 +3,9 @@
 //! curve is the product's intrinsic rendering, see `graph::GraphOpts`.)
 
 use std::collections::HashMap;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{AppContext, Context, Div, Entity, InteractiveElement, ParentElement, Styled, div};
 
@@ -57,9 +60,7 @@ pub(super) fn graph_options_group(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
                 .flex()
@@ -68,14 +69,14 @@ pub(super) fn graph_options_group(
                 .justify_between()
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(t.fg))
                         .child(i18n::t("settings.graph_data_points")),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(t.fg_dim))
                         .child(points_readout),
                 ),
         )
@@ -87,8 +88,8 @@ pub(super) fn graph_options_group(
         .child(
             div()
                 .id("tm-graph-points-restart-note")
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(t.fg_dim))
                 .child(i18n::t("settings.graph_data_points_restart")),
         )
         .child(graph_switch_row(
@@ -148,8 +149,8 @@ fn graph_switch_row(
         .justify_between()
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(t.fg))
                 .child(spec.label),
         )
         .child(

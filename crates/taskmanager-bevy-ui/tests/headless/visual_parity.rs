@@ -30,6 +30,11 @@ use crate::icons::{IconPlates, PLATE_ICONS, icon_rgba, icon_scene};
 use crate::palette::{no_wrap_text, ui_palette};
 use crate::window::{Role, TextRole};
 use bevy::ui::widget::Text;
+use taskmanager_application::AppAction;
+use taskmanager_application::AppPage;
+use taskmanager_assets::asset_bytes;
+use taskmanager_assets::ui_icon_rgba;
+use taskmanager_icons::path;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::IconId;
 
@@ -59,9 +64,9 @@ fn the_nav_tab_set_is_the_shared_page_vocabulary_onto_shared_icons() {
         .iter()
         .map(|&page| crate::app::action_for_page(page))
         .collect();
-    let shared: Vec<_> = taskmanager_application::AppPage::ALL
+    let shared: Vec<_> = AppPage::ALL
         .iter()
-        .map(|&page| Some(taskmanager_application::AppAction::SelectPage(page)))
+        .map(|&page| Some(AppAction::SelectPage(page)))
         .collect();
     assert_eq!(routed, shared, "nav tabs must mirror AppPage::ALL in order");
     // Every tab and trailing affordance resolves its icon in BOTH asset
@@ -72,13 +77,13 @@ fn the_nav_tab_set_is_the_shared_page_vocabulary_onto_shared_icons() {
         .chain([crate::app::Page::Alerts, crate::app::Page::Settings].iter())
     {
         let icon = crate::app::tab_icon(page);
-        let path = taskmanager_icons::path(icon);
+        let path = path(icon);
         assert!(
-            taskmanager_assets::asset_bytes(path).is_some(),
+            asset_bytes(path).is_some(),
             "{page:?} icon {path} has no SVG source"
         );
         assert!(
-            taskmanager_assets::ui_icon_rgba(path).is_some(),
+            ui_icon_rgba(path).is_some(),
             "{page:?} icon {path} has no bitmap plate"
         );
     }

@@ -212,7 +212,7 @@ pub(crate) const RESOURCE_DIGITS_SHORTCUT: &str = "1-7";
 /// advertised chord always executes.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TuiLocalCommand {
-    pub(crate) binding: taskmanager_shell::LocalBinding,
+    pub(crate) binding: LocalBinding,
     pub(crate) palette_action: Option<PaletteLocalAction>,
     /// Direct-dispatch arms, tried in order (first armed arm wins).
     pub(crate) direct: &'static [TuiDirectArm],
@@ -222,7 +222,7 @@ pub(crate) struct TuiLocalCommand {
 /// every chord here — declaration and execution are one authority.
 pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "p",
             label: "Settings",
         },
@@ -233,7 +233,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "i",
             label: "About / system info",
         },
@@ -244,7 +244,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "h",
             label: "System health & alerts",
         },
@@ -255,7 +255,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "c",
             label: "Containers",
         },
@@ -266,7 +266,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "x",
             label: "Export snapshot",
         },
@@ -277,7 +277,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "X",
             label: "Export diagnostic report",
         },
@@ -288,7 +288,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: ROW_TARGET_SHORTCUT,
             label: "Service actions (Services page)",
         },
@@ -313,7 +313,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         ],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: RESOURCE_DIGITS_SHORTCUT,
             label: "Performance resource (Performance page)",
         },
@@ -324,7 +324,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "C",
             label: "Columns (Applications page)",
         },
@@ -335,7 +335,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "m",
             label: "Mark process for batch control (Applications page)",
         },
@@ -346,7 +346,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "B",
             label: "Batch actions on marked processes (Applications page)",
         },
@@ -357,7 +357,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "y",
             label: "Copy selected pid+name to clipboard (Applications page)",
         },
@@ -368,7 +368,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "a",
             label: "Process actions · open location / search (Applications page)",
         },
@@ -379,7 +379,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "o",
             label: "Service logs (Services)",
         },
@@ -390,7 +390,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "e",
             label: "GPU engines (Performance·GPU) · network escalate (process)",
         },
@@ -411,7 +411,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         ],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "d",
             label: "Directory usage scan (Performance·Disk)",
         },
@@ -428,7 +428,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         ],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "t",
             label: "SMART self-test (Performance·Disk)",
         },
@@ -439,7 +439,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
         }],
     },
     TuiLocalCommand {
-        binding: taskmanager_shell::LocalBinding {
+        binding: LocalBinding {
             shortcut: "g",
             label: "GPU chart metric (Performance·GPU)",
         },
@@ -462,6 +462,9 @@ pub(crate) use surface_protocol::{
 // `surface_protocol_action` and the painted-footer lane above.
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use surface_protocol::{TUI_SURFACE_HINTS, TUI_SURFACE_PROTOCOL, TuiSurfaceArm};
+use taskmanager_core::core::text::contains_ascii_ci;
+use taskmanager_shell::presentation::command_help;
+use taskmanager_shell::{InfoTable, LocalBinding, shell_local_bindings};
 
 /// Shared commands safe to invoke from the command palette.  Destructive
 /// actions and direction-key commands stay out of the palette because their
@@ -499,7 +502,7 @@ impl TuiApp {
     /// [`AppAction`]; local rows carry `None` and are shown for discovery only.
     #[must_use]
     pub fn palette_rows() -> Vec<CommandPaletteRow> {
-        let mut rows: Vec<CommandPaletteRow> = taskmanager_shell::presentation::command_help()
+        let mut rows: Vec<CommandPaletteRow> = command_help()
             .into_iter()
             .filter(|help| crate::command_palette::PALETTE_SHARED_COMMANDS.contains(&help.command))
             .map(|help| CommandPaletteRow {
@@ -514,7 +517,7 @@ impl TuiApp {
         // TUI runs itself, so the palette is a true command entry point for
         // the whole keyboard surface. The prefix jump and the F1 alias are
         // discoverable only (`None`).
-        for binding in taskmanager_shell::shell_local_bindings() {
+        for binding in shell_local_bindings() {
             rows.push(CommandPaletteRow {
                 shortcut: binding.shortcut,
                 label: binding.label,
@@ -562,8 +565,7 @@ impl TuiApp {
         Self::palette_rows()
             .into_iter()
             .filter(|row| {
-                taskmanager_core::core::text::contains_ascii_ci(row.shortcut, filter)
-                    || taskmanager_core::core::text::contains_ascii_ci(row.label, filter)
+                contains_ascii_ci(row.shortcut, filter) || contains_ascii_ci(row.label, filter)
             })
             .collect()
     }
@@ -680,14 +682,13 @@ impl TuiApp {
             Some(PaletteLocalAction::ToggleHelp) => self.toggle_help(),
             Some(PaletteLocalAction::CycleSortColumn) => match self.page() {
                 AppPage::Applications => self.cycle_sort_column_visible(),
-                AppPage::Services => self.cycle_info_sort_column_preserving_anchor(
-                    taskmanager_shell::InfoTable::Services,
-                ),
-                AppPage::Startup => self.cycle_info_sort_column_preserving_anchor(
-                    taskmanager_shell::InfoTable::Startup,
-                ),
-                AppPage::Users => self
-                    .cycle_info_sort_column_preserving_anchor(taskmanager_shell::InfoTable::Users),
+                AppPage::Services => {
+                    self.cycle_info_sort_column_preserving_anchor(InfoTable::Services)
+                }
+                AppPage::Startup => {
+                    self.cycle_info_sort_column_preserving_anchor(InfoTable::Startup)
+                }
+                AppPage::Users => self.cycle_info_sort_column_preserving_anchor(InfoTable::Users),
                 AppPage::Performance | AppPage::System | AppPage::AppHistory => {}
             },
             Some(PaletteLocalAction::ToggleSortDirection) => match self.page() {
@@ -695,15 +696,15 @@ impl TuiApp {
                     self.toggle_sort_direction();
                     self.persist_process_prefs();
                 }
-                AppPage::Services => self.toggle_info_sort_direction_preserving_anchor(
-                    taskmanager_shell::InfoTable::Services,
-                ),
-                AppPage::Startup => self.toggle_info_sort_direction_preserving_anchor(
-                    taskmanager_shell::InfoTable::Startup,
-                ),
-                AppPage::Users => self.toggle_info_sort_direction_preserving_anchor(
-                    taskmanager_shell::InfoTable::Users,
-                ),
+                AppPage::Services => {
+                    self.toggle_info_sort_direction_preserving_anchor(InfoTable::Services)
+                }
+                AppPage::Startup => {
+                    self.toggle_info_sort_direction_preserving_anchor(InfoTable::Startup)
+                }
+                AppPage::Users => {
+                    self.toggle_info_sort_direction_preserving_anchor(InfoTable::Users)
+                }
                 AppPage::Performance | AppPage::System | AppPage::AppHistory => {}
             },
             Some(PaletteLocalAction::ToggleSuggestions) => self.shell.toggle_suggestions(),

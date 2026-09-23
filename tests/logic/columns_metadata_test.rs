@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_gpui::gpui_app::processes_view::rows::{
     columns, header_label, is_hideable, is_numeric,
 };
@@ -60,7 +61,7 @@ fn sortcol_all_has_sixteen_columns_in_canonical_order_no_dups() {
 /// mapping is the real assertion; wording is locale-dependent by design).
 #[test]
 fn sortcol_header_labels_match_header_render() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let cases = [
         (SortCol::Name, "Name"),
         (SortCol::User, "User"),

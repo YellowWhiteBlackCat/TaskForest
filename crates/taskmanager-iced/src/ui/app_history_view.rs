@@ -11,6 +11,8 @@ use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus};
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::bytes;
 
+use taskmanager_shell::presentation::missing_value;
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 #[derive(Clone)]
@@ -37,7 +39,7 @@ fn app_history_table_body(
     })
 }
 
-fn app_history_table_key(generation: u64, theme_snapshot: &taskmanager_theme::Theme) -> u64 {
+fn app_history_table_key(generation: u64, theme_snapshot: &Theme) -> u64 {
     super::lazy_key::LazyKey::new("app-history-table")
         .revision(generation)
         .theme(theme_snapshot)
@@ -112,7 +114,7 @@ pub(super) fn app_history_page(
 }
 
 fn history_window_controls<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     selected: HistoryWindow,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let mut controls = row![].spacing(4);
@@ -250,5 +252,5 @@ fn app_history_row(
 }
 
 fn missing() -> String {
-    taskmanager_shell::presentation::missing_value()
+    missing_value()
 }

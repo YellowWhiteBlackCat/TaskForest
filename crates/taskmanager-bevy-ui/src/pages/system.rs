@@ -36,6 +36,13 @@ use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_application::SmbiosMemoryState;
+use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
+use taskmanager_core::core::npu::NpuEngineKind;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_shell::presentation::health_score_for_snapshot;
+use taskmanager_shell::presentation::kernel_error_summary;
+use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
 /// The page's single body container. Painted exclusively by
 /// [`paint_system`], which the root's on-insert hook binds.
@@ -118,7 +125,7 @@ pub(crate) fn system_summary_model(projection: &SystemProjectionStore) -> System
         // clipped inside a narrow fifth card. The detailed deduction bill is
         // still available through the shared score summary on dense surfaces.
         health: snapshot
-            .and_then(taskmanager_shell::presentation::health_score_for_snapshot)
+            .and_then(health_score_for_snapshot)
             .map(|score| format!("{}/100", score.score)),
     }
 }
@@ -158,8 +165,8 @@ fn joined(first: Option<&str>, second: Option<&str>) -> String {
 /// Pure; headless tests pin it against fixture hardware.
 pub(crate) fn system_fact_rows(
     hardware: Option<&HardwareInfo>,
-    smbios: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
-    npu: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    smbios: Option<&SmbiosMemorySnapshot>,
+    npu: Option<&NpuInventorySnapshot>,
 ) -> Vec<SystemFactRow> {
     let mut rows: Vec<SystemFactRow> = Vec::new();
     let dash = missing_value();
@@ -181,7 +188,7 @@ pub(crate) fn system_fact_rows(
             hardware.kernel_build.as_deref(),
         ),
     });
-    if let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hardware) {
+    if let Some(errors) = kernel_error_summary(hardware) {
         rows.push(SystemFactRow {
             label: t("system.kernel_errors").to_owned(),
             value: errors,
@@ -264,8 +271,7 @@ pub(crate) fn system_fact_rows(
         value: optional(hardware.locale.as_deref()),
     });
     if let Some(smbios) = smbios {
-        for (label, value) in taskmanager_shell::presentation::smbios_memory_inventory_rows(smbios)
-        {
+        for (label, value) in smbios_memory_inventory_rows(smbios) {
             rows.push(SystemFactRow { label, value });
         }
     }
@@ -289,12 +295,12 @@ pub(crate) fn system_fact_rows(
             });
             for engine in &dev.engines {
                 let label = match engine.kind {
-                    taskmanager_core::core::npu::NpuEngineKind::Compute => t("npu.engine_compute"),
-                    taskmanager_core::core::npu::NpuEngineKind::Matrix => t("npu.engine_matrix"),
-                    taskmanager_core::core::npu::NpuEngineKind::Vector => t("npu.engine_vector"),
-                    taskmanager_core::core::npu::NpuEngineKind::Video => t("npu.engine_video"),
-                    taskmanager_core::core::npu::NpuEngineKind::Copy => t("npu.engine_copy"),
-                    taskmanager_core::core::npu::NpuEngineKind::Unknown => t("npu.engine_unknown"),
+                    NpuEngineKind::Compute => t("npu.engine_compute"),
+                    NpuEngineKind::Matrix => t("npu.engine_matrix"),
+                    NpuEngineKind::Vector => t("npu.engine_vector"),
+                    NpuEngineKind::Video => t("npu.engine_video"),
+                    NpuEngineKind::Copy => t("npu.engine_copy"),
+                    NpuEngineKind::Unknown => t("npu.engine_unknown"),
                 };
                 rows.push(SystemFactRow {
                     label: format!("{} · {label}", t("npu.title")),
@@ -328,8 +334,8 @@ pub(crate) fn system_fact_rows(
 /// has states its fact count — never a fabricated zero.
 fn status_line_text(
     hardware: Option<&HardwareInfo>,
-    smbios: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
-    npu: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    smbios: Option<&SmbiosMemorySnapshot>,
+    npu: Option<&NpuInventorySnapshot>,
 ) -> String {
     if hardware.is_none() && smbios.is_none() && npu.is_none() {
         t("common.waiting_inventory").to_owned()
@@ -416,8 +422,8 @@ fn section_card_scene(
 
 fn system_body_scene(
     hardware: Option<&HardwareInfo>,
-    smbios: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
-    npu: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    smbios: Option<&SmbiosMemorySnapshot>,
+    npu: Option<&NpuInventorySnapshot>,
     summary: &SystemSummaryModel,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
@@ -618,9 +624,7 @@ pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
     let (hardware, smbios, npu, summary, status) = {
         let shell = &world.non_send::<FrontendTrack>().shell;
         let smbios = match shell.smbios_memory_state() {
-            taskmanager_application::SmbiosMemoryState::Ready(ready) => {
-                Some(ready.snapshot.clone())
-            }
+            SmbiosMemoryState::Ready(ready) => Some(ready.snapshot.clone()),
             _ => None,
         };
         let projection = shell.projection();

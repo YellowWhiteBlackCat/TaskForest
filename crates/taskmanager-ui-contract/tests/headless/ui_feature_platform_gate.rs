@@ -747,8 +747,8 @@ fn the_evidence_closure_requires_a_complete_source_commitment() {
     // table with the same shape: without it, deleting the rule would leave the
     // committed table green.
     let pending_table = FeatureEvidenceTable::parse(concat!(
-        "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\n",
+        "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\t-\n",
     ));
     assert!(
         pending_table.findings().is_empty(),
@@ -826,58 +826,68 @@ fn g2_refuses_the_un_anchored_remainder_even_with_the_committed_table() {
 /// duplicated cell, and an anchor on a non-delivery binding are all findings.
 #[test]
 fn the_evidence_table_parser_rejects_malformed_rows() {
-    let header = "feature_id\tfrontend\ttest_id\tstatus\tnote\n";
+    let header = "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n";
     let legal = FeatureEvidenceTable::parse(concat!(
-        "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-        "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
-        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\n",
+        "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+        "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\tgpui_app::tests::co_anchor\n",
+        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\t-\n",
     ));
     assert!(legal.findings().is_empty(), "{:?}", legal.findings());
     assert_eq!(legal.anchored_count(), 1);
     assert_eq!(legal.pending_count(), 1);
+    assert_eq!(
+        legal.co_anchor(FeatureId::HandleEnumeration, FrontendShape::Gpui),
+        Some("gpui_app::tests::co_anchor"),
+        "the sixth column parses into the row's co-anchor"
+    );
+    assert_eq!(
+        legal.co_anchor(FeatureId::DiskSmartHealth, FrontendShape::Bevy),
+        None,
+        "a row without a co-anchor exposes none"
+    );
 
     type EvidenceFindingCase = (&'static str, fn(&FeatureEvidenceFinding) -> bool);
-    let cases: [EvidenceFindingCase; 6] = [
+    let cases: [EvidenceFindingCase; 7] = [
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "handles.nope\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.nope\tgpui\tgpui_app::tests::anchor\tanchored\t-\t-\n",
             ),
             |finding| matches!(finding, FeatureEvidenceFinding::UnknownFeature { .. }),
         ),
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "handles.enumeration\twatch\tgpui_app::tests::anchor\tanchored\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.enumeration\twatch\tgpui_app::tests::anchor\tanchored\t-\t-\n",
             ),
             |finding| matches!(finding, FeatureEvidenceFinding::UnknownFrontend { .. }),
         ),
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "handles.enumeration\tgpui\tpending\tanchored\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.enumeration\tgpui\tpending\tanchored\t-\t-\n",
             ),
             |finding| matches!(finding, FeatureEvidenceFinding::UnusableAnchor { .. }),
         ),
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tpending\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tpending\t-\t-\n",
             ),
             |finding| matches!(finding, FeatureEvidenceFinding::PendingWithAnchor { .. }),
         ),
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
-                "handles.enumeration\tgpui\tgpui_app::tests::other\tanchored\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\t-\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::other\tanchored\t-\t-\n",
             ),
             |finding| matches!(finding, FeatureEvidenceFinding::DuplicateCell { .. }),
         ),
         (
             concat!(
-                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
-                "memory.leak-trend\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "memory.leak-trend\tgpui\tgpui_app::tests::anchor\tanchored\t-\t-\n",
             ),
             |finding| {
                 matches!(
@@ -885,6 +895,13 @@ fn the_evidence_table_parser_rejects_malformed_rows() {
                     FeatureEvidenceFinding::AnchorOnNonDeliveryBinding { .. }
                 )
             },
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::MalformedRow { .. }),
         ),
     ];
     for (table, predicate) in cases {

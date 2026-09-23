@@ -30,12 +30,15 @@ use taskmanager_platform_contract::{
     EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{LightDark, Skin, Theme};
 
-use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
+use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, resolve_demo_theme};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 /// Headless-only infrastructure composition. The production launcher owns
 /// these plugins through `DefaultPlugins`; keeping this in the test module
@@ -233,6 +236,39 @@ fn text_role_observer_stamps_palette_typography() {
     );
 }
 
+/// The shared `TM_SKIN` testing override selects the demo/capture appearance.
+/// Unset (and invalid) keeps today's GNOME-light reference skin; a valid token
+/// resolves the requested skin/mode and repaints the window palette.
+#[test]
+fn tm_skin_override_resolves_the_demo_theme() {
+    let default = resolve_demo_theme(None, false);
+    assert_eq!(default.skin, Skin::Gnome, "unset keeps the GNOME skin");
+    assert_eq!(
+        default.mode,
+        LightDark::Light,
+        "unset keeps the light reference mode"
+    );
+    assert_eq!(
+        resolve_demo_theme(Some("plasma-dark"), false).skin,
+        Skin::Gnome,
+        "an unknown skin is not an override"
+    );
+
+    let dark = resolve_demo_theme(Some("gnome-dark"), false);
+    assert_eq!(dark.skin, Skin::Gnome);
+    assert_eq!(dark.mode, LightDark::Dark);
+    assert_ne!(
+        ui_palette(&default).window_clear,
+        ui_palette(&dark).window_clear,
+        "gnome-dark must repaint the window backdrop"
+    );
+
+    let contrast = resolve_demo_theme(Some("KDE-DARK"), true);
+    assert_eq!(contrast.skin, Skin::Kde, "case-insensitive skin alias");
+    assert_eq!(contrast.mode, LightDark::Dark);
+    assert!(contrast.hc, "TM_SKIN_HC rides the same override");
+}
+
 #[test]
 fn the_accessibility_bridge_resources_are_installed_once() {
     // The AccessKit bridge (accesskit_unix on Linux) publishes
@@ -296,9 +332,9 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
         .non_send_mut::<crate::app::FrontendTrack>()
         .shell
         .report_notice(
-            taskmanager_shell::FeedbackSource::Interaction,
-            taskmanager_shell::FeedbackSeverity::Info,
-            taskmanager_shell::FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
+            FeedbackSource::Interaction,
+            FeedbackSeverity::Info,
+            FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
             "Screenshot captured",
         );
 

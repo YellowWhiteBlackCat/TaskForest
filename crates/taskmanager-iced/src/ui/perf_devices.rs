@@ -13,6 +13,9 @@ use taskmanager_shell::presentation::{
 };
 
 use super::responsive::PerformancePageBudget;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::SPACE_7;
+use taskmanager_theme::tokens::SPACE_10;
 
 /// The frame-local render context shared by every Performance device block
 /// (fan / disk / network / battery) and the graph helpers they delegate to.
@@ -28,7 +31,7 @@ pub(super) struct DeviceBlockContext<'a> {
     /// The Iced root the block reads cached series and preferences from.
     pub app: &'a crate::IcedApp,
     /// The resolved theme snapshot for this frame.
-    pub theme: &'a taskmanager_theme::Theme,
+    pub theme: &'a Theme,
     /// The device family's resolved stroke color.
     pub color: iced::Color,
     /// Whether the frame renders the compact Strip device navigation.
@@ -60,7 +63,7 @@ pub(crate) use rates::{rate_text_pref, throughput_scale};
 /// Wrap a device section's per-device blocks inside the shared panel container.
 pub(crate) fn device_rows_panel<'a>(
     rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     container(column(rows).spacing(12).width(iced::Length::Fill))
         .width(iced::Length::Fill)
@@ -76,7 +79,7 @@ pub(crate) fn device_rows_panel<'a>(
 /// the shared `device_action_i18n_key` projection, so iced and GPUI never
 /// disagree on which hint to render for a given status.
 pub(crate) fn device_status_footer<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     status: DeviceStatus,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     if status == DeviceStatus::Healthy {
@@ -85,10 +88,7 @@ pub(crate) fn device_status_footer<'a>(
     let palette = theme_snapshot.palette();
     Some(
         container(text(t(device_action_i18n_key(status))).size(f32::from(tokens::FONT_12)))
-            .padding([
-                f32::from(taskmanager_theme::tokens::SPACE_7),
-                f32::from(taskmanager_theme::tokens::SPACE_10),
-            ])
+            .padding([f32::from(SPACE_7), f32::from(SPACE_10)])
             .style(move |_| {
                 use iced::widget::container::Style;
                 let accent = crate::theme_binding::color(theme_snapshot.accent);

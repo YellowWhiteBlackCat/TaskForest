@@ -7,14 +7,18 @@ use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_shell::presentation::smart_availability_i18n_key;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, with_alpha};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
     let mut column = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .w(px(360.0))
         .child(prop_row(
             theme,
@@ -96,22 +100,13 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
     if disk.smart_critical_warning == Some(true) {
         column = column.child(
             div()
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
-                .px(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_10,
-                ))
-                .py(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::small_radius(theme),
-                ))
-                .bg(taskmanager_ui::theme_binding::fill(with_alpha(
-                    theme.danger,
-                    0.18,
-                )))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
+                .mt(length(tokens::SPACE_8))
+                .px(definite_length(tokens::SPACE_10))
+                .py(definite_length(tokens::SPACE_6))
+                .rounded(absolute(tokens::small_radius(theme)))
+                .bg(fill(with_alpha(theme.danger, 0.18)))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.danger))
                 .child(i18n::t("disk.warning_text")),
         );
     }

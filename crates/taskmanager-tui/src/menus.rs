@@ -16,6 +16,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SmartAvailability;
+use taskmanager_core::core::process::{FrozenProcessIdentity, PriorityTier};
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
@@ -169,9 +170,9 @@ impl TuiApp {
             return None;
         }
         match action {
-            ui::process_menu::ProcessMenuAction::EndTask => self
-                .shell
-                .apply_action(taskmanager_application::AppAction::RequestEndTask),
+            ui::process_menu::ProcessMenuAction::EndTask => {
+                self.shell.apply_action(AppAction::RequestEndTask)
+            }
             ui::process_menu::ProcessMenuAction::EndProcessTree => {
                 self.shell.request_process_tree_end(menu.identity);
                 None
@@ -190,8 +191,7 @@ impl TuiApp {
             | ui::process_menu::ProcessMenuAction::PriorityLow => {
                 // priority_tier is total over the priority variants; the
                 // Normal fallback keeps the production tree panic-free.
-                let tier = ui::process_menu::priority_tier(action)
-                    .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
+                let tier = ui::process_menu::priority_tier(action).unwrap_or(PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
             }
@@ -199,9 +199,7 @@ impl TuiApp {
                 .shell
                 .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true)),
             ui::process_menu::ProcessMenuAction::Affinity => {
-                if let Some(target) =
-                    taskmanager_core::core::process::FrozenProcessIdentity::from_process(&menu.item)
-                {
+                if let Some(target) = FrozenProcessIdentity::from_process(&menu.item) {
                     self.open_process_affinity_for(target)
                 } else {
                     self.open_process_affinity()
@@ -302,8 +300,7 @@ impl TuiApp {
             | ui::batch_menu::BatchMenuAction::PriorityLow => {
                 // priority_tier is total over the priority variants; the
                 // Normal fallback keeps the production tree panic-free.
-                let tier = ui::batch_menu::priority_tier(action)
-                    .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
+                let tier = ui::batch_menu::priority_tier(action).unwrap_or(PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
             }
@@ -334,9 +331,7 @@ impl TuiApp {
         let Some(item) = self.selected_detail_process() else {
             return false;
         };
-        let Some(identity) =
-            taskmanager_core::core::process::FrozenProcessIdentity::from_process(&item)
-        else {
+        let Some(identity) = FrozenProcessIdentity::from_process(&item) else {
             return false;
         };
         self.close_local_overlays();
@@ -510,7 +505,7 @@ impl TuiApp {
     /// Open the interactive service dependencies browsing modal for the selected service.
     #[must_use]
     pub fn open_service_dependencies(&mut self) -> bool {
-        if self.page() != taskmanager_application::AppPage::Services {
+        if self.page() != AppPage::Services {
             return false;
         }
         let Some(service) = self.sorted_service_at(self.selected) else {
@@ -546,7 +541,7 @@ impl TuiApp {
             return None;
         }
         let item = self.selected_detail_process()?;
-        let target = taskmanager_core::core::process::FrozenProcessIdentity::from_process(&item)?;
+        let target = FrozenProcessIdentity::from_process(&item)?;
         self.open_process_affinity_for(target)
     }
 
@@ -560,13 +555,11 @@ impl TuiApp {
     #[must_use]
     pub fn open_process_affinity_for(
         &mut self,
-        target: taskmanager_core::core::process::FrozenProcessIdentity,
+        target: FrozenProcessIdentity,
     ) -> Option<PlatformEffect> {
         let logical_cpu_count = self.logical_cpu_count();
         let current_mask = match self.shell.process_affinity_state() {
-            taskmanager_application::ProcessAffinityState::Ready(ready)
-                if ready.target == target =>
-            {
+            ProcessAffinityState::Ready(ready) if ready.target == target => {
                 Some(ready.cpus.clone())
             }
             _ => None,
@@ -651,7 +644,7 @@ impl TuiApp {
 #[must_use]
 fn affinity_last_good<'a>(
     state: &'a ProcessAffinityState,
-    target: &taskmanager_core::core::process::FrozenProcessIdentity,
+    target: &FrozenProcessIdentity,
 ) -> Option<&'a ProcessAffinityReady> {
     match state {
         ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),

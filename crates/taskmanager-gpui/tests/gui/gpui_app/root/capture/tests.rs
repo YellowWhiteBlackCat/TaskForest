@@ -1,3 +1,10 @@
+use taskmanager_core::core::FilesystemHealthSnapshot;
+use taskmanager_core::core::PowerSupplySnapshot;
+use taskmanager_core::core::SensorCenterSnapshot;
+use taskmanager_core::core::SensorQuantity;
+use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 #[path = "tests/dashboard.rs"]
 mod dashboard;
 #[path = "tests/live.rs"]
@@ -165,7 +172,7 @@ fn process_selection_capture_targets_the_visible_application_aggregate() {
         ProcessApplicationIdentity::new("io.example.CaptureTarget", "Capture Target", None)
             .expect("valid capture application identity");
     let mut processes = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(42_424)
             .name("capture-host".into())
             .application_identity_observation(ProcessMetadataObservation::available(
@@ -173,7 +180,7 @@ fn process_selection_capture_targets_the_visible_application_aggregate() {
                 1,
             ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(42_425)
             .parent_pid(Some(42_424))
             .name("taskmanager".into())
@@ -184,11 +191,8 @@ fn process_selection_capture_targets_the_visible_application_aggregate() {
     assert_eq!(
         evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
         Some(CaptureProcessAction::ApplicationSelection(
-            ProcessLiveKey::from_parts(
-                42_424,
-                taskmanager_test_support::fixture_start_token(42_424),
-            )
-            .expect("fixture identity"),
+            ProcessLiveKey::from_parts(42_424, fixture_start_token(42_424),)
+                .expect("fixture identity"),
         ))
     );
     assert!(evidence.scenario_ready());
@@ -635,8 +639,8 @@ fn health_scenarios_wait_for_exact_visible_fixture_state() {
         );
         let mut page = TopPage::Apps;
         let mut dashboard = DashboardState::new();
-        let mut filesystems = taskmanager_core::core::FilesystemHealthSnapshot::default();
-        let mut sensors = taskmanager_core::core::SensorCenterSnapshot::default();
+        let mut filesystems = FilesystemHealthSnapshot::default();
+        let mut sensors = SensorCenterSnapshot::default();
         let outcome = evidence.on_system_health_state(
             &mut page,
             &mut dashboard,
@@ -680,8 +684,8 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
             .is_none()
     );
     let mut page = TopPage::Apps;
-    let mut power_supplies = taskmanager_core::core::PowerSupplySnapshot::default();
-    let mut sensors = taskmanager_core::core::SensorCenterSnapshot::default();
+    let mut power_supplies = PowerSupplySnapshot::default();
+    let mut sensors = SensorCenterSnapshot::default();
     assert!(evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
     assert_eq!(page, TopPage::Performance);
     assert_eq!(power_supplies.batteries.len(), 1);
@@ -689,7 +693,7 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
         sensors
             .readings
             .iter()
-            .any(|reading| reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed)
+            .any(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
     );
     assert!(evidence.scenario_ready());
     assert!(!evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
@@ -836,13 +840,12 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
         snapshot.timestamp_ms,
     ));
     assert!(evidence.scenario_ready());
-    let aggregate_samples =
-        taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
-            &live_graph,
-            "gpu:capture:engine-inventory",
-            1,
-            GpuChartMetric::Utilization,
-        );
+    let aggregate_samples = gpu_chart_metric_history(
+        &live_graph,
+        "gpu:capture:engine-inventory",
+        1,
+        GpuChartMetric::Utilization,
+    );
     assert_eq!(aggregate_samples.len(), 5);
     assert_eq!(
         aggregate_samples.last().copied(),

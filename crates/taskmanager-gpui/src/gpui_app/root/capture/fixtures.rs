@@ -271,9 +271,7 @@ fn capture_partition(
     let observations = if mount_point.is_empty() {
         DiskPartitionScalarObservations {
             capacity_bytes: ScalarObservation::available(total_gib * scale, now),
-            ..DiskPartitionScalarObservations::unavailable(
-                taskmanager_core::core::FailureKind::Unsupported,
-            )
+            ..DiskPartitionScalarObservations::unavailable(FailureKind::Unsupported)
         }
     } else {
         DiskPartitionScalarObservations {

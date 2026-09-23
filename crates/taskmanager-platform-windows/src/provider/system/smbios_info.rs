@@ -9,11 +9,13 @@ use smbioslib::{
     SMBiosSystemInformation,
 };
 use taskmanager_core::FirmwareInfo;
+#[cfg(windows)]
+use taskmanager_windows_api::raw_smbios_table;
 
 /// Query and parse SMBIOS firmware and system facts.
 #[cfg(windows)]
 pub(super) fn query_firmware_info() -> Option<FirmwareInfo> {
-    let raw_bytes = taskmanager_windows_api::raw_smbios_table().ok()?;
+    let raw_bytes = raw_smbios_table().ok()?;
     let table_data = if raw_bytes.len() > 8 {
         raw_bytes[8..].to_vec()
     } else {
@@ -95,7 +97,7 @@ pub(super) struct SmbiosMemoryFacts {
 /// Query and parse memory slots, speed, and module information from SMBIOS.
 #[cfg(windows)]
 pub(super) fn query_memory_hardware_info() -> Option<SmbiosMemoryFacts> {
-    let raw_bytes = taskmanager_windows_api::raw_smbios_table().ok()?;
+    let raw_bytes = raw_smbios_table().ok()?;
     let table_data = if raw_bytes.len() > 8 {
         raw_bytes[8..].to_vec()
     } else {

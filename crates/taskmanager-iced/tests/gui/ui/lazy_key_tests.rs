@@ -5,6 +5,7 @@
 //! and set-valued inputs hash order-independently.
 
 use super::LazyKey;
+use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::{HighContrast, LightDark, Skin, Theme};
 
 fn dark_theme() -> Theme {
@@ -12,7 +13,7 @@ fn dark_theme() -> Theme {
         Skin::Gnome,
         LightDark::Dark,
         HighContrast::Off,
-        taskmanager_theme::ResolvedFonts {
+        ResolvedFonts {
             ui: "Adwaita Sans",
             mono: "Adwaita Mono",
         },
@@ -50,7 +51,7 @@ fn one_theme_rule_invalidates_every_surface_and_stability_holds() {
         Skin::Gnome,
         LightDark::Light,
         HighContrast::Off,
-        taskmanager_theme::ResolvedFonts {
+        ResolvedFonts {
             ui: "Adwaita Sans",
             mono: "Adwaita Mono",
         },

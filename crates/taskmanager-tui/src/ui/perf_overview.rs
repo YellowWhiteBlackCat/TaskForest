@@ -27,6 +27,7 @@ use super::{perf_core_grid, perf_memory};
 use crate::PerfDevice;
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskmanager_application::RaplPowerState;
 
 /// Render the selected CPU or Memory overview through its dedicated layout.
 pub(super) fn render_perf_overview(
@@ -194,7 +195,7 @@ fn render_cpu_overview(
 fn cpu_rail_rows(
     snapshot: &SystemSnapshot,
     hardware: Option<&HardwareInfo>,
-    rapl_state: Option<&taskmanager_application::RaplPowerState>,
+    rapl_state: Option<&RaplPowerState>,
 ) -> Vec<CpuRailRow> {
     let mut rows = cpu_live_rail_rows(snapshot, rapl_state);
     rows.extend(cpu_spec_rail_rows(&snapshot.cpu, hardware));
@@ -239,12 +240,9 @@ fn render_cpu_rail(
     let (effective_scroll, max_scroll) =
         super::process_details::clamped_scroll(content_lines, available, scroll);
     let title = if max_scroll > 0 {
-        format!(
-            "{} · Ctrl↑↓",
-            taskmanager_application::i18n::t("common.details")
-        )
+        format!("{} · Ctrl↑↓", t("common.details"))
     } else {
-        taskmanager_application::i18n::t("common.details").to_owned()
+        t("common.details").to_owned()
     };
     frame.render_widget(
         Paragraph::new(lines)

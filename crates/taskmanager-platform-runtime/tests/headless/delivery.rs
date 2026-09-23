@@ -23,9 +23,17 @@ use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPubli
 use crate::Queued;
 use crate::config::{CapabilityRoute, DeliveryClass};
 use crate::health::CapabilityHealth;
+use taskmanager_application::DirectoryUsageEvent;
+use taskmanager_application::ShellEvent;
 
 #[path = "delivery/worker_lifecycle.rs"]
 mod worker_lifecycle;
+
+// One definition of the deterministic cross-thread wait macro; every runtime
+// test module invokes it as `crate::wait_for!`. A file may not be mounted as a
+// module more than once (`clippy::duplicate_mod`).
+#[path = "wait.rs"]
+mod wait;
 
 fn fixed_clock() -> u64 {
     42
@@ -464,15 +472,13 @@ fn successfully_published_progress_renews_the_target_lease_from_monotonic_time()
             request,
             CapabilityId::DIRECTORY_USAGE,
             ProviderId::borrowed("fixture.directory"),
-            PlatformEvent::DirectoryUsage(taskmanager_application::DirectoryUsageEvent::Update(
-                DirectoryUsageSnapshot {
-                    scan_id: DirectoryScanId::new(request.get()),
-                    root: "/fixture/long-running".into(),
-                    status: DirectoryScanStatus::Scanning,
-                    entries: Vec::new(),
-                    totals: DirectoryScanTotals::fresh(1),
-                },
-            )),
+            PlatformEvent::DirectoryUsage(DirectoryUsageEvent::Update(DirectoryUsageSnapshot {
+                scan_id: DirectoryScanId::new(request.get()),
+                root: "/fixture/long-running".into(),
+                status: DirectoryScanStatus::Scanning,
+                entries: Vec::new(),
+                totals: DirectoryScanTotals::fresh(1),
+            },)),
         ),
         LaneFlow::Continue
     );
@@ -620,7 +626,7 @@ fn duplicate_catalog_routes_keep_one_descriptor_and_first_provider_authority() {
 fn mismatched_success_payloads_fail_closed_before_health_publication() {
     let (publisher, control_rx, _, catalog) = fixture();
     let provider = ProviderId::borrowed("fixture.process-control");
-    let mismatched = || PlatformEvent::Shell(taskmanager_application::ShellEvent::TargetOpened);
+    let mismatched = || PlatformEvent::Shell(ShellEvent::TargetOpened);
     let first = RequestId::new(40).expect("fixture id");
     reserve_fixture_owner(&catalog, &CapabilityId::PROCESS_CONTROL, first);
     assert_eq!(
@@ -716,7 +722,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
                     Vec::new(),
                 )),
             }),
-            CapabilityHealth::Degraded(taskmanager_core::FailureKind::PermissionDenied),
+            CapabilityHealth::Degraded(FailureKind::PermissionDenied),
         ),
         LaneFlow::Continue
     );
@@ -730,7 +736,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
         .expect("telemetry capability");
     assert_eq!(
         descriptor.status,
-        CapabilityStatus::Degraded(taskmanager_core::FailureKind::PermissionDenied)
+        CapabilityStatus::Degraded(FailureKind::PermissionDenied)
     );
     assert_eq!(descriptor.last_success_at_ms, Some(fixed_clock()));
 }
@@ -818,7 +824,7 @@ fn failed_publication_retains_the_envelope_sequence_after_detachment() {
     assert_eq!(sequence, EventSequence::new(1));
     assert_eq!(failure.sequence, sequence);
     assert_eq!(failure.request_id, request_id);
-    assert_eq!(failure.kind, taskmanager_core::FailureKind::TimedOut);
+    assert_eq!(failure.kind, FailureKind::TimedOut);
 }
 
 #[test]
@@ -870,22 +876,16 @@ fn lane_panic_is_isolated_and_publishes_a_typed_failure() {
 
     // The panicked request's owner retires only when its terminal health
     // record lands (claim -> enqueue -> record), while the event above is
-    // already observable after the enqueue; retry admission across that
-    // documented microsecond window instead of assuming one interleaving.
-    let mut ok_admitted = false;
-    for _ in 0..10_000 {
-        if catalog
+    // already observable after the enqueue; wait on a wall-clock deadline for
+    // that documented window instead of assuming one interleaving.
+    crate::wait_for!("panicked terminal to retire its owner", || {
+        catalog
             .ecs_scheduler_handle()
             .lock()
             .expect("scheduler lock")
             .reserve_submission(&CapabilityId::TELEMETRY_CPU, ok_id, 0)
-        {
-            ok_admitted = true;
-            break;
-        }
-        std::thread::yield_now();
-    }
-    assert!(ok_admitted, "panicked terminal must retire its owner");
+            .then_some(())
+    });
     request_tx
         .send(Queued {
             request_id: ok_id,
@@ -912,6 +912,7 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
     let workers = crate::WorkerRuntime::default();
     let served = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let marker = served.clone();
+    let (served_tx, served_rx) = bounded(2);
     let cpu_event = |payload: u8| {
         PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Cpu {
             revision: SystemTelemetryRevision::new(u64::from(payload) + 1),
@@ -924,6 +925,7 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
     };
     super::spawn_lane(&workers, request_rx, publisher, move |payload: u8| {
         marker.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let _ = served_tx.send(());
         Ok(cpu_event(payload))
     })
     .expect("provider worker starts");
@@ -941,10 +943,12 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
             .expect("request queued");
     }
     drop(request_tx);
-    let mut waited = 0;
-    while served.load(std::sync::atomic::Ordering::SeqCst) < 2 && waited < 500 {
-        thread::sleep(Duration::from_millis(10));
-        waited += 1;
+    // The provider runs on the lane thread; block on its own completion
+    // signal rather than counting scheduler yields.
+    for _ in 0..2 {
+        served_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the lane must keep serving requests after stale publications");
     }
     assert_eq!(
         served.load(std::sync::atomic::Ordering::SeqCst),

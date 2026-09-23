@@ -5,10 +5,20 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, px,
 };
 use taskmanager_app_host::WindowCaptureClient;
+use taskmanager_application::i18n;
 use taskmanager_application::window_capture::WindowCaptureSession;
 use taskmanager_application::window_capture::WindowCaptureState;
 use taskmanager_application::window_capture::{WindowCaptureSubmitError, WindowCaptureTarget};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_theme::Color;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::SPACE_6;
+use taskmanager_theme::tokens::SPACE_8;
+use taskmanager_theme::tokens::control_radius;
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui_contract::IconId;
 use tracing::{info, warn};
 
@@ -42,7 +52,7 @@ impl WindowCaptureRuntime {
 /// Cross-platform one-shot capture affordance. The click only submits a typed
 /// application request; the app-host owns native providers and PNG commit.
 pub(crate) fn current_window_capture_btn(
-    t: &taskmanager_theme::Theme,
+    t: &Theme,
     hovered: Option<&Hover>,
     icon_only: bool,
     cx: &mut Context<RootView>,
@@ -82,30 +92,24 @@ pub(crate) fn current_window_capture_btn(
             .focusable()
             .tab_stop(true)
             .focus(elements::focus_ring(t))
-            .px(taskmanager_ui::theme_binding::definite_length(
-                taskmanager_theme::tokens::SPACE_8,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                taskmanager_theme::tokens::SPACE_6,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                taskmanager_theme::tokens::control_radius(t),
-            ))
-            .bg(taskmanager_ui::theme_binding::fill(if is_hov {
+            .px(definite_length(SPACE_8))
+            .py(definite_length(SPACE_6))
+            .rounded(absolute(control_radius(t)))
+            .bg(fill(if is_hov {
                 t.accent.with_alpha(0.12)
             } else {
-                taskmanager_theme::Color::TRANSPARENT
+                Color::TRANSPARENT
             }))
             .flex()
             .items_center()
             .justify_center()
-            .child(taskmanager_ui::icons_binding::icon(IconId::Export).size(px(16.0)))
+            .child(icon(IconId::Export).size(px(16.0)))
             .into_any_element();
     }
 
     elements::Pill::new(
         "window-capture-btn",
-        taskmanager_application::i18n::t("window_capture.capture"),
+        i18n::t("window_capture.capture"),
         on_click,
         on_hover,
     )
@@ -127,7 +131,7 @@ impl RootView {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::TIMED_LONG,
-                taskmanager_application::i18n::t("window_capture.unavailable"),
+                i18n::t("window_capture.unavailable"),
             );
             return false;
         };
@@ -142,7 +146,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("window_capture.queued"),
+                    i18n::t("window_capture.queued"),
                 );
                 true
             }
@@ -151,7 +155,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("window_capture.busy"),
+                    i18n::t("window_capture.busy"),
                 );
                 false
             }
@@ -160,7 +164,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::UntilReplaced,
-                    taskmanager_application::i18n::t("window_capture.unavailable"),
+                    i18n::t("window_capture.unavailable"),
                 );
                 false
             }
@@ -175,8 +179,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("window_capture.failed")
-                        .replace("{}", error.detail()),
+                    i18n::t("window_capture.failed").replace("{}", error.detail()),
                 );
                 false
             }
@@ -208,7 +211,7 @@ impl RootView {
                     backend = backend.code(),
                     "current-window PNG capture completed"
                 );
-                let message = taskmanager_application::i18n::t("window_capture.success")
+                let message = i18n::t("window_capture.success")
                     .replacen("{}", destination.as_ref(), 1)
                     .replacen("{}", &width.to_string(), 1)
                     .replacen("{}", &height.to_string(), 1);
@@ -233,8 +236,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("window_capture.failed")
-                        .replace("{}", error.detail()),
+                    i18n::t("window_capture.failed").replace("{}", error.detail()),
                 );
             }
             WindowCaptureState::Closed

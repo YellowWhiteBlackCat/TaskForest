@@ -1,13 +1,17 @@
 //! Host smoke tests for hardware-data correctness (cache totals, etc.). These read
 //! live /sys + DMI, so they assert aggregate sanity rather than exact host values.
 
+// Linux-only provider: `detect_cpu_cache` is a real /sys reader on Linux and a
+// None stub elsewhere, so the import rides the Linux gate with its consumer.
+#[cfg(target_os = "linux")]
+use taskmanager_platform_linux::{detect_cpu_cache, parse_size_to_kb};
 // Reads live /sys + detect_cpu_cache (a Linux-only provider that returns a
 // None stub on macOS/Windows) — compile/run on Linux only, else the stub makes
 // every assertion fail pointlessly off-Linux.
 #[cfg(target_os = "linux")]
 #[test]
 fn cache_totals_are_aggregated_not_per_core() {
-    let (l1d, _l1i, l2, l3) = taskmanager_platform_linux::detect_cpu_cache();
+    let (l1d, _l1i, l2, l3) = detect_cpu_cache();
     assert!(
         l1d.is_some_and(|value| value > 0),
         "L1 data cache missing: {l1d:?}"
@@ -54,7 +58,7 @@ fn cpu0_l2_instance_kb() -> Option<u64> {
         if level.trim() != "2" {
             continue;
         }
-        max = max.max(taskmanager_platform_linux::parse_size_to_kb(size.trim()));
+        max = max.max(parse_size_to_kb(size.trim()));
         saw_any = true;
     }
     saw_any.then_some(max)

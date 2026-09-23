@@ -132,11 +132,13 @@ mod sort;
 #[path = "app/source_status.rs"]
 mod source_status;
 
+use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_application::{
     CorrelatedDirectoryUsageEvent, CorrelatedEvent, DeviceLifecyclePartition, DirectoryUsageEvent,
     KeyCode, Modifiers, PlatformEventContext, SensorEvent, SessionControlOutcome,
     StartupControlOutcome,
 };
+use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 use taskmanager_core::core::directory_usage::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
 };
@@ -144,6 +146,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceId, ProviderId};
 use taskmanager_core::core::metrics::{CpuScalarObservations, ScalarObservation};
 use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
 };
@@ -165,11 +168,11 @@ fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
 }
 
 /// A zero-duration CPU rule so the test fires on the first evaluation.
-fn instant_cpu_rule() -> taskmanager_core::core::alerts::AlertRule {
-    taskmanager_core::core::alerts::AlertRule::new(
+fn instant_cpu_rule() -> AlertRule {
+    AlertRule::new(
         "cpu-high",
-        taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
-        taskmanager_core::core::alerts::AlertSeverity::Warning,
+        AlertMetric::CpuUsagePercent,
+        AlertSeverity::Warning,
         90.0,
         std::time::Duration::ZERO,
         0.0,
@@ -186,12 +189,9 @@ fn alert_center_evaluates_each_new_telemetry_tick_and_queues_notifications() {
     });
     app.data
         .alert_center
-        .edit_rules(taskmanager_application::ManagedAlertRuleEdit::Import {
-            rules: vec![taskmanager_application::ManagedAlertRule::new(
-                instant_cpu_rule(),
-                true,
-            )],
-            mode: taskmanager_application::AlertRuleImportMode::Replace,
+        .edit_rules(ManagedAlertRuleEdit::Import {
+            rules: vec![ManagedAlertRule::new(instant_cpu_rule(), true)],
+            mode: AlertRuleImportMode::Replace,
         })
         .unwrap();
     app.data.snapshot = Some(snapshot_with_cpu(95.0, 100_000));
@@ -222,12 +222,9 @@ fn alert_notifications_respect_opt_out_policy() {
     let mut app = crate::demo_app();
     app.data
         .alert_center
-        .edit_rules(taskmanager_application::ManagedAlertRuleEdit::Import {
-            rules: vec![taskmanager_application::ManagedAlertRule::new(
-                instant_cpu_rule(),
-                true,
-            )],
-            mode: taskmanager_application::AlertRuleImportMode::Replace,
+        .edit_rules(ManagedAlertRuleEdit::Import {
+            rules: vec![ManagedAlertRule::new(instant_cpu_rule(), true)],
+            mode: AlertRuleImportMode::Replace,
         })
         .unwrap();
     app.data.snapshot = Some(snapshot_with_cpu(95.0, 100_000));
@@ -248,7 +245,7 @@ fn alert_notifications_respect_opt_out_policy() {
 fn managed_rule_toggle_has_one_semantics_on_composed_and_direct_frontend_tracks() {
     let mut composed = crate::demo_app();
     let mut direct = DirectTrackState::default();
-    let edit = taskmanager_application::ManagedAlertRuleEdit::Toggle {
+    let edit = ManagedAlertRuleEdit::Toggle {
         rule_id: "cpu-high".into(),
     };
 
@@ -267,12 +264,9 @@ fn managed_rule_toggle_has_one_semantics_on_composed_and_direct_frontend_tracks(
 fn alert_transition_history_is_identical_on_composed_and_direct_tracks() {
     let mut composed = crate::ShellApp::new();
     let mut direct = crate::DirectTrackState::default();
-    let edit = taskmanager_application::ManagedAlertRuleEdit::Import {
-        rules: vec![taskmanager_application::ManagedAlertRule::new(
-            instant_cpu_rule(),
-            true,
-        )],
-        mode: taskmanager_application::AlertRuleImportMode::Replace,
+    let edit = ManagedAlertRuleEdit::Import {
+        rules: vec![ManagedAlertRule::new(instant_cpu_rule(), true)],
+        mode: AlertRuleImportMode::Replace,
     };
     composed.edit_alert_rules(edit.clone()).unwrap();
     direct.edit_alert_rules(edit).unwrap();
@@ -328,11 +322,12 @@ fn legacy_process_row_cannot_open_or_confirm_a_dangerous_action() {
     // action (CORE-01 fail-closed rule).
     app.data.processes = Some(
         vec![
-            taskmanager_core::core::process::ProcessItem::new(42, "legacy-worker")
-                .with_scalar_observations(ProcessScalarObservations {
+            ProcessItem::new(42, "legacy-worker").with_scalar_observations(
+                ProcessScalarObservations {
                     start_time_secs: ScalarObservation::available(7_500, 1),
                     ..ProcessScalarObservations::default()
-                }),
+                },
+            ),
         ]
         .into(),
     );

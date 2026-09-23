@@ -24,6 +24,10 @@ use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 
 use crate::{ProcessDetailsSection, ProcessPropertiesTarget};
+use taskmanager_application::{InteractionEvent, PendingConfirmation};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
+use taskmanager_ui_contract::{SemanticNode, SemanticSnapshot};
 
 /// The publication bound the GPUI/Iced frontends also apply.
 const EXPECTED_MAX_PUBLISHED_ROWS: usize = 64;
@@ -41,7 +45,7 @@ fn app_on_applications_page() -> TuiApp {
 /// are available observations, `None` is a typed permission-denied
 /// unavailability (never a legacy fallback).
 fn process_with(pid: u32, name: &str, cpu: Option<f32>, memory_bytes: Option<u64>) -> ProcessItem {
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.to_owned())
         .build();
@@ -58,9 +62,7 @@ fn process_with(pid: u32, name: &str, cpu: Option<f32>, memory_bytes: Option<u64
     item
 }
 
-fn row_nodes(
-    snapshot: &taskmanager_ui_contract::SemanticSnapshot,
-) -> Vec<&taskmanager_ui_contract::SemanticNode> {
+fn row_nodes(snapshot: &SemanticSnapshot) -> Vec<&SemanticNode> {
     snapshot
         .nodes()
         .filter(|node| node.role() == SemanticRole::Row)
@@ -68,10 +70,7 @@ fn row_nodes(
 }
 
 fn process_row_id(pid: u32) -> String {
-    format!(
-        "row:process:pid:{pid}:start:{}",
-        taskmanager_test_support::fixture_start_token(pid)
-    )
+    format!("row:process:pid:{pid}:start:{}", fixture_start_token(pid))
 }
 
 fn process_cell_id(pid: u32, cell: &str) -> String {
@@ -86,18 +85,18 @@ fn process_cell_id(pid: u32, cell: &str) -> String {
 #[test]
 fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
     let mut app = app_on_applications_page();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             process_with(101, "alpha", Some(12.5), Some(25_000)),
             process_with(102, "bravo", Some(50.0), None),
             process_with(103, "gamma", None, Some(50_000)),
             process_with(104, "   ", None, None),
         ])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(SystemSnapshot {
+        ProjectionSeedFact::Snapshot(Box::new(Some(SystemSnapshot {
             cpu: CpuMetrics::from_observations(CpuScalarObservations {
                 global_usage_pct: ScalarObservation::available(31.0, 1),
                 ..Default::default()
@@ -112,16 +111,12 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
             ..SystemSnapshot::default()
         }))),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::AdvanceRefresh);
     app.selected = 2;
     app.shell.clear_process_selection();
-    app.shell.selected_rows.insert(
-        ProcessLiveKey::from_parts(103, taskmanager_test_support::fixture_start_token(103))
-            .expect("non-zero parts"),
-    );
+    app.shell
+        .selected_rows
+        .insert(ProcessLiveKey::from_parts(103, fixture_start_token(103)).expect("non-zero parts"));
     app.shell.set_feedback_activity("");
     app.shell.clear_feedback_notice();
 
@@ -199,9 +194,9 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
 #[test]
 fn semantic_process_rows_follow_the_visual_tree_visibility() {
     let mut app = app_on_applications_page();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             process_with(201, "parent", None, Some(1_000)),
             process_with(202, "child", Some(12.0), Some(2_000)),
         ])),
@@ -239,19 +234,11 @@ fn semantic_process_rows_follow_the_visual_tree_visibility() {
 #[test]
 fn first_loading_frame_omits_unobserved_graph_and_keeps_scalars_unavailable() {
     let mut app = app_on_applications_page();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![process_with(
-            77,
-            "unobserved",
-            None,
-            None,
-        )])),
+        ProjectionSeedFact::Processes(Some(vec![process_with(77, "unobserved", None, None)])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::AdvanceRefresh);
 
     let snapshot = app.semantic_snapshot().expect("loading tree must build");
 
@@ -289,11 +276,13 @@ fn shell_end_task_confirmation_is_a_dismissible_dialog() {
     let mut app = app_on_applications_page();
     let target = FrozenProcessIdentity::from_authoritative_parts(1810, "worker", 7_500, 9_000)
         .expect("valid fixture identity");
-    let _ = app.shell.application.interaction.reduce(
-        taskmanager_application::InteractionEvent::ArmConfirmation(
-            taskmanager_application::PendingConfirmation::EndTask(target),
-        ),
-    );
+    let _ = app
+        .shell
+        .application
+        .interaction
+        .reduce(InteractionEvent::ArmConfirmation(
+            PendingConfirmation::EndTask(target),
+        ));
 
     let snapshot = app.semantic_snapshot().expect("modal tree must build");
     let modal = snapshot
@@ -355,17 +344,14 @@ fn tui_local_properties_modal_publishes_and_releases_the_dialog() {
 #[test]
 fn snapshot_stays_in_the_semantic_vocabulary_with_three_domain_cells_per_row() {
     let mut app = app_on_applications_page();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             process_with(201, "alpha", Some(1.0), Some(1_000)),
             process_with(202, "beta", None, None),
         ])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::AdvanceRefresh);
 
     let snapshot = app.semantic_snapshot().expect("semantic tree must build");
 
@@ -413,14 +399,11 @@ fn row_publication_is_bounded_to_the_reader_friendly_prefix() {
     let processes: Vec<ProcessItem> = (0..70)
         .map(|index| process_with(1000 + index, "proc", Some(0.5), Some(1_000)))
         .collect();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(processes)),
+        ProjectionSeedFact::Processes(Some(processes)),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::AdvanceRefresh);
 
     let snapshot = app.semantic_snapshot().expect("bounded tree must build");
     let interactive_rows = snapshot

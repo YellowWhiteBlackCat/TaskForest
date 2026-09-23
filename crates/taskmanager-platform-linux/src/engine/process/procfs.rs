@@ -9,6 +9,7 @@ use nix::unistd::{SysconfVar, sysconf};
 use taskmanager_core::{FailureKind, FrozenProcessIdentity};
 
 use super::tree::io_failure;
+use taskmanager_core::ProcessSchedulingPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcStatFields {
@@ -17,7 +18,7 @@ pub struct ProcStatFields {
     pub(super) user_ticks: u64,
     pub(super) system_ticks: u64,
     pub(super) nice: i32,
-    pub(super) policy: Option<taskmanager_core::ProcessSchedulingPolicy>,
+    pub(super) policy: Option<ProcessSchedulingPolicy>,
     pub(super) minflt: u64,
     pub(super) majflt: u64,
 }
@@ -105,7 +106,7 @@ pub fn parse_proc_stat(text: &str) -> Option<ProcStatFields> {
         .split_whitespace()
         .nth(38)
         .and_then(|p| p.parse::<u32>().ok())
-        .map(taskmanager_core::ProcessSchedulingPolicy::from_linux_policy);
+        .map(ProcessSchedulingPolicy::from_linux_policy);
     Some(ProcStatFields {
         user_ticks: user_ticks.parse().ok()?,
         system_ticks: system_ticks.parse().ok()?,

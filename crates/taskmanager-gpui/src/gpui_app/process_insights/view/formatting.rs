@@ -1,6 +1,7 @@
 //! Small pure folds used by the GPUI process-insights cards.
 
 use taskmanager_application::i18n;
+use taskmanager_core::core::process_telemetry::IsolationKind;
 use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionTransport, LimitValue, ProcessConnection,
 };
@@ -63,9 +64,7 @@ pub(super) fn format_pair(
     }
 }
 
-pub(super) fn isolation_label(
-    kind: &taskmanager_core::core::process_telemetry::IsolationKind,
-) -> &'static str {
+pub(super) fn isolation_label(kind: &IsolationKind) -> &'static str {
     use taskmanager_core::core::process_telemetry::IsolationKind;
     match kind {
         IsolationKind::Docker => "Docker",

@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::{
     LatestControlRequest, PlatformEvent, PlatformHandle, SessionControlRequest, SessionEvent,
     StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest, StartupInventoryRequest,
@@ -55,13 +52,9 @@ fn registered_environment_provider(capability: &CapabilityId) -> ProviderId {
 }
 
 fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            return event;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("environment runtime event did not arrive");
+    crate::wait_for!("environment runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    })
 }
 
 #[test]
@@ -284,23 +277,21 @@ fn blocked_startup_evidence_never_stalls_startup_inventory_lane() {
         })
         .expect("inventory request accepted");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port")
-            && matches!(
+    let event = crate::wait_for!(
+        "startup inventory snapshot while evidence is blocked",
+        || {
+            let event = handle.events().try_recv().expect("connected event port")?;
+            matches!(
                 event.outcome,
                 Ok(PlatformEvent::Startup(StartupEvent::Snapshot(_)))
             )
-        {
-            assert_eq!(event.request_id.get(), 9);
-            assert_eq!(
-                event.provider,
-                Some(registered_environment_provider(&event.capability))
-            );
-            release_tx.send(()).expect("release evidence lane");
-            return;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    release_tx.send(()).ok();
-    panic!("startup inventory was stalled by evidence");
+            .then_some(event)
+        },
+    );
+    assert_eq!(event.request_id.get(), 9);
+    assert_eq!(
+        event.provider,
+        Some(registered_environment_provider(&event.capability))
+    );
+    release_tx.send(()).expect("release evidence lane");
 }

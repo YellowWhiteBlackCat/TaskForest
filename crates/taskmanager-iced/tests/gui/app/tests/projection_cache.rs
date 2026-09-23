@@ -1,6 +1,14 @@
 use super::*;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::SortCol;
+use taskmanager_shell::fixture::ProjectionSeedDomain;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::presentation::trend::TrendSeries;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 // --- Round-3 ProcessProjection fingerprint cache ---------------------------
 
@@ -11,45 +19,41 @@ fn projection_cache_app() -> crate::app::IcedApp {
     let mib = 1024 * 1024_u64;
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    let mut p1 = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut p1 = ProcessItemFixtureBuilder::new()
         .pid(100)
         .name("zed".into())
         .current_cpu_percentage(24.8)
         .current_memory_bytes(2_640 * mib)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("devuser"),
+            None,
+            1,
+        ))
         .build();
     p1.parent_pid = None;
-    let mut p2 = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut p2 = ProcessItemFixtureBuilder::new()
         .pid(101)
         .name("zed-worker".into())
         .current_cpu_percentage(11.2)
         .current_memory_bytes(1_000 * mib)
         .build();
     p2.parent_pid = Some(100);
-    let p3 = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let p3 = ProcessItemFixtureBuilder::new()
         .pid(102)
         .name("gnome-shell".into())
         .current_cpu_percentage(9.6)
         .current_memory_bytes(1_120 * mib)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![p1, p2, p3])),
+        ProjectionSeedFact::Processes(Some(vec![p1, p2, p3])),
     );
     // Simulate the platform batch that delivered the fixture table (the
     // documented convention for direct slot swaps: bump the process revision
     // the shell's own process memos key on).
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
     app
 }
@@ -90,7 +94,7 @@ fn projection_cache_hits_on_unchanged_state_and_reuses_the_allocation() {
         app.shell.process_sort,
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
         app.shell
             .projection()
             .snapshot
@@ -117,11 +121,9 @@ fn projection_cache_misses_when_the_data_revision_advances() {
     drop(before);
 
     // Simulate a platform batch that bumped the process-domain revision.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
 
     let after = app.projected_rows();
@@ -149,11 +151,9 @@ fn projection_cache_ignores_unrelated_system_revision() {
     let first_ptr = first.rows().as_ptr();
     drop(first);
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::System,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::System),
     );
 
     let second = app.projected_rows();
@@ -230,11 +230,9 @@ fn services_projection_ignores_unrelated_process_revision() {
     let mut app = crate::IcedApp::demo();
     let first = std::rc::Rc::clone(&app.services_projection("").0);
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
 
     let second = std::rc::Rc::clone(&app.services_projection("").0);
@@ -262,8 +260,7 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     app.performance.process_history = Some(process_history);
 
     let process_perf = app.process_perf_series().unwrap().cpu;
-    let history = app
-        .cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent);
+    let history = app.cached_metric_series(TrendSeries::CpuUsagePercent);
     let processes = app.projected_table_model().0;
     let app_history = app.projected_app_history_model();
     let services = app.services_projection("").0;
@@ -281,9 +278,7 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     ));
     assert!(Rc::ptr_eq(
         &history,
-        &app.cached_metric_series(
-            taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent
-        )
+        &app.cached_metric_series(TrendSeries::CpuUsagePercent)
     ));
     assert!(Rc::ptr_eq(&processes, &app.projected_table_model().0));
     assert!(Rc::ptr_eq(&app_history, &app.projected_app_history_model()));
@@ -307,11 +302,9 @@ fn inventory_projection_revisions_invalidate_only_their_own_domain() {
     let startup = app.startup_projection().0;
     let users = app.users_projection().0;
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Services,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Services),
     );
     let services_after = app.services_projection("").0;
     let startup_after_services = app.startup_projection().0;
@@ -320,11 +313,9 @@ fn inventory_projection_revisions_invalidate_only_their_own_domain() {
     assert!(Rc::ptr_eq(&startup, &startup_after_services));
     assert!(Rc::ptr_eq(&users, &users_after_services));
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Startup,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Startup),
     );
     let services_after_startup = app.services_projection("").0;
     let startup_after = app.startup_projection().0;
@@ -333,11 +324,9 @@ fn inventory_projection_revisions_invalidate_only_their_own_domain() {
     assert!(!Rc::ptr_eq(&startup_after_services, &startup_after));
     assert!(Rc::ptr_eq(&users_after_services, &users_after_startup));
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Sessions,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Sessions),
     );
     let services_after_users = app.services_projection("").0;
     let startup_after_users = app.startup_projection().0;
@@ -360,11 +349,9 @@ fn system_revision_rebuilds_only_the_performance_rail_domain() {
     let window = crate::ui::VirtualWindow::for_rows(devices.len(), 0.0, 800.0, 96.0, 0.0);
     let rail = app.performance_rail_rows(&devices, window);
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::System,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::System),
     );
 
     assert!(!Rc::ptr_eq(

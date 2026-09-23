@@ -140,7 +140,8 @@ fn parse_mode(line: &str) -> Option<(u32, u32)> {
 /// connector identity. Byte-level EDID interpretation is adapter-neutral; the
 /// connector name and the mode fallback stay Linux-owned.
 pub(super) fn parse_edid(connector: &str, edid: &[u8]) -> Option<DisplayInfo> {
-    let facts = taskmanager_platform_portable::parse_edid(edid)?;
+    use taskmanager_platform_portable::parse_edid;
+    let facts = parse_edid(edid)?;
     let EdidFacts {
         manufacturer,
         model,

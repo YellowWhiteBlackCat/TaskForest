@@ -2,6 +2,7 @@ use super::network_stats;
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::NetworkMetrics;
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn labels_of(metrics: &NetworkMetrics) -> Vec<String> {
     network_stats(metrics, false, UnitPreferences::default())
@@ -41,7 +42,7 @@ fn rate_rows_keep_none_for_first_sample_gaps() {
         link_speed_mbps: ScalarObservation::available(1_000, 0),
         ..NetworkScalarObservations::default()
     };
-    let metrics = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let metrics = NetworkMetricsFixtureBuilder::new()
         .ipv4_addr(Some("192.0.2.10".into()))
         .scalar_observations(scalar_observations)
         .build();
@@ -74,7 +75,7 @@ fn mtu_and_queue_rows_keep_measured_zero_visible() {
     use taskmanager_core::core::metrics::{
         NetworkAdapterType, NetworkScalarObservations, ScalarObservation,
     };
-    let metrics = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let metrics = NetworkMetricsFixtureBuilder::new()
         .scalar_observations(NetworkScalarObservations {
             mtu_bytes: ScalarObservation::available(9000, 1),
             tx_queue_len: ScalarObservation::available(0, 1),
@@ -95,7 +96,7 @@ fn mtu_and_queue_rows_keep_measured_zero_visible() {
 #[test]
 fn packet_error_rows_are_omitted_until_a_counter_is_observed() {
     use taskmanager_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
-    let metrics = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let metrics = NetworkMetricsFixtureBuilder::new()
         .scalar_observations(NetworkScalarObservations {
             rx_drops: ScalarObservation::available(3, 1),
             tx_errors: ScalarObservation::available(1, 1),

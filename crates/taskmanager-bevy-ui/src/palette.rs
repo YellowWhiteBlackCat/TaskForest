@@ -11,9 +11,10 @@
 //! (nav rail, tables, dialogs) consume `UiPalette` — never the official
 //! Feathers skin system, which this frontend does not adopt.
 
-use bevy::color::Color;
 use bevy::text::{FontSize, FontWeight, TextFont, TextLayout};
+use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
+use taskmanager_theme::Weight;
 use taskmanager_theme::tokens::{self, UiSize};
 
 /// Strictly single-line text layout for bounded rows: a value wider than its
@@ -33,14 +34,14 @@ pub(crate) fn no_wrap_text() -> TextLayout {
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
 /// clamping, premultiplication or gamma reinterpretation happens here, so a
 /// round trip through [`Color::to_srgba`][bevy_color] recovers the token.
-pub(crate) fn theme_color(color: taskmanager_theme::Color) -> Color {
-    Color::srgba(color.r, color.g, color.b, color.a)
+pub(crate) fn theme_color(color: Color) -> bevy::color::Color {
+    bevy::color::Color::srgba(color.r, color.g, color.b, color.a)
 }
 
 /// Weight token → bevy font weight. Variable-font weights live in 1..=1000;
 /// the token scale never leaves that range, and the clamp is a guard for
 /// future token edits, not an expected path.
-fn theme_weight(weight: taskmanager_theme::Weight) -> FontWeight {
+fn theme_weight(weight: Weight) -> FontWeight {
     FontWeight(weight.0.round().clamp(1.0, 1000.0) as u16)
 }
 
@@ -54,25 +55,25 @@ fn theme_weight(weight: taskmanager_theme::Weight) -> FontWeight {
 #[derive(Clone, Debug)]
 pub(crate) struct UiPalette {
     /// Window clear color — the theme's window backdrop token.
-    pub(crate) window_clear: Color,
+    pub(crate) window_clear: bevy::color::Color,
     /// Card/panel fill — the theme's derived elevated surface, shared by
     /// menus, confirmations, and page cards.
-    pub(crate) panel_fill: Color,
+    pub(crate) panel_fill: bevy::color::Color,
     /// Content-region backdrop — the theme's view surface.
-    pub(crate) content_bg: Color,
+    pub(crate) content_bg: bevy::color::Color,
     /// Left navigation rail backdrop — the theme's sidebar surface.
-    pub(crate) nav_bg: Color,
+    pub(crate) nav_bg: bevy::color::Color,
     /// Active nav item fill — the theme's elevated sidebar card surface.
-    pub(crate) nav_active_bg: Color,
+    pub(crate) nav_active_bg: bevy::color::Color,
     /// Hovered control surface — the theme's semantic accent tint.
-    pub(crate) hover_bg: Color,
+    pub(crate) hover_bg: bevy::color::Color,
     /// Pressed control surface — the theme's semantic selection tint.
-    pub(crate) selection_bg: Color,
+    pub(crate) selection_bg: bevy::color::Color,
     /// Text/icon ink used on the active navigation accent surface.
-    pub(crate) nav_active_ink: Color,
+    pub(crate) nav_active_ink: bevy::color::Color,
     /// Modal scrim — the theme's dimming overlay token, shared by modal
     /// surfaces and status treatments.
-    pub(crate) scrim: Color,
+    pub(crate) scrim: bevy::color::Color,
     /// Card corner radius in px, from the theme's radius scale.
     pub(crate) panel_radius_px: f32,
     /// Control (nav item, table row) corner radius in px.
@@ -80,17 +81,17 @@ pub(crate) struct UiPalette {
     /// Standard control / table-row height in px, from the density scale.
     pub(crate) control_height_px: f32,
     /// Accent ink — the theme's accent token.
-    pub(crate) accent: Color,
+    pub(crate) accent: bevy::color::Color,
     /// Heading ink.
-    pub(crate) heading_color: Color,
+    pub(crate) heading_color: bevy::color::Color,
     /// Body ink.
-    pub(crate) body_color: Color,
+    pub(crate) body_color: bevy::color::Color,
     /// Dimmed ink (captions, summary lines, idle nav labels).
-    pub(crate) dim_color: Color,
+    pub(crate) dim_color: bevy::color::Color,
     /// Destructive/error ink.
-    pub(crate) danger_color: Color,
+    pub(crate) danger_color: bevy::color::Color,
     /// Warning ink.
-    pub(crate) warning_color: Color,
+    pub(crate) warning_color: bevy::color::Color,
     /// Page-title type metrics (size + weight; handle stamped later).
     pub(crate) heading: TextFont,
     /// Body type metrics.
@@ -102,7 +103,7 @@ pub(crate) struct UiPalette {
     /// High-contrast theme active flag.
     pub(crate) high_contrast: bool,
     /// Panel and card border color.
-    pub(crate) border_color: Color,
+    pub(crate) border_color: bevy::color::Color,
 }
 
 /// Resolve the window palette from a theme snapshot.

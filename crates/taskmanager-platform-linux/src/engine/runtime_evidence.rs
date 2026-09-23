@@ -23,6 +23,7 @@ mod ebpf_tests;
 
 #[cfg(target_os = "linux")]
 use crate::engine::hardware::classify_storage_connection;
+use taskmanager_core::core::time::unix_millis;
 
 const CAPABILITY_RECEIPT_SCHEMA_VERSION: u8 = 6;
 
@@ -641,7 +642,7 @@ fn is_executable_file(path: &Path) -> bool {
 }
 
 fn unix_time_millis(now: std::time::SystemTime) -> u64 {
-    taskmanager_core::core::time::unix_millis(now)
+    unix_millis(now)
 }
 
 #[cfg(test)]

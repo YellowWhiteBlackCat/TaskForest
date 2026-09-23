@@ -5,6 +5,7 @@ use crate::pages::performance::metrics::{
     batteries, battery_fact_line, disk_partition_view_models, disks, gpu_vram_view_model,
 };
 use crate::palette::space_2;
+use taskmanager_core::core::power::BatteryInfo;
 
 pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
     let identity = gpu_display_identity(gpu);
@@ -277,7 +278,7 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
 }
 
 fn battery_block_scene(
-    battery: &taskmanager_core::core::power::BatteryInfo,
+    battery: &BatteryInfo,
     index: usize,
     palette: &UiPalette,
 ) -> impl Scene + use<> {

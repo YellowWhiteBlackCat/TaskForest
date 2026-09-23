@@ -20,6 +20,7 @@ use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 use super::{BatchFoldOutput, ShellApp};
+use taskmanager_application::ProcessAffinityReady;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RequestSessions {
@@ -244,10 +245,7 @@ impl ShellApp {
 }
 
 impl RequestSessions {
-    pub(crate) fn seed_affinity(
-        &mut self,
-        ready: Option<taskmanager_application::ProcessAffinityReady>,
-    ) {
+    pub(crate) fn seed_affinity(&mut self, ready: Option<ProcessAffinityReady>) {
         self.affinity.close();
         let Some(ready) = ready else {
             return;

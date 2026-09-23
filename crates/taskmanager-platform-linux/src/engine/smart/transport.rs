@@ -3,6 +3,7 @@
 use taskmanager_core::core::metrics::{
     SmartAvailability, StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
+use taskmanager_core::core::smart::AtaSmartAttribute;
 use taskmanager_core::core::smart::SmartProviderFailureKind;
 
 use super::{DiskSmart, SmartCommandResult, parse_command_result};
@@ -381,9 +382,7 @@ fn ata_raw_attribute<'a>(
 /// string value `"now"`.
 fn parse_ata_attributes(
     attributes: Option<&[serde_json::Value]>,
-) -> Option<Vec<taskmanager_core::core::smart::AtaSmartAttribute>> {
-    use taskmanager_core::core::smart::AtaSmartAttribute;
-
+) -> Option<Vec<AtaSmartAttribute>> {
     let parsed: Vec<AtaSmartAttribute> = attributes?
         .iter()
         .filter_map(|attribute| {

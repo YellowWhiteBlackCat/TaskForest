@@ -8,6 +8,8 @@ use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::{ShellApp, fixture};
 
 use super::projection;
+use taskmanager_core::core::process_telemetry::ConnectionState;
+use taskmanager_shell::presentation::MISSING_VALUE;
 
 fn shell_with(mut process: ProcessItem) -> ShellApp {
     let mut scalars = *process.scalar_observations();
@@ -36,7 +38,7 @@ fn selected_projection_uses_the_shared_vm_and_keeps_insights_typed() {
     let value = |field: ProcessDetailsField| {
         view.overview
             .iter()
-            .find(|row| row.label == taskmanager_application::i18n::t(field_label(field)))
+            .find(|row| row.label == t(field_label(field)))
             .map(|row| row.value.as_str())
     };
     assert_eq!(value(ProcessDetailsField::Cpu), Some("17.5%"));
@@ -46,7 +48,7 @@ fn selected_projection_uses_the_shared_vm_and_keeps_insights_typed() {
     assert!(
         view.insights
             .iter()
-            .all(|card| card.value == taskmanager_application::i18n::t("proc_insights.collecting")),
+            .all(|card| card.value == t("proc_insights.collecting")),
         "no process-insights projection means collecting, never fabricated zeros"
     );
 }
@@ -103,10 +105,7 @@ fn memory_breakdown_rows_render_every_narrowed_facet() {
         .iter()
         .find(|row| row.label == t("proc.shared"))
         .expect("the overview carries the derived-shared row");
-    assert_eq!(
-        cold_shared.value,
-        taskmanager_shell::presentation::MISSING_VALUE
-    );
+    assert_eq!(cold_shared.value, MISSING_VALUE);
     assert_ne!(cold_shared.value, "0 B");
 }
 
@@ -123,10 +122,7 @@ fn field_label(field: ProcessDetailsField) -> &'static str {
 fn resources_summary_empty_keeps_honest_gap() {
     use taskmanager_core::core::process_telemetry::ProcessResourceSnapshot;
     let snapshot = ProcessResourceSnapshot::default();
-    assert_eq!(
-        super::resources_summary(&snapshot),
-        taskmanager_shell::presentation::MISSING_VALUE
-    );
+    assert_eq!(super::resources_summary(&snapshot), MISSING_VALUE);
 }
 
 #[test]
@@ -311,7 +307,7 @@ fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
     let value = |label: &'static str| {
         view.overview
             .iter()
-            .find(|row| row.label == taskmanager_application::i18n::t(label))
+            .find(|row| row.label == t(label))
             .map(|row| row.value.as_str())
     };
     assert_eq!(
@@ -387,11 +383,7 @@ fn isolation_summary_renders_the_linux_namespace_audit() {
             LinuxNamespaceKind::Network.as_str(),
             t("proc_insights.namespace_isolated")
         ),
-        format!(
-            "{} {}",
-            LinuxNamespaceKind::Ipc.as_str(),
-            taskmanager_shell::presentation::MISSING_VALUE
-        ),
+        format!("{} {}", LinuxNamespaceKind::Ipc.as_str(), MISSING_VALUE),
         format!("2 {}", t("proc_insights.namespace_isolated_count")),
     ] {
         assert!(
@@ -424,7 +416,7 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
     let empty = ProcessThreads::default();
     assert_eq!(
         super::threads_summary(&empty),
-        taskmanager_application::i18n::t("proc_insights.no_threads")
+        t("proc_insights.no_threads")
     );
 
     let populated = ProcessThreads {
@@ -493,7 +485,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
     let empty = ProcessOpenFiles::default();
     assert_eq!(
         super::open_files_summary(&empty),
-        taskmanager_application::i18n::t("proc_insights.no_open_files")
+        t("proc_insights.no_open_files")
     );
 
     let files = ProcessOpenFiles {
@@ -529,20 +521,11 @@ fn open_files_summary_empty_unreadable_and_populated() {
 
     let summary = super::open_files_summary(&files);
     let lines: Vec<&str> = summary.lines().collect();
-    assert_eq!(
-        lines[0],
-        format!(
-            "4 · 1 {}",
-            taskmanager_application::i18n::t("proc_insights.unreadable")
-        )
-    );
+    assert_eq!(lines[0], format!("4 · 1 {}", t("proc_insights.unreadable")));
     assert_eq!(lines[1], "0 [file] -> /dev/null");
     assert_eq!(
         lines[2],
-        format!(
-            "1 [socket] -> {}",
-            taskmanager_application::i18n::t("proc_insights.unreadable")
-        )
+        format!("1 [socket] -> {}", t("proc_insights.unreadable"))
     );
     assert_eq!(lines[3], "2 [pipe] -> pipe:[12345]");
     assert_eq!(lines[4], "…");
@@ -573,7 +556,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     45678,
                 )),
-                state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
+                state: ConnectionState::Established,
                 provider_key: None,
                 rtt_ms: None,
             },
@@ -584,7 +567,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                     path: "/run/user/1000/bus".into(),
                 },
                 remote: ConnectionEndpoint::Unspecified,
-                state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
+                state: ConnectionState::Established,
                 provider_key: None,
                 rtt_ms: None,
             },
@@ -624,12 +607,8 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
 
     let esc_summary = super::network_summary(&escalating);
     assert!(esc_summary.contains("0 · RX — · TX —"));
-    assert!(esc_summary.contains(taskmanager_application::i18n::t(
-        "proc_insights.network_requires_escalation"
-    )));
-    assert!(esc_summary.contains(taskmanager_application::i18n::t(
-        "proc_insights.enable_network_capture"
-    )));
+    assert!(esc_summary.contains(t("proc_insights.network_requires_escalation")));
+    assert!(esc_summary.contains(t("proc_insights.enable_network_capture")));
 }
 
 #[test]
@@ -640,7 +619,7 @@ fn environment_summary_formats_entries_and_truncation() {
     let empty = ProcessEnvironment::default();
     assert_eq!(
         super::environment_summary(&empty),
-        taskmanager_application::i18n::t("prop.environment_empty")
+        t("prop.environment_empty")
     );
 
     let env = ProcessEnvironment {
@@ -686,10 +665,7 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
     };
 
     let empty = ProcessGpuSnapshot::default();
-    assert_eq!(
-        super::gpu_summary(&empty),
-        taskmanager_application::i18n::t("proc_insights.no_gpu")
-    );
+    assert_eq!(super::gpu_summary(&empty), t("proc_insights.no_gpu"));
 
     let gpu = ProcessGpuSnapshot {
         state: DeviceState::healthy(1000),
@@ -730,26 +706,19 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(
         lines[0],
-        format!(
-            "2 · 2 {}",
-            taskmanager_application::i18n::t("proc_insights.gpu_engines")
-        )
+        format!("2 · 2 {}", t("proc_insights.gpu_engines"))
     );
     assert_eq!(
         lines[1],
         format!(
             "{} #0 45.5% · {} 1.0 GiB",
-            taskmanager_application::i18n::t("common.gpu"),
-            taskmanager_application::i18n::t("gpu.vram_in_use")
+            t("common.gpu"),
+            t("gpu.vram_in_use")
         )
     );
     assert_eq!(
         lines[2],
-        format!(
-            "{} #1 — · {} —",
-            taskmanager_application::i18n::t("common.gpu"),
-            taskmanager_application::i18n::t("gpu.vram_in_use")
-        )
+        format!("{} #1 — · {} —", t("common.gpu"), t("gpu.vram_in_use"))
     );
     assert_eq!(lines[3], "render  78.2%  2.5s");
     assert_eq!(lines[4], "copy  —  1.5M cycles");
@@ -778,15 +747,17 @@ fn insight_cards_wires_network_escalation_action() {
     let cards = super::insight_cards(Some(&projection_esc));
     let net_card = cards
         .iter()
-        .find(|c| c.title == taskmanager_application::i18n::t("proc_insights.network_throughput"))
+        .find(|c| c.title == t("proc_insights.network_throughput"))
         .unwrap();
     assert_eq!(
         net_card.action,
         Some(super::InsightCardAction::NetworkEscalation)
     );
-    assert!(net_card.value.contains(taskmanager_application::i18n::t(
-        "proc_insights.enable_network_capture"
-    )));
+    assert!(
+        net_card
+            .value
+            .contains(t("proc_insights.enable_network_capture"))
+    );
 
     // Healthy without escalation
     let mut tracker_healthy = ProcessInsightsProjection::default();
@@ -797,7 +768,7 @@ fn insight_cards_wires_network_escalation_action() {
     let cards_healthy = super::insight_cards(Some(&projection_healthy));
     let net_card_healthy = cards_healthy
         .iter()
-        .find(|c| c.title == taskmanager_application::i18n::t("proc_insights.network_throughput"))
+        .find(|c| c.title == t("proc_insights.network_throughput"))
         .unwrap();
     assert_eq!(net_card_healthy.action, None);
 }

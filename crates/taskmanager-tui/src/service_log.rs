@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use crate::TuiApp;
+use taskmanager_application::i18n::t;
 
 impl TuiApp {
     /// Export the currently visible service-log entries to `taskmanager-service-{id}.log`.
@@ -14,7 +15,7 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_nothing_to_export"),
+                t("svc.logs_nothing_to_export"),
             );
             return;
         };
@@ -23,7 +24,7 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_nothing_to_export"),
+                t("svc.logs_nothing_to_export"),
             );
             return;
         };
@@ -39,7 +40,7 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_nothing_to_export"),
+                t("svc.logs_nothing_to_export"),
             );
             return;
         }
@@ -75,8 +76,7 @@ impl TuiApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::SHORT,
-                    taskmanager_application::i18n::t("svc.logs_exported")
-                        .replace("{path}", &destination.display().to_string()),
+                    t("svc.logs_exported").replace("{path}", &destination.display().to_string()),
                 );
             }
             Err(_) => {
@@ -84,7 +84,7 @@ impl TuiApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::UntilReplaced,
-                    taskmanager_application::i18n::t("svc.logs_export_failed"),
+                    t("svc.logs_export_failed"),
                 );
             }
         }

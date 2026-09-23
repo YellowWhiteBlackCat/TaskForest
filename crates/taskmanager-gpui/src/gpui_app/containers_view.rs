@@ -12,6 +12,11 @@
 //! first-sample gap renders an em dash, not a fabricated `0.0%`.
 
 use gpui::{Div, ParentElement, Styled, div, px};
+use taskmanager_theme::Weight;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use taskmanager_core::core::{
     ContainerRollup, ContainerSummary, DeviceStatus, IsolationKind, ScalarAvailability,
@@ -70,9 +75,7 @@ pub fn render_containers(t: &Theme, rollup: &ContainerRollup, units: UnitPrefere
         .min_h(px(0.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(header_row(t))
         .child(body)
 }
@@ -218,9 +221,9 @@ fn row_skeleton(
     };
     let cell = |label: &str, grow: bool| {
         let mut cell = div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(fg))
-            .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(fg))
+            .font_weight(font_weight(weight))
             .min_w(px(0.0));
         if grow {
             cell = cell.flex_1();
@@ -238,13 +241,13 @@ fn row_skeleton(
         .render()
 }
 
-fn fixed_cell(label: &str, width: f32, fg: Color, weight: taskmanager_theme::Weight) -> Div {
+fn fixed_cell(label: &str, width: f32, fg: Color, weight: Weight) -> Div {
     div()
         .w(px(width))
         .min_w(px(0.0))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .text_color(taskmanager_ui::theme_binding::hsla(fg))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
+        .text_size(font_size(tokens::FONT_12))
+        .text_color(hsla(fg))
+        .font_weight(font_weight(weight))
         .child(label.to_string())
 }
 

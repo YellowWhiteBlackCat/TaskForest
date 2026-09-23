@@ -37,6 +37,7 @@ use super::{
     PendingEffects, QuitForwarded, ShellInteractionApplied, TextInputState, commit_query_to_shell,
     keyboard_owner, modifiers_from, text_char,
 };
+use taskmanager_core::core::smart::SmartSelfTestKind;
 
 /// One just-pressed key, normalized once for the whole arm chain: the facts
 /// every arm reads are captured here so each arm stays a predicate on
@@ -457,7 +458,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if !crate::pages::performance::request_smart_self_test(
             self.shell,
             &disk_id,
-            taskmanager_core::core::smart::SmartSelfTestKind::Short,
+            SmartSelfTestKind::Short,
         ) {
             return false;
         }
@@ -534,10 +535,12 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
 
     /// Arm 4 — fixed-key router (arrows, Delete, Escape, F5, F9, chorded letters).
     fn shared_key(&mut self, press: KeyPress) {
+        use taskmanager_application::KeyCode;
+
         let Some(shared) = shared_key(press.key_code) else {
             return;
         };
-        if shared == taskmanager_application::KeyCode::F9 && press.modifiers == Modifiers::NONE {
+        if shared == KeyCode::F9 && press.modifiers == Modifiers::NONE {
             self.commands
                 .trigger(crate::pages::performance::TogglePerformanceSidebar);
             self.applied = true;

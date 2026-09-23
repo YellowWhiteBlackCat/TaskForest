@@ -1,6 +1,7 @@
 use super::*;
 use crate::engine::process::telemetry::safe_cgroup_path;
 use std::collections::HashSet;
+use taskmanager_core::ScalarAvailability;
 
 fn fixture_tree(label: &str) -> PathBuf {
     // Reuse the agent lease tmp when present (mirrors the facet fixture
@@ -129,7 +130,7 @@ fn rate_first_sample_is_gap_and_second_sample_uses_elapsed() {
     let first = tracker.percentage("/docker/x", 1_000_000, 1_000);
     assert_eq!(
         first.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
     // 2 cpu-seconds consumed over 1 second wall => 200%.
     let second = tracker.percentage("/docker/x", 3_000_000, 2_000);
@@ -146,7 +147,7 @@ fn rate_counter_rollback_resets_baseline_to_identity_changed() {
     let rollback = tracker.percentage("/docker/x", 1_000, 2_000);
     assert_eq!(
         rollback.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::IdentityChanged)
+        ScalarAvailability::Unavailable(FailureKind::IdentityChanged)
     );
     // The next sample computes a fresh delta from the re-seeded baseline
     // (1_001_000 - 1_000 = 1 cpu-second over 1 s wall => 100%), mirroring
@@ -281,7 +282,7 @@ fn collect_typed_unavailable_for_vanished_cgroup_fields() {
     let container = rollup.containers.first().expect("container discovered");
     assert_eq!(
         container.cpu_percentage.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::IdentityChanged)
+        ScalarAvailability::Unavailable(FailureKind::IdentityChanged)
     );
     // memory.current is still readable.
     assert_eq!(container.memory_bytes.current_value(), Some(&1_024));

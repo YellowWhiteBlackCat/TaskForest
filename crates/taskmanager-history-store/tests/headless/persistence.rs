@@ -8,6 +8,7 @@ use std::sync::Arc;
 use taskmanager_core::{
     DeviceId, HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey, HistoryWindow,
 };
+use taskmanager_history_store::MAX_RECORDED_BOOTS;
 use taskmanager_history_store::{
     FlushReport, HistoryQuery, HistoryStoreErrorKind, MAX_BOOT_HISTORY_BYTES,
     MAX_DIRECTORY_ENTRIES_PER_SCAN, MAX_PENDING_BYTES, MAX_PENDING_SAMPLES, MAX_PENDING_SERIES,
@@ -491,7 +492,7 @@ fn boot_history_deduplicates_content_and_returns_the_previous_baseline() {
         history.record_boot(&boot, 20_000 + index).expect("record");
     }
     let boots = history.boots().expect("read boots");
-    assert_eq!(boots.len(), taskmanager_history_store::MAX_RECORDED_BOOTS);
+    assert_eq!(boots.len(), MAX_RECORDED_BOOTS);
     assert_eq!(boots.last().expect("newest").timeline.total_ms, 9);
 
     drop(history);

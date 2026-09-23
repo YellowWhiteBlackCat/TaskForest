@@ -4,26 +4,25 @@ use std::collections::HashSet;
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::{SortCol, SortDir, project_process_tree_rows};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
 
 fn key(pid: u32) -> ProcessLiveKey {
-    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-        .expect("fixture identity")
+    ProcessLiveKey::from_parts(pid, fixture_start_token(pid)).expect("fixture identity")
 }
 
 fn app_key(pid: u32) -> String {
     format!("app-tree:{}", key(pid).stable_key())
 }
 
-fn expected_key(
-    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
-    pid: u32,
-) -> Option<taskmanager_shell::ProcessRowId> {
-    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid)).map(kind)
+fn expected_key(kind: fn(ProcessLiveKey) -> ProcessRowId, pid: u32) -> Option<ProcessRowId> {
+    ProcessLiveKey::from_parts(pid, fixture_start_token(pid)).map(kind)
 }
 
 fn proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .current_cpu_percentage(cpu)
@@ -107,7 +106,7 @@ fn canonical_projection_buckets_in_domain_order_and_aggregates() {
 #[test]
 fn group_rows_keep_typed_missing_metrics_instead_of_fabricating_zero() {
     let mut missing = ProcessItem::new(41, "missing");
-    missing.apply_scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+    missing.apply_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(410, 10),
         cpu_percentage: ScalarObservation::unavailable(FailureKind::PermissionDenied),
         memory_bytes: ScalarObservation::unavailable(FailureKind::PermissionDenied),
@@ -138,7 +137,7 @@ fn application_aggregate_is_pidless_but_process_children_keep_identity() {
     assert!(
         matches!(projected[1], ProcessRow::Group { depth: 1, .. })
             && crate::process_view::row_key_at(&projected, 1)
-                == expected_key(taskmanager_shell::ProcessRowId::Application, 11)
+                == expected_key(ProcessRowId::Application, 11)
     );
     assert!(matches!(
         projected[2],
@@ -150,12 +149,12 @@ fn application_aggregate_is_pidless_but_process_children_keep_identity() {
     ));
     assert_eq!(
         row_key_at(&projected, 1),
-        expected_key(taskmanager_shell::ProcessRowId::Application, 11)
+        expected_key(ProcessRowId::Application, 11)
     );
     assert_eq!(process_at(&projected, 1), None);
     assert_eq!(
         row_key_at(&projected, 2),
-        expected_key(taskmanager_shell::ProcessRowId::Process, 11)
+        expected_key(ProcessRowId::Process, 11)
     );
 }
 
@@ -183,7 +182,7 @@ fn application_roots_sort_by_the_aggregate_header_metric() {
         .filter_map(|row| match row {
             ProcessRow::Group {
                 depth: 1,
-                row_key: Some(taskmanager_shell::ProcessRowId::Application(identity)),
+                row_key: Some(ProcessRowId::Application(identity)),
                 ..
             } => Some(identity.pid()),
             _ => None,

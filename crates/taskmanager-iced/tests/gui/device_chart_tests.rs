@@ -15,6 +15,7 @@ use crate::perf_chart::{
     ChartOpts, WindowSlots, hovered_index, sample_x, scaled_y, series_point_runs_windowed,
     y_axis_tick_values,
 };
+use taskmanager_theme::Theme;
 
 const SIZE: Size = Size::new(100.0, 50.0);
 
@@ -430,7 +431,7 @@ fn multi_chart_without_hover_ignores_cursor_motion() {
 /// factory surface page wiring will call.
 #[test]
 fn device_multi_graph_factory_composes_the_caption_and_canvas() {
-    let theme_snapshot = taskmanager_theme::Theme::dark();
+    let theme_snapshot = Theme::dark();
     let element = multi::device_multi_graph_fill(
         multi::DeviceMultiGraphSpec {
             primary: series("Read", &[10.0, 20.0, 30.0], Color::WHITE),
@@ -465,7 +466,7 @@ fn device_multi_graph_factory_composes_the_caption_and_canvas() {
 /// both layouts.
 #[test]
 fn device_multi_graph_fill_factory_composes_both_height_policies() {
-    let theme_snapshot = taskmanager_theme::Theme::dark();
+    let theme_snapshot = Theme::dark();
     let spec = || multi::DeviceMultiGraphSpec {
         primary: series("Read", &[10.0, 20.0, 30.0], Color::WHITE),
         secondary: series("Write", &[5.0, 15.0, 25.0], Color::BLACK),

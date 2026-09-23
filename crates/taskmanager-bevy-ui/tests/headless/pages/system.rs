@@ -24,6 +24,8 @@ use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::pages::history::HistoryProjectionResource;
 use crate::window::WindowPalette;
+use taskmanager_shell::SystemProjectionStore;
+use taskmanager_shell::presentation::MISSING_VALUE;
 
 /// Hardware fixture: every optional identity fact present, so both the
 /// populated rows and the joined-value grammar are exercised for free.
@@ -92,8 +94,7 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
         .find(|row| row.label == t("system.desktop_environment"))
         .expect("the desktop fact row stays visible");
     assert_eq!(
-        desktop.value,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        desktop.value, MISSING_VALUE,
         "an absent fact is the shared missing value"
     );
 }
@@ -241,16 +242,14 @@ fn clean_memory_size_formats_cleanly() {
 
 #[test]
 fn system_summary_model_mirrors_gpui_and_iced_parity() {
-    let projection = taskmanager_shell::SystemProjectionStore::default();
+    let projection = SystemProjectionStore::default();
     let model = system_summary_model(&projection);
     assert_eq!(
-        model.cpu,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        model.cpu, MISSING_VALUE,
         "an unobserved CPU renders the dash"
     );
     assert_eq!(
-        model.memory,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        model.memory, MISSING_VALUE,
         "an unobserved memory renders the dash"
     );
     assert_eq!(model.processes, None, "no inventory means no process count");
@@ -260,13 +259,11 @@ fn system_summary_model_mirrors_gpui_and_iced_parity() {
     let demo = crate::demo_fixture::demo_shell();
     let demo_model = system_summary_model(demo.projection());
     assert_ne!(
-        demo_model.cpu,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        demo_model.cpu, MISSING_VALUE,
         "demo shell provides observed CPU percentage"
     );
     assert_ne!(
-        demo_model.memory,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        demo_model.memory, MISSING_VALUE,
         "demo shell provides observed memory percentage"
     );
 }

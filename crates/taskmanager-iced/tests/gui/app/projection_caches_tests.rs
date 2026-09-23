@@ -6,6 +6,11 @@
 //! reloaded when the epoch (accepted writes / visible capacity) moves.
 
 use super::*;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn inventory_builder_can_reenter_without_a_live_refcell_borrow() {
@@ -43,24 +48,24 @@ fn inventory_builder_can_reenter_without_a_live_refcell_borrow() {
 #[test]
 fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     let mut app = crate::IcedApp::default();
-    let demo = taskmanager_shell::demo_app();
+    let demo = demo_app();
     let snapshot = demo
         .projection()
         .snapshot
         .clone()
         .expect("demo snapshot fixture");
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
     );
     // One accepted history frame fixes the starting epoch.
-    taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+    record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     let disk = &snapshot.disks[0];
     let disk_id = disk.device_id.clone();
     let generation = disk.device_generation.get();
 
     let loads = std::cell::Cell::new(0_u32);
-    let load = |_: &taskmanager_shell::ShellApp| {
+    let load = |_: &ShellApp| {
         loads.set(loads.get() + 1);
         (vec![1.0, 2.0], vec![3.0, 4.0])
     };
@@ -100,7 +105,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     assert_eq!(loads.get(), 2);
 
     // A real accepted write moves the history epoch: the disk pair reloads.
-    taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+    record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     let after_write = app.projection_caches.dual_device_series(
         &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
@@ -146,23 +151,18 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
 #[test]
 fn cached_split_windows_derive_from_the_same_frames_as_the_summed_lane() {
     let mut app = crate::IcedApp::default();
-    let demo = taskmanager_shell::demo_app();
+    let demo = demo_app();
     let snapshot = demo
         .projection()
         .snapshot
         .clone()
         .expect("demo snapshot fixture");
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
     );
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
 
     let disk = &snapshot.disks[0];

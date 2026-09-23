@@ -19,6 +19,7 @@ use taskmanager_shell::ShellApp;
 
 use super::dependencies_panel::{dependencies_fingerprint, service_dependencies_panel_scene};
 use super::tests::{headless_services_app, push_services, route_to_services};
+use taskmanager_theme::Theme;
 
 fn service_item(id: &str, name: &str, status: ServiceStatus) -> ServiceItem {
     ServiceItem::from_inventory(
@@ -129,7 +130,7 @@ fn dependencies_panel_renders_relations_scene() {
     shell.service_dependencies.begin(req_id, target.clone());
     shell.service_dependencies.resolve(req_id, target, deps);
 
-    let theme = taskmanager_theme::Theme::default();
+    let theme = Theme::default();
     let palette = crate::palette::ui_palette(&theme);
     let scene = service_dependencies_panel_scene(&shell, &palette);
 

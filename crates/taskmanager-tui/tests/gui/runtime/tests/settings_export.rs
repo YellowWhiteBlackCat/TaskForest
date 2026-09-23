@@ -3,12 +3,23 @@
 
 use super::super::*;
 use taskmanager_application::AppAction;
+use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigStore;
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskmanager_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
+};
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
+use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
+use taskmanager_test_support::pin_english;
 
-fn wait_for_config(
-    app: &mut TuiApp,
-    predicate: impl Fn(&taskmanager_core::core::config::Config) -> bool,
-) {
+fn wait_for_config(app: &mut TuiApp, predicate: impl Fn(&Config) -> bool) {
     for _ in 0..64 {
         let drain = app
             .config_client
@@ -16,13 +27,13 @@ fn wait_for_config(
             .expect("injected config client")
             .wait_for_drain(std::time::Duration::from_secs(2));
         match drain {
-            taskmanager_application::ConfigDrain::Empty => {}
-            taskmanager_application::ConfigDrain::Publications(publications) => {
+            ConfigDrain::Empty => {}
+            ConfigDrain::Publications(publications) => {
                 for publication in publications {
                     app.apply_config_publication(&publication);
                 }
             }
-            taskmanager_application::ConfigDrain::ResyncRequired { latest, .. } => {
+            ConfigDrain::ResyncRequired { latest, .. } => {
                 app.apply_config_publication(&latest);
             }
         }
@@ -74,13 +85,13 @@ fn submit_save_and_wait_for_error(app: &mut TuiApp, language_index: usize) -> St
             .expect("injected config client")
             .wait_for_drain(std::time::Duration::from_secs(2));
         match drain {
-            taskmanager_application::ConfigDrain::Empty => {}
-            taskmanager_application::ConfigDrain::Publications(publications) => {
+            ConfigDrain::Empty => {}
+            ConfigDrain::Publications(publications) => {
                 for publication in publications {
                     app.apply_config_publication(&publication);
                 }
             }
-            taskmanager_application::ConfigDrain::ResyncRequired { latest, .. } => {
+            ConfigDrain::ResyncRequired { latest, .. } => {
                 app.apply_config_publication(&latest);
             }
         }
@@ -98,10 +109,7 @@ fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
     app.shell.clear_feedback_notice();
     crate::ui::test_support::install_config_store(&mut app, dir.join("config.json"));
 
-    assert_eq!(
-        app.config_draft,
-        taskmanager_core::core::config::Config::default()
-    );
+    assert_eq!(app.config_draft, Config::default());
     assert!(app.shell.feedback_notice().is_none());
 
     drop(app);
@@ -305,7 +313,7 @@ fn settings_esc_cancels_without_applying_changes() {
 
 #[test]
 fn export_key_records_feedback_without_a_platform_effect() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::demo_app();
     let effect = handle_key(
         &mut app,
@@ -316,24 +324,15 @@ fn export_key_records_feedback_without_a_platform_effect() {
     );
     assert!(effect.is_none());
     let feedback = app.feedback_notice().expect("export feedback");
-    assert_eq!(
-        feedback.source(),
-        taskmanager_shell::FeedbackSource::Persistence
-    );
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Error
-    );
+    assert_eq!(feedback.source(), FeedbackSource::Persistence);
+    assert_eq!(feedback.severity(), FeedbackSeverity::Error);
     assert_eq!(feedback.text(), "Snapshot export is unavailable");
 }
 
 #[test]
 fn export_without_a_snapshot_reports_an_honest_error() {
     let mut app = TuiApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -342,14 +341,8 @@ fn export_without_a_snapshot_reports_an_honest_error() {
         ),
     );
     let feedback = app.feedback_notice().expect("export feedback");
-    assert_eq!(
-        feedback.source(),
-        taskmanager_shell::FeedbackSource::Persistence
-    );
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Warning
-    );
+    assert_eq!(feedback.source(), FeedbackSource::Persistence);
+    assert_eq!(feedback.severity(), FeedbackSeverity::Warning);
 }
 
 #[test]
@@ -429,50 +422,39 @@ fn device_visibility_preferences_filter_the_digit_selector() {
     let mut app = crate::demo_app();
     // Seed the demo with a battery and a fan so the full seven-resource rail
     // renders (the demo fixture carries neither).
-    let mut battery = taskmanager_core::core::power::BatteryInfo::new(
-        "battery:demo:BAT0",
-        taskmanager_core::core::device_state::DeviceState::healthy(1),
-    );
+    let mut battery = BatteryInfo::new("battery:demo:BAT0", DeviceState::healthy(1));
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(80, 1),
         ..Default::default()
     });
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(
-            taskmanager_core::core::power::PowerSupplySnapshot {
-                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
-                timestamp_ms: 1,
-                batteries: vec![battery],
-                ..Default::default()
-            },
-        )),
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+            state: DeviceState::healthy(1),
+            timestamp_ms: 1,
+            batteries: vec![battery],
+            ..Default::default()
+        })),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(
-            taskmanager_core::core::sensors::SensorCenterSnapshot {
-                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
-                timestamp_ms: 1,
-                readings: vec![
-                    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
-                        "hwmon:demo:cpu".into(),
-                        "fan1".into(),
-                        "CPU Fan".into(),
-                        taskmanager_core::core::sensors::SensorMeasurementObservation::available(
-                            taskmanager_core::core::sensors::SensorDescriptor::fan_speed(
-                                taskmanager_core::core::sensors::SensorScale::IDENTITY,
-                            ),
-                            taskmanager_core::core::sensors::SensorMagnitude::Unsigned(1200),
-                            1,
-                        )
-                        .expect("valid fan fixture"),
-                    ),
-                ],
-                ..Default::default()
-            },
-        )),
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+            state: DeviceState::healthy(1),
+            timestamp_ms: 1,
+            readings: vec![SensorReading::from_measurement_observation(
+                "hwmon:demo:cpu".into(),
+                "fan1".into(),
+                "CPU Fan".into(),
+                SensorMeasurementObservation::available(
+                    SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+                    SensorMagnitude::Unsigned(1200),
+                    1,
+                )
+                .expect("valid fan fixture"),
+            )],
+            ..Default::default()
+        })),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));
 
@@ -623,12 +605,9 @@ fn graph_data_points_preference_scales_the_shared_history_store() {
         point.timestamp_ms = 1_785_292_800_000 + tick;
         let mut observations = point.cpu.scalar_observations().clone();
         observations.global_usage_pct =
-            taskmanager_core::core::metrics::ScalarObservation::available(
-                tick as f32,
-                point.timestamp_ms,
-            );
+            ScalarObservation::available(tick as f32, point.timestamp_ms);
         point.cpu.apply_scalar_observations(observations);
-        taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &point, None, None);
+        record_demo_history_frame(&mut app.shell, &point, None, None);
     }
     let cpu = app.history.series(MetricSeries::CpuUsagePercent);
     assert_eq!(cpu.len(), 300, "the shared window is bounded");

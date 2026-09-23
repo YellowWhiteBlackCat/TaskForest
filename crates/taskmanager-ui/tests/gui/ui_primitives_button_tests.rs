@@ -7,8 +7,9 @@ use gpui::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_theme::Palette;
+use taskmanager_theme::Theme;
 fn palette() -> Palette {
-    taskmanager_theme::Theme::dark().palette()
+    Theme::dark().palette()
 }
 
 /// The primary fill must render as a LINEAR GRADIENT (not a solid), with

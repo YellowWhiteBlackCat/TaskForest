@@ -19,6 +19,7 @@ use std::io::{self, Write};
 use serde_json::json;
 use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::RaplHelperOutcome;
+use taskmanager_escalation::polkit::invoke_rapl_helper;
 
 /// Presentation rounding: the contract carries full-precision floats; the CLI
 /// document rounds each reading to its display resolution (watts to one
@@ -34,7 +35,7 @@ fn round_watts(value: f32) -> f64 {
 /// Returns `Ok` as long as the document could be written; the OUTCOME is
 /// carried in the printed JSON, not in the process exit code.
 pub fn run_package_power() -> io::Result<()> {
-    let outcome = taskmanager_escalation::polkit::invoke_rapl_helper();
+    let outcome = invoke_rapl_helper();
     let document = render_outcome(&outcome);
     let stdout = io::stdout();
     let mut handle = stdout.lock();

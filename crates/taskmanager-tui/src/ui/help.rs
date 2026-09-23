@@ -20,6 +20,8 @@ use super::containers::{KeyHint, KeyHintTone, Modal};
 use crate::{TuiApp, TuiTheme};
 
 use crate::command_palette::TUI_LOCAL_COMMANDS;
+use taskmanager_shell::presentation::command_help;
+use taskmanager_shell::shell_local_bindings;
 
 /// The honest, TUI-verified keyboard reference.
 ///
@@ -34,7 +36,7 @@ use crate::command_palette::TUI_LOCAL_COMMANDS;
 /// [`localize_tui_binding`]).
 #[must_use]
 pub fn help_rows() -> Vec<LocalBinding> {
-    let mut rows: Vec<LocalBinding> = taskmanager_shell::presentation::command_help()
+    let mut rows: Vec<LocalBinding> = command_help()
         .into_iter()
         .filter(|help| !crate::bindings::is_deliberately_unbound(help.command))
         .map(|help| LocalBinding {
@@ -42,7 +44,7 @@ pub fn help_rows() -> Vec<LocalBinding> {
             label: help.label,
         })
         .collect();
-    rows.extend(taskmanager_shell::shell_local_bindings().iter().copied());
+    rows.extend(shell_local_bindings().iter().copied());
     rows.extend(
         TUI_LOCAL_COMMANDS
             .into_iter()

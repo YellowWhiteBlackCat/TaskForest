@@ -47,6 +47,10 @@ use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::palette::ui_palette;
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::appearance::DesktopFamily;
+use taskmanager_core::core::appearance::PreferredColorScheme;
+use taskmanager_platform_contract::RequestEnvelope;
 
 // ---- scripted platform client (the headless shell-app composition) ----
 
@@ -73,10 +77,7 @@ struct QuietRequests;
 impl RequestPort for QuietRequests {
     type Request = HostTelemetryRequest;
 
-    fn try_submit(
-        &self,
-        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), SubmissionError> {
+    fn try_submit(&self, _request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         Ok(())
     }
 }
@@ -467,9 +468,9 @@ fn system_mode_and_theme_preferences_follow_observed_appearance() {
         "defaults to Dark before observation"
     );
 
-    let light_app = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Light,
+    let light_app = DesktopAppearance {
+        family: DesktopFamily::Gnome,
+        color_scheme: PreferredColorScheme::Light,
         high_contrast: Some(false),
     };
     prefs.observed_appearance = Some(light_app);
@@ -479,9 +480,9 @@ fn system_mode_and_theme_preferences_follow_observed_appearance() {
         "follows light appearance in System mode"
     );
 
-    let hc_app = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Dark,
+    let hc_app = DesktopAppearance {
+        family: DesktopFamily::Gnome,
+        color_scheme: PreferredColorScheme::Dark,
         high_contrast: Some(true),
     };
     prefs.observed_appearance = Some(hc_app);

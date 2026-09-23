@@ -27,7 +27,13 @@ use taskmanager_application::i18n;
 use taskmanager_theme::Color;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::tokens;
+use taskmanager_ui::icons_binding;
 use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use super::responsive::NavigationPresentation;
@@ -111,37 +117,29 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            match presentation {
-                NavigationPresentation::IconOnly => tokens::SPACE_8,
-                NavigationPresentation::Labeled => {
-                    if horizontal {
-                        // The horizontal strip has eight tabs plus three
-                        // fixed controls. Keep the label-bearing buttons
-                        // readable at the standard 1180px capture width;
-                        // the vertical rail retains its roomier inset.
-                        tokens::SPACE_4
-                    } else {
-                        tokens::SPACE_14
-                    }
+        .px(definite_length(match presentation {
+            NavigationPresentation::IconOnly => tokens::SPACE_8,
+            NavigationPresentation::Labeled => {
+                if horizontal {
+                    // The horizontal strip has eight tabs plus three
+                    // fixed controls. Keep the label-bearing buttons
+                    // readable at the standard 1180px capture width;
+                    // the vertical rail retains its roomier inset.
+                    tokens::SPACE_4
+                } else {
+                    tokens::SPACE_14
                 }
-            },
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_7,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(t),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(base))
+            }
+        }))
+        .py(definite_length(tokens::SPACE_7))
+        .rounded(absolute(tokens::control_radius(t)))
+        .bg(fill(base))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(taskmanager_ui::theme_binding::absolute(
-                        tokens::control_radius(t),
-                    ))
+                    .rounded(absolute(tokens::control_radius(t)))
                     .with_animation(
                         ("tab-bg", hover_state_key(is_act, is_hov)),
                         hover_animation(),
@@ -153,7 +151,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
                             } else {
                                 base
                             };
-                            el.bg(taskmanager_ui::theme_binding::fill(bg))
+                            el.bg(fill(bg))
                         },
                     ),
             ),
@@ -172,10 +170,8 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
                 .child(
                     div()
                         .h_full()
-                        .rounded(taskmanager_ui::theme_binding::absolute(
-                            tokens::xsmall_radius(t),
-                        ))
-                        .bg(taskmanager_ui::theme_binding::fill(accent))
+                        .rounded(absolute(tokens::xsmall_radius(t)))
+                        .bg(fill(accent))
                         .with_animation(
                             ("tab-indicator", hover_state_key(is_act, false)),
                             hover_animation(),
@@ -195,13 +191,11 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             horizontal || presentation == NavigationPresentation::IconOnly,
             |tab| tab.justify_center(),
         )
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            if horizontal {
-                tokens::SPACE_4
-            } else {
-                tokens::SPACE_6
-            },
-        ))
+        .gap(definite_length(if horizontal {
+            tokens::SPACE_4
+        } else {
+            tokens::SPACE_6
+        }))
         // Elastic shrink: the tab is a flex child of the nav strip's tabs row.
         // min_w(0) overrides flex's default min-width:auto (= the content's
         // natural width) so this tab can shrink below content width when the
@@ -213,18 +207,12 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         .when(horizontal, |tab| tab.flex_1())
         .when(!horizontal, |tab| tab.w_full().flex_shrink_0())
         .font_weight(if is_act {
-            taskmanager_ui::theme_binding::font_weight(tokens::FONT_WEIGHT_BOLD)
+            font_weight(tokens::FONT_WEIGHT_BOLD)
         } else {
-            taskmanager_ui::theme_binding::font_weight(tokens::FONT_WEIGHT_NORMAL)
+            font_weight(tokens::FONT_WEIGHT_NORMAL)
         })
-        .text_color(taskmanager_ui::theme_binding::hsla(fg))
-        .child(
-            taskmanager_ui::icons_binding::icon(icon).size(px(if horizontal {
-                16.0
-            } else {
-                18.0
-            })),
-        )
+        .text_color(hsla(fg))
+        .child(icons_binding::icon(icon).size(px(if horizontal { 16.0 } else { 18.0 })))
         // Label wraps min_w(0)+truncate so it shrinks/ellipses inside the tab's
         // flex row instead of forcing the tab to its natural text width. Text
         // styling is inherited from the tab div above. A hover tooltip (the full
@@ -281,36 +269,24 @@ pub fn gear_btn(
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(t),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(transparent))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_6))
+        .rounded(absolute(tokens::control_radius(t)))
+        .bg(fill(transparent))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(taskmanager_ui::theme_binding::absolute(
-                        tokens::control_radius(t),
-                    ))
+                    .rounded(absolute(tokens::control_radius(t)))
                     .with_animation(
                         ("gear-bg", hover_state_key(false, is_hov)),
                         hover_animation(),
                         move |el, delta| {
                             if is_hov {
-                                el.bg(taskmanager_ui::theme_binding::fill(mix(
-                                    transparent,
-                                    hover_bg,
-                                    delta,
-                                )))
+                                el.bg(fill(mix(transparent, hover_bg, delta)))
                             } else {
-                                el.bg(taskmanager_ui::theme_binding::fill(transparent))
+                                el.bg(fill(transparent))
                             }
                         },
                     ),
@@ -320,9 +296,9 @@ pub fn gear_btn(
         .items_center()
         .justify_center()
         .child(
-            taskmanager_ui::icons_binding::icon(IconId::Settings)
+            icons_binding::icon(IconId::Settings)
                 .size(px(16.0))
-                .text_color(taskmanager_ui::theme_binding::hsla(color)),
+                .text_color(hsla(color)),
         )
 }
 
@@ -360,36 +336,24 @@ pub fn nav_orientation_btn(
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(t),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(transparent))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_6))
+        .rounded(absolute(tokens::control_radius(t)))
+        .bg(fill(transparent))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(taskmanager_ui::theme_binding::absolute(
-                        tokens::control_radius(t),
-                    ))
+                    .rounded(absolute(tokens::control_radius(t)))
                     .with_animation(
                         ("nav-orientation-bg", hover_state_key(false, is_hov)),
                         hover_animation(),
                         move |el, delta| {
                             if is_hov {
-                                el.bg(taskmanager_ui::theme_binding::fill(mix(
-                                    transparent,
-                                    hover_bg,
-                                    delta,
-                                )))
+                                el.bg(fill(mix(transparent, hover_bg, delta)))
                             } else {
-                                el.bg(taskmanager_ui::theme_binding::fill(transparent))
+                                el.bg(fill(transparent))
                             }
                         },
                     ),
@@ -399,8 +363,8 @@ pub fn nav_orientation_btn(
         .items_center()
         .justify_center()
         .child(
-            taskmanager_ui::icons_binding::icon(IconId::Sidebar)
+            icons_binding::icon(IconId::Sidebar)
                 .size(px(16.0))
-                .text_color(taskmanager_ui::theme_binding::hsla(color)),
+                .text_color(hsla(color)),
         )
 }

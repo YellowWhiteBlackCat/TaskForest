@@ -13,6 +13,7 @@ use iced::{Element, Length};
 use taskmanager_core::core::text::match_ranges_ascii_ci;
 
 use crate::app::Message;
+use taskmanager_theme::Theme;
 
 /// Split `text` into alternating non-matching/matching segments for `query`.
 ///
@@ -56,7 +57,7 @@ pub fn highlight_segments(text: &str, query: &str) -> Vec<(String, bool)> {
 /// so wrapping and truncation behavior never changes with highlighting.
 #[must_use]
 pub fn cell(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     text: &str,
     query: &str,
     search_active: bool,

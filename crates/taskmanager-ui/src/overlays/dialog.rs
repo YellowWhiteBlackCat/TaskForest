@@ -22,6 +22,7 @@ use crate::overlays::layer_stack::{LayerBackfill, ModalSpec, PaletteScrim};
 use crate::primitives::button::ButtonVariant;
 use crate::primitives::icon_button::{IconButton, IconButtonState};
 use crate::{BackfillBuilder, ElementBuilder, OptBoolCallback, OptCallback};
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 /// The dialog key context (Escape/Enter bindings live under it).
@@ -144,7 +145,7 @@ impl Dialog {
             on_cancel: None,
             on_close: None,
             button_props: DialogButtonProps::default(),
-            palette: taskmanager_theme::Theme::dark().palette(),
+            palette: Theme::dark().palette(),
         }
     }
 

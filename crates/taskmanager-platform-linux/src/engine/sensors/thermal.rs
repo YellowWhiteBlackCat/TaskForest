@@ -10,6 +10,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use taskmanager_core::ScalarAvailability;
 use taskmanager_core::{
     DeviceId, FailureKind, ProviderId, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorReading, SensorScale, SourceOutcome, SourceStatus,
@@ -566,12 +567,12 @@ fn summarize_entities(
 }
 
 fn summarize_fields<const N: usize>(
-    fields: [taskmanager_core::ScalarAvailability; N],
+    fields: [ScalarAvailability; N],
 ) -> (bool, Option<FailureKind>) {
     let complete = fields.iter().all(|field| field.is_current());
     let failure = fields
         .into_iter()
-        .filter_map(taskmanager_core::ScalarAvailability::failure)
+        .filter_map(ScalarAvailability::failure)
         .reduce(select_failure);
     (complete, failure)
 }

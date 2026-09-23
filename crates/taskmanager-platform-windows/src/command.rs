@@ -16,6 +16,10 @@ use taskmanager_platform_portable::{
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsProcessJob;
+#[cfg(windows)]
+use taskmanager_windows_api::assign_and_resume_suspended_process;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -32,7 +36,8 @@ pub(crate) fn run_with_timeout(
     }
     #[cfg(not(windows))]
     {
-        taskmanager_platform_portable::run_with_timeout(command, timeout)
+        use taskmanager_platform_portable::run_with_timeout;
+        run_with_timeout(command, timeout)
     }
 }
 
@@ -44,7 +49,7 @@ impl BoundedCommandSpawner for WindowsCommandSpawner {
     fn spawn(&self, command: &mut Command) -> Result<SpawnedCommand, BoundedCommandError> {
         command.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
         let mut child = command.spawn().map_err(BoundedCommandError::Spawn)?;
-        let job = match taskmanager_windows_api::assign_and_resume_suspended_process(child.id()) {
+        let job = match assign_and_resume_suspended_process(child.id()) {
             Ok(job) => job,
             Err(_) => {
                 let _ = child.kill();
@@ -61,7 +66,7 @@ impl BoundedCommandSpawner for WindowsCommandSpawner {
 
 #[cfg(windows)]
 struct WindowsJobTree {
-    job: Option<taskmanager_windows_api::WindowsProcessJob>,
+    job: Option<WindowsProcessJob>,
 }
 
 #[cfg(windows)]

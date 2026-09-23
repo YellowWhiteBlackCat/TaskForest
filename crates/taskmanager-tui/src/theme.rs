@@ -17,6 +17,8 @@ use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, The
 
 use crate::TuiApp;
 use crate::TuiTerminalProfile;
+use taskmanager_core::core::appearance::PreferredColorScheme;
+use taskmanager_ui_contract::IconId;
 
 /// Runtime-resolved theme construction parameters (ADR-026): the neutral
 /// skin, the light/dark mode, and the high-contrast axis. The runtime holds
@@ -57,7 +59,7 @@ impl ThemeParams {
         skin: &str,
         mode: &str,
         hc: bool,
-        appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+        appearance: Option<DesktopAppearance>,
     ) -> Self {
         let skin = Skin::ALL
             .into_iter()
@@ -65,9 +67,7 @@ impl ThemeParams {
             .unwrap_or(Skin::Gnome);
         let mode = match mode {
             "System" | "" => match appearance.map(|app| app.color_scheme) {
-                Some(taskmanager_core::core::appearance::PreferredColorScheme::Light) => {
-                    LightDark::Light
-                }
+                Some(PreferredColorScheme::Light) => LightDark::Light,
                 _ => LightDark::Dark,
             },
             "Light" => LightDark::Light,
@@ -91,6 +91,57 @@ impl ThemeParams {
             HighContrast::Off
         }
     }
+}
+
+/// Parse the shared testing/developer appearance override GPUI owns
+/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
+/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
+/// `None` for an unset or syntactically invalid value, so an invalid request
+/// never forces a wrong skin. This is the SAME vocabulary (and env name) GPUI's
+/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
+/// vocabulary would let the capture harness and the frontends drift.
+#[must_use]
+pub(crate) fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
+    let (skin_token, mode_token) = value.split_once('-')?;
+    let skin = match skin_token.to_ascii_lowercase().as_str() {
+        "gnome" => Skin::Gnome,
+        "kde" => Skin::Kde,
+        "win" | "windows" => Skin::Windows,
+        "mac" | "macos" => Skin::Macos,
+        _ => return None,
+    };
+    let mode = match mode_token.to_ascii_lowercase().as_str() {
+        "dark" => LightDark::Dark,
+        "light" => LightDark::Light,
+        "eyeforest" | "eye-forest" => LightDark::EyeForest,
+        _ => return None,
+    };
+    Some((skin, mode))
+}
+
+/// Resolve the demo/capture theme parameters from the shared `TM_SKIN`
+/// override plus the optional `TM_SKIN_HC` contrast flag. The override is a
+/// FALLBACK: an explicit configuration/preference (the production
+/// `from_config_tokens_with_appearance` path) is never displaced because it
+/// does not consult the environment. `None` when the variable is unset or
+/// invalid, which keeps the demo default exactly as it is today.
+#[must_use]
+pub(crate) fn forced_theme_params(value: Option<&str>, high_contrast: bool) -> Option<ThemeParams> {
+    let (skin, mode) = parse_tm_skin(value?)?;
+    Some(ThemeParams {
+        skin,
+        mode,
+        hc: high_contrast,
+    })
+}
+
+/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override from the process
+/// environment for the demo/capture boot.
+#[must_use]
+pub(crate) fn forced_theme_params_from_env() -> Option<ThemeParams> {
+    let value = std::env::var("TM_SKIN").ok();
+    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
+    forced_theme_params(value.as_deref(), high_contrast)
 }
 
 /// The TUI's resolved terminal palette, derived once per app construction
@@ -209,7 +260,7 @@ impl TuiTheme {
 
     /// Resolve a semantic icon through this frame's glyph repertoire.
     #[must_use]
-    pub const fn glyph(self, icon: taskmanager_ui_contract::IconId) -> &'static str {
+    pub const fn glyph(self, icon: IconId) -> &'static str {
         self.terminal.glyph(icon)
     }
 }

@@ -19,6 +19,8 @@ use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
 
 use super::super::{panel, text};
 use crate::{TuiApp, TuiTheme};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::presentation::{missing_value, service_diagnostics_rows};
 
 /// The details column's fixed width: the widest localized label plus a
 /// relation value that wraps inside the panel instead of eating the table.
@@ -85,9 +87,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         ),
         fact_line(theme, t("svc.sub_state"), honest_value(&service.sub_state)),
     ];
-    for (label, value) in
-        taskmanager_shell::presentation::service_diagnostics_rows(service.diagnostics())
-    {
+    for (label, value) in service_diagnostics_rows(service.diagnostics()) {
         lines.push(fact_line(theme, &label, value));
     }
     for (kind, key) in [
@@ -96,10 +96,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         (ServiceRelationKind::WantedBy, "svc.wanted_by"),
         (ServiceRelationKind::After, "svc.after"),
     ] {
-        let value = dependencies
-            .map_or_else(taskmanager_shell::presentation::missing_value, |deps| {
-                relation_value(deps, &kind)
-            });
+        let value = dependencies.map_or_else(missing_value, |deps| relation_value(deps, &kind));
         lines.push(fact_line(theme, t(key), value));
     }
     if aimed_here && lifecycle.is_loading() {
@@ -125,7 +122,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
 /// whose provider left the field blank renders the shared missing-value dash.
 fn honest_value(value: &str) -> String {
     if value.is_empty() {
-        taskmanager_shell::presentation::missing_value()
+        missing_value()
     } else {
         value.to_owned()
     }
@@ -137,11 +134,11 @@ fn honest_value(value: &str) -> String {
 fn relation_value(dependencies: &ServiceDeps, kind: &ServiceRelationKind) -> String {
     let joined = dependencies
         .relation_targets(kind)
-        .map(taskmanager_core::core::target::ServiceId::as_str)
+        .map(ServiceId::as_str)
         .collect::<Vec<_>>()
         .join(" ");
     if joined.is_empty() {
-        return taskmanager_shell::presentation::missing_value();
+        return missing_value();
     }
     if joined.chars().count() > MAX_RELATION_CHARS {
         format!(

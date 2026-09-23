@@ -28,6 +28,7 @@ use iced::advanced::{Clipboard, Shell, Widget};
 use iced::{Element, Event, Length, Point, Rectangle, Size, Vector};
 
 use crate::app::Message;
+use taskmanager_theme::tokens::SPACE_1;
 
 mod anchor;
 
@@ -50,7 +51,7 @@ impl<'a> Popover<'a> {
             anchor: anchor.into(),
             panel: panel.into(),
             on_dismiss,
-            gap: f32::from(taskmanager_theme::tokens::SPACE_1),
+            gap: f32::from(SPACE_1),
         }
     }
 }

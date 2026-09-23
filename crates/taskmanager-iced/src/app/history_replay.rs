@@ -9,6 +9,17 @@ use taskmanager_application::{
 use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 use super::IcedApp;
+use taskmanager_app_host::HistoryFrontendConnectRequestId;
+use taskmanager_app_host::HistoryFrontendConnector;
+use taskmanager_app_host::HistoryFrontendConnectorStartError;
+use taskmanager_app_host::HistoryPersistenceWriter;
+use taskmanager_app_host::HistoryReplayClient;
+use taskmanager_application::ApplicationHistoryCapability;
+use taskmanager_application::ApplicationHistoryProjection;
+use taskmanager_application::ApplicationHistoryUnavailableReason;
+use taskmanager_application::HistoryReplayCompletion;
+use taskmanager_application::HistoryReplayError;
+use taskmanager_core::core::history::HistoryRecordSink;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HistoryReplayRow {
@@ -53,7 +64,7 @@ impl IcedHistoryReplay {
         &self.rows
     }
 
-    pub(crate) fn failure(&self) -> Option<&taskmanager_application::HistoryReplayError> {
+    pub(crate) fn failure(&self) -> Option<&HistoryReplayError> {
         self.controller.failure()
     }
 
@@ -84,16 +95,12 @@ impl IcedHistoryReplay {
         self.controller.select_window(window).ok()
     }
 
-    fn reject_submission(
-        &mut self,
-        request: HistoryReplayRequest,
-        error: taskmanager_application::HistoryReplayError,
-    ) {
+    fn reject_submission(&mut self, request: HistoryReplayRequest, error: HistoryReplayError) {
         let _ = self.controller.reject_submission(request, error);
         self.sync_rows_projection();
     }
 
-    fn complete(&mut self, completion: taskmanager_application::HistoryReplayCompletion) -> bool {
+    fn complete(&mut self, completion: HistoryReplayCompletion) -> bool {
         if self.controller.complete(completion) != HistoryReplayCompletionDisposition::Applied {
             return false;
         }
@@ -132,34 +139,34 @@ impl IcedHistoryReplay {
 
     fn application_history_projection(
         &self,
-        capability: taskmanager_application::ApplicationHistoryCapability,
-    ) -> taskmanager_application::ApplicationHistoryProjection {
+        capability: ApplicationHistoryCapability,
+    ) -> ApplicationHistoryProjection {
         self.controller.application_history_projection(capability)
     }
 }
 
 enum IcedHistoryResources {
-    PendingBoot(Option<taskmanager_app_host::HistoryReplayClient>),
+    PendingBoot(Option<HistoryReplayClient>),
     Disabled,
-    Connecting(taskmanager_app_host::HistoryFrontendConnectRequestId),
-    Unavailable(taskmanager_application::ApplicationHistoryUnavailableReason),
+    Connecting(HistoryFrontendConnectRequestId),
+    Unavailable(ApplicationHistoryUnavailableReason),
     Active(IcedHistoryActive),
 }
 
 struct IcedHistoryActive {
-    replay: taskmanager_app_host::HistoryReplayClient,
-    persistence: Option<taskmanager_app_host::HistoryPersistenceWriter>,
+    replay: HistoryReplayClient,
+    persistence: Option<HistoryPersistenceWriter>,
 }
 
 pub(crate) struct IcedHistoryRuntime {
     resources: IcedHistoryResources,
     replay: IcedHistoryReplay,
-    connector: Option<taskmanager_app_host::HistoryFrontendConnector>,
+    connector: Option<HistoryFrontendConnector>,
     requested: bool,
 }
 
 impl IcedHistoryRuntime {
-    pub(crate) fn new(candidate: Option<taskmanager_app_host::HistoryReplayClient>) -> Self {
+    pub(crate) fn new(candidate: Option<HistoryReplayClient>) -> Self {
         Self {
             resources: IcedHistoryResources::PendingBoot(candidate),
             replay: IcedHistoryReplay::default(),
@@ -176,16 +183,14 @@ impl IcedHistoryRuntime {
         }
         let IcedHistoryResources::PendingBoot(candidate) = std::mem::replace(
             &mut self.resources,
-            IcedHistoryResources::Unavailable(
-                taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStart,
-            ),
+            IcedHistoryResources::Unavailable(ApplicationHistoryUnavailableReason::ConnectorStart),
         ) else {
             return;
         };
         self.resources = if requested {
             candidate.map_or(
                 IcedHistoryResources::Unavailable(
-                    taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStart,
+                    ApplicationHistoryUnavailableReason::ConnectorStart,
                 ),
                 |replay| {
                     IcedHistoryResources::Active(IcedHistoryActive {
@@ -212,10 +217,7 @@ impl IcedHistoryRuntime {
 
     fn install_connector(
         &mut self,
-        connector: Result<
-            taskmanager_app_host::HistoryFrontendConnector,
-            taskmanager_app_host::HistoryFrontendConnectorStartError,
-        >,
+        connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     ) {
         match connector {
             Ok(connector) => {
@@ -285,31 +287,21 @@ impl IcedHistoryRuntime {
         }
     }
 
-    const fn application_history_capability(
-        &self,
-    ) -> taskmanager_application::ApplicationHistoryCapability {
+    const fn application_history_capability(&self) -> ApplicationHistoryCapability {
         match &self.resources {
-            IcedHistoryResources::Disabled => {
-                taskmanager_application::ApplicationHistoryCapability::Disabled
-            }
-            IcedHistoryResources::Active(_) => {
-                taskmanager_application::ApplicationHistoryCapability::Available
-            }
-            IcedHistoryResources::Connecting(_) => {
-                taskmanager_application::ApplicationHistoryCapability::Connecting
-            }
+            IcedHistoryResources::Disabled => ApplicationHistoryCapability::Disabled,
+            IcedHistoryResources::Active(_) => ApplicationHistoryCapability::Available,
+            IcedHistoryResources::Connecting(_) => ApplicationHistoryCapability::Connecting,
             IcedHistoryResources::Unavailable(reason) => {
-                taskmanager_application::ApplicationHistoryCapability::Unavailable(*reason)
+                ApplicationHistoryCapability::Unavailable(*reason)
             }
-            IcedHistoryResources::PendingBoot(_) => {
-                taskmanager_application::ApplicationHistoryCapability::Unavailable(
-                    taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStart,
-                )
-            }
+            IcedHistoryResources::PendingBoot(_) => ApplicationHistoryCapability::Unavailable(
+                ApplicationHistoryUnavailableReason::ConnectorStart,
+            ),
         }
     }
 
-    fn client_mut(&mut self) -> Option<&mut taskmanager_app_host::HistoryReplayClient> {
+    fn client_mut(&mut self) -> Option<&mut HistoryReplayClient> {
         match &mut self.resources {
             IcedHistoryResources::Active(active) => Some(&mut active.replay),
             IcedHistoryResources::PendingBoot(_)
@@ -319,9 +311,7 @@ impl IcedHistoryRuntime {
         }
     }
 
-    fn record_sink(
-        &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
+    fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
         match &self.resources {
             IcedHistoryResources::Active(active) => active
                 .persistence
@@ -346,10 +336,7 @@ impl IcedHistoryRuntime {
 impl IcedApp {
     pub(crate) fn install_history_frontend_connector(
         &mut self,
-        connector: Result<
-            taskmanager_app_host::HistoryFrontendConnector,
-            taskmanager_app_host::HistoryFrontendConnectorStartError,
-        >,
+        connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     ) {
         self.history_runtime.install_connector(connector);
         self.sync_history_persistence_sink();
@@ -435,9 +422,7 @@ impl IcedApp {
         self.history_runtime.replay()
     }
 
-    pub(crate) fn application_history_projection(
-        &self,
-    ) -> taskmanager_application::ApplicationHistoryProjection {
+    pub(crate) fn application_history_projection(&self) -> ApplicationHistoryProjection {
         self.history_runtime
             .replay()
             .application_history_projection(self.history_runtime.application_history_capability())

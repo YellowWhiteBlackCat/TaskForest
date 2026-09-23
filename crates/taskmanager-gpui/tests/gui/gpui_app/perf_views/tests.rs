@@ -9,6 +9,9 @@
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -282,7 +285,7 @@ async fn mc02_partition_case_disk_page_paints_title_and_stats_from_device_data(
         v.page = TopPage::Performance;
         v.selected = SelectedDevice::Disk(0);
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("nvme0n1".into())
                 .name("nvme0n1".into())
                 .disk_type("NVMe SSD".into())
@@ -295,7 +298,7 @@ async fn mc02_partition_case_disk_page_paints_title_and_stats_from_device_data(
                 .current_capacity_bytes(gib(2000))
                 .current_available_bytes(gib(1200))
                 .partitions(vec![
-                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                    DiskPartitionFixtureBuilder::new()
                         .device_id("partition:nvme0n1:nvme0n1p1".into())
                         .parent_device_id("nvme0n1".into())
                         .device_generation(DeviceGeneration::new(1))
@@ -312,7 +315,7 @@ async fn mc02_partition_case_disk_page_paints_title_and_stats_from_device_data(
                             free_bytes: ScalarObservation::available(gib(300), 10),
                         })
                         .build(),
-                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                    DiskPartitionFixtureBuilder::new()
                         .device_id("partition:nvme0n1:nvme0n1p2".into())
                         .parent_device_id("nvme0n1".into())
                         .device_generation(DeviceGeneration::new(1))
@@ -481,7 +484,7 @@ async fn disk_page_composes_instead_of_scrolling(cx: &mut TestAppContext) {
         v.selected = SelectedDevice::Disk(0);
         let partitions = (0..32)
             .map(|index| {
-                taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                DiskPartitionFixtureBuilder::new()
                     .device_id(format!("partition:fixture:fixture{index}"))
                     .parent_device_id("fixture".into())
                     .device_generation(DeviceGeneration::new(1))
@@ -498,7 +501,7 @@ async fn disk_page_composes_instead_of_scrolling(cx: &mut TestAppContext) {
             })
             .collect();
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("fixture".into())
                 .name("fixture".into())
                 .current_capacity_bytes(gib(320))
@@ -572,7 +575,7 @@ async fn network_page_keeps_shared_main_graph_readable_in_compact_view(cx: &mut 
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Performance;
         v.system_snapshot_mut_for_test().networks = vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id("fixture:nic0".into())
                 .interface_name("nic0".into())
                 .ipv4_addr(Some("192.0.2.10".into()))

@@ -34,6 +34,8 @@ use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{Node, px};
 use bevy::ui::widget::ImageNode;
 use taskmanager_assets::UI_ICON_RGBA_SIZE;
+use taskmanager_assets::ui_icon_rgba;
+use taskmanager_icons::path;
 use taskmanager_ui_contract::IconId;
 
 /// The semantic ids this frontend draws. The list is exhaustive for the
@@ -64,7 +66,7 @@ pub(crate) const PLATE_ICONS: &[IconId] = &[
 /// the registry test turns into a gate failure, and the renderer into an
 /// honest skip.
 pub(crate) fn icon_rgba(icon: IconId) -> Option<&'static [u8]> {
-    taskmanager_assets::ui_icon_rgba(taskmanager_icons::path(icon))
+    ui_icon_rgba(path(icon))
 }
 
 /// One decoded bitmap in the bevy image store. Length is guaranteed by the

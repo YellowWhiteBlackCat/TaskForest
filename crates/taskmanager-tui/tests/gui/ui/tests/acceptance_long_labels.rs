@@ -16,6 +16,12 @@ use super::acceptance_support::{
     frame_in_language, visible_row_count, with_frame_in_language,
 };
 use crate::TuiApp;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::fixture::{ProjectionSeedFact, edit_processes, seed_projection_fact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 /// Long pure-ASCII identity: a 90-character name and a ~200-character command
 /// line whose path segments never form a dotted key shape.
@@ -31,14 +37,8 @@ const LONG_CJK_CMD: &str = "/opt/工具/超长安装路径/bin/可执行文件 -
 const LONG_ASCII_PATH: &str =
     "/opt/very/long/install/path/bin/long-ascii-name-abcdefghijklmnopqrstuvwxyz";
 
-fn long_named_process(
-    pid: u32,
-    name: &str,
-    cmd: &str,
-    path: &str,
-    cpu: f32,
-) -> taskmanager_core::core::process::ProcessItem {
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+fn long_named_process(pid: u32, name: &str, cmd: &str, path: &str, cpu: f32) -> ProcessItem {
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.to_owned())
         .cmdline(cmd.to_owned())
@@ -67,7 +67,7 @@ fn long_named_process(
 /// long-named service appended to the inventory.
 fn long_label_app() -> TuiApp {
     let mut app = TuiApp::demo();
-    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+    edit_processes(&mut app.shell, |processes| {
         if let Some(items) = processes {
             items.push(long_named_process(
                 431,
@@ -85,20 +85,18 @@ fn long_label_app() -> TuiApp {
             ));
         }
     });
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            taskmanager_core::core::services::ServiceItem::from_inventory(
-                taskmanager_core::core::target::ServiceId::new("fixture.service:long.service".to_owned()),
-                "a-very-long-service-name-abcdefghijklmnop-qrstuv-abcdefghijklmnopqrstuvwxyz.service"
-                    .to_owned(),
-                taskmanager_core::core::services::ServiceStatus::Active,
-                "一个很长很长的中文服务描述用于验证服务表截断行为没有问题",
-                "",
-                "",
-                "",
-            ),
-        ])),
+        ProjectionSeedFact::Services(Some(vec![ServiceItem::from_inventory(
+            ServiceId::new("fixture.service:long.service".to_owned()),
+            "a-very-long-service-name-abcdefghijklmnop-qrstuv-abcdefghijklmnopqrstuvwxyz.service"
+                .to_owned(),
+            ServiceStatus::Active,
+            "一个很长很长的中文服务描述用于验证服务表截断行为没有问题",
+            "",
+            "",
+            "",
+        )])),
     );
     app
 }
@@ -185,7 +183,7 @@ fn process_properties_overlay_survives_long_paths_and_cjk_at_both_sizes() {
 
     for (width, height) in [(REFERENCE_WIDTH, REFERENCE_HEIGHT), (54, 16)] {
         with_frame_in_language(&app, width, height, Language::En, |frame| {
-            let title = taskmanager_application::i18n::t("prop.process_details");
+            let title = t("prop.process_details");
             assert_ne!(title, "prop.process_details");
             assert!(
                 frame.contains(title),

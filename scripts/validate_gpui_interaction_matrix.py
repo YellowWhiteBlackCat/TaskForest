@@ -6,12 +6,15 @@ The structural authority for the interaction contract is no longer here:
 * the unified matrix (``scripts/parity/cross_frontend_matrix.tsv``) owns the row
   declarations and the ``contract_tag == first paths token`` rule;
 * the Rust ``ContractTag`` conformance owns the token vocabulary;
-* ``tests/logic/gpui_interaction_matrix_test.rs`` owns the GPUI projection
-  (pinned row count, interaction path vocabulary, case-prefix discipline,
-  requirement and capture-scenario coverage);
+* the Rust GPUI projection gate owns the GPUI projection (pinned row count,
+  interaction path vocabulary, case-prefix discipline, requirement and
+  capture-scenario coverage);
 * the unified resolver (``resolve_frontend_evidence.py``) resolves every
   declared anchor against discovery, including the GPUI stable case-prefix
   channel.
+
+This module reads the unified matrix directly and projects its ``gpui`` rows;
+the per-frontend view it used to consume is retired (D6).
 
 What remains in this module is the one guarantee no other check owns: every
 discovered GPUI interaction anchor ran to ``ok`` in its own nextest target
@@ -31,7 +34,8 @@ from pathlib import Path
 
 
 ALLOWED_TARGETS = ("gui", "lib")
-REQUIRED_COLUMNS = ("case_id", "target")
+REQUIRED_COLUMNS = ("case_id", "frontend", "target")
+FRONTEND = "gpui"
 
 
 class MatrixError(RuntimeError):
@@ -39,11 +43,12 @@ class MatrixError(RuntimeError):
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
-    """Read the interaction rows that seed the receipt.
+    """Project the unified matrix's GPUI rows that seed the receipt.
 
     Only the columns the receipt needs are required; the row schema and its
     semantics are owned by the unified matrix and its Rust gate, so this reader
-    does not re-declare them.
+    does not re-declare them.  Every row is checked for well-formedness before
+    the frontend filter, so a malformed row can never be skipped silently.
     """
     if not path.is_file():
         raise MatrixError(f"{path}: matrix not found")
@@ -66,9 +71,11 @@ def read_rows(path: Path) -> list[dict[str, str]]:
             raise MatrixError(f"{path}: malformed row (too many fields): {row[None]!r}")
         if not (row.get("case_id") or "").strip() or not (row.get("target") or "").strip():
             raise MatrixError(f"{path}: malformed row (missing case_id or target)")
+        if (row.get("frontend") or "").strip() != FRONTEND:
+            continue
         rows.append(row)
     if not rows:
-        raise MatrixError(f"{path}: matrix has no data rows")
+        raise MatrixError(f"{path}: matrix has no {FRONTEND} data rows")
     return rows
 
 
@@ -232,10 +239,21 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="gpui-receipt-selftest-") as raw:
         root = Path(raw)
         matrix = root / "matrix.tsv"
-        matrix.write_text("case_id\ttarget\nmc00-case\tgui\n", encoding="utf-8")
+        matrix.write_text(
+            "case_id\tfrontend\ttarget\nmc00-case\tgpui\tgui\n", encoding="utf-8"
+        )
+        assert [row["case_id"] for row in read_rows(matrix)] == ["mc00-case"]
+        # The reader projects GPUI rows only: a sibling frontend's row is not
+        # folded into the GPUI receipt.
+        matrix.write_text(
+            "case_id\tfrontend\ttarget\nmc00-case\tgpui\tgui\nmc99-case\ticed\tlib\n",
+            encoding="utf-8",
+        )
         assert [row["case_id"] for row in read_rows(matrix)] == ["mc00-case"]
         # A malformed row must fail, never be silently skipped out of the receipt.
-        matrix.write_text("case_id\ttarget\nmc00-case\n", encoding="utf-8")
+        matrix.write_text(
+            "case_id\tfrontend\ttarget\nmc00-case\tgpui\n", encoding="utf-8"
+        )
         try:
             read_rows(matrix)
         except MatrixError:

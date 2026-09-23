@@ -5,15 +5,18 @@ use gpui::{Div, ParentElement, Styled, div};
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 pub(super) fn shortcut_grid(t: &Theme) -> Div {
     div()
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .children([
             shortcut(t, "Alt+1…6", i18n::t("settings.keys_pages")),
             shortcut(t, "Ctrl+F", i18n::t("settings.keys_search")),
@@ -34,32 +37,24 @@ fn shortcut(t: &Theme, keys: &'static str, label: &'static str) -> Div {
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_7,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_5,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::small_radius(t),
-        ))
+        .gap(definite_length(tokens::SPACE_6))
+        .px(definite_length(tokens::SPACE_7))
+        .py(definite_length(tokens::SPACE_5))
+        .rounded(absolute(tokens::small_radius(t)))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(t.border))
-        .bg(taskmanager_ui::theme_binding::fill(t.card_bg))
+        .border_color(hsla(t.border))
+        .bg(fill(t.card_bg))
         .child(
             div()
                 .font(mono_font_with_fallback(t))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.accent))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(t.accent))
                 .child(keys),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(t.fg))
                 .child(label),
         )
 }

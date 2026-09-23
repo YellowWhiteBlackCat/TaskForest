@@ -8,6 +8,8 @@
 
 use super::navigation::StableDeviceKind;
 use crate::gpui_app::sidebar::SelectedDevice;
+use taskmanager_core::core::SensorQuantity;
+use taskmanager_core::core::SensorReading;
 
 use super::RootView;
 
@@ -41,9 +43,7 @@ impl RootView {
                 .sensors()
                 .readings
                 .iter()
-                .filter(|reading| {
-                    reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed
-                })
+                .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
                 .nth(index)
                 .map(|reading| (StableDeviceKind::Fan, reading.id().to_owned())),
             SelectedDevice::Cpu | SelectedDevice::Memory => None,
@@ -101,10 +101,8 @@ impl RootView {
                     self.sensors()
                         .readings
                         .iter()
-                        .filter(|reading| {
-                            reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed
-                        })
-                        .map(taskmanager_core::core::SensorReading::id),
+                        .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
+                        .map(SensorReading::id),
                 )
                 .map(SelectedDevice::Fan),
             None => {

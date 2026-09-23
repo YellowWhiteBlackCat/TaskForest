@@ -25,6 +25,12 @@ use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 
 mod insights;
 pub(crate) use insights::{insights_lines, modal_insights_lines, network_requires_escalation};
+use taskmanager_application::process_details_vm::{
+    ProcessDetailsRowVm, process_details_rows_with_local_time,
+};
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::ProcessTreeRow;
+use taskmanager_shell::presentation::command_identity_summary;
 
 /// Clamp a stored vertical-scroll intent to the valid viewport range so the
 /// rendered content never scrolls past the last line. `content_lines` is the
@@ -112,7 +118,7 @@ pub(super) struct ProcessCellInput<'a> {
     pub(super) columns: ColumnVisibility<'a>,
     pub(super) tree_prefix: Option<ProcessTreePrefix>,
     pub(super) gray_zero: bool,
-    pub(super) local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub(super) local_time_rules: &'a LocalTimeRulesObservation,
 }
 
 /// Tree chrome projected for one process cell. The names make the upstream
@@ -389,10 +395,7 @@ pub(super) fn group_header_cells(
 /// Render one VM value with the TUI's shared dash spelling — the single
 /// adapter between the neutral [`DetailValue`] fold and every details/
 /// properties row this module renders.
-pub(crate) fn vm_text(
-    rows: &[taskmanager_application::process_details_vm::ProcessDetailsRowVm],
-    field: ProcessDetailsField,
-) -> String {
+pub(crate) fn vm_text(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) -> String {
     rows.iter()
         .find(|row| row.field == field)
         .map_or_else(missing_value, |row| match &row.value {
@@ -410,9 +413,9 @@ pub(crate) fn vm_text(
 fn detail_panel_pairs_with_local_time(
     process: &ProcessItem,
     frozen: Option<&FrozenProcessIdentity>,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
-    let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
+    let rows = process_details_rows_with_local_time(
         process,
         &UnitPreferences::default(),
         local_time_rules,
@@ -473,7 +476,7 @@ fn detail_panel_pairs_with_local_time(
         (t("common.executable"), text(ProcessDetailsField::Exe)),
         (t("prop.command"), text(ProcessDetailsField::Cmdline)),
     ];
-    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+    if let Some(summary) = command_identity_summary(process) {
         pairs.push((t("proc_insights.command_identity"), summary));
     }
     pairs
@@ -505,7 +508,7 @@ pub(super) fn render_process_details_with_focus_from_canonical_indexed(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[taskmanager_shell::ProcessTreeRow],
+    ids: &[ProcessTreeRow],
     visible: &crate::process_view::VisibleProcesses<'_>,
 ) {
     let selected = visible.id_process(ids, app.selected);
@@ -522,17 +525,14 @@ fn render_details_for_selection(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[taskmanager_shell::ProcessTreeRow],
+    ids: &[ProcessTreeRow],
     selected: Option<&ProcessItem>,
 ) {
     let Some(process) = selected else {
         let on_group_header = app.page() == AppPage::Applications
             && matches!(
                 ids.get(app.selected),
-                Some(
-                    taskmanager_shell::ProcessTreeRow::Category { .. }
-                        | taskmanager_shell::ProcessTreeRow::Application { .. }
-                )
+                Some(ProcessTreeRow::Category { .. } | ProcessTreeRow::Application { .. })
             );
         let hint = if on_group_header {
             t("tui.details_group_hint").replacen("{label}", t("empty.no_process_selected"), 1)

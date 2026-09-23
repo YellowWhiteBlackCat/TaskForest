@@ -2,6 +2,11 @@
 //! (`taskmanager_ui::inputs::slider`).
 
 use std::time::Duration;
+use taskmanager_application::TelemetryInterval;
+use taskmanager_application::TelemetryRefreshPolicyChange;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{AppContext, Context, Div, Entity, ParentElement, Styled, div};
 
@@ -78,11 +83,9 @@ pub(super) fn refresh_row(
     let slider = Slider::new(slider_entity, t.palette()).on_change(move |secs, _win, cx| {
         let ms = (secs * 1000.0).round().max(50.0) as u64;
         ent.update(cx, |v, cx| {
-            let interval =
-                taskmanager_application::TelemetryInterval::clamped(Duration::from_millis(ms));
-            v.telemetry_refresh_policy.apply(
-                taskmanager_application::TelemetryRefreshPolicyChange::SetInterval(interval),
-            );
+            let interval = TelemetryInterval::clamped(Duration::from_millis(ms));
+            v.telemetry_refresh_policy
+                .apply(TelemetryRefreshPolicyChange::SetInterval(interval));
             if let Some(platform) = &mut v.platform {
                 platform.set_telemetry_interval(interval);
             }
@@ -93,9 +96,7 @@ pub(super) fn refresh_row(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
                 .flex()
@@ -104,14 +105,14 @@ pub(super) fn refresh_row(
                 .justify_between()
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(t.fg))
                         .child(i18n::t("settings.refresh_interval")),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(t.fg_dim))
                         .child(readout),
                 ),
         )

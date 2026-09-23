@@ -7,6 +7,7 @@
 
 use gpui::Img;
 use taskmanager_core::core::{ApplicationIconAsset, ApplicationIconFormat};
+use taskmanager_ui::icons_binding::ApplicationImageFormat;
 
 /// Adapt a provider-resolved, toolkit-neutral icon asset to a GPUI image.
 ///
@@ -15,12 +16,14 @@ use taskmanager_core::core::{ApplicationIconAsset, ApplicationIconFormat};
 /// native provider, so rendering performs no Linux filesystem access.
 #[must_use]
 pub fn application_image(asset: &ApplicationIconAsset) -> Img {
+    use taskmanager_ui::icons_binding::application_image;
+
     let format = match asset.format {
-        ApplicationIconFormat::Svg => taskmanager_ui::icons_binding::ApplicationImageFormat::Svg,
-        ApplicationIconFormat::Png => taskmanager_ui::icons_binding::ApplicationImageFormat::Png,
-        ApplicationIconFormat::Jpeg => taskmanager_ui::icons_binding::ApplicationImageFormat::Jpeg,
-        ApplicationIconFormat::Webp => taskmanager_ui::icons_binding::ApplicationImageFormat::Webp,
-        ApplicationIconFormat::Bmp => taskmanager_ui::icons_binding::ApplicationImageFormat::Bmp,
+        ApplicationIconFormat::Svg => ApplicationImageFormat::Svg,
+        ApplicationIconFormat::Png => ApplicationImageFormat::Png,
+        ApplicationIconFormat::Jpeg => ApplicationImageFormat::Jpeg,
+        ApplicationIconFormat::Webp => ApplicationImageFormat::Webp,
+        ApplicationIconFormat::Bmp => ApplicationImageFormat::Bmp,
     };
-    taskmanager_ui::icons_binding::application_image(format, &asset.bytes)
+    application_image(format, &asset.bytes)
 }

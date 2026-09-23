@@ -1,6 +1,11 @@
 use super::*;
 use gpui::AppContext;
 use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::ProcessControlFeedback;
+use taskmanager_shell::ProcessControlKind;
+use taskmanager_theme::Theme;
 
 #[test]
 fn typed_submission_errors_preserve_provider_unavailable_presentation() {
@@ -24,12 +29,12 @@ fn typed_submission_errors_preserve_provider_unavailable_presentation() {
 fn accepted_control_feedback_replaces_local_toast_with_one_shell_notice(
     cx: &mut gpui::TestAppContext,
 ) {
-    let entity = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let entity = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let target = FrozenProcessIdentity::from_authoritative_parts(42, "worker", 10, 99)
         .expect("fixture identity is authoritative");
-    let feedback = taskmanager_shell::ProcessControlFeedback {
+    let feedback = ProcessControlFeedback {
         target,
-        kind: taskmanager_shell::ProcessControlKind::EndTask,
+        kind: ProcessControlKind::EndTask,
         result: Ok(()),
     };
 
@@ -46,11 +51,8 @@ fn accepted_control_feedback_replaces_local_toast_with_one_shell_notice(
             .shell
             .feedback_notice()
             .expect("accepted control feedback publishes one typed notice");
-        assert_eq!(notice.source(), taskmanager_shell::FeedbackSource::Control);
-        assert_eq!(
-            notice.severity(),
-            taskmanager_shell::FeedbackSeverity::Success
-        );
+        assert_eq!(notice.source(), FeedbackSource::Control);
+        assert_eq!(notice.severity(), FeedbackSeverity::Success);
         assert!(notice.text().contains("42"));
     });
 }

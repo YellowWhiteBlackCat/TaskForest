@@ -8,10 +8,11 @@ use crate::platform::{
     SystemTelemetryDomainOutcome, SystemTelemetryProjectionApplyResult,
     SystemTelemetryProjectionRejection, SystemTelemetryUnavailable,
 };
+use taskmanager_core::FailureKind;
 
 pub(super) struct SystemEventProjectionOutcome {
     pub(super) projection: Option<SystemTelemetryProjectionApplyResult>,
-    pub(super) rejection: Option<taskmanager_core::FailureKind>,
+    pub(super) rejection: Option<FailureKind>,
     pub(super) outcome: Option<SystemTelemetryDomainOutcome>,
 }
 
@@ -31,7 +32,7 @@ impl SystemEventProjectionOutcome {
         revision: crate::SystemTelemetryRevision,
         domain: SystemTelemetryDomain,
         projection: Option<SystemTelemetryProjectionApplyResult>,
-        failure: taskmanager_core::FailureKind,
+        failure: FailureKind,
     ) -> Self {
         Self {
             projection,
@@ -44,7 +45,7 @@ impl SystemEventProjectionOutcome {
         }
     }
 
-    fn discarded(failure: taskmanager_core::FailureKind) -> Self {
+    fn discarded(failure: FailureKind) -> Self {
         Self {
             projection: None,
             rejection: Some(failure),
@@ -61,14 +62,12 @@ impl PlatformClient {
         event: &SystemTelemetryDomainEvent,
     ) -> SystemEventProjectionOutcome {
         let Some(pending) = self.system_telemetry_requests.remove(&request_id) else {
-            return SystemEventProjectionOutcome::discarded(
-                taskmanager_core::FailureKind::IdentityChanged,
-            );
+            return SystemEventProjectionOutcome::discarded(FailureKind::IdentityChanged);
         };
         if pending.domain != event.domain()
             || system_telemetry_domain(capability) != Some(pending.domain)
         {
-            let failure = taskmanager_core::FailureKind::ProviderFault;
+            let failure = FailureKind::ProviderFault;
             let projection = self.system_telemetry_projection.apply_failure(
                 pending.revision,
                 pending.domain,
@@ -88,12 +87,10 @@ impl PlatformClient {
         let failure = match rejection {
             SystemTelemetryProjectionRejection::ConflictingDeviceLifecycle
             | SystemTelemetryProjectionRejection::StaleOrUnexpectedRevision => {
-                taskmanager_core::FailureKind::IdentityChanged
+                FailureKind::IdentityChanged
             }
             SystemTelemetryProjectionRejection::NoActiveRequest
-            | SystemTelemetryProjectionRejection::DuplicateDomain => {
-                taskmanager_core::FailureKind::ProviderFault
-            }
+            | SystemTelemetryProjectionRejection::DuplicateDomain => FailureKind::ProviderFault,
         };
         let projection = self.system_telemetry_projection.apply_failure(
             pending.revision,

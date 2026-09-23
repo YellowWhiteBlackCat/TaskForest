@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_platform_conformance::assert_device_discovery_consistent;
 
 #[test]
 fn battery_status_labels_cover_every_state() {
@@ -80,6 +81,6 @@ fn battery_snapshot_has_coherent_discovery_authority() {
     let snapshot =
         collect_battery_snapshot("fixture", ProviderId::borrowed("fixture.power.battery"), 1)
             .expect("starship-battery returns a typed snapshot");
-    taskmanager_platform_conformance::assert_device_discovery_consistent(&snapshot)
+    assert_device_discovery_consistent(&snapshot)
         .expect("portable battery discovery must be coherent");
 }

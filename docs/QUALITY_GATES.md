@@ -45,7 +45,7 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
 - `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build 和
   平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
@@ -143,6 +143,7 @@ SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 Niri `screenshot-window` 写出 PNG；验收脚本拒绝 `TM_CAPTURE_NIRI_BACKGROUND=0`，避免调试
 参数意外触碰宿主桌面。需要研究可见 compositor 行为时，必须使用独立的手工调试环境，
 不得把结果写入验收 receipt。
+画面外观是可记录维度：scenario 表新增 `skin` 列（复用 `TM_SKIN` 词表），capture 把请求值传给应用并从 PNG 均值亮度回读 `appearance_rendered`，再按请求模式与回读结果比对得出 `appearance_control`：全部场景一致记 `honored`，任一场景不一致记 `ignored`，其余（含无法量测或不可判定项）记 `unknown`，不伪装成可控；Bevy/Iced/TUI 在 Performance/CPU 页各有 light/dark 成对场景（Bevy `performance`/`performance-dark`、Iced `cpu`/`cpu-light`、TUI 同页切换 `TM_TUI_CAPTURE_SKIN=gnome-light|gnome-dark`），保证同页可比。
 
 每个后台 capture 必须经 `scripts/capture_supervisor.py` 获得随机 Run UUID，并将应用
 binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 与 receipt
@@ -155,7 +156,7 @@ binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 
 standard` 重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形
 runner 只能报告环境性 SKIP，不能把它记为隔离 PASS。
 
-Bevy 交互矩阵（`scripts/bevy_interaction_matrix.tsv`）由机械发现驱动：脚本先对 lib 目标做
+Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 bevy 投影）由机械发现驱动：脚本先对 lib 目标做
 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
 存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。

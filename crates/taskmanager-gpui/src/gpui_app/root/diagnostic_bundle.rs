@@ -7,6 +7,13 @@ use gpui::{
 use std::path::PathBuf;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::theme::mono_font_with_fallback;
@@ -190,13 +197,11 @@ fn preview_panel(theme: &Theme, preview: &DiagnosticPreview, scroll: ScrollHandl
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg))
                 .child(summary),
         )
         .child(bounded_scroll_region_with_rail(
@@ -214,36 +219,24 @@ fn preview_panel(theme: &Theme, preview: &DiagnosticPreview, scroll: ScrollHandl
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .children(preview.files.iter().map(|file| {
                     div()
-                        .p(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_8,
-                        ))
-                        .rounded(taskmanager_ui::theme_binding::absolute(
-                            tokens::control_radius(theme),
-                        ))
-                        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+                        .p(definite_length(tokens::SPACE_8))
+                        .rounded(absolute(tokens::control_radius(theme)))
+                        .bg(fill(theme.sidebar_card_bg))
                         .child(
                             div()
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_12,
-                                ))
-                                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                    tokens::FONT_WEIGHT_SEMIBOLD,
-                                ))
+                                .text_size(font_size(tokens::FONT_12))
+                                .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
                                 .child(format!("{} · {} B", file.name, file.bytes)),
                         )
                         .child(
                             div()
-                                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_4))
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_10,
-                                ))
+                                .mt(length(tokens::SPACE_4))
+                                .text_size(font_size(tokens::FONT_10))
                                 .font(mono_font_with_fallback(theme))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                                .text_color(hsla(theme.fg_dim))
                                 .whitespace_normal()
                                 .child(file.excerpt.clone()),
                         )
@@ -270,17 +263,17 @@ pub(super) fn render_diagnostic_bundle_dialog(
         DiagnosticBundleUiState::Preview(plan) => preview_panel(theme, plan.preview(), scroll),
         DiagnosticBundleUiState::Writing(preview) => preview_panel(theme, preview, scroll).child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("diagnostics.writing")),
         ),
         DiagnosticBundleUiState::Complete(path) => div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.disk))
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(theme.disk))
             .child(i18n::t("diagnostics.complete").replace("{path}", &path.display().to_string())),
         DiagnosticBundleUiState::Failed(error) => div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(theme.gpu))
             .child(diagnostic_failure_message(error)),
     };
     let dialog_width = (f32::from(window.viewport_size().width) - 80.0).clamp(320.0, 580.0);
@@ -289,17 +282,13 @@ pub(super) fn render_diagnostic_bundle_dialog(
         .w(px(content_width))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(body);
     let close_button = entity.clone();
     let actions = div()
         .flex()
         .justify_end()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(elements::pill(
             theme,
             "diagnostic-close",

@@ -22,6 +22,9 @@ use taskmanager_platform_contract::{
 use taskmanager_shell::ShellApp;
 
 use super::{EVENT_DRAIN_BATCH, capability_summary_line, run_drain_cycle};
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 /// Capability catalog serving one fixed snapshot per handle.
 struct FixedCapabilities(CapabilitySnapshot);
@@ -307,9 +310,9 @@ fn advance_feedback_time_clears_timed_notices_in_drain_cycle() {
     let mut client = client_with(snapshot_with_mixed_statuses(), events);
     let mut shell = ShellApp::new();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
         "Screenshot saved to /tmp/screenshot.png",
     );
     assert!(shell.feedback_notice().is_some());

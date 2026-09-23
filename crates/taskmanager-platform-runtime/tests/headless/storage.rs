@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::{
     PlatformEvent, PlatformHandle, SmartControlRequest, SmartEvent, SmartObservationRequest,
     StorageHealthEvent, StorageHealthRequest,
@@ -38,13 +35,9 @@ fn storage_bindings() -> RuntimeProviderBindings {
 }
 
 fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            return event;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("storage runtime event did not arrive");
+    crate::wait_for!("storage runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    })
 }
 
 #[test]

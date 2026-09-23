@@ -41,6 +41,10 @@ use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8, space_16, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_shell::ShellApp;
 
 /// Renderer-neutral view of one armed gate: the exact copy the dialog shows,
 /// resolved once so the scene adapter stays dumb. `kind` routes the typed
@@ -146,10 +150,8 @@ impl PendingConfirmationView {
             }
             PendingConfirmation::SessionControl(pending) => {
                 let action_label = match pending.action {
-                    taskmanager_core::core::session::SessionControlAction::Disconnect => {
-                        t("users.disconnect")
-                    }
-                    taskmanager_core::core::session::SessionControlAction::Lock => t("users.lock"),
+                    SessionControlAction::Disconnect => t("users.disconnect"),
+                    SessionControlAction::Lock => t("users.lock"),
                 };
                 let headline = t("confirm.session_headline")
                     .replace("{action}", action_label)
@@ -191,47 +193,41 @@ impl PendingConfirmationView {
 }
 
 /// Stable token for the session verb inside a target key.
-fn service_action_token_session(
-    action: taskmanager_core::core::session::SessionControlAction,
-) -> &'static str {
+fn service_action_token_session(action: SessionControlAction) -> &'static str {
     match action {
-        taskmanager_core::core::session::SessionControlAction::Disconnect => "disconnect",
-        taskmanager_core::core::session::SessionControlAction::Lock => "lock",
+        SessionControlAction::Disconnect => "disconnect",
+        SessionControlAction::Lock => "lock",
     }
 }
 
 /// The shared action word for one service verb (the same `svc.*` fold the
 /// TUI's action menu uses).
 #[must_use]
-pub(crate) fn service_action_label(
-    action: taskmanager_core::core::services::ServiceAction,
-) -> &'static str {
+pub(crate) fn service_action_label(action: ServiceAction) -> &'static str {
     match action {
-        taskmanager_core::core::services::ServiceAction::Start => t("svc.start"),
-        taskmanager_core::core::services::ServiceAction::Stop => t("svc.stop"),
-        taskmanager_core::core::services::ServiceAction::Restart => t("svc.restart"),
-        taskmanager_core::core::services::ServiceAction::Enable => t("svc.enable"),
-        taskmanager_core::core::services::ServiceAction::Disable => t("svc.disable"),
-        taskmanager_core::core::services::ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
+        ServiceAction::Start => t("svc.start"),
+        ServiceAction::Stop => t("svc.stop"),
+        ServiceAction::Restart => t("svc.restart"),
+        ServiceAction::Enable => t("svc.enable"),
+        ServiceAction::Disable => t("svc.disable"),
+        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
     }
 }
 
 /// Stable token for the verb inside a target key.
-fn service_action_token(action: taskmanager_core::core::services::ServiceAction) -> &'static str {
+fn service_action_token(action: ServiceAction) -> &'static str {
     match action {
-        taskmanager_core::core::services::ServiceAction::Start => "start",
-        taskmanager_core::core::services::ServiceAction::Stop => "stop",
-        taskmanager_core::core::services::ServiceAction::Restart => "restart",
-        taskmanager_core::core::services::ServiceAction::Enable => "enable",
-        taskmanager_core::core::services::ServiceAction::Disable => "disable",
-        taskmanager_core::core::services::ServiceAction::ReloadDaemon => "reload-daemon",
+        ServiceAction::Start => "start",
+        ServiceAction::Stop => "stop",
+        ServiceAction::Restart => "restart",
+        ServiceAction::Enable => "enable",
+        ServiceAction::Disable => "disable",
+        ServiceAction::ReloadDaemon => "reload-daemon",
     }
 }
 
 /// Stable, order-independent key over the frozen target set.
-fn frozen_process_key<'a>(
-    targets: impl Iterator<Item = &'a taskmanager_core::core::process::FrozenProcessIdentity>,
-) -> String {
+fn frozen_process_key<'a>(targets: impl Iterator<Item = &'a FrozenProcessIdentity>) -> String {
     let mut identities: Vec<String> = targets
         .map(|target| {
             target.live_key().map_or_else(
@@ -251,7 +247,7 @@ fn frozen_process_key<'a>(
 /// Emit the armed gate's frozen request through the shell's typed confirm
 /// path. Mirrors the shell's own gate vocabulary branch-for-branch.
 pub(crate) fn confirm_armed(
-    shell: &mut taskmanager_shell::ShellApp,
+    shell: &mut ShellApp,
     kind: ConfirmationKind,
 ) -> Option<PlatformEffect> {
     match kind {
@@ -273,7 +269,7 @@ pub(crate) struct ConfirmationChanged(pub(crate) Option<PendingConfirmationView>
 /// Republish the gate state from the shell after any choice path ran. Shared
 /// with the services action menu (any gate-arming path must republish so the
 /// modal mounts from one authority).
-pub(crate) fn republish(shell: &taskmanager_shell::ShellApp, commands: &mut Commands) {
+pub(crate) fn republish(shell: &ShellApp, commands: &mut Commands) {
     let view = shell
         .pending_confirmation()
         .and_then(PendingConfirmationView::from_pending);

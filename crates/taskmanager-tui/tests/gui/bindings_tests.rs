@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_shell::presentation::command_help;
+use taskmanager_shell::shell_local_bindings;
 use taskmanager_ui_contract::{BindingCoverageStatus, coverage_report, drift_findings};
 
 /// Contract gate: every command has exactly one explicit entry — no
@@ -32,7 +35,7 @@ fn only_the_explicit_terminal_exemptions_are_deliberately_unbound() {
 #[test]
 fn every_wired_command_carries_the_shortcut_the_help_renders() {
     let declaration = binding_declaration();
-    for help in taskmanager_shell::presentation::command_help() {
+    for help in command_help() {
         let entry = declaration
             .entries
             .iter()
@@ -73,9 +76,7 @@ fn bound_entries_match_the_help_overlay_row_composition() {
     let rows = crate::ui::help::help_rows();
     assert_eq!(
         rows.len(),
-        bound
-            + taskmanager_shell::shell_local_bindings().len()
-            + crate::command_palette::TUI_LOCAL_COMMANDS.len()
+        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len()
     );
 }
 
@@ -90,7 +91,7 @@ fn action_menu_vocabulary_pairs_match_the_pinned_footers() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     assert_eq!(
         menu_hint_pairs(&ACTION_MENU_HINTS),
@@ -134,7 +135,7 @@ fn service_menu_footer_paints_the_shared_vocabulary_bytes() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
@@ -187,13 +188,13 @@ fn gpu_chart_metric_catalog_key_matches_the_registry_const_label() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let declared = crate::command_palette::TUI_LOCAL_COMMANDS
         .iter()
         .find(|command| command.binding.shortcut == "g")
         .expect("the registry declares the g chord");
     assert_eq!(
-        taskmanager_application::i18n::t("help.binding.gpu_chart_metric"),
+        t("help.binding.gpu_chart_metric"),
         declared.binding.label,
         "the catalog copy must stay identical to the registry's const label"
     );
@@ -276,7 +277,7 @@ fn surface_hint_vocabulary_pairs_match_the_pinned_footers() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     assert_eq!(
         surface_hint_pairs(
@@ -322,7 +323,7 @@ fn about_overlay_footer_paints_the_surface_hint_vocabulary_bytes() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let expected: String = surface_hint_pairs(
         TuiSurfaceScope::StatusOverlay,

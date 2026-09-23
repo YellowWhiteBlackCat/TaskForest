@@ -34,6 +34,8 @@ use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
+use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
+use taskmanager_platform_contract::RequestEnvelope;
 
 /// Apply a persisted [`Config`] snapshot to the live theme preferences and
 /// shell. The windowed composition does not yet restore persisted config at
@@ -105,7 +107,7 @@ fn sync_preferences_from_config(
     };
 
     if client.snapshot().is_none() {
-        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
+        let _ = client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT);
     } else {
         let _ = client.drain();
     }
@@ -138,10 +140,7 @@ struct QuietRequests;
 impl RequestPort for QuietRequests {
     type Request = HostTelemetryRequest;
 
-    fn try_submit(
-        &self,
-        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), SubmissionError> {
+    fn try_submit(&self, _request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         Ok(())
     }
 }

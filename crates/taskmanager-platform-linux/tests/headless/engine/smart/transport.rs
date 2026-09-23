@@ -1,6 +1,7 @@
 //! Smartctl transport parsing tests (line split).
 
 use super::*;
+use taskmanager_core::StorageDeviceKind;
 
 mod tests_inner {
     use std::cell::{Cell, RefCell};
@@ -215,7 +216,7 @@ mod tests_inner {
             smartctl_strategy_for_connection(StorageConnection::new(
                 StorageProtocol::Ata,
                 StorageInterconnect::Usb,
-                taskmanager_core::StorageDeviceKind::Physical,
+                StorageDeviceKind::Physical,
             )),
             &[
                 SmartctlDeviceType::Auto,
@@ -227,7 +228,7 @@ mod tests_inner {
             smartctl_strategy_for_connection(StorageConnection::new(
                 StorageProtocol::Scsi,
                 StorageInterconnect::Usb,
-                taskmanager_core::StorageDeviceKind::Physical,
+                StorageDeviceKind::Physical,
             )),
             &[
                 SmartctlDeviceType::Auto,
@@ -239,7 +240,7 @@ mod tests_inner {
             smartctl_strategy_for_connection(StorageConnection::new(
                 StorageProtocol::Nvme,
                 StorageInterconnect::Usb,
-                taskmanager_core::StorageDeviceKind::Physical,
+                StorageDeviceKind::Physical,
             )),
             &[
                 SmartctlDeviceType::Auto,
@@ -294,7 +295,7 @@ mod tests_inner {
         let connection = StorageConnection::new(
             StorageProtocol::Nvme,
             StorageInterconnect::Usb,
-            taskmanager_core::StorageDeviceKind::Physical,
+            StorageDeviceKind::Physical,
         );
         let requested = RefCell::new(Vec::new());
         let out = read_smartctl_with_connection("future0", connection, |_, device_type| {

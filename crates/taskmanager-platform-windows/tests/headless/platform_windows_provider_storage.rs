@@ -1,4 +1,8 @@
 use super::*;
+use taskmanager_core::DirectoryScanBounds;
+use taskmanager_core::DirectoryScanId;
+use taskmanager_core::DirectoryScanStatus;
+use taskmanager_core::SmartSelfTestKind;
 use taskmanager_core::{DeviceGeneration, DeviceId, StorageDeviceKey};
 
 fn target() -> StorageDeviceTarget {
@@ -31,7 +35,7 @@ fn observation_and_control_never_degrade_to_unsupported() {
         device_generation: DeviceGeneration::INITIAL,
         device_key: StorageDeviceKey::new("test"),
         display_name: "test".into(),
-        kind: taskmanager_core::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     };
     assert_ne!(control.start(&intent, 1), Err(ProviderFailure::Unsupported));
 }
@@ -64,10 +68,10 @@ fn directory_usage_scans_a_real_fixture_tree() {
     let mut provider = WinDirectoryUsageProvider::new();
     let spec = DirectoryScanSpec {
         root: root.to_string_lossy().into_owned(),
-        bounds: taskmanager_core::DirectoryScanBounds::default(),
+        bounds: DirectoryScanBounds::default(),
     };
     let control = DirectoryScanControl::new(
-        taskmanager_core::DirectoryScanId::new(1),
+        DirectoryScanId::new(1),
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
     );
     let mut latest = None;
@@ -82,10 +86,7 @@ fn directory_usage_scans_a_real_fixture_tree() {
         }
     }
     let snapshot = latest.expect("bounded fixture scan must terminate");
-    assert_eq!(
-        snapshot.status,
-        taskmanager_core::DirectoryScanStatus::Completed
-    );
+    assert_eq!(snapshot.status, DirectoryScanStatus::Completed);
     assert_eq!(snapshot.totals.files_counted, 2);
     assert_eq!(snapshot.totals.bytes_counted.current_value(), Some(&150));
     let _ = std::fs::remove_dir_all(&root);
@@ -106,10 +107,10 @@ fn directory_usage_missing_root_is_a_typed_terminal_failure() {
     let mut provider = WinDirectoryUsageProvider::new();
     let spec = DirectoryScanSpec {
         root: missing.to_string_lossy().into_owned(),
-        bounds: taskmanager_core::DirectoryScanBounds::default(),
+        bounds: DirectoryScanBounds::default(),
     };
     let control = DirectoryScanControl::new(
-        taskmanager_core::DirectoryScanId::new(2),
+        DirectoryScanId::new(2),
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
     );
     let snapshot = provider
@@ -117,7 +118,7 @@ fn directory_usage_missing_root_is_a_typed_terminal_failure() {
         .expect("missing-root failure is typed into the snapshot");
     assert_eq!(
         snapshot.status,
-        taskmanager_core::DirectoryScanStatus::Failed(FailureKind::TemporarilyUnavailable)
+        DirectoryScanStatus::Failed(FailureKind::TemporarilyUnavailable)
     );
     assert!(
         snapshot.entries[0].unreadable.is_some(),

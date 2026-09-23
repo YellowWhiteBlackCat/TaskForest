@@ -6,6 +6,8 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::target::ServiceId;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 use taskmanager_theme::Theme;
 
 /// Interaction regression for the write path the Apps-page row handlers
@@ -19,7 +21,7 @@ fn selection_interactions_follow_the_shell_owned_rules(cx: &mut gpui::TestAppCon
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _| {
         let fixture = |pid: u32| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .name("worker".to_owned())
                 .status("S".to_owned())
@@ -33,8 +35,7 @@ fn selection_interactions_follow_the_shell_owned_rules(cx: &mut gpui::TestAppCon
             fixture(13),
         ]);
         let identity = |pid| {
-            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-                .expect("fixture identity")
+            ProcessLiveKey::from_parts(pid, fixture_start_token(pid)).expect("fixture identity")
         };
         let display = [identity(10), identity(11), identity(12), identity(13)];
 

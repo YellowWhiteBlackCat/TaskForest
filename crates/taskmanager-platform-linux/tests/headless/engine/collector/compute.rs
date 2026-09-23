@@ -160,7 +160,7 @@ fn rapl_first_tick_and_recovery_are_gaps_but_idle_delta_is_current_zero() {
     let first = observe_rapl_power(Some(1_000), &mut previous, 10_000, first_at, 10, &source);
     assert_eq!(
         first.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
 
     let idle = observe_rapl_power(
@@ -183,7 +183,7 @@ fn rapl_first_tick_and_recovery_are_gaps_but_idle_delta_is_current_zero() {
     );
     assert_eq!(
         failed.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
     assert!(
         previous.is_none(),
@@ -200,7 +200,7 @@ fn rapl_first_tick_and_recovery_are_gaps_but_idle_delta_is_current_zero() {
     );
     assert_eq!(
         recovered.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
 }
 
@@ -324,7 +324,7 @@ fn memory_observation_always_carries_all_granular_sources() {
             .optional_observations()
             .hardware_reserved_bytes
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
     assert_eq!(
         observation
@@ -333,7 +333,7 @@ fn memory_observation_always_carries_all_granular_sources() {
             .compression
             .compressed_memory_used_bytes
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
     assert_eq!(observation.value.current_used_rate_mib_per_sec(), None);
     assert_eq!(
@@ -350,7 +350,7 @@ fn memory_observation_always_carries_all_granular_sources() {
             .scalar_observations()
             .used_rate_mib_per_sec
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
 
     let second = collect_memory(

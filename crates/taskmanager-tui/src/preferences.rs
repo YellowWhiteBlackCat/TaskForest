@@ -11,7 +11,14 @@ use crate::TuiApp;
 use crate::theme::ThemeParams;
 use crate::ui::settings::SettingsForm;
 use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppPage, TelemetryInterval};
+use taskmanager_application::{
+    ConfigBootstrap, ConfigClient, ConfigDrain, ConfigPublication, ConfigPublicationOutcome,
+    ConfigRecovery, ConfigRecoveryNotice, ConfigRevision, ConfigStoreErrorKind,
+    ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
+};
+use taskmanager_core::core::config::Config;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
 
 /// Stable token for one shell [`SortCol`], compatible with the GPUI frontend's
@@ -94,17 +101,17 @@ impl Default for AppliedPrefs {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum SettingsDraftLifecycle {
     Clean {
-        base_revision: Option<taskmanager_application::ConfigRevision>,
+        base_revision: Option<ConfigRevision>,
     },
     Dirty {
-        base_revision: Option<taskmanager_application::ConfigRevision>,
-        base: Box<taskmanager_core::core::config::Config>,
+        base_revision: Option<ConfigRevision>,
+        base: Box<Config>,
     },
     Conflict {
-        base_revision: Option<taskmanager_application::ConfigRevision>,
-        base: Box<taskmanager_core::core::config::Config>,
-        latest_revision: taskmanager_application::ConfigRevision,
-        latest: Box<taskmanager_core::core::config::Config>,
+        base_revision: Option<ConfigRevision>,
+        base: Box<Config>,
+        latest_revision: ConfigRevision,
+        latest: Box<Config>,
     },
 }
 
@@ -126,11 +133,12 @@ impl TuiApp {
     /// composition edge; tests inject an app-host-equivalent client backed by
     /// an isolated fixture store.
     pub fn load_config(&mut self) {
-        let bootstrap = self.config_client.as_mut().map(|client| {
-            client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT)
-        });
+        let bootstrap = self
+            .config_client
+            .as_mut()
+            .map(|client| client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT));
         match bootstrap {
-            Some(taskmanager_application::ConfigBootstrap::Published(publication)) => {
+            Some(ConfigBootstrap::Published(publication)) => {
                 self.apply_config_snapshot(publication.snapshot(), true, true);
                 self.applied_config_revision = Some(publication.revision());
                 self.settings_draft = SettingsDraftLifecycle::Clean {
@@ -138,7 +146,7 @@ impl TuiApp {
                 };
                 self.report_config_recovery(publication.outcome());
             }
-            Some(taskmanager_application::ConfigBootstrap::Fallback { snapshot, source }) => {
+            Some(ConfigBootstrap::Fallback { snapshot, source }) => {
                 self.apply_config_snapshot(&snapshot, true, true);
                 self.report_notice(
                     FeedbackSource::Settings,
@@ -147,20 +155,11 @@ impl TuiApp {
                     format!("Configuration fallback: {source:?}"),
                 );
             }
-            None => self.apply_config_snapshot(
-                &taskmanager_core::core::config::Config::default(),
-                true,
-                true,
-            ),
+            None => self.apply_config_snapshot(&Config::default(), true, true),
         }
     }
 
-    fn apply_config_snapshot(
-        &mut self,
-        config: &taskmanager_core::core::config::Config,
-        startup: bool,
-        update_form: bool,
-    ) {
+    fn apply_config_snapshot(&mut self, config: &Config, startup: bool, update_form: bool) {
         self.theme_params = ThemeParams::from_config_tokens_with_appearance(
             &config.skin,
             &config.mode,
@@ -215,7 +214,7 @@ impl TuiApp {
             if let Some(language) =
                 crate::ui::settings::SettingsForm::language_for_token(config.language.as_deref())
             {
-                taskmanager_application::i18n::set_language(language);
+                set_language(language);
             }
         }
         self.prefs = AppliedPrefs {
@@ -307,18 +306,16 @@ impl TuiApp {
         let drain = self
             .config_client
             .as_mut()
-            .map_or(taskmanager_application::ConfigDrain::Empty, |client| {
-                client.drain()
-            });
+            .map_or(ConfigDrain::Empty, |client| client.drain());
         match drain {
-            taskmanager_application::ConfigDrain::Empty => false,
-            taskmanager_application::ConfigDrain::Publications(publications) => {
+            ConfigDrain::Empty => false,
+            ConfigDrain::Publications(publications) => {
                 for publication in publications {
                     self.apply_config_publication(&publication);
                 }
                 true
             }
-            taskmanager_application::ConfigDrain::ResyncRequired {
+            ConfigDrain::ResyncRequired {
                 missed_publications,
                 latest,
             } => {
@@ -336,10 +333,7 @@ impl TuiApp {
         }
     }
 
-    pub(crate) fn apply_config_publication(
-        &mut self,
-        publication: &taskmanager_application::ConfigPublication,
-    ) {
+    pub(crate) fn apply_config_publication(&mut self, publication: &ConfigPublication) {
         let failed = publication.outcome().is_failure();
         let revision_changed = self.applied_config_revision != Some(publication.revision());
         if revision_changed {
@@ -378,7 +372,7 @@ impl TuiApp {
             self.applied_config_revision = Some(publication.revision());
         }
         match publication.outcome() {
-            taskmanager_application::ConfigPublicationOutcome::SaveFailed { error, .. } => {
+            ConfigPublicationOutcome::SaveFailed { error, .. } => {
                 let detail =
                     t("tui.settings_save_failed").replacen("{}", error.kind().stable_code(), 1);
                 self.settings_form.save_error = Some(detail.clone());
@@ -390,7 +384,7 @@ impl TuiApp {
                     detail,
                 );
             }
-            taskmanager_application::ConfigPublicationOutcome::RefreshFailed(recovery) => {
+            ConfigPublicationOutcome::RefreshFailed(recovery) => {
                 self.report_notice(
                     FeedbackSource::Settings,
                     FeedbackSeverity::Warning,
@@ -402,17 +396,13 @@ impl TuiApp {
         }
     }
 
-    fn commit_config_draft(&mut self, config: taskmanager_core::core::config::Config) -> bool {
+    fn commit_config_draft(&mut self, config: Config) -> bool {
         let submission = self
             .config_client
             .as_ref()
             .map(|client| client.try_submit(config.clone()));
         match submission {
-            None
-            | Some(Ok(
-                taskmanager_application::ConfigSubmissionStatus::Queued
-                | taskmanager_application::ConfigSubmissionStatus::NoChange,
-            )) => {
+            None | Some(Ok(ConfigSubmissionStatus::Queued | ConfigSubmissionStatus::NoChange)) => {
                 self.config_draft = config.clone();
                 self.apply_config_snapshot(&config, false, true);
                 self.settings_draft = SettingsDraftLifecycle::Clean {
@@ -424,7 +414,7 @@ impl TuiApp {
                 if let Some(canonical) = self
                     .config_client
                     .as_ref()
-                    .and_then(taskmanager_application::ConfigClient::snapshot)
+                    .and_then(ConfigClient::snapshot)
                     .cloned()
                 {
                     self.apply_config_snapshot(&canonical, false, true);
@@ -440,19 +430,16 @@ impl TuiApp {
         }
     }
 
-    fn report_config_recovery(
-        &mut self,
-        outcome: &taskmanager_application::ConfigPublicationOutcome,
-    ) {
+    fn report_config_recovery(&mut self, outcome: &ConfigPublicationOutcome) {
         let recovery = match outcome {
-            taskmanager_application::ConfigPublicationOutcome::Loaded(recovery)
-            | taskmanager_application::ConfigPublicationOutcome::Refreshed(recovery) => *recovery,
+            ConfigPublicationOutcome::Loaded(recovery)
+            | ConfigPublicationOutcome::Refreshed(recovery) => *recovery,
             _ => return,
         };
         let severity = match recovery.initial_notice() {
-            taskmanager_application::ConfigRecoveryNotice::None => return,
-            taskmanager_application::ConfigRecoveryNotice::Recovered => FeedbackSeverity::Warning,
-            taskmanager_application::ConfigRecoveryNotice::Failed => FeedbackSeverity::Error,
+            ConfigRecoveryNotice::None => return,
+            ConfigRecoveryNotice::Recovered => FeedbackSeverity::Warning,
+            ConfigRecoveryNotice::Failed => FeedbackSeverity::Error,
         };
         self.report_notice(
             FeedbackSource::Settings,
@@ -544,11 +531,11 @@ impl TuiApp {
             // Language write-through (G-22): the token is already saved
             // by `apply_settings`; apply the choice to the process-global
             // i18n bundle so the very next frame renders localized.
-            taskmanager_application::i18n::set_language(
+            set_language(
                 crate::ui::settings::SettingsForm::language_for_token(Some(
                     self.settings_form.language_token(),
                 ))
-                .unwrap_or(taskmanager_application::i18n::Language::En),
+                .unwrap_or(Language::En),
             );
             self.prefs = AppliedPrefs {
                 show: self.settings_form.show,
@@ -657,20 +644,15 @@ impl TuiApp {
     }
 }
 
-fn config_recovery_message(
-    prefix: &str,
-    recovery: taskmanager_application::ConfigRecovery,
-) -> String {
+fn config_recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
     format!(
         "{prefix}: source={:?}, primary={}, backup={}",
         recovery.source(),
-        recovery.primary_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
-        recovery.backup_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
+        recovery
+            .primary_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
+        recovery
+            .backup_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
     )
 }

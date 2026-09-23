@@ -12,14 +12,21 @@ use gpui::{
     AnyElement, App, AppContext, Context, Div, IntoElement, ParentElement, Stateful, Styled,
     Window, div, px,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::CapabilityStatus;
 use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::inputs::text_input::TextInput;
 use taskmanager_ui::layout::{
     BoundedScrollRailSpec, bounded_scroll_column_with_fixed_header, bounded_scroll_region_with_rail,
 };
+use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::button::{Button, ButtonVariant};
 use taskmanager_ui::primitives::spinner::Spinner;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 pub(super) fn compose_primary_dialogs(
     view: &mut RootView,
@@ -167,38 +174,34 @@ pub(super) fn compose_primary_dialogs(
                         .capture_evidence
                         .settings_permission_center_enabled()
                     {
-                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
+                        Some(CapabilityStatus::RequiresEscalation)
                     } else {
-                        view.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
-                        )
+                        view.projection()
+                            .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES)
                     },
                     gpu_engine_device_id,
                     gpu_engine_index,
                     smbios_state: view.shell.smbios_memory_state(),
                     smbios_capability: if view.capture_evidence.settings_permission_center_enabled()
                     {
-                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
+                        Some(CapabilityStatus::RequiresEscalation)
                     } else {
-                        view.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
-                        )
+                        view.projection()
+                            .capability_status(&CapabilityId::TELEMETRY_MEMORY_SMBIOS)
                     },
                     rapl_state: view.shell.rapl_power_state(),
                     rapl_capability: if view.capture_evidence.settings_permission_center_enabled() {
-                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
+                        Some(CapabilityStatus::RequiresEscalation)
                     } else {
-                        view.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
-                        )
+                        view.projection()
+                            .capability_status(&CapabilityId::TELEMETRY_CPU_PACKAGE_POWER)
                     },
                     msr_state: view.shell.msr_readout_state(),
                     msr_capability: if view.capture_evidence.settings_permission_center_enabled() {
-                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
+                        Some(CapabilityStatus::RequiresEscalation)
                     } else {
-                        view.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,
-                        )
+                        view.projection()
+                            .capability_status(&CapabilityId::TELEMETRY_CPU_MSR)
                     },
                 },
                 permission_center_only: view.capture_evidence.settings_permission_center_enabled(),
@@ -427,16 +430,14 @@ pub(super) fn compose_primary_dialogs(
             let mut column = div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(input);
             if let Some(error) = &run_error {
                 column = column.child(
                     div()
                         .w(px(360.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.danger))
                         .child(error.clone()),
                 );
             }
@@ -445,7 +446,7 @@ pub(super) fn compose_primary_dialogs(
                     div()
                         .flex()
                         .flex_row()
-                        .gap(taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8))
+                        .gap(definite_length(tokens::SPACE_8))
                         .justify_end()
                         .child(elements::pill(
                             theme,
@@ -505,15 +506,11 @@ pub(super) fn cold_start_placeholder(
         div()
             .flex()
             .items_center()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_10,
-            ))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+            .gap(definite_length(tokens::SPACE_10))
+            .text_color(hsla(theme.fg_dim))
+            .text_size(font_size(tokens::FONT_13))
             .child(Spinner::new(theme.palette()).size(16.0))
-            .child(taskmanager_application::i18n::t(
-                "common.collecting_telemetry",
-            )),
+            .child(t("common.collecting_telemetry")),
     )
 }
 
@@ -526,7 +523,7 @@ pub(super) fn warmup_retry_button(
     let (state, focus_on_mount) = match view.telemetry_warmup_retry_button.as_ref() {
         Some(state) => (state.clone(), false),
         None => {
-            let state = cx.new(|cx| taskmanager_ui::primitives::button::ButtonState::new(cx));
+            let state = cx.new(|cx| ButtonState::new(cx));
             view.telemetry_warmup_retry_button = Some(state.clone());
             (state, true)
         }

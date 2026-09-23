@@ -8,6 +8,8 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 
 use crate::{TuiApp, TuiTheme};
+use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let state = if app.paused() {
@@ -30,11 +32,11 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
                 .iter()
                 .map(|alert| alert.severity)
                 .max()
-                .unwrap_or(taskmanager_core::core::alerts::AlertSeverity::Info);
+                .unwrap_or(AlertSeverity::Info);
             let color = match worst {
-                taskmanager_core::core::alerts::AlertSeverity::Critical => theme.danger,
-                taskmanager_core::core::alerts::AlertSeverity::Warning => theme.warn,
-                taskmanager_core::core::alerts::AlertSeverity::Info => theme.good,
+                AlertSeverity::Critical => theme.danger,
+                AlertSeverity::Warning => theme.warn,
+                AlertSeverity::Info => theme.good,
             };
             Span::styled(
                 format!(
@@ -50,17 +52,17 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             .feedback_notice()
             .map_or(("", theme.color(Color::White)), |notice| {
                 match notice.severity() {
-                    taskmanager_shell::FeedbackSeverity::Info => ("", theme.color(Color::White)),
-                    taskmanager_shell::FeedbackSeverity::Success => ("\u{2713} ", theme.good),
-                    taskmanager_shell::FeedbackSeverity::Warning => ("\u{26a0} ", theme.warn),
-                    taskmanager_shell::FeedbackSeverity::Error => ("\u{26a0} ", theme.danger),
+                    FeedbackSeverity::Info => ("", theme.color(Color::White)),
+                    FeedbackSeverity::Success => ("\u{2713} ", theme.good),
+                    FeedbackSeverity::Warning => ("\u{26a0} ", theme.warn),
+                    FeedbackSeverity::Error => ("\u{26a0} ", theme.danger),
                 }
             });
     let feedback_width = usize::from(area.width.saturating_sub(30)).max(12);
     let feedback = if app
         .shell
         .feedback_notice()
-        .is_some_and(|notice| notice.source() == taskmanager_shell::FeedbackSource::Persistence)
+        .is_some_and(|notice| notice.source() == FeedbackSource::Persistence)
     {
         compact_feedback(app.feedback_text(), feedback_width)
     } else {

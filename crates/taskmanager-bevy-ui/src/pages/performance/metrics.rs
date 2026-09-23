@@ -1,6 +1,12 @@
 //! Pure Performance-page metric projections and formatting.
 
 use super::*;
+use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::effective_smart_status;
+use taskmanager_shell::presentation::has_smart_fields;
+use taskmanager_shell::presentation::smart_section_visible;
+use taskmanager_shell::presentation::trend::window;
 
 pub(super) mod cpu;
 
@@ -112,7 +118,7 @@ pub(super) fn disks(shell: &ShellApp) -> Option<&[DiskMetrics]> {
         .map(|snapshot| snapshot.disks.as_slice())
 }
 
-pub(super) fn batteries(shell: &ShellApp) -> Option<&[taskmanager_core::core::power::BatteryInfo]> {
+pub(super) fn batteries(shell: &ShellApp) -> Option<&[BatteryInfo]> {
     shell
         .projection()
         .power_supplies
@@ -293,15 +299,11 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
     // provider reports a usable SMART state but no concrete field, the shared
     // status fold still speaks (Iced parity), and nothing is fabricated when
     // the section is honestly hidden.
-    if taskmanager_shell::presentation::smart_section_visible(disk)
-        && !taskmanager_shell::presentation::has_smart_fields(disk)
-    {
+    if smart_section_visible(disk) && !has_smart_fields(disk) {
         parts.push(format!(
             "{} {}",
             t("disk.smart_status"),
-            t(taskmanager_shell::presentation::device_status_i18n_key(
-                taskmanager_shell::presentation::effective_smart_status(disk)
-            )),
+            t(device_status_i18n_key(effective_smart_status(disk))),
         ));
     }
     if disk.current_read_merges_per_sec().is_some() || disk.current_write_merges_per_sec().is_some()
@@ -338,10 +340,7 @@ pub(super) fn disk_spare_warning_for(shell: &ShellApp, device_id: &str) -> bool 
         .is_some_and(disk_spare_warning)
 }
 
-pub(super) fn battery_sidebar_title(
-    battery: &taskmanager_core::core::power::BatteryInfo,
-    index: usize,
-) -> String {
+pub(super) fn battery_sidebar_title(battery: &BatteryInfo, index: usize) -> String {
     if !battery.model_name.trim().is_empty() {
         battery.model_name.trim().to_string()
     } else if !battery.display_name.trim().is_empty() {
@@ -351,7 +350,7 @@ pub(super) fn battery_sidebar_title(
     }
 }
 
-pub(super) fn battery_caption(battery: &taskmanager_core::core::power::BatteryInfo) -> String {
+pub(super) fn battery_caption(battery: &BatteryInfo) -> String {
     let charge = battery
         .current_capacity_pct()
         .map_or_else(missing_value, |pct| format!("{pct}%"));
@@ -438,7 +437,7 @@ pub(super) fn curve_samples(shell: &ShellApp, curve: SystemCurve) -> Vec<f32> {
             .copied()
             .collect();
     }
-    taskmanager_shell::presentation::trend::window(&shell.history, curve.series())
+    window(&shell.history, curve.series())
 }
 
 /// TUI parity: a window under two samples is still collecting — the curve
@@ -509,7 +508,7 @@ pub(crate) fn section_keys(shell: &ShellApp, section: Section) -> Vec<String> {
     }
 }
 
-pub(super) fn battery_fact_line(battery: &taskmanager_core::core::power::BatteryInfo) -> String {
+pub(super) fn battery_fact_line(battery: &BatteryInfo) -> String {
     let charge = battery
         .current_capacity_pct()
         .map_or_else(missing_value, |pct| format!("{pct}%"));

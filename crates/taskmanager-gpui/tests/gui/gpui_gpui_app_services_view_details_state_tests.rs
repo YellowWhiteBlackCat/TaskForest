@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::ServiceLogSnapshot;
 
 fn dependencies(kind: ServiceRelationKind, target: &str) -> ServiceDeps {
     let mut dependencies = ServiceDeps::default();
@@ -27,7 +29,7 @@ fn details_state_projects_only_the_shared_correlated_dependency_session() {
     assert!(state.accept_log_snapshot(&service_id, log_request_id));
     state.apply(ServiceUpdate::Logs {
         request_id: log_request_id,
-        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+        snapshot: ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::from_lines(vec!["ready".into()]),
         },
@@ -58,7 +60,7 @@ fn late_log_snapshot_cannot_replace_a_newer_details_request() {
     assert!(state.accept_log_snapshot(&service_id, first_request));
     state.apply(ServiceUpdate::Logs {
         request_id: first_request,
-        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+        snapshot: ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::from_lines(vec!["first".into()]),
         },
@@ -70,7 +72,7 @@ fn late_log_snapshot_cannot_replace_a_newer_details_request() {
 
     state.apply(ServiceUpdate::Logs {
         request_id: first_request,
-        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+        snapshot: ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::from_lines(vec!["stale".into()]),
         },
@@ -84,7 +86,7 @@ fn late_log_snapshot_cannot_replace_a_newer_details_request() {
 
     state.apply(ServiceUpdate::Logs {
         request_id: second_request,
-        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+        snapshot: ServiceLogSnapshot {
             service_id,
             state: ServiceLogState::from_lines(vec!["second".into()]),
         },
@@ -108,10 +110,7 @@ fn rejected_stream_attempt_becomes_typed_unavailable_state() {
     let attempt_id = state
         .begin_stream_attempt(query)
         .expect("targeted attempt starts");
-    state.reject_stream(
-        attempt_id,
-        taskmanager_core::core::failure::FailureKind::TemporarilyUnavailable,
-    );
+    state.reject_stream(attempt_id, FailureKind::TemporarilyUnavailable);
 
     assert!(matches!(
         state
@@ -131,16 +130,12 @@ fn shared_dependency_failure_and_retry_keep_one_typed_authority() {
     assert!(state.select(&service_id));
     let mut lifecycle = ServiceDependenciesLifecycle::default();
     lifecycle.begin(RequestId::MIN, service_id.clone());
-    assert!(lifecycle.fail(
-        RequestId::MIN,
-        service_id.clone(),
-        taskmanager_core::core::failure::FailureKind::Rejected,
-    ));
+    assert!(lifecycle.fail(RequestId::MIN, service_id.clone(), FailureKind::Rejected,));
     let log_request_id = RequestId::new(20).expect("fixture id");
     assert!(state.accept_log_snapshot(&service_id, log_request_id));
     state.apply(ServiceUpdate::Logs {
         request_id: log_request_id,
-        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+        snapshot: ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
                 ServiceLogErrorKind::ProviderFailed,
@@ -150,10 +145,7 @@ fn shared_dependency_failure_and_retry_keep_one_typed_authority() {
     });
 
     let snapshot = state.snapshot(&lifecycle);
-    assert_eq!(
-        snapshot.dependencies.failure(),
-        Some(taskmanager_core::core::failure::FailureKind::Rejected)
-    );
+    assert_eq!(snapshot.dependencies.failure(), Some(FailureKind::Rejected));
     assert!(matches!(
         snapshot.logs,
         ServiceLogState::Unavailable(ServiceLogFailure {

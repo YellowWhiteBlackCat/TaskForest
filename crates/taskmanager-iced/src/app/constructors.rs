@@ -6,14 +6,50 @@ use std::path::PathBuf;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_theme::{LightDark, Skin};
 
 use super::*;
+use taskmanager_app_host::HistoryReplayClient;
+use taskmanager_application::AppPage;
+use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::metrics::CpuScalarObservations;
+use taskmanager_core::core::metrics::GpuEngine;
+use taskmanager_core::core::metrics::GpuScalarObservations;
+use taskmanager_core::core::metrics::ScalarObservationGroup;
+use taskmanager_core::core::npu::NpuDevice;
+use taskmanager_core::core::npu::NpuEngineKind;
+use taskmanager_core::core::npu::NpuEngineUsage;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_core::core::npu::NpuMemoryReport;
+use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_core::core::process::ProcessCategory;
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_core::core::sensors::SensorDescriptor;
+use taskmanager_core::core::sensors::SensorMagnitude;
+use taskmanager_core::core::sensors::SensorMeasurementObservation;
+use taskmanager_core::core::sensors::SensorReading;
+use taskmanager_core::core::sensors::SensorScale;
+use taskmanager_core::core::source::SourceOutcome;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
+use taskmanager_core::core::time::LocalTimeRules;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 fn default_category_expansions() -> std::collections::HashSet<String> {
-    taskmanager_core::core::process::ProcessCategory::ALL
+    ProcessCategory::ALL
         .iter()
         .copied()
-        .map(taskmanager_application::process_category_projection::category_expansion_key)
+        .map(category_expansion_key)
         .collect()
 }
 
@@ -28,21 +64,21 @@ impl IcedApp {
     pub(crate) fn new_with_runtime_clients(
         platform: Option<PlatformClient>,
         config_client: Option<ConfigClient>,
-        history_replay_client: Option<taskmanager_app_host::HistoryReplayClient>,
+        history_replay_client: Option<HistoryReplayClient>,
     ) -> Self {
         Self::new_with_native_runtime_clients(
             platform,
             config_client,
             history_replay_client,
-            taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+            LocalTimeRulesObservation::unsupported(0),
         )
     }
 
     pub(crate) fn new_with_native_runtime_clients(
         platform: Option<PlatformClient>,
         config_client: Option<ConfigClient>,
-        history_replay_client: Option<taskmanager_app_host::HistoryReplayClient>,
-        local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+        history_replay_client: Option<HistoryReplayClient>,
+        local_time_rules: LocalTimeRulesObservation,
     ) -> Self {
         let mut shell = ShellApp::new();
         if let Some(platform) = platform.as_ref() {
@@ -107,19 +143,14 @@ impl IcedApp {
             shell: {
                 // Seed the shared boot-evidence slot (the TUI demo seeds the
                 // same field through `shell.projection()`).
-                let mut shell = taskmanager_shell::demo_app();
-                taskmanager_shell::fixture::seed_projection_fact(
+                let mut shell = demo_app();
+                seed_projection_fact(
                     &mut shell,
-                    taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(
-                        demo_boot_evidence(),
-                    )),
+                    ProjectionSeedFact::StartupBootEvidence(Some(demo_boot_evidence())),
                 );
                 shell
             },
-            local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::current(
-                taskmanager_core::core::time::LocalTimeRules::utc(),
-                0,
-            ),
+            local_time_rules: LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
             runtime: super::runtime::IcedRuntime::new(None),
             capture: super::capture_state::CaptureState::new(capture_marker_path()),
             input: super::input_state::InputState::default(),
@@ -168,29 +199,51 @@ impl IcedApp {
     }
 
     /// Build the deterministic demo shape for an evidence run. The optional
-    /// environment selector is deliberately a fixed vocabulary so capture can
-    /// target a device page without adding a production command or arbitrary
-    /// state injection path.
+    /// environment selectors are deliberately a fixed vocabulary so capture can
+    /// target a device page and an appearance without adding a production
+    /// command or arbitrary state injection path.
     pub(crate) fn demo_for_capture() -> Self {
+        let locale = std::env::var_os("TM_ICED_CAPTURE_LOCALE")
+            .and_then(|value| value.to_str().map(str::to_owned));
+        Self::demo_for_capture_with(locale, super::settings::forced_appearance_from_env())
+    }
+
+    /// Build the capture demo with the two capture-only overrides injected
+    /// explicitly (the environment readers live in [`Self::demo_for_capture`]).
+    /// Both ride ONE synthesized configuration snapshot through the ordinary
+    /// config pipeline; when neither is present the demo default is untouched.
+    pub(crate) fn demo_for_capture_with(
+        locale: Option<String>,
+        appearance: Option<(Skin, LightDark, bool)>,
+    ) -> Self {
         let mut app = Self::demo();
         app.process_presentation.expanded_groups = default_category_expansions();
         seed_capture_performance_fixture(&mut app);
-        // The locale snapshot must land BEFORE the capture target: it runs
-        // the startup fold (`apply_startup_page`), which resets the active
-        // page — the target selector below has to win on page semantics.
-        if let Some(locale) = std::env::var_os("TM_ICED_CAPTURE_LOCALE")
-            .and_then(|value| value.to_str().map(str::to_owned))
-        {
+        // The locale/appearance snapshot must land BEFORE the capture target:
+        // it runs the startup fold (`apply_startup_page`), which resets the
+        // active page — the target selector below has to win on page semantics.
+        let mut config = Config::default();
+        let mut overridden = false;
+        if let Some(locale) = locale {
             // The demo boot deliberately skips `load_config` (no host I/O),
             // so the capture locale rides the production pipeline one level
             // up: one synthesized snapshot whose only override is the shared
             // language token. Everything downstream (localized labels, the
             // synced shared catalog) follows the same code path a settings
             // change uses.
-            let config = taskmanager_core::core::config::Config {
-                language: Some(locale),
-                ..Config::default()
-            };
+            config.language = Some(locale);
+            overridden = true;
+        }
+        if let Some((skin, mode, high_contrast)) = appearance {
+            // The shared `TM_SKIN` testing override (the same vocabulary GPUI
+            // reads) resolves through the persisted skin/mode tokens, so the
+            // capture frame renders exactly what a saved preference would.
+            config.skin = skin.label().to_string();
+            config.mode = mode.label().to_string();
+            config.hc = high_contrast;
+            overridden = true;
+        }
+        if overridden {
             app.apply_config_snapshot(&config, true);
         }
         if let Some(target) = std::env::var_os("TM_ICED_CAPTURE_DEVICE")
@@ -208,7 +261,7 @@ impl IcedApp {
 /// the unobserved state.
 fn apply_capture_target(app: &mut IcedApp, target: &str) {
     if target == "service-details" {
-        app.shell.application.active_page = taskmanager_application::AppPage::Services;
+        app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
     } else if target == crate::capture::HEALTH_TARGET {
         // The health modal is a renderer-local surface. Ride the same reducer
@@ -218,7 +271,7 @@ fn apply_capture_target(app: &mut IcedApp, target: &str) {
         let _ = app.update(Message::OpenHealth);
     } else if let Some(page) = capture_page_from_name(target) {
         app.shell.application.active_page = page;
-        if page == taskmanager_application::AppPage::System {
+        if page == AppPage::System {
             seed_capture_npu_fixture(app);
         }
     } else if let Some(device) = capture_device_from_name(target) {
@@ -231,40 +284,28 @@ fn apply_capture_target(app: &mut IcedApp, target: &str) {
 
 fn seed_capture_npu_fixture(app: &mut IcedApp) {
     let observed_at_ms = 7_000;
-    let inventory = taskmanager_core::core::npu::NpuInventorySnapshot::discovered(
-        vec![taskmanager_core::core::npu::NpuDevice {
-            device_id: taskmanager_core::core::identity::DeviceId::new("accel0"),
+    let inventory = NpuInventorySnapshot::discovered(
+        vec![NpuDevice {
+            device_id: DeviceId::new("accel0"),
             brand: Some("Intel AI Boost".into()),
             driver: Some("intel_vpu".into()),
-            utilization_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-                38.0,
-                observed_at_ms,
-            ),
-            engines: vec![taskmanager_core::core::npu::NpuEngineUsage {
-                kind: taskmanager_core::core::npu::NpuEngineKind::Matrix,
-                utilization_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-                    61.0,
-                    observed_at_ms,
-                ),
+            utilization_pct: ScalarObservation::available(38.0, observed_at_ms),
+            engines: vec![NpuEngineUsage {
+                kind: NpuEngineKind::Matrix,
+                utilization_pct: ScalarObservation::available(61.0, observed_at_ms),
             }],
-            memory: taskmanager_core::core::npu::NpuMemoryReport {
-                dedicated_total_bytes:
-                    taskmanager_core::core::metrics::ScalarObservation::available(0, observed_at_ms),
-                shared_total_bytes: taskmanager_core::core::metrics::ScalarObservation::unavailable(
-                    taskmanager_core::core::failure::FailureKind::Unsupported,
-                ),
-                sram_total_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
-                    32 * 1024 * 1024,
-                    observed_at_ms,
-                ),
+            memory: NpuMemoryReport {
+                dedicated_total_bytes: ScalarObservation::available(0, observed_at_ms),
+                shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, observed_at_ms),
             },
             ..Default::default()
         }],
         observed_at_ms,
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::NpuInventory(Some(inventory)),
+        ProjectionSeedFact::NpuInventory(Some(inventory)),
     );
 }
 
@@ -294,35 +335,22 @@ fn seed_capture_performance_fixture(app: &mut IcedApp) {
         let core_usages = [cpu * 1.25, cpu * 0.9, cpu * 0.72, cpu * 0.48]
             .into_iter()
             .collect();
-        snapshot.cpu.apply_scalar_observations(
-            taskmanager_core::core::metrics::CpuScalarObservations {
-                global_usage_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-                    cpu,
+        snapshot
+            .cpu
+            .apply_scalar_observations(CpuScalarObservations {
+                global_usage_pct: ScalarObservation::available(cpu, snapshot.timestamp_ms),
+                core_usage_group: ScalarObservationGroup::available(
+                    core_usages,
                     snapshot.timestamp_ms,
                 ),
-                core_usage_group:
-                    taskmanager_core::core::metrics::ScalarObservationGroup::available(
-                        core_usages,
-                        snapshot.timestamp_ms,
-                    ),
-                frequency_mhz: taskmanager_core::core::metrics::ScalarObservation::available(
-                    frequency,
-                    snapshot.timestamp_ms,
-                ),
-                temperature_c: taskmanager_core::core::metrics::ScalarObservation::available(
-                    temperature,
-                    snapshot.timestamp_ms,
-                ),
-                power_w: taskmanager_core::core::metrics::ScalarObservation::available(
-                    power,
-                    snapshot.timestamp_ms,
-                ),
+                frequency_mhz: ScalarObservation::available(frequency, snapshot.timestamp_ms),
+                temperature_c: ScalarObservation::available(temperature, snapshot.timestamp_ms),
+                power_w: ScalarObservation::available(power, snapshot.timestamp_ms),
                 ..Default::default()
-            },
-        );
+            });
         if let Some(total_bytes) = snapshot.memory.current_total_bytes() {
             let mut observations = *snapshot.memory.scalar_observations();
-            observations.used_bytes = taskmanager_core::core::metrics::ScalarObservation::available(
+            observations.used_bytes = ScalarObservation::available(
                 (total_bytes as f32 * memory / 100.0) as u64,
                 snapshot.timestamp_ms,
             );
@@ -370,58 +398,49 @@ fn seed_capture_performance_fixture(app: &mut IcedApp) {
             network.apply_observations(adapter_type, observations, wireless_observations);
         }
         if let Some(gpu_metrics) = snapshot.gpu.first_mut() {
-            gpu_metrics.apply_scalar_observations(
-                taskmanager_core::core::metrics::GpuScalarObservations {
-                    utilization_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-                        gpu,
-                        snapshot.timestamp_ms,
-                    ),
-                    temperature_c: taskmanager_core::core::metrics::ScalarObservation::available(
-                        43.0 + gpu / 5.0,
-                        snapshot.timestamp_ms,
-                    ),
-                    frequency_mhz: taskmanager_core::core::metrics::ScalarObservation::available(
-                        (600.0 + gpu * 18.0) as u64,
-                        snapshot.timestamp_ms,
-                    ),
-                    ..Default::default()
-                },
-            );
+            gpu_metrics.apply_scalar_observations(GpuScalarObservations {
+                utilization_pct: ScalarObservation::available(gpu, snapshot.timestamp_ms),
+                temperature_c: ScalarObservation::available(
+                    43.0 + gpu / 5.0,
+                    snapshot.timestamp_ms,
+                ),
+                frequency_mhz: ScalarObservation::available(
+                    (600.0 + gpu * 18.0) as u64,
+                    snapshot.timestamp_ms,
+                ),
+                ..Default::default()
+            });
             gpu_metrics.engines = vec![
-                taskmanager_core::core::metrics::GpuEngine {
+                GpuEngine {
                     name: "Render/3D".into(),
                     usage_pct: (gpu * 1.35).min(100.0),
                     ..Default::default()
                 },
-                taskmanager_core::core::metrics::GpuEngine {
+                GpuEngine {
                     name: "Copy".into(),
                     usage_pct: (gpu * 0.45).min(100.0),
                     ..Default::default()
                 },
             ];
         }
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(
-                snapshot.clone(),
-            ))),
+            ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
         );
 
         let timestamp_ms = snapshot.timestamp_ms;
         let power_snapshot = capture_power_snapshot(timestamp_ms, 68 + index as u8 * 2, power);
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(
-                power_snapshot.clone(),
-            )),
+            ProjectionSeedFact::PowerSupplies(Some(power_snapshot.clone())),
         );
 
         let sensors = capture_sensor_snapshot(timestamp_ms, 1_050 + index as u32 * 95, temperature);
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(sensors.clone())),
+            ProjectionSeedFact::Sensors(Some(sensors.clone())),
         );
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(
             &mut app.shell,
             &snapshot,
             Some(&power_snapshot),
@@ -444,44 +463,38 @@ fn seed_capture_source_failure(app: &mut IcedApp) {
         return;
     };
     app.shell.application.active_page = page;
-    let status = taskmanager_core::core::source::SourceStatus {
-        provider: taskmanager_core::core::identity::ProviderId::borrowed("capture.provider"),
-        outcome: taskmanager_core::core::source::SourceOutcome::Unavailable(
-            taskmanager_core::core::failure::FailureKind::TimedOut,
-        ),
+    let status = SourceStatus {
+        provider: ProviderId::borrowed("capture.provider"),
+        outcome: SourceOutcome::Unavailable(FailureKind::TimedOut),
         item_count: match page {
-            taskmanager_application::AppPage::Services => {
-                app.shell.projection().services.as_ref().map_or(0, Vec::len)
-            }
-            taskmanager_application::AppPage::Startup => app
+            AppPage::Services => app.shell.projection().services.as_ref().map_or(0, Vec::len),
+            AppPage::Startup => app
                 .shell
                 .projection()
                 .startup_entries
                 .as_ref()
                 .map_or(0, Vec::len),
-            taskmanager_application::AppPage::Users => {
-                app.shell.projection().sessions.as_ref().map_or(0, Vec::len)
-            }
+            AppPage::Users => app.shell.projection().sessions.as_ref().map_or(0, Vec::len),
             _ => return,
         },
     };
     match page {
-        taskmanager_application::AppPage::Services => {
-            taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Services => {
+            seed_projection_fact(
                 &mut app.shell,
-                taskmanager_shell::fixture::ProjectionSeedFact::ServicesSource(Some(vec![status])),
+                ProjectionSeedFact::ServicesSource(Some(vec![status])),
             );
         }
-        taskmanager_application::AppPage::Startup => {
-            taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Startup => {
+            seed_projection_fact(
                 &mut app.shell,
-                taskmanager_shell::fixture::ProjectionSeedFact::StartupSource(Some(vec![status])),
+                ProjectionSeedFact::StartupSource(Some(vec![status])),
             );
         }
-        taskmanager_application::AppPage::Users => {
-            taskmanager_shell::fixture::seed_projection_fact(
+        AppPage::Users => {
+            seed_projection_fact(
                 &mut app.shell,
-                taskmanager_shell::fixture::ProjectionSeedFact::SessionsSource(Some(vec![status])),
+                ProjectionSeedFact::SessionsSource(Some(vec![status])),
             );
         }
         _ => {}
@@ -492,52 +505,26 @@ fn capture_power_snapshot(
     timestamp_ms: u64,
     capacity_pct: u8,
     power_w: f32,
-) -> taskmanager_core::core::power::PowerSupplySnapshot {
-    let mut battery = taskmanager_core::core::power::BatteryInfo::new(
-        "battery:demo:BAT0",
-        taskmanager_core::core::device_state::DeviceState::healthy(timestamp_ms),
-    );
+) -> PowerSupplySnapshot {
+    let mut battery = BatteryInfo::new("battery:demo:BAT0", DeviceState::healthy(timestamp_ms));
     battery.status = "Discharging".into();
     battery.technology = "Li-ion".into();
     battery.model_name = "TaskForest Battery".into();
     battery.manufacturer = "TaskForest Lab".into();
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-            capacity_pct,
-            timestamp_ms,
-        ),
-        voltage_uv: taskmanager_core::core::metrics::ScalarObservation::available(
-            12_480_000,
-            timestamp_ms,
-        ),
-        power_w: taskmanager_core::core::metrics::ScalarObservation::available(
-            power_w,
-            timestamp_ms,
-        ),
-        cycle_count: taskmanager_core::core::metrics::ScalarObservation::available(
-            184,
-            timestamp_ms,
-        ),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(capacity_pct, timestamp_ms),
+        voltage_uv: ScalarObservation::available(12_480_000, timestamp_ms),
+        power_w: ScalarObservation::available(power_w, timestamp_ms),
+        cycle_count: ScalarObservation::available(184, timestamp_ms),
         // 49/56 Wh → 87.5% health; a discharge estimate consistent with the
         // "Discharging" status (the gated time_to_full stays absent).
-        energy_full_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
-            49_000_000.0,
-            timestamp_ms,
-        ),
-        energy_full_design_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
-            56_000_000.0,
-            timestamp_ms,
-        ),
-        time_to_empty_secs: taskmanager_core::core::metrics::ScalarObservation::available(
-            3_780.0,
-            timestamp_ms,
-        ),
-        time_to_full_secs: taskmanager_core::core::metrics::ScalarObservation::unavailable(
-            taskmanager_core::core::failure::FailureKind::Unsupported,
-        ),
+        energy_full_uwh: ScalarObservation::available(49_000_000.0, timestamp_ms),
+        energy_full_design_uwh: ScalarObservation::available(56_000_000.0, timestamp_ms),
+        time_to_empty_secs: ScalarObservation::available(3_780.0, timestamp_ms),
+        time_to_full_secs: ScalarObservation::unavailable(FailureKind::Unsupported),
     });
-    taskmanager_core::core::power::PowerSupplySnapshot {
-        state: taskmanager_core::core::device_state::DeviceState::healthy(timestamp_ms),
+    PowerSupplySnapshot {
+        state: DeviceState::healthy(timestamp_ms),
         timestamp_ms,
         batteries: vec![battery],
         ..Default::default()
@@ -548,30 +535,26 @@ fn capture_sensor_snapshot(
     timestamp_ms: u64,
     rpm: u32,
     temperature_c: f32,
-) -> taskmanager_core::core::sensors::SensorCenterSnapshot {
+) -> SensorCenterSnapshot {
     let device_id = "hwmon:demo:cpu".to_string();
-    taskmanager_core::core::sensors::SensorCenterSnapshot {
-        state: taskmanager_core::core::device_state::DeviceState::healthy(timestamp_ms),
+    SensorCenterSnapshot {
+        state: DeviceState::healthy(timestamp_ms),
         timestamp_ms,
         readings: vec![
             capture_sensor_reading(
                 device_id.clone().into(),
                 "fan1",
                 "CPU Fan",
-                taskmanager_core::core::sensors::SensorDescriptor::fan_speed(
-                    taskmanager_core::core::sensors::SensorScale::IDENTITY,
-                ),
-                taskmanager_core::core::sensors::SensorMagnitude::Unsigned(u64::from(rpm)),
+                SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+                SensorMagnitude::Unsigned(u64::from(rpm)),
                 timestamp_ms,
             ),
             capture_sensor_reading(
                 device_id.clone().into(),
                 "temp1",
                 "Package",
-                taskmanager_core::core::sensors::SensorDescriptor::temperature(
-                    taskmanager_core::core::sensors::SensorScale::IDENTITY,
-                ),
-                taskmanager_core::core::sensors::SensorMagnitude::Decimal(f64::from(temperature_c)),
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                SensorMagnitude::Decimal(f64::from(temperature_c)),
                 timestamp_ms,
             ),
             // A second readable zone keeps the thermal-zone panel's traversal
@@ -582,12 +565,8 @@ fn capture_sensor_snapshot(
                 device_id.into(),
                 "temp2",
                 "acpitz",
-                taskmanager_core::core::sensors::SensorDescriptor::temperature(
-                    taskmanager_core::core::sensors::SensorScale::IDENTITY,
-                ),
-                taskmanager_core::core::sensors::SensorMagnitude::Decimal(f64::from(
-                    temperature_c + 6.0,
-                )),
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                SensorMagnitude::Decimal(f64::from(temperature_c + 6.0)),
                 timestamp_ms,
             ),
             // An unreadable zone from another hwmon device stays in the
@@ -601,49 +580,32 @@ fn capture_sensor_snapshot(
 
 /// One honest typed-absence channel for the capture fixture: the failed read
 /// keeps its named row with the shared dash.
-fn capture_unreadable_sensor_reading(
-    device_id: taskmanager_core::core::identity::DeviceId,
-    id: &str,
-    label: &str,
-) -> taskmanager_core::core::sensors::SensorReading {
-    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
+fn capture_unreadable_sensor_reading(device_id: DeviceId, id: &str, label: &str) -> SensorReading {
+    SensorReading::from_measurement_observation(
         device_id,
         id.into(),
         label.into(),
-        taskmanager_core::core::sensors::SensorMeasurementObservation::unavailable(
-            taskmanager_core::core::sensors::SensorDescriptor::temperature(
-                taskmanager_core::core::sensors::SensorScale::IDENTITY,
-            ),
-            taskmanager_core::core::failure::FailureKind::PermissionDenied,
+        SensorMeasurementObservation::unavailable(
+            SensorDescriptor::temperature(SensorScale::IDENTITY),
+            FailureKind::PermissionDenied,
         ),
     )
 }
 
 fn capture_sensor_reading(
-    device_id: taskmanager_core::core::identity::DeviceId,
+    device_id: DeviceId,
     id: &str,
     label: &str,
-    descriptor: taskmanager_core::core::sensors::SensorDescriptor,
-    magnitude: taskmanager_core::core::sensors::SensorMagnitude,
+    descriptor: SensorDescriptor,
+    magnitude: SensorMagnitude,
     timestamp_ms: u64,
-) -> taskmanager_core::core::sensors::SensorReading {
-    let observation = taskmanager_core::core::sensors::SensorMeasurementObservation::available(
-        descriptor.clone(),
-        magnitude,
-        timestamp_ms,
-    )
-    .unwrap_or_else(|_| {
-        taskmanager_core::core::sensors::SensorMeasurementObservation::unavailable(
-            descriptor,
-            taskmanager_core::core::failure::FailureKind::ProviderFault,
-        )
-    });
-    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
-        device_id,
-        id.into(),
-        label.into(),
-        observation,
-    )
+) -> SensorReading {
+    let observation =
+        SensorMeasurementObservation::available(descriptor.clone(), magnitude, timestamp_ms)
+            .unwrap_or_else(|_| {
+                SensorMeasurementObservation::unavailable(descriptor, FailureKind::ProviderFault)
+            });
+    SensorReading::from_measurement_observation(device_id, id.into(), label.into(), observation)
 }
 
 fn capture_marker_path() -> Option<PathBuf> {
@@ -654,10 +616,7 @@ fn capture_marker_path() -> Option<PathBuf> {
 /// systemd-user critical chain (three timed units, one untimed node) so the
 /// Startup-page waterfall renders in demo mode exactly like a measured boot.
 /// This is honest fixture data, not a fabricated provider answer.
-fn demo_boot_evidence() -> taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
-
+fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
     let healthy = DeviceState::healthy(1_785_292_800_000);
     StartupBootEvidenceSnapshot {
         state: healthy,

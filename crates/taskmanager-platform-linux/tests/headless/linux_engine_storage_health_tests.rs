@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::FilesystemBackingKind;
 
 const MOUNTINFO: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -79,11 +80,11 @@ fn mount_sources_are_classified_by_filesystem_topology() {
             .map(|filesystem| filesystem.backing_kind)
             .collect::<Vec<_>>(),
         vec![
-            taskmanager_core::FilesystemBackingKind::Overlay,
-            taskmanager_core::FilesystemBackingKind::Tmpfs,
-            taskmanager_core::FilesystemBackingKind::BtrfsSubvolume,
-            taskmanager_core::FilesystemBackingKind::Network,
-            taskmanager_core::FilesystemBackingKind::PhysicalBlock,
+            FilesystemBackingKind::Overlay,
+            FilesystemBackingKind::Tmpfs,
+            FilesystemBackingKind::BtrfsSubvolume,
+            FilesystemBackingKind::Network,
+            FilesystemBackingKind::PhysicalBlock,
         ]
     );
 }

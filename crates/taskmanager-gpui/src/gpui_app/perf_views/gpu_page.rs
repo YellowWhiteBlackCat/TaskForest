@@ -3,6 +3,12 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_platform_contract::CapabilityStatus;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
@@ -55,9 +61,9 @@ const MAX_GPU_ENGINE_ROWS: usize = 64;
 /// per-window; this props boundary only prevents the stateless renderer from
 /// growing another independent argument for every GPU control family.
 pub(crate) struct GpuRenderState<'a> {
-    pub(crate) engine_session: &'a taskmanager_application::GpuEngineRowsState,
-    pub(crate) engine_capability_status: Option<taskmanager_platform_contract::CapabilityStatus>,
-    pub(crate) engine_device_id: taskmanager_core::core::identity::DeviceId,
+    pub(crate) engine_session: &'a GpuEngineRowsState,
+    pub(crate) engine_capability_status: Option<CapabilityStatus>,
+    pub(crate) engine_device_id: DeviceId,
     pub(crate) chart_layout: GpuChartLayout,
     pub(crate) performance: PerformanceSettings,
     pub(crate) budget: crate::gpui_app::root::responsive::PerformancePageBudget,
@@ -100,8 +106,8 @@ struct GpuEngineMiniGridProps<'a> {
     history: &'a CorrelatedSystemTelemetryHistory,
     metrics: &'a GpuMetrics,
     engine_session: &'a GpuEngineRowsState,
-    engine_device_id: &'a taskmanager_core::core::identity::DeviceId,
-    engine_capability_status: Option<taskmanager_platform_contract::CapabilityStatus>,
+    engine_device_id: &'a DeviceId,
+    engine_capability_status: Option<CapabilityStatus>,
     graph_settings: GraphSettings,
     graph_cache: GraphCacheHandle,
     max_rows: Option<usize>,
@@ -135,9 +141,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
         .flex()
         .flex_col()
         .flex_none()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .w_full()
         .min_h(px(0.0))
         .child(
@@ -148,17 +152,15 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                 .justify_between()
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                            tokens::FONT_WEIGHT_BOLD,
-                        ))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_12))
+                        .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                        .text_color(hsla(theme.fg))
                         .child(i18n::t("gpu.per_engine_title")),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(if visible_count == total_engines {
                             visible_count.to_string()
                         } else {
@@ -170,9 +172,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
         let mut row = div()
             .flex()
             .flex_row()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_4,
-            ))
+            .gap(definite_length(tokens::SPACE_4))
             .flex_none()
             .h(px(GPU_ENGINE_ROW_HEIGHT))
             .w_full();
@@ -316,9 +316,7 @@ pub(crate) fn render_gpu(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(group)
                 .child(memory)
                 .into_any_element(),

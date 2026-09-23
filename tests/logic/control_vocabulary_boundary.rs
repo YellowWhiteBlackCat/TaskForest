@@ -136,10 +136,14 @@ fn ui_shells_construct_no_raw_nice_priority_control() {
 
     assert!(
         offenders.is_empty(),
-        "raw nice-value priority control in UI shell(s): {offenders:?} — a frontend must \
-         construct ProcessBatchAction::SetPriority(PriorityTier) and read labels through \
-         taskmanager_shell::presentation::priority_tier_label (ARCH.md §8.1 语义完备律: a \
-         raw nice number never crosses into a UI; the adapters own the tier→native mapping)."
+        concat!(
+            "raw nice-value priority control in UI shell(s): {offenders:?} — a frontend must ",
+            "construct ProcessBatchAction::SetPriority(PriorityTier) and read labels through ",
+            "taskmanager_shell",
+            "::presentation::priority_tier_label",
+            " (ARCH.md §8.1 语义完备律: a raw nice number never crosses into a UI; the adapters own the tier→native mapping)."
+        ),
+        offenders = offenders
     );
 }
 

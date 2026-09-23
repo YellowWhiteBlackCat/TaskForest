@@ -25,11 +25,11 @@ discovery payloads and proves the resolver is not a rubber stamp:
   cell and test id, counts `pending` rows separately, and rejects a malformed
   row (missing test id, note on an anchored row, test id on a pending row,
   empty gap note, duplicate cell, unknown frontend or status);
-* the sparse feature co-anchor table resolves every extra `co_test_id` against
-  the owning frontend's discovery, keeps the primary anchor's semantics
-  untouched, reports a deleted co-anchor as dangling with its cell and channel,
-  rejects a co-anchor that names an unanchored cell or repeats the primary
-  anchor as invalid, and rejects a malformed co-anchor row;
+* the feature table's optional sixth column (`co_test_id`) resolves every extra
+  co-anchor against the owning frontend's discovery, keeps the primary anchor's
+  semantics untouched, reports a deleted co-anchor as dangling with its cell and
+  channel, rejects a co-anchor that names a pending cell or repeats the primary
+  anchor as invalid, and fails closed on a malformed sixth column;
 * the `--scope auto` diff-scope only skips when no evidence-relevant path
   changed, evaluates fail-closed when the git probe fails, and never treats a
   skipped diff as a resolved anchor set.
@@ -58,9 +58,7 @@ _spec.loader.exec_module(resolver)
 HEADER = "\t".join(resolver.MANIFEST_FIELDS)
 INTERACTION_HEADER = "\t".join(resolver.INTERACTION_FIELDS)
 FEATURE_HEADER = "\t".join(resolver.FEATURE_EVIDENCE_FIELDS)
-CO_ANCHOR_HEADER = "\t".join(resolver.FEATURE_CO_ANCHOR_FIELDS)
 DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
-DEFAULT_FEATURE_CO_ANCHORS = "scripts/parity/feature_evidence_co_anchors.tsv"
 
 CHECKS = 0
 FAILURES: list[str] = []
@@ -146,25 +144,16 @@ def feature_row(
     test_id: str = "-",
     status: str = "anchored",
     note: str = "-",
+    co_test_id: str = "-",
 ) -> str:
-    """One feature-evidence row; anchored rows default to the `-` note."""
-    return "\t".join([feature_id, frontend, test_id, status, note])
+    """One feature-evidence row; anchored rows default to the `-` note and
+    every row defaults to no co-anchor (`-` in the sixth column)."""
+    return "\t".join([feature_id, frontend, test_id, status, note, co_test_id])
 
 
 def write_feature_evidence(path: Path, rows: list[str]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join([FEATURE_HEADER, *rows]) + "\n", encoding="utf-8")
-    return path
-
-
-def co_anchor_row(feature_id: str, frontend: str, co_test_id: str, reason: str) -> str:
-    """One sparse feature co-anchor row."""
-    return "\t".join([feature_id, frontend, co_test_id, reason])
-
-
-def write_feature_co_anchors(path: Path, rows: list[str]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join([CO_ANCHOR_HEADER, *rows]) + "\n", encoding="utf-8")
     return path
 
 
@@ -189,20 +178,6 @@ def default_feature_evidence(repo: Path) -> Path:
     path = repo / DEFAULT_FEATURE_EVIDENCE
     if not path.is_file():
         write_feature_evidence(path, DEFAULT_FEATURE_ROWS)
-    return path
-
-
-def default_feature_co_anchors(repo: Path) -> Path:
-    """Materialize the synthetic default co-anchor table (header only).
-
-    The co-anchor source is default-on like the feature table, so every
-    synthetic repo carries a committed-shape table; a test that wants rows
-    overrides the path or rewrites this file.  The empty table is the legal
-    "no co-anchor declared yet" state.
-    """
-    path = repo / DEFAULT_FEATURE_CO_ANCHORS
-    if not path.is_file():
-        write_feature_co_anchors(path, [])
     return path
 
 
@@ -238,19 +213,14 @@ def namespace(
     requirements: Path | None = None,
     require_requirement_coverage: bool = False,
     feature_evidence: Path | None = None,
-    co_anchors: Path | None = None,
 ) -> argparse.Namespace:
     # The feature-evidence source is default-on (the gate consumes it without a
     # flag), so every synthetic repo carries a committed-shape table unless a
-    # test overrides the path.  The co-anchor side table follows the same
-    # default-on rule (header-only when no test supplies rows).
+    # test overrides the path.  The co-anchors live in that table's sixth column.
     materialized = (
         feature_evidence
         if feature_evidence is not None
         else default_feature_evidence(repo)
-    )
-    materialized_co_anchors = (
-        co_anchors if co_anchors is not None else default_feature_co_anchors(repo)
     )
     return argparse.Namespace(
         manifest=str(manifest),
@@ -260,7 +230,6 @@ def namespace(
         requirements=str(requirements) if requirements else None,
         require_requirement_coverage=require_requirement_coverage,
         feature_evidence=str(materialized),
-        co_anchors=str(materialized_co_anchors),
         nextest=False,
         nextest_timeout=30,
         scope=scope,
@@ -514,7 +483,6 @@ SCOPE_IN_PATH = [
     "scripts/parity/cross_frontend_manifest.tsv",
     "scripts/parity/cross_frontend_matrix.tsv",
     "scripts/parity/feature_evidence.tsv",
-    "scripts/parity/feature_evidence_co_anchors.tsv",
     "scripts/parity/resolve_frontend_evidence.py",
     "crates/taskmanager-ui-contract/src/conformance.rs",
     "crates/taskmanager-ui-contract/src/feature_coverage.rs",
@@ -1048,7 +1016,7 @@ def test_feature_evidence_resolves(tmp: Path) -> None:
         report["co_anchors"]["rows"] == 0
         and report["co_anchors"]["dangling"] == 0
         and report["counts"]["feature_co_anchors"] == 0,
-        "the default co-anchor table is the legal empty state",
+        "the default feature table declares no co-anchor",
     )
 
 
@@ -1176,6 +1144,28 @@ def test_feature_evidence_malformed() -> None:
             [feature_row("process.scheduler-policy", "gpui", status="someday")],
             "an unknown feature status is rejected",
         )
+        reject(
+            ["process.scheduler-policy\tgpui\tsuite::alpha_ok\tanchored\t-"],
+            "a feature row missing the sixth (co_test_id) column is rejected",
+        )
+        reject(
+            ["process.scheduler-policy\tgpui\tsuite::alpha_ok\tanchored\t-\t"],
+            "a feature row with an empty co_test_id column is rejected",
+        )
+        bad_header = tmp / "bad-header.tsv"
+        bad_header.write_text(
+            "feature_id\tfrontend\ttest_id\tstatus\tnote\n"
+            "process.scheduler-policy\tgpui\tsuite::alpha_ok\tanchored\t-\n",
+            encoding="utf-8",
+        )
+        try:
+            resolver.resolve(
+                namespace(manifest, discovery, tmp, feature_evidence=bad_header)
+            )
+        except resolver.ResolveError:
+            check(True, "a five-column feature header is rejected")
+        else:
+            check(False, "a five-column feature header is rejected")
 
 
 def test_feature_evidence_missing_file_errors(tmp: Path) -> None:
@@ -1194,23 +1184,31 @@ def test_feature_evidence_missing_file_errors(tmp: Path) -> None:
         check(False, "a missing feature table fails loudly")
 
 
-# The sparse feature co-anchor table: extra discoverable tests for an
-# already-anchored cell.  The synthetic vocabulary is the same opaque
-# fixture vocabulary as the feature rows above.
+# The feature table's optional sixth column: extra discoverable tests for an
+# already-anchored cell.  The synthetic vocabulary is the same opaque fixture
+# vocabulary as the feature rows above.
 CO_ANCHOR_GPUI_TEST = "feature_suite::co_anchor_gpui"
 CO_ANCHOR_ICED_TEST = "feature_suite::co_anchor_iced"
 
 
 def test_feature_co_anchors_resolve(tmp: Path) -> None:
-    table = write_feature_co_anchors(
-        tmp / "co_anchors.tsv",
+    table = write_feature_evidence(
+        tmp / "feature.tsv",
         [
-            co_anchor_row(
-                "process.scheduler-policy", "gpui", CO_ANCHOR_GPUI_TEST, "clause a"
+            feature_row(
+                "process.scheduler-policy",
+                "gpui",
+                test_id=FEATURE_GPUI_TEST,
+                co_test_id=CO_ANCHOR_GPUI_TEST,
             ),
-            co_anchor_row(
-                "process.scheduler-policy", "iced", CO_ANCHOR_ICED_TEST, "clause b"
+            feature_row(
+                "process.scheduler-policy",
+                "iced",
+                test_id=FEATURE_ICED_TEST,
+                co_test_id=CO_ANCHOR_ICED_TEST,
             ),
+            feature_row("process.scheduler-policy", "tui", test_id=FEATURE_TUI_TEST),
+            feature_row("process.scheduler-policy", "bevy", test_id=FEATURE_BEVY_TEST),
         ],
     )
     discovery = base_discovery(tmp)
@@ -1225,7 +1223,7 @@ def test_feature_co_anchors_resolve(tmp: Path) -> None:
             write_manifest(tmp / "manifest.tsv", BASE_ROWS),
             discovery,
             tmp,
-            co_anchors=table,
+            feature_evidence=table,
         )
     )
     check(report["status"] == "pass", "a discoverable co-anchor keeps the run green")
@@ -1238,7 +1236,7 @@ def test_feature_co_anchors_resolve(tmp: Path) -> None:
     check(
         report["co_anchors"]
         == {"path": str(table), "rows": 2, "cells": 2, "dangling": 0},
-        "the report carries the co-anchor block (--json shape)",
+        "the report carries the co-anchor block keyed to the main table",
     )
     check(
         report["counts"]["feature_anchored"] == 4
@@ -1253,12 +1251,15 @@ def test_feature_co_anchors_resolve(tmp: Path) -> None:
 
 
 def test_feature_co_anchors_dangling(tmp: Path) -> None:
-    table = write_feature_co_anchors(
-        tmp / "co_anchors.tsv",
+    table = write_feature_evidence(
+        tmp / "feature.tsv",
         [
-            co_anchor_row(
-                "process.scheduler-policy", "iced", CO_ANCHOR_ICED_TEST, "clause b"
-            )
+            feature_row(
+                "process.scheduler-policy",
+                "iced",
+                test_id=FEATURE_ICED_TEST,
+                co_test_id=CO_ANCHOR_ICED_TEST,
+            ),
         ],
     )
     report = resolver.resolve(
@@ -1266,7 +1267,7 @@ def test_feature_co_anchors_dangling(tmp: Path) -> None:
             write_manifest(tmp / "manifest.tsv", BASE_ROWS),
             base_discovery(tmp),
             tmp,
-            co_anchors=table,
+            feature_evidence=table,
         )
     )
     check(report["status"] == "fail", "deleting a referenced co-anchor fails the run")
@@ -1292,24 +1293,32 @@ def test_feature_co_anchors_dangling(tmp: Path) -> None:
         "the co-anchor dangling entry names the cell, frontend, test id and channel",
     )
     check(
-        report["counts"]["feature_anchored"] == 4
+        report["counts"]["feature_anchored"] == 1
         and report["counts"]["feature_dangling"] == 0,
-        "the primary anchors stay resolved when only a co-anchor dangles",
+        "the primary anchor stays resolved when only its co-anchor dangles",
     )
 
 
 def test_feature_co_anchors_invalid(tmp: Path) -> None:
     discovery = base_discovery(tmp)
     manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
-    # A cell with no anchored feature-evidence row cannot carry a co-anchor.
-    unanchored = write_feature_co_anchors(
-        tmp / "unanchored.tsv",
-        [co_anchor_row("storage.smart-health", "gpui", CO_ANCHOR_GPUI_TEST, "gap")],
+    # A pending row has no anchored primary, so it cannot carry a co-anchor.
+    pending_with_co_anchor = write_feature_evidence(
+        tmp / "pending.tsv",
+        [
+            feature_row(
+                "storage.smart-health",
+                "gpui",
+                status="pending",
+                note="no discoverable anchor yet",
+                co_test_id=CO_ANCHOR_GPUI_TEST,
+            )
+        ],
     )
     report = resolver.resolve(
-        namespace(manifest, discovery, tmp, co_anchors=unanchored)
+        namespace(manifest, discovery, tmp, feature_evidence=pending_with_co_anchor)
     )
-    check(report["status"] == "fail", "a co-anchor on an unanchored cell fails")
+    check(report["status"] == "fail", "a co-anchor on a pending cell fails")
     check(
         any(
             item.get("reason", "").startswith("co-anchor names a (feature_id, frontend)")
@@ -1317,22 +1326,27 @@ def test_feature_co_anchors_invalid(tmp: Path) -> None:
             and item["frontend"] == "gpui"
             for item in report["invalid"]
         ),
-        "the unanchored cell is reported as invalid with its cell",
+        "the pending cell is reported as invalid with its cell",
     )
     check(
         report["counts"]["feature_co_anchor_dangling"] == 0,
         "an invalid co-anchor is not double-reported as dangling",
     )
     # Repeating the cell's primary anchor adds no evidence.
-    repeated = write_feature_co_anchors(
+    repeated = write_feature_evidence(
         tmp / "repeated.tsv",
         [
-            co_anchor_row(
-                "process.scheduler-policy", "gpui", FEATURE_GPUI_TEST, "same test"
+            feature_row(
+                "process.scheduler-policy",
+                "gpui",
+                test_id=FEATURE_GPUI_TEST,
+                co_test_id=FEATURE_GPUI_TEST,
             )
         ],
     )
-    report = resolver.resolve(namespace(manifest, discovery, tmp, co_anchors=repeated))
+    report = resolver.resolve(
+        namespace(manifest, discovery, tmp, feature_evidence=repeated)
+    )
     check(report["status"] == "fail", "a co-anchor repeating the primary anchor fails")
     check(
         any(
@@ -1344,70 +1358,6 @@ def test_feature_co_anchors_invalid(tmp: Path) -> None:
         ),
         "the repeated primary anchor is reported precisely",
     )
-
-
-def test_feature_co_anchors_malformed() -> None:
-    with tempfile.TemporaryDirectory() as raw:
-        tmp = Path(raw)
-        manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
-        discovery = base_discovery(tmp)
-
-        def reject(rows: list[str] | None, label: str, *, missing: bool = False) -> None:
-            table = tmp / "co_anchors.tsv"
-            if missing:
-                table = tmp / "absent-co-anchors.tsv"
-            else:
-                assert rows is not None
-                write_feature_co_anchors(table, rows)
-            try:
-                resolver.resolve(
-                    namespace(manifest, discovery, tmp, co_anchors=table)
-                )
-            except resolver.ResolveError:
-                check(True, label)
-            else:
-                check(False, label)
-
-        reject(None, "a missing co-anchor table fails loudly", missing=True)
-        reject(
-            [
-                co_anchor_row(
-                    "process.scheduler-policy", "gpui", CO_ANCHOR_GPUI_TEST, "clause"
-                ),
-                co_anchor_row(
-                    "process.scheduler-policy", "gpui", CO_ANCHOR_GPUI_TEST, "clause"
-                ),
-            ],
-            "a duplicate (feature_id, frontend, co_test_id) row is rejected",
-        )
-        reject(
-            [co_anchor_row("process.scheduler-policy", "gpui", CO_ANCHOR_GPUI_TEST, "-")],
-            "a co-anchor row without a clause reason is rejected",
-        )
-        reject(
-            [co_anchor_row("process.scheduler-policy", "gpui", "-", "clause")],
-            "a co-anchor row without a test id is rejected",
-        )
-        reject(
-            [co_anchor_row("process.scheduler-policy", "watch", CO_ANCHOR_GPUI_TEST, "x")],
-            "an unknown co-anchor frontend is rejected",
-        )
-        reject(
-            ["process.scheduler-policy\tgpui\t" + CO_ANCHOR_GPUI_TEST],
-            "a co-anchor row with a missing column is rejected",
-        )
-        table = tmp / "bad-co-anchors.tsv"
-        table.write_text(
-            "feature_id\tfrontend\tco_test_id\n"
-            "process.scheduler-policy\tgpui\t" + CO_ANCHOR_GPUI_TEST + "\n",
-            encoding="utf-8",
-        )
-        try:
-            resolver.resolve(namespace(manifest, discovery, tmp, co_anchors=table))
-        except resolver.ResolveError:
-            check(True, "an unexpected co-anchor header is rejected")
-        else:
-            check(False, "an unexpected co-anchor header is rejected")
 
 
 def main() -> int:
@@ -1442,7 +1392,6 @@ def main() -> int:
         test_feature_co_anchors_resolve(tmp)
         test_feature_co_anchors_dangling(tmp)
         test_feature_co_anchors_invalid(tmp)
-        test_feature_co_anchors_malformed()
 
     if FAILURES:
         print(f"\nself-test: FAIL ({len(FAILURES)}/{CHECKS} checks failed)")

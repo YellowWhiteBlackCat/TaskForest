@@ -4,6 +4,8 @@
 //! shared search-highlight matcher parity (ADR-020). `super::` resolves back
 //! into the parent `elements` module where the helpers live.
 
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rgba;
 // Re-export every helper from the parent `elements` module so the nested
 // `#[cfg(test)]` sub-modules below keep their verbatim `use super::<helper>;`
 // imports resolving one level deeper than they did inline in `elements.rs`.
@@ -11,6 +13,7 @@ use super::*;
 
 #[cfg(test)]
 mod titlebar_border_tests {
+    use super::*;
 
     use super::titlebar_border;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
@@ -24,10 +27,7 @@ mod titlebar_border_tests {
             for mode in [LightDark::Light, LightDark::Dark] {
                 for contrast in [HighContrast::Off, HighContrast::On] {
                     let theme = Theme::build(skin, mode, contrast, ResolvedFonts::system_for(skin));
-                    assert_eq!(
-                        titlebar_border(&theme, true),
-                        taskmanager_ui::theme_binding::rgba(theme.border)
-                    );
+                    assert_eq!(titlebar_border(&theme, true), rgba(theme.border));
                 }
             }
         }
@@ -43,9 +43,7 @@ mod titlebar_border_tests {
                 for contrast in [HighContrast::Off, HighContrast::On] {
                     let theme = Theme::build(skin, mode, contrast, ResolvedFonts::system_for(skin));
                     let dim = titlebar_border(&theme, false);
-                    let expected = taskmanager_ui::theme_binding::rgba(
-                        theme.border.with_alpha(theme.border.a * 0.6),
-                    );
+                    let expected = rgba(theme.border.with_alpha(theme.border.a * 0.6));
                     assert_eq!(dim, expected);
                     assert_eq!(
                         (dim.r, dim.g, dim.b),
@@ -65,6 +63,7 @@ mod titlebar_border_tests {
 #[cfg(test)]
 mod card_shadow_tests {
     use super::card_shadow;
+    use super::*;
     use crate::gpui_app::elements::CARD_SHADOW_AMBIENT_ALPHA;
     use gpui::Hsla;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
@@ -91,8 +90,8 @@ mod card_shadow_tests {
                     skin.label(),
                     mode.label()
                 );
-                let ink: Hsla = taskmanager_ui::theme_binding::hsla(theme.card_shadow());
-                let ambient: Hsla = taskmanager_ui::theme_binding::hsla(
+                let ink: Hsla = hsla(theme.card_shadow());
+                let ambient: Hsla = hsla(
                     theme
                         .card_shadow()
                         .with_alpha(theme.card_shadow().a * CARD_SHADOW_AMBIENT_ALPHA),
@@ -146,7 +145,7 @@ mod card_shadow_tests {
             ambient.blur_radius
         );
         assert!(f32::from(ambient.offset.y) <= 3.0);
-        let ink: Hsla = taskmanager_ui::theme_binding::hsla(theme.card_shadow());
+        let ink: Hsla = hsla(theme.card_shadow());
         let painted: Hsla = ambient.color;
         assert!(
             painted.a <= ink.a * 0.4,
@@ -178,7 +177,7 @@ mod card_shadow_tests {
             dark_shadow[1].color, light_shadow[1].color,
             "light and dark cards must cast different shadow ink"
         );
-        let black_ink: Hsla = taskmanager_ui::theme_binding::hsla(Theme::dark().card_shadow());
+        let black_ink: Hsla = hsla(Theme::dark().card_shadow());
         assert_eq!(
             dark_shadow[1].color, black_ink,
             "dark skins cast the locked black ink"

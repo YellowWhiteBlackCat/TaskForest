@@ -1,10 +1,11 @@
 //! Latest-wins folds for renderer-neutral on-demand data lanes.
 
 use super::*;
+use taskmanager_application::{CorrelatedDirectoryUsageEvent, CorrelatedGpuEngineRowsEvent};
 
 pub(super) fn apply_directory_usage(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedDirectoryUsageEvent>,
+    events: Vec<CorrelatedDirectoryUsageEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -17,7 +18,7 @@ pub(super) fn apply_directory_usage(
 
 pub(super) fn apply_gpu_engine_rows(
     _store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedGpuEngineRowsEvent>,
+    events: Vec<CorrelatedGpuEngineRowsEvent>,
     fold: &mut FoldState,
 ) {
     if !events.is_empty() {

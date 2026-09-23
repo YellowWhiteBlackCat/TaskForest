@@ -9,6 +9,7 @@ use taskmanager_application::window_capture::{
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::IcedApp;
+use taskmanager_application::i18n::t;
 
 #[derive(Debug, Default)]
 pub(super) enum IcedWindowCaptureRuntime {
@@ -45,7 +46,7 @@ impl IcedApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::TIMED_LONG,
-                taskmanager_application::i18n::t("window_capture.unavailable"),
+                t("window_capture.unavailable"),
             );
             return false;
         };
@@ -55,7 +56,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("window_capture.queued"),
+                    t("window_capture.queued"),
                 );
                 true
             }
@@ -64,7 +65,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("window_capture.busy"),
+                    t("window_capture.busy"),
                 );
                 false
             }
@@ -73,7 +74,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("window_capture.unavailable"),
+                    t("window_capture.unavailable"),
                 );
                 false
             }
@@ -82,8 +83,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("window_capture.failed")
-                        .replace("{}", error.detail()),
+                    t("window_capture.failed").replace("{}", error.detail()),
                 );
                 false
             }
@@ -105,7 +105,7 @@ impl IcedApp {
                 height,
                 ..
             } => {
-                let message = taskmanager_application::i18n::t("window_capture.success")
+                let message = t("window_capture.success")
                     .replacen("{}", destination.as_ref(), 1)
                     .replacen("{}", &width.to_string(), 1)
                     .replacen("{}", &height.to_string(), 1);
@@ -121,8 +121,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("window_capture.failed")
-                        .replace("{}", error.detail()),
+                    t("window_capture.failed").replace("{}", error.detail()),
                 );
             }
             WindowCaptureState::Closed

@@ -16,6 +16,7 @@ use taskmanager_shell::ShellApp;
 
 use crate::menu_modal::{ActionMenuContext, MenuModal};
 use crate::widgets::menu::{MenuItem, MenuSpec};
+use taskmanager_core::core::target::ServiceId;
 
 /// The six shared verbs, in the same display order as the TUI action menu.
 pub(crate) const MENU_ACTIONS: [ServiceAction; 6] = [
@@ -61,11 +62,7 @@ pub(crate) type ServiceMenuModal = MenuModal<ServiceMenuCtx>;
 
 /// Open the menu for one selected row, resolved through the shell's
 /// `sorted_services`. Fails closed on an unknown or empty target.
-pub(crate) fn open_for(
-    modal: &mut ServiceMenuModal,
-    shell: &ShellApp,
-    target: &taskmanager_core::core::target::ServiceId,
-) -> bool {
+pub(crate) fn open_for(modal: &mut ServiceMenuModal, shell: &ShellApp, target: &ServiceId) -> bool {
     let Some(service) = shell
         .sorted_services()
         .into_iter()

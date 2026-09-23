@@ -5,6 +5,8 @@ use taskmanager_core::{ProcessMetadataAvailability, ProcessScalarObservations, S
 use super::super::ProcessManager;
 use super::*;
 use std::fs;
+use taskmanager_core::ApplicationIconFormat;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn identity(id: &str, name: &str, icon: Option<&str>) -> ProcessApplicationIdentity {
     ProcessApplicationIdentity::new(id, name, icon.map(str::to_owned))
@@ -542,7 +544,7 @@ fn catalog_resolves_hicolor_asset_without_leaking_its_linux_path() {
     assert_eq!(identity.icon_token.as_deref(), Some("editor"));
     assert_eq!(identity.icon_failure, None);
     let asset = identity.icon_asset.as_ref().expect("icon bytes");
-    assert_eq!(asset.format, taskmanager_core::ApplicationIconFormat::Svg);
+    assert_eq!(asset.format, ApplicationIconFormat::Svg);
     assert!(asset.bytes.starts_with(b"<?xml"));
     let root_text = root.to_string_lossy();
     assert!(!String::from_utf8_lossy(&asset.bytes).contains(root_text.as_ref()));
@@ -551,7 +553,7 @@ fn catalog_resolves_hicolor_asset_without_leaking_its_linux_path() {
 
 #[test]
 fn application_retention_requires_the_exact_nonzero_start_token() {
-    let previous = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous = ProcessItemFixtureBuilder::new()
         .pid(7)
         .application_identity_observation(ProcessMetadataObservation::available(
             identity("editor", "Editor", Some("editor")),

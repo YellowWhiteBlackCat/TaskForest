@@ -11,6 +11,7 @@
 //! single source every frontend's tree/group projection consumes, so the
 //! frontends cannot drift.
 use super::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
+use taskmanager_application::process_sort::compare_axis;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::session::SessionItem;
@@ -136,11 +137,7 @@ impl SortCol {
     /// [`compare_processes`](taskmanager_application::process_sort::compare_processes)
     /// ordering.
     pub(super) fn ascending(self, left: &ProcessItem, right: &ProcessItem) -> std::cmp::Ordering {
-        taskmanager_application::process_sort::compare_axis(
-            left,
-            right,
-            super::sort_axis::sort_axis(self),
-        )
+        compare_axis(left, right, super::sort_axis::sort_axis(self))
     }
 }
 

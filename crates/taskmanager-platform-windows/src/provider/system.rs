@@ -60,6 +60,18 @@ pub use msr_readout::PendingMsrReadoutProvider;
 pub use network::WinNetworkTelemetryProvider;
 pub use rapl_power::PendingRaplPowerProvider;
 pub use smbios_memory::PendingSmbiosMemoryProvider;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::MemoryOptionalObservations;
+use taskmanager_core::OptionalObservation;
+use taskmanager_core::metrics::MemoryScalarObservations;
+use taskmanager_windows_api::WindowsApiError;
+use taskmanager_windows_api::WindowsComputeAccelerator;
+use taskmanager_windows_api::WindowsGpuEngineSample;
+use taskmanager_windows_api::enumerate_compute_accelerators;
+use taskmanager_windows_api::enumerate_gpu_adapters;
+use taskmanager_windows_api::query_gpu_engine_utilization;
+use taskmanager_windows_api::query_memory_compression_used_bytes;
+use taskmanager_windows_api::system_performance;
 
 type HostRegistration = ProviderRegistration<HostTelemetryRequest, Box<dyn HostTelemetryProvider>>;
 type CpuRegistration = ProviderRegistration<CpuTelemetryRequest, Box<dyn CpuTelemetryProvider>>;
@@ -134,7 +146,7 @@ impl HostTelemetryProvider for WinHostTelemetryProvider {
             ));
             ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable)
         };
-        match taskmanager_windows_api::system_performance() {
+        match system_performance() {
             Ok(performance) => {
                 processes = ScalarObservation::available(
                     u64::from(performance.process_count),
@@ -146,7 +158,7 @@ impl HostTelemetryProvider for WinHostTelemetryProvider {
                 );
                 sources.push(available_source(HOST_PERFORMANCE_PROVIDER, 2));
             }
-            Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
+            Err(WindowsApiError::Unsupported) => {
                 sources.push(unavailable_source(
                     HOST_PERFORMANCE_PROVIDER,
                     FailureKind::Unsupported,
@@ -237,7 +249,7 @@ impl MemoryTelemetryProvider for WinMemoryTelemetryProvider {
         let swap_total = self.system.total_swap();
         let swap_used = self.system.used_swap();
 
-        let perf_info = taskmanager_windows_api::system_performance().ok();
+        let perf_info = system_performance().ok();
         let smbios_facts = self::smbios_info::query_memory_hardware_info();
 
         let cached_bytes = perf_info.map(|perf| {
@@ -277,34 +289,34 @@ impl MemoryTelemetryProvider for WinMemoryTelemetryProvider {
             used_rate,
             observed_at_ms,
         );
-        let mut optional_obs = taskmanager_core::MemoryOptionalObservations::default();
+        let mut optional_obs = MemoryOptionalObservations::default();
         if let Some(active) = Some(used) {
             optional_obs.composition.active_bytes =
-                taskmanager_core::OptionalObservation::present(active, observed_at_ms);
+                OptionalObservation::present(active, observed_at_ms);
         }
         if let Some(inactive) = nonpaged_pool_bytes {
             optional_obs.composition.inactive_bytes =
-                taskmanager_core::OptionalObservation::present(inactive, observed_at_ms);
+                OptionalObservation::present(inactive, observed_at_ms);
         }
         if let Some(free) = free_bytes {
             optional_obs.composition.free_bytes =
-                taskmanager_core::OptionalObservation::present(free, observed_at_ms);
+                OptionalObservation::present(free, observed_at_ms);
         }
         if let Some(cached) = cached_bytes {
             optional_obs.composition.cached_bytes =
-                taskmanager_core::OptionalObservation::present(cached, observed_at_ms);
+                OptionalObservation::present(cached, observed_at_ms);
         }
         if let Some(reclaimable) = paged_pool_bytes {
             optional_obs.composition.reclaimable_bytes =
-                taskmanager_core::OptionalObservation::present(reclaimable, observed_at_ms);
+                OptionalObservation::present(reclaimable, observed_at_ms);
         }
         if let Some(committed) = committed_bytes {
             optional_obs.virtual_memory_commit.committed_bytes =
-                taskmanager_core::OptionalObservation::present(committed, observed_at_ms);
+                OptionalObservation::present(committed, observed_at_ms);
         }
         if let Some(limit) = commit_limit_bytes {
             optional_obs.virtual_memory_commit.limit_bytes =
-                taskmanager_core::OptionalObservation::present(limit, observed_at_ms);
+                OptionalObservation::present(limit, observed_at_ms);
         }
         // Compressed-memory store: the kernel process snapshot's "Memory
         // Compression" working set (hidden from the `sysinfo` table). An
@@ -312,40 +324,38 @@ impl MemoryTelemetryProvider for WinMemoryTelemetryProvider {
         // degrade exactly like the other optional native facts above — the
         // slot keeps its never-observed default rather than a fabricated
         // zero or an error failing the whole memory observation.
-        if let Ok(Some(compressed_used)) =
-            taskmanager_windows_api::query_memory_compression_used_bytes()
-        {
+        if let Ok(Some(compressed_used)) = query_memory_compression_used_bytes() {
             optional_obs.compression.compressed_memory_used_bytes =
-                taskmanager_core::OptionalObservation::present(compressed_used, observed_at_ms);
+                OptionalObservation::present(compressed_used, observed_at_ms);
         }
         if let Some(reserved) = hardware_reserved_bytes {
             optional_obs.hardware_reserved_bytes =
-                taskmanager_core::OptionalObservation::present(reserved, observed_at_ms);
+                OptionalObservation::present(reserved, observed_at_ms);
         }
         if let Some(ref smbios) = smbios_facts {
             if let Some(speed) = smbios.speed_mhz {
                 optional_obs.modules.speed_mhz =
-                    taskmanager_core::OptionalObservation::present(speed, observed_at_ms);
+                    OptionalObservation::present(speed, observed_at_ms);
             }
             if let Some(used) = smbios.slots_used {
                 optional_obs.modules.slots_used =
-                    taskmanager_core::OptionalObservation::present(used, observed_at_ms);
+                    OptionalObservation::present(used, observed_at_ms);
             }
             if let Some(total) = smbios.slots_total {
                 optional_obs.modules.slots_total =
-                    taskmanager_core::OptionalObservation::present(total, observed_at_ms);
+                    OptionalObservation::present(total, observed_at_ms);
             }
             if let Some(ref t) = smbios.module_type {
                 optional_obs.modules.module_type =
-                    taskmanager_core::OptionalObservation::present(t.clone(), observed_at_ms);
+                    OptionalObservation::present(t.clone(), observed_at_ms);
             }
             if let Some(ref m) = smbios.module_manufacturer {
                 optional_obs.modules.manufacturer =
-                    taskmanager_core::OptionalObservation::present(m.clone(), observed_at_ms);
+                    OptionalObservation::present(m.clone(), observed_at_ms);
             }
             if let Some(ref f) = smbios.module_form_factor {
                 optional_obs.modules.form_factor =
-                    taskmanager_core::OptionalObservation::present(f.clone(), observed_at_ms);
+                    OptionalObservation::present(f.clone(), observed_at_ms);
             }
         }
         let metrics = MemoryMetrics::from_observations(observations, optional_obs);
@@ -369,8 +379,8 @@ impl MemoryScalarObservationFactory {
         swap_used: u64,
         used_rate: ScalarObservation<f32>,
         observed_at_ms: u64,
-    ) -> taskmanager_core::metrics::MemoryScalarObservations {
-        taskmanager_core::metrics::MemoryScalarObservations {
+    ) -> MemoryScalarObservations {
+        MemoryScalarObservations {
             total_bytes: ScalarObservation::available(total, observed_at_ms),
             used_bytes: ScalarObservation::available(used, observed_at_ms),
             available_bytes: ScalarObservation::available(available, observed_at_ms),
@@ -415,9 +425,9 @@ impl ContainerRollupProvider for WinContainerRollupProvider {
     fn refresh(&mut self, now_ms: u64) -> Result<ContainerRollup, ProviderFailure> {
         let outcome = self.wsl.rollup(now_ms);
         let status = if outcome.complete {
-            taskmanager_core::DeviceStatus::Healthy
+            DeviceStatus::Healthy
         } else {
-            taskmanager_core::DeviceStatus::Stale
+            DeviceStatus::Stale
         };
         let state = DeviceState::default().transition(status, now_ms);
         Ok(ContainerRollup {
@@ -540,14 +550,14 @@ impl GpuEngineRowsProvider for WinGpuEngineRowsProvider {
         &mut self,
         device_id: &DeviceId,
     ) -> Result<GpuEngineRowsSnapshot, ProviderFailure> {
-        let inventory = taskmanager_windows_api::enumerate_gpu_adapters()
+        let inventory = enumerate_gpu_adapters()
             .map_err(|error| ProviderFailure::from_kind(gpu::windows_gpu_failure_kind(error)))?;
         let Some(adapter) = inventory.adapters.iter().find(|adapter| {
             gpu::dxgi_adapter_identity(adapter.luid, adapter.is_npu) == device_id.as_str()
         }) else {
             return Err(ProviderFailure::Unsupported);
         };
-        let samples = taskmanager_windows_api::query_gpu_engine_utilization()
+        let samples = query_gpu_engine_utilization()
             .map_err(|error| ProviderFailure::from_kind(gpu::windows_gpu_failure_kind(error)))?;
         // A PDH answer without this LUID is the honest "no active engine
         // rows right now" success; only the query itself can fail.
@@ -564,9 +574,7 @@ impl GpuEngineRowsProvider for WinGpuEngineRowsProvider {
 /// boundary already sums sibling engine instances per type and clamps to
 /// 0–100; unmapped display labels stay `Unknown` rather than receiving a
 /// guessed semantic.
-fn engine_rows_from_pdh_sample(
-    sample: &taskmanager_windows_api::WindowsGpuEngineSample,
-) -> Vec<GpuEngineMetric> {
+fn engine_rows_from_pdh_sample(sample: &WindowsGpuEngineSample) -> Vec<GpuEngineMetric> {
     sample
         .engines
         .iter()
@@ -604,7 +612,7 @@ impl NpuInventoryProvider for WinNpuInventoryProvider {
         &mut self,
         observed_at_ms: u64,
     ) -> Result<NpuInventorySnapshot, ProviderFailure> {
-        let accelerators = taskmanager_windows_api::enumerate_compute_accelerators()
+        let accelerators = enumerate_compute_accelerators()
             .map_err(|error| ProviderFailure::from_kind(gpu::windows_gpu_failure_kind(error)))?;
         // An empty accelerator list with no failure is the honest "no NPU on
         // this host" success; a dormant (non-Windows) boundary surfaces as
@@ -624,9 +632,7 @@ impl NpuInventoryProvider for WinNpuInventoryProvider {
 /// unique per device, mirroring the Linux sysfs-path identity — and the
 /// utilization/engine/memory facts stay typed-unavailable per the core
 /// contract until a stable public interface exists.
-fn npu_device_from_setupapi(
-    accelerator: taskmanager_windows_api::WindowsComputeAccelerator,
-) -> NpuDevice {
+fn npu_device_from_setupapi(accelerator: WindowsComputeAccelerator) -> NpuDevice {
     NpuDevice {
         device_id: DeviceId::new(format!(
             "windows:npu:setupapi:{}",

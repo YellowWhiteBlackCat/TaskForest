@@ -3,6 +3,26 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 
 use super::*;
+use taskmanager_application::PlatformClient;
+use taskmanager_application::PlatformEffect;
+use taskmanager_application::PlatformEvent;
+use taskmanager_application::PlatformFacets;
+use taskmanager_application::PlatformHandle;
+use taskmanager_application::ProcessEvent;
+use taskmanager_application::RefreshRequest;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_platform_contract::CapabilityCatalog;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::CapabilitySnapshot;
+use taskmanager_platform_contract::EventEnvelope;
+use taskmanager_platform_contract::EventPort;
+use taskmanager_platform_contract::EventPortError;
+use taskmanager_platform_contract::EventSequence;
+use taskmanager_platform_contract::InstanceEvent;
+use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn instance_activation_is_drained_without_blocking_and_coalesced() {
@@ -10,10 +30,10 @@ fn instance_activation_is_drained_without_blocking_and_coalesced() {
     let (sender, receiver) = channel();
     app.install_instance_runtime(None, Some(receiver));
     sender
-        .send(taskmanager_platform_contract::InstanceEvent::Activate)
+        .send(InstanceEvent::Activate)
         .expect("test instance receiver is live");
     sender
-        .send(taskmanager_platform_contract::InstanceEvent::Activate)
+        .send(InstanceEvent::Activate)
         .expect("test instance receiver is live");
 
     assert!(app.runtime.drain_instance_events());
@@ -27,7 +47,7 @@ fn lifecycle_event_drains_are_bounded_and_converge_across_ticks() {
     runtime.install_instance(None, Some(instance_receiver));
     for _ in 0..=MAX_LIFECYCLE_EVENTS_PER_TICK {
         instance_sender
-            .send(taskmanager_platform_contract::InstanceEvent::Activate)
+            .send(InstanceEvent::Activate)
             .expect("test instance receiver is live");
     }
 
@@ -86,14 +106,12 @@ fn no_platform_reports_submission_failure_and_still_runs_tick_finish() {
         .and_then(|processes| processes.first())
         .cloned()
         .expect("demo process");
-    let identity = taskmanager_core::core::process::FrozenProcessIdentity::from_process(&first)
-        .expect("demo process carries identity");
+    let identity =
+        FrozenProcessIdentity::from_process(&first).expect("demo process carries identity");
     app.shell.application.selected_process = Some(identity.clone());
     let _ = app.shell.open_process_properties_for(identity);
 
-    app.queue(taskmanager_application::PlatformEffect::Refresh(
-        taskmanager_application::RefreshRequest::Processes,
-    ));
+    app.queue(PlatformEffect::Refresh(RefreshRequest::Processes));
     assert_eq!(
         app.shell.feedback_text(),
         "Demo mode suppresses platform actions"
@@ -107,10 +125,7 @@ fn no_platform_reports_submission_failure_and_still_runs_tick_finish() {
     );
 
     let committed_snapshot = app.shell.projection().snapshot.clone();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     assert!(
         app.shell.telemetry_frame_state().is_collecting(),
         "missing first snapshot exercises frontend-local motion finalization"
@@ -120,39 +135,28 @@ fn no_platform_reports_submission_failure_and_still_runs_tick_finish() {
         app.warmup_spin_phase().is_some(),
         "the same finish phase advances frontend-local motion without a platform"
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(committed_snapshot)),
+        ProjectionSeedFact::Snapshot(Box::new(committed_snapshot)),
     );
 }
 
 #[derive(Default)]
 struct EmptyCapabilities;
 
-impl taskmanager_platform_contract::CapabilityCatalog for EmptyCapabilities {
-    fn snapshot(&self) -> taskmanager_platform_contract::CapabilitySnapshot {
-        taskmanager_platform_contract::CapabilitySnapshot::default()
+impl CapabilityCatalog for EmptyCapabilities {
+    fn snapshot(&self) -> CapabilitySnapshot {
+        CapabilitySnapshot::default()
     }
 }
 
 #[derive(Default)]
-struct QueuedEvents(
-    Mutex<
-        VecDeque<
-            taskmanager_platform_contract::EventEnvelope<taskmanager_application::PlatformEvent>,
-        >,
-    >,
-);
+struct QueuedEvents(Mutex<VecDeque<EventEnvelope<PlatformEvent>>>);
 
-impl taskmanager_platform_contract::EventPort for QueuedEvents {
-    type Event = taskmanager_application::PlatformEvent;
+impl EventPort for QueuedEvents {
+    type Event = PlatformEvent;
 
-    fn try_recv(
-        &self,
-    ) -> Result<
-        Option<taskmanager_platform_contract::EventEnvelope<Self::Event>>,
-        taskmanager_platform_contract::EventPortError,
-    > {
+    fn try_recv(&self) -> Result<Option<EventEnvelope<Self::Event>>, EventPortError> {
         Ok(self.0.lock().expect("queue lock").pop_front())
     }
 }
@@ -164,28 +168,26 @@ fn tick_drains_the_directly_owned_platform_before_view_local_finish() {
         .0
         .lock()
         .expect("queue lock")
-        .push_back(taskmanager_platform_contract::EventEnvelope {
-            request_id: taskmanager_platform_contract::RequestId::new(1)
-                .expect("non-zero request id"),
-            capability: taskmanager_platform_contract::CapabilityId::PROCESS_LIST,
+        .push_back(EventEnvelope {
+            request_id: RequestId::new(1).expect("non-zero request id"),
+            capability: CapabilityId::PROCESS_LIST,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(1),
+            sequence: EventSequence::new(1),
             observed_at_ms: 100,
-            outcome: Ok(taskmanager_application::PlatformEvent::Processes(
-                taskmanager_application::ProcessEvent::Snapshot(std::sync::Arc::new(vec![
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            outcome: Ok(PlatformEvent::Processes(ProcessEvent::Snapshot(
+                std::sync::Arc::new(vec![
+                    ProcessItemFixtureBuilder::new()
                         .pid(77)
                         .name("runtime-owned".into())
                         .build(),
-                ])),
-            )),
+                ]),
+            ))),
         });
-    let client =
-        taskmanager_application::PlatformClient::new(taskmanager_application::PlatformHandle::new(
-            Arc::new(EmptyCapabilities),
-            events,
-            taskmanager_application::PlatformFacets::default(),
-        ));
+    let client = PlatformClient::new(PlatformHandle::new(
+        Arc::new(EmptyCapabilities),
+        events,
+        PlatformFacets::default(),
+    ));
     let mut app = IcedApp::new(Some(client));
 
     app.tick();

@@ -11,6 +11,8 @@ use taskmanager_shell::ShellKeyEvent;
 use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::ui::applications::application_row_height;
+use taskmanager_application::i18n::t;
+use taskmanager_shell::ProcessRowId;
 
 impl IcedApp {
     /// Ctrl+C: copy the current selected row's summary through the shared
@@ -34,10 +36,7 @@ impl IcedApp {
             FeedbackSource::Clipboard,
             FeedbackSeverity::Success,
             FeedbackLifecycle::SHORT,
-            format!(
-                "Selected Row {}",
-                taskmanager_application::i18n::t("common.copied")
-            ),
+            format!("Selected Row {}", t("common.copied")),
         );
         Some(iced::clipboard::write(summary))
     }
@@ -178,15 +177,13 @@ impl IcedApp {
             return;
         };
         match row_key {
-            Some(taskmanager_shell::ProcessRowId::Application(root)) => {
-                let _ = self
-                    .shell
-                    .select_row_id(taskmanager_shell::ProcessRowId::Application(root));
+            Some(ProcessRowId::Application(root)) => {
+                let _ = self.shell.select_row_id(ProcessRowId::Application(root));
             }
-            Some(taskmanager_shell::ProcessRowId::Process(_)) => {
+            Some(ProcessRowId::Process(_)) => {
                 let _ = self.shell.select_row(flat_index);
             }
-            Some(taskmanager_shell::ProcessRowId::Category(_)) | None => {
+            Some(ProcessRowId::Category(_)) | None => {
                 self.shell.clear_process_selection();
             }
         }
@@ -251,10 +248,8 @@ impl IcedApp {
                             .expanded_groups
                             .insert(expansion_key);
                     }
-                    if let Some(taskmanager_shell::ProcessRowId::Application(root)) = row_key {
-                        let _ = self
-                            .shell
-                            .select_row_id(taskmanager_shell::ProcessRowId::Application(root));
+                    if let Some(ProcessRowId::Application(root)) = row_key {
+                        let _ = self.shell.select_row_id(ProcessRowId::Application(root));
                     }
                 }
             }

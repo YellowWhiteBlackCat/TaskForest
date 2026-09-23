@@ -1,20 +1,21 @@
 use super::{disk_stats, temperature_trend_stat_row, temperature_trend_value};
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::{
     DiskMetrics, DiskScalarObservations, ScalarObservation, SmartAvailability,
 };
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::pin_english;
 
-fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> Option<String> {
+fn row_value(rows: &[StatRow], label: &str) -> Option<String> {
     rows.iter()
         .find(|row| row.label() == label)
         .and_then(|row| row.value().map(str::to_owned))
 }
 
-fn keyed_value(
-    rows: &[taskmanager_shell::viewmodel::StatRow],
-    key: &'static str,
-) -> Option<String> {
-    row_value(rows, taskmanager_application::i18n::t(key))
+fn keyed_value(rows: &[StatRow], key: &'static str) -> Option<String> {
+    row_value(rows, t(key))
 }
 
 /// An empty or all-gap window renders no trend row — absence stays
@@ -36,9 +37,9 @@ fn temperature_trend_summarizes_latest_average_and_peak() {
         trend,
         format!(
             "{} 40 °C · {} 34 °C · {} 40 °C",
-            taskmanager_application::i18n::t("common.latest"),
-            taskmanager_application::i18n::t("common.avg"),
-            taskmanager_application::i18n::t("common.peak"),
+            t("common.latest"),
+            t("common.avg"),
+            t("common.peak"),
         )
     );
 }
@@ -49,7 +50,7 @@ fn temperature_trend_summarizes_latest_average_and_peak() {
 fn temperature_trend_stat_row_preserves_multiline_parts_and_raw_value() {
     let row =
         temperature_trend_stat_row(&[35.0, 37.0, 42.0]).expect("finite temperature samples exist");
-    assert_eq!(row.label(), taskmanager_application::i18n::t("proc.trend"));
+    assert_eq!(row.label(), t("proc.trend"));
     let (latest, avg, peak) = row.trend_parts().expect("trend parts must be present");
     assert!(latest.contains("42"));
     assert!(avg.contains("38"));
@@ -64,25 +65,25 @@ fn temperature_trend_stat_row_preserves_multiline_parts_and_raw_value() {
 /// localized `{hours} h ({days} d)` catalog entry.
 #[test]
 fn removable_and_power_on_rows_use_locale_catalog_entries() {
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .media_removable(Some(true))
         .smart_power_on_hours(Some(72))
         .build();
     let rows = disk_stats(&disk, UnitPreferences::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
-            .find(|row| row.label() == taskmanager_application::i18n::t(key))
+            .find(|row| row.label() == t(key))
             .unwrap_or_else(|| panic!("{key} row must exist"))
     };
     assert_eq!(
         find("disk.removable").value(),
-        Some(taskmanager_application::i18n::t("common.yes")),
+        Some(t("common.yes")),
         "removable row must use the locale label, not hardcoded English"
     );
     assert_eq!(
         find("disk.power_on").value().map(str::to_owned),
         Some(
-            taskmanager_application::i18n::t("disk.power_on_format")
+            t("disk.power_on_format")
                 .replace("{hours}", "72")
                 .replace("{days}", "3")
         )
@@ -96,7 +97,7 @@ fn first_sample_rate_rows_are_none_not_fabricated_zeros() {
     let rows = disk_stats(&DiskMetrics::default(), UnitPreferences::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
-            .find(|row| row.label() == taskmanager_application::i18n::t(key))
+            .find(|row| row.label() == t(key))
             .unwrap_or_else(|| panic!("{key} row must exist"))
     };
     assert_eq!(find("disk.read").value(), None);
@@ -112,8 +113,8 @@ fn first_sample_rate_rows_are_none_not_fabricated_zeros() {
 /// `None` — the panel's shared dash — never a fabricated `0`.
 #[test]
 fn disk_stats_render_the_observed_iops_latency_and_queue_depth() {
-    taskmanager_test_support::pin_english();
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    pin_english();
+    let disk = DiskMetricsFixtureBuilder::new()
         .scalar_observations(DiskScalarObservations {
             iops: ScalarObservation::available(137, 10),
             response_time_ms: ScalarObservation::available(1.54, 10),
@@ -147,8 +148,7 @@ fn disk_stats_render_the_observed_iops_latency_and_queue_depth() {
         "disk.service_time",
     ] {
         assert!(
-            cold.iter()
-                .any(|row| row.label() == taskmanager_application::i18n::t(key)),
+            cold.iter().any(|row| row.label() == t(key)),
             "{key}: an applicable unobserved fact keeps its dash row"
         );
         assert_eq!(keyed_value(&cold, key), None, "{key}: never a fabricated 0");
@@ -164,8 +164,8 @@ fn disk_stats_render_the_observed_iops_latency_and_queue_depth() {
 /// none of the six clauses can surface as a fabricated `0%` / `0 h` / `0`.
 #[test]
 fn disk_stats_render_the_smart_health_evidence_families() {
-    taskmanager_test_support::pin_english();
-    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    pin_english();
+    let mut disk = DiskMetricsFixtureBuilder::new()
         .device_id("disk:wwid:smart".into())
         .name("nvme0n1".into())
         .smart_availability(SmartAvailability::Available)
@@ -185,12 +185,7 @@ fn disk_stats_render_the_smart_health_evidence_families() {
         Some("41 / 85 °C"),
         "the shared temperature readout must carry the value and its critical bound"
     );
-    let sensor = |index: usize| {
-        format!(
-            "{} {index}",
-            taskmanager_application::i18n::t("disk.temperature_sensor")
-        )
-    };
+    let sensor = |index: usize| format!("{} {index}", t("disk.temperature_sensor"));
     assert_eq!(
         row_value(&rows, &sensor(1)).as_deref(),
         Some("41 °C"),
@@ -209,7 +204,7 @@ fn disk_stats_render_the_smart_health_evidence_families() {
     assert_eq!(
         keyed_value(&rows, "disk.power_on").as_deref(),
         Some(
-            taskmanager_application::i18n::t("disk.power_on_format")
+            t("disk.power_on_format")
                 .replace("{hours}", "7200")
                 .replace("{days}", "300")
                 .as_str()
@@ -222,13 +217,13 @@ fn disk_stats_render_the_smart_health_evidence_families() {
 
     // A disk whose provider can only report availability keeps that one typed
     // row; a disk with no SMART telemetry at all gets the section hidden.
-    let availability_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let availability_only = DiskMetricsFixtureBuilder::new()
         .smart_availability(SmartAvailability::Available)
         .build();
     let rows = disk_stats(&availability_only, UnitPreferences::default(), &[]);
     assert_eq!(
         keyed_value(&rows, "disk.smart_status").as_deref(),
-        Some(taskmanager_application::i18n::t("device.healthy")),
+        Some(t("device.healthy")),
         "a reported-available provider must surface its typed availability status"
     );
     assert_eq!(keyed_value(&rows, "disk.endurance_used"), None);

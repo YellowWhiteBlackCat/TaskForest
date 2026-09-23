@@ -1,6 +1,7 @@
 use taskmanager_core::ScalarAvailability;
 
 use super::*;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn stat(start_ticks: u64, user_ticks: u64, system_ticks: u64) -> ProcStatFields {
     ProcStatFields {
@@ -118,7 +119,7 @@ fn one_clock_failure_invalidates_start_and_cpu_without_poisoning_stat_siblings()
 
 #[test]
 fn fd_failure_becomes_stale_only_when_current_stat_proves_same_identity() {
-    let previous = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous = ProcessItemFixtureBuilder::new()
         .pid(7)
         .name("worker".to_owned())
         .scalar_observations(ProcessScalarObservations {
@@ -156,7 +157,7 @@ fn fd_failure_becomes_stale_only_when_current_stat_proves_same_identity() {
         Ok(100),
         30,
         Some(
-            &taskmanager_test_support::ProcessItemFixtureBuilder::from_item(previous)
+            &ProcessItemFixtureBuilder::from_item(previous)
                 .scalar_observations(failed)
                 .build(),
         ),
@@ -168,7 +169,7 @@ fn fd_failure_becomes_stale_only_when_current_stat_proves_same_identity() {
 
 #[test]
 fn exact_start_token_change_blocks_all_stale_inheritance() {
-    let previous = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous = ProcessItemFixtureBuilder::new()
         .pid(7)
         .scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(600, 10),
@@ -269,7 +270,7 @@ fn deferred_fd_tick_reuses_previous_value_for_unchanged_identity() {
     // The fd SOURCE outcome stays Available so the aggregate fd source
     // status does not toggle Available/Empty across the decimation cadence;
     // the value's Stale availability already conveys "not freshly read".
-    let previous = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous = ProcessItemFixtureBuilder::new()
         .pid(7)
         .name("worker".to_owned())
         .scalar_observations(ProcessScalarObservations {
@@ -340,7 +341,7 @@ fn deferred_fd_tick_without_previous_is_typed_unavailable_not_zero() {
 fn full_fd_tick_reads_fresh_count_after_a_deferred_tick() {
     // The cadence is full → deferred → full. The second full tick must read
     // a fresh fd count (not the retained one) and report it as current.
-    let previous = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let previous = ProcessItemFixtureBuilder::new()
         .pid(7)
         .name("worker".to_owned())
         .scalar_observations(ProcessScalarObservations {

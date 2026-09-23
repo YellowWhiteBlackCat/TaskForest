@@ -9,28 +9,36 @@ use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::theme;
+use taskmanager_shell::memory::MemSegment;
+use taskmanager_shell::memory::MemSegmentKind;
+use taskmanager_shell::memory::SwapBreakdown;
+use taskmanager_shell::memory::memory_segments;
+use taskmanager_shell::memory::swap_breakdown;
+use taskmanager_shell::presentation::bytes;
+use taskmanager_shell::presentation::missing_value;
+use taskmanager_theme::Theme;
 
 /// The memory-composition bar, legend, and swap bar for the Memory Performance
 /// view. Renders the shared [`taskmanager_shell::memory`] breakdown; only the
 /// color mapping and the bar widgets are iced-specific.
 pub(super) fn memory_composition_block(
     memory: &MemoryMetrics,
-    theme: &taskmanager_theme::Theme,
+    theme: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let observed = super::projection::MemoryObservation::from(memory);
     let total = observed.total_bytes.unwrap_or(0);
-    let segments = taskmanager_shell::memory::memory_segments(memory);
+    let segments = memory_segments(memory);
     let nonzero: Vec<_> = segments.iter().copied().filter(|s| s.bytes > 0).collect();
 
     let readout = match (observed.used_bytes, observed.total_bytes) {
         (Some(used), Some(total)) => format!(
             "{} {} · {} {}",
             t("mem.in_use"),
-            taskmanager_shell::presentation::bytes(used),
-            taskmanager_shell::presentation::bytes(total),
+            bytes(used),
+            bytes(total),
             t("mem.total"),
         ),
-        _ => taskmanager_shell::presentation::missing_value(),
+        _ => missing_value(),
     };
     let header = row!(
         text(t("mem.composition")).size(f32::from(tokens::FONT_14)),
@@ -45,7 +53,7 @@ pub(super) fn memory_composition_block(
         .collect();
 
     let mut block = column![header, bar, column(legend).spacing(4)].spacing(8);
-    if let Some(swap) = taskmanager_shell::memory::swap_breakdown(memory) {
+    if let Some(swap) = swap_breakdown(memory) {
         block = block.push(swap_bar_view(&swap, theme));
     }
     if let Some(comp_card) = compression_card_view(memory, theme) {
@@ -57,11 +65,7 @@ pub(super) fn memory_composition_block(
 /// One semantic segment kind → the resolved iced color. Every frontend derives
 /// these from the same `taskmanager-theme` tokens, so the bar matches the
 /// gpui/tui composition bar.
-pub(crate) fn segment_color(
-    kind: taskmanager_shell::memory::MemSegmentKind,
-    theme: &taskmanager_theme::Theme,
-) -> iced::Color {
-    use taskmanager_shell::memory::MemSegmentKind;
+pub(crate) fn segment_color(kind: MemSegmentKind, theme: &Theme) -> iced::Color {
     let token = match kind {
         MemSegmentKind::ZfsArc => {
             // Reclaimable like the page cache, dimmed so the ARC legend
@@ -84,8 +88,8 @@ pub(crate) fn segment_color(
 /// segment, sized by its share of the segment-byte sum (matching gpui's
 /// share-sum normalization).
 fn composition_bar(
-    segments: &[taskmanager_shell::memory::MemSegment],
-    theme: &taskmanager_theme::Theme,
+    segments: &[MemSegment],
+    theme: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let drawn: Vec<(iced::Color, u64)> = segments
         .iter()
@@ -114,9 +118,9 @@ fn composition_bar(
 /// One legend row: a colored swatch, the localized label, the percent share,
 /// and the byte count.
 fn legend_row(
-    seg: taskmanager_shell::memory::MemSegment,
+    seg: MemSegment,
     total: u64,
-    theme: &taskmanager_theme::Theme,
+    theme: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let color = segment_color(seg.kind, theme);
     let pct = if total == 0 {
@@ -131,7 +135,7 @@ fn legend_row(
             .style(move |_| theme::fill_style(color)),
         container(text(seg.label.to_string()).size(f32::from(tokens::FONT_12))).width(Length::Fill),
         text(format!("{pct:>4.0}%")).size(f32::from(tokens::FONT_12)),
-        text(taskmanager_shell::presentation::bytes(seg.bytes)).size(f32::from(tokens::FONT_12)),
+        text(bytes(seg.bytes)).size(f32::from(tokens::FONT_12)),
     )
     .spacing(8)
     .into()
@@ -141,8 +145,8 @@ fn legend_row(
 /// RAM used R · zswap on") and a two-segment used/free proportion bar
 /// beneath it.
 fn swap_bar_view(
-    swap: &taskmanager_shell::memory::SwapBreakdown,
-    theme: &taskmanager_theme::Theme,
+    swap: &SwapBreakdown,
+    theme: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let pct = if swap.total_bytes == 0 {
         0.0
@@ -152,24 +156,16 @@ fn swap_bar_view(
     let mut label = format!(
         "{}  {} / {}  ({pct:.0}%)",
         t("mem.swap"),
-        taskmanager_shell::presentation::bytes(swap.used_bytes),
-        taskmanager_shell::presentation::bytes(swap.total_bytes),
+        bytes(swap.used_bytes),
+        bytes(swap.total_bytes),
     );
     if let Some(zram) = swap.zram_bytes.filter(|z| *z > 0) {
-        label.push_str(&format!(
-            "   ·   {} {}",
-            t("mem.zram_swap"),
-            taskmanager_shell::presentation::bytes(zram)
-        ));
+        label.push_str(&format!("   ·   {} {}", t("mem.zram_swap"), bytes(zram)));
     }
     // The RAM the store actually consumes (`mm_stat` `mem_used_total`):
     // distinct from the swap-used view above and the compressed size below.
     if let Some(ram) = swap.zram_memory_used_bytes.filter(|v| *v > 0) {
-        label.push_str(&format!(
-            "   ·   {} {}",
-            t("mem.zram_ram_used"),
-            taskmanager_shell::presentation::bytes(ram)
-        ));
+        label.push_str(&format!("   ·   {} {}", t("mem.zram_ram_used"), bytes(ram)));
     }
     if let Some(ratio) = swap.zram_compression_ratio {
         label.push_str(&format!(
@@ -182,9 +178,9 @@ fn swap_bar_view(
             label.push_str(&format!(
                 " · {} {} → {} {}",
                 t("mem.compression_original"),
-                taskmanager_shell::presentation::bytes(original),
+                bytes(original),
                 t("mem.compression_compressed"),
-                taskmanager_shell::presentation::bytes(compressed),
+                bytes(compressed),
             ));
         }
     }
@@ -228,7 +224,7 @@ fn swap_bar_view(
 /// Specialized memory compression and savings card for active ZRAM/OS memory compression.
 pub(crate) fn compression_card_view(
     memory: &MemoryMetrics,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Option<Element<'static, Message, iced::Theme, iced::Renderer>> {
     let observed = super::projection::MemoryObservation::from(memory);
     let comp_used = observed.compressed_memory_used_bytes;
@@ -240,18 +236,10 @@ pub(crate) fn compression_card_view(
 
     let mut parts: Vec<String> = Vec::new();
     if let Some(used) = comp_used {
-        parts.push(format!(
-            "{}: {}",
-            t("mem.compressed"),
-            taskmanager_shell::presentation::bytes(used)
-        ));
+        parts.push(format!("{}: {}", t("mem.compressed"), bytes(used)));
     }
     if let Some(swap) = swap_used {
-        parts.push(format!(
-            "{}: {}",
-            t("mem.zram_swap"),
-            taskmanager_shell::presentation::bytes(swap)
-        ));
+        parts.push(format!("{}: {}", t("mem.zram_swap"), bytes(swap)));
     }
     // The RAM the store consumes, metadata included (`mm_stat`
     // `mem_used_total`) — the cost line the swap-used view cannot show.
@@ -259,11 +247,7 @@ pub(crate) fn compression_card_view(
         .compressed_swap_memory_used_bytes
         .filter(|v| *v > 0)
     {
-        parts.push(format!(
-            "{}: {}",
-            t("mem.zram_ram_used"),
-            taskmanager_shell::presentation::bytes(ram)
-        ));
+        parts.push(format!("{}: {}", t("mem.zram_ram_used"), bytes(ram)));
     }
     if let (Some(original), Some(compressed), Some(ratio)) = (
         observed.compressed_swap_original_bytes,
@@ -274,9 +258,9 @@ pub(crate) fn compression_card_view(
             "{} {ratio:.1}:1 · {} {} → {} {}",
             t("mem.compression_ratio"),
             t("mem.compression_original"),
-            taskmanager_shell::presentation::bytes(original),
+            bytes(original),
             t("mem.compression_compressed"),
-            taskmanager_shell::presentation::bytes(compressed),
+            bytes(compressed),
         ));
     }
     if observed.compressed_swap_cache_enabled == Some(true) {

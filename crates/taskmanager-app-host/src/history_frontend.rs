@@ -8,6 +8,7 @@ use std::thread::JoinHandle;
 use super::{HistoryPersistenceWriter, HistoryReplayClient, NativeAppHost};
 
 use crate::worker_fault::catch_worker_panic;
+use taskmanager_application::ApplicationHistoryUnavailableReason;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoryFrontendStartErrorKind {
@@ -92,17 +93,13 @@ impl fmt::Display for HistoryFrontendConnectorStartError {
 
 impl std::error::Error for HistoryFrontendConnectorStartError {}
 
-impl From<HistoryFrontendConnectorStartError>
-    for taskmanager_application::ApplicationHistoryUnavailableReason
-{
+impl From<HistoryFrontendConnectorStartError> for ApplicationHistoryUnavailableReason {
     fn from(_: HistoryFrontendConnectorStartError) -> Self {
         Self::ConnectorStart
     }
 }
 
-impl From<HistoryFrontendConnectSubmitError>
-    for taskmanager_application::ApplicationHistoryUnavailableReason
-{
+impl From<HistoryFrontendConnectSubmitError> for ApplicationHistoryUnavailableReason {
     fn from(error: HistoryFrontendConnectSubmitError) -> Self {
         match error {
             HistoryFrontendConnectSubmitError::Busy => Self::ConnectorBusy,
@@ -112,9 +109,7 @@ impl From<HistoryFrontendConnectSubmitError>
     }
 }
 
-impl From<HistoryFrontendStartErrorKind>
-    for taskmanager_application::ApplicationHistoryUnavailableReason
-{
+impl From<HistoryFrontendStartErrorKind> for ApplicationHistoryUnavailableReason {
     fn from(error: HistoryFrontendStartErrorKind) -> Self {
         match error {
             HistoryFrontendStartErrorKind::PersistenceWriter => Self::PersistenceWriter,

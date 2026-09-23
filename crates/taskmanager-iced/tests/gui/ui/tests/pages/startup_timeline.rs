@@ -1,14 +1,20 @@
 use super::*;
+use taskmanager_application::KeyCode;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::startup::StartupCriticalChainNode;
+use taskmanager_core::core::startup::StartupEvidenceFailure;
+use taskmanager_shell::ShellKeyEvent;
+use taskmanager_theme::Theme;
 
 // ── BN-05 boot timeline ──────────────────────────────────────────────────────
 
 /// A measured critical chain: two timed units plus one untimed node.
-fn timeline_evidence() -> taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
+fn timeline_evidence() -> StartupBootEvidenceSnapshot {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::startup::StartupCriticalChainNode;
 
     let healthy = DeviceState::healthy(1_785_292_800_000);
-    taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
+    StartupBootEvidenceSnapshot {
         state: healthy,
         failed_units_state: healthy,
         critical_chain_state: healthy,
@@ -78,8 +84,7 @@ fn startup_timeline_stays_silent_without_evidence_or_on_typed_failure() {
     assert!(startup_timeline(None).is_none(), "no evidence yet: silent");
 
     let mut failing = timeline_evidence();
-    failing.critical_chain_failure =
-        Some(taskmanager_core::core::startup::StartupEvidenceFailure::MissingTool);
+    failing.critical_chain_failure = Some(StartupEvidenceFailure::MissingTool);
     assert!(
         startup_timeline(Some(&failing)).is_none(),
         "a typed failure must suppress the waterfall, never render stale bars"
@@ -103,12 +108,12 @@ fn startup_timeline_collapses_overflow_into_a_bounded_row() {
             }
         })
         .collect();
-    let evidence = taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
+    let evidence = StartupBootEvidenceSnapshot {
         state: healthy,
         failed_units_state: healthy,
         critical_chain_state: healthy,
         critical_chain: chain,
-        ..taskmanager_core::core::startup::StartupBootEvidenceSnapshot::default()
+        ..StartupBootEvidenceSnapshot::default()
     };
     let (_, rows) = startup_timeline(Some(&evidence)).expect("large chain projects");
     assert_eq!(
@@ -132,20 +137,14 @@ fn startup_page_keyboard_navigation_skips_the_timeline_block() {
     let _ = app.update(crate::app::Message::SelectPage(AppPage::Startup));
     assert_eq!(app.shell.selected, 0);
     let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Fixed(
-        taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::ArrowDown,
-            Modifiers::NONE,
-        ),
+        ShellKeyEvent::new(KeyCode::ArrowDown, Modifiers::NONE),
     )));
     assert_eq!(
         app.shell.selected, 1,
         "ArrowDown moves the table cursor; timeline rows are not focus targets"
     );
     let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Fixed(
-        taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::ArrowUp,
-            Modifiers::NONE,
-        ),
+        ShellKeyEvent::new(KeyCode::ArrowUp, Modifiers::NONE),
     )));
     assert_eq!(app.shell.selected, 0);
     let _view = view(&app);
@@ -173,7 +172,7 @@ fn format_impact_time_handles_ms_seconds_and_minutes_cleanly() {
 #[test]
 fn boot_timeline_block_handles_compact_and_standard_modes_cleanly() {
     use crate::ui::startup_table::boot_timeline_block;
-    let theme = taskmanager_theme::Theme::dark();
+    let theme = Theme::dark();
     let evidence = timeline_evidence();
 
     // Standard mode renders
@@ -186,13 +185,13 @@ fn boot_timeline_block_handles_compact_and_standard_modes_cleanly() {
 
     // Long unit names and untimed lists are handled cleanly in both modes
     let mut extreme_evidence = timeline_evidence();
-    extreme_evidence.critical_chain.push(
-        taskmanager_core::core::startup::StartupCriticalChainNode {
+    extreme_evidence
+        .critical_chain
+        .push(StartupCriticalChainNode {
             unit: "systemd-networkd-wait-online-extra-long-unit-name.service".into(),
             activated_at_ms: Some(3_000),
             duration_ms: Some(15_400),
-        },
-    );
+        });
     let standard_extreme = boot_timeline_block(&theme, Some(&extreme_evidence), false);
     assert!(standard_extreme.is_some());
     let compact_extreme = boot_timeline_block(&theme, Some(&extreme_evidence), true);

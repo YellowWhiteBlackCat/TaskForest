@@ -15,6 +15,7 @@ use super::{
     command_spawn_failure, io_failure, read_counter, read_link_speed, read_link_up, read_mtu,
     read_sysfs_inventory, read_tx_queue_len,
 };
+use taskmanager_core::ScalarAvailability;
 
 #[test]
 fn wireless_parser_preserves_unknown_zero_as_no_measurement() {
@@ -295,7 +296,7 @@ fn zero_link_speed_is_temporary_unavailability_not_a_real_capacity() {
 
     assert_eq!(
         observed.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
     assert_eq!(observed.current_value(), None);
     fs::remove_file(path).unwrap();
@@ -348,7 +349,7 @@ fn mtu_and_queue_parsers_keep_zero_queue_distinct_from_invalid_mtu() {
     fs::write(&mtu_path, "0\n").unwrap();
     assert_eq!(
         read_mtu(&mtu_path, 2_000).availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+        ScalarAvailability::Unavailable(FailureKind::ProviderFault)
     );
 
     fs::remove_file(mtu_path).unwrap();
@@ -378,7 +379,7 @@ fn network_error_counters_accept_measured_zero_and_reject_malformed_values() {
     fs::write(&path, "not-a-counter\n").unwrap();
     assert_eq!(
         read_counter(&path, 3_000).availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+        ScalarAvailability::Unavailable(FailureKind::ProviderFault)
     );
     fs::remove_file(path).unwrap();
 }

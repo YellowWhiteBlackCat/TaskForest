@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 
 #[test]
 fn disabled_frontend_history_is_inert_before_any_path_or_worker_lookup() {
@@ -62,7 +63,7 @@ fn fixture_host(
         config_path,
         history_root,
         local_time_cache: std::sync::Arc::new(crate::StartupLocalTimeCache::capture(
-            taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+            LocalTimeRulesObservation::unsupported(0),
         )),
         config_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         history_replay_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),

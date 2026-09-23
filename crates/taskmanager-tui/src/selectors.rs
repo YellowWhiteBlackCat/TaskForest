@@ -11,6 +11,10 @@ use taskmanager_platform_contract::CapabilityId;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use crate::TuiApp;
+use taskmanager_shell::presentation::gpu_engine_rows::{
+    GpuEngineRowsAction, present_gpu_engine_rows,
+};
+use taskmanager_shell::{ShellApp, gpu_chart_metric_gate};
 
 /// Frontend-local selector for the Performance page's resource detail model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -218,7 +222,7 @@ impl TuiApp {
                 FeedbackLifecycle::SHORT,
                 t("tui.status.scan_cancelling").replacen("{}", &root, 1),
             );
-            return Some(taskmanager_shell::ShellApp::request_directory_usage(
+            return Some(ShellApp::request_directory_usage(
                 DirectoryUsageRequest::Cancel(scan_id),
             ));
         }
@@ -242,7 +246,7 @@ impl TuiApp {
             FeedbackLifecycle::SHORT,
             t("tui.status.scan_started").replacen("{}", &root, 1),
         );
-        Some(taskmanager_shell::ShellApp::request_directory_usage(
+        Some(ShellApp::request_directory_usage(
             DirectoryUsageRequest::StartScan(spec),
         ))
     }
@@ -259,7 +263,7 @@ impl TuiApp {
             return None;
         }
         let device_id = self.gpu_engine_rows_device_id()?;
-        let action = taskmanager_shell::presentation::gpu_engine_rows::present_gpu_engine_rows(
+        let action = present_gpu_engine_rows(
             self.shell.gpu_engine_rows_state(),
             &device_id,
             self.projection()
@@ -267,7 +271,7 @@ impl TuiApp {
         )
         .action();
         match action {
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Disable => {
+            GpuEngineRowsAction::Disable => {
                 self.shell.close_gpu_engine_rows_request();
                 self.report_notice(
                     FeedbackSource::Control,
@@ -277,20 +281,18 @@ impl TuiApp {
                 );
                 None
             }
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Enable
-            | taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Reauthorize
-            | taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Recheck => {
+            GpuEngineRowsAction::Enable
+            | GpuEngineRowsAction::Reauthorize
+            | GpuEngineRowsAction::Recheck => {
                 self.report_notice(
                     FeedbackSource::Control,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::SHORT,
                     t("tui.status.gpu_engines_requested"),
                 );
-                Some(taskmanager_shell::ShellApp::request_gpu_engine_rows(
-                    device_id,
-                ))
+                Some(ShellApp::request_gpu_engine_rows(device_id))
             }
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::None => None,
+            GpuEngineRowsAction::None => None,
         }
     }
 
@@ -314,7 +316,7 @@ impl TuiApp {
         if self.page() != AppPage::Performance || self.perf_device != PerfDevice::Gpu {
             return;
         }
-        let gate = taskmanager_shell::gpu_chart_metric_gate(self.viewed_gpu());
+        let gate = gpu_chart_metric_gate(self.viewed_gpu());
         if self.shell.cycle_gpu_chart_metric(&gate) {
             let selected = self.shell.gpu_chart_metric_selected();
             self.report_notice(

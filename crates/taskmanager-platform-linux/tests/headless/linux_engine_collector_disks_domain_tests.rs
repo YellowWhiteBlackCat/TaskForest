@@ -7,6 +7,7 @@ use taskmanager_core::ScalarAvailability;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::source::SourceOutcome;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn diskstats(
     name: &str,
@@ -41,7 +42,7 @@ fn diskstats_rates_use_one_elapsed_interval_and_whole_device_counters() {
     )]);
     let current = diskstats("future0", 14, 104, 22, 208, 500, 500);
     let mut metrics = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .name("/dev/future0".into())
             .build(),
     ];
@@ -99,7 +100,7 @@ fn absent_diskstats_row_resets_baseline_and_is_typed_unavailable() {
         },
     )]);
     let mut metrics = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .name("/dev/future0".into())
             .build(),
     ];
@@ -141,7 +142,7 @@ fn zero_io_is_current_but_response_time_without_operations_is_unavailable() {
     )]);
     let current = diskstats("future0", 10, 100, 20, 200, 300, 300);
     let mut metrics = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .name("/dev/future0".into())
             .build(),
     ];
@@ -182,7 +183,7 @@ fn counter_rollback_is_identity_change_instead_of_zero_activity() {
     )]);
     let current = diskstats("future0", 1, 10, 2, 20, 30, 30);
     let mut metrics = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .name("/dev/future0".into())
             .build(),
     ];
@@ -250,7 +251,7 @@ fn same_kernel_slot_with_new_stable_identity_resets_rate_generation() {
         },
     )]);
     let metrics = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .name("/dev/sda".into())
             .device_id("disk:wwid:new".into())
             .build(),

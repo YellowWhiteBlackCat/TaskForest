@@ -1,26 +1,28 @@
 use std::collections::HashSet;
 use std::str;
 
+use taskmanager_assets::product::GPUI_APP_ID;
+use taskmanager_assets::product::GPUI_NAME;
+use taskmanager_assets::product::ICED_APP_ID;
+use taskmanager_assets::product::ICED_NAME;
+use taskmanager_assets::product::NAME;
+use taskmanager_assets::product::TAGLINE_EN;
+use taskmanager_assets::product::TAGLINE_ZH;
+use taskmanager_assets::product::ZH_NAME;
 use taskmanager_assets::{
     EMBEDDED_FONT_FAMILIES, TASKMANAGER_ICON_PATHS, all_asset_paths, asset_bytes, embedded_fonts,
 };
 
 #[test]
 fn product_identity_uses_the_task_forest_brand() {
-    assert_eq!(taskmanager_assets::product::NAME, "TaskForest");
-    assert_eq!(taskmanager_assets::product::ZH_NAME, "任务森林");
-    assert_eq!(taskmanager_assets::product::GPUI_NAME, "TaskForestG");
-    assert_eq!(taskmanager_assets::product::ICED_NAME, "TaskForestI");
-    assert_eq!(
-        taskmanager_assets::product::GPUI_APP_ID,
-        "io.github.YellowWhiteBlackCat.TaskForestG"
-    );
-    assert_eq!(
-        taskmanager_assets::product::ICED_APP_ID,
-        "io.github.YellowWhiteBlackCat.TaskForestI"
-    );
-    assert!(taskmanager_assets::product::TAGLINE_EN.contains("system monitor"));
-    assert!(taskmanager_assets::product::TAGLINE_ZH.contains("护眼"));
+    assert_eq!(NAME, "TaskForest");
+    assert_eq!(ZH_NAME, "任务森林");
+    assert_eq!(GPUI_NAME, "TaskForestG");
+    assert_eq!(ICED_NAME, "TaskForestI");
+    assert_eq!(GPUI_APP_ID, "io.github.YellowWhiteBlackCat.TaskForestG");
+    assert_eq!(ICED_APP_ID, "io.github.YellowWhiteBlackCat.TaskForestI");
+    assert!(TAGLINE_EN.contains("system monitor"));
+    assert!(TAGLINE_ZH.contains("护眼"));
 }
 
 #[test]

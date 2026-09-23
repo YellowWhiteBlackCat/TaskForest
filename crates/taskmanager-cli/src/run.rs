@@ -15,6 +15,7 @@ use std::path::Path;
 use taskmanager_app_host::NativeAppHost;
 
 use crate::cli::{self, CliCapabilities, CliMode};
+use taskmanager_application::ConfigStore;
 
 /// Window-capture handler: write the product's own capture evidence into
 /// `out` (Windows GPUI product only).
@@ -181,9 +182,7 @@ pub fn run(binary_name: &'static str, handlers: FrontendHandlers) {
                     std::process::exit(1);
                 }
             };
-            let config = taskmanager_application::ConfigStore::new(host.config_path())
-                .load()
-                .ok();
+            let config = ConfigStore::new(host.config_path()).load().ok();
             if let Err(error) =
                 cli::run_export_diagnostic_bundle_with(&mut client, &path, config.as_ref())
             {

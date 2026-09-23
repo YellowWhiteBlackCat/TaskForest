@@ -19,6 +19,7 @@ use crate::app::alerts::{AlertRuleRowModel, active_alert_lines, empty_state_text
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 /// Column widths for the rule list (layout contracts, not theme tokens).
@@ -27,10 +28,7 @@ const SEVERITY_CELL_WIDTH: f32 = 80.0;
 const THRESHOLD_CELL_WIDTH: f32 = 90.0;
 const TOGGLE_CELL_WIDTH: f32 = 150.0;
 
-fn severity_color(
-    severity: AlertSeverity,
-    theme_snapshot: &taskmanager_theme::Theme,
-) -> iced::Color {
+fn severity_color(severity: AlertSeverity, theme_snapshot: &Theme) -> iced::Color {
     let palette = theme_snapshot.palette();
     match severity {
         AlertSeverity::Critical => crate::theme_binding::color(palette.danger),
@@ -112,7 +110,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
 fn active_section<'a>(
     app: &crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     let lines = active_alert_lines(app);
@@ -148,7 +146,7 @@ fn active_section<'a>(
 
 fn rules_section<'a>(
     app: &crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     let rows = rule_rows(app);
@@ -201,7 +199,7 @@ fn rules_section<'a>(
 }
 
 fn rule_row<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     index: usize,
     row_model: AlertRuleRowModel,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {

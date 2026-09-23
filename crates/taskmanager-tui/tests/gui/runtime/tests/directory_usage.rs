@@ -7,11 +7,14 @@
 
 use super::super::*;
 
+use taskmanager_application::PlatformClient;
 use taskmanager_application::{AppAction, AppPage, DirectoryUsageRequest};
 use taskmanager_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
     DirectoryUsageSnapshot,
 };
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::queue_effect;
 
 /// Helper: place the app on the Performance page's Disk device.
 fn on_disk_device(app: &mut crate::TuiApp) {
@@ -28,10 +31,7 @@ fn d_on_disk_device_yields_directory_usage_start_scan_for_first_mount_point() {
     let mut app = crate::demo_app();
     on_disk_device(&mut app);
     // No active scan → the toggle must request a StartScan.
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::DirectoryUsage(None));
 
     let effect = handle_key(
         &mut app,
@@ -66,17 +66,15 @@ fn d_while_scanning_yields_directory_usage_cancel_for_the_active_scan_id() {
     on_disk_device(&mut app);
     // Seed an active Scanning snapshot with a known scan id in the shared slot.
     let scan_id = DirectoryScanId::new(42);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(Some(
-            DirectoryUsageSnapshot {
-                scan_id,
-                root: "/".into(),
-                status: DirectoryScanStatus::Scanning,
-                entries: Vec::new(),
-                totals: DirectoryScanTotals::fresh(10),
-            },
-        )),
+        ProjectionSeedFact::DirectoryUsage(Some(DirectoryUsageSnapshot {
+            scan_id,
+            root: "/".into(),
+            status: DirectoryScanStatus::Scanning,
+            entries: Vec::new(),
+            totals: DirectoryScanTotals::fresh(10),
+        })),
     );
 
     let effect = handle_key(
@@ -159,7 +157,7 @@ fn directory_scan_round_trips_through_queue_effect_to_the_provider() {
     }
 
     let recorded = Arc::new(RecordingDirectoryUsage::default());
-    let mut client = taskmanager_application::PlatformClient::new(PlatformHandle::new(
+    let mut client = PlatformClient::new(PlatformHandle::new(
         Arc::new(EmptyCapabilities),
         Arc::new(EmptyEvents),
         PlatformFacets::default()
@@ -168,10 +166,7 @@ fn directory_scan_round_trips_through_queue_effect_to_the_provider() {
 
     let mut app = crate::demo_app();
     on_disk_device(&mut app);
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::DirectoryUsage(None));
 
     // The key yields the typed effect; the runtime queues it — exactly what
     // the live loop does with every handle_key result.
@@ -183,7 +178,7 @@ fn directory_scan_round_trips_through_queue_effect_to_the_provider() {
         ),
     )
     .expect("StartScan effect yielded");
-    taskmanager_shell::queue_effect(&mut app.shell, &mut client, effect);
+    queue_effect(&mut app.shell, &mut client, effect);
 
     let submitted = recorded
         .0

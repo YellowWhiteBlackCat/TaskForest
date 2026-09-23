@@ -4,6 +4,11 @@
 use super::super::*;
 
 use taskmanager_application::AppAction;
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
+    StartupImpactUnknownReason, StartupScope, StartupSource,
+};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]
 fn enter_on_startup_opens_the_enable_disable_menu_and_esc_closes_it() {
@@ -221,9 +226,9 @@ fn boot_timeline_typed_failure_leaves_the_page_keyboard_contract_intact() {
     evidence.critical_chain_state = healthy;
     evidence.failed_units_state = healthy;
     evidence.state = healthy;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(evidence)),
+        ProjectionSeedFact::StartupBootEvidence(Some(evidence)),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
 
@@ -242,19 +247,19 @@ fn boot_timeline_typed_failure_leaves_the_page_keyboard_contract_intact() {
 
 /// One synthetic startup row: the provider-issued id is derived from the
 /// entry locator so the sorted-vs-provider order assertions are unambiguous.
-fn sorted_fixture_entry(id: &str, name: &str) -> taskmanager_core::core::startup::StartupEntry {
-    taskmanager_core::core::startup::StartupEntry {
+fn sorted_fixture_entry(id: &str, name: &str) -> StartupEntry {
+    StartupEntry {
         id: id.into(),
         name: name.into(),
         exec: "fixture-exec".into(),
         enabled: true,
-        source: taskmanager_core::core::startup::StartupSource::UserService,
-        scope: taskmanager_core::core::startup::StartupScope::User,
-        control_policy: taskmanager_core::core::startup::StartupControlPolicy::Direct,
+        source: StartupSource::UserService,
+        scope: StartupScope::User,
+        control_policy: StartupControlPolicy::Direct,
         locator: id.into(),
-        impact: taskmanager_core::core::startup::StartupImpact::Low,
-        impact_evidence: taskmanager_core::core::startup::StartupImpactEvidence::Unknown {
-            reason: taskmanager_core::core::startup::StartupImpactUnknownReason::NotInstrumented,
+        impact: StartupImpact::Low,
+        impact_evidence: StartupImpactEvidence::Unknown {
+            reason: StartupImpactUnknownReason::NotInstrumented,
         },
     }
 }
@@ -266,9 +271,9 @@ fn sorted_fixture_entry(id: &str, name: &str) -> taskmanager_core::core::startup
 fn menu_targets_the_sorted_startup_row() {
     let mut app = TuiApp::from_shell(ShellApp::new());
     // Provider order [Beta, Alpha]; the Name sort renders [Alpha, Beta].
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupEntries(Some(vec![
+        ProjectionSeedFact::StartupEntries(Some(vec![
             sorted_fixture_entry("user-service:beta.service", "Beta"),
             sorted_fixture_entry("desktop:alpha.desktop", "Alpha"),
         ])),

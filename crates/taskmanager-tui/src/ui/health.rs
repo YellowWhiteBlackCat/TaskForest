@@ -37,6 +37,7 @@ pub(crate) mod health_support;
 use crate::TuiTheme;
 use crate::ui::alerts::{alert_event_line, managed_rule_line};
 use crate::ui::{DeviceHealth, classify_device_state};
+use taskmanager_core::core::device_state::DeviceState;
 
 /// Render the health overlay centred over `area`.
 pub(super) fn render_health_overlay_at(
@@ -256,7 +257,7 @@ fn provider_line(
         // firewall, so re-wrap the provider's typed status into a public
         // `DeviceState`; the application layer's neutral VM owns the
         // status→kind fold — this view only maps kind→tone and token.
-        let runtime = taskmanager_core::core::device_state::DeviceState {
+        let runtime = DeviceState {
             status: provider.status,
             last_success_ms: provider.last_success_ms,
         };

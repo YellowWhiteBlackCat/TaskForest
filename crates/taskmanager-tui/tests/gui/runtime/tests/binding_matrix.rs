@@ -19,6 +19,8 @@ use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectScope};
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::{FeedbackSource, shell_local_bindings};
 
 fn press_char(app: &mut crate::TuiApp, character: char) -> Option<PlatformEffect> {
     handle_key(
@@ -82,7 +84,7 @@ fn registry_shortcuts_are_unique_and_disjoint_from_the_shell_layer() {
         );
         seen.push(command.binding.shortcut);
         assert!(
-            !taskmanager_shell::shell_local_bindings()
+            !shell_local_bindings()
                 .iter()
                 .any(|binding| binding.shortcut == command.binding.shortcut),
             "chord {:?} is declared by BOTH the shell layer and the TUI registry",
@@ -180,7 +182,7 @@ fn x_reports_the_snapshot_export_feedback() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     app.shell.clear_feedback_notice();
     let effect = press_char(&mut app, 'x');
@@ -191,7 +193,7 @@ fn x_reports_the_snapshot_export_feedback() {
     let feedback = app.feedback_notice().expect("export feedback");
     assert_eq!(
         feedback.source(),
-        taskmanager_shell::FeedbackSource::Persistence,
+        FeedbackSource::Persistence,
         "the declared x chord must reach the export path"
     );
 }
@@ -201,7 +203,7 @@ fn capital_x_reports_the_diagnostic_report_export_feedback() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     app.shell.clear_feedback_notice();
     let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
@@ -219,7 +221,7 @@ fn capital_x_reports_the_diagnostic_report_export_feedback() {
     let feedback = app.feedback_notice().expect("export feedback");
     assert_eq!(
         feedback.source(),
-        taskmanager_shell::FeedbackSource::Persistence,
+        FeedbackSource::Persistence,
         "the declared X chord must reach the diagnostic export path"
     );
 
@@ -404,7 +406,7 @@ fn y_copies_the_selected_row_through_the_declared_chord() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = app_on_processes();
     let pid = app.selected_detail_process().expect("a selected row").pid;
     let effect = press_char(&mut app, 'y');
@@ -551,7 +553,7 @@ fn palette_and_help_carry_every_registry_row_with_declared_executability() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let palette = crate::TuiApp::palette_rows();
     let help = crate::ui::help::help_rows();
     for command in TUI_LOCAL_COMMANDS {

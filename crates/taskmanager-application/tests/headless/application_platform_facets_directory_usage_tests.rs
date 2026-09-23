@@ -4,6 +4,8 @@ use taskmanager_platform_contract::{
 };
 
 use super::*;
+use taskmanager_core::DirectoryScanStatus;
+use taskmanager_core::DirectoryScanTotals;
 
 #[test]
 fn directory_usage_request_owns_the_filesystem_directory_usage_capability() {
@@ -50,9 +52,9 @@ fn update_events_only_accept_the_directory_usage_capability() {
     let update = DirectoryUsageEvent::Update(DirectoryUsageSnapshot {
         scan_id: DirectoryScanId::new(1),
         root: "/data".to_string(),
-        status: taskmanager_core::DirectoryScanStatus::Scanning,
+        status: DirectoryScanStatus::Scanning,
         entries: Vec::new(),
-        totals: taskmanager_core::DirectoryScanTotals::fresh(10),
+        totals: DirectoryScanTotals::fresh(10),
     });
     assert!(update.accepts_capability(&CapabilityId::DIRECTORY_USAGE));
     assert!(!update.accepts_capability(&CapabilityId::STORAGE_HEALTH));

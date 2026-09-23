@@ -15,6 +15,8 @@ use taskmanager_application::i18n::{Language, set_language};
 
 use crate::render;
 use crate::{TuiApp, TuiTheme};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::{ProjectionSeedFact, edit_processes, seed_projection_fact};
 
 /// Render the live frame through the same TestBackend path the render tests
 /// use, pinning English + serializing against the language-flipping i18n test.
@@ -86,7 +88,7 @@ fn overview_renders_observed_page_fault_counters() {
     // The demo rows carry no page-fault counters, so this test writes the two
     // typed `ProcessItem` counters the Linux provider fills from
     // `/proc/<pid>/stat` (minflt/majflt) before the modal freezes its target.
-    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+    edit_processes(&mut app.shell, |processes| {
         let process = processes
             .as_mut()
             .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
@@ -146,7 +148,7 @@ fn overview_renders_observed_page_fault_counters() {
 fn trigger_does_nothing_when_no_process_is_selected() {
     // A fresh shell has no processes at all; on the Applications page Enter must
     // not open the modal (honest no-op, never a fabricated empty target).
-    let mut app = TuiApp::from_shell(taskmanager_shell::ShellApp::new());
+    let mut app = TuiApp::from_shell(ShellApp::new());
     app.application.active_page = AppPage::Applications;
     assert!(app.visible_processes().is_empty());
     let _ = handle_key(
@@ -337,11 +339,9 @@ fn insights_tab_renders_thread_list_when_projection_is_present() {
         },
     }));
     let _ = tracker.apply(&event);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ProcessInsights(Box::new(
-            tracker.snapshot(),
-        )),
+        ProjectionSeedFact::ProcessInsights(Box::new(tracker.snapshot())),
     );
 
     // Open the modal and advance to the Insights tab.
@@ -535,11 +535,9 @@ fn seed_requires_escalation_network(app: &mut TuiApp) -> u32 {
         ProcessInsightFacet::Network,
         ProcessInsightUnavailable::Provider(FailureKind::RequiresEscalation),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ProcessInsights(Box::new(
-            tracker.snapshot(),
-        )),
+        ProjectionSeedFact::ProcessInsights(Box::new(tracker.snapshot())),
     );
     target.pid
 }
@@ -638,11 +636,9 @@ fn e_without_the_requires_escalation_facet_produces_no_effect() {
         ProcessInsightFacet::Network,
         ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ProcessInsights(Box::new(
-            tracker.snapshot(),
-        )),
+        ProjectionSeedFact::ProcessInsights(Box::new(tracker.snapshot())),
     );
     let effect = handle_key(
         &mut app,

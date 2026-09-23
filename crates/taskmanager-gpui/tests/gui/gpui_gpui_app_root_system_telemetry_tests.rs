@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use taskmanager_application::apply_system_outcome_lifecycle;
 
 use std::rc::Rc;
 
@@ -67,7 +68,7 @@ fn apply_system_domain_lifecycle(
     diagnostics: &mut DeviceLifecycleDiagnosticHistory,
     correlated: &CorrelatedSystemTelemetryOutcome,
 ) {
-    taskmanager_application::apply_system_outcome_lifecycle(projection, diagnostics, correlated);
+    apply_system_outcome_lifecycle(projection, diagnostics, correlated);
 }
 
 fn host(observed_at_ms: u64) -> HostRuntimeObservation {

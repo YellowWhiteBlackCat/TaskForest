@@ -32,6 +32,7 @@ use crate::input::PendingEffects;
 use crate::palette::{UiPalette, no_wrap_text, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use taskmanager_application::ProcessAffinityRequest;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AffinitySession {
@@ -301,9 +302,11 @@ pub(crate) fn on_affinity_requested(
     let target = request.event().0.clone();
     let cpu_count = request.event().1;
     state.open(target.clone(), cpu_count);
-    pending.0.push(PlatformEffect::ProcessAffinity(
-        taskmanager_application::ProcessAffinityRequest { target },
-    ));
+    pending
+        .0
+        .push(PlatformEffect::ProcessAffinity(ProcessAffinityRequest {
+            target,
+        }));
     commands.trigger(ProcessAffinityRepaintRequired);
 }
 

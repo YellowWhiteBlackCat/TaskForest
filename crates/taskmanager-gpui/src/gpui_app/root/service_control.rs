@@ -25,6 +25,9 @@ use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::RootView;
 use taskmanager_theme::tokens;
@@ -269,18 +272,12 @@ pub(super) fn render_service_control_confirmation_dialog(
         .w(px(420.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_14,
-        ))
+        .gap(definite_length(tokens::SPACE_14))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_size(font_size(tokens::FONT_13))
                 .line_height(relative(1.45))
-                .text_color(taskmanager_ui::theme_binding::hsla(if is_high_risk {
-                    theme.danger
-                } else {
-                    theme.fg
-                }))
+                .text_color(hsla(if is_high_risk { theme.danger } else { theme.fg }))
                 .child(message),
         )
         .child(
@@ -288,9 +285,7 @@ pub(super) fn render_service_control_confirmation_dialog(
                 .flex()
                 .flex_row()
                 .justify_end()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(elements::pill(
                     theme,
                     "service-control-cancel",

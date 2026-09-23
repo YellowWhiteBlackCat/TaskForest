@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::DeviceStatus;
 use taskmanager_core::ThreadState;
 
 fn stat(token: u64) -> String {
@@ -57,10 +58,7 @@ fn network_collector_preserves_success_and_resets_state_on_pid_reuse() {
     let stale = collector
         .collect_from_root(&root, 42, 2_000)
         .expect("collect stale network facet");
-    assert_eq!(
-        stale.value.state.status,
-        taskmanager_core::DeviceStatus::Stale
-    );
+    assert_eq!(stale.value.state.status, DeviceStatus::Stale);
     assert_eq!(stale.value.state.last_success_ms, Some(1_000));
 
     std::fs::write(proc_dir.join("stat"), stat(200)).expect("replace process identity");
@@ -113,10 +111,7 @@ fn network_collector_prunes_exited_pid_state_but_keeps_live_targets() {
     let kept = collector
         .collect_from_root(&root, 42, 2_000)
         .expect("collect live target facet");
-    assert_eq!(
-        kept.value.state.status,
-        taskmanager_core::DeviceStatus::Stale
-    );
+    assert_eq!(kept.value.state.status, DeviceStatus::Stale);
     assert_eq!(
         kept.value.state.last_success_ms,
         Some(1_000),
@@ -125,10 +120,7 @@ fn network_collector_prunes_exited_pid_state_but_keeps_live_targets() {
     let pruned = collector
         .collect_from_root(&root, 43, 2_000)
         .expect("collect exited target facet");
-    assert_eq!(
-        pruned.value.state.status,
-        taskmanager_core::DeviceStatus::Stale
-    );
+    assert_eq!(pruned.value.state.status, DeviceStatus::Stale);
     assert_eq!(
         pruned.value.state.last_success_ms, None,
         "an exited pid's collector state is dropped and re-seeds from scratch"

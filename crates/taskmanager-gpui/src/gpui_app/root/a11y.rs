@@ -12,8 +12,12 @@
 //! adapter's `update_if_active` is a no-op until an assistive technology
 //! subscribes, so this is free when no screen reader is running.
 
+use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::units::bytes_percent;
+use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::{
     AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, GraphSummary,
     ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot, SemanticSnapshotBuilder,
@@ -35,7 +39,7 @@ fn process_confirmation_copy(
 ) -> Option<(String, u32, String, &'static str)> {
     match pending? {
         PendingConfirmation::EndTask(target) => Some((
-            taskmanager_application::i18n::t("proc.end_task").to_owned(),
+            t("proc.end_task").to_owned(),
             target.pid,
             target.name.clone(),
             "end-task-confirmation",
@@ -120,10 +124,9 @@ pub(crate) fn apply_accessibility_action(
     request.validate_against(snapshot)?;
 
     if let Some(identity) = view.processes().iter().find_map(|process| {
-        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
-            == request.node.as_str())
-        .then(|| ProcessLiveKey::from_process(process))
-        .flatten()
+        (format!("row:{}", process_semantic_key(process)) == request.node.as_str())
+            .then(|| ProcessLiveKey::from_process(process))
+            .flatten()
     }) {
         match request.action {
             SemanticAction::Focus | SemanticAction::Select => {
@@ -153,10 +156,7 @@ pub(crate) fn apply_accessibility_action(
 /// Assemble the canonical snapshot from view state. Returns `None` only if the
 /// builder rejects the inputs (it never does for the values produced here, but
 /// the failure is surfaced honestly rather than panicked).
-fn build_snapshot(
-    view: &RootView,
-    revision: u64,
-) -> Option<taskmanager_ui_contract::SemanticSnapshot> {
+fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
     let cpu_current = view
         .system_snapshot()
         .cpu
@@ -191,16 +191,15 @@ fn build_snapshot(
     // (`total_cmp` places an unmeasured/NaN sample deterministically, and the
     // direction-independent pid tie-break keeps equal readings stable across
     // refresh ticks), never a local float compare.
-    let mut rows: Vec<&taskmanager_core::core::process::ProcessItem> =
-        view.processes().iter().collect();
+    let mut rows: Vec<&ProcessItem> = view.processes().iter().collect();
     rows.sort_by(|left, right| compare_processes(left, right, ProcessSortAxis::Cpu, false));
     for item in rows.iter().take(MAX_PUBLISHED_ROWS) {
         let memory_percent = memory_total.and_then(|total| {
             item.current_memory_bytes()
-                .and_then(|value| taskmanager_core::core::units::bytes_percent(value, total))
+                .and_then(|value| bytes_percent(value, total))
         });
         builder = builder.process_row(ProcessRowInput {
-            id: taskmanager_shell::process_semantic_key(item),
+            id: process_semantic_key(item),
             name: item.name.clone(),
             cpu_percent: item
                 .current_cpu_percentage()

@@ -89,9 +89,7 @@ fn shell_with(items: Vec<ProcessItem>) -> ShellApp {
 /// against the wrong row space.
 fn applications_shell(items: Vec<ProcessItem>) -> ShellApp {
     let mut shell = shell_with(items);
-    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     shell
 }
 
@@ -344,10 +342,7 @@ fn a_query_that_matches_nothing_empties_the_visible_set() {
 
 #[test]
 fn sort_projection_maps_the_shell_sort_onto_contract_tokens() {
-    let cpu_desc = sort_projection((
-        taskmanager_shell::SortCol::Cpu,
-        taskmanager_shell::SortDir::Desc,
-    ));
+    let cpu_desc = sort_projection((SortCol::Cpu, SortDir::Desc));
     assert_eq!(
         cpu_desc,
         Some(crate::widgets::table::SortProjection {
@@ -355,10 +350,7 @@ fn sort_projection_maps_the_shell_sort_onto_contract_tokens() {
             descending: true,
         })
     );
-    let name_asc = sort_projection((
-        taskmanager_shell::SortCol::Name,
-        taskmanager_shell::SortDir::Asc,
-    ));
+    let name_asc = sort_projection((SortCol::Name, SortDir::Asc));
     assert_eq!(
         name_asc,
         Some(crate::widgets::table::SortProjection {
@@ -367,10 +359,7 @@ fn sort_projection_maps_the_shell_sort_onto_contract_tokens() {
         })
     );
     assert_eq!(
-        sort_projection((
-            taskmanager_shell::SortCol::Pss,
-            taskmanager_shell::SortDir::Asc
-        )),
+        sort_projection((SortCol::Pss, SortDir::Asc)),
         Some(crate::widgets::table::SortProjection {
             column: "MemoryPss",
             descending: false,
@@ -443,7 +432,7 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
         .world_mut()
         .query::<&crate::icons::IconPlate>()
         .iter(app.world())
-        .filter(|plate| plate.0 == taskmanager_ui_contract::IconId::NavigateDown)
+        .filter(|plate| plate.0 == IconId::NavigateDown)
         .count();
     assert!(
         down_plates >= 1,
@@ -777,7 +766,7 @@ fn the_search_input_displays_the_shell_query() {
     // capped by SEARCH_QUERY_MAX there), and the input submodule keeps the
     // node in step on every shell mutation.
     let mut shell = shell_with(vec![process(10, "alpha")]);
-    let _ = shell.apply_action(taskmanager_application::AppAction::FocusSearch);
+    let _ = shell.apply_action(AppAction::FocusSearch);
     shell.push_search_char('a');
     shell.push_search_char('l');
     let mut app = headless_page_app(ui_palette(&Theme::dark()), shell);
@@ -836,8 +825,13 @@ fn wheel_scrolls_map_to_signed_rows_by_unit() {
 }
 
 // ---- multi-select batch tests ----
+use taskmanager_application::AppAction;
+use taskmanager_application::AppPage;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_shell::SortCol;
+use taskmanager_shell::SortDir;
+use taskmanager_ui_contract::IconId;
 
 fn test_proc(pid: u32, name: &str) -> ProcessItem {
     let mut p = ProcessItem::new(pid, name);
@@ -857,9 +851,7 @@ fn multi_select_processes_arms_batch_confirmation_gate() {
     fixture::edit_processes(&mut shell, |shelved| {
         *shelved = Some(vec![p1, p2, p3]);
     });
-    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
 
     // Mark row 0 and toggle row 1
     assert!(shell.select_row(0));

@@ -12,6 +12,7 @@
 //! so the requirement holds by construction.
 
 use std::sync::mpsc::channel;
+use taskmanager_application::TelemetryRefreshPolicyChange;
 
 use gpui::{AnyWindowHandle, App, Entity};
 use taskmanager_app_host::spawn_tray;
@@ -170,7 +171,7 @@ fn toggle_pause_from_tray(view: &mut RootView) {
     let paused = view.telemetry_refresh_policy.is_manually_paused();
     let next = !paused;
     view.telemetry_refresh_policy
-        .apply(taskmanager_application::TelemetryRefreshPolicyChange::SetPaused(next));
+        .apply(TelemetryRefreshPolicyChange::SetPaused(next));
     sync_tray_pause_checkmark(view, next);
 }
 

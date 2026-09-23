@@ -1,4 +1,5 @@
 use super::{CursorRefreshState, should_schedule_cursor_refresh, ui_font_with_fallback};
+use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
 
 #[test]
@@ -139,7 +140,7 @@ async fn desktop_widget_surface_paints_metric_cards_from_the_snapshot(cx: &mut T
             global_usage_pct: ScalarObservation::available(42.5, 10),
             ..CpuScalarObservations::default()
         });
-        snap.memory = taskmanager_core::core::metrics::MemoryMetrics::from_observations(
+        snap.memory = MemoryMetrics::from_observations(
             MemoryScalarObservations {
                 total_bytes: ScalarObservation::available(gib(16), 10),
                 used_bytes: ScalarObservation::available(gib(6), 10),

@@ -1,6 +1,8 @@
 //! Deterministic fixtures and English-only copy for capture/headless wiring.
 
+use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
+use taskmanager_core::core::storage_health::FilesystemBackingKind;
 use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorDescriptor,
@@ -25,7 +27,7 @@ pub fn capture_fixture() -> SystemHealthCaptureFixture {
             mount_point: mount.into(),
             source: Some(source.into()),
             fs_type: fs_type.into(),
-            backing_kind: taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
+            backing_kind: FilesystemBackingKind::Unknown,
             read_only,
             error_count: errors,
             inode_used: None,
@@ -146,14 +148,8 @@ pub fn capture_fixture() -> SystemHealthCaptureFixture {
             disk.smart_state = DeviceState::healthy(now);
             disk.smart_temperature_c = Some(39.0);
             disk.apply_scalar_observations(DiskScalarObservations {
-                capacity_bytes: taskmanager_core::core::ScalarObservation::available(
-                    2_000_000_000_000,
-                    now,
-                ),
-                available_bytes: taskmanager_core::core::ScalarObservation::available(
-                    625_000_000_000,
-                    now,
-                ),
+                capacity_bytes: ScalarObservation::available(2_000_000_000_000, now),
+                available_bytes: ScalarObservation::available(625_000_000_000, now),
                 ..Default::default()
             });
             disk
@@ -194,9 +190,9 @@ pub fn capture_english_text(text: SystemHealthText) -> String {
         SystemHealthText::Progress => "Progress",
         SystemHealthText::LifetimeHours => "Lifetime hours",
         SystemHealthText::FirstErrorLba => "First error LBA",
-        SystemHealthText::SensorGroup(SensorGroup::Temperature) => "Temperature",
+        SystemHealthText::SensorGroup(SensorGroup::Temperature) => "Thermal zones",
         SystemHealthText::SensorGroup(SensorGroup::FanSpeed) => "Fans",
-        SystemHealthText::SensorGroup(SensorGroup::Power) => "Power",
+        SystemHealthText::SensorGroup(SensorGroup::Power) => "Power sensors",
         SystemHealthText::DeviceStatus(DeviceStatus::Healthy) => "Healthy",
         SystemHealthText::DeviceStatus(DeviceStatus::Stale) => "Stale",
         SystemHealthText::DeviceStatus(DeviceStatus::PermissionDenied) => "Permission denied",

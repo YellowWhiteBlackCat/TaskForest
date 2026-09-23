@@ -5,20 +5,26 @@ use taskmanager_application::PlatformClient;
 use taskmanager_application::{FocusDirection, KeyCode, Modifiers};
 use taskmanager_core::core::process::ProcessLiveKey;
 
+use taskmanager_application::AppPage;
+use taskmanager_application::PlatformEvent;
+use taskmanager_application::SessionInventoryRequest;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_platform_contract::RequestEnvelope;
+use taskmanager_platform_contract::RequestPort;
+use taskmanager_platform_contract::SubmissionError;
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ShellKeyEvent;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[derive(Default)]
-struct RecordingSessionInventory(
-    std::sync::Mutex<Vec<taskmanager_application::SessionInventoryRequest>>,
-);
+struct RecordingSessionInventory(std::sync::Mutex<Vec<SessionInventoryRequest>>);
 
-impl taskmanager_platform_contract::RequestPort for RecordingSessionInventory {
-    type Request = taskmanager_application::SessionInventoryRequest;
+impl RequestPort for RecordingSessionInventory {
+    type Request = SessionInventoryRequest;
 
-    fn try_submit(
-        &self,
-        request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), taskmanager_platform_contract::SubmissionError> {
+    fn try_submit(&self, request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         self.0
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -46,7 +52,7 @@ fn session_refresh_client(port: std::sync::Arc<RecordingSessionInventory>) -> Pl
     #[derive(Default)]
     struct EmptyEvents;
     impl EventPort for EmptyEvents {
-        type Event = taskmanager_application::PlatformEvent;
+        type Event = PlatformEvent;
 
         fn try_recv(&self) -> Result<Option<EventEnvelope<Self::Event>>, EventPortError> {
             Ok(None)
@@ -90,10 +96,7 @@ fn refresh_source_message_reaches_the_independent_session_lane() {
         .0
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    assert_eq!(
-        requests.as_slice(),
-        &[taskmanager_application::SessionInventoryRequest::Refresh]
-    );
+    assert_eq!(requests.as_slice(), &[SessionInventoryRequest::Refresh]);
 }
 
 #[test]
@@ -172,9 +175,7 @@ fn activate_tree_node_toggles_subtree_and_selects_parent() {
     // select_row validates against the active page's row count; switch to
     // Applications so the process table is the active surface (the demo fixture
     // carries 12 processes).
-    let _ = app.update(Message::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = app.update(Message::SelectPage(AppPage::Applications));
     let tree_identity = ProcessLiveKey::from_parts(1234, 12341).expect("fixture process identity");
     assert!(
         !app.process_presentation
@@ -214,9 +215,7 @@ fn request_process_batch_routes_through_the_shared_shell_batch_path() {
     // The action bar's Suspend/Resume verbs route through
     // ShellApp::request_process_batch; demo mode has no platform client, so the
     // produced ExecuteBatch effect is honestly suppressed rather than executed.
-    let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_core::core::process::ProcessBatchAction::Suspend,
-    ));
+    let _ = app.update(Message::RequestProcessBatch(ProcessBatchAction::Suspend));
     assert!(
         app.shell.feedback_text().contains("Demo mode"),
         "process batch must route through the shared shell method: {}",
@@ -233,7 +232,7 @@ fn application_aggregate_selection_stays_pidless() {
     let root_row_key = app.shell.visible_processes()[0]
         .current_start_token()
         .and_then(|token| ProcessLiveKey::from_parts(root_pid, token))
-        .map(taskmanager_shell::ProcessRowId::Application);
+        .map(ProcessRowId::Application);
     let _ = app.update(Message::ToggleGroupExpansion {
         name: format!(
             "app-tree:{}",
@@ -255,9 +254,7 @@ fn kill_gates_behind_confirmation_and_confirm_emits_the_batch() {
     let mut app = IcedApp::demo();
     // Kill is destructive: requesting it gates behind a confirmation (no effect
     // yet) and sets the pending batch intent.
-    let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_core::core::process::ProcessBatchAction::Kill,
-    ));
+    let _ = app.update(Message::RequestProcessBatch(ProcessBatchAction::Kill));
     assert!(
         app.shell.pending_batch().is_some(),
         "Kill must gate behind pending_batch"
@@ -274,9 +271,7 @@ fn kill_gates_behind_confirmation_and_confirm_emits_the_batch() {
         app.shell.feedback_text()
     );
     // Dismiss cancels a pending Kill without submitting.
-    let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_core::core::process::ProcessBatchAction::Kill,
-    ));
+    let _ = app.update(Message::RequestProcessBatch(ProcessBatchAction::Kill));
     assert!(app.shell.pending_batch().is_some());
     let _ = app.update(Message::DismissOverlay);
     assert!(
@@ -336,7 +331,7 @@ fn opening_the_containers_modal_requests_and_renders_a_rollup() {
 
     // The rollup answer arrives as a platform event batch; the shell fold is
     // the same one the live tick drives.
-    let rollup = taskmanager_core::core::process_telemetry::ContainerRollup::empty_healthy(1_000);
+    let rollup = ContainerRollup::empty_healthy(1_000);
     let mut batch = PlatformEventBatch::default();
     batch.containers_events.push(CorrelatedEvent::new(
         PlatformEventContext {
@@ -587,10 +582,7 @@ fn sort_by_matches_the_keyboard_chord_outcome() {
 
     let mut keyed = IcedApp::demo();
     keyed.shell.process_sort = (SortCol::Cpu, SortDir::Desc);
-    let _ = keyed.update(Message::Key(IcedKey::Character(
-        'S',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _ = keyed.update(Message::Key(IcedKey::Character('S', Modifiers::NONE)));
 
     assert_eq!(clicked.shell.process_sort, keyed.shell.process_sort);
     assert_eq!(clicked.shell.feedback_text(), keyed.shell.feedback_text());
@@ -644,10 +636,7 @@ fn pending_end_tab_messages_update_the_renderer_focus_scope() {
     let _ = app.update(Message::RequestEndTask);
     assert_eq!(app.input.focused_control, Some(FocusTarget::ConfirmEndTask));
 
-    let tab = taskmanager_shell::ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Tab,
-        taskmanager_application::Modifiers::NONE,
-    );
+    let tab = ShellKeyEvent::new(KeyCode::Tab, Modifiers::NONE);
     let _ = app.update(Message::Key(IcedKey::Fixed(tab)));
     assert_eq!(app.input.focused_control, Some(FocusTarget::CancelEndTask));
 }
@@ -662,10 +651,7 @@ fn arrow_selection_keeps_renderer_focus_on_each_typed_table() {
     ] {
         let mut app = IcedApp::demo();
         app.shell.application.active_page = page;
-        let arrow_down = taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::ArrowDown,
-            taskmanager_application::Modifiers::NONE,
-        );
+        let arrow_down = ShellKeyEvent::new(KeyCode::ArrowDown, Modifiers::NONE);
 
         let _ = app.update(Message::Key(IcedKey::Fixed(arrow_down)));
 
@@ -691,10 +677,7 @@ fn arrow_selection_keeps_renderer_focus_on_each_typed_table() {
 fn page_down_keeps_applications_focus_bound_to_the_new_selection() {
     let mut app = IcedApp::demo();
     app.shell.application.active_page = AppPage::Applications;
-    let page_down = taskmanager_shell::ShellKeyEvent::new(
-        taskmanager_application::KeyCode::PageDown,
-        taskmanager_application::Modifiers::NONE,
-    );
+    let page_down = ShellKeyEvent::new(KeyCode::PageDown, Modifiers::NONE);
 
     let _ = app.update(Message::Key(IcedKey::Fixed(page_down)));
 
@@ -714,19 +697,16 @@ fn selection_keys_do_not_steal_focus_from_the_search_field_or_empty_table() {
     let mut searching = IcedApp::demo();
     searching.shell.application.active_page = AppPage::Applications;
     searching.shell.open_search();
-    let arrow_down = taskmanager_shell::ShellKeyEvent::new(
-        taskmanager_application::KeyCode::ArrowDown,
-        taskmanager_application::Modifiers::NONE,
-    );
+    let arrow_down = ShellKeyEvent::new(KeyCode::ArrowDown, Modifiers::NONE);
     let _ = searching.update(Message::Key(IcedKey::Fixed(arrow_down)));
     assert_eq!(searching.shell.selected, 0);
     assert_eq!(searching.input.focused_control, None);
 
     let mut empty = IcedApp::demo();
     empty.shell.application.active_page = AppPage::Services;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut empty.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(Vec::new())),
+        ProjectionSeedFact::Services(Some(Vec::new())),
     );
     let _ = empty.update(Message::Key(IcedKey::Fixed(arrow_down)));
     assert_eq!(empty.shell.selected, 0);

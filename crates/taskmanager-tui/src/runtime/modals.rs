@@ -27,6 +27,8 @@ use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurfaceKind};
 
 use super::handle_settings_key;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_shell::ShellApp;
 
 /// Route one key through the open TUI-local modals, highest-precedence first.
 /// `Unhandled` means no modal was open. Every full modal consumes every key;
@@ -85,7 +87,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                     }) =>
             {
                 return InputDispatch::Effect(Box::new(
-                    taskmanager_shell::ShellApp::request_process_network_escalation(),
+                    ShellApp::request_process_network_escalation(),
                 ));
             }
             ratatui::crossterm::event::KeyCode::Esc => {
@@ -161,11 +163,9 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 ratatui::crossterm::event::KeyCode::Enter => app.process_menu_select(),
                 ratatui::crossterm::event::KeyCode::Char('a' | 'A') => {
-                    let target = app.process_menu_mut().and_then(|m| {
-                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
-                            &m.item,
-                        )
-                    });
+                    let target = app
+                        .process_menu_mut()
+                        .and_then(|m| FrozenProcessIdentity::from_process(&m.item));
                     match target {
                         Some(target) => app.open_process_affinity_for(target),
                         None => app.open_process_affinity(),

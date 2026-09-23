@@ -30,6 +30,9 @@ use crate::ui::chart_cursor::chart_cursor_system;
 use crate::{FocusPanel, PerfDevice, TuiApp, TuiInputScope};
 
 use super::{HELP_PAGE_STEP, inline_network_escalation_ready, key_to_terminal, modals, navigation};
+use taskmanager_application::SurfaceKind;
+use taskmanager_core::core::history::HistoryWindow;
+use taskmanager_shell::ShellApp;
 
 type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
@@ -79,13 +82,9 @@ fn owned_input_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
     }
 }
 
-fn route_shared_surface(
-    app: &mut TuiApp,
-    kind: taskmanager_application::SurfaceKind,
-    key: &KeyEvent,
-) -> InputDispatch {
+fn route_shared_surface(app: &mut TuiApp, kind: SurfaceKind, key: &KeyEvent) -> InputDispatch {
     match kind {
-        taskmanager_application::SurfaceKind::Confirmation(_) => match key.code {
+        SurfaceKind::Confirmation(_) => match key.code {
             KeyCode::Char(character) => app.handle_local_char(character, modifiers(key)),
             KeyCode::Esc => {
                 app.shell.dismiss_overlay();
@@ -93,7 +92,7 @@ fn route_shared_surface(
             }
             _ => InputDispatch::Consumed,
         },
-        taskmanager_application::SurfaceKind::ProcessProperties => {
+        SurfaceKind::ProcessProperties => {
             if key.code == KeyCode::Esc {
                 app.shell.dismiss_overlay();
             }
@@ -190,9 +189,9 @@ fn app_history_window_system(
         return InputDispatch::Unhandled;
     }
     let window = match character {
-        '1' => taskmanager_core::core::history::HistoryWindow::OneHour,
-        '2' => taskmanager_core::core::history::HistoryWindow::TwentyFourHours,
-        '3' => taskmanager_core::core::history::HistoryWindow::SevenDays,
+        '1' => HistoryWindow::OneHour,
+        '2' => HistoryWindow::TwentyFourHours,
+        '3' => HistoryWindow::SevenDays,
         _ => return InputDispatch::Unhandled,
     };
     let _ = app.select_application_history_window(window);
@@ -452,9 +451,9 @@ fn execute_tui_local_direct(
             app.export_service_log();
             InputDispatch::Consumed
         }
-        TuiDirectAction::RequestNetworkEscalation => InputDispatch::Effect(Box::new(
-            taskmanager_shell::ShellApp::request_process_network_escalation(),
-        )),
+        TuiDirectAction::RequestNetworkEscalation => {
+            InputDispatch::Effect(Box::new(ShellApp::request_process_network_escalation()))
+        }
         TuiDirectAction::ToggleGpuEngineRows => {
             InputDispatch::consumed(app.toggle_gpu_engine_rows())
         }

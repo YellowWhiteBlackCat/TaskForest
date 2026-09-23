@@ -28,6 +28,7 @@ use taskmanager_shell::ShellApp;
 
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskmanager_core::core::power::PowerSupplySnapshot;
 
 /// Render the per-battery detail section into `area`. A zero-height area (the
 /// small-terminal case where no panel was allocated) renders nothing. A `None`
@@ -40,7 +41,7 @@ pub(super) fn render_battery_section(
     app: &TuiApp,
     theme: TuiTheme,
     area: Rect,
-    power_supplies: Option<&taskmanager_core::core::power::PowerSupplySnapshot>,
+    power_supplies: Option<&PowerSupplySnapshot>,
 ) {
     if area.height == 0 {
         return;

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 
 #[test]
 fn classifies_indexed_axis_and_named_channels_without_vendor_tables() {
@@ -181,8 +182,7 @@ fn fake_iio_tree_collects_scaled_known_and_opaque_raw_channels() {
     assert_eq!(snapshot.state.status, DeviceStatus::Healthy);
     assert_eq!(snapshot.readings.len(), 5);
     assert!(snapshot.readings.iter().all(|reading| {
-        reading.measurement_observation().availability()
-            != taskmanager_core::ScalarAvailability::Unknown
+        reading.measurement_observation().availability() != ScalarAvailability::Unknown
     }));
     let temperature = snapshot
         .readings
@@ -219,7 +219,7 @@ fn fake_iio_tree_collects_scaled_known_and_opaque_raw_channels() {
         .expect("current channel");
     assert_eq!(
         current.measurement_observation().availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
     assert!(matches!(
         source.enrichments[0].outcome,

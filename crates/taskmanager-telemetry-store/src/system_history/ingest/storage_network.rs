@@ -16,6 +16,7 @@ use super::super::{
 use super::{
     CorrelatedSystemTelemetryIngestor, NETWORK_RATE_PERSISTED, STORAGE_ACTIVITY_PERSISTED, finite,
 };
+use taskmanager_core::NetworkAdapterType;
 
 impl CorrelatedSystemTelemetryIngestor {
     pub fn ingest_correlated_storage(
@@ -261,9 +262,7 @@ impl CorrelatedSystemTelemetryIngestor {
                     }
                     metrics
                         .iter()
-                        .filter(|network| {
-                            network.adapter_type() != taskmanager_core::NetworkAdapterType::Loopback
-                        })
+                        .filter(|network| network.adapter_type() != NetworkAdapterType::Loopback)
                         .try_fold(0_u64, |total, network| {
                             total
                                 .checked_add(

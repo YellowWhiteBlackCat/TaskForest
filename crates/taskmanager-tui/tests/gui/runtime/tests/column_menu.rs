@@ -13,6 +13,8 @@ use taskmanager_application::AppPage;
 
 use crate::TuiTheme;
 use crate::render;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::SortCol;
 
 /// Render the live frame through the same TestBackend path the render tests
 /// use.
@@ -20,7 +22,7 @@ fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -88,11 +90,8 @@ fn column_menu_toggle_hides_and_reshows_a_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(
-        app.hidden_columns
-            .contains(&taskmanager_shell::SortCol::Cpu)
-    );
-    assert!(!app.column_visible(taskmanager_shell::SortCol::Cpu));
+    assert!(app.hidden_columns.contains(&SortCol::Cpu));
+    assert!(!app.column_visible(SortCol::Cpu));
 
     // Enter again on the same row re-shows it.
     let _ = handle_key(
@@ -102,7 +101,7 @@ fn column_menu_toggle_hides_and_reshows_a_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(app.column_visible(taskmanager_shell::SortCol::Cpu));
+    assert!(app.column_visible(SortCol::Cpu));
 }
 
 #[test]
@@ -123,14 +122,11 @@ fn hiding_the_active_sort_column_relocates_the_sort_to_a_visible_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(
-        app.hidden_columns
-            .contains(&taskmanager_shell::SortCol::Cpu)
-    );
+    assert!(app.hidden_columns.contains(&SortCol::Cpu));
     // The sort must have moved to the first visible column (Memory).
     assert_eq!(
         app.effective_sort_col(),
-        taskmanager_shell::SortCol::Memory,
+        SortCol::Memory,
         "the sort must relocate to the first visible column"
     );
 }
@@ -140,9 +136,8 @@ fn hidden_columns_disappear_from_the_header_and_rows() {
     let mut app = app_on_processes();
     // Hide CPU + DiskRead: the header must lose both labels and the rows must
     // stay aligned (the memory readout still renders, the disk columns do not).
-    app.hidden_columns.insert(taskmanager_shell::SortCol::Cpu);
-    app.hidden_columns
-        .insert(taskmanager_shell::SortCol::DiskRead);
+    app.hidden_columns.insert(SortCol::Cpu);
+    app.hidden_columns.insert(SortCol::DiskRead);
     let text = frame_text(&app, 140, 40);
     assert!(
         !text.contains("CPU%"),
@@ -169,7 +164,7 @@ fn sort_cycle_walks_only_the_visible_columns() {
     // Default sort is CPU; the visible cycle is PID → Name → CPU → Memory →
     // PSS → Swap → User → State (advanced columns hidden). One `s` from CPU
     // lands on Memory.
-    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Cpu);
+    assert_eq!(app.effective_sort_col(), SortCol::Cpu);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -177,11 +172,10 @@ fn sort_cycle_walks_only_the_visible_columns() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Memory);
+    assert_eq!(app.effective_sort_col(), SortCol::Memory);
 
     // Hide Memory: `s` now skips it (CPU → PSS).
-    app.hidden_columns
-        .insert(taskmanager_shell::SortCol::Memory);
+    app.hidden_columns.insert(SortCol::Memory);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -189,7 +183,7 @@ fn sort_cycle_walks_only_the_visible_columns() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Pss);
+    assert_eq!(app.effective_sort_col(), SortCol::Pss);
 }
 
 /// Paint the frame through the backend buffer so a character index in a line
@@ -199,7 +193,7 @@ fn painted_lines(app: &crate::TuiApp, width: u16, height: u16) -> Vec<String> {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -271,10 +265,7 @@ fn moving_the_selected_column_left_reorders_the_painted_table() {
     }
     assert_eq!(
         &app.column_order[..2],
-        &[
-            taskmanager_shell::SortCol::State,
-            taskmanager_shell::SortCol::Memory,
-        ],
+        &[SortCol::State, SortCol::Memory,],
         "State must swap left past Memory"
     );
 
@@ -284,11 +275,7 @@ fn moving_the_selected_column_left_reorders_the_painted_table() {
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Left, KeyModifiers::NONE),
     );
-    assert_eq!(
-        app.column_order[0],
-        taskmanager_shell::SortCol::State,
-        "the left edge clamps"
-    );
+    assert_eq!(app.column_order[0], SortCol::State, "the left edge clamps");
     for _ in 0..13 {
         let _ = handle_key(
             &mut app,
@@ -306,7 +293,7 @@ fn moving_the_selected_column_left_reorders_the_painted_table() {
     }
     assert_eq!(
         app.column_order.last().copied(),
-        Some(taskmanager_shell::SortCol::Network),
+        Some(SortCol::Network),
         "the right edge clamps"
     );
 

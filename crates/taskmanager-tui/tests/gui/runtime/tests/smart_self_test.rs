@@ -10,18 +10,21 @@ use super::super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AppAction, AppPage, SmartSelfTestState};
+use taskmanager_application::{AppAction, AppPage, SmartControlRequest, SmartSelfTestState};
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
 
 use crate::{TuiApp, TuiTheme, render};
+use taskmanager_application::{PendingConfirmation, PlatformClient};
+use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::queue_effect;
 
 /// Seed: the stock demo disk reports the `Unavailable` default, so flip it to
 /// `Available` — the readiness GPUI's health view demands before it enables
 /// its self-test actions. The fixture rides the shell's typed snapshot seam,
 /// never a hand-rolled store write.
 fn seed_smart_capable_disk(app: &mut TuiApp) {
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         for disk in &mut snapshot.disks {
             disk.smart_availability = SmartAvailability::Available;
@@ -75,8 +78,7 @@ fn t_on_a_smart_capable_disk_arms_the_shared_confirmation_with_the_frozen_identi
         effect.is_none(),
         "arming opens only the shared gate, no platform work"
     );
-    let Some(taskmanager_application::PendingConfirmation::SmartSelfTest(intent)) =
-        app.pending_confirmation().cloned()
+    let Some(PendingConfirmation::SmartSelfTest(intent)) = app.pending_confirmation().cloned()
     else {
         panic!("the declared t chord must arm the SMART self-test gate");
     };
@@ -180,9 +182,7 @@ fn y_confirms_the_displayed_intent_into_the_typed_smart_effect() {
     assert!(app.pending_confirmation().is_some(), "precondition: armed");
 
     let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Char('y'));
-    let Some(PlatformEffect::SmartControl(
-        taskmanager_application::SmartControlRequest::StartSelfTest(intent),
-    )) = effect
+    let Some(PlatformEffect::SmartControl(SmartControlRequest::StartSelfTest(intent))) = effect
     else {
         panic!("confirm must emit the typed SmartControl effect, got {effect:?}");
     };
@@ -228,9 +228,7 @@ fn while_armed_the_gate_owns_the_keyboard() {
     assert!(
         matches!(
             app.pending_confirmation(),
-            Some(taskmanager_application::PendingConfirmation::SmartSelfTest(
-                _
-            ))
+            Some(PendingConfirmation::SmartSelfTest(_))
         ),
         "the gate swallows non-gate characters"
     );
@@ -290,7 +288,7 @@ fn confirm_round_trips_through_queue_effect_into_the_smart_control_session() {
     }
 
     let recorded = Arc::new(RecordingSmartControl::default());
-    let mut client = taskmanager_application::PlatformClient::new(PlatformHandle::new(
+    let mut client = PlatformClient::new(PlatformHandle::new(
         Arc::new(EmptyCapabilities),
         Arc::new(EmptyEvents),
         PlatformFacets::default()
@@ -302,7 +300,7 @@ fn confirm_round_trips_through_queue_effect_into_the_smart_control_session() {
         .expect("confirm yields the typed effect");
 
     // The runtime queues every key effect through the shared seam.
-    taskmanager_shell::queue_effect(&mut app.shell, &mut client, effect);
+    queue_effect(&mut app.shell, &mut client, effect);
 
     let submitted = recorded
         .0
@@ -353,8 +351,6 @@ fn palette_runs_the_same_smart_arm_under_the_same_scope() {
     disk.run_palette_local_action(Some(PaletteLocalAction::RequestSmartSelfTest));
     assert!(matches!(
         disk.pending_confirmation(),
-        Some(taskmanager_application::PendingConfirmation::SmartSelfTest(
-            _
-        ))
+        Some(PendingConfirmation::SmartSelfTest(_))
     ));
 }

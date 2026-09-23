@@ -26,6 +26,7 @@ mod services;
 mod storage;
 
 pub(super) use registry::fake_registry;
+use taskmanager_core::ProcessSignal;
 
 #[derive(Clone, Default)]
 pub(super) struct FakeProvider {
@@ -34,7 +35,7 @@ pub(super) struct FakeProvider {
     pub(super) service_error: Option<ProviderFailure>,
     pub(super) service_operation_error: Option<ProviderFailure>,
     pub(super) ended: Arc<Mutex<Vec<FrozenProcessIdentity>>>,
-    pub(super) signaled: Arc<Mutex<Vec<(u32, taskmanager_core::ProcessSignal)>>>,
+    pub(super) signaled: Arc<Mutex<Vec<(u32, ProcessSignal)>>>,
     pub(super) revealed: Arc<Mutex<Vec<FrozenProcessIdentity>>>,
     pub(super) startup_controls: Arc<Mutex<Vec<(String, bool)>>>,
     pub(super) startup_evidence_times: Arc<Mutex<Vec<u64>>>,

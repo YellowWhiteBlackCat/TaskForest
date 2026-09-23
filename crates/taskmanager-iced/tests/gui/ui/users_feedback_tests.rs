@@ -6,11 +6,15 @@ use taskmanager_application::{
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_theme::Theme;
 
 /// Push one session-control outcome through the PUBLIC batch path (the
 /// same way a real platform client delivers it) and return the shell.
-fn shell_with_feedback(ok: bool) -> (ShellApp, taskmanager_theme::Theme) {
-    let mut shell = taskmanager_shell::demo_app();
+fn shell_with_feedback(ok: bool) -> (ShellApp, Theme) {
+    let mut shell = demo_app();
     shell.selected = 0;
     let effect = shell
         .request_session_control(SessionControlAction::Disconnect)
@@ -39,13 +43,13 @@ fn shell_with_feedback(ok: bool) -> (ShellApp, taskmanager_theme::Theme) {
         }),
     ));
     shell.apply_platform_batch(batch);
-    (shell, taskmanager_theme::Theme::dark())
+    (shell, Theme::dark())
 }
 
 #[test]
 fn session_feedback_line_renders_success_and_failure_typed_copy() {
-    let shell = taskmanager_shell::demo_app();
-    let theme = taskmanager_theme::Theme::dark();
+    let shell = demo_app();
+    let theme = Theme::dark();
     assert!(
         session_feedback_line(&theme, &shell).is_none(),
         "no outcome yet: the bar shows the selection hint, not feedback"
@@ -91,17 +95,12 @@ fn empty_sessions_from_a_failed_source_report_the_typed_reason() {
     use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(Vec::new())),
-    );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("loginctl"),
-            outcome: SourceOutcome::Unavailable(
-                taskmanager_core::core::failure::FailureKind::MissingDependency,
-            ),
+            outcome: SourceOutcome::Unavailable(FailureKind::MissingDependency),
             item_count: 0,
         }])),
     );
@@ -113,9 +112,7 @@ fn empty_sessions_from_a_failed_source_report_the_typed_reason() {
                 .as_deref()
                 .unwrap_or_default()
         ),
-        Some(SourceNotice::Unavailable(
-            taskmanager_core::core::failure::FailureKind::MissingDependency,
-        ))
+        Some(SourceNotice::Unavailable(FailureKind::MissingDependency,))
     );
     // The panel renders the honest reason, not "No sessions", and keeps
     // the non-retryable capability-change guidance instead of a dead
@@ -135,13 +132,10 @@ fn empty_sessions_from_an_available_source_stay_a_genuine_empty_state() {
     use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(Vec::new())),
-    );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("loginctl"),
             outcome: SourceOutcome::Empty,
             item_count: 0,
@@ -165,17 +159,12 @@ fn retryable_source_state_exposes_a_page_scoped_refresh_surface() {
     use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(Vec::new())),
-    );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("loginctl"),
-            outcome: SourceOutcome::Unavailable(
-                taskmanager_core::core::failure::FailureKind::TimedOut,
-            ),
+            outcome: SourceOutcome::Unavailable(FailureKind::TimedOut),
             item_count: 0,
         }])),
     );

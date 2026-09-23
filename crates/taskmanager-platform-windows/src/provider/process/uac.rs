@@ -35,6 +35,10 @@ use taskmanager_escalation::uac::{
 };
 #[cfg(any(windows, test))]
 use taskmanager_windows_api::RunasLaunchOutcome;
+#[cfg(windows)]
+use taskmanager_windows_api::interactive_session_available;
+#[cfg(windows)]
+use taskmanager_windows_api::run_elevated_and_wait;
 
 /// The packaged helper binary name (the crate's `[[bin]]` name on Windows).
 #[cfg(windows)]
@@ -179,21 +183,15 @@ impl UacForeignProcessControlTransport for RunasUacTransport {
         // A UAC consent needs an interactive session; Session 0 (services)
         // cannot show one, and a failed session query is equally
         // unattributable — neither is a user refusal.
-        if !matches!(
-            taskmanager_windows_api::interactive_session_available(),
-            Ok(true)
-        ) {
+        if !matches!(interactive_session_available(), Ok(true)) {
             return UacCrossingObservation::ConsentUnavailable;
         }
         let Some(channel) = create_reply_channel() else {
             return UacCrossingObservation::ReplyChannelUnavailable;
         };
         let parameters = runas_command_line(target, operation, &channel);
-        let launch = taskmanager_windows_api::run_elevated_and_wait(
-            &self.helper.to_string_lossy(),
-            &parameters,
-            RUNAS_DEADLINE,
-        );
+        let launch =
+            run_elevated_and_wait(&self.helper.to_string_lossy(), &parameters, RUNAS_DEADLINE);
         let observation = map_runas_launch(launch, || read_reply_bounded(&channel));
         // The channel is one-shot: remove it regardless of outcome so no
         // stale reply can ever survive a crossing.

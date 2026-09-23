@@ -17,8 +17,12 @@ use taskmanager_cli::{FrontendHandlers, run};
 /// the CLI surface stays uniform across products (the iced window identity
 /// comes from the crate's own composition edge).
 fn run_gui(app_id: Option<String>, demo: bool) {
+    // The iced product's `run` shares its name with the CLI harness `run`
+    // imported above; the block-scoped import shadows it for this function only.
+    use taskmanager_iced::run;
+
     let _ = app_id;
-    if let Err(error) = taskmanager_iced::run(demo) {
+    if let Err(error) = run(demo) {
         eprintln!("taskforest-i: {error}");
         std::process::exit(1);
     }

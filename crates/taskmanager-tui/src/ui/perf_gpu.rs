@@ -22,6 +22,13 @@ use taskmanager_shell::presentation::{bytes, gpu_display_identity};
 use taskmanager_ui_contract::IconId;
 
 use crate::{TuiApp, TuiTheme};
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::gpu_chart_metric_gate;
+use taskmanager_shell::presentation::gpu_engine_rows::{
+    GpuEngineRowsPresentation, present_gpu_engine_rows,
+};
+use taskmanager_shell::presentation::{MISSING_VALUE, megahertz, power_w, temperature_c};
 
 const MIN_STANDARD_GRAPH_HEIGHT: u16 = 10;
 const MAX_ENGINE_VIEWPORT_HEIGHT: u16 = 8;
@@ -176,12 +183,12 @@ pub(super) fn render_gpu_section(
 
     let compact_facts = gpu_fact_lines_with_theme(gpus, theme, GpuFactDensity::Compact);
     let full_facts = gpu_fact_lines_with_theme(gpus, theme, GpuFactDensity::Full);
-    let engine_rows = taskmanager_core::core::identity::DeviceId::new(gpus[0].device_id.clone());
-    let engine_rows = taskmanager_shell::presentation::gpu_engine_rows::present_gpu_engine_rows(
+    let engine_rows = DeviceId::new(gpus[0].device_id.clone());
+    let engine_rows = present_gpu_engine_rows(
         app.shell.gpu_engine_rows_state(),
         &engine_rows,
         app.projection()
-            .capability_status(&taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES),
+            .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
     );
     let engine_lines = gpu_engine_lines(gpus, app, theme, app.prefs.graph_points, engine_rows);
     let layout = GpuPanelLayout::resolve(
@@ -204,7 +211,7 @@ pub(super) fn render_gpu_section(
     // same frame the `g` cycle or a generation reset changes it.
     let metric = app
         .shell
-        .gpu_chart_metric_projection(&taskmanager_shell::gpu_chart_metric_gate(gpus.first()))
+        .gpu_chart_metric_projection(&gpu_chart_metric_gate(gpus.first()))
         .selected;
     render_gpu_metric_chart(frame, gpus, app, theme, layout.graph(), metric);
     if let Some(engine_area) = layout.engines() {
@@ -226,9 +233,7 @@ fn gpu_fact_lines_with_theme(
     let mut lines = Vec::with_capacity(gpus.len().saturating_mul(10));
     for gpu in gpus {
         let data = super::perf_data::gpu_data(gpu);
-        let identity = gpu_display_identity(gpu)
-            .headline
-            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE);
+        let identity = gpu_display_identity(gpu).headline.unwrap_or(MISSING_VALUE);
         match density {
             GpuFactDensity::Compact => {
                 lines.push(Line::from(format!(
@@ -238,10 +243,7 @@ fn gpu_fact_lines_with_theme(
                     t("common.utilization"),
                     data.utilization,
                 )));
-                let power = data
-                    .power
-                    .as_deref()
-                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE);
+                let power = data.power.as_deref().unwrap_or(MISSING_VALUE);
                 lines.push(Line::from(format!(
                     "  {} · {} · {} {} · {} {}",
                     data.temperature,
@@ -313,10 +315,7 @@ fn gpu_fact_lines_with_theme(
                         )));
                     }
                 }
-                let power = data
-                    .power
-                    .as_deref()
-                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE);
+                let power = data.power.as_deref().unwrap_or(MISSING_VALUE);
                 lines.push(Line::from(format!(
                     "  {} {} · {} {} · {} {} · {} {}",
                     t("common.clock"),
@@ -332,26 +331,18 @@ fn gpu_fact_lines_with_theme(
                     lines.push(Line::from(format!(
                         "  {} {} · {} {}",
                         t("fan.rpm"),
-                        data.fan_rpm
-                            .as_deref()
-                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        data.fan_rpm.as_deref().unwrap_or(MISSING_VALUE),
                         t("fan.pwm"),
-                        data.fan_pwm
-                            .as_deref()
-                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        data.fan_pwm.as_deref().unwrap_or(MISSING_VALUE),
                     )));
                 }
                 if data.memory_bus_width.is_some() || data.power_limit.is_some() {
                     lines.push(Line::from(format!(
                         "  {} {} · {} {}",
                         t("gpu.memory_bus_width"),
-                        data.memory_bus_width
-                            .as_deref()
-                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        data.memory_bus_width.as_deref().unwrap_or(MISSING_VALUE),
                         t("gpu.power_limit"),
-                        data.power_limit
-                            .as_deref()
-                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        data.power_limit.as_deref().unwrap_or(MISSING_VALUE),
                     )));
                 }
                 if let Some(bandwidth) = gpu
@@ -431,7 +422,7 @@ fn gpu_engine_lines(
     shell: &ShellApp,
     theme: TuiTheme,
     graph_window: usize,
-    engine_rows: taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation<'_>,
+    engine_rows: GpuEngineRowsPresentation<'_>,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     for (index, gpu) in gpus.iter().enumerate() {
@@ -453,7 +444,7 @@ fn gpu_engine_lines(
         }
         if index == 0 {
             match &engine_rows {
-                taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::Active(engines) => {
+                GpuEngineRowsPresentation::Active(engines) => {
                     if engines.is_empty() {
                         lines.push(Line::from(t("gpu.engines_none_reported")));
                     }
@@ -470,10 +461,7 @@ fn gpu_engine_lines(
                     if let Some(key) = presentation.message_key() {
                         lines.push(Line::from(t(key)));
                     }
-                    if matches!(
-                        presentation,
-                        taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::MissingDependency
-                    ) {
+                    if matches!(presentation, GpuEngineRowsPresentation::MissingDependency) {
                         lines.push(Line::from(t("gpu.engines_install_hint")));
                     }
                 }
@@ -591,14 +579,12 @@ fn gpu_metric_y_axis(unit: GpuChartMetricUnit, windows: &[Vec<f32>]) -> Axis<'st
         .fold(0.0_f64, |peak, value| peak.max(f64::from(value)));
     let upper = if peak > 0.0 { peak * 1.1 } else { 1.0 };
     let format = |value: f64| match unit {
-        GpuChartMetricUnit::Watts => taskmanager_shell::presentation::power_w(upper_scale(value)),
-        GpuChartMetricUnit::Celsius => {
-            taskmanager_shell::presentation::temperature_c(upper_scale(value))
-        }
+        GpuChartMetricUnit::Watts => power_w(upper_scale(value)),
+        GpuChartMetricUnit::Celsius => temperature_c(upper_scale(value)),
         // The axis constructor is only reached for non-percent units; the
         // percent arm above caught `Percent`.
         GpuChartMetricUnit::Megahertz | GpuChartMetricUnit::Percent => {
-            taskmanager_shell::presentation::megahertz(upper_scale(value))
+            megahertz(upper_scale(value))
         }
     };
     Axis::default().bounds([0.0, upper]).labels([

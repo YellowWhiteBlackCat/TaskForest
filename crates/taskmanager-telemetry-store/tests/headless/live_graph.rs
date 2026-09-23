@@ -15,6 +15,8 @@ use super::{
     ChartSeriesError, ChartSeriesQuery, DeviceDomain, LiveGraphHistory, MetricSeries, SeriesScope,
 };
 use crate::{CorrelatedTelemetryStamp, TelemetryStore};
+use taskmanager_core::DiskScalarObservations;
+use taskmanager_core::GpuEngine;
 
 fn stamp_at(revision: u64, completed_at_ms: u64) -> CorrelatedTelemetryStamp {
     CorrelatedTelemetryStamp::from_accepted_event(revision, completed_at_ms)
@@ -55,7 +57,7 @@ fn disk(
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(generation))
         .device_state(DeviceState::healthy(10))
-        .scalar_observations(taskmanager_core::DiskScalarObservations {
+        .scalar_observations(DiskScalarObservations {
             active_time_pct: activity
                 .map(|value| ScalarObservation::available(value, 10))
                 .unwrap_or_default(),
@@ -566,7 +568,7 @@ fn gpu_device_legs_share_one_generation_discipline() {
     let device_id = "gpu:leak-probe";
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
     let mut probe = gpu(device_id, 1, Some(55.0));
-    probe.engines = vec![taskmanager_core::GpuEngine {
+    probe.engines = vec![GpuEngine {
         name: "Graphics".to_owned(),
         usage_pct: 62.0,
         ..Default::default()

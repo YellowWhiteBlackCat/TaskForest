@@ -19,6 +19,7 @@ use taskmanager_platform_contract::{
 
 use super::*;
 use crate::app::FocusTarget;
+use taskmanager_shell::QuitReason;
 
 fn info() -> SetupScriptInfo {
     SetupScriptInfo {
@@ -230,10 +231,7 @@ fn action_completion_follows_platform_semantics_and_restart_quits() {
         SetupScriptAction::Restart,
     )]);
     assert!(app.shell.should_quit());
-    assert_eq!(
-        app.shell.quit_reason(),
-        Some(taskmanager_shell::QuitReason::Restart)
-    );
+    assert_eq!(app.shell.quit_reason(), Some(QuitReason::Restart));
 }
 
 #[test]

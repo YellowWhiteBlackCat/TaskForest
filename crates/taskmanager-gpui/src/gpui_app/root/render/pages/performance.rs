@@ -4,8 +4,12 @@
 //! navigation for the active width class, from the frame-local render context.
 
 use gpui::{Context, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use taskmanager_application::i18n;
+use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageFrame;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::{PageRenderContext, RootView, SelectedDevice};
 use crate::gpui_app::root::{cpu_view, elements, perf_views, responsive, sidebar};
@@ -85,32 +89,30 @@ impl RootView {
                         units: self.display_units(),
                         package_power: cpu_view::PackagePowerInputs {
                             state: self.shell.rapl_power_state(),
-                            capability: self.projection().capability_status(
-                                &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
-                            ),
+                            capability: self
+                                .projection()
+                                .capability_status(&CapabilityId::TELEMETRY_CPU_PACKAGE_POWER),
                         },
                         msr_readouts: cpu_view::MsrReadoutsInputs {
                             state: self.shell.msr_readout_state(),
-                            capability: self.projection().capability_status(
-                                &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,
-                            ),
+                            capability: self
+                                .projection()
+                                .capability_status(&CapabilityId::TELEMETRY_CPU_MSR),
                         },
                         details_scroll: &self.cpu_details_scroll,
                     },
                     &mut self.cpu_core_history,
                 ),
-                SelectedDevice::Memory => {
-                    perf_views::render_memory(perf_views::MemoryViewProps {
-                        theme: t,
-                        snap,
-                        telemetry,
-                        performance,
-                        hover_slot: &self.graph_hover,
-                        graph_cache: graph_cache.clone(),
-                        memory_history: &mut self.memory_history,
-                        budget: performance_layout,
-                    })
-                }
+                SelectedDevice::Memory => perf_views::render_memory(perf_views::MemoryViewProps {
+                    theme: t,
+                    snap,
+                    telemetry,
+                    performance,
+                    hover_slot: &self.graph_hover,
+                    graph_cache: graph_cache.clone(),
+                    memory_history: &mut self.memory_history,
+                    budget: performance_layout,
+                }),
                 SelectedDevice::Disk(i) => perf_views::render_disk(
                     perf_views::DiskViewProps {
                         theme: t,
@@ -146,9 +148,9 @@ impl RootView {
                         i,
                         perf_views::GpuRenderState {
                             engine_session: self.shell.gpu_engine_rows_state(),
-                            engine_capability_status: self.projection().capability_status(
-                                &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
-                            ),
+                            engine_capability_status: self
+                                .projection()
+                                .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
                             engine_device_id,
                             chart_layout: perf_views::GpuChartLayout::for_chart_inventory(
                                 performance_layout.chart_inventory,
@@ -172,18 +174,16 @@ impl RootView {
                         budget: performance_layout,
                     })
                 }
-                SelectedDevice::Fan(i) => {
-                    perf_views::render_fan(perf_views::FanViewProps {
-                        theme: t,
-                        sensors: self.sensors(),
-                        telemetry,
-                        index: i,
-                        performance,
-                        hover_slot: &self.graph_hover,
-                        graph_cache: graph_cache.clone(),
-                        budget: performance_layout,
-                    })
-                }
+                SelectedDevice::Fan(i) => perf_views::render_fan(perf_views::FanViewProps {
+                    theme: t,
+                    sensors: self.sensors(),
+                    telemetry,
+                    index: i,
+                    performance,
+                    hover_slot: &self.graph_hover,
+                    graph_cache: graph_cache.clone(),
+                    budget: performance_layout,
+                }),
             }
             .into_any_element()
         };
@@ -200,11 +200,9 @@ impl RootView {
                     .flex_row()
                     .justify_end()
                     .items_center()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
-                    .child(taskmanager_application::i18n::t(
-                        "perf.replay.startup_unavailable",
-                    ))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(t.fg_dim))
+                    .child(i18n::t("perf.replay.startup_unavailable"))
                     .into_any_element(),
             )
         } else {
@@ -213,7 +211,7 @@ impl RootView {
                 elements::tool_btn(
                     t,
                     "tm-replay-toggle",
-                    taskmanager_application::i18n::t(if self.history_replay_state().is_open() {
+                    i18n::t(if self.history_replay_state().is_open() {
                         "perf.replay.back_to_live"
                     } else {
                         "perf.replay.toggle"

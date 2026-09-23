@@ -6,8 +6,8 @@
 //! semantic IDs rather than toolkit handles.
 
 use bevy::ecs::component::Component;
-use bevy::input::keyboard::KeyCode;
-use taskmanager_application::{AppAction, CommandContext, Modifiers};
+use bevy::input::keyboard;
+use taskmanager_application::{AppAction, CommandContext, KeyCode, Modifiers};
 
 use taskmanager_shell::{ShellKeyEvent, route_key};
 use taskmanager_ui_contract::SemanticNodeId;
@@ -32,34 +32,34 @@ impl InputModifiers {
 /// Map the Bevy physical key vocabulary into the single application key
 /// vocabulary. Unlisted keys remain frontend-local and are not guessed.
 #[must_use]
-pub(crate) fn shared_key(key: KeyCode) -> Option<taskmanager_application::KeyCode> {
+pub(crate) fn shared_key(key: keyboard::KeyCode) -> Option<KeyCode> {
     Some(match key {
-        KeyCode::KeyF => taskmanager_application::KeyCode::F,
-        KeyCode::KeyA => taskmanager_application::KeyCode::A,
-        KeyCode::KeyC => taskmanager_application::KeyCode::C,
-        KeyCode::Digit1 => taskmanager_application::KeyCode::Digit1,
-        KeyCode::Digit2 => taskmanager_application::KeyCode::Digit2,
-        KeyCode::Digit3 => taskmanager_application::KeyCode::Digit3,
-        KeyCode::Digit4 => taskmanager_application::KeyCode::Digit4,
-        KeyCode::Digit5 => taskmanager_application::KeyCode::Digit5,
-        KeyCode::Digit6 => taskmanager_application::KeyCode::Digit6,
-        KeyCode::Digit7 => taskmanager_application::KeyCode::Digit7,
-        KeyCode::Digit8 => taskmanager_application::KeyCode::Digit8,
-        KeyCode::PageUp => taskmanager_application::KeyCode::PageUp,
-        KeyCode::PageDown => taskmanager_application::KeyCode::PageDown,
-        KeyCode::ArrowUp => taskmanager_application::KeyCode::ArrowUp,
-        KeyCode::ArrowDown => taskmanager_application::KeyCode::ArrowDown,
-        KeyCode::ArrowLeft => taskmanager_application::KeyCode::ArrowLeft,
-        KeyCode::ArrowRight => taskmanager_application::KeyCode::ArrowRight,
-        KeyCode::Tab => taskmanager_application::KeyCode::Tab,
-        KeyCode::F5 => taskmanager_application::KeyCode::F5,
-        KeyCode::F9 => taskmanager_application::KeyCode::F9,
-        KeyCode::Delete => taskmanager_application::KeyCode::Delete,
-        KeyCode::Enter => taskmanager_application::KeyCode::Enter,
-        KeyCode::Escape => taskmanager_application::KeyCode::Escape,
-        KeyCode::Space => taskmanager_application::KeyCode::Space,
-        KeyCode::Home => taskmanager_application::KeyCode::Home,
-        KeyCode::End => taskmanager_application::KeyCode::End,
+        keyboard::KeyCode::KeyF => KeyCode::F,
+        keyboard::KeyCode::KeyA => KeyCode::A,
+        keyboard::KeyCode::KeyC => KeyCode::C,
+        keyboard::KeyCode::Digit1 => KeyCode::Digit1,
+        keyboard::KeyCode::Digit2 => KeyCode::Digit2,
+        keyboard::KeyCode::Digit3 => KeyCode::Digit3,
+        keyboard::KeyCode::Digit4 => KeyCode::Digit4,
+        keyboard::KeyCode::Digit5 => KeyCode::Digit5,
+        keyboard::KeyCode::Digit6 => KeyCode::Digit6,
+        keyboard::KeyCode::Digit7 => KeyCode::Digit7,
+        keyboard::KeyCode::Digit8 => KeyCode::Digit8,
+        keyboard::KeyCode::PageUp => KeyCode::PageUp,
+        keyboard::KeyCode::PageDown => KeyCode::PageDown,
+        keyboard::KeyCode::ArrowUp => KeyCode::ArrowUp,
+        keyboard::KeyCode::ArrowDown => KeyCode::ArrowDown,
+        keyboard::KeyCode::ArrowLeft => KeyCode::ArrowLeft,
+        keyboard::KeyCode::ArrowRight => KeyCode::ArrowRight,
+        keyboard::KeyCode::Tab => KeyCode::Tab,
+        keyboard::KeyCode::F5 => KeyCode::F5,
+        keyboard::KeyCode::F9 => KeyCode::F9,
+        keyboard::KeyCode::Delete => KeyCode::Delete,
+        keyboard::KeyCode::Enter => KeyCode::Enter,
+        keyboard::KeyCode::Escape => KeyCode::Escape,
+        keyboard::KeyCode::Space => KeyCode::Space,
+        keyboard::KeyCode::Home => KeyCode::Home,
+        keyboard::KeyCode::End => KeyCode::End,
         _ => return None,
     })
 }
@@ -69,7 +69,7 @@ pub(crate) fn shared_key(key: KeyCode) -> Option<taskmanager_application::KeyCod
 /// frontend never bypasses those enable rules with a local match arm.
 #[must_use]
 pub(crate) fn normalize_key(
-    key: KeyCode,
+    key: keyboard::KeyCode,
     modifiers: InputModifiers,
     context: CommandContext,
 ) -> Option<AppAction> {

@@ -1,5 +1,7 @@
 use super::*;
+use taskmanager_core::PriorityTier;
 use taskmanager_core::ProcessBatchAction;
+use taskmanager_core::ResourceGroupLimitRequest;
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessGpuProvider,
     ProcessIsolationProvider, ProcessNetworkProvider, ProcessOpenFilesProvider,
@@ -61,10 +63,7 @@ fn pending_providers_complete_with_typed_unsupported() {
     );
     let mut resource_control = PendingProcessResourceControlProvider;
     assert_eq!(
-        resource_control.apply_limits(
-            &frozen(1),
-            &taskmanager_core::ResourceGroupLimitRequest::default()
-        ),
+        resource_control.apply_limits(&frozen(1), &ResourceGroupLimitRequest::default()),
         Err(ProviderFailure::Unsupported)
     );
 }
@@ -213,7 +212,7 @@ fn batch_preserves_the_exact_unsupported_failure_for_every_action_and_target() {
         ProcessBatchAction::Kill,
         ProcessBatchAction::Suspend,
         ProcessBatchAction::Resume,
-        ProcessBatchAction::SetPriority(taskmanager_core::PriorityTier::High),
+        ProcessBatchAction::SetPriority(PriorityTier::High),
         ProcessBatchAction::SetEfficiencyMode(true),
     ] {
         let mut provider = MacProcessControlProvider::new();

@@ -3,6 +3,7 @@ use taskmanager_application::{RaplPowerRequestFailure, RaplPowerSession, RaplPow
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::{RaplPackageRow, RaplPowerSnapshot};
 use taskmanager_platform_contract::{CapabilityStatus, RequestId};
+use taskmanager_theme::Theme;
 
 fn inputs<'a>(
     state: &'a RaplPowerState,
@@ -154,7 +155,7 @@ fn closed_session_renders_nothing_without_a_lane() {
 /// request through the session.
 #[gpui::test]
 async fn authorize_affordance_submits_one_request(cx: &mut gpui::TestAppContext) {
-    let win = cx.add_window(|_window, cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |view, _window, cx| {
         let attempt = view.shell.begin_rapl_power_request();
         view.shell
@@ -176,7 +177,7 @@ async fn authorize_affordance_submits_one_request(cx: &mut gpui::TestAppContext)
 /// is already in flight must not submit a second one.
 #[gpui::test]
 async fn authorize_affordance_is_gated_on_the_projection(cx: &mut gpui::TestAppContext) {
-    let win = cx.add_window(|_window, cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |view, _window, cx| {
         let _ = view.shell.begin_rapl_power_request();
         view.authorize_package_power(cx);

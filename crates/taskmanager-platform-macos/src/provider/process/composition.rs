@@ -20,6 +20,7 @@ use taskmanager_platform_provider::{
     ProcessNetworkEscalationProvider, ProcessNetworkProvider, ProcessOpenFilesProvider,
     ProcessResourceControlProvider, ProcessResourcesProvider, ProcessThreadsProvider,
 };
+use taskmanager_platform_runtime::ProcessExecutors;
 use taskmanager_platform_runtime::{
     ProcessControlExecutors, ProcessObservationExecutors, ProcessProviderBindings,
     ProcessProviderBindingsInput, ProviderRegistration,
@@ -198,14 +199,14 @@ impl MacProcessControlProviders {
         ProcessControlExecutors::new(
             move |target, cpus| affinity_control.set_affinity(&target, &cpus),
             move |request| match request {
-                taskmanager_application::ProcessControlRequest::EndTask(target) => {
+                ProcessControlRequest::EndTask(target) => {
                     control.end_task(target.clone())?;
                     Ok(ProcessControlCompletion::EndTask(target))
                 }
-                taskmanager_application::ProcessControlRequest::ExecuteBatch(intent) => Ok(
-                    ProcessControlCompletion::Batch(control.execute_batch(intent)?),
-                ),
-                taskmanager_application::ProcessControlRequest::SendSignal { target, signal } => {
+                ProcessControlRequest::ExecuteBatch(intent) => Ok(ProcessControlCompletion::Batch(
+                    control.execute_batch(intent)?,
+                )),
+                ProcessControlRequest::SendSignal { target, signal } => {
                     control.send_signal(&target, signal)?;
                     Ok(ProcessControlCompletion::Signal { target, signal })
                 }
@@ -213,14 +214,14 @@ impl MacProcessControlProviders {
                 // stop/continue signals at this adapter edge — the same
                 // `signal_pid` primitive the batch arms use — and completion
                 // rides the signal event.
-                taskmanager_application::ProcessControlRequest::Suspend { target } => {
+                ProcessControlRequest::Suspend { target } => {
                     control.send_signal(&target, ProcessSignal::Stop)?;
                     Ok(ProcessControlCompletion::Signal {
                         target,
                         signal: ProcessSignal::Stop,
                     })
                 }
-                taskmanager_application::ProcessControlRequest::Resume { target } => {
+                ProcessControlRequest::Resume { target } => {
                     control.send_signal(&target, ProcessSignal::Continue)?;
                     Ok(ProcessControlCompletion::Signal {
                         target,
@@ -272,8 +273,8 @@ impl MacProcessProviders {
         }
     }
 
-    pub(crate) fn into_runtime(self) -> taskmanager_platform_runtime::ProcessExecutors {
-        taskmanager_platform_runtime::ProcessExecutors::new(
+    pub(crate) fn into_runtime(self) -> ProcessExecutors {
+        ProcessExecutors::new(
             self.observations.into_runtime(),
             self.controls.into_runtime(),
         )

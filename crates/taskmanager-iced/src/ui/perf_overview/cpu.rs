@@ -19,12 +19,14 @@ use super::projection::{CpuHeadlineKind, CpuHeadlineMetric, CpuHeadlineValue};
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use taskmanager_shell::ShellApp;
+use taskmanager_theme::Theme;
 
 pub(super) fn cpu_headline_readouts(
     metrics: &[CpuHeadlineMetric],
     bogomips: bool,
     temperature_source: CpuTemperatureSource,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     crate::ui::perf_layout::headline_readouts(
         theme_snapshot,
@@ -259,7 +261,7 @@ pub(crate) fn msr_readout_needs_authorization(
 
 pub(crate) fn rapl_power_card<'a>(
     app: &'a crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let state = app.shell.rapl_power_state();
     let capability = app
@@ -350,7 +352,7 @@ pub(crate) fn rapl_power_card<'a>(
 
 pub(crate) fn msr_readouts_card<'a>(
     app: &'a crate::IcedApp,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let state = app.shell.msr_readout_state();
     let capability = app
@@ -472,10 +474,7 @@ pub(crate) fn msr_readouts_card<'a>(
     None
 }
 
-pub(crate) fn append_rapl_and_msr_stats(
-    shell: &taskmanager_shell::ShellApp,
-    stats: &mut Vec<StatRow>,
-) {
+pub(crate) fn append_rapl_and_msr_stats(shell: &ShellApp, stats: &mut Vec<StatRow>) {
     match shell.rapl_power_state() {
         RaplPowerState::Ready(ready) => {
             for pkg in &ready.snapshot.packages {

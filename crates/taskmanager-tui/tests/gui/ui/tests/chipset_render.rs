@@ -5,6 +5,7 @@
 use taskmanager_application::{AppAction, AppPage};
 
 use super::frame_text;
+use taskmanager_shell::fixture::edit_hardware;
 
 /// The System viewport is scrollable; visit enough offsets to cover the whole
 /// device section no matter where the section starts.
@@ -22,7 +23,7 @@ fn system_frame_text(app: &mut crate::TuiApp) -> String {
 fn system_device_section_renders_the_chipset_row_when_proved() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
-    taskmanager_shell::fixture::edit_hardware(&mut app.shell, |hardware| {
+    edit_hardware(&mut app.shell, |hardware| {
         if let Some(info) = hardware.as_mut() {
             info.chipset = Some("Z690 Chipset".into());
         }

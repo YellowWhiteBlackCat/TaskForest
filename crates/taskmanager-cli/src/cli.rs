@@ -19,11 +19,14 @@ use std::fmt;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+use taskmanager_application::collect_diagnostic_bundle_from_client;
+use taskmanager_application::export_diagnostic_bundle;
 use taskmanager_application::{
     ContainerRollupEvent, HardwareInventoryEvent, NpuInventoryEvent, NpuInventoryRequest,
     PlatformClient, ProcessEvent, RefreshRequest,
 };
 use taskmanager_assets::product;
+use taskmanager_core::config::Config;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_core::core::process_telemetry::ContainerSummary;
@@ -638,14 +641,10 @@ pub fn run_suggest_thresholds_with(client: PlatformClient) -> io::Result<()> {
 pub fn run_export_diagnostic_bundle_with(
     client: &mut PlatformClient,
     path: &std::path::Path,
-    config: Option<&taskmanager_core::config::Config>,
+    config: Option<&Config>,
 ) -> io::Result<std::path::PathBuf> {
-    let bundle = taskmanager_application::collect_diagnostic_bundle_from_client(
-        client,
-        config,
-        DEFAULT_COLLECTION_TIMEOUT,
-    )
-    .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
+    let bundle = collect_diagnostic_bundle_from_client(client, config, DEFAULT_COLLECTION_TIMEOUT)
+        .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
 
     if path == std::path::Path::new("-") {
         let plan = bundle
@@ -660,7 +659,7 @@ pub fn run_export_diagnostic_bundle_with(
         handle.write_all(b"\n")?;
         Ok(std::path::PathBuf::from("-"))
     } else {
-        let exported = taskmanager_application::export_diagnostic_bundle(&bundle, path)
+        let exported = export_diagnostic_bundle(&bundle, path)
             .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
         let stdout = io::stdout();
         let mut handle = stdout.lock();

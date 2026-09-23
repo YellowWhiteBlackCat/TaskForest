@@ -1,6 +1,7 @@
 //! Row-density chooser row of the Settings modal (Comfortable / Compact).
 
 use gpui::{Context, Div, Entity, ParentElement, Styled, div};
+use taskmanager_ui::theme_binding::definite_length;
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
@@ -24,9 +25,7 @@ pub(super) fn density_row(
     div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(pill(
             t,
             "density-comfortable",

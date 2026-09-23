@@ -13,25 +13,39 @@ use taskmanager_core::{
 };
 
 use super::*;
+use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskmanager_core::DeviceId;
+use taskmanager_core::DeviceLifecycleRegistry;
+use taskmanager_core::DeviceRefreshOutcome;
+use taskmanager_core::DeviceState;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::GpuEngine;
+use taskmanager_core::GpuEngineKind;
+use taskmanager_windows_api::WindowsApiError;
+use taskmanager_windows_api::WindowsGpuAdapterMemorySample;
+use taskmanager_windows_api::WindowsPciAddress;
+use taskmanager_windows_api::enumerate_gpu_adapters;
+use taskmanager_windows_api::query_gpu_adapter_memory;
+use taskmanager_windows_api::query_gpu_engine_utilization;
 
 const MAX_NVML_GPU_DEVICES: u32 = 16;
 
 #[derive(Debug)]
 struct NvmlGpuSample {
-    pci_address: taskmanager_windows_api::WindowsPciAddress,
+    pci_address: WindowsPciAddress,
     metrics: GpuMetrics,
 }
 
 #[derive(Debug)]
 struct DxgiGpuSample {
-    pci_address: Option<taskmanager_windows_api::WindowsPciAddress>,
+    pci_address: Option<WindowsPciAddress>,
     metrics: GpuMetrics,
 }
 
 /// GPU telemetry provider supporting NVML with native DXGI fallback.
 pub struct WinGpuTelemetryProvider {
     nvml: Option<nvml_wrapper::Nvml>,
-    lifecycles: taskmanager_core::DeviceLifecycleRegistry,
+    lifecycles: DeviceLifecycleRegistry,
 }
 
 impl WinGpuTelemetryProvider {
@@ -39,9 +53,7 @@ impl WinGpuTelemetryProvider {
         let nvml = nvml_wrapper::Nvml::init().ok();
         Self {
             nvml,
-            lifecycles: taskmanager_core::DeviceLifecycleRegistry::new(
-                taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS,
-            ),
+            lifecycles: DeviceLifecycleRegistry::new(DEFAULT_DEVICE_ABSENCE_RETENTION_MS),
         }
     }
 
@@ -74,7 +86,7 @@ impl WinGpuTelemetryProvider {
                 identity_failure = Some(FailureKind::Unsupported);
                 continue;
             }
-            let pci_address = taskmanager_windows_api::WindowsPciAddress {
+            let pci_address = WindowsPciAddress {
                 bus: pci.bus,
                 device: pci.device,
                 function,
@@ -204,19 +216,17 @@ impl WinGpuTelemetryProvider {
     fn refresh_dxgi(
         observed_at_ms: u64,
     ) -> Result<(Vec<DxgiGpuSample>, Option<FailureKind>), FailureKind> {
-        let inventory =
-            taskmanager_windows_api::enumerate_gpu_adapters().map_err(windows_gpu_failure_kind)?;
+        let inventory = enumerate_gpu_adapters().map_err(windows_gpu_failure_kind)?;
         let adapters = inventory.adapters;
         // WDDM 2.0+ exposes per-adapter dedicated/shared usage through PDH
         // `\GPU Adapter Memory(*)` — the same source Task Manager reads. DXGI
         // `QueryVideoMemoryInfo(NON_LOCAL)` is unreliable on Intel/AMD drivers
         // (fails or reports 0), so PDH values fill the shared-usage gap while
         // DXGI local usage remains the dedicated-usage preference.
-        let (adapter_memory, memory_failure) =
-            match taskmanager_windows_api::query_gpu_adapter_memory() {
-                Ok(samples) => (samples, None),
-                Err(error) => (Vec::new(), Some(windows_gpu_failure_kind(error))),
-            };
+        let (adapter_memory, memory_failure) = match query_gpu_adapter_memory() {
+            Ok(samples) => (samples, None),
+            Err(error) => (Vec::new(), Some(windows_gpu_failure_kind(error))),
+        };
         // Prefer hardware adapters if present.
         let has_hardware = adapters.iter().any(|a| !a.is_software);
         let eligible = adapters
@@ -224,11 +234,10 @@ impl WinGpuTelemetryProvider {
             .enumerate()
             .filter(|(_, a)| !has_hardware || !a.is_software);
 
-        let (engine_samples, engine_failure) =
-            match taskmanager_windows_api::query_gpu_engine_utilization() {
-                Ok(samples) => (samples, None),
-                Err(error) => (Vec::new(), Some(windows_gpu_failure_kind(error))),
-            };
+        let (engine_samples, engine_failure) = match query_gpu_engine_utilization() {
+            Ok(samples) => (samples, None),
+            Err(error) => (Vec::new(), Some(windows_gpu_failure_kind(error))),
+        };
         let mut gpus = Vec::new();
         for (_index, adapter) in eligible {
             let brand = adapter.name.clone();
@@ -251,9 +260,9 @@ impl WinGpuTelemetryProvider {
                     .engines
                     .iter()
                     .filter(|e| !e.engine_name.is_empty())
-                    .map(|e| taskmanager_core::GpuEngine {
+                    .map(|e| GpuEngine {
                         name: e.engine_name.clone(),
-                        kind: taskmanager_core::GpuEngineKind::from_display_name(&e.engine_name),
+                        kind: GpuEngineKind::from_display_name(&e.engine_name),
                         usage_pct: e.utilization_pct,
                     })
                     .collect();
@@ -482,8 +491,8 @@ fn map_nvml_throttle_bits(raw: u64) -> Vec<GpuThrottleReason> {
 fn find_adapter_memory_sample<'a>(
     _name: &str,
     luid: u64,
-    samples: &'a [taskmanager_windows_api::WindowsGpuAdapterMemorySample],
-) -> Option<&'a taskmanager_windows_api::WindowsGpuAdapterMemorySample> {
+    samples: &'a [WindowsGpuAdapterMemorySample],
+) -> Option<&'a WindowsGpuAdapterMemorySample> {
     samples.iter().find(|sample| sample.luid == Some(luid))
 }
 
@@ -491,8 +500,8 @@ fn find_adapter_memory_sample<'a>(
 fn find_adapter_memory_sample<'a>(
     _name: &str,
     _luid: u64,
-    _samples: &'a [taskmanager_windows_api::WindowsGpuAdapterMemorySample],
-) -> Option<&'a taskmanager_windows_api::WindowsGpuAdapterMemorySample> {
+    _samples: &'a [WindowsGpuAdapterMemorySample],
+) -> Option<&'a WindowsGpuAdapterMemorySample> {
     None
 }
 
@@ -585,9 +594,7 @@ impl GpuTelemetryProvider for WinGpuTelemetryProvider {
             Ok(snapshot) => snapshot,
             Err(failure) => {
                 let _delta = self.lifecycles.finish_refresh(
-                    taskmanager_core::DeviceRefreshOutcome::Unavailable(
-                        taskmanager_core::DeviceStatus::from_failure(failure),
-                    ),
+                    DeviceRefreshOutcome::Unavailable(DeviceStatus::from_failure(failure)),
                     observed_at_ms,
                 );
                 return Ok(GpuTelemetryObservation::unavailable(
@@ -610,7 +617,7 @@ impl GpuTelemetryProvider for WinGpuTelemetryProvider {
         let partial_failure = merge_failure.or(nvml_failure).or(dxgi_partial_failure);
 
         for gpu in &mut gpus {
-            let device_state = taskmanager_core::DeviceState::healthy(observed_at_ms);
+            let device_state = DeviceState::healthy(observed_at_ms);
             let lifecycle =
                 self.lifecycles
                     .observe(gpu.device_id.as_str(), device_state, observed_at_ms);
@@ -618,14 +625,13 @@ impl GpuTelemetryProvider for WinGpuTelemetryProvider {
             gpu.device_state = device_state;
         }
 
-        let _delta = self.lifecycles.finish_refresh(
-            taskmanager_core::DeviceRefreshOutcome::Complete,
-            observed_at_ms,
-        );
+        let _delta = self
+            .lifecycles
+            .finish_refresh(DeviceRefreshOutcome::Complete, observed_at_ms);
         let lifecycles = self
             .lifecycles
             .iter()
-            .map(|(id, l)| (taskmanager_core::DeviceId::new(id), *l))
+            .map(|(id, l)| (DeviceId::new(id), *l))
             .collect::<std::collections::BTreeMap<_, _>>();
 
         if gpus.is_empty() {
@@ -677,19 +683,16 @@ impl GpuTelemetryProvider for WinGpuTelemetryProvider {
     }
 }
 
-pub(super) fn windows_gpu_failure_kind(
-    error: taskmanager_windows_api::WindowsApiError,
-) -> FailureKind {
+pub(super) fn windows_gpu_failure_kind(error: WindowsApiError) -> FailureKind {
     match error {
-        taskmanager_windows_api::WindowsApiError::Unsupported => FailureKind::Unsupported,
-        taskmanager_windows_api::WindowsApiError::PermissionDenied => FailureKind::PermissionDenied,
-        taskmanager_windows_api::WindowsApiError::IdentityChanged
-        | taskmanager_windows_api::WindowsApiError::InvalidInput => FailureKind::IdentityChanged,
-        taskmanager_windows_api::WindowsApiError::ResourceLimit
-        | taskmanager_windows_api::WindowsApiError::InvalidText
-        | taskmanager_windows_api::WindowsApiError::QueryFailed => {
-            FailureKind::TemporarilyUnavailable
+        WindowsApiError::Unsupported => FailureKind::Unsupported,
+        WindowsApiError::PermissionDenied => FailureKind::PermissionDenied,
+        WindowsApiError::IdentityChanged | WindowsApiError::InvalidInput => {
+            FailureKind::IdentityChanged
         }
+        WindowsApiError::ResourceLimit
+        | WindowsApiError::InvalidText
+        | WindowsApiError::QueryFailed => FailureKind::TemporarilyUnavailable,
     }
 }
 

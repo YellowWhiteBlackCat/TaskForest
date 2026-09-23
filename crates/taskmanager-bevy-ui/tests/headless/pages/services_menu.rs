@@ -17,6 +17,13 @@ use taskmanager_shell::ShellApp;
 use super::menu::{ServiceMenuCtx, ServiceMenuModal, open_for};
 use crate::menu_modal::ActionMenuContext;
 use crate::pages::services::ServiceSelection;
+use taskmanager_application::CorrelatedServiceEvent;
+use taskmanager_application::PlatformEventBatch;
+use taskmanager_application::ServiceEvent;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::EventSequence;
+use taskmanager_platform_contract::PartialSourceSnapshot;
+use taskmanager_platform_contract::RequestId;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -34,21 +41,19 @@ fn service_item(id: &str, name: &str, status: ServiceStatus) -> ServiceItem {
 
 fn shelved_shell(items: &[ServiceItem]) -> ShellApp {
     let mut shell = ShellApp::new();
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
-        service_events: vec![taskmanager_application::CorrelatedServiceEvent {
-            request_id: taskmanager_platform_contract::RequestId::MIN,
-            capability: taskmanager_platform_contract::CapabilityId::SERVICES,
+    shell.apply_platform_batch(PlatformEventBatch {
+        service_events: vec![CorrelatedServiceEvent {
+            request_id: RequestId::MIN,
+            capability: CapabilityId::SERVICES,
             provider: None,
-            sequence: taskmanager_platform_contract::EventSequence::new(1),
+            sequence: EventSequence::new(1),
             observed_at_ms: 1,
-            event: taskmanager_application::ServiceEvent::Snapshot(
-                taskmanager_platform_contract::PartialSourceSnapshot {
-                    items: items.to_vec(),
-                    sources: Vec::new(),
-                },
-            ),
+            event: ServiceEvent::Snapshot(PartialSourceSnapshot {
+                items: items.to_vec(),
+                sources: Vec::new(),
+            }),
         }],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Services));
     shell

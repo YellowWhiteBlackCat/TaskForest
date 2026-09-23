@@ -2,23 +2,21 @@ use super::*;
 use taskmanager_application::process_category_projection::category_buckets;
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::process::{
     ProcessApplicationIdentity, ProcessMetadataObservation, process_category,
 };
+use taskmanager_shell::ProcessRowId;
 
 /// Fixture accepted-snapshot timestamp matching the observations below, whose
 /// `last_success_ms` is 1.
 const SNAPSHOT_MS: u64 = 1;
 
-fn tokened(
-    pid: u32,
-    name: &str,
-    parent: Option<u32>,
-) -> taskmanager_core::core::process::ProcessItem {
+fn tokened(pid: u32, name: &str, parent: Option<u32>) -> ProcessItem {
     use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
-    let mut item = taskmanager_core::core::process::ProcessItem::new(pid, name);
+    let mut item = ProcessItem::new(pid, name);
     item.parent_pid = parent;
     item.with_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(u64::from(pid) * 10 + 1, 1),
@@ -26,10 +24,7 @@ fn tokened(
     })
 }
 
-fn key_of(
-    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
-    pid: u32,
-) -> taskmanager_shell::ProcessRowId {
+fn key_of(kind: fn(ProcessLiveKey) -> ProcessRowId, pid: u32) -> ProcessRowId {
     ProcessLiveKey::from_parts(pid, u64::from(pid) * 10 + 1)
         .map(kind)
         .expect("non-zero parts")
@@ -37,7 +32,6 @@ fn key_of(
 
 fn application(pid: u32, parent_pid: Option<u32>, name: &str) -> ProcessItem {
     use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
 
     let identity =
         ProcessApplicationIdentity::new(format!("org.example.{name}"), name.to_owned(), None)
@@ -57,7 +51,7 @@ fn expansion_keys_are_stable_and_typed() {
     let mut expansion = ProcessTreeExpansion::default();
     let category_key = category_expansion_key(ProcessCategory::Application);
     assert!(!expansion.expanded_groups.contains(&category_key));
-    let identity = key_of(taskmanager_shell::ProcessRowId::Process, 7)
+    let identity = key_of(ProcessRowId::Process, 7)
         .live_key()
         .expect("fixture identity");
     let application_key = app_tree_expansion_key_for_identity(identity);
@@ -92,15 +86,9 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     assert_eq!(
         collapsed.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
-            Some(taskmanager_shell::ProcessRowId::Category(
-                ProcessCategory::Application
-            )),
-            Some(taskmanager_shell::ProcessRowId::Category(
-                ProcessCategory::Background
-            )),
-            Some(taskmanager_shell::ProcessRowId::Category(
-                ProcessCategory::Uncategorized
-            )),
+            Some(ProcessRowId::Category(ProcessCategory::Application)),
+            Some(ProcessRowId::Category(ProcessCategory::Background)),
+            Some(ProcessRowId::Category(ProcessCategory::Uncategorized)),
         ]
     );
     assert_eq!(collapsed[0].member_count, 2);
@@ -110,24 +98,18 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     let category_open = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         category_open[1].key,
-        Some(key_of(taskmanager_shell::ProcessRowId::Application, 10))
+        Some(key_of(ProcessRowId::Application, 10))
     );
     assert_eq!(category_open[1].member_count, 2);
 
     expansion.toggle_application(
-        key_of(taskmanager_shell::ProcessRowId::Process, 10)
+        key_of(ProcessRowId::Process, 10)
             .live_key()
             .expect("root identity"),
     );
     let tree_open = project_items(&items, &expansion, SNAPSHOT_MS);
-    assert_eq!(
-        tree_open[2].key,
-        Some(key_of(taskmanager_shell::ProcessRowId::Process, 10))
-    );
-    assert_eq!(
-        tree_open[3].key,
-        Some(key_of(taskmanager_shell::ProcessRowId::Process, 11))
-    );
+    assert_eq!(tree_open[2].key, Some(key_of(ProcessRowId::Process, 10)));
+    assert_eq!(tree_open[3].key, Some(key_of(ProcessRowId::Process, 11)));
     assert_eq!(tree_open[2].item.map(|item| item.pid), Some(10));
     assert_eq!(tree_open[1].item, None);
     assert_eq!(tree_open[2].depth, 2);
@@ -136,18 +118,16 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
 
 #[test]
 fn category_projection_consumes_typed_aggregate_without_zero_fallback() {
-    let measured_zero = application(60, None, "Editor").with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
+    let measured_zero =
+        application(60, None, "Editor").with_scalar_observations(ProcessScalarObservations {
             cpu_percentage: ScalarObservation::available(0.0, 1),
             ..Default::default()
-        },
-    );
-    let unavailable = application(61, None, "EditorWorker").with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
+        });
+    let unavailable =
+        application(61, None, "EditorWorker").with_scalar_observations(ProcessScalarObservations {
             cpu_percentage: ScalarObservation::unavailable(FailureKind::PermissionDenied),
             ..Default::default()
-        },
-    );
+        });
     let items = vec![measured_zero, unavailable];
     let buckets = category_buckets(&items, process_category);
     let application_bucket = buckets
@@ -180,12 +160,12 @@ fn process_collapse_hides_only_descendants() {
     let mut expansion = ProcessTreeExpansion::default();
     expansion.toggle_category(ProcessCategory::Application);
     expansion.toggle_application(
-        key_of(taskmanager_shell::ProcessRowId::Process, 50)
+        key_of(ProcessRowId::Process, 50)
             .live_key()
             .expect("root identity"),
     );
     expansion.toggle_process(
-        key_of(taskmanager_shell::ProcessRowId::Process, 51)
+        key_of(ProcessRowId::Process, 51)
             .live_key()
             .expect("child identity"),
     );
@@ -193,12 +173,10 @@ fn process_collapse_hides_only_descendants() {
     assert_eq!(
         rows.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
-            Some(taskmanager_shell::ProcessRowId::Category(
-                ProcessCategory::Application
-            )),
-            Some(key_of(taskmanager_shell::ProcessRowId::Application, 50)),
-            Some(key_of(taskmanager_shell::ProcessRowId::Process, 50)),
-            Some(key_of(taskmanager_shell::ProcessRowId::Process, 51)),
+            Some(ProcessRowId::Category(ProcessCategory::Application)),
+            Some(key_of(ProcessRowId::Application, 50)),
+            Some(key_of(ProcessRowId::Process, 50)),
+            Some(key_of(ProcessRowId::Process, 51)),
         ]
     );
     assert!(rows[3].has_children);
@@ -219,19 +197,18 @@ fn tree_rows_carry_typed_aggregates_without_zero_fallback() {
     helper.apply_scalar_observations(helper_observations);
     measured.parent_pid = None;
     helper.parent_pid = Some(70);
-    let background = tokened(80, "daemon", None).with_scalar_observations(
-        taskmanager_core::core::process::ProcessScalarObservations {
+    let background =
+        tokened(80, "daemon", None).with_scalar_observations(ProcessScalarObservations {
             cpu_percentage: ScalarObservation::available(1.5, SNAPSHOT_MS),
             memory_bytes: ScalarObservation::available(4_096, SNAPSHOT_MS),
             ..Default::default()
-        },
-    );
+        });
     let items = vec![measured, helper, background];
 
     let mut expansion = ProcessTreeExpansion::default();
     expansion.toggle_category(ProcessCategory::Application);
     expansion.toggle_application(
-        key_of(taskmanager_shell::ProcessRowId::Process, 70)
+        key_of(ProcessRowId::Process, 70)
             .live_key()
             .expect("root identity"),
     );

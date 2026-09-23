@@ -33,6 +33,15 @@ use super::{PendingEffects, QuitForwarded};
 use crate::app::{AppShellPlugin, ContentSlot, FrontendTrack, Page, Route};
 use crate::pages::history::HistoryProjectionResource;
 use crate::window::WindowPalette;
+use taskmanager_application::AppAction;
+use taskmanager_application::AppPage;
+use taskmanager_application::PendingConfirmation;
+use taskmanager_application::PlatformEffect;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::QuitReason;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -55,9 +64,7 @@ fn shell_with_selection() -> ShellApp {
             token_process(200, "beta"),
         ])
     });
-    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     shell
 }
 
@@ -125,7 +132,7 @@ fn delete_arms_the_shared_gate_and_y_confirms_to_the_end_task_effect() {
     assert!(
         matches!(
             shell.pending_confirmation(),
-            Some(taskmanager_application::PendingConfirmation::EndTask(_))
+            Some(PendingConfirmation::EndTask(_))
         ),
         "Delete must arm the shared end-task gate, got {:?}",
         shell.confirmation_kind()
@@ -139,10 +146,7 @@ fn delete_arms_the_shared_gate_and_y_confirms_to_the_end_task_effect() {
     app.update();
     let effects = &app.world().resource::<PendingEffects>().0;
     assert!(
-        matches!(
-            effects.as_slice(),
-            [taskmanager_application::PlatformEffect::EndTask(_)]
-        ),
+        matches!(effects.as_slice(), [PlatformEffect::EndTask(_)]),
         "the gate confirm must re-emit the frozen end-task effect, got {effects:?}"
     );
     let shell = &app.world().non_send::<FrontendTrack>().shell;
@@ -279,7 +283,7 @@ fn quit_reason_forwards_app_exit_exactly_once() {
     }
 
     let mut shell = shell_with_selection();
-    shell.request_quit(taskmanager_shell::QuitReason::Keyboard);
+    shell.request_quit(QuitReason::Keyboard);
     let mut app = input_app(shell);
     app.init_resource::<ExitCount>();
     // No ordering against the adapter: the buffered message is read within
@@ -332,23 +336,19 @@ fn the_process_action_chord_opens_the_applications_menu_and_commits_through_the_
         "a committed menu closes"
     );
     let effects = app.world().resource::<PendingEffects>().0.clone();
-    let Some(taskmanager_application::PlatformEffect::ExecuteBatch(intent)) = effects.first()
-    else {
+    let Some(PlatformEffect::ExecuteBatch(intent)) = effects.first() else {
         panic!("the menu's verb crosses the effect bridge, got {effects:?}");
     };
-    assert_eq!(
-        intent.action,
-        taskmanager_core::core::process::ProcessBatchAction::Suspend
-    );
+    assert_eq!(intent.action, ProcessBatchAction::Suspend);
 }
 
 #[test]
 fn escape_clears_active_feedback_notice_when_no_modal_is_open() {
     let mut shell = shell_with_selection();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Screenshot saved to /tmp/screenshot.png",
     );
     assert!(shell.feedback_notice().is_some());
@@ -390,9 +390,9 @@ fn escape_clears_active_feedback_notice_when_no_modal_is_open() {
 fn escape_dismisses_armed_gate_first_before_clearing_feedback_notice() {
     let mut shell = shell_with_selection();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Active notice across modal",
     );
 
@@ -463,9 +463,9 @@ fn escape_cancels_action_menu_first_before_clearing_feedback_notice() {
 
     let mut shell = shell_with_selection();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Active notice across menu modal",
     );
 
@@ -534,9 +534,9 @@ fn escape_clears_feedback_notice_and_fires_feedback_changed() {
 
     let mut shell = shell_with_selection();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Active notice to clear",
     );
 

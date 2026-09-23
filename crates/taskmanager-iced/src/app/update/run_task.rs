@@ -4,6 +4,7 @@ use taskmanager_application::{CommandLaunchRequest, PlatformEffect};
 
 use super::super::{IcedApp, Message};
 use crate::app::{LocalSurface, LocalSurfaceKind};
+use taskmanager_application::i18n::t;
 
 impl IcedApp {
     pub(super) fn handle_run_task_message(&mut self, message: Message) -> Option<PlatformEffect> {
@@ -24,8 +25,7 @@ impl IcedApp {
             }
             Message::SubmitRunTask if self.run_task_open() => {
                 if self.run_task.command.trim().is_empty() {
-                    self.run_task.error_msg =
-                        Some(taskmanager_application::i18n::t("search.run_command").to_string());
+                    self.run_task.error_msg = Some(t("search.run_command").to_string());
                     None
                 } else {
                     // The command leaves through the shared platform request

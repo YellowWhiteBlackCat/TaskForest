@@ -13,6 +13,7 @@
 //! [`super::system::HardwareInventoryRequest`].
 
 use taskmanager_core::SmbiosMemorySnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One SMBIOS memory-inventory read for the host.

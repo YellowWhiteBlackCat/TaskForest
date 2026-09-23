@@ -24,6 +24,9 @@ use taskmanager_shell::app::service_log::{
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use super::{IcedApp, LocalSurface, Message, PlatformEffect};
+use taskmanager_application::AppAction;
+use taskmanager_application::ServiceAttemptId;
+use taskmanager_application::i18n::t;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceDetailsSnapshot {
@@ -118,23 +121,15 @@ impl ServiceDetailsState {
     pub(crate) fn begin_stream_attempt(
         &mut self,
         query: ServiceLogQuery,
-    ) -> Option<taskmanager_application::ServiceAttemptId> {
+    ) -> Option<ServiceAttemptId> {
         self.stream.begin_attempt(query)
     }
 
-    pub(crate) fn accept_stream(
-        &mut self,
-        attempt_id: taskmanager_application::ServiceAttemptId,
-        request_id: RequestId,
-    ) {
+    pub(crate) fn accept_stream(&mut self, attempt_id: ServiceAttemptId, request_id: RequestId) {
         self.stream.accept_attempt(attempt_id, request_id);
     }
 
-    pub(crate) fn reject_stream(
-        &mut self,
-        attempt_id: taskmanager_application::ServiceAttemptId,
-        failure: FailureKind,
-    ) {
+    pub(crate) fn reject_stream(&mut self, attempt_id: ServiceAttemptId, failure: FailureKind) {
         let failure = ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
             format!("service log request was rejected: {failure:?}"),
@@ -336,9 +331,9 @@ impl IcedApp {
                     None => self.request_service_action_at(index, action),
                 }
             }
-            Message::ConfirmServiceControl => self
-                .shell
-                .apply_action(taskmanager_application::AppAction::ConfirmServiceControl),
+            Message::ConfirmServiceControl => {
+                self.shell.apply_action(AppAction::ConfirmServiceControl)
+            }
             _ => None,
         }
     }
@@ -362,7 +357,7 @@ impl IcedApp {
         self.service_details.select(&service_id);
 
         if self.is_demo() {
-            let request_id = taskmanager_platform_contract::RequestId::MIN;
+            let request_id = RequestId::MIN;
             self.shell
                 .service_dependencies
                 .begin(request_id, service_id.clone());
@@ -381,7 +376,7 @@ impl IcedApp {
     pub(super) fn refresh_service_details_effect(&mut self) -> Option<PlatformEffect> {
         let service_id = self.service_details.begin_refresh()?;
         if self.is_demo() {
-            let request_id = taskmanager_platform_contract::RequestId::MIN;
+            let request_id = RequestId::MIN;
             self.shell
                 .service_dependencies
                 .begin(request_id, service_id.clone());
@@ -419,11 +414,7 @@ impl IcedApp {
                     FeedbackSource::Clipboard,
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::SHORT,
-                    format!(
-                        "{} · {}",
-                        taskmanager_application::i18n::t("hint.copied"),
-                        taskmanager_application::i18n::t("svc.logs"),
-                    ),
+                    format!("{} · {}", t("hint.copied"), t("svc.logs"),),
                 );
                 *clipboard_task = Some(iced::clipboard::write(payload));
             }
@@ -432,7 +423,7 @@ impl IcedApp {
                     FeedbackSource::Clipboard,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::SHORT,
-                    taskmanager_application::i18n::t("svc.logs_nothing_to_copy"),
+                    t("svc.logs_nothing_to_copy"),
                 );
             }
         }

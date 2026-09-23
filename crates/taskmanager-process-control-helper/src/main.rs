@@ -41,6 +41,24 @@ use serde::Serialize;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+// Consumed only by the Linux-gated pidfd path below (the dependency itself is
+// declared under `[target.'cfg(target_os = "linux")'.dependencies]`).
+#[cfg(target_os = "linux")]
+use taskmanager_fd_bridge::is_pidfd_unsupported;
+#[cfg(target_os = "linux")]
+use taskmanager_fd_bridge::pidfd_open;
+#[cfg(target_os = "linux")]
+use taskmanager_fd_bridge::pidfd_send_signal;
+#[cfg(windows)]
+use taskmanager_windows_api::ProcessPriorityClass;
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsApiError;
+#[cfg(windows)]
+use taskmanager_windows_api::set_process_affinity_exact;
+#[cfg(windows)]
+use taskmanager_windows_api::set_process_priority_exact;
+#[cfg(windows)]
+use taskmanager_windows_api::terminate_process_exact;
 
 const SCHEMA_VERSION: u32 = 1;
 
@@ -400,16 +418,16 @@ fn apply_operation(pid: u32, expected: u64, operation: &Operation) -> Result<(),
 fn send_signal_checked(pid: u32, expected: u64, signal: SignalName) -> Result<(), HelperError> {
     #[cfg(target_os = "linux")]
     {
-        match taskmanager_fd_bridge::pidfd_open(pid) {
+        match pidfd_open(pid) {
             Ok(pidfd) => {
                 validate_start_token(pid, expected)?;
-                taskmanager_fd_bridge::pidfd_send_signal(&pidfd, signal_number(signal))
+                pidfd_send_signal(&pidfd, signal_number(signal))
                     .map_err(|error| classify_pidfd_error(error, "process signal failed"))
             }
             // Linux < 5.1 has no pidfd syscalls; fall back to the legacy
             // re-read-then-signal path with its narrow audited residual
             // window (see `send_signal_legacy_checked`).
-            Err(error) if taskmanager_fd_bridge::is_pidfd_unsupported(&error) => {
+            Err(error) if is_pidfd_unsupported(&error) => {
                 send_signal_legacy_checked(pid, expected, signal)
             }
             Err(error) => Err(classify_pidfd_error(
@@ -567,24 +585,21 @@ fn classify_io(error: io::Error, context: String) -> HelperError {
 fn apply_operation(pid: u32, expected: u64, operation: &Operation) -> Result<(), HelperError> {
     match operation {
         Operation::End | Operation::Kill => {
-            taskmanager_windows_api::terminate_process_exact(pid, expected).map_err(map_win_api_err)
+            terminate_process_exact(pid, expected).map_err(map_win_api_err)
         }
         Operation::Priority(nice) => {
             let class = map_nice_to_win_priority(*nice);
-            taskmanager_windows_api::set_process_priority_exact(pid, expected, class)
-                .map_err(map_win_api_err)
+            set_process_priority_exact(pid, expected, class).map_err(map_win_api_err)
         }
         Operation::Affinity(cpus) => {
-            taskmanager_windows_api::set_process_affinity_exact(pid, expected, cpus)
-                .map_err(map_win_api_err)
+            set_process_affinity_exact(pid, expected, cpus).map_err(map_win_api_err)
         }
         Operation::Suspend | Operation::Resume => Err(HelperError::Unsupported(
             "process suspend/resume is unsupported on Windows".to_owned(),
         )),
         Operation::Signal(signal) => match signal {
             SignalName::Terminate | SignalName::Kill => {
-                taskmanager_windows_api::terminate_process_exact(pid, expected)
-                    .map_err(map_win_api_err)
+                terminate_process_exact(pid, expected).map_err(map_win_api_err)
             }
             _ => Err(HelperError::Unsupported(format!(
                 "signal {} is unsupported on Windows",
@@ -595,35 +610,33 @@ fn apply_operation(pid: u32, expected: u64, operation: &Operation) -> Result<(),
 }
 
 #[cfg(windows)]
-fn map_nice_to_win_priority(nice: i32) -> taskmanager_windows_api::ProcessPriorityClass {
+fn map_nice_to_win_priority(nice: i32) -> ProcessPriorityClass {
     if nice <= -15 {
-        taskmanager_windows_api::ProcessPriorityClass::Realtime
+        ProcessPriorityClass::Realtime
     } else if nice <= -6 {
-        taskmanager_windows_api::ProcessPriorityClass::High
+        ProcessPriorityClass::High
     } else if nice <= -1 {
-        taskmanager_windows_api::ProcessPriorityClass::AboveNormal
+        ProcessPriorityClass::AboveNormal
     } else if nice <= 0 {
-        taskmanager_windows_api::ProcessPriorityClass::Normal
+        ProcessPriorityClass::Normal
     } else if nice <= 6 {
-        taskmanager_windows_api::ProcessPriorityClass::BelowNormal
+        ProcessPriorityClass::BelowNormal
     } else {
-        taskmanager_windows_api::ProcessPriorityClass::Idle
+        ProcessPriorityClass::Idle
     }
 }
 
 #[cfg(windows)]
-fn map_win_api_err(err: taskmanager_windows_api::WindowsApiError) -> HelperError {
+fn map_win_api_err(err: WindowsApiError) -> HelperError {
     match err {
-        taskmanager_windows_api::WindowsApiError::PermissionDenied => {
+        WindowsApiError::PermissionDenied => {
             HelperError::PermissionDenied("permission denied".to_owned())
         }
-        taskmanager_windows_api::WindowsApiError::IdentityChanged => {
+        WindowsApiError::IdentityChanged => {
             HelperError::IdentityChanged("process identity changed or process exited".to_owned())
         }
-        taskmanager_windows_api::WindowsApiError::InvalidInput => {
-            HelperError::Rejected("invalid input argument".to_owned())
-        }
-        taskmanager_windows_api::WindowsApiError::Unsupported => {
+        WindowsApiError::InvalidInput => HelperError::Rejected("invalid input argument".to_owned()),
+        WindowsApiError::Unsupported => {
             HelperError::Unsupported("operation unsupported on this system".to_owned())
         }
         _ => HelperError::OperationFailed(format!("{err}")),

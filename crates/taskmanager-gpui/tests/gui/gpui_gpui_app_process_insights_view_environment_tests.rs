@@ -4,6 +4,7 @@ use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::process_telemetry::{
     ProcessEnvironment, ProcessEnvironmentEntry, ProcessTelemetrySnapshot,
 };
+use taskmanager_ui::init;
 
 fn labels() -> ProcessInsightsLabels {
     ProcessInsightsLabels::capture_fixture()
@@ -45,7 +46,7 @@ impl Render for EnvironmentCardView {
 }
 
 fn draw_frame(cx: &mut TestAppContext, snapshot: ProcessTelemetrySnapshot) {
-    cx.update(taskmanager_ui::init);
+    cx.update(init);
     let theme = Theme::dark();
     let card = environment_card(&theme, &snapshot, &labels(), 480.0);
     let window = cx.add_window(|_w, _cx| EnvironmentCardView { card });

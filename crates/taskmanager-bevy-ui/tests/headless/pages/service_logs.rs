@@ -19,6 +19,7 @@
 use bevy::app::App;
 use bevy::input::keyboard::KeyCode;
 use taskmanager_application::PlatformEffect;
+use taskmanager_core::core::services::ServiceLogLevel;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogLevelFilter,
@@ -33,6 +34,10 @@ use super::log_panel::{
     log_status_caption,
 };
 use super::tests::{headless_services_app, push_services, route_to_services};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_theme::Theme;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -53,7 +58,7 @@ fn entry(index: usize) -> ServiceLogEntry {
         cursor: format!("j:{index:04}"),
         realtime_timestamp_micros: Some(1_700_000_000_000_000 + index as u64 * 1_000_000),
         priority: Some(6),
-        level: taskmanager_core::core::services::ServiceLogLevel::Unknown,
+        level: ServiceLogLevel::Unknown,
         message: format!("line {index}"),
     }
 }
@@ -128,7 +133,7 @@ fn the_open_affordance_targets_the_selected_service_and_submits_one_follow() {
 #[test]
 fn folded_snapshots_grow_visible_entries_without_cursor_duplicates() {
     let mut shell = ShellApp::new();
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let service = ServiceId::new("demo.service");
     let _ = shell.open_service_log_for(service.clone());
     let query = ServiceLogQuery {
         service_id: service.clone(),
@@ -188,7 +193,7 @@ fn painted_panel(shell: &ShellApp) -> Vec<(crate::window::Role, String)> {
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
-    let palette = crate::palette::ui_palette(&taskmanager_theme::Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark());
     let scene = super::log_panel::service_log_panel_scene(shell, &palette);
     let world = app.world_mut();
     let root = world
@@ -223,10 +228,8 @@ fn painted_messages(shell: &ShellApp) -> Vec<String> {
 
 #[test]
 fn painted_rows_follow_the_level_filter() {
-    use taskmanager_core::core::services::ServiceLogLevel;
-
     let mut shell = ShellApp::new();
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let service = ServiceId::new("demo.service");
     let _ = shell.open_service_log_for(service.clone());
     let query = ServiceLogQuery {
         service_id: service,
@@ -269,7 +272,7 @@ fn painted_rows_follow_the_level_filter() {
     assert!(
         painted_texts(&shell)
             .iter()
-            .any(|text| text == taskmanager_application::i18n::t("svc.logs_level_errors")),
+            .any(|text| text == t("svc.logs_level_errors")),
         "the level chip must name the active filter"
     );
 
@@ -294,7 +297,7 @@ fn painted_rows_follow_the_level_filter() {
     assert!(
         texts
             .iter()
-            .any(|text| text == taskmanager_application::i18n::t("svc.logs_level_warnings")),
+            .any(|text| text == t("svc.logs_level_warnings")),
         "the level chip must follow the second cycle"
     );
 }
@@ -306,7 +309,7 @@ fn the_status_caption_is_a_typed_provider_decision() {
     let loading = ServiceLogProviderState::default();
     assert_eq!(
         log_status_caption(&loading),
-        taskmanager_application::i18n::t("svc.logs_loading"),
+        t("svc.logs_loading"),
         "a cold provider says it is loading, never that there are no logs"
     );
 
@@ -317,7 +320,7 @@ fn the_status_caption_is_a_typed_provider_decision() {
     ));
     assert_eq!(
         log_status_caption(&denied),
-        taskmanager_application::i18n::t("svc.logs_permission_denied"),
+        t("svc.logs_permission_denied"),
         "a permission failure is reported as one, not as empty"
     );
 
@@ -328,7 +331,7 @@ fn the_status_caption_is_a_typed_provider_decision() {
     ));
     let caption = log_status_caption(&failed);
     assert!(
-        caption.starts_with(taskmanager_application::i18n::t("svc.logs_failed")),
+        caption.starts_with(t("svc.logs_failed")),
         "a provider failure reports the failure vocabulary, got {caption}"
     );
 
@@ -336,7 +339,7 @@ fn the_status_caption_is_a_typed_provider_decision() {
     empty.observe_success(true, 10);
     assert_eq!(
         log_status_caption(&empty),
-        taskmanager_application::i18n::t("svc.logs_empty"),
+        t("svc.logs_empty"),
         "an empty successful read says there are no entries"
     );
 
@@ -390,7 +393,7 @@ fn the_chord_mapping_is_total_and_exclusive() {
 
 #[test]
 fn panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet() {
-    let service = taskmanager_core::core::target::ServiceId::new("alpha.service");
+    let service = ServiceId::new("alpha.service");
     let (mut app, events) = headless_services_app();
     push_services(
         &events,
@@ -513,7 +516,7 @@ fn panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet() {
 
 #[test]
 fn the_repaint_gate_fires_only_when_a_rendered_fact_moves() {
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let service = ServiceId::new("demo.service");
     let mut open = OpenServiceLog::new(service);
     let closed = log_fingerprint(None);
     assert_ne!(
@@ -529,7 +532,7 @@ fn the_repaint_gate_fires_only_when_a_rendered_fact_moves() {
     );
 
     let query = ServiceLogQuery {
-        service_id: taskmanager_core::core::target::ServiceId::new("demo.service"),
+        service_id: ServiceId::new("demo.service"),
         level: ServiceLogLevelFilter::All,
         time: ServiceLogTimeFilter::All,
         after_cursor: None,
@@ -549,7 +552,7 @@ fn the_repaint_gate_fires_only_when_a_rendered_fact_moves() {
 #[test]
 fn service_log_export_writes_formatted_lines_and_reports_notice() {
     let mut shell = ShellApp::new();
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let service = ServiceId::new("demo.service");
     let _ = shell.open_service_log_for(service.clone());
     let query = ServiceLogQuery {
         service_id: service.clone(),
@@ -578,10 +581,7 @@ fn service_log_export_writes_formatted_lines_and_reports_notice() {
     assert!(content.contains("[Unknown] line 2"));
 
     let notice = shell.feedback_notice().expect("feedback notice reported");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(notice.text().contains(&exported_file.display().to_string()));
 
     let _ = std::fs::remove_dir_all(&scratch_dir);
@@ -590,7 +590,7 @@ fn service_log_export_writes_formatted_lines_and_reports_notice() {
 #[test]
 fn service_log_export_with_no_entries_reports_warning_notice() {
     let mut shell = ShellApp::new();
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let service = ServiceId::new("demo.service");
     let _ = shell.open_service_log_for(service.clone());
 
     let scratch_dir = crate::app::app_support::repo_temp_dir().join("bevy-svc-log-export-empty");
@@ -605,14 +605,8 @@ fn service_log_export_with_no_entries_reports_warning_notice() {
     );
 
     let notice = shell.feedback_notice().expect("warning notice reported");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Warning
-    );
-    assert_eq!(
-        notice.text(),
-        taskmanager_application::i18n::t("svc.logs_nothing_to_export")
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Warning);
+    assert_eq!(notice.text(), t("svc.logs_nothing_to_export"));
 
     let _ = std::fs::remove_dir_all(&scratch_dir);
 }
@@ -657,9 +651,7 @@ fn e_key_triggers_service_log_export_when_panel_is_open() {
     // Open log panel
     app.world_mut()
         .resource_mut::<crate::pages::services::ServiceSelection>()
-        .target = Some(taskmanager_core::core::target::ServiceId::new(
-        "alpha.service",
-    ));
+        .target = Some(ServiceId::new("alpha.service"));
     app.world_mut()
         .commands()
         .trigger(crate::pages::services::log_panel::ServiceLogsRequested);
@@ -667,7 +659,7 @@ fn e_key_triggers_service_log_export_when_panel_is_open() {
 
     // Populate feed
     let query = ServiceLogQuery {
-        service_id: taskmanager_core::core::target::ServiceId::new("alpha.service"),
+        service_id: ServiceId::new("alpha.service"),
         level: ServiceLogLevelFilter::All,
         time: ServiceLogTimeFilter::All,
         after_cursor: None,
@@ -689,10 +681,7 @@ fn e_key_triggers_service_log_export_when_panel_is_open() {
         .shell
         .feedback_notice()
         .expect("feedback notice reported on E key");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
 
     let exported_file = scratch_dir.join("taskmanager-service-alpha.service.log");
     assert!(exported_file.exists(), "exported file must exist");

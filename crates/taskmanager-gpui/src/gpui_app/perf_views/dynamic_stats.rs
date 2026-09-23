@@ -4,6 +4,7 @@ use taskmanager_application::i18n;
 use taskmanager_core::core::{
     BatteryInfo, SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::viewmodel::StatRow;
 
 pub(super) fn battery_stats(battery: &BatteryInfo) -> Vec<StatRow> {
@@ -46,13 +47,13 @@ pub(super) fn battery_stats(battery: &BatteryInfo) -> Vec<StatRow> {
     if let Some(secs) = battery.current_time_to_full_secs() {
         stats.push(StatRow::text(
             i18n::t("battery.time_to_full"),
-            Some(taskmanager_shell::presentation::duration(secs as u64)),
+            Some(duration(secs as u64)),
         ));
     }
     if let Some(secs) = battery.current_time_to_empty_secs() {
         stats.push(StatRow::text(
             i18n::t("battery.time_to_empty"),
-            Some(taskmanager_shell::presentation::duration(secs as u64)),
+            Some(duration(secs as u64)),
         ));
     }
     if !battery.technology.is_empty() {

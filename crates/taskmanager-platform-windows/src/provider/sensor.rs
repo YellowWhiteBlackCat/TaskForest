@@ -10,6 +10,7 @@
 //! source and stay typed absent.
 
 use taskmanager_application::SensorRequest;
+use taskmanager_core::DeviceId;
 use taskmanager_core::{
     DeviceGeneration, DeviceState, DeviceStatus, FailureKind, ProviderId, SensorCenterSnapshot,
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
@@ -17,6 +18,8 @@ use taskmanager_core::{
 use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::SensorProvider;
 use taskmanager_platform_runtime::{ProviderRegistration, SensorExecutors, SensorProviderBindings};
+use taskmanager_windows_api::WindowsThermalZoneReading;
+use taskmanager_windows_api::query_acpi_thermal_zones;
 
 const SENSOR_CAPABILITY_PROVIDER: ProviderId = ProviderId::borrowed("windows.sensor.native");
 
@@ -39,7 +42,7 @@ impl SensorProvider for WinSensorProvider {
         &mut self,
         observed_at_ms: u64,
     ) -> Result<DeviceSourceSnapshot<SensorCenterSnapshot>, ProviderFailure> {
-        let acpi = taskmanager_windows_api::query_acpi_thermal_zones();
+        let acpi = query_acpi_thermal_zones();
         let acpi_failed = acpi.is_err();
         let mut thermal_zones = acpi.unwrap_or_default();
         let mut used_component_fallback = false;
@@ -51,7 +54,7 @@ impl SensorProvider for WinSensorProvider {
                     && temp > 0.0
                     && temp < 120.0
                 {
-                    thermal_zones.push(taskmanager_windows_api::WindowsThermalZoneReading {
+                    thermal_zones.push(WindowsThermalZoneReading {
                         name: c.label().to_string(),
                         temperature_c: temp,
                         critical_trip_point_c: c.critical(),
@@ -80,7 +83,7 @@ impl SensorProvider for WinSensorProvider {
                     return None;
                 }
                 let id = format!("thermal-zone:{normalized}");
-                let device_id = taskmanager_core::DeviceId::from(format!("windows:{id}"));
+                let device_id = DeviceId::from(format!("windows:{id}"));
                 let Ok(measurement) = SensorMeasurementObservation::available(
                     SensorDescriptor::temperature(SensorScale::IDENTITY),
                     SensorMagnitude::Decimal(f64::from(z.temperature_c)),

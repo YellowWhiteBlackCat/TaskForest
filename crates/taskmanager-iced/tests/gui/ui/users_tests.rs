@@ -1,5 +1,10 @@
 use super::*;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::session::SessionItem;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn user_projection_preserves_session_identity_and_remote_facts() {
@@ -9,7 +14,7 @@ fn user_projection_preserves_session_identity_and_remote_facts() {
     use taskmanager_application::i18n::{Language, set_language};
     set_language(Language::En);
 
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     assert_eq!(user_list_state(&shell), ListState::Ready);
 
     let rows = user_rows(&shell);
@@ -28,7 +33,7 @@ fn user_projection_preserves_session_identity_and_remote_facts() {
 fn user_projection_distinguishes_loading_empty_and_missing_fields() {
     // Localized copy: pin English so the assertion is identical on
     // every runner regardless of the host locale.
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let shell = ShellApp::new();
     assert_eq!(user_list_state(&shell), ListState::Loading);
     assert_eq!(
@@ -37,16 +42,13 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
     );
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(Vec::new())),
-    );
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
     assert_eq!(user_list_state(&shell), ListState::Empty);
     assert_eq!(user_heading(ListState::Empty, 0), "Users · 0 reported");
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(vec![SessionItem {
+        ProjectionSeedFact::Sessions(Some(vec![SessionItem {
             id: "local".into(),
             uid: 0,
             user: "unknown".into(),
@@ -69,7 +71,7 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
 /// kept on this page.
 #[test]
 fn user_rows_have_no_page_filter_so_names_stay_plain_under_a_shared_search() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     shell.query = "root".into();
     shell.open_search();
 

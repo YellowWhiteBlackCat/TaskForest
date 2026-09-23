@@ -1,6 +1,9 @@
 //! Capability-declaration gate for the Iced shape (CORE-08).
 
 use super::*;
+use taskmanager_ui_contract::CapabilitySupport;
+use taskmanager_ui_contract::ComponentCapability;
+use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::{capability_drift, capability_findings, capability_report};
 
 /// Contract gate: every capability has exactly one explicit decision and
@@ -8,14 +11,8 @@ use taskmanager_ui_contract::{capability_drift, capability_findings, capability_
 #[test]
 fn declaration_is_total_and_every_difference_is_registered() {
     let declaration = capability_declaration();
-    assert_eq!(
-        declaration.frontend,
-        taskmanager_ui_contract::FrontendShape::Iced
-    );
-    assert_eq!(
-        declaration.entries.len(),
-        taskmanager_ui_contract::ComponentCapability::ALL.len()
-    );
+    assert_eq!(declaration.frontend, FrontendShape::Iced);
+    assert_eq!(declaration.entries.len(), ComponentCapability::ALL.len());
     let report = capability_report(&declaration);
     assert!(
         capability_drift(&report).is_empty(),
@@ -35,12 +32,7 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
     let divergent: Vec<&str> = declaration
         .entries
         .iter()
-        .filter(|entry| {
-            matches!(
-                entry.support,
-                taskmanager_ui_contract::CapabilitySupport::Divergent { .. }
-            )
-        })
+        .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
     assert_eq!(divergent, ["toast", "text-selection"]);
@@ -49,32 +41,28 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
 #[test]
 fn every_capability_is_classified_correctly() {
     let declaration = capability_declaration();
-    for capability in taskmanager_ui_contract::ComponentCapability::ALL {
+    for capability in ComponentCapability::ALL {
         let entry = declaration
             .entries
             .iter()
             .find(|e| e.capability == *capability)
             .unwrap_or_else(|| panic!("capability {capability:?} must be registered"));
         match capability {
-            taskmanager_ui_contract::ComponentCapability::Scrollbar => {
+            ComponentCapability::Scrollbar => {
                 assert!(
-                    matches!(entry.support, taskmanager_ui_contract::CapabilitySupport::Native { via } if via == "iced scrollable"),
+                    matches!(entry.support, CapabilitySupport::Native { via } if via == "iced scrollable"),
                     "Scrollbar must be Native via iced scrollable"
                 );
             }
-            taskmanager_ui_contract::ComponentCapability::Toast
-            | taskmanager_ui_contract::ComponentCapability::TextSelection => {
+            ComponentCapability::Toast | ComponentCapability::TextSelection => {
                 assert!(
-                    matches!(entry.support, taskmanager_ui_contract::CapabilitySupport::Divergent { reason } if !reason.is_empty()),
+                    matches!(entry.support, CapabilitySupport::Divergent { reason } if !reason.is_empty()),
                     "{capability:?} must be Divergent with a non-empty reason"
                 );
             }
             _ => {
                 assert!(
-                    matches!(
-                        entry.support,
-                        taskmanager_ui_contract::CapabilitySupport::Ported
-                    ),
+                    matches!(entry.support, CapabilitySupport::Ported),
                     "{capability:?} must be Ported"
                 );
             }

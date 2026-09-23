@@ -3,31 +3,32 @@
 use super::super::*;
 use taskmanager_application::AppPage;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture_app() -> TuiApp {
     let mut processes = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1)
             .name("root".into())
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(2)
             .name("child".into())
             .parent_pid(Some(1))
             .build(),
     ];
     for process in &mut processes {
-        process.apply_scalar_observations(
-            taskmanager_core::core::process::ProcessScalarObservations {
-                start_token: ScalarObservation::available(u64::from(process.pid), 42),
-                ..Default::default()
-            },
-        );
+        process.apply_scalar_observations(ProcessScalarObservations {
+            start_token: ScalarObservation::available(u64::from(process.pid), 42),
+            ..Default::default()
+        });
     }
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(processes)),
+        ProjectionSeedFact::Processes(Some(processes)),
     );
     app.application.active_page = AppPage::Applications;
     app.expanded_groups = ["category:uncategorized".to_string()].into_iter().collect();

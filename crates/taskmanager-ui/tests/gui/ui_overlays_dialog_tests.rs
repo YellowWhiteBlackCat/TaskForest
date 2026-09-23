@@ -1,5 +1,9 @@
 use super::{Dialog, panel_shadow};
 
+use taskmanager_theme::HighContrast;
+use taskmanager_theme::LightDark;
+use taskmanager_theme::ResolvedFonts;
+use taskmanager_theme::Skin;
 use taskmanager_theme::Theme;
 #[test]
 fn dialog_confirm_preset_disables_mask_close_and_close_button() {
@@ -30,15 +34,12 @@ fn default_mask_is_palette_scrim() {
 /// and the edge layer carrying the token color verbatim.
 #[test]
 fn panel_shadow_is_two_layer_token_ink() {
-    for mode in [
-        taskmanager_theme::LightDark::Light,
-        taskmanager_theme::LightDark::Dark,
-    ] {
+    for mode in [LightDark::Light, LightDark::Dark] {
         let theme = Theme::build(
-            taskmanager_theme::Skin::Gnome,
+            Skin::Gnome,
             mode,
-            taskmanager_theme::HighContrast::Off,
-            taskmanager_theme::ResolvedFonts::system_for(taskmanager_theme::Skin::Gnome),
+            HighContrast::Off,
+            ResolvedFonts::system_for(Skin::Gnome),
         );
         let palette = theme.palette();
         let shadow = panel_shadow(&palette);

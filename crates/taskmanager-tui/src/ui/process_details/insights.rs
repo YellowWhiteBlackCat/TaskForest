@@ -21,6 +21,12 @@ pub(crate) use formatting::{
     capabilities_preview_lines_with_limit, environment_preview_lines_with_limit,
     format_engine_usage_line, format_gpu_device_row, open_files_preview_lines_with_limit,
 };
+use taskmanager_application::ProcessAffinityState;
+use taskmanager_core::core::process_telemetry::ThreadWaitKind;
+use taskmanager_shell::presentation::{
+    capabilities_summary, namespaces_summary, network_connection_counters_summary,
+    sandbox_details_summary,
+};
 
 /// Whether the network facet for `pid` reports the typed
 /// `RequiresEscalation` state — the one facet whose unavailability the
@@ -134,8 +140,7 @@ pub(crate) fn insights_lines_with_limit(
                 snapshot.connections.len()
             )));
             if let Some(counters) = snapshot.connection_counters.as_ref()
-                && let Some(summary) =
-                    taskmanager_shell::presentation::network_connection_counters_summary(counters)
+                && let Some(summary) = network_connection_counters_summary(counters)
             {
                 lines.push(ratatui::text::Line::from(format!("  {summary}")));
             }
@@ -334,7 +339,7 @@ pub(crate) fn insights_lines_with_limit(
                 isolation
                     .capabilities
                     .as_ref()
-                    .map(taskmanager_shell::presentation::capabilities_summary)
+                    .map(capabilities_summary)
                     .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             )));
             lines.push(ratatui::text::Line::from(format!(
@@ -343,12 +348,10 @@ pub(crate) fn insights_lines_with_limit(
                 isolation
                     .namespaces
                     .as_ref()
-                    .map(taskmanager_shell::presentation::namespaces_summary)
+                    .map(namespaces_summary)
                     .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             )));
-            if let Some(details) =
-                taskmanager_shell::presentation::sandbox_details_summary(isolation)
-            {
+            if let Some(details) = sandbox_details_summary(isolation) {
                 lines.push(ratatui::text::Line::from(format!(
                     "  {} {}",
                     t("proc_insights.sandbox_details"),
@@ -389,7 +392,7 @@ pub(crate) fn insights_lines_with_limit(
     }
     // CPU Affinity: render observed affinity state for this process
     match app.shell.process_affinity_state() {
-        taskmanager_application::ProcessAffinityState::Ready(ready) if ready.target.pid == pid => {
+        ProcessAffinityState::Ready(ready) if ready.target.pid == pid => {
             let total = app.logical_cpu_count();
             let cpus_summary = if ready.cpus.is_empty() {
                 missing_value()
@@ -413,9 +416,7 @@ pub(crate) fn insights_lines_with_limit(
                 cpus_summary,
             )));
         }
-        taskmanager_application::ProcessAffinityState::Loading { target, .. }
-            if target.pid == pid =>
-        {
+        ProcessAffinityState::Loading { target, .. } if target.pid == pid => {
             lines.push(ratatui::text::Line::from(format!(
                 "  {} {}",
                 t("proc.affinity"),
@@ -526,7 +527,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
     let wait = thread.run_queue_wait_ns.map(|nanos| {
         let kind = thread
             .wait_kind
-            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .map(ThreadWaitKind::as_str)
             .unwrap_or("wait");
         format!("{kind} {:.1}ms", nanos as f64 / 1_000_000.0)
     });

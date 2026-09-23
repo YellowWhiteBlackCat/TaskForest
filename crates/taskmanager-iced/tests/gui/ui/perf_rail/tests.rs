@@ -3,6 +3,8 @@ use crate::app::{Message, SettingsChange};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::metrics::OptionalObservation;
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryMetrics,
     MemoryScalarObservations, NetworkAdapterType, ScalarObservation, ScalarObservationGroup,
@@ -11,6 +13,12 @@ use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations};
 use taskmanager_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorQuantity, SensorScale,
 };
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::presentation::trend::cpu_usage_percent;
+use taskmanager_shell::presentation::trend::memory_usage_percent;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn rail_key(app: &crate::IcedApp, theme: &Theme) -> u64 {
     let devices = [PerfDevice::Cpu];
@@ -127,7 +135,7 @@ fn mem_caption_formats_used_total_and_percentage() {
 #[test]
 fn disk_caption_combines_active_rate_type_temperature_and_badge() {
     pin_english();
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:nvme0".into())
         .name("/dev/nvme0n1".into())
         .model("ZHITAI TiPro9000 2TB".into())
@@ -136,12 +144,12 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
         .current_write_bytes_per_sec(24 << 20)
         .current_active_time_pct(12.4)
         .smart_temperature_c(Some(41.0))
-        .device_state(taskmanager_core::core::device_state::DeviceState {
+        .device_state(DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
-        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
-        .smart_state(taskmanager_core::core::device_state::DeviceState {
+        .smart_availability(SmartAvailability::Available)
+        .smart_state(DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -152,7 +160,7 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
     assert_eq!(cap1, "12% · 124.0 MiB/s");
     assert_eq!(cap2, "nvme0n1 · NVMe SSD · 41 \u{b0}C");
 
-    let degraded = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let degraded = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:sda".into())
         .name("sda".into())
         .smart_critical_warning(Some(true))
@@ -168,23 +176,23 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
 #[test]
 fn nic_caption_reads_wireless_association_and_wired_link() {
     pin_english();
-    let wifi = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let wifi = NetworkMetricsFixtureBuilder::new()
         .device_id("net:test:wlan0".into())
         .interface_name("wlan0".into())
         .adapter_type(NetworkAdapterType::WiFi)
         .ssid_observation(match Some("office".into()) {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .signal_observation(match Some(-50) {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .link_speed_observation(match Some(866) {
-            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
-            None => taskmanager_core::core::metrics::ScalarObservation::default(),
+            Some(value) => ScalarObservation::available(value, 1),
+            None => ScalarObservation::default(),
         })
-        .device_state(taskmanager_core::core::device_state::DeviceState {
+        .device_state(DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -196,14 +204,14 @@ fn nic_caption_reads_wireless_association_and_wired_link() {
     assert!(cap1.contains(" R: "), "recv label follows: {cap1}");
     assert_eq!(cap2, "office · 67% · 866 Mbps");
 
-    let wired = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let wired = NetworkMetricsFixtureBuilder::new()
         .interface_name("enp3s0".into())
         .adapter_type(NetworkAdapterType::Ethernet)
         .link_speed_observation(match Some(1000) {
-            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
-            None => taskmanager_core::core::metrics::ScalarObservation::default(),
+            Some(value) => ScalarObservation::available(value, 1),
+            None => ScalarObservation::default(),
         })
-        .device_state(taskmanager_core::core::device_state::DeviceState {
+        .device_state(DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -288,14 +296,14 @@ fn battery_and_fan_captions_read_capacity_rpm_and_badges() {
 #[test]
 fn rail_rows_project_every_visible_device_from_its_own_window() {
     pin_english();
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     let snapshot = shell
         .projection()
         .snapshot
         .clone()
         .expect("demo snapshot fixture");
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(&mut shell, &snapshot, None, None);
+        record_demo_history_frame(&mut shell, &snapshot, None, None);
     }
     let history = &shell.history;
     let inputs = RailInputs {
@@ -304,13 +312,8 @@ fn rail_rows_project_every_visible_device_from_its_own_window() {
         sensors: shell.projection().sensors.as_ref(),
         shell: &shell,
         device_samples: None,
-        cpu_samples: std::rc::Rc::from(
-            taskmanager_shell::presentation::trend::cpu_usage_percent(history).into_boxed_slice(),
-        ),
-        memory_samples: std::rc::Rc::from(
-            taskmanager_shell::presentation::trend::memory_usage_percent(history)
-                .into_boxed_slice(),
-        ),
+        cpu_samples: std::rc::Rc::from(cpu_usage_percent(history).into_boxed_slice()),
+        memory_samples: std::rc::Rc::from(memory_usage_percent(history).into_boxed_slice()),
         memory_units: UnitPrefs::default(),
         drive_units: UnitPrefs::default(),
         network_units: UnitPrefs::default(),
