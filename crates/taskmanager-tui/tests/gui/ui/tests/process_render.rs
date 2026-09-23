@@ -14,6 +14,19 @@ use crate::ui::*;
 use crate::{TuiApp, TuiTheme};
 
 use super::frame_text;
+use taskmanager_application::ConfigDrain;
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, edit_processes, record_demo_history_frame, seed_projection_fact,
+};
+use taskmanager_shell::{
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable,
+};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
 
 #[path = "process_render/grouped_render.rs"]
 mod grouped_render;
@@ -25,13 +38,13 @@ fn wait_for_config_outcome(app: &mut TuiApp) {
         .expect("injected config client")
         .wait_for_drain(std::time::Duration::from_secs(2));
     match drain {
-        taskmanager_application::ConfigDrain::Empty => panic!("expected config outcome"),
-        taskmanager_application::ConfigDrain::Publications(publications) => {
+        ConfigDrain::Empty => panic!("expected config outcome"),
+        ConfigDrain::Publications(publications) => {
             for publication in publications {
                 app.apply_config_publication(&publication);
             }
         }
-        taskmanager_application::ConfigDrain::ResyncRequired { latest, .. } => {
+        ConfigDrain::ResyncRequired { latest, .. } => {
             app.apply_config_publication(&latest);
         }
     }
@@ -177,11 +190,11 @@ fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() 
     use taskmanager_core::core::metrics::ScalarObservation;
     use taskmanager_core::core::process::FrozenProcessIdentity;
 
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut item = ProcessItemFixtureBuilder::new()
         .pid(4321)
         .name("my worker".into())
         .build();
-    item.apply_scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+    item.apply_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(7, 1),
         ..Default::default()
     });
@@ -231,7 +244,7 @@ fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() 
 fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
-    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+    edit_processes(&mut app.shell, |processes| {
         let process = processes
             .as_mut()
             .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
@@ -275,7 +288,7 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     // family (`RSS - USS`) reaches the details panel's own row.
     let shared_row = text
         .lines()
-        .find(|line| line.contains(taskmanager_application::i18n::t("proc.shared")))
+        .find(|line| line.contains(t("proc.shared")))
         .unwrap_or_else(|| panic!("the derived-shared detail row must render:\n{text}"));
     assert!(
         shared_row.contains("768.0 MiB"),
@@ -301,7 +314,7 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     );
     let cold_shared_row = cold_text
         .lines()
-        .find(|line| line.contains(taskmanager_application::i18n::t("proc.shared")))
+        .find(|line| line.contains(t("proc.shared")))
         .unwrap_or_else(|| panic!("the derived-shared detail row must render:\n{cold_text}"));
     assert!(
         cold_shared_row.contains('—'),
@@ -321,7 +334,7 @@ fn process_details_panel_renders_the_observed_anonymous_huge_page_charge() {
     // writes the same typed scalar the Linux provider fills from
     // `/proc/<pid>/smaps` (AnonHugePages) before the frame is drawn. The row
     // must paint the SHARED projection value, never a fabricated charge.
-    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+    edit_processes(&mut app.shell, |processes| {
         let process = processes
             .as_mut()
             .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
@@ -374,9 +387,9 @@ fn process_details_panel_renders_the_observed_anonymous_huge_page_charge() {
 fn process_details_panel_renders_honest_empty_state_without_rows() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(Vec::new())),
+        ProjectionSeedFact::Processes(Some(Vec::new())),
     );
     app.selected = 0;
 
@@ -391,10 +404,7 @@ fn service_confirmation_overlay_renders_for_a_pending_control_target() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
     let service = app.projection().services.as_ref().expect("demo services")[1].clone();
-    assert!(app.select_service_control(
-        &service,
-        taskmanager_core::core::services::ServiceAction::Restart
-    ));
+    assert!(app.select_service_control(&service, ServiceAction::Restart));
     let _ = app.apply_action(AppAction::RequestServiceControl);
 
     let text = frame_text(&app, 100, 30);
@@ -505,7 +515,7 @@ fn settings_save_failure_is_surfaced_in_the_overlay() {
 #[test]
 fn unavailable_export_worker_feedback_renders_in_the_footer() {
     // Pin before export_snapshot() freezes the notice text.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::demo_app();
     // Shorten the status line so the export hint survives the footer's
     // wrap-trim at the reference width.
@@ -513,10 +523,7 @@ fn unavailable_export_worker_feedback_renders_in_the_footer() {
     app.clear_feedback_notice();
     app.export_snapshot();
     let feedback = app.feedback_notice().expect("export feedback");
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Error
-    );
+    assert_eq!(feedback.severity(), FeedbackSeverity::Error);
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("Snapshot export is unavailable"));
     assert!(text.contains("x export"));
@@ -525,13 +532,13 @@ fn unavailable_export_worker_feedback_renders_in_the_footer() {
 #[test]
 fn export_failure_renders_in_the_footer_in_danger_style() {
     // Pin before t() resolves the notice text the assertions match.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::demo_app();
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Persistence,
-        taskmanager_shell::FeedbackSeverity::Error,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
-        taskmanager_application::i18n::t("system.export_failed").replacen("{}", "disk full", 1),
+        FeedbackSource::Persistence,
+        FeedbackSeverity::Error,
+        FeedbackLifecycle::UntilReplaced,
+        t("system.export_failed").replacen("{}", "disk full", 1),
     );
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("export failed"));
@@ -541,25 +548,25 @@ fn export_failure_renders_in_the_footer_in_danger_style() {
 #[test]
 fn empty_tables_render_honest_empty_states() {
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(Vec::new())),
+        ProjectionSeedFact::Services(Some(Vec::new())),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("No services reported yet."));
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(Vec::new())),
+        ProjectionSeedFact::Sessions(Some(Vec::new())),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("No sessions"));
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupEntries(Some(Vec::new())),
+        ProjectionSeedFact::StartupEntries(Some(Vec::new())),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let text = frame_text(&app, 120, 36);
@@ -569,9 +576,9 @@ fn empty_tables_render_honest_empty_states() {
 #[test]
 fn applications_empty_state_answers_the_search_question() {
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(Vec::new())),
+        ProjectionSeedFact::Processes(Some(Vec::new())),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
 
@@ -580,15 +587,11 @@ fn applications_empty_state_answers_the_search_question() {
     // windowed-table primitive's zero-row branch).
     let text = frame_text(&app, 120, 36);
     assert!(
-        text.contains(taskmanager_application::i18n::t(
-            "empty.no_processes_reported"
-        )),
+        text.contains(t("empty.no_processes_reported")),
         "no-query empty state must say nothing was reported, got:\n{text}"
     );
     assert!(
-        !text.contains(taskmanager_application::i18n::t(
-            "empty.no_processes_match_query"
-        )),
+        !text.contains(t("empty.no_processes_match_query")),
         "the query-mismatch copy must not paint without a query"
     );
 
@@ -597,15 +600,11 @@ fn applications_empty_state_answers_the_search_question() {
     app.query = "zzz".to_string();
     let text = frame_text(&app, 120, 36);
     assert!(
-        text.contains(taskmanager_application::i18n::t(
-            "empty.no_processes_match_query"
-        )),
+        text.contains(t("empty.no_processes_match_query")),
         "a non-matching query must name the query mismatch, got:\n{text}"
     );
     assert!(
-        !text.contains(taskmanager_application::i18n::t(
-            "empty.no_processes_reported"
-        )),
+        !text.contains(t("empty.no_processes_reported")),
         "the no-query copy must not paint under an active query"
     );
 }
@@ -617,18 +616,15 @@ fn containers_event_drains_into_tui_state_through_the_batch() {
     use taskmanager_platform_contract::{EventSequence, RequestId};
 
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Containers(None),
-    );
-    let rollup = taskmanager_core::core::process_telemetry::ContainerRollup {
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Containers(None));
+    let rollup = ContainerRollup {
         state: DeviceState::healthy(1_000),
         containers: Vec::new(),
     };
     let mut batch = PlatformEventBatch::default();
     batch.containers_events.push(CorrelatedEvent {
         request_id: RequestId::new(1).expect("non-zero request id"),
-        capability: taskmanager_platform_contract::CapabilityId::CONTAINERS,
+        capability: CapabilityId::CONTAINERS,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
@@ -700,20 +696,12 @@ fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
         snapshot.timestamp_ms = 1_785_292_800_000 + tick;
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.global_usage_pct =
-            taskmanager_core::core::metrics::ScalarObservation::available(
-                30.0 + tick as f32,
-                snapshot.timestamp_ms,
-            );
+            ScalarObservation::available(30.0 + tick as f32, snapshot.timestamp_ms);
         snapshot.cpu.apply_scalar_observations(observations);
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+        seed_projection_fact(
             &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
-        taskmanager_shell::fixture::seed_projection_fact(
-            &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+            ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
         );
     }
     // The shared window holds exactly the twelve finite ticks we drove plus
@@ -875,9 +863,9 @@ fn gray_zero_dims_measured_zeros_but_keeps_unavailable_dashes() {
         observations.memory_bytes = ScalarObservation::available(0, 1);
         process.apply_scalar_observations(observations);
     }
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(processes)),
+        ProjectionSeedFact::Processes(Some(processes)),
     );
     app.prefs.gray_zero = true;
     let text = frame_text(&app, 150, 36);
@@ -895,7 +883,7 @@ fn gray_zero_dims_measured_zeros_but_keeps_unavailable_dashes() {
 
 #[test]
 fn services_table_header_marks_the_active_keyboard_sort_column() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
 
@@ -905,12 +893,9 @@ fn services_table_header_marks_the_active_keyboard_sort_column() {
 
     // The `s` key sort (w8) writes the shared slot; the header then marks the
     // active column with the direction arrow.
-    app.shell.set_info_sort(
-        taskmanager_shell::InfoTable::Services,
-        taskmanager_shell::InfoSortCol::Status,
-    );
     app.shell
-        .toggle_info_sort_direction(taskmanager_shell::InfoTable::Services);
+        .set_info_sort(InfoTable::Services, InfoSortCol::Status);
+    app.shell.toggle_info_sort_direction(InfoTable::Services);
     let text = frame_text(&app, 100, 30);
     assert!(
         text.contains("Status ▼"),

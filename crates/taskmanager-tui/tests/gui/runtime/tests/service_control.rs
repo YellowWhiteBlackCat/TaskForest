@@ -9,6 +9,15 @@ use taskmanager_application::AppAction;
 
 use crate::render;
 use crate::{TuiApp, TuiTheme};
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_core::core::services::{
+    ServiceAction, ServiceItem, ServiceLogEntries, ServiceLogEntry, ServiceLogLevel,
+    ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState,
+    ServiceLogTimeFilter, ServiceStatus,
+};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::{FeedbackSeverity, InfoSortCol, PAGE_STEP, SortCol, SortDir, queue_effect};
 
 /// Render the live frame through the same TestBackend path the render tests
 /// use, pinning English and serializing against the language-flipping test.
@@ -16,7 +25,7 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -99,10 +108,7 @@ fn service_menu_select_opens_the_shared_confirmation_and_y_confirms() {
     let Some(PlatformEffect::ServiceControl(target)) = effect else {
         panic!("confirm must produce a ServiceControl effect");
     };
-    assert_eq!(
-        target.action,
-        taskmanager_core::core::services::ServiceAction::Stop
-    );
+    assert_eq!(target.action, ServiceAction::Stop);
     assert!(!target.service_id.as_str().is_empty());
     assert_eq!(app.pending_service_control(), None);
 }
@@ -225,14 +231,14 @@ fn service_control_round_trip_submits_through_queue_effect() {
     )
     .expect("confirm must produce an effect");
 
-    taskmanager_shell::queue_effect(&mut app, &mut client, effect);
+    queue_effect(&mut app, &mut client, effect);
 
     let submitted = recorded.0.lock().expect("recorded requests");
     assert_eq!(submitted.len(), 1, "exactly one request is submitted");
     let request = &submitted[0];
     assert_eq!(
         request.action,
-        taskmanager_core::core::services::ServiceAction::Stop,
+        ServiceAction::Stop,
         "the menu's Stop pick must reach the provider"
     );
     assert!(
@@ -300,7 +306,7 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
     );
     assert_eq!(
         app.shell.service_log.as_ref().unwrap().feed.level,
-        taskmanager_core::core::services::ServiceLogLevelFilter::Errors
+        ServiceLogLevelFilter::Errors
     );
     let _ = handle_key(
         &mut app,
@@ -311,7 +317,7 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
     );
     assert_eq!(
         app.shell.service_log.as_ref().unwrap().feed.time,
-        taskmanager_core::core::services::ServiceLogTimeFilter::LastHour
+        ServiceLogTimeFilter::LastHour
     );
 
     // `q` closes; the page switch closes it too (page-change hygiene).
@@ -544,7 +550,7 @@ fn paging_and_bound_keys_work_on_every_table_page() {
     );
     assert_eq!(
         app.selected,
-        taskmanager_shell::PAGE_STEP.min(service_count - 1),
+        PAGE_STEP.min(service_count - 1),
         "PageDown pages the service list by the shared step"
     );
     let _ = handle_key(
@@ -660,10 +666,7 @@ fn s_key_sorts_the_inventory_tables_from_the_keyboard() {
     );
     assert_eq!(
         app.shell.services_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Name,
-            taskmanager_shell::SortDir::Asc
-        )),
+        Some((InfoSortCol::Name, SortDir::Asc)),
         "s on Services starts the Name sort"
     );
     let _ = handle_key(
@@ -675,10 +678,7 @@ fn s_key_sorts_the_inventory_tables_from_the_keyboard() {
     );
     assert_eq!(
         app.shell.services_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Status,
-            taskmanager_shell::SortDir::Asc
-        )),
+        Some((InfoSortCol::Status, SortDir::Asc)),
         "the second s walks to the Status column"
     );
 
@@ -692,10 +692,7 @@ fn s_key_sorts_the_inventory_tables_from_the_keyboard() {
     );
     assert_eq!(
         app.shell.services_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Status,
-            taskmanager_shell::SortDir::Desc
-        )),
+        Some((InfoSortCol::Status, SortDir::Desc)),
         "S flips the direction"
     );
 
@@ -717,10 +714,7 @@ fn s_key_sorts_the_inventory_tables_from_the_keyboard() {
     );
     assert_eq!(
         app.shell.sessions_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Name,
-            taskmanager_shell::SortDir::Asc
-        )),
+        Some((InfoSortCol::Name, SortDir::Asc)),
         "s on Users starts the Name sort"
     );
 }
@@ -737,10 +731,7 @@ fn s_key_on_the_applications_page_still_cycles_visible_process_columns() {
         ),
     );
     assert_eq!(app.page(), AppPage::Applications);
-    app.process_sort = (
-        taskmanager_shell::SortCol::Cpu,
-        taskmanager_shell::SortDir::Desc,
-    );
+    app.process_sort = (SortCol::Cpu, SortDir::Desc);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -750,18 +741,18 @@ fn s_key_on_the_applications_page_still_cycles_visible_process_columns() {
     );
     assert_eq!(
         app.effective_sort_col(),
-        taskmanager_shell::SortCol::Memory,
+        SortCol::Memory,
         "s on Applications walks the visible process columns as before"
     );
 }
 
 /// One synthetic service row: the provider-issued id is derived from the
 /// name so the sorted-vs-provider order assertions below are unambiguous.
-fn sorted_fixture_service(name: &str) -> taskmanager_core::core::services::ServiceItem {
-    taskmanager_core::core::services::ServiceItem::from_inventory(
-        taskmanager_core::core::target::ServiceId::new(format!("fixture.service:{name}")),
+fn sorted_fixture_service(name: &str) -> ServiceItem {
+    ServiceItem::from_inventory(
+        ServiceId::new(format!("fixture.service:{name}")),
         name,
-        taskmanager_core::core::services::ServiceStatus::Active,
+        ServiceStatus::Active,
         "",
         "",
         "",
@@ -777,9 +768,9 @@ fn sorted_fixture_service(name: &str) -> taskmanager_core::core::services::Servi
 fn menu_and_log_open_target_the_sorted_services_row() {
     let mut app = TuiApp::from_shell(ShellApp::new());
     // Provider order [zeta, alpha]; the Name sort renders [alpha, zeta].
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             sorted_fixture_service("zeta.service"),
             sorted_fixture_service("alpha.service"),
         ])),
@@ -874,31 +865,30 @@ fn service_log_export_via_e_key_writes_file_and_reports_notice() {
         .unwrap()
         .clone();
 
-    let entry1 = taskmanager_core::core::services::ServiceLogEntry {
+    let entry1 = ServiceLogEntry {
         cursor: "c1".into(),
         realtime_timestamp_micros: Some(1_000_000),
         priority: Some(6),
-        level: taskmanager_core::core::services::ServiceLogLevel::Info,
+        level: ServiceLogLevel::Info,
         message: "daemon started successfully".into(),
     };
-    let entry2 = taskmanager_core::core::services::ServiceLogEntry {
+    let entry2 = ServiceLogEntry {
         cursor: "c2".into(),
         realtime_timestamp_micros: Some(1_001_000),
         priority: Some(4),
-        level: taskmanager_core::core::services::ServiceLogLevel::Warning,
+        level: ServiceLogLevel::Warning,
         message: "connection pool retry".into(),
     };
-    let entries =
-        taskmanager_core::core::services::ServiceLogEntries::new(vec![entry1, entry2]).unwrap();
-    let query = taskmanager_core::core::services::ServiceLogQuery {
+    let entries = ServiceLogEntries::new(vec![entry1, entry2]).unwrap();
+    let query = ServiceLogQuery {
         service_id: service_id.clone(),
-        level: taskmanager_core::core::services::ServiceLogLevelFilter::All,
-        time: taskmanager_core::core::services::ServiceLogTimeFilter::All,
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
         after_cursor: None,
     };
-    let snapshot = taskmanager_core::core::services::ServiceLogStreamSnapshot {
+    let snapshot = ServiceLogStreamSnapshot {
         query,
-        state: taskmanager_core::core::services::ServiceLogStreamState::Ready(entries),
+        state: ServiceLogStreamState::Ready(entries),
     };
     app.shell
         .service_log
@@ -939,10 +929,7 @@ fn service_log_export_via_e_key_writes_file_and_reports_notice() {
     assert!(content.contains("[Warning] connection pool retry"));
 
     let notice = app.feedback_notice().expect("feedback notice reported");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
     assert!(notice.text().contains(&expected_file.display().to_string()));
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -983,23 +970,23 @@ fn service_log_export_palette_action_triggers_export() {
         .unwrap()
         .clone();
 
-    let entry = taskmanager_core::core::services::ServiceLogEntry {
+    let entry = ServiceLogEntry {
         cursor: "c1".into(),
         realtime_timestamp_micros: Some(1_000_000),
         priority: Some(6),
-        level: taskmanager_core::core::services::ServiceLogLevel::Info,
+        level: ServiceLogLevel::Info,
         message: "palette triggered log export".into(),
     };
-    let entries = taskmanager_core::core::services::ServiceLogEntries::new(vec![entry]).unwrap();
-    let query = taskmanager_core::core::services::ServiceLogQuery {
+    let entries = ServiceLogEntries::new(vec![entry]).unwrap();
+    let query = ServiceLogQuery {
         service_id: service_id.clone(),
-        level: taskmanager_core::core::services::ServiceLogLevelFilter::All,
-        time: taskmanager_core::core::services::ServiceLogTimeFilter::All,
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
         after_cursor: None,
     };
-    let snapshot = taskmanager_core::core::services::ServiceLogStreamSnapshot {
+    let snapshot = ServiceLogStreamSnapshot {
         query,
-        state: taskmanager_core::core::services::ServiceLogStreamState::Ready(entries),
+        state: ServiceLogStreamState::Ready(entries),
     };
     app.shell
         .service_log
@@ -1010,10 +997,7 @@ fn service_log_export_palette_action_triggers_export() {
 
     app.run_palette_local_action(Some(crate::PaletteLocalAction::ExportServiceLog));
     let notice = app.feedback_notice().expect("feedback notice reported");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
 
     let service_id_str = service_id.to_string();
     let safe_id: String = service_id_str
@@ -1067,14 +1051,8 @@ fn service_log_export_with_no_entries_reports_warning_notice() {
     );
     assert!(effect.is_none());
     let notice = app.feedback_notice().expect("feedback notice reported");
-    assert_eq!(
-        notice.severity(),
-        taskmanager_shell::FeedbackSeverity::Warning
-    );
-    assert_eq!(
-        notice.text(),
-        taskmanager_application::i18n::t("svc.logs_nothing_to_export")
-    );
+    assert_eq!(notice.severity(), FeedbackSeverity::Warning);
+    assert_eq!(notice.text(), t("svc.logs_nothing_to_export"));
 
     let file_count = std::fs::read_dir(&dir).unwrap().count();
     assert_eq!(file_count, 0, "no files should be written on empty export");

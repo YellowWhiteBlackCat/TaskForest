@@ -13,6 +13,10 @@ use taskmanager_application::{
     ServiceDependenciesRequest, ServiceFacets, ServiceLogSnapshotRequest, SetupScriptRequest,
     SmartControlRequest, SmbiosMemoryRequest, StorageFacets, SystemFacets,
 };
+use taskmanager_application::{
+    GpuEngineRowsState, MsrReadoutState, NetworkEscalationState, ProcessAffinityState,
+    RaplPowerState, RequestCorrelation, ShellUiActionIntent, ShellUiActionState, SmbiosMemoryState,
+};
 use taskmanager_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
 };
@@ -167,7 +171,7 @@ fn gpu_engine_rows_effect_begins_the_typed_request_session() {
     );
     assert!(matches!(
         app.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Loading {
+        GpuEngineRowsState::Loading {
             device_id: pending,
             ..
         } if pending == &device_id
@@ -188,7 +192,7 @@ fn smbios_memory_effect_begins_the_typed_request_session() {
     assert_eq!(recorded(&recorder), vec![SmbiosMemoryRequest::Refresh]);
     assert!(matches!(
         app.smbios_memory_state(),
-        taskmanager_application::SmbiosMemoryState::Loading { .. }
+        SmbiosMemoryState::Loading { .. }
     ));
 }
 
@@ -206,7 +210,7 @@ fn rapl_power_effect_begins_the_typed_request_session() {
     assert_eq!(recorded(&recorder), vec![RaplPowerRequest::Refresh]);
     assert!(matches!(
         app.rapl_power_state(),
-        taskmanager_application::RaplPowerState::Loading { .. }
+        RaplPowerState::Loading { .. }
     ));
 }
 
@@ -224,7 +228,7 @@ fn msr_readout_effect_begins_the_typed_request_session() {
     assert_eq!(recorded(&recorder), vec![MsrReadoutRequest::Refresh]);
     assert!(matches!(
         app.msr_readout_state(),
-        taskmanager_application::MsrReadoutState::Loading { .. }
+        MsrReadoutState::Loading { .. }
     ));
 }
 
@@ -246,9 +250,7 @@ fn network_escalation_effect_begins_the_typed_request_session() {
     assert_eq!(recorded(&recorder), vec![ProcessNetworkEscalationRequest]);
     assert!(matches!(
         app.network_escalation_state(),
-        taskmanager_application::NetworkEscalationState::Loading(
-            taskmanager_application::RequestCorrelation::Request(_)
-        )
+        NetworkEscalationState::Loading(RequestCorrelation::Request(_))
     ));
 }
 
@@ -375,7 +377,7 @@ fn process_affinity_effect_submits_the_read_and_begins_correlation() {
     // fail-closed acceptance is covered in tests/process_control.rs).
     assert!(matches!(
         app.process_affinity_state(),
-        taskmanager_application::ProcessAffinityState::Loading { target: pending, .. }
+        ProcessAffinityState::Loading { target: pending, .. }
             if pending == &target
     ));
 }
@@ -430,8 +432,8 @@ fn command_launch_effect_submits_through_the_integration_port() {
     assert_eq!(recorded(&recorder), vec![request]);
     assert!(matches!(
         app.shell_ui_action_state(),
-        taskmanager_application::ShellUiActionState::Loading {
-            intent: taskmanager_application::ShellUiActionIntent::Command(_),
+        ShellUiActionState::Loading {
+            intent: ShellUiActionIntent::Command(_),
             ..
         }
     ));

@@ -4,6 +4,9 @@
 use super::super::*;
 
 use taskmanager_application::AppAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::queue_effect;
 
 #[test]
 fn enter_on_users_opens_the_action_menu_and_esc_closes_it() {
@@ -65,7 +68,7 @@ fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     assert!(app.session_menu().is_none(), "the menu closes on pick");
     assert_eq!(
         app.shell.pending_session().map(|pending| pending.action),
-        Some(taskmanager_core::core::session::SessionControlAction::Disconnect)
+        Some(SessionControlAction::Disconnect)
     );
 
     // y confirms: the platform request is produced with the frozen target.
@@ -79,10 +82,7 @@ fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     let Some(PlatformEffect::SessionControl(target)) = effect else {
         panic!("confirm must produce a SessionControl effect");
     };
-    assert_eq!(
-        target.action,
-        taskmanager_core::core::session::SessionControlAction::Disconnect
-    );
+    assert_eq!(target.action, SessionControlAction::Disconnect);
     // The first demo session has id "2".
     assert_eq!(target.session_id.as_str(), "2");
     assert!(app.shell.pending_session().is_none());
@@ -202,14 +202,14 @@ fn session_control_round_trip_submits_through_queue_effect() {
     )
     .expect("confirm must produce an effect");
 
-    taskmanager_shell::queue_effect(&mut app, &mut client, effect);
+    queue_effect(&mut app, &mut client, effect);
 
     let submitted = recorded.0.lock().expect("recorded requests");
     assert_eq!(submitted.len(), 1, "exactly one request is submitted");
     let request = &submitted[0];
     assert_eq!(
         request.action,
-        taskmanager_core::core::session::SessionControlAction::Disconnect,
+        SessionControlAction::Disconnect,
         "the menu's Disconnect pick must reach the provider"
     );
     assert_eq!(
@@ -232,10 +232,10 @@ fn menu_targets_the_sorted_session_row() {
     let mut app = TuiApp::from_shell(ShellApp::new());
     // Provider order [zeta (7), alpha (3)]; the Name sort (logon user)
     // renders [alpha (3), zeta (7)].
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(vec![
-            taskmanager_core::core::session::SessionItem {
+        ProjectionSeedFact::Sessions(Some(vec![
+            SessionItem {
                 id: "7".into(),
                 uid: 1000,
                 user: "zeta".into(),
@@ -244,7 +244,7 @@ fn menu_targets_the_sorted_session_row() {
                 remote: false,
                 timestamp: None,
             },
-            taskmanager_core::core::session::SessionItem {
+            SessionItem {
                 id: "3".into(),
                 uid: 1000,
                 user: "alpha".into(),

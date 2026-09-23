@@ -14,6 +14,9 @@ use taskmanager_application::AppAction;
 
 use crate::TuiTheme;
 use crate::render;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::trend::cpu_usage_percent;
 
 /// Render the live frame through the same TestBackend path the render tests
 /// use.
@@ -21,7 +24,7 @@ fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -43,7 +46,7 @@ fn app_on_cpu() -> crate::TuiApp {
 #[test]
 fn arrows_move_the_chart_cursor_and_paint_the_hover_readout() {
     let mut app = app_on_cpu();
-    let samples = taskmanager_shell::presentation::trend::cpu_usage_percent(&app.history);
+    let samples = cpu_usage_percent(&app.history);
     assert!(
         samples.len() >= 2,
         "the demo history seeds a steppable CPU series"
@@ -139,10 +142,7 @@ fn a_short_window_has_no_cursor_and_a_gap_keeps_the_dash() {
     let gap = readout_line("CPU", &[f32::NAN, 50.0], 0, |value| format!("{value:.0}%"));
     assert_eq!(
         gap,
-        Some(format!(
-            "CPU · 1/2 · {}",
-            taskmanager_shell::presentation::missing_value()
-        )),
+        Some(format!("CPU · 1/2 · {}", missing_value())),
         "a gap sample keeps the shared dash"
     );
     assert_eq!(

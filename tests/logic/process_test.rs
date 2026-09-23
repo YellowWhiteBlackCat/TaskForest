@@ -12,13 +12,15 @@ fn refs(items: &[ProcessItem]) -> Vec<&ProcessItem> {
 }
 // SIGSTOP/SIGCONT and setpriority are Linux-process controls exercised against
 // a real child; the rest of this module is neutral core process logic.
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{ProcessManager, pause_process, resume_process};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn test_process_scan_and_sorting() {
     let mut items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(100)
             .parent_pid(Some(1))
             .name("alpha".to_string())
@@ -28,15 +30,13 @@ fn test_process_scan_and_sorting() {
             .current_disk_read_bytes_per_sec(500)
             .current_disk_write_bytes_per_sec(2000)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("root".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("root".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(10)
             .parent_pid(Some(1))
             .name("beta".to_string())
@@ -46,15 +46,13 @@ fn test_process_scan_and_sorting() {
             .current_disk_read_bytes_per_sec(10000)
             .current_disk_write_bytes_per_sec(100)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(50)
             .parent_pid(Some(1))
             .name("charlie".to_string())
@@ -64,13 +62,11 @@ fn test_process_scan_and_sorting() {
             .current_disk_read_bytes_per_sec(100)
             .current_disk_write_bytes_per_sec(50)
             .status("Sleeping".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
     ];
 
@@ -101,7 +97,7 @@ fn test_process_scan_and_sorting() {
 #[test]
 fn test_build_process_tree() {
     let items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1)
             .parent_pid(None)
             .name("systemd".to_string())
@@ -111,15 +107,13 @@ fn test_build_process_tree() {
             .current_disk_read_bytes_per_sec(1000)
             .current_disk_write_bytes_per_sec(500)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("root".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("root".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(10)
             .parent_pid(Some(1))
             .name("bash".to_string())
@@ -129,15 +123,13 @@ fn test_build_process_tree() {
             .current_disk_read_bytes_per_sec(0)
             .current_disk_write_bytes_per_sec(0)
             .status("Sleeping".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(100)
             .parent_pid(Some(10))
             .name("cargo".to_string())
@@ -147,15 +139,13 @@ fn test_build_process_tree() {
             .current_disk_read_bytes_per_sec(5000)
             .current_disk_write_bytes_per_sec(10000)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(200)
             .parent_pid(Some(9999))
             .name("orphan_daemon".to_string())
@@ -165,13 +155,11 @@ fn test_build_process_tree() {
             .current_disk_read_bytes_per_sec(0)
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("nobody".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("nobody".to_string()),
+                None,
+                1,
+            ))
             .build(),
     ];
 
@@ -211,7 +199,7 @@ fn test_build_process_tree() {
 #[test]
 fn test_aggregate_apps() {
     let items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1000)
             .parent_pid(Some(1))
             .name("chrome".to_string())
@@ -221,15 +209,13 @@ fn test_aggregate_apps() {
             .current_disk_read_bytes_per_sec(100)
             .current_disk_write_bytes_per_sec(200)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1001)
             .parent_pid(Some(1000))
             .name("chrome".to_string())
@@ -239,15 +225,13 @@ fn test_aggregate_apps() {
             .current_disk_read_bytes_per_sec(0)
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1002)
             .parent_pid(Some(1000))
             .name("chrome".to_string())
@@ -257,15 +241,13 @@ fn test_aggregate_apps() {
             .current_disk_read_bytes_per_sec(50)
             .current_disk_write_bytes_per_sec(50)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(2000)
             .parent_pid(Some(1))
             .name("code".to_string())
@@ -275,15 +257,13 @@ fn test_aggregate_apps() {
             .current_disk_read_bytes_per_sec(0)
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(3000)
             .parent_pid(Some(1))
             .name("zed".to_string())
@@ -293,13 +273,11 @@ fn test_aggregate_apps() {
             .current_disk_read_bytes_per_sec(0)
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
-            .metadata_observations(
-                taskmanager_core::core::process::ProcessMetadataObservations::current(
-                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
-                    None,
-                    1,
-                ),
-            )
+            .metadata_observations(ProcessMetadataObservations::current(
+                ProcessOwner::opaque("user".to_string()),
+                None,
+                1,
+            ))
             .build(),
     ];
 
@@ -354,7 +332,7 @@ fn test_normalize_app_name() {
 
 #[test]
 fn verified_desktop_identity_drives_app_group_name_without_fabricating_icon_state() {
-    let mut process = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut process = ProcessItemFixtureBuilder::new()
         .pid(7)
         .name("editor-wrapper".into())
         .cmdline("/opt/editor/editor-wrapper".into())
@@ -486,13 +464,13 @@ fn test_set_process_nice() {
 #[test]
 fn process_batch_freeze_excludes_rows_without_exact_identity_authority() {
     let processes = [
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(41)
             .name("unknown-identity".to_owned())
             .current_start_time_secs(0)
             .without_current_start_token()
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(42)
             .name("known-identity".to_owned())
             .scalar_observations(ProcessScalarObservations {
@@ -555,7 +533,7 @@ fn test_fuzzy_match_order_matters_and_non_match() {
 
 /// Helper: build a ProcessItem with only the filter-relevant fields set.
 fn mk_filter_item(pid: u32, name: &str, cmdline: &str, user: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .parent_pid(Some(1))
         .name(name.to_string())
@@ -565,13 +543,11 @@ fn mk_filter_item(pid: u32, name: &str, cmdline: &str, user: &str) -> ProcessIte
         .current_disk_read_bytes_per_sec(0)
         .current_disk_write_bytes_per_sec(0)
         .status("Sleeping".to_string())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque(user.to_string()),
+            None,
+            1,
+        ))
         .build()
 }
 
@@ -718,7 +694,7 @@ fn test_build_process_tree_self_parent_terminates() {
     // the visited set inside build_node (the node is its own entry in
     // children_map and must not be re-entered).
     let items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(5)
             .parent_pid(Some(5))
             .name("oddity".to_string())
@@ -740,12 +716,12 @@ fn test_build_process_tree_mutual_parent_cycle_terminates() {
     // cycle is dropped entirely. The contract locked in here: build_process_tree
     // terminates (does not infinite-loop) on cyclic parent links.
     let items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1)
             .parent_pid(Some(2))
             .name("a".to_string())
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(2)
             .parent_pid(Some(1))
             .name("b".to_string())
@@ -802,18 +778,14 @@ fn test_sort_tiebreak_preserves_non_tie_ordering() {
     // When the primary key is NOT tied, the pid tiebreak must not perturb the
     // order: the higher-CPU process ranks above the lower-CPU one regardless of
     // pid. (`.then_with` short-circuits on a non-Equal primary.)
-    let hi_cpu = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(mk_filter_item(
-        20, "hi", "hi", "u",
-    ))
-    .pid(20)
-    .current_cpu_percentage(50.0)
-    .build();
-    let lo_cpu = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(mk_filter_item(
-        10, "lo", "lo", "u",
-    ))
-    .pid(10)
-    .current_cpu_percentage(5.0)
-    .build();
+    let hi_cpu = ProcessItemFixtureBuilder::from_item(mk_filter_item(20, "hi", "hi", "u"))
+        .pid(20)
+        .current_cpu_percentage(50.0)
+        .build();
+    let lo_cpu = ProcessItemFixtureBuilder::from_item(mk_filter_item(10, "lo", "lo", "u"))
+        .pid(10)
+        .current_cpu_percentage(5.0)
+        .build();
     let mut items = vec![hi_cpu, lo_cpu];
     // Descending CPU: 50.0 (pid 20) before 5.0 (pid 10), even though pid 10 < 20.
     sort_processes(&mut items, ProcessSortKey::CpuUsage, false);

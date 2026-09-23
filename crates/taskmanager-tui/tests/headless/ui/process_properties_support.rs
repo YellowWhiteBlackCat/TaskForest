@@ -24,12 +24,11 @@ pub(crate) fn render_process_properties(
         focus,
         overlay_popup(
             area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::ProcessProperties,
-            ),
+            crate::TuiInputScope::SharedSurface(SurfaceKind::ProcessProperties),
         )
         .unwrap_or(Rect::ZERO),
     );
 }
 
 pub(crate) use super::ProcessPropertiesTarget;
+use taskmanager_application::SurfaceKind;

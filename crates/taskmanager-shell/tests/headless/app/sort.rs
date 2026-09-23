@@ -8,6 +8,7 @@ use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn default_sort_matches_historic_cpu_descending_primary_key() {
@@ -51,7 +52,7 @@ fn pss_and_swap_sort_use_typed_current_values_without_rss_fallbacks() {
     let mut app = ShellApp::new();
     app.application.active_page = AppPage::Applications;
 
-    let mut low = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut low = ProcessItemFixtureBuilder::new()
         .pid(10)
         .name("low".into())
         .current_memory_bytes(9 * 1024)
@@ -61,7 +62,7 @@ fn pss_and_swap_sort_use_typed_current_values_without_rss_fallbacks() {
     low_observations.swap_bytes = ScalarObservation::available(4, 1);
     low.apply_scalar_observations(low_observations);
 
-    let mut high = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut high = ProcessItemFixtureBuilder::new()
         .pid(20)
         .name("high".into())
         .current_memory_bytes(1)
@@ -84,7 +85,7 @@ fn advanced_sort_columns_use_typed_current_values_and_skip_the_display_cycle() {
     let mut app = ShellApp::new();
     app.application.active_page = AppPage::Applications;
 
-    let mut low = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut low = ProcessItemFixtureBuilder::new()
         .pid(10)
         .name("low".into())
         .build();
@@ -97,7 +98,7 @@ fn advanced_sort_columns_use_typed_current_values_and_skip_the_display_cycle() {
         ..Default::default()
     });
 
-    let mut high = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut high = ProcessItemFixtureBuilder::new()
         .pid(20)
         .name("high".into())
         .build();
@@ -141,7 +142,7 @@ fn advanced_sort_columns_use_typed_current_values_and_skip_the_display_cycle() {
 
     // An unobserved value (None) sorts below a measured one so a provider
     // failure never wins the top of a descending list.
-    let mut missing = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut missing = ProcessItemFixtureBuilder::new()
         .pid(30)
         .name("missing".into())
         .build();

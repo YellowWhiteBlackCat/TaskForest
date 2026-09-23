@@ -12,11 +12,13 @@ use crate::{
     BatchMenuTarget, CommandPalette, ProcessMenuTarget, ServiceMenuTarget, SessionMenuTarget,
     StartupMenuTarget, TuiApp,
 };
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::target::ServiceId;
 
 /// Target for the interactive service-dependencies modal.
 #[derive(Clone, Debug)]
 pub struct ServiceDependenciesTarget {
-    pub service_id: taskmanager_core::core::target::ServiceId,
+    pub service_id: ServiceId,
     pub service_name: String,
     pub scroll: usize,
 }
@@ -27,7 +29,7 @@ pub const AFFINITY_GRID_COLS: usize = 4;
 /// Target and interactive state for the CPU affinity editor modal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AffinityModalState {
-    pub target: taskmanager_core::core::process::FrozenProcessIdentity,
+    pub target: FrozenProcessIdentity,
     pub selected_cpu: usize,
     pub selected_mask: Vec<u32>,
     pub logical_cpu_count: usize,
@@ -42,7 +44,7 @@ pub struct AffinityModalState {
 impl AffinityModalState {
     #[must_use]
     pub fn new(
-        target: taskmanager_core::core::process::FrozenProcessIdentity,
+        target: FrozenProcessIdentity,
         current_mask: Option<Vec<u32>>,
         logical_cpu_count: usize,
     ) -> Self {

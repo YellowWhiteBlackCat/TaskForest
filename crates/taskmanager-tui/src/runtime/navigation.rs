@@ -17,6 +17,7 @@ use taskmanager_application::{AppPage, PlatformEffect};
 use taskmanager_shell::InputDispatch;
 
 use crate::TuiApp;
+use taskmanager_shell::PAGE_STEP;
 
 /// Route one table-page navigation key with an explicit consumed/unhandled
 /// result. Chorded variants (Ctrl+Home, Shift+PageUp, …) are not wired.
@@ -38,20 +39,20 @@ pub(super) fn handle_table_navigation(app: &mut TuiApp, key: &KeyEvent) -> Input
         }
         ratatui::crossterm::event::KeyCode::PageUp if page_rows_flat(app) => {
             app.detail_scroll_reset();
-            app.move_selection(-(taskmanager_shell::PAGE_STEP as isize));
+            app.move_selection(-(PAGE_STEP as isize));
             InputDispatch::consumed(app.refresh_selected_process_insights())
         }
         ratatui::crossterm::event::KeyCode::PageDown if page_rows_flat(app) => {
             app.detail_scroll_reset();
-            app.move_selection(taskmanager_shell::PAGE_STEP as isize);
+            app.move_selection(PAGE_STEP as isize);
             InputDispatch::consumed(app.refresh_selected_process_insights())
         }
-        ratatui::crossterm::event::KeyCode::PageUp => InputDispatch::consumed(
-            app.move_nonflat_selection_oneshot(-(taskmanager_shell::PAGE_STEP as isize)),
-        ),
-        ratatui::crossterm::event::KeyCode::PageDown => InputDispatch::consumed(
-            app.move_nonflat_selection_oneshot(taskmanager_shell::PAGE_STEP as isize),
-        ),
+        ratatui::crossterm::event::KeyCode::PageUp => {
+            InputDispatch::consumed(app.move_nonflat_selection_oneshot(-(PAGE_STEP as isize)))
+        }
+        ratatui::crossterm::event::KeyCode::PageDown => {
+            InputDispatch::consumed(app.move_nonflat_selection_oneshot(PAGE_STEP as isize))
+        }
         _ => InputDispatch::Unhandled,
     }
 }

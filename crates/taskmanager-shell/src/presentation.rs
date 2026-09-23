@@ -35,6 +35,8 @@ pub use cpu::*;
 pub use network::*;
 pub use process::*;
 pub use storage::*;
+use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
+use taskmanager_core::core::metrics::ResourcePressure;
 pub use telemetry::*;
 
 /// Stable service IDs participating in an observed ordering or strict
@@ -113,9 +115,7 @@ pub fn optional_count(value: Option<u32>) -> String {
 /// Format a ResourcePressure (some/full) into a human-readable display string,
 /// e.g. "some 0.5% · full 0.1%" or "some 0.0%".
 #[must_use]
-pub fn format_resource_pressure(
-    pressure: Option<&taskmanager_core::core::metrics::ResourcePressure>,
-) -> String {
+pub fn format_resource_pressure(pressure: Option<&ResourcePressure>) -> String {
     let Some(pressure) = pressure else {
         return missing_value();
     };
@@ -267,11 +267,7 @@ pub fn start_clock_local(epoch_secs: Option<u64>, rules: &LocalTimeRulesObservat
 #[must_use]
 pub fn local_timestamp(epoch_millis: u64, rules: &LocalTimeRulesObservation) -> String {
     let epoch_seconds = epoch_millis / 1_000;
-    taskmanager_application::process_details_vm::format_local_timestamp_seconds(
-        epoch_seconds,
-        rules,
-    )
-    .unwrap_or_else(missing_value)
+    format_local_timestamp_seconds(epoch_seconds, rules).unwrap_or_else(missing_value)
 }
 
 /// Format a temperature in °C the way every badge/graph readout does

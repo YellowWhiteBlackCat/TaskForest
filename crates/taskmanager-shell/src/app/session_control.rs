@@ -7,6 +7,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 impl ShellApp {
     /// Capture the selected provider-issued session identity and produce a
@@ -122,10 +123,7 @@ impl ShellApp {
     }
 
     /// Arm the shared SMART self-test confirmation gate with an explicit intent.
-    pub fn arm_smart_self_test(
-        &mut self,
-        intent: taskmanager_core::core::system_health::SmartSelfTestIntent,
-    ) {
+    pub fn arm_smart_self_test(&mut self, intent: SmartSelfTestIntent) {
         self.arm_confirmation(PendingConfirmation::SmartSelfTest(intent));
     }
 

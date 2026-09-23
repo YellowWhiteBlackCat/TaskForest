@@ -14,6 +14,8 @@ use crate::ui::process_details::{clamped_scroll, wrapped_content_height};
 use crate::ui::process_properties::process_properties_support::render_process_properties;
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{TuiApp, TuiTheme};
+use taskmanager_application::SurfaceKind;
+use taskmanager_application::i18n::{Language, set_language};
 
 /// Pin English + serialize against the language-flipping i18n test, then render
 /// the inline detail panel alone into a `width × height` TestBackend. Rendering
@@ -23,7 +25,7 @@ fn detail_panel_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -47,7 +49,7 @@ fn modal_text(target: &ProcessPropertiesTarget, app: &TuiApp, width: u16, height
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -71,9 +73,7 @@ fn modal_text(target: &ProcessPropertiesTarget, app: &TuiApp, width: u16, height
 fn modal_focus_plan(section: ProcessDetailsSection) -> crate::ui::frame_plan::TuiFocusPlan {
     use crate::ui::frame_plan::{TuiFocusControl, TuiFocusOrder, TuiFocusPlan, TuiFocusTarget};
     TuiFocusPlan {
-        target: TuiFocusTarget::SharedSurface(
-            taskmanager_application::SurfaceKind::ProcessProperties,
-        ),
+        target: TuiFocusTarget::SharedSurface(SurfaceKind::ProcessProperties),
         order: TuiFocusOrder::None,
         control: TuiFocusControl::PropertiesTab(section),
     }

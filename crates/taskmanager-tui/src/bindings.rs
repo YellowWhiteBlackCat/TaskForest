@@ -15,6 +15,7 @@
 
 use taskmanager_application::CommandId;
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::command_help;
 use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration, FrontendShape};
 
 /// Shared-router commands the terminal shape deliberately does not wire.
@@ -130,7 +131,7 @@ pub(crate) fn menu_hint_pairs(hints: &[MenuHint]) -> Vec<(&'static str, String)>
 /// dropped, so the coverage gate can tell a choice from an omission.
 #[must_use]
 pub fn binding_declaration() -> FrontendBindingDeclaration {
-    let shared = taskmanager_shell::presentation::command_help();
+    let shared = command_help();
     let entries = CommandId::ALL
         .into_iter()
         .map(|command| {

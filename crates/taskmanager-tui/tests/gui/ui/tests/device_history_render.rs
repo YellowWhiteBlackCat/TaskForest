@@ -14,13 +14,18 @@ use taskmanager_core::core::sensors::{
 };
 
 use super::frame_text;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
 
 fn observed_battery() -> BatteryInfo {
     let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(1_000));
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1_000),
-        power_w: taskmanager_core::core::metrics::ScalarObservation::available(9.5, 1_000),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(80, 1_000),
+        power_w: ScalarObservation::available(9.5, 1_000),
         ..Default::default()
     });
     battery
@@ -48,7 +53,7 @@ fn record_dynamic_history(
     sensors: Option<&SensorCenterSnapshot>,
 ) {
     let system = app.projection().snapshot.clone().unwrap_or_default();
-    taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &system, power, sensors);
+    record_demo_history_frame(&mut app.shell, &system, power, sensors);
 }
 
 /// F04: a disk whose SMART provider never opened hides the whole SMART section
@@ -88,20 +93,15 @@ fn disk_block_renders_smart_verdict_and_temperature_history() {
         measured.disks[0].smart_availability = SmartAvailability::Available;
         measured.disks[0].smart_state = DeviceState::healthy(timestamp_ms);
         measured.disks[0].smart_temperature_c = Some(42.0);
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &measured,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &measured, None, None);
     }
     let mut live_snapshot = app.projection().snapshot.clone().expect("demo snapshot");
     let live_disk = &mut live_snapshot.disks[0];
     live_disk.smart_availability = SmartAvailability::Available;
     live_disk.smart_state = DeviceState::healthy(2_000);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(live_snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(live_snapshot))),
     );
     let history_text = frame_text(&app, 140, 48);
     assert!(
@@ -117,9 +117,9 @@ fn disk_block_renders_smart_verdict_and_temperature_history() {
     // readouts (mirroring iced's `!has_smart_fields` gate).
     let mut snapshot = app.projection().snapshot.clone().expect("demo snapshot");
     snapshot.disks[0].smart_temperature_c = Some(42.0);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     let measured_text = frame_text(&app, 140, 48);
     assert!(
@@ -149,9 +149,9 @@ fn battery_block_renders_power_history_at_two_or_more_samples() {
     // power-history line must NOT (below the two-sample floor).
     let mut sparse = crate::demo_app();
     sparse.perf_device = crate::PerfDevice::Battery;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut sparse.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             timestamp_ms: 1_000,
             batteries: vec![observed_battery()],
             ..Default::default()
@@ -172,9 +172,9 @@ fn battery_block_renders_power_history_at_two_or_more_samples() {
     // the watts unit from the battery's OWN window.
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Battery;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             timestamp_ms: 1_000,
             batteries: vec![observed_battery()],
             ..Default::default()
@@ -227,9 +227,9 @@ fn fan_block_renders_temperature_history_at_two_or_more_samples() {
     // the temperature-history line must NOT (below the two-sample floor).
     let mut sparse = crate::demo_app();
     sparse.perf_device = crate::PerfDevice::Fan;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut sparse.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             timestamp_ms: 1_000,
             readings: vec![
                 sensor_reading(
@@ -265,9 +265,9 @@ fn fan_block_renders_temperature_history_at_two_or_more_samples() {
     // with the °C unit from the fan channel's OWN window.
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Fan;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             timestamp_ms: 1_000,
             readings: vec![
                 sensor_reading(

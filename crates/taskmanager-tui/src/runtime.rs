@@ -25,6 +25,8 @@ mod seam;
 mod semantic;
 
 use keys::handle_key;
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_shell::{ShellKeyEvent, queue_effect};
 
 /// Test-only re-export of the terminal event seam: the overlay HitMap
 /// behavior tests (`tests/gui/ui/tests/overlay_hit.rs`) apply pointer clicks
@@ -139,7 +141,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         match host.config_client() {
             Ok(client) => TuiApp::new_with_config_client(client),
             Err(error) => {
-                let mut app = TuiApp::from_shell(taskmanager_shell::ShellApp::new());
+                let mut app = TuiApp::from_shell(ShellApp::new());
                 app.report_notice(
                     FeedbackSource::Settings,
                     FeedbackSeverity::Error,
@@ -151,10 +153,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         }
     };
     app.local_time_rules = if demo {
-        taskmanager_core::core::time::LocalTimeRulesObservation::current(
-            taskmanager_core::core::time::LocalTimeRules::utc(),
-            0,
-        )
+        LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0)
     } else {
         host.local_time_rules()
     };
@@ -180,7 +179,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         Some(client)
     };
     if let Some(platform) = platform.as_mut() {
-        taskmanager_shell::queue_effect(
+        queue_effect(
             &mut app,
             platform,
             PlatformEffect::Refresh(RefreshRequest::Dashboard),
@@ -234,11 +233,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
 fn submit_alert_notifications(app: &mut ShellApp, platform: &mut PlatformClient) -> bool {
     let mut queued = false;
     for request in app.drain_alert_notifications() {
-        taskmanager_shell::queue_effect(
-            app,
-            platform,
-            PlatformEffect::DesktopNotification(request),
-        );
+        queue_effect(app, platform, PlatformEffect::DesktopNotification(request));
         queued = true;
     }
     queued
@@ -264,7 +259,7 @@ fn inline_network_escalation_ready(app: &TuiApp) -> bool {
 fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> bool {
     match app.shell.take_process_refresh_request() {
         Some(effect) => {
-            taskmanager_shell::queue_effect(&mut app.shell, platform, effect);
+            queue_effect(&mut app.shell, platform, effect);
             true
         }
         None => false,
@@ -306,7 +301,7 @@ pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
     }
 }
 
-fn key_to_terminal(event: KeyEvent) -> Option<taskmanager_shell::ShellKeyEvent> {
+fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {
     let key = match event.code {
         ratatui::crossterm::event::KeyCode::Char('f' | 'F') => KeyCode::F,
         ratatui::crossterm::event::KeyCode::Char('a' | 'A') => KeyCode::A,
@@ -341,7 +336,7 @@ fn key_to_terminal(event: KeyEvent) -> Option<taskmanager_shell::ShellKeyEvent> 
             || event.code == ratatui::crossterm::event::KeyCode::BackTab,
         event.modifiers.contains(KeyModifiers::SUPER),
     );
-    Some(taskmanager_shell::ShellKeyEvent::new(key, modifiers))
+    Some(ShellKeyEvent::new(key, modifiers))
 }
 
 #[cfg(test)]

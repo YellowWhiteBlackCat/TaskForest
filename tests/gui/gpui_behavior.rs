@@ -3,7 +3,12 @@
 //! confirmation, and navigation behavior. Renderer-internal projections and
 //! render-only smoke coverage live in `taskmanager-gpui`'s own test suite.
 
+use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{
+    ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
+};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[path = "gpui_behavior/confirmations.rs"]
 mod confirmations;
@@ -13,16 +18,13 @@ mod nav_chrome;
 mod render_coverage;
 
 fn proc(pid: u32, name: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .parent_pid(None)
         .name(name.into())
         .cmdline(String::new())
-        .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
-            start_token: taskmanager_core::core::ScalarObservation::available(
-                u64::from(pid) + 1_000,
-                1,
-            ),
+        .scalar_observations(ProcessScalarObservations {
+            start_token: ScalarObservation::available(u64::from(pid) + 1_000, 1),
             ..Default::default()
         })
         .current_cpu_percentage(0.0)
@@ -30,12 +32,10 @@ fn proc(pid: u32, name: &str) -> ProcessItem {
         .current_disk_read_bytes_per_sec(0)
         .current_disk_write_bytes_per_sec(0)
         .status("R".into())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("u"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("u"),
+            None,
+            1,
+        ))
         .build()
 }

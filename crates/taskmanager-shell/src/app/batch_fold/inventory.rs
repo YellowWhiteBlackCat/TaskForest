@@ -1,10 +1,15 @@
 //! Hardware, service, startup, session and container inventory fold systems.
 
 use super::*;
+use taskmanager_application::{
+    CorrelatedContainerRollupEvent, CorrelatedHardwareInventoryEvent, CorrelatedNpuInventoryEvent,
+    CorrelatedServiceEvent, CorrelatedSessionEvent, CorrelatedStartupEvent,
+    ProjectedStartupEvidence,
+};
 
 pub(super) fn apply_hardware(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedHardwareInventoryEvent>,
+    events: Vec<CorrelatedHardwareInventoryEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -18,7 +23,7 @@ pub(super) fn apply_hardware(
 
 pub(super) fn apply_services(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedServiceEvent>,
+    events: Vec<CorrelatedServiceEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -53,7 +58,7 @@ pub(super) fn apply_services(
 
 pub(super) fn apply_containers(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedContainerRollupEvent>,
+    events: Vec<CorrelatedContainerRollupEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -66,7 +71,7 @@ pub(super) fn apply_containers(
 
 pub(super) fn apply_startup_evidence(
     store: &mut SystemProjectionStore,
-    projections: Vec<taskmanager_application::ProjectedStartupEvidence>,
+    projections: Vec<ProjectedStartupEvidence>,
     fold: &mut FoldState,
 ) {
     for projection in projections {
@@ -79,7 +84,7 @@ pub(super) fn apply_startup_evidence(
 
 pub(super) fn apply_startup(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedStartupEvent>,
+    events: Vec<CorrelatedStartupEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -102,7 +107,7 @@ pub(super) fn apply_startup(
 
 pub(super) fn apply_sessions(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedSessionEvent>,
+    events: Vec<CorrelatedSessionEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -125,7 +130,7 @@ pub(super) fn apply_sessions(
 
 pub(super) fn apply_npu(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedNpuInventoryEvent>,
+    events: Vec<CorrelatedNpuInventoryEvent>,
     fold: &mut FoldState,
 ) {
     if store.apply_npu_inventory_events(events) {

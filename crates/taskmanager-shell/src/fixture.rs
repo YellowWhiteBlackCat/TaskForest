@@ -48,6 +48,15 @@ pub use cpu_topology::{CpuClusterSpec, CpuTopologySpec, demo_cpu_topology};
 use cpu_topology::{
     core_usage_seed, cpu_types_seed, per_core_frequency_seed, per_core_temperature_seed,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_application::{ProcessAffinityReady, ProjectedProcessInsights};
+use taskmanager_core::core::alerts::Alert;
+use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
+use taskmanager_core::core::process::ProcessBatchIntent;
+use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_telemetry_store::TelemetryStore;
+use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 
 const GIB: u64 = 1024 * 1024 * 1024;
 const MIB: u64 = 1024 * 1024;
@@ -80,18 +89,18 @@ pub enum ProjectionSeedFact {
     Services(Option<Vec<ServiceItem>>),
     StartupEntries(Option<Vec<StartupEntry>>),
     Sessions(Option<Vec<SessionItem>>),
-    Containers(Option<taskmanager_core::core::process_telemetry::ContainerRollup>),
+    Containers(Option<ContainerRollup>),
     PowerSupplies(Option<PowerSupplySnapshot>),
     Sensors(Option<SensorCenterSnapshot>),
-    NpuInventory(Option<taskmanager_core::core::npu::NpuInventorySnapshot>),
-    DirectoryUsage(Option<taskmanager_core::core::directory_usage::DirectoryUsageSnapshot>),
-    StartupBootEvidence(Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>),
+    NpuInventory(Option<NpuInventorySnapshot>),
+    DirectoryUsage(Option<DirectoryUsageSnapshot>),
+    StartupBootEvidence(Option<StartupBootEvidenceSnapshot>),
     ServicesSource(Option<Vec<SourceStatus>>),
     StartupSource(Option<Vec<SourceStatus>>),
     SessionsSource(Option<Vec<SourceStatus>>),
-    ProcessAffinity(Option<taskmanager_application::ProcessAffinityReady>),
-    ProcessInsights(Box<Option<taskmanager_application::ProjectedProcessInsights>>),
-    ActiveAlerts(Vec<taskmanager_core::core::alerts::Alert>),
+    ProcessAffinity(Option<ProcessAffinityReady>),
+    ProcessInsights(Box<Option<ProjectedProcessInsights>>),
+    ActiveAlerts(Vec<Alert>),
     AdvanceRevision(ProjectionSeedDomain),
     AdvanceRefresh,
 }
@@ -124,10 +133,7 @@ pub fn edit_hardware(app: &mut ShellApp, edit: impl FnOnce(&mut Option<HardwareI
     app.edit_fixture_hardware(edit);
 }
 
-pub fn edit_containers(
-    app: &mut ShellApp,
-    edit: impl FnOnce(&mut Option<taskmanager_core::core::process_telemetry::ContainerRollup>),
-) {
+pub fn edit_containers(app: &mut ShellApp, edit: impl FnOnce(&mut Option<ContainerRollup>)) {
     app.edit_fixture_containers(edit);
 }
 
@@ -136,7 +142,7 @@ pub fn edit_containers(
 /// as a real platform submission.
 pub fn seed_process_batch_loading(
     app: &mut ShellApp,
-    intent: taskmanager_core::core::process::ProcessBatchIntent,
+    intent: ProcessBatchIntent,
     request_id: RequestId,
 ) {
     app.seed_fixture_process_batch_loading(intent, request_id);
@@ -211,7 +217,7 @@ pub fn demo_app() -> ShellApp {
         FeedbackSource::Demo,
         FeedbackSeverity::Info,
         FeedbackLifecycle::UntilReplaced,
-        taskmanager_application::i18n::t("status.demo_snapshot"),
+        t("status.demo_snapshot"),
     );
     app
 }
@@ -232,11 +238,10 @@ pub fn demo_direct_track() -> DirectTrackState {
 /// schedules live collection.
 #[must_use]
 pub fn demo_telemetry() -> (
-    std::sync::Arc<taskmanager_telemetry_store::TelemetryStore>,
+    std::sync::Arc<TelemetryStore>,
     CorrelatedSystemTelemetryIngestor,
 ) {
-    let (history, ingestor) =
-        LiveGraphHistory::shared(taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY);
+    let (history, ingestor) = LiveGraphHistory::shared(MAX_HISTORY_CAPACITY);
     let base = snapshot();
     for revision in 1..=4 {
         let mut frame = base.clone();

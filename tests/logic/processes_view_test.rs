@@ -43,8 +43,7 @@ fn refs(items: &[ProcessItem]) -> Vec<&ProcessItem> {
 }
 
 fn key(pid: u32) -> ProcessLiveKey {
-    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-        .expect("fixture identity")
+    ProcessLiveKey::from_parts(pid, fixture_start_token(pid)).expect("fixture identity")
 }
 
 /// Project the only runtime hierarchy and retain its selectable process rows.
@@ -62,7 +61,7 @@ fn canonical_process_rows(
         ascending,
         &default_category_expansions(),
         collapsed,
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     )
     .into_iter()
     .filter(|row| row.process_identity.is_some())
@@ -93,7 +92,7 @@ struct ProcessFixture {
 /// Materialize one [`ProcessFixture`] into a `ProcessItem` with every
 /// sort-relevant field set.
 fn mk(fixture: ProcessFixture) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .scalar_observations(ProcessScalarObservations {
             swap_bytes: ScalarObservation::available(u64::from(fixture.pid), 1),
             ..ProcessScalarObservations::default()
@@ -107,13 +106,11 @@ fn mk(fixture: ProcessFixture) -> ProcessItem {
         .current_disk_read_bytes_per_sec(fixture.disk_read)
         .current_disk_write_bytes_per_sec(fixture.disk_write)
         .status(fixture.status.to_string())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque(fixture.user.to_string()),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque(fixture.user.to_string()),
+            None,
+            1,
+        ))
         .current_threads(fixture.threads)
         .current_start_time_secs(fixture.start)
         .cpu_history(Vec::new())
@@ -348,17 +345,15 @@ fn canonical_tree_all_roots_share_the_recursive_sort_contract() {
 /// Build a tree node `ProcessItem` with only name + user populated (the two
 /// columns exercised by the structural tree tests). Other fields default.
 fn mk_tree(pid: u32, parent: Option<u32>, name: &str, user: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .parent_pid(parent)
         .name(name.to_string())
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque(user.to_string()),
+            None,
+            1,
+        ))
         .build()
 }
 
@@ -558,7 +553,7 @@ fn click_sort_column_new_column_gets_conventional_initial_direction() {
 
 #[test]
 fn memory_projection_prefers_current_pss_and_falls_back_to_typed_rss() {
-    let pss = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let pss = ProcessItemFixtureBuilder::new()
         .pid(71)
         .scalar_observations(ProcessScalarObservations {
             memory_bytes: ScalarObservation::available(900, 1),
@@ -567,13 +562,11 @@ fn memory_projection_prefers_current_pss_and_falls_back_to_typed_rss() {
             ..ProcessScalarObservations::default()
         })
         .build();
-    let fallback = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let fallback = ProcessItemFixtureBuilder::new()
         .pid(72)
         .scalar_observations(ProcessScalarObservations {
             memory_bytes: ScalarObservation::available(456, 1),
-            memory_pss_bytes: ScalarObservation::unavailable(
-                taskmanager_core::core::FailureKind::TemporarilyUnavailable,
-            ),
+            memory_pss_bytes: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             ..ProcessScalarObservations::default()
         })
         .build();
@@ -708,7 +701,7 @@ fn status_filter_label_id_and_all_constant() {
     // The pill row is rendered from ALL; its length + labels are part of the UI
     // contract, so pin them. Labels are localized through `i18n::t`, so the
     // contract asserts the en catalog (the fallback locale) explicitly.
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     assert_eq!(ProcessStatusFilter::All.label(), "All");
     assert_eq!(ProcessStatusFilter::Running.label(), "Running");
     assert_eq!(ProcessStatusFilter::Sleeping.label(), "Sleeping");
@@ -718,7 +711,7 @@ fn status_filter_label_id_and_all_constant() {
 
     // The zh catalog translates every pill label (a missing key falls back to
     // the key literal, which would break the pill row in the zh UI).
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+    set_language(Language::Zh);
     assert_eq!(ProcessStatusFilter::All.label(), "全部");
     assert_eq!(ProcessStatusFilter::Running.label(), "运行中");
     assert_eq!(ProcessStatusFilter::Sleeping.label(), "睡眠");
@@ -804,8 +797,12 @@ fn query_no_match_returns_empty() {
 
 // ── typed observations drive visible rows ─────────────────────────────────
 
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_core::core::{FailureKind, ScalarObservation};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
 
 /// One process whose typed observations carry either a measured value or an
 /// explicit unavailable state, per field. `None` means the platform reported the
@@ -827,7 +824,7 @@ fn typed_item(fixture: TypedProcessFixture) -> ProcessItem {
         Some(value) => ScalarObservation::available(value, 10),
         None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
     };
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(fixture.pid)
         // Keep every typed fixture as an orphan root so this helper's sort
         // tests exercise one sibling level instead of an accidental pid-1
@@ -1003,7 +1000,7 @@ fn canonical_category_root_sums_only_available_members() {
         true,
         &default_category_expansions(),
         &HashSet::new(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     let aggregate = rows
         .iter()
@@ -1057,7 +1054,7 @@ fn visible_rows_precomputes_name_highlight_ranges_for_the_active_query() {
             filter: ProcessStatusFilter::All,
             collapsed,
             expanded_apps,
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         }
     }
 

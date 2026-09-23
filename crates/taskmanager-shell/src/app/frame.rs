@@ -10,6 +10,7 @@ use taskmanager_core::core::storage::StorageDeviceTarget;
 use taskmanager_platform_contract::{OperationFailure, RequestId};
 
 use super::ProcessControlFeedback;
+use taskmanager_application::ServiceControlOutcome;
 
 /// Persistent lifecycle of the visible telemetry frame.
 ///
@@ -161,7 +162,7 @@ pub struct BatchFoldOutput {
     pub smart_self_test_results: Vec<SmartSelfTestResult>,
     pub startup_control_outcomes: Vec<StartupControlOutcome>,
     pub session_control_outcomes: Vec<SessionControlOutcome>,
-    pub service_control_outcomes: Vec<taskmanager_application::ServiceControlOutcome>,
+    pub service_control_outcomes: Vec<ServiceControlOutcome>,
     pub network_capture_escalations: Vec<RequestId>,
     pub shell_events: Vec<CorrelatedShellEvent>,
     pub setup_script_events: Vec<CorrelatedSetupScriptEvent>,

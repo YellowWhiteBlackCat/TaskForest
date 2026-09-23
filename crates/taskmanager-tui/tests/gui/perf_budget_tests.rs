@@ -93,13 +93,10 @@ impl TreeFixture {
         for index in 0..self.apps {
             groups.insert(format!(
                 "{}{}",
-                taskmanager_shell::APP_TREE_EXPANSION_KEY_PREFIX,
-                ProcessLiveKey::from_parts(
-                    root_pid(index),
-                    taskmanager_test_support::fixture_start_token(root_pid(index)),
-                )
-                .expect("fixture identity")
-                .stable_key()
+                APP_TREE_EXPANSION_KEY_PREFIX,
+                ProcessLiveKey::from_parts(root_pid(index), fixture_start_token(root_pid(index)),)
+                    .expect("fixture identity")
+                    .stable_key()
             ));
         }
         groups
@@ -112,7 +109,7 @@ fn root_pid(index: usize) -> u32 {
 }
 
 fn base_process(pid: u32, name: String, cpu: f32) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name)
         .current_cpu_percentage(cpu)
@@ -229,7 +226,7 @@ fn minimal_snapshot() -> SystemSnapshot {
 /// Build an uncomposed TuiApp seeded with the fixture through the shell's
 /// typed fixture boundary (no `/proc`, no network, no host state).
 fn seeded_app(fixture: &TreeFixture) -> TuiApp {
-    let mut shell = taskmanager_shell::ShellApp::new();
+    let mut shell = ShellApp::new();
     seed_projection_fact(
         &mut shell,
         ProjectionSeedFact::Snapshot(Box::new(Some(minimal_snapshot()))),
@@ -308,11 +305,11 @@ fn canonical_rows_follow_the_pure_count_formula_at_10k() {
     // Collapsing the first application root hides exactly its child subtree;
     // the aggregate header and the root row stay visible (flatten emits the
     // node itself, then gates the children on the collapsed set).
-    let collapsed: HashSet<ProcessLiveKey> = HashSet::from([ProcessLiveKey::from_parts(
-        root_pid(0),
-        taskmanager_test_support::fixture_start_token(root_pid(0)),
-    )
-    .expect("fixture identity")]);
+    let collapsed: HashSet<ProcessLiveKey> =
+        HashSet::from([
+            ProcessLiveKey::from_parts(root_pid(0), fixture_start_token(root_pid(0)))
+                .expect("fixture identity"),
+        ]);
     let rows = process_view_support::build_process_rows(
         &refs,
         &expanded,
@@ -367,24 +364,18 @@ fn visual_row_count_matches_the_canonical_slice_and_invalidates_per_input() {
     for index in 0..fixture.apps {
         app.expanded_groups.insert(format!(
             "{}{}",
-            taskmanager_shell::APP_TREE_EXPANSION_KEY_PREFIX,
-            ProcessLiveKey::from_parts(
-                root_pid(index),
-                taskmanager_test_support::fixture_start_token(root_pid(index)),
-            )
-            .expect("fixture identity")
-            .stable_key()
+            APP_TREE_EXPANSION_KEY_PREFIX,
+            ProcessLiveKey::from_parts(root_pid(index), fixture_start_token(root_pid(index)),)
+                .expect("fixture identity")
+                .stable_key()
         ));
     }
     assert_eq!(app.visual_row_count(), fixture.rows_all_expanded());
 
     // Tree input: collapsing one root hides exactly its child subtree.
     app.collapsed_tree.insert(
-        ProcessLiveKey::from_parts(
-            root_pid(0),
-            taskmanager_test_support::fixture_start_token(root_pid(0)),
-        )
-        .expect("fixture identity"),
+        ProcessLiveKey::from_parts(root_pid(0), fixture_start_token(root_pid(0)))
+            .expect("fixture identity"),
     );
     assert_eq!(
         app.visual_row_count(),
@@ -701,6 +692,8 @@ fn an_event_window_forces_exactly_one_follow_up_repaint() {
 
 // ─── Extreme terminal dimension layout budget assertions ───────────────────
 use taskmanager_application::i18n::t;
+use taskmanager_shell::{APP_TREE_EXPANSION_KEY_PREFIX, ShellApp};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
 const BRAILLE_SPARKLINE_BLOCKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
 fn assert_terminal_cell_bounds(terminal: &Terminal<TestBackend>, expected_w: u16, expected_h: u16) {

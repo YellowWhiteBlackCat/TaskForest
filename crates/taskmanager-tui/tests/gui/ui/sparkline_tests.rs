@@ -6,6 +6,7 @@ use super::test_support::ascii_device_trend;
 use super::test_support::device_trend;
 use super::*;
 use crate::{TuiColorMode, TuiTerminalProfile};
+use taskmanager_application::i18n::{Language, set_language};
 
 /// A flat series renders as a constant mid-ramp line — honest about the
 /// trend being flat, never a panic on a zero range. `(0.5 * 7.0).round()`
@@ -235,7 +236,7 @@ fn guarded_english_summary(
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     device_summary_line_in(mode, label, samples, unit).expect("finite fixture window")
 }
 

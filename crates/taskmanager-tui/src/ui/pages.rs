@@ -14,6 +14,11 @@ use super::containers::{
 };
 use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
+use taskmanager_application::SmbiosMemoryState;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
+use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_shell::{InfoSortCol, SortDir, service_cycle_members};
 
 mod service_details;
 mod service_log;
@@ -34,7 +39,7 @@ fn source_state_message(
     let Some(notice) = sources.and_then(source_notice) else {
         return fallback.to_owned();
     };
-    let reason = taskmanager_shell::presentation::control_error_detail(notice.failure());
+    let reason = control_error_detail(notice.failure());
     let action = if retryable && notice.is_retryable() {
         format!(" · r {}", t("common.refresh"))
     } else {
@@ -77,15 +82,13 @@ pub(super) fn source_notice_layout(
 /// first column is the name and second the state. Name → header index 0,
 /// Status → index 1; the user-only columns can never land in these sorts (the
 /// shell cycle excludes them), so the fallback is defensive only.
-fn name_status_sort(
-    sort: Option<(taskmanager_shell::InfoSortCol, taskmanager_shell::SortDir)>,
-) -> Option<(usize, taskmanager_shell::SortDir)> {
+fn name_status_sort(sort: Option<(InfoSortCol, SortDir)>) -> Option<(usize, SortDir)> {
     sort.map(|(column, direction)| {
         (
             match column {
-                taskmanager_shell::InfoSortCol::Name => 0,
-                taskmanager_shell::InfoSortCol::Status => 1,
-                taskmanager_shell::InfoSortCol::Session | taskmanager_shell::InfoSortCol::Seat => 0,
+                InfoSortCol::Name => 0,
+                InfoSortCol::Status => 1,
+                InfoSortCol::Session | InfoSortCol::Seat => 0,
             },
             direction,
         )
@@ -254,7 +257,7 @@ pub(super) fn render_services(
         .projection()
         .services
         .as_deref()
-        .map(taskmanager_shell::service_cycle_members)
+        .map(service_cycle_members)
         .unwrap_or_default();
     let state_message = source_state_message(
         app.projection().services_source.as_deref(),
@@ -363,7 +366,7 @@ impl SystemFactViewport {
 
 pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let smbios_snapshot = match app.shell.smbios_memory_state() {
-        taskmanager_application::SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
+        SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
         _ => None,
     };
     let sections = system_data::system_sections(
@@ -493,7 +496,7 @@ pub(super) fn render_startup(
 
 /// The source column with its scope suffix (GPUI parity: the row reads
 /// `Desktop Entry · User` instead of the bare provider label).
-pub(super) fn startup_source_text(entry: &taskmanager_core::core::startup::StartupEntry) -> String {
+pub(super) fn startup_source_text(entry: &StartupEntry) -> String {
     format!(
         "{} · {}",
         entry.source.as_str(),
@@ -501,24 +504,24 @@ pub(super) fn startup_source_text(entry: &taskmanager_core::core::startup::Start
     )
 }
 
-fn startup_scope_text(scope: taskmanager_core::core::startup::StartupScope) -> &'static str {
+fn startup_scope_text(scope: StartupScope) -> &'static str {
     match scope {
-        taskmanager_core::core::startup::StartupScope::User => t("startup.scope_user"),
-        taskmanager_core::core::startup::StartupScope::System => t("startup.scope_system"),
-        taskmanager_core::core::startup::StartupScope::Session => t("startup.scope_session"),
-        taskmanager_core::core::startup::StartupScope::Unknown => t("startup.scope_unknown"),
+        StartupScope::User => t("startup.scope_user"),
+        StartupScope::System => t("startup.scope_system"),
+        StartupScope::Session => t("startup.scope_session"),
+        StartupScope::Unknown => t("startup.scope_unknown"),
     }
 }
 
 /// The impact column with its evidence (GPUI parity: `Low · 42 ms` for a
 /// measured boot impact, `Low · unmeasured` when the provider could not
 /// instrument it — never a fabricated duration).
-pub(super) fn startup_impact_text(entry: &taskmanager_core::core::startup::StartupEntry) -> String {
+pub(super) fn startup_impact_text(entry: &StartupEntry) -> String {
     match entry.impact_evidence {
-        taskmanager_core::core::startup::StartupImpactEvidence::Measured { duration_ms } => {
+        StartupImpactEvidence::Measured { duration_ms } => {
             format!("{} · {duration_ms} ms", t(entry.impact.i18n_key()))
         }
-        taskmanager_core::core::startup::StartupImpactEvidence::Unknown { .. } => {
+        StartupImpactEvidence::Unknown { .. } => {
             format!(
                 "{} · {}",
                 t(entry.impact.i18n_key()),
@@ -571,10 +574,10 @@ pub(super) fn render_users(
                 app.shell.sessions_sort.map(|(column, direction)| {
                     (
                         match column {
-                            taskmanager_shell::InfoSortCol::Session => 0,
-                            taskmanager_shell::InfoSortCol::Name => 1,
-                            taskmanager_shell::InfoSortCol::Seat => 2,
-                            taskmanager_shell::InfoSortCol::Status => 1,
+                            InfoSortCol::Session => 0,
+                            InfoSortCol::Name => 1,
+                            InfoSortCol::Seat => 2,
+                            InfoSortCol::Status => 1,
                         },
                         direction,
                     )
@@ -629,8 +632,8 @@ fn session_feedback_line(app: &TuiApp, theme: TuiTheme) -> Option<Line<'static>>
     let outcome = app.shell.projection().session_control_feedback.as_ref()?;
     let target = outcome.session_id.to_string();
     let action = match outcome.action {
-        taskmanager_core::core::session::SessionControlAction::Disconnect => t("users.disconnect"),
-        taskmanager_core::core::session::SessionControlAction::Lock => t("users.lock"),
+        SessionControlAction::Disconnect => t("users.disconnect"),
+        SessionControlAction::Lock => t("users.lock"),
     };
     match &outcome.result {
         Ok(()) => Some(Line::from(Span::styled(

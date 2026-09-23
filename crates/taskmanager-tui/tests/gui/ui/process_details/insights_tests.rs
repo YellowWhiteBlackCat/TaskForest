@@ -22,7 +22,9 @@ use taskmanager_core::core::process_telemetry::{
     OpenFileKind, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessGpuSnapshot,
     ThreadState,
 };
+use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::presentation::missing_value;
 
 /// Compact preview row bounds asserted by the headless preview tests. The
 /// production renderer always passes its own limit, so these bounded wrappers
@@ -283,7 +285,7 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
     // A thread whose `stat` lacked parseable CPU counters keeps its own row
     // with the explicit dash in both CPU columns — never a fabricated
     // `0.0s` / `0.0%`.
-    let dash = taskmanager_shell::presentation::missing_value();
+    let dash = missing_value();
     assert!(
         text.contains(&format!("101  worker  S  {dash}  {dash}")),
         "a thread without parsed CPU counters must render both dashes:\n{text}"
@@ -902,7 +904,7 @@ fn insights_lines_renders_cpu_affinity_when_observed() {
     let ready = ProcessAffinityReady {
         target,
         cpus: vec![0, 1, 2, 3],
-        request_id: taskmanager_platform_contract::RequestId::new(1).expect("valid request id"),
+        request_id: RequestId::new(1).expect("valid request id"),
     };
     seed_projection_fact(
         &mut app.shell,

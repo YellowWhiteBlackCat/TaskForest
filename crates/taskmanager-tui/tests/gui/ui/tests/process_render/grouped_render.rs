@@ -3,15 +3,17 @@
 use super::frame_text;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn category_app() -> crate::TuiApp {
     let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
         .expect("identity fixture");
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProjectionSeedFact::Processes(Some(vec![
+            ProcessItemFixtureBuilder::new()
                 .pid(11)
                 .name("editor".into())
                 .current_cpu_percentage(24.8)
@@ -19,7 +21,7 @@ fn category_app() -> crate::TuiApp {
                     identity, 10,
                 ))
                 .build(),
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(30)
                 .name("daemon".into())
                 .current_cpu_percentage(1.0)

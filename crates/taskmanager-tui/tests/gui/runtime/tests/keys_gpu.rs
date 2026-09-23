@@ -1,6 +1,9 @@
 //! GPU-page keyboard routing and generation-bound chart selection tests.
 
 use super::super::*;
+use taskmanager_application::PlatformEventBatch;
+use taskmanager_application::i18n::t;
+use taskmanager_shell::fixture::edit_snapshot;
 
 /// The GPU-page `g` chord cycles the shared shell chart-metric selection
 /// (ADR-034 stage 2): availability-gated through the demo GPU's typed
@@ -43,7 +46,7 @@ fn gpu_page_g_cycles_the_shared_chart_metric_selection() {
         .map(|notice| notice.text().to_owned())
         .unwrap_or_default();
     assert!(
-        notice.contains(taskmanager_application::i18n::t("gpu.graph_temperature")),
+        notice.contains(t("gpu.graph_temperature")),
         "the cycle must report the family it landed on: {notice}"
     );
 
@@ -90,7 +93,7 @@ fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
     );
     // Bind the selection to the demo GPU's generation first — the production
     // fold does this on the very first batch, long before a user can press g.
-    app.apply_platform_batch(taskmanager_application::PlatformEventBatch::default());
+    app.apply_platform_batch(PlatformEventBatch::default());
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -103,7 +106,7 @@ fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
         GpuChartMetric::Temperature
     );
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         if let Some(snapshot) = snapshot.as_mut()
             && let Some(gpu) = snapshot.gpu.first_mut()
         {
@@ -111,7 +114,7 @@ fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
                 DeviceGeneration::new(gpu.device_generation.get().saturating_add(1));
         }
     });
-    app.apply_platform_batch(taskmanager_application::PlatformEventBatch::default());
+    app.apply_platform_batch(PlatformEventBatch::default());
 
     assert_eq!(
         app.shell.gpu_chart_metric_selected(),
@@ -124,7 +127,7 @@ fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
         .map(|notice| notice.text().to_owned())
         .unwrap_or_default();
     assert!(
-        notice.contains(taskmanager_application::i18n::t("gpu.graph_utilization")),
+        notice.contains(t("gpu.graph_utilization")),
         "the reset must land in the same wave the fact did: {notice}"
     );
 }

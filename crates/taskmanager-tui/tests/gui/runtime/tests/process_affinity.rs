@@ -27,6 +27,8 @@ use taskmanager_platform_contract::{
 
 use crate::render;
 use crate::{TuiApp, TuiSurfaceKind, TuiTheme};
+use taskmanager_application::{PlatformClient, PlatformHandle};
+use taskmanager_shell::queue_effect;
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
@@ -83,10 +85,8 @@ impl RequestPort for RecordingAffinityReads {
     }
 }
 
-fn affinity_client(
-    recorder: Arc<RecordingAffinityReads>,
-) -> taskmanager_application::PlatformClient {
-    taskmanager_application::PlatformClient::new(taskmanager_application::PlatformHandle::new(
+fn affinity_client(recorder: Arc<RecordingAffinityReads>) -> PlatformClient {
+    PlatformClient::new(PlatformHandle::new(
         Arc::new(EmptyCapabilities),
         Arc::new(EmptyEvents),
         PlatformFacets::default().with_process(ProcessFacets::default().with_affinity(recorder)),
@@ -116,7 +116,7 @@ fn open_and_observe(app: &mut TuiApp, cpus: Vec<u32>) -> FrozenProcessIdentity {
     };
     let target = request.target.clone();
     let mut client = affinity_client(Arc::clone(&recorder));
-    taskmanager_shell::queue_effect(&mut app.shell, &mut client, effect);
+    queue_effect(&mut app.shell, &mut client, effect);
 
     let reads = recorded_reads(&recorder);
     let (request_id, _) = reads
@@ -446,7 +446,7 @@ fn fresh_authoritative_read_rewrites_in_progress_edits() {
         .request_process_affinity()
         .expect("the selected row has an identity");
     let mut client = affinity_client(Arc::clone(&recorder));
-    taskmanager_shell::queue_effect(&mut app.shell, &mut client, effect);
+    queue_effect(&mut app.shell, &mut client, effect);
     let (request_id, _) = recorded_reads(&recorder)
         .first()
         .cloned()
@@ -483,7 +483,7 @@ fn a_foreign_identity_read_never_enters_the_editor() {
     // renderer state can see it.
     let mut batch = PlatformEventBatch::default();
     batch.process_affinity_events.push(CorrelatedEvent {
-        request_id: taskmanager_platform_contract::RequestId::MIN,
+        request_id: RequestId::MIN,
         capability: CapabilityId::PROCESS_AFFINITY,
         provider: None,
         sequence: EventSequence::new(1),

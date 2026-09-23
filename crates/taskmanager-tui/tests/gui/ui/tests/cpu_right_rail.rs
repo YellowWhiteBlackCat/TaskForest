@@ -14,6 +14,10 @@ use taskmanager_core::core::metrics::{
 
 use super::acceptance_support::frame_in_language;
 use super::frame_text;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::CpuPackageMetrics;
+use taskmanager_shell::fixture::{edit_hardware, edit_snapshot};
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 
 fn cpu_app() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -36,7 +40,7 @@ fn row_paints(text: &str, label: &str, value: &str) -> bool {
 /// — only painted because the projection reports it), independent of any
 /// concurrent fixture enrichment.
 fn with_full_spec(app: &mut crate::TuiApp) {
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.processes = 347;
         snapshot.threads = Some(2_816);
@@ -52,7 +56,7 @@ fn with_full_spec(app: &mut crate::TuiApp) {
         snapshot.cpu.performance_policy.active_policy = Some("powersave".into());
         snapshot.cpu.performance_policy.energy_preference = Some("balance_performance".into());
     });
-    taskmanager_shell::fixture::edit_hardware(&mut app.shell, |hardware| {
+    edit_hardware(&mut app.shell, |hardware| {
         let hardware = hardware.as_mut().expect("demo hardware");
         hardware.base_freq_mhz = Some(3200);
         hardware.sockets = Some(2);
@@ -257,7 +261,7 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
             .snapshot
             .as_ref()
             .expect("demo snapshot");
-        taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+        cpu_thermal_throttle_summary(&snapshot.cpu)
             .expect("observed counters must produce the shared fold")
     };
     assert!(
@@ -276,12 +280,12 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
         .snapshot
         .clone()
         .expect("demo snapshot");
-    let expected = taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+    let expected = cpu_thermal_throttle_summary(&snapshot.cpu)
         .expect("observed counters must produce the shared fold");
     let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(&snapshot.cpu, None);
     let throttle = rows
         .iter()
-        .find(|row| row.label == taskmanager_application::i18n::t("cpu.thermal_throttle"))
+        .find(|row| row.label == t("cpu.thermal_throttle"))
         .expect("the observed counters must grow a rail row");
     assert_eq!(
         throttle.value, expected,
@@ -300,13 +304,12 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
 }
 
 fn set_package_counters(app: &mut crate::TuiApp, counters: &[(u32, Option<u64>, Option<u64>)]) {
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.cpu.packages = counters
             .iter()
             .map(|&(package_id, package_count, core_count)| {
-                let mut package =
-                    taskmanager_core::core::metrics::CpuPackageMetrics::new(package_id);
+                let mut package = CpuPackageMetrics::new(package_id);
                 package.package_throttle_count = package_count;
                 package.core_throttle_count = core_count;
                 package
@@ -332,7 +335,7 @@ fn bogomips_fallback_qualifies_the_frequency_fact() {
         "a native frequency must not carry the BogoMIPS qualifier:\n{native}"
     );
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.cpu.frequency_source = CpuFrequencySource::BogoMips;
     });
@@ -377,7 +380,7 @@ fn per_core_temperature_footnote_reports_average_and_peak() {
 }
 
 fn set_per_core_temperatures(app: &mut crate::TuiApp, temperatures: Vec<f32>) {
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.per_core_temperature_group =
@@ -388,7 +391,7 @@ fn set_per_core_temperatures(app: &mut crate::TuiApp, temperatures: Vec<f32>) {
 
 /// Pin the live frequency readout the BogoMIPS assertions scan for.
 fn set_frequency(app: &mut crate::TuiApp, mhz: u64) {
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.frequency_mhz = ScalarObservation::available(mhz, 1_000_000);

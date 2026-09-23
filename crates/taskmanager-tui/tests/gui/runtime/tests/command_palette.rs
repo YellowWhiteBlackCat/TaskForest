@@ -9,6 +9,8 @@ use taskmanager_application::{AppAction, AppPage};
 
 use crate::TuiTheme;
 use crate::render;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::{InfoSortCol, QuitReason, SortDir};
 
 fn app_on_processes() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -43,7 +45,7 @@ fn question_mark_opens_the_palette_and_esc_closes_it() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(120, 36);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -71,7 +73,7 @@ fn typing_narrows_the_rows_and_enter_runs_the_selected_action() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -254,18 +256,12 @@ fn palette_runs_tui_local_actions_from_the_selected_row() {
     services.run_palette_local_action(Some(PaletteLocalAction::CycleSortColumn));
     assert_eq!(
         services.shell.services_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Name,
-            taskmanager_shell::SortDir::Asc
-        ))
+        Some((InfoSortCol::Name, SortDir::Asc))
     );
     services.run_palette_local_action(Some(PaletteLocalAction::ToggleSortDirection));
     assert_eq!(
         services.shell.services_sort,
-        Some((
-            taskmanager_shell::InfoSortCol::Name,
-            taskmanager_shell::SortDir::Desc
-        ))
+        Some((InfoSortCol::Name, SortDir::Desc))
     );
 }
 
@@ -298,10 +294,7 @@ fn palette_quit_sets_the_run_loop_flag() {
         app.should_quit(),
         "palette Quit sets the same flag the q key does"
     );
-    assert_eq!(
-        app.quit_reason(),
-        Some(taskmanager_shell::QuitReason::CommandPalette)
-    );
+    assert_eq!(app.quit_reason(), Some(QuitReason::CommandPalette));
 }
 
 #[test]

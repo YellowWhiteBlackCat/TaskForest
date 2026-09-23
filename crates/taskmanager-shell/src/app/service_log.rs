@@ -8,6 +8,7 @@
 //! drift apart.
 use super::{ShellApp, submission_time_ms};
 use taskmanager_application::{PlatformEffect, ServiceLogStreamLifecycle, ServiceLogStreamRequest};
+use taskmanager_core::core::services::ServiceLogLevel;
 use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogProviderState,
     ServiceLogQuery, ServiceLogState, ServiceLogStreamSnapshot, ServiceLogStreamState,
@@ -243,7 +244,7 @@ impl ShellApp {
                     cursor: format!("snapshot:{index}"),
                     realtime_timestamp_micros: None,
                     priority: None,
-                    level: taskmanager_core::core::services::ServiceLogLevel::Unknown,
+                    level: ServiceLogLevel::Unknown,
                     message,
                 })
                 .collect(),

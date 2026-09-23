@@ -1,10 +1,13 @@
 //! System telemetry, dynamic-device and alert-watermark fold systems.
 
 use super::*;
+use taskmanager_application::{
+    CorrelatedPowerSupplyEvent, CorrelatedSensorEvent, CorrelatedSystemTelemetryOutcome,
+};
 
 pub(super) fn apply_system_telemetry(
     store: &mut SystemProjectionStore,
-    outcomes: &[taskmanager_application::CorrelatedSystemTelemetryOutcome],
+    outcomes: &[CorrelatedSystemTelemetryOutcome],
     projections: Vec<ProjectedSystemTelemetry>,
     fold: &mut FoldState,
 ) {
@@ -39,8 +42,8 @@ pub(super) fn apply_system_telemetry(
 
 pub(super) fn apply_dynamic_devices(
     store: &mut SystemProjectionStore,
-    sensor_events: Vec<taskmanager_application::CorrelatedSensorEvent>,
-    power_events: Vec<taskmanager_application::CorrelatedPowerSupplyEvent>,
+    sensor_events: Vec<CorrelatedSensorEvent>,
+    power_events: Vec<CorrelatedPowerSupplyEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in sensor_events {

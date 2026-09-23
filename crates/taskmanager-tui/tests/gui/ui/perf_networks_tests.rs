@@ -1,6 +1,12 @@
 use super::*;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::metrics::{NetworkAdapterType, OptionalObservation, SystemSnapshot};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::wifi_signal_quality_percent;
+use taskmanager_test_support::{NetworkMetricsFixtureBuilder, pin_english};
 
 /// Flatten a ratatui `Line` back to its raw text so a test can assert on
 /// the rendered string.
@@ -18,26 +24,26 @@ fn with_english(body: impl FnOnce()) {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     body();
 }
 
 fn wireless_network(signal_dbm: Option<i32>) -> NetworkMetrics {
-    taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    NetworkMetricsFixtureBuilder::new()
         .device_id("network:test:wlan0".into())
         .interface_name("wlan0".into())
         .adapter_type(if true {
-            taskmanager_core::core::metrics::NetworkAdapterType::WiFi
+            NetworkAdapterType::WiFi
         } else {
-            taskmanager_core::core::metrics::NetworkAdapterType::Unknown
+            NetworkAdapterType::Unknown
         })
         .ssid_observation(match Some("Lab".into()) {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .signal_observation(match signal_dbm {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .build()
 }
@@ -73,7 +79,7 @@ fn the_shared_signal_quality_fold_maps_the_standard_rssi_range() {
 #[test]
 fn wireless_signal_renders_quality_only_from_an_observed_dbm() {
     with_english(|| {
-        let shell = taskmanager_shell::ShellApp::new();
+        let shell = ShellApp::new();
         let with_signal = network_lines(
             &[&wireless_network(Some(-52))],
             &shell,
@@ -127,39 +133,39 @@ fn network_direction_rows_share_one_scale_and_keep_the_summed_summary() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
-    let mut shell = taskmanager_shell::ShellApp::new();
+    pin_english();
+    let mut shell = ShellApp::new();
     // rx varies 1→3 MiB/s while tx stays pinned at 3 MiB/s.
     for (timestamp_ms, rx, tx) in [
         (1_u64, 1_048_576_u64, 3_145_728_u64),
         (2, 2_097_152, 3_145_728),
         (3, 3_145_728, 3_145_728),
     ] {
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(
             &mut shell,
-            &taskmanager_core::core::metrics::SystemSnapshot {
+            &SystemSnapshot {
                 timestamp_ms,
                 networks: vec![
-                    taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+                    NetworkMetricsFixtureBuilder::new()
                         .device_id("network:test:eth0".into())
                         .interface_name("eth0".into())
                         .current_rx_bytes_per_sec(rx)
                         .current_tx_bytes_per_sec(tx)
                         .build(),
                 ],
-                ..taskmanager_core::core::metrics::SystemSnapshot::default()
+                ..SystemSnapshot::default()
             },
             None,
             None,
         );
     }
 
-    let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let nic = NetworkMetricsFixtureBuilder::new()
         .device_id("network:test:eth0".into())
         .interface_name("eth0".into())
         // The demo seeding resets rings for generation 1; the rendered row
         // carries that bound generation like a real platform row would.
-        .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+        .device_generation(DeviceGeneration::new(1))
         .build();
     let lines = network_lines(&[&nic], &shell, TuiTheme::default(), true, true, 60);
     // Index 0 is the header and index 1 the device-status row, so the
@@ -191,7 +197,7 @@ fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut stale = wireless_network(None);
     stale.device_state = DeviceState {
         status: DeviceStatus::Stale,
@@ -202,7 +208,7 @@ fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
     stale.ipv4_addr = Some("192.168.1.10".into());
     let texts: Vec<String> = network_lines(
         &[&stale],
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         true,
         true,
@@ -237,7 +243,7 @@ fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
     healthy.device_state = DeviceState::healthy(1);
     let texts: Vec<String> = network_lines(
         &[&healthy],
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         true,
         true,
@@ -271,10 +277,10 @@ fn network_status_row_renders_the_active_locale_copy() {
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let en_texts: Vec<String> = network_lines(
         &[&stale],
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         true,
         true,
@@ -285,10 +291,10 @@ fn network_status_row_renders_the_active_locale_copy() {
     .collect();
     let en_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
 
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+    set_language(Language::Zh);
     let zh_texts: Vec<String> = network_lines(
         &[&stale],
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         true,
         true,

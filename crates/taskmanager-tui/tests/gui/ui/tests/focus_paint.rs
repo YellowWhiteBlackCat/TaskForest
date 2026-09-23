@@ -20,13 +20,15 @@ use crate::TuiTheme;
 use crate::ui::frame_plan::{TuiFocusControl, TuiFocusOrder, TuiFocusPlan, TuiFocusTarget};
 use crate::ui::process_properties::ProcessDetailsSection;
 use crate::{TuiSurfaceKind, demo_app};
+use taskmanager_application::SurfaceKind;
+use taskmanager_application::i18n::{Language, set_language};
 
 /// Pin English and serialize against the language-flipping i18n test.
 fn pinned<T>(paint: impl FnOnce() -> T) -> T {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     paint()
 }
 
@@ -271,9 +273,7 @@ fn properties_modal_highlights_only_the_plan_named_tab() {
                     &app,
                     TuiTheme::default(),
                     TuiFocusPlan {
-                        target: TuiFocusTarget::SharedSurface(
-                            taskmanager_application::SurfaceKind::ProcessProperties,
-                        ),
+                        target: TuiFocusTarget::SharedSurface(SurfaceKind::ProcessProperties),
                         order: TuiFocusOrder::None,
                         control,
                     },

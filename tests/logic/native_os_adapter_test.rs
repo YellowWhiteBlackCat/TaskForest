@@ -21,14 +21,15 @@ fn native_selector_physically_selects_linux_windows_or_macos() {
             "native selector omitted {target}"
         );
     }
-    for runtime in [
-        "taskmanager_platform_linux::NativePlatformRuntime",
-        "taskmanager_platform_windows::NativePlatformRuntime",
-        "taskmanager_platform_macos::NativePlatformRuntime",
+    for (adapter, runtime) in [
+        ("taskmanager_platform_linux", "NativePlatformRuntime"),
+        ("taskmanager_platform_windows", "NativePlatformRuntime"),
+        ("taskmanager_platform_macos", "NativePlatformRuntime"),
     ] {
+        let qualified = format!("{adapter}::{runtime}");
         assert!(
-            source.contains(runtime),
-            "native selector omitted physical runtime selection {runtime}"
+            source.contains(&qualified),
+            "native selector omitted physical runtime selection {qualified}"
         );
     }
     assert!(

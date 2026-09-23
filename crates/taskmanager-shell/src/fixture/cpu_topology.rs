@@ -4,6 +4,8 @@
 //! topology, so GPUI, Iced, TUI and Bevy all read the same elastic fields and
 //! none of them hardcodes a shape.
 
+use taskmanager_core::core::hardware::CpuType;
+
 /// One CPU cluster: physical cores of ONE class sharing one SMT shape.
 /// Free composition across any number of clusters is what makes the model
 /// cover the market: homogeneous AMD/server parts are ONE cluster with SMT
@@ -13,7 +15,7 @@
 #[derive(Clone, Copy, Debug)]
 pub struct CpuClusterSpec {
     /// The class every core in this cluster reports.
-    pub kind: taskmanager_core::core::hardware::CpuType,
+    pub kind: CpuType,
     /// Physical cores in this cluster.
     pub physical_cores: usize,
     /// Logical CPUs per physical core: 1 = no SMT, 2 = SMT/Hyper-Threading.
@@ -54,7 +56,7 @@ impl CpuTopologySpec {
 
     /// Per-logical-CPU type in cluster order (the order every consumer —
     /// grid grouping, captions — must preserve).
-    pub fn cpu_types(&self) -> Vec<taskmanager_core::core::hardware::CpuType> {
+    pub fn cpu_types(&self) -> Vec<CpuType> {
         self.clusters
             .iter()
             .flat_map(|cluster| {
@@ -113,7 +115,7 @@ impl CpuTopologySpec {
     /// How many logical CPUs of `kind` precede this cluster — the tiling
     /// offset so same-kind clusters continue the pattern instead of
     /// restarting it.
-    fn painted_logical_of_kind(&self, kind: taskmanager_core::core::hardware::CpuType) -> usize {
+    fn painted_logical_of_kind(&self, kind: CpuType) -> usize {
         self.clusters
             .iter()
             .take_while(|cluster| cluster.kind != kind)
@@ -136,7 +138,6 @@ impl CpuClusterSpec {
 /// AMD/server with SMT on every core, Snapdragon-style 1X+5P+2LP,
 /// Apple-style big.LITTLE, a fourth cluster…) is one literal swap away.
 pub fn demo_cpu_topology() -> CpuTopologySpec {
-    use taskmanager_core::core::hardware::CpuType;
     CpuTopologySpec {
         clusters: vec![
             CpuClusterSpec {
@@ -164,8 +165,7 @@ pub fn demo_cpu_topology() -> CpuTopologySpec {
 /// topology stays deterministic and plausible. Patterns live per KIND (not
 /// per full vector) precisely so topology changes never require re-writing
 /// literal vectors.
-fn usage_pattern(kind: taskmanager_core::core::hardware::CpuType) -> &'static [f32] {
-    use taskmanager_core::core::hardware::CpuType;
+fn usage_pattern(kind: CpuType) -> &'static [f32] {
     match kind {
         CpuType::Performance => &[
             52.0, 41.0, 34.0, 22.0, 57.5, 33.0, 48.5, 39.0, 44.5, 28.0, 61.5, 36.0,
@@ -176,8 +176,7 @@ fn usage_pattern(kind: taskmanager_core::core::hardware::CpuType) -> &'static [f
     }
 }
 
-fn frequency_pattern(kind: taskmanager_core::core::hardware::CpuType) -> &'static [u64] {
-    use taskmanager_core::core::hardware::CpuType;
+fn frequency_pattern(kind: CpuType) -> &'static [u64] {
     match kind {
         CpuType::Performance => &[
             4_820, 4_760, 4_910, 4_640, 4_750, 4_690, 4_880, 4_710, 4_800, 4_655, 4_940, 4_725,
@@ -188,8 +187,7 @@ fn frequency_pattern(kind: taskmanager_core::core::hardware::CpuType) -> &'stati
     }
 }
 
-fn temperature_pattern(kind: taskmanager_core::core::hardware::CpuType) -> &'static [f32] {
-    use taskmanager_core::core::hardware::CpuType;
+fn temperature_pattern(kind: CpuType) -> &'static [f32] {
     match kind {
         CpuType::Performance => &[
             58.0, 56.5, 61.0, 54.0, 57.5, 55.5, 59.5, 56.0, 58.5, 54.5, 62.0, 57.0,
@@ -226,7 +224,7 @@ pub(super) fn per_core_temperature_seed() -> Vec<f32> {
     demo_cpu_topology().temperatures_c()
 }
 
-pub(super) fn cpu_types_seed() -> Vec<taskmanager_core::core::hardware::CpuType> {
+pub(super) fn cpu_types_seed() -> Vec<CpuType> {
     demo_cpu_topology().cpu_types()
 }
 

@@ -119,15 +119,15 @@ struct NetworkClassVisibility {
 }
 
 impl NetworkClassVisibility {
-    fn allows(self, adapter_type: taskmanager_core::core::metrics::NetworkAdapterType) -> bool {
+    fn allows(self, adapter_type: NetworkAdapterType) -> bool {
         match adapter_type {
-            taskmanager_core::core::metrics::NetworkAdapterType::Ethernet => self.wired,
-            taskmanager_core::core::metrics::NetworkAdapterType::WiFi => self.wireless,
-            taskmanager_core::core::metrics::NetworkAdapterType::Vpn => self.vpn,
-            taskmanager_core::core::metrics::NetworkAdapterType::Virtual => self.virtual_devices,
-            taskmanager_core::core::metrics::NetworkAdapterType::Unknown
-            | taskmanager_core::core::metrics::NetworkAdapterType::Loopback
-            | taskmanager_core::core::metrics::NetworkAdapterType::Other => self.other,
+            NetworkAdapterType::Ethernet => self.wired,
+            NetworkAdapterType::WiFi => self.wireless,
+            NetworkAdapterType::Vpn => self.vpn,
+            NetworkAdapterType::Virtual => self.virtual_devices,
+            NetworkAdapterType::Unknown
+            | NetworkAdapterType::Loopback
+            | NetworkAdapterType::Other => self.other,
         }
     }
 }

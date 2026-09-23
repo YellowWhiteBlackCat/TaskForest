@@ -6,6 +6,10 @@ use taskmanager_application::{
     ShellEvent, ShellUiActionIntent, SmartEvent, SmartObservationBatch, SmartStateRevision,
     UrlOpenRequest,
 };
+use taskmanager_application::{
+    GpuEngineRowsState, NetworkEscalationState, ProcessAffinityState, ShellUiActionState,
+};
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
 use taskmanager_core::core::process::{
@@ -15,6 +19,7 @@ use taskmanager_core::core::process::{
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::target::StorageDeviceKey;
+use taskmanager_platform_contract::OperationFailure;
 use taskmanager_platform_contract::{CapabilityId, EventSequence, ProviderFailure, RequestId};
 
 fn request(value: u64) -> RequestId {
@@ -79,7 +84,7 @@ fn direct_track_filters_wrong_identity_late_and_duplicate_terminals_once() {
     );
     assert!(matches!(
         track.process_affinity_state(),
-        taskmanager_application::ProcessAffinityState::Loading { .. }
+        ProcessAffinityState::Loading { .. }
     ));
 
     let mut affinity = PlatformEventBatch::default();
@@ -187,7 +192,7 @@ fn direct_track_correlates_gpu_network_and_ui_action_terminals_once() {
     assert!(accepted.changes.gpu_engine_rows);
     assert!(matches!(
         track.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Ready(ready)
+        GpuEngineRowsState::Ready(ready)
             if ready.snapshot.device_id == gpu
     ));
 
@@ -208,7 +213,7 @@ fn direct_track_correlates_gpu_network_and_ui_action_terminals_once() {
     assert_eq!(accepted.shell_events.len(), 1);
     assert!(matches!(
         track.shell_ui_action_state(),
-        taskmanager_application::ShellUiActionState::Ready(_)
+        ShellUiActionState::Ready(_)
     ));
 
     let network_attempt = track.begin_network_escalation();
@@ -225,7 +230,7 @@ fn direct_track_correlates_gpu_network_and_ui_action_terminals_once() {
     assert_eq!(accepted.network_capture_escalations, vec![request(12)]);
     assert!(matches!(
         track.network_escalation_state(),
-        taskmanager_application::NetworkEscalationState::Ready(_)
+        NetworkEscalationState::Ready(_)
     ));
 }
 
@@ -245,7 +250,7 @@ fn shell_app_uses_the_same_close_and_late_terminal_rules() {
     app.apply_platform_batch(batch);
     assert!(matches!(
         app.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Closed
+        GpuEngineRowsState::Closed
     ));
 }
 
@@ -261,49 +266,48 @@ fn direct_track_routes_operation_failures_to_the_exact_active_session() {
     }));
     assert!(track.accept_shell_ui_action(ui_attempt, request(32)));
 
-    let operation_failure =
-        |request_id, capability, kind| taskmanager_platform_contract::OperationFailure {
-            request_id,
-            capability,
-            sequence: EventSequence::new(request_id.get()),
-            kind,
-            retry: ProviderFailure::from_kind(kind).retry(),
-            provider: None,
-            observed_at_ms: request_id.get(),
-        };
+    let operation_failure = |request_id, capability, kind| OperationFailure {
+        request_id,
+        capability,
+        sequence: EventSequence::new(request_id.get()),
+        kind,
+        retry: ProviderFailure::from_kind(kind).retry(),
+        provider: None,
+        observed_at_ms: request_id.get(),
+    };
     let mut batch = PlatformEventBatch::default();
     batch.failures.push(operation_failure(
         request(30),
         CapabilityId::TELEMETRY_GPU_ENGINES,
-        taskmanager_core::core::failure::FailureKind::PermissionDenied,
+        FailureKind::PermissionDenied,
     ));
     batch.failures.push(operation_failure(
         request(31),
         CapabilityId::PROCESS_NETWORK_ESCALATION,
-        taskmanager_core::core::failure::FailureKind::Rejected,
+        FailureKind::Rejected,
     ));
     batch.failures.push(operation_failure(
         request(32),
         CapabilityId::RESOURCE_REVEAL,
-        taskmanager_core::core::failure::FailureKind::ProviderFault,
+        FailureKind::ProviderFault,
     ));
     batch.failures.push(operation_failure(
         request(32),
         CapabilityId::URL_OPEN,
-        taskmanager_core::core::failure::FailureKind::ProviderFault,
+        FailureKind::ProviderFault,
     ));
     let _ = track.apply_platform_batch(batch);
 
     assert!(matches!(
         track.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Failed(_)
+        GpuEngineRowsState::Failed(_)
     ));
     assert!(matches!(
         track.network_escalation_state(),
-        taskmanager_application::NetworkEscalationState::Failed(_)
+        NetworkEscalationState::Failed(_)
     ));
     assert!(matches!(
         track.shell_ui_action_state(),
-        taskmanager_application::ShellUiActionState::Failed(_)
+        ShellUiActionState::Failed(_)
     ));
 }

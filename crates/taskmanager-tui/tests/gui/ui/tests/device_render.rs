@@ -10,6 +10,16 @@ use taskmanager_core::core::metrics::{
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::frame_text;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::hardware::DisplayInfo;
+use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::metrics::{
+    DiskPartitionScalarObservations, NetworkAdapterType, NetworkWirelessObservations,
+    SmartAvailability,
+};
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_core::core::sensors::SensorScale;
+use taskmanager_shell::fixture::{ProjectionSeedFact, edit_snapshot, seed_projection_fact};
 
 #[test]
 fn every_page_renders_headlessly_at_reference_and_minimum_sizes() {
@@ -52,7 +62,7 @@ fn cpu_view_renders_all_facts_without_fabricated_zeroes() {
     let mut app = crate::demo_app();
     // Cold CPU frequency/temperature observations render dashes instead of
     // fabricated numeric values.
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.frequency_mhz = ScalarObservation::default();
@@ -125,7 +135,7 @@ fn performance_selector_renders_resource_tab_row_with_active_highlight() {
 #[test]
 fn missing_memory_denominators_render_as_dashes_instead_of_zero_percent() {
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         snapshot.as_mut().expect("demo snapshot").memory = MemoryMetricsFixtureBuilder::new()
             .current_total_bytes(0)
             .current_used_bytes(0)
@@ -162,9 +172,9 @@ fn memory_view_renders_composition_bar_with_categories_and_swap() {
         .free_bytes(8 * gib)
         .reclaimable_bytes(gib)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let text = frame_text(&app, 120, 40);
@@ -200,9 +210,9 @@ fn swap_bar_labels_the_zram_ram_used_from_mm_stat() {
         .compressed_swap_compressed_bytes(mib)
         .compressed_swap_memory_used_bytes(mib / 2)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let text = frame_text(&app, 160, 40);
@@ -238,7 +248,7 @@ fn missing_gpu_observations_render_as_dashes() {
     let mut app = crate::demo_app();
     // The dedicated GPU panel only renders under the Gpu selector.
     app.perf_device = crate::PerfDevice::Gpu;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let gpu = snapshot
             .as_mut()
             .and_then(|snapshot| snapshot.gpu.first_mut())
@@ -265,7 +275,7 @@ fn gpu_detail_section_renders_utilization_vram_clocks_and_engines() {
     let mut app = crate::demo_app();
     // The dedicated GPU panel only renders under the Gpu selector.
     app.perf_device = crate::PerfDevice::Gpu;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let gpu = snapshot
             .as_mut()
             .and_then(|snapshot| snapshot.gpu.first_mut())
@@ -348,7 +358,7 @@ fn gpu_detail_section_renders_honest_empty_state_when_no_gpu() {
     app.perf_device = crate::PerfDevice::Gpu;
     // Strip every GPU so the panel cannot fall back to a fabricated idle
     // reading; it must say so honestly.
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         snapshot.as_mut().expect("demo snapshot").gpu.clear();
     });
 
@@ -373,7 +383,7 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     let mut app = crate::demo_app();
     // The dedicated disk panel only renders under the Disk selector.
     app.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let gib = 1024_u64.pow(3);
         // SMART health fields the compact devices summary never shows.
@@ -412,13 +422,11 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
             .expect("pushed partition is present");
         partition.name = "nvme0n1p1".into();
         partition.mount_point = "/".into();
-        partition.apply_scalar_observations(
-            taskmanager_core::core::metrics::DiskPartitionScalarObservations {
-                capacity_bytes: ScalarObservation::available(500 * gib, 1),
-                free_bytes: ScalarObservation::available(200 * gib, 1),
-                ..Default::default()
-            },
-        );
+        partition.apply_scalar_observations(DiskPartitionScalarObservations {
+            capacity_bytes: ScalarObservation::available(500 * gib, 1),
+            free_bytes: ScalarObservation::available(200 * gib, 1),
+            ..Default::default()
+        });
     });
 
     let text = frame_text(&app, 140, 48);
@@ -481,18 +489,14 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     // A disk whose two counters are explicitly unavailable omits the whole
     // queue/service row: the panel never prints a fabricated "Avg queue 0.00"
     // or "Service estimate 0.00 ms" for an unobserved device.
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let disk = snapshot
             .as_mut()
             .and_then(|snapshot| snapshot.disks.first_mut())
             .expect("demo app should carry one disk");
         let mut observations = *disk.scalar_observations();
-        observations.average_queue_depth = ScalarObservation::unavailable(
-            taskmanager_core::core::failure::FailureKind::Unsupported,
-        );
-        observations.service_time_ms = ScalarObservation::unavailable(
-            taskmanager_core::core::failure::FailureKind::Unsupported,
-        );
+        observations.average_queue_depth = ScalarObservation::unavailable(FailureKind::Unsupported);
+        observations.service_time_ms = ScalarObservation::unavailable(FailureKind::Unsupported);
         disk.apply_scalar_observations(observations);
     });
     let cold = frame_text(&app, 140, 48);
@@ -510,12 +514,12 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     // endurance/spare/temperature row.
     let mut availability_only = crate::demo_app();
     availability_only.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::edit_snapshot(&mut availability_only.shell, |snapshot| {
+    edit_snapshot(&mut availability_only.shell, |snapshot| {
         let disk = snapshot
             .as_mut()
             .and_then(|snapshot| snapshot.disks.first_mut())
             .expect("demo app should carry one disk");
-        disk.smart_availability = taskmanager_core::core::metrics::SmartAvailability::Available;
+        disk.smart_availability = SmartAvailability::Available;
     });
     let status_only = frame_text(&availability_only, 140, 48);
     assert!(
@@ -544,7 +548,7 @@ fn network_detail_section_renders_rates_link_and_wireless_association() {
     // assertions below explicit rather than default-dependent.
     app.prefs.units[4] = true;
     app.prefs.units[5] = true;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         // Populate the typed wireless/link fields the panel reads.
         let network = snapshot
@@ -557,7 +561,7 @@ fn network_detail_section_renders_rates_link_and_wireless_association() {
         let mut wireless_observations = network.wireless_observations().clone();
         wireless_observations.signal_dbm = OptionalObservation::present(-52, 1);
         network.apply_observations(
-            taskmanager_core::core::metrics::NetworkAdapterType::WiFi,
+            NetworkAdapterType::WiFi,
             scalar_observations,
             wireless_observations,
         );
@@ -600,7 +604,7 @@ fn system_page_renders_the_full_hardware_and_telemetry_fact_set() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
     let mut hardware = app.projection().hardware.clone().expect("demo hardware");
-    hardware.displays = vec![taskmanager_core::core::hardware::DisplayInfo {
+    hardware.displays = vec![DisplayInfo {
         connector: "DP-1".into(),
         manufacturer: Some("DEL".into()),
         model: Some("TaskPanel".into()),
@@ -610,9 +614,9 @@ fn system_page_renders_the_full_hardware_and_telemetry_fact_set() {
         hdr_supported: Some(true),
         ..Default::default()
     }];
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Hardware(Some(Box::new(hardware))),
+        ProjectionSeedFact::Hardware(Some(Box::new(hardware))),
     );
     let first = frame_text(&app, 120, 52);
     app.system_scroll = usize::MAX;
@@ -632,7 +636,7 @@ fn system_page_renders_the_full_hardware_and_telemetry_fact_set() {
 #[test]
 fn disk_and_network_selectors_render_honest_empty_state_when_absent() {
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.disks.clear();
         snapshot.networks.clear();
@@ -675,28 +679,20 @@ fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
     charged.status = "Discharging".into();
     charged.technology = "Li-ion".into();
     charged.manufacturer = "TaskForest Cells".into();
-    charged.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(82, 1_000),
-        voltage_uv: taskmanager_core::core::metrics::ScalarObservation::available(
-            12_400_000, 1_000,
-        ),
-        power_w: taskmanager_core::core::metrics::ScalarObservation::available(9.5, 1_000),
-        cycle_count: taskmanager_core::core::metrics::ScalarObservation::available(318, 1_000),
-        energy_full_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
-            49_000_000.0,
-            1_000,
-        ),
-        energy_full_design_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
-            56_000_000.0,
-            1_000,
-        ),
+    charged.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(82, 1_000),
+        voltage_uv: ScalarObservation::available(12_400_000, 1_000),
+        power_w: ScalarObservation::available(9.5, 1_000),
+        cycle_count: ScalarObservation::available(318, 1_000),
+        energy_full_uwh: ScalarObservation::available(49_000_000.0, 1_000),
+        energy_full_design_uwh: ScalarObservation::available(56_000_000.0, 1_000),
         ..Default::default()
     });
     let mut cold = BatteryInfo::default();
     cold.status = "Unknown".into();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             batteries: vec![charged, cold],
@@ -753,10 +749,7 @@ fn battery_detail_section_renders_honest_empty_state_when_no_power_snapshot() {
 
     // No power batch has landed yet (desktop host / first tick): the panel
     // must say so honestly rather than fabricate an idle battery.
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::PowerSupplies(None));
     let none_text = frame_text(&app, 140, 48);
     assert!(
         none_text.contains("No battery or power supply was detected"),
@@ -769,9 +762,9 @@ fn battery_detail_section_renders_honest_empty_state_when_no_power_snapshot() {
 
     // A snapshot that arrived with zero batteries is the same honest empty
     // state, not a fabricated idle board.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             batteries: Vec::new(),
@@ -806,13 +799,13 @@ fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
         "fan1".into(),
         "cpu_fan".into(),
         SensorMeasurementObservation::available(
-            SensorDescriptor::fan_speed(taskmanager_core::core::sensors::SensorScale::IDENTITY),
+            SensorDescriptor::fan_speed(SensorScale::IDENTITY),
             SensorMagnitude::Unsigned(2_400),
             1_000,
         )
         .expect("valid fan magnitude"),
     )
-    .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
+    .with_device_generation(DeviceGeneration::new(1));
     let pwm = SensorReading::from_measurement_observation(
         "hwmon:cpu".into(),
         "pwm1".into(),
@@ -827,19 +820,19 @@ fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
         )
         .expect("valid duty-cycle magnitude"),
     )
-    .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
+    .with_device_generation(DeviceGeneration::new(1));
     let temperature = SensorReading::from_measurement_observation(
         "hwmon:cpu".into(),
         "temp1".into(),
         "cpu_temp".into(),
         SensorMeasurementObservation::available(
-            SensorDescriptor::temperature(taskmanager_core::core::sensors::SensorScale::IDENTITY),
+            SensorDescriptor::temperature(SensorScale::IDENTITY),
             SensorMagnitude::Decimal(54.5),
             1_000,
         )
         .expect("valid temperature magnitude"),
     )
-    .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
+    .with_device_generation(DeviceGeneration::new(1));
     // A second temperature channel on the same physical device: the panel
     // traverses this device's temperature channels, so each one gets its own
     // row named by its own source label.
@@ -848,16 +841,16 @@ fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
         "temp2".into(),
         "board_temp".into(),
         SensorMeasurementObservation::available(
-            SensorDescriptor::temperature(taskmanager_core::core::sensors::SensorScale::IDENTITY),
+            SensorDescriptor::temperature(SensorScale::IDENTITY),
             SensorMagnitude::Decimal(41.0),
             1_000,
         )
         .expect("valid temperature magnitude"),
     )
-    .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
-    taskmanager_shell::fixture::seed_projection_fact(
+    .with_device_generation(DeviceGeneration::new(1));
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![fan, pwm, temperature, second_temperature],
@@ -897,10 +890,7 @@ fn fan_detail_section_renders_honest_empty_state_without_sensor_data() {
 
     // No sensor batch has landed yet: the panel must say so honestly rather
     // than fabricate an idle fan.
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sensors(None));
     let none_text = frame_text(&app, 140, 48);
     assert!(
         none_text.contains("No fan sensor was detected"),
@@ -917,9 +907,9 @@ fn fan_detail_section_renders_honest_empty_state_without_sensor_data() {
         SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
         SensorReading, SensorScale,
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![
@@ -934,7 +924,7 @@ fn fan_detail_section_renders_honest_empty_state_without_sensor_data() {
                     )
                     .expect("valid temperature fixture"),
                 )
-                .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1)),
+                .with_device_generation(DeviceGeneration::new(1)),
             ],
             ..Default::default()
         })),
@@ -959,7 +949,7 @@ fn network_subcategory_visibility_filters_the_nic_panel() {
     wired.apply_observations(
         NetworkAdapterType::Ethernet,
         wired_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     let mut vpn = snapshot.networks[0].clone();
     vpn.interface_name = "tun0".into();
@@ -967,12 +957,12 @@ fn network_subcategory_visibility_filters_the_nic_panel() {
     vpn.apply_observations(
         NetworkAdapterType::Vpn,
         vpn_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks = vec![wired, vpn];
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     // Both NICs render by default.
@@ -1051,7 +1041,7 @@ fn system_npu_facts_are_reachable_at_reference_and_compact_sizes() {
 fn gpu_panel_names_proven_graphics_apis_and_pci_slot() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Gpu;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let gpu = snapshot
             .as_mut()
             .and_then(|snapshot| snapshot.gpu.first_mut())

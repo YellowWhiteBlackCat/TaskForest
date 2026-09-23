@@ -9,9 +9,11 @@
 //! 4. Performance chart fidelity (smooth Catmull-Rom / Bezier curves, fixed ceiling scaling, shared-scale sparklines, honest gap preservation).
 //! 5. Responsive layout properties (typed viewport budgets, compact breakpoints, rail collapsing, minimum usable chart floors).
 
+use taskmanager_accessibility_linux::snapshot_to_tree_update;
 use taskmanager_application::CommandId;
 use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_shell::presentation::{command_help, page_help};
+use taskmanager_shell::presentation::{graph_summary, peak_of};
 use taskmanager_theme::color::contrast_ratio;
 use taskmanager_theme::{
     HighContrast, LightDark, NativeAppearance, ResolvedFonts, Skin, Theme, detect_high_contrast,
@@ -686,7 +688,7 @@ fn accesskit_consumer_oracle_validates_semantic_trees() {
     }
 
     let snapshot = builder.build().expect("snapshot must build");
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let update = snapshot_to_tree_update(&snapshot);
     let tree = accesskit_consumer::Tree::new(update, false);
 
     let root = tree.state().root();
@@ -697,26 +699,13 @@ fn accesskit_consumer_oracle_validates_semantic_trees() {
 #[test]
 fn chart_fidelity_and_responsive_contract_invariants() {
     // 1. Chart fidelity: peak_of correctly respects sample windows and optional live readings
-    assert_eq!(
-        taskmanager_shell::presentation::peak_of(&[f32::NAN], None),
-        None
-    );
-    assert_eq!(
-        taskmanager_shell::presentation::peak_of(&[10.0, 50.0, 20.0], None),
-        Some(50.0)
-    );
-    assert_eq!(
-        taskmanager_shell::presentation::peak_of(&[10.0, 50.0, 20.0], Some(80.0)),
-        Some(80.0)
-    );
-    assert_eq!(
-        taskmanager_shell::presentation::peak_of(&[], Some(40.0)),
-        Some(40.0)
-    );
+    assert_eq!(peak_of(&[f32::NAN], None), None);
+    assert_eq!(peak_of(&[10.0, 50.0, 20.0], None), Some(50.0));
+    assert_eq!(peak_of(&[10.0, 50.0, 20.0], Some(80.0)), Some(80.0));
+    assert_eq!(peak_of(&[], Some(40.0)), Some(40.0));
 
     // 2. Chart summary computes honest metrics over finite values without fabricating zero for gaps
-    let summary = taskmanager_shell::presentation::graph_summary(&[10.0, f32::NAN, 30.0])
-        .expect("finite samples produce summary");
+    let summary = graph_summary(&[10.0, f32::NAN, 30.0]).expect("finite samples produce summary");
     assert_eq!(summary.latest, 30.0);
     assert_eq!(summary.minimum, 10.0);
     assert_eq!(summary.maximum, 30.0);
@@ -725,5 +714,5 @@ fn chart_fidelity_and_responsive_contract_invariants() {
 
     // 3. Peak of an empty series without live value is None (honest absence)
     let empty_samples: [f32; 0] = [];
-    assert!(taskmanager_shell::presentation::graph_summary(&empty_samples).is_none());
+    assert!(graph_summary(&empty_samples).is_none());
 }

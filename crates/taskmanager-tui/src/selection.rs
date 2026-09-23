@@ -23,6 +23,7 @@ use taskmanager_shell::{
 
 use crate::TuiApp;
 use crate::process_view;
+use taskmanager_shell::{ProcessStatusFilter, ShellApp, SortCol, SortDir};
 
 #[cfg(test)]
 #[path = "../tests/headless/selection_support.rs"]
@@ -73,8 +74,8 @@ pub(crate) enum PageRowAnchor {
 pub(crate) struct VisualRowCountKey {
     process_revision: u64,
     query: String,
-    status_filter: taskmanager_shell::ProcessStatusFilter,
-    sort: (taskmanager_shell::SortCol, taskmanager_shell::SortDir),
+    status_filter: ProcessStatusFilter,
+    sort: (SortCol, SortDir),
     expanded_groups: Vec<String>,
     collapsed_tree: Vec<ProcessLiveKey>,
 }
@@ -625,10 +626,7 @@ impl TuiApp {
     /// Preserve the selected Applications row while the shell changes its
     /// process sort. The shell still owns the sort and notice; this wrapper
     /// only restores the renderer-local visual anchor afterward.
-    pub(crate) fn set_process_sort_column_preserving_anchor(
-        &mut self,
-        column: taskmanager_shell::SortCol,
-    ) {
+    pub(crate) fn set_process_sort_column_preserving_anchor(&mut self, column: SortCol) {
         let anchor = self.selected_application_row_anchor();
         self.shell.set_sort_column(column);
         self.reconcile_application_row_anchor(anchor);
@@ -778,9 +776,7 @@ impl TuiApp {
             return None;
         }
         self.last_service_dependencies_target = Some(service_id.clone());
-        Some(taskmanager_shell::ShellApp::request_service_dependencies(
-            service_id,
-        ))
+        Some(ShellApp::request_service_dependencies(service_id))
     }
 
     fn process_start_token_for_key(&self, key: ProcessRowId) -> Option<u64> {

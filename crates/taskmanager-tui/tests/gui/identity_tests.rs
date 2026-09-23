@@ -20,13 +20,17 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{
     CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
 };
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::demo_app;
 use taskmanager_shell::fixture::{self, ProjectionSeedFact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 // ── shared fixtures ──────────────────────────────────────────────────────────
 
@@ -80,11 +84,11 @@ fn processes_snapshot_batch(processes: Vec<ProcessItem>) -> PlatformEventBatch {
 }
 
 fn process(pid: u32, name: &str, cpu: f32) -> ProcessItem {
-    let mut process = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut process = ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.to_owned())
         .build();
-    process.apply_scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+    process.apply_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(u64::from(pid), 1),
         cpu_percentage: ScalarObservation::available(cpu, 1),
         ..Default::default()
@@ -99,7 +103,7 @@ fn row_pid(app: &TuiApp, index: usize) -> Option<u32> {
     match rows.get(index)? {
         crate::process_view::ProcessRow::TreeNode { process, .. } => Some(process.pid),
         crate::process_view::ProcessRow::Group {
-            row_key: Some(taskmanager_shell::ProcessRowId::Application(identity)),
+            row_key: Some(ProcessRowId::Application(identity)),
             ..
         } => Some(identity.pid()),
         crate::process_view::ProcessRow::Group { .. } => None,
@@ -133,7 +137,7 @@ fn selected_service_id(app: &TuiApp) -> String {
 
 #[test]
 fn gpu_hot_unplug_falls_back_to_the_first_still_backed_resource() {
-    let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
+    let mut app = TuiApp::from_shell(demo_app());
     app.select_perf_device(PerfDevice::Gpu);
     assert!(app.visible_perf_devices().contains(&PerfDevice::Gpu));
     app.gpu_engine_scroll = 5;
@@ -168,7 +172,7 @@ fn gpu_hot_unplug_falls_back_to_the_first_still_backed_resource() {
 
 #[test]
 fn disk_hot_unplug_falls_back_to_the_first_still_backed_resource() {
-    let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
+    let mut app = TuiApp::from_shell(demo_app());
     app.select_perf_device(PerfDevice::Disk);
     assert!(app.visible_perf_devices().contains(&PerfDevice::Disk));
 
@@ -203,7 +207,7 @@ fn disk_hot_unplug_falls_back_to_the_first_still_backed_resource() {
 
 #[test]
 fn an_unrelated_batch_never_moves_a_backed_device_selection() {
-    let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
+    let mut app = TuiApp::from_shell(demo_app());
     app.select_perf_device(PerfDevice::Gpu);
     app.apply_platform_batch(PlatformEventBatch::default());
     assert_eq!(app.perf_device, PerfDevice::Gpu);
@@ -211,7 +215,7 @@ fn an_unrelated_batch_never_moves_a_backed_device_selection() {
 
 #[test]
 fn with_no_visible_resource_the_explicit_empty_state_is_kept() {
-    let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
+    let mut app = TuiApp::from_shell(demo_app());
     app.select_perf_device(PerfDevice::Gpu);
     // Preference-gated families hidden and no facts left to back the rest:
     // nothing is selectable, so there is no honest fallback target.

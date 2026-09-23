@@ -3,7 +3,11 @@
 use super::super::*;
 use taskmanager_application::AppAction;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::{ProcessRowId, SortCol, SortDir};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn key_with_token(pid: u32, start_token: u64) -> ProcessLiveKey {
     ProcessLiveKey::from_parts(pid, start_token).expect("fixture identity")
@@ -17,10 +21,7 @@ fn app_key(pid: u32, start_token: u64) -> String {
     format!("app-tree:{}", key_with_token(pid, start_token).stable_key())
 }
 
-fn expected_key(
-    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
-    pid: u32,
-) -> Option<taskmanager_shell::ProcessRowId> {
+fn expected_key(kind: fn(ProcessLiveKey) -> ProcessRowId, pid: u32) -> Option<ProcessRowId> {
     // trustworthy_process pins the token to the pid itself
     ProcessLiveKey::from_parts(pid, u64::from(pid)).map(kind)
 }
@@ -35,12 +36,12 @@ fn trustworthy_process_with_token(
     parent_pid: Option<u32>,
     start_token: u64,
 ) -> ProcessItem {
-    let mut process = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut process = ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .parent_pid(parent_pid)
         .build();
-    process.apply_scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+    process.apply_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(start_token, 42),
         ..Default::default()
     });
@@ -58,11 +59,9 @@ fn cpu_process(pid: u32, name: &str, cpu: f32, start_token: u64) -> ProcessItem 
 #[test]
 fn enter_and_right_toggle_the_category_header() {
     let mut app = crate::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![trustworthy_process(
-            11, "demo", None,
-        )])),
+        ProjectionSeedFact::Processes(Some(vec![trustworthy_process(11, "demo", None)])),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     app.expanded_groups.clear();
@@ -92,9 +91,9 @@ fn enter_and_right_toggle_the_category_header() {
 #[test]
 fn left_collapses_a_recursive_process_node() {
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             trustworthy_process(1, "root", None),
             trustworthy_process(2, "child", Some(1)),
         ])),
@@ -114,11 +113,9 @@ fn left_collapses_a_recursive_process_node() {
 #[test]
 fn selection_motion_emits_and_then_dedupes_process_insights() {
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![trustworthy_process(
-            1, "root", None,
-        )])),
+        ProjectionSeedFact::Processes(Some(vec![trustworthy_process(1, "root", None)])),
     );
     app.application.active_page = AppPage::Applications;
     app.expanded_groups = ["category:uncategorized".to_string()].into_iter().collect();
@@ -137,9 +134,9 @@ fn application_aggregate_selection_is_pidless() {
     let mut process = trustworthy_process(11, "editor", None);
     process.apply_application_identity(ProcessMetadataObservation::available(identity, 10));
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![process])),
+        ProjectionSeedFact::Processes(Some(vec![process])),
     );
     app.application.active_page = AppPage::Applications;
     app.expanded_groups = ["category:application".to_string()].into_iter().collect();
@@ -147,7 +144,7 @@ fn application_aggregate_selection_is_pidless() {
     let _ = app.move_nonflat_selection_oneshot(1);
     assert_eq!(
         app.shell.selected_row,
-        expected_key(taskmanager_shell::ProcessRowId::Application, 11)
+        expected_key(ProcessRowId::Application, 11)
     );
     assert!(app.shell.selected_identities().is_empty());
     assert!(app.shell.selected_process_identity().is_none());
@@ -165,9 +162,9 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
     use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             trustworthy_process(1, "root", None),
             trustworthy_process(2, "child", Some(1)),
             trustworthy_process(3, "other", None),
@@ -230,11 +227,14 @@ fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
     use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
-            trustworthy_process_with_token(7, "old-process", None, 700),
-        ])),
+        ProjectionSeedFact::Processes(Some(vec![trustworthy_process_with_token(
+            7,
+            "old-process",
+            None,
+            700,
+        )])),
     );
     app.application.active_page = AppPage::Applications;
     // Initialize the identity index from the first observation, then attach
@@ -274,19 +274,16 @@ fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
 #[test]
 fn reversing_process_sort_keeps_the_selected_row_identity() {
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             cpu_process(31, "low", 10.0, 310),
             cpu_process(32, "target", 90.0, 320),
         ])),
     );
     app.application.active_page = AppPage::Applications;
     app.expanded_groups = ["category:uncategorized".to_string()].into_iter().collect();
-    app.process_sort = (
-        taskmanager_shell::SortCol::Cpu,
-        taskmanager_shell::SortDir::Desc,
-    );
+    app.process_sort = (SortCol::Cpu, SortDir::Desc);
 
     let target = app
         .process_rows_snapshot()
@@ -350,9 +347,9 @@ fn canonical_row_digest(row: &crate::process_view::ProcessRow<'_>) -> String {
 #[test]
 fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_rebuild() {
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             trustworthy_process(1, "root", None),
             trustworthy_process(2, "child", Some(1)),
             trustworthy_process(9, "other", None),
@@ -420,10 +417,7 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
     assert_cache_equals_rebuild(&app);
 
     // Input 4 — sort: the visible order (and the tree order) flips.
-    app.process_sort = (
-        taskmanager_shell::SortCol::Pid,
-        taskmanager_shell::SortDir::Asc,
-    );
+    app.process_sort = (SortCol::Pid, SortDir::Asc);
     assert!(
         !app.canonical_row_cache_is_valid_for_current_inputs(),
         "a sort change must invalidate the entry"
@@ -436,10 +430,7 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
     rebatch.push(trustworthy_process(2, "child", Some(1)));
     rebatch.push(trustworthy_process(9, "other", None));
     rebatch.push(trustworthy_process(10, "newcomer", None));
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(rebatch)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(rebatch)));
     assert!(
         !app.canonical_row_cache_is_valid_for_current_inputs(),
         "a process revision bump must invalidate the entry"
@@ -458,9 +449,9 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
 #[test]
 fn anchor_survives_group_toggles_through_the_cached_projection() {
     let mut app = TuiApp::from_shell(ShellApp::new());
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+        ProjectionSeedFact::Processes(Some(vec![
             trustworthy_process(1, "root", None),
             trustworthy_process(2, "child", Some(1)),
         ])),
@@ -493,7 +484,7 @@ fn anchor_survives_group_toggles_through_the_cached_projection() {
         let pid_of = |row: &crate::process_view::ProcessRow<'_>| match row {
             crate::process_view::ProcessRow::TreeNode { process, .. } => Some(process.pid),
             crate::process_view::ProcessRow::Group {
-                row_key: Some(taskmanager_shell::ProcessRowId::Application(identity)),
+                row_key: Some(ProcessRowId::Application(identity)),
                 ..
             } => Some(identity.pid()),
             _ => None,

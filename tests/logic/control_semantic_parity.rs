@@ -342,8 +342,13 @@ fn the_priority_tier_label_fold_is_single_sourced_and_read_by_every_frontend() {
         );
         assert!(
             offenders.is_empty(),
-            "private priority tier label folds in {scan_root}: {offenders:?} — the one \
-             fold lives in taskmanager_shell::presentation::priority_tier_label"
+            concat!(
+                "private priority tier label folds in {scan_root}: {offenders:?} — the one fold lives in ",
+                "taskmanager_shell",
+                "::presentation::priority_tier_label"
+            ),
+            scan_root = scan_root,
+            offenders = offenders
         );
     }
 }

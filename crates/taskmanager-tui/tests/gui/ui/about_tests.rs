@@ -4,6 +4,8 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
 use crate::demo_app;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -12,7 +14,7 @@ fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -43,14 +45,11 @@ fn about_overlay_renders_hardware_facts_and_version() {
 #[test]
 fn about_overlay_renders_dashes_when_telemetry_is_missing() {
     let mut app = demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Hardware((None).map(Box::new)),
+        ProjectionSeedFact::Hardware((None).map(Box::new)),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("Hostname"));
     assert!(text.contains('—'));

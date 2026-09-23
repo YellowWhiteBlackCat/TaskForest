@@ -2,6 +2,8 @@
 //! frontend modes and the live end-to-end JSON snapshot honesty proofs.
 
 use super::*;
+use taskmanager_application::PlatformClient;
+use taskmanager_platform_native::NativePlatformRuntime;
 
 #[test]
 fn no_args_launches_the_gui() {
@@ -27,8 +29,8 @@ fn live_json_snapshot_collects_valid_typed_json() {
     // generous timeout only guards a wedged provider. The runtime is spawned
     // through the native seam directly — the app-host production constructor
     // (real user config/history paths) is never touched by tests.
-    let client = taskmanager_platform_native::NativePlatformRuntime::spawn()
-        .map(taskmanager_application::PlatformClient::new)
+    let client = NativePlatformRuntime::spawn()
+        .map(PlatformClient::new)
         .expect("native runtime spawns on a Linux host with /proc");
     let json = cli::collect_json_snapshot_from_client(client, std::time::Duration::from_secs(10))
         .expect("collects a complete six-domain snapshot on this host");

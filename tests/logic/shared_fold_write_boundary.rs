@@ -372,9 +372,12 @@ fn the_dbm_signal_quality_fold_is_single_sourced_in_the_shell() {
     );
     assert_no_violations(
         &violations,
-        "private dBm→percent fold(s) in a frontend — read \
-         taskmanager_shell::presentation::wifi_signal_quality_percent (and its `optional_` \
-         pair) instead of re-deriving the mapping",
+        concat!(
+            "private dBm→percent fold(s) in a frontend — read ",
+            "taskmanager_shell",
+            "::presentation::wifi_signal_quality_percent",
+            " (and its `optional_` pair) instead of re-deriving the mapping"
+        ),
     );
     assert_local_dbm_helpers_delegate();
     assert_allowlist_is_absorbing(WAITING_FIX_DBM_FOLDS, &absorbed, "the dBm→percent fold");
@@ -407,12 +410,15 @@ fn assert_local_dbm_helpers_delegate() {
                     let body_end = (head + HELPER_LOOKAHEAD_CHARS).min(flat.text.len());
                     if !flat.text[head..body_end].contains("presentation::") {
                         offenders.push(format!(
-                            "{relative}:{}: `{}` does not delegate to \
-                             taskmanager_shell::presentation (a private dBm→percent table \
-                             drifts from the single source the first time the clamp window is \
-                             tuned)",
+                            concat!(
+                                "{relative}:{}: `{}` does not delegate to ",
+                                "taskmanager_shell",
+                                "::presentation",
+                                " (a private dBm→percent table drifts from the single source the first time the clamp window is tuned)"
+                            ),
                             flat.line_of(at),
-                            name.trim_start_matches("fn")
+                            name.trim_start_matches("fn"),
+                            relative = relative
                         ));
                     }
                 }

@@ -17,12 +17,13 @@ use super::acceptance_support::{
     frame_in_language,
 };
 use crate::{TuiApp, ui::TuiFramePlan};
+use taskmanager_application::i18n::set_language;
 
 fn set_language_blocking(language: Language) {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(language);
+    set_language(language);
     assert_eq!(
         current_language(),
         language,

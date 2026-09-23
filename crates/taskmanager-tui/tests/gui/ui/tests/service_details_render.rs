@@ -9,12 +9,16 @@
 
 use super::frame_text;
 
+use taskmanager_application::{AppAction, PlatformEffect};
 use taskmanager_application::{AppPage, i18n};
+use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::{
     ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus,
 };
+use taskmanager_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_ui_contract::{ProductIntent, SurfaceDecision};
 
 /// The reference frame the details column is designed for: wide and tall
@@ -38,9 +42,9 @@ fn service(id: &str, load: &str, active: &str, sub: &str) -> ServiceItem {
 /// fixture replaces the demo inventory through the shell-owned seed reducer,
 /// so the canonical store and its revision stay the only mutated facts.
 fn seed_two_services(app: &mut crate::TuiApp) -> (ServiceId, ServiceId) {
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             service("alpha.service", "loaded", "active", "running"),
             service("beta.service", "loaded", "inactive", "exited"),
         ])),
@@ -142,18 +146,13 @@ fn a_resolved_dependency_capture_paints_its_relation_targets() {
     // the inventory's units is marked in the painted status cell through the
     // shared cycle fold, never rendered as a normal unit.
     let cyclic = |id: &str, other: &str| {
-        service(id, "loaded", "active", "running").with_relations(
-            taskmanager_core::core::services::ServiceRelationGraph::from_edges([
-                taskmanager_core::core::services::ServiceRelationEdge::new(
-                    ServiceRelationKind::Before,
-                    other,
-                ),
-            ]),
-        )
+        service(id, "loaded", "active", "running").with_relations(ServiceRelationGraph::from_edges(
+            [ServiceRelationEdge::new(ServiceRelationKind::Before, other)],
+        ))
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             cyclic("cycle-a.service", "cycle-b.service"),
             cyclic("cycle-b.service", "cycle-a.service"),
         ])),
@@ -304,9 +303,7 @@ fn the_details_column_labels_translate_across_both_locales() {
 #[test]
 fn service_dependencies_modal_opens_and_renders_relations() {
     let mut app = crate::demo_app();
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Services,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
     assert!(
         app.open_service_dependencies(),
         "opens dependencies modal on services page"
@@ -321,14 +318,9 @@ fn service_dependencies_modal_opens_and_renders_relations() {
         .expect("selected service")
         .id
         .clone();
-    let deps = ServiceDeps::from_relations(
-        taskmanager_core::core::services::ServiceRelationGraph::from_edges(vec![
-            taskmanager_core::core::services::ServiceRelationEdge::new(
-                taskmanager_core::core::services::ServiceRelationKind::Requires,
-                "systemd-journald.service",
-            ),
-        ]),
-    );
+    let deps = ServiceDeps::from_relations(ServiceRelationGraph::from_edges(vec![
+        ServiceRelationEdge::new(ServiceRelationKind::Requires, "systemd-journald.service"),
+    ]));
     resolve_relations(&mut app, service_id, deps);
 
     let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
@@ -351,14 +343,12 @@ fn service_dependencies_modal_opens_and_renders_relations() {
 #[test]
 fn batch_menu_end_on_multi_select_arms_batch_confirmation_with_targets() {
     let mut app = crate::demo_app();
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
 
     let processes = app.shell.projection().processes_slice().to_vec();
     assert!(processes.len() >= 2);
-    let p0 = taskmanager_core::core::process::ProcessLiveKey::from_process(&processes[0]).unwrap();
-    let p1 = taskmanager_core::core::process::ProcessLiveKey::from_process(&processes[1]).unwrap();
+    let p0 = ProcessLiveKey::from_process(&processes[0]).unwrap();
+    let p1 = ProcessLiveKey::from_process(&processes[1]).unwrap();
     app.shell.toggle_selected_identity(p0);
     app.shell.toggle_selected_identity(p1);
     assert_eq!(
@@ -379,10 +369,7 @@ fn batch_menu_end_on_multi_select_arms_batch_confirmation_with_targets() {
         2,
         "both targets frozen in batch intent"
     );
-    assert_eq!(
-        pending.action,
-        taskmanager_core::core::process::ProcessBatchAction::End
-    );
+    assert_eq!(pending.action, ProcessBatchAction::End);
 
     // Render frame while confirmation is open
     let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
@@ -399,7 +386,7 @@ fn batch_menu_end_on_multi_select_arms_batch_confirmation_with_targets() {
     // Confirm batch
     let effect = app.shell.confirm_process_batch();
     assert!(
-        matches!(effect, Some(taskmanager_application::PlatformEffect::ExecuteBatch(intent)) if intent.targets.len() == 2),
+        matches!(effect, Some(PlatformEffect::ExecuteBatch(intent)) if intent.targets.len() == 2),
         "confirming emits ExecuteBatch with 2 targets"
     );
 }

@@ -75,7 +75,8 @@ pub(super) fn apply_system_outcome_lifecycle(
     diagnostics: &mut DeviceLifecycleDiagnosticHistory,
     correlated: &CorrelatedSystemTelemetryOutcome,
 ) {
-    taskmanager_application::apply_system_outcome_lifecycle(projection, diagnostics, correlated);
+    use taskmanager_application::apply_system_outcome_lifecycle;
+    apply_system_outcome_lifecycle(projection, diagnostics, correlated);
 }
 
 #[cfg(test)]

@@ -37,6 +37,9 @@ use crate::TuiApp;
 #[path = "../../tests/headless/ui/process_properties_support.rs"]
 pub(crate) mod process_properties_support;
 use crate::TuiTheme;
+use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::presentation::command_identity_summary;
 
 /// The active Properties section. Mirrors GPUI's `ProcessDetailsSection`
 /// (`crates/taskmanager-gpui/src/gpui_app/root/chrome.rs`): Overview / Performance / Command / Insights.
@@ -206,13 +209,10 @@ fn tab_row_line(active: Option<ProcessDetailsSection>, theme: TuiTheme) -> Line<
 /// fabricated value.
 fn overview_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
-    let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        item,
-        &UnitPreferences::default(),
-        local_time_rules,
-    );
+    let rows =
+        process_details_rows_with_local_time(item, &UnitPreferences::default(), local_time_rules);
     let text = |field| vm_text(&rows, field);
     vec![
         (t("common.name"), text(ProcessDetailsField::Name)),
@@ -245,7 +245,7 @@ fn overview_pairs(
 
 fn overview_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     overview_pairs(item, local_time_rules)
@@ -264,13 +264,10 @@ fn overview_lines(
 /// history renders the shared dash, never a fabricated `0.0`.
 fn performance_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
-    let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        item,
-        &UnitPreferences::default(),
-        local_time_rules,
-    );
+    let rows =
+        process_details_rows_with_local_time(item, &UnitPreferences::default(), local_time_rules);
     let text = |field| vm_text(&rows, field);
     let peaks = super::process_data::process_performance_peaks(item);
     vec![
@@ -301,7 +298,7 @@ fn performance_pairs(
 
 fn performance_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = performance_pairs(item, local_time_rules)
@@ -321,20 +318,17 @@ fn performance_lines(
 /// never a fabricated path.
 fn command_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
-    let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        item,
-        &UnitPreferences::default(),
-        local_time_rules,
-    );
+    let rows =
+        process_details_rows_with_local_time(item, &UnitPreferences::default(), local_time_rules);
     let text = |field| vm_text(&rows, field);
     let mut pairs = vec![
         (t("common.name"), text(ProcessDetailsField::Name)),
         (t("prop.location"), text(ProcessDetailsField::Exe)),
         (t("prop.command_line"), text(ProcessDetailsField::Cmdline)),
     ];
-    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(item) {
+    if let Some(summary) = command_identity_summary(item) {
         pairs.push((t("proc_insights.command_identity"), summary));
     }
     pairs
@@ -342,7 +336,7 @@ fn command_pairs(
 
 fn command_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     command_pairs(item, local_time_rules)

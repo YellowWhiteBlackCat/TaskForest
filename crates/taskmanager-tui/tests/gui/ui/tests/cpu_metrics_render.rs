@@ -6,6 +6,7 @@ use taskmanager_core::core::metrics::{
 };
 
 use super::frame_text;
+use taskmanager_shell::fixture::{edit_snapshot, record_demo_history_frame};
 
 fn cpu_app() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -55,7 +56,7 @@ fn cpu_page_shows_every_headline_fact_and_per_core_without_a_selector() {
 #[test]
 fn available_power_joins_the_fact_strip_without_displacing_the_main_graph() {
     let mut app = cpu_app();
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.power_w = ScalarObservation::available(12.5, 1_000_000);
@@ -67,12 +68,7 @@ fn available_power_joins_the_fact_strip_without_displacing_the_main_graph() {
         .clone()
         .expect("edited demo snapshot");
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
 
     let text = frame_text(&app, 120, 48);
@@ -86,7 +82,7 @@ fn available_power_joins_the_fact_strip_without_displacing_the_main_graph() {
 #[test]
 fn tall_terminal_core_viewport_reaches_the_tail_of_a_dense_topology() {
     let mut app = cpu_app();
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.core_usage_group = ScalarObservationGroup::available(
@@ -100,7 +96,7 @@ fn tall_terminal_core_viewport_reaches_the_tail_of_a_dense_topology() {
         .snapshot
         .clone()
         .expect("edited demo snapshot");
-    taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+    record_demo_history_frame(&mut app.shell, &snapshot, None, None);
 
     let first = frame_text(&app, 120, 36);
     assert!(
@@ -129,7 +125,7 @@ fn tall_terminal_core_viewport_reaches_the_tail_of_a_dense_topology() {
 fn temperature_fact_annotates_labeled_fallback_sources_like_the_gui_frontends() {
     let mut app = cpu_app();
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.cpu.temperature_source = CpuTemperatureSource::PackageHwmon;
     });
@@ -139,7 +135,7 @@ fn temperature_fact_annotates_labeled_fallback_sources_like_the_gui_frontends() 
         "a package-labeled hwmon fallback must be qualified:\n{fallback}"
     );
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.cpu.temperature_source = CpuTemperatureSource::ThermalZone;
     });
@@ -149,7 +145,7 @@ fn temperature_fact_annotates_labeled_fallback_sources_like_the_gui_frontends() 
         "an ACPI thermal zone fallback must be qualified:\n{zone}"
     );
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         snapshot.cpu.temperature_source = CpuTemperatureSource::Coretemp;
     });

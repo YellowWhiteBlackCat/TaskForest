@@ -22,6 +22,7 @@ use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, OperationFailure, RequestId};
 
 use super::process_rows::ProcessRowId;
+use taskmanager_application::RefreshRequest;
 
 /// The scope a process-control action will freeze at the application boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -434,7 +435,7 @@ impl SystemProjectionStore {
             kind: pending.kind,
             result: Ok(()),
         };
-        self.process_refresh_request = Some(taskmanager_application::RefreshRequest::Processes);
+        self.process_refresh_request = Some(RefreshRequest::Processes);
         Some(feedback)
     }
 

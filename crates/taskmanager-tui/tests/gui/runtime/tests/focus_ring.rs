@@ -12,6 +12,7 @@ use taskmanager_application::AppPage;
 
 use crate::TuiTheme;
 use crate::render;
+use taskmanager_application::i18n::{Language, set_language};
 
 fn app_on_processes() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -113,7 +114,7 @@ fn focused_panel_renders_the_visual_focus_marker() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let backend = TestBackend::new(140, 40);
     let mut terminal = Terminal::new(backend).expect("test terminal");

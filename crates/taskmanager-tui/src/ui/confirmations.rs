@@ -13,6 +13,13 @@ use super::containers::{KeyHint, KeyHintTone, Modal};
 use super::{service_menu, session_menu};
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskmanager_application::{
+    ServiceControlTarget, SessionControlConfirmation, StartupControlRequest,
+};
+use taskmanager_core::core::process::ProcessBatchIntent;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::process_batch_action_label;
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/confirmations_support.rs"]
@@ -76,7 +83,7 @@ pub(super) fn render_service_control_confirmation_at(
     frame: &mut Frame<'_>,
     _app: &TuiApp,
     theme: TuiTheme,
-    pending: &taskmanager_application::ServiceControlTarget,
+    pending: &ServiceControlTarget,
     popup: Rect,
 ) {
     let inner = Modal::alert(theme, theme.danger, t("confirm.service_title")).render(frame, popup);
@@ -109,7 +116,7 @@ pub(super) fn render_service_control_confirmation_at(
 pub(super) fn render_session_control_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    pending: &taskmanager_application::SessionControlConfirmation,
+    pending: &SessionControlConfirmation,
     popup: Rect,
 ) {
     let inner = Modal::alert(theme, theme.danger, t("confirm.session_title")).render(frame, popup);
@@ -141,7 +148,7 @@ pub(super) fn render_session_control_confirmation_at(
 pub(super) fn render_startup_control_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    pending: &taskmanager_application::StartupControlRequest,
+    pending: &StartupControlRequest,
     popup: Rect,
 ) {
     let inner = Modal::alert(theme, theme.accent, t("confirm.startup_title")).render(frame, popup);
@@ -178,20 +185,20 @@ pub(super) fn render_startup_control_confirmation_at(
 pub(super) fn render_batch_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    intent: &taskmanager_core::core::process::ProcessBatchIntent,
+    intent: &ProcessBatchIntent,
     popup: Rect,
 ) {
     // The dedicated batch title is a kill receipt; a reversible batch keeps
     // the process-action title so the overlay never names a verb it is not
     // about to run.
-    let title = if taskmanager_shell::ShellApp::process_batch_is_destructive(intent.action) {
+    let title = if ShellApp::process_batch_is_destructive(intent.action) {
         t("confirm.batch_title")
     } else {
         t("confirm.process_title")
     };
     let inner = Modal::alert(theme, theme.danger, title).render(frame, popup);
     let targets = &intent.targets;
-    let action = taskmanager_shell::presentation::process_batch_action_label(intent.action);
+    let action = process_batch_action_label(intent.action);
     let scope = if targets.len() <= 1 {
         targets.first().map_or_else(
             || t("confirm.selected_process").to_owned(),
@@ -253,7 +260,7 @@ pub(super) fn render_batch_confirmation_at(
 pub(super) fn render_smart_self_test_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    intent: &taskmanager_core::core::system_health::SmartSelfTestIntent,
+    intent: &SmartSelfTestIntent,
     popup: Rect,
 ) {
     let inner = Modal::alert(theme, theme.danger, "SMART self-test").render(frame, popup);

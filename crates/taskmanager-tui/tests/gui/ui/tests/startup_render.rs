@@ -8,10 +8,18 @@ use crate::ui::confirmations::confirmations_support::render_startup_control_conf
 use crate::ui::pages::{startup_impact_text, startup_source_text};
 use crate::ui::startup_menu;
 
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::startup::{
+    DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, StartupEntry, StartupEntryId, StartupImpactEvidence,
+    StartupImpactUnknownReason,
+};
 use taskmanager_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
 };
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 /// A measured critical chain: two timed units plus one untimed node (the
 /// same shape as the live systemd-user chain the Linux provider reports).
@@ -44,12 +52,12 @@ fn evidence_fixture() -> StartupBootEvidenceSnapshot {
     }
 }
 
-fn entry_fixture() -> taskmanager_core::core::startup::StartupEntry {
+fn entry_fixture() -> StartupEntry {
     use taskmanager_core::core::startup::{
         StartupControlPolicy, StartupImpact, StartupImpactEvidence, StartupScope, StartupSource,
     };
-    taskmanager_core::core::startup::StartupEntry {
-        id: taskmanager_core::core::startup::StartupEntryId::new("fixture:demo"),
+    StartupEntry {
+        id: StartupEntryId::new("fixture:demo"),
         name: "demo-autostart.desktop".into(),
         exec: "/usr/bin/demo --daemon".into(),
         enabled: true,
@@ -70,14 +78,14 @@ fn startup_impact_and_source_columns_carry_evidence_and_scope() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let entry = entry_fixture();
     // The measured boot impact renders the duration; an unmeasured one is
     // honest about it — never a fabricated number.
     assert_eq!(startup_impact_text(&entry), "Low · 42 ms");
     let mut unknown = entry.clone();
-    unknown.impact_evidence = taskmanager_core::core::startup::StartupImpactEvidence::Unknown {
-        reason: taskmanager_core::core::startup::StartupImpactUnknownReason::NotInstrumented,
+    unknown.impact_evidence = StartupImpactEvidence::Unknown {
+        reason: StartupImpactUnknownReason::NotInstrumented,
     };
     assert_eq!(startup_impact_text(&unknown), "Low · unmeasured");
     // The source column carries the scope suffix (GPUI parity).
@@ -87,9 +95,7 @@ fn startup_impact_and_source_columns_carry_evidence_and_scope() {
 #[test]
 fn startup_menu_and_confirmation_render_without_panicking() {
     let mut app = crate::demo_app();
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Startup,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let theme = TuiTheme::default();
     let mut terminal =
         ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 40)).expect("test terminal");
@@ -142,9 +148,7 @@ fn startup_menu_and_confirmation_render_without_panicking() {
 #[test]
 fn startup_page_renders_the_enhanced_columns() {
     let mut app = crate::demo_app();
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Startup,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let text = frame_text(&app, 120, 40);
     assert!(text.contains("ssh-agent"), "fixture entry name visible");
     assert!(
@@ -160,9 +164,7 @@ fn startup_page_renders_the_enhanced_columns() {
 #[test]
 fn boot_timeline_measured_state_projects_unit_windows_with_bars() {
     let mut app = crate::demo_app();
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Startup,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let text = frame_text(&app, 120, 40);
     assert!(
         text.contains("Boot timeline"),
@@ -181,16 +183,12 @@ fn boot_timeline_measured_state_projects_unit_windows_with_bars() {
 /// never fabricated into a bar. A typed failure suppresses the whole block.
 #[test]
 fn boot_timeline_unknown_state_lists_untimed_units_without_bars() {
-    let mut app = crate::TuiApp::from_shell(taskmanager_shell::demo_app());
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut app = crate::TuiApp::from_shell(demo_app());
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(
-            evidence_fixture(),
-        )),
+        ProjectionSeedFact::StartupBootEvidence(Some(evidence_fixture())),
     );
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Startup,
-    ));
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let text = frame_text(&app, 120, 40);
     assert!(
         text.contains("No timing data"),
@@ -221,10 +219,8 @@ fn boot_timeline_unknown_state_lists_untimed_units_without_bars() {
 /// zero-ms waterfall, no comparison baseline invented.
 #[test]
 fn boot_timeline_stays_silent_without_typed_evidence_or_on_failure() {
-    let mut app = crate::TuiApp::from_shell(taskmanager_shell::demo_app());
-    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Startup,
-    ));
+    let mut app = crate::TuiApp::from_shell(demo_app());
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
     let text = frame_text(&app, 120, 40);
     assert!(
         !text.contains("Boot timeline"),
@@ -233,9 +229,9 @@ fn boot_timeline_stays_silent_without_typed_evidence_or_on_failure() {
 
     let mut failing = evidence_fixture();
     failing.critical_chain_failure = Some(StartupEvidenceFailure::MissingTool);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(failing)),
+        ProjectionSeedFact::StartupBootEvidence(Some(failing)),
     );
     let text = frame_text(&app, 120, 40);
     assert!(
@@ -259,26 +255,23 @@ fn boot_timeline_collapses_overflow_into_a_bounded_row() {
             }
         })
         .collect();
-    let mut app = crate::TuiApp::from_shell(taskmanager_shell::demo_app());
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut app = crate::TuiApp::from_shell(demo_app());
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupBootEvidence(Some(
-            StartupBootEvidenceSnapshot {
-                state: healthy,
-                failed_units_state: healthy,
-                critical_chain_state: healthy,
-                critical_chain: chain,
-                ..StartupBootEvidenceSnapshot::default()
-            },
-        )),
+        ProjectionSeedFact::StartupBootEvidence(Some(StartupBootEvidenceSnapshot {
+            state: healthy,
+            failed_units_state: healthy,
+            critical_chain_state: healthy,
+            critical_chain: chain,
+            ..StartupBootEvidenceSnapshot::default()
+        })),
     );
     let projection = crate::ui::boot_timeline::project_timeline(
         app.shell.projection().startup_boot_evidence.as_ref(),
     )
     .expect("large chain projects rows");
     assert!(
-        projection.rows.len()
-            <= taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS + 1,
+        projection.rows.len() <= DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS + 1,
         "segment rows are capped plus one collapsed row"
     );
     let collapsed = projection

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
 
 /// Every skin × mode resolves a valid terminal palette with the semantic
@@ -81,9 +82,9 @@ fn config_tokens_resolve_onto_typed_theme_params() {
     );
 
     // Follow system setting when appearance is observed
-    let light_appearance = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Light,
+    let light_appearance = DesktopAppearance {
+        family: DesktopFamily::Gnome,
+        color_scheme: PreferredColorScheme::Light,
         high_contrast: Some(false),
     };
     assert_eq!(
@@ -100,9 +101,9 @@ fn config_tokens_resolve_onto_typed_theme_params() {
         }
     );
 
-    let hc_appearance = taskmanager_core::core::appearance::DesktopAppearance {
-        family: taskmanager_core::core::appearance::DesktopFamily::Kde,
-        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Dark,
+    let hc_appearance = DesktopAppearance {
+        family: DesktopFamily::Kde,
+        color_scheme: PreferredColorScheme::Dark,
         high_contrast: Some(true),
     };
     assert_eq!(

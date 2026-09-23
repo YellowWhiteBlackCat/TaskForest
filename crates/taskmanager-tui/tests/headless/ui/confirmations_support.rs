@@ -7,11 +7,12 @@ use ratatui::layout::Rect;
 
 use super::render_startup_control_confirmation_at;
 use crate::TuiTheme;
+use taskmanager_application::{ConfirmationKind, StartupControlRequest, SurfaceKind};
 
 pub(crate) fn render_startup_control_confirmation(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    pending: &taskmanager_application::StartupControlRequest,
+    pending: &StartupControlRequest,
     area: Rect,
 ) {
     render_startup_control_confirmation_at(
@@ -20,11 +21,9 @@ pub(crate) fn render_startup_control_confirmation(
         pending,
         crate::ui::frame_plan::overlay_popup(
             area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::StartupControl,
-                ),
-            ),
+            crate::TuiInputScope::SharedSurface(SurfaceKind::Confirmation(
+                ConfirmationKind::StartupControl,
+            )),
         )
         .unwrap_or(Rect::ZERO),
     );

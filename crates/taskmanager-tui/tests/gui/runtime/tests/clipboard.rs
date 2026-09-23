@@ -4,10 +4,12 @@
 use super::super::*;
 
 use taskmanager_application::AppAction;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]
 fn y_copies_the_selected_pid_and_name_via_osc52() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     let selected = app.selected_detail_process().expect("a row is selected");
@@ -47,12 +49,12 @@ fn copy_selected_process_writes_pid_tab_name_to_the_sink() {
 
 #[test]
 fn copy_without_a_selected_row_reports_an_honest_status() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::demo_app();
     // An empty process list has no row to copy.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(Vec::new())),
+        ProjectionSeedFact::Processes(Some(Vec::new())),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
 

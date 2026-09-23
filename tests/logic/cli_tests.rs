@@ -4,11 +4,14 @@
 use super::suggest::{shape_suggestion, suggest_thresholds_json};
 use super::*;
 use std::path::PathBuf;
+use taskmanager_application::PlatformClient;
 use taskmanager_core::core::alerts::{
     AlertMetric, SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
 use taskmanager_core::core::export::snapshot_to_json;
 use taskmanager_core::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+use taskmanager_platform_native::NativePlatformRuntime;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
 fn parse_args_dispatches_flag_modes() {
@@ -325,10 +328,10 @@ fn suggest_thresholds_json_aggregates_per_disk_samples_but_still_insufficient() 
     // aggregated count honestly, not invent a threshold.
     let snapshot = SystemSnapshot {
         disks: vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .smart_temperature_c(Some(40.0))
                 .build(),
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .smart_temperature_c(Some(45.0))
                 .build(),
         ],
@@ -482,8 +485,8 @@ fn help_output_lists_export_diagnostic_bundle() {
 #[test]
 #[cfg(target_os = "linux")]
 fn live_export_diagnostic_bundle_writes_valid_json() {
-    let mut client = taskmanager_platform_native::NativePlatformRuntime::spawn()
-        .map(taskmanager_application::PlatformClient::new)
+    let mut client = NativePlatformRuntime::spawn()
+        .map(PlatformClient::new)
         .expect("native runtime spawns");
     let scratch = crate::test_support::repo_temp_dir().join("cli_exported_bundle.json");
     let exported = run_export_diagnostic_bundle_with(&mut client, &scratch, None)

@@ -21,6 +21,7 @@ use super::frame_plan::TablePanelProjection;
 use super::panel;
 use super::process_details;
 use super::sparkline;
+use taskmanager_shell::presentation::{process_anomaly_summary, uninterruptible_process_summary};
 
 /// The minimum body width at which the per-row CPU sparkline column renders.
 /// Below this the trend column hides (mirroring `swap_visible`'s adaptivity):
@@ -121,8 +122,8 @@ pub(super) fn render_processes(
         .map(|items| items.as_slice());
     let mut panel_title = t("tui.processes_title").to_owned();
     for summary in [
-        taskmanager_shell::presentation::uninterruptible_process_summary(processes),
-        taskmanager_shell::presentation::process_anomaly_summary(processes),
+        uninterruptible_process_summary(processes),
+        process_anomaly_summary(processes),
     ]
     .into_iter()
     .flatten()

@@ -278,8 +278,12 @@ mod tests {
 
     #[test]
     fn cross_crate_heads_are_extracted_from_joined_statements() {
-        let text = "pub use taskmanager_theme::*;\npub use crate::x::Y;\npub use self::z;\npub use local_mod::{A, B};\npub use taskmanager_shell::\n    presentation::{command_help};\n";
-        let heads: Vec<String> = pub_use_statements(text)
+        let theme = "taskmanager_theme";
+        let shell = "taskmanager_shell";
+        let text = format!(
+            "pub use {theme}::*;\npub use crate::x::Y;\npub use self::z;\npub use local_mod::{{A, B}};\npub use {shell}::\n    presentation::{{command_help}};\n"
+        );
+        let heads: Vec<String> = pub_use_statements(&text)
             .iter()
             .map(|s| s.split("::").next().unwrap_or("").trim().to_owned())
             .collect();

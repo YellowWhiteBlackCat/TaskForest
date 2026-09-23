@@ -1,10 +1,13 @@
 //! Shared folds for native appearance and health facts consumed by renderers.
 
 use super::*;
+use taskmanager_application::{
+    CorrelatedDesktopAppearanceEvent, CorrelatedSmartEvent, CorrelatedStorageHealthEvent,
+};
 use taskmanager_platform_contract::CapabilityId;
 
 pub(super) fn apply_desktop_appearance(
-    events: Vec<taskmanager_application::CorrelatedDesktopAppearanceEvent>,
+    events: Vec<CorrelatedDesktopAppearanceEvent>,
     fold: &mut FoldState,
 ) {
     if events.is_empty() {
@@ -20,7 +23,7 @@ pub(super) fn apply_desktop_appearance(
 
 pub(super) fn apply_storage_health(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedStorageHealthEvent>,
+    events: Vec<CorrelatedStorageHealthEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -34,7 +37,7 @@ pub(super) fn apply_storage_health(
 
 pub(super) fn apply_smart(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedSmartEvent>,
+    events: Vec<CorrelatedSmartEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {

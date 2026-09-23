@@ -6,14 +6,15 @@ use taskmanager_application::AppPage;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]
 fn partial_services_frame_keeps_rows_and_shows_page_scoped_retry_hint() {
     let mut app = crate::TuiApp::demo();
     app.application.active_page = AppPage::Services;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("fixture.services"),
             outcome: SourceOutcome::Partial(FailureKind::TimedOut),
             item_count: 5,
@@ -30,9 +31,9 @@ fn partial_services_frame_keeps_rows_and_shows_page_scoped_retry_hint() {
 fn permission_denied_services_frame_explains_capability_change_without_retry() {
     let mut app = crate::TuiApp::demo();
     app.application.active_page = AppPage::Services;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("fixture.services"),
             outcome: SourceOutcome::Unavailable(FailureKind::PermissionDenied),
             item_count: 5,
@@ -53,13 +54,13 @@ fn permission_denied_services_frame_explains_capability_change_without_retry() {
 fn empty_services_from_a_failed_source_explain_the_failure_not_the_absence() {
     let mut app = crate::TuiApp::demo();
     app.application.active_page = AppPage::Services;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(Vec::new())),
+        ProjectionSeedFact::Services(Some(Vec::new())),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
+        ProjectionSeedFact::ServicesSource(Some(vec![SourceStatus {
             provider: ProviderId::borrowed("fixture.services"),
             outcome: SourceOutcome::Unavailable(FailureKind::PermissionDenied),
             item_count: 0,

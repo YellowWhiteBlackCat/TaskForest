@@ -1,10 +1,12 @@
 //! Process inventory, control-correlation and insight fold systems.
 
 use super::*;
+use taskmanager_application::{CorrelatedProcessAffinityEvent, CorrelatedProcessEvent};
+use taskmanager_platform_contract::CapabilityId;
 
 pub(super) fn apply_process_events(
     store: &mut SystemProjectionStore,
-    events: Vec<taskmanager_application::CorrelatedProcessEvent>,
+    events: Vec<CorrelatedProcessEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {
@@ -32,9 +34,7 @@ pub(super) fn apply_process_events(
                     store.apply_process_control_completion(correlated.request_id, target);
             }
             ProcessEvent::NetworkCaptureEscalated => {
-                if correlated.capability
-                    == taskmanager_platform_contract::CapabilityId::PROCESS_NETWORK_ESCALATION
-                {
+                if correlated.capability == CapabilityId::PROCESS_NETWORK_ESCALATION {
                     fold.output
                         .network_capture_escalations
                         .push(correlated.request_id);
@@ -45,7 +45,7 @@ pub(super) fn apply_process_events(
 }
 
 pub(super) fn apply_affinity_events(
-    events: Vec<taskmanager_application::CorrelatedProcessAffinityEvent>,
+    events: Vec<CorrelatedProcessAffinityEvent>,
     fold: &mut FoldState,
 ) {
     for correlated in events {

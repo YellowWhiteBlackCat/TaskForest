@@ -10,12 +10,14 @@ use taskmanager_application::{
 use taskmanager_core::core::history::HistoryWindow;
 
 use crate::TuiApp;
+use taskmanager_app_host::HistoryFrontendSession;
+use taskmanager_core::core::history::HistoryRecordSink;
 
 enum HistoryResources {
     Disabled,
     Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(taskmanager_application::ApplicationHistoryUnavailableReason),
-    Active(taskmanager_app_host::HistoryFrontendSession),
+    Unavailable(ApplicationHistoryUnavailableReason),
+    Active(HistoryFrontendSession),
 }
 
 pub(crate) struct TuiHistoryRuntime {
@@ -62,7 +64,7 @@ impl TuiHistoryRuntime {
         }
         let Some(connector) = self.connector.as_mut() else {
             self.resources = HistoryResources::Unavailable(
-                taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStopped,
+                ApplicationHistoryUnavailableReason::ConnectorStopped,
             );
             return;
         };
@@ -143,9 +145,7 @@ impl TuiHistoryRuntime {
         }
     }
 
-    pub(crate) fn unavailable_reason(
-        &self,
-    ) -> Option<taskmanager_application::ApplicationHistoryUnavailableReason> {
+    pub(crate) fn unavailable_reason(&self) -> Option<ApplicationHistoryUnavailableReason> {
         match self.resources {
             HistoryResources::Unavailable(reason) => Some(reason),
             HistoryResources::Disabled
@@ -154,9 +154,7 @@ impl TuiHistoryRuntime {
         }
     }
 
-    pub(crate) fn record_sink(
-        &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
+    pub(crate) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
         match &self.resources {
             HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
             HistoryResources::Disabled

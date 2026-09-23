@@ -11,6 +11,7 @@ use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use crate::TuiApp;
+use taskmanager_application::i18n::t;
 
 #[derive(Debug, Default)]
 pub(crate) enum TuiSnapshotExportRuntime {
@@ -43,7 +44,7 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("system.export_no_data"),
+                t("system.export_no_data"),
             );
             return;
         };
@@ -64,7 +65,7 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("system.export_unavailable"),
+                t("system.export_unavailable"),
             );
             return;
         };
@@ -73,26 +74,25 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Info,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("system.export_queued"),
+                t("system.export_queued"),
             ),
             Err(SnapshotExportSubmitError::Busy(_)) => self.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("system.export_busy"),
+                t("system.export_busy"),
             ),
             Err(SnapshotExportSubmitError::RequestSpaceExhausted) => self.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("system.export_unavailable"),
+                t("system.export_unavailable"),
             ),
             Err(SnapshotExportSubmitError::Rejected(error)) => self.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("system.export_failed")
-                    .replace("{}", error.detail()),
+                t("system.export_failed").replace("{}", error.detail()),
             ),
         }
     }
@@ -110,15 +110,13 @@ impl TuiApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Success,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("system.snapshot_exported_to")
-                    .replace("{}", &base),
+                t("system.snapshot_exported_to").replace("{}", &base),
             ),
             SnapshotExportState::Failed { error, .. } => self.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("system.export_failed")
-                    .replace("{}", error.detail()),
+                t("system.export_failed").replace("{}", error.detail()),
             ),
             SnapshotExportState::Closed
             | SnapshotExportState::Queued(_)

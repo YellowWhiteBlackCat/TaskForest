@@ -15,14 +15,15 @@ use taskmanager_core::core::services::{ServiceDiagnostics, ServiceFailureCause};
 use taskmanager_core::{HealthScoreInput, SystemHealthScore};
 
 use super::{MISSING_VALUE, service_exit};
+use taskmanager_application::process_details_vm::command_identity_comparison;
+use taskmanager_core::ProcessItem;
+use taskmanager_core::core::process_telemetry::CapabilityRiskLevel;
 
 /// Compact shared process-anomaly banner. It is intentionally a triage hint:
 /// the typed core heuristic owns the evidence and the renderer only localizes
 /// the kind and identifies a process when the rule can do so.
 #[must_use]
-pub fn process_anomaly_summary(
-    processes: Option<&[taskmanager_core::ProcessItem]>,
-) -> Option<String> {
+pub fn process_anomaly_summary(processes: Option<&[ProcessItem]>) -> Option<String> {
     let anomalies = detect_process_anomalies(processes?);
     if anomalies.is_empty() {
         return None;
@@ -296,18 +297,10 @@ pub fn service_diagnostics_rows(diagnostics: &ServiceDiagnostics) -> Vec<(String
 #[must_use]
 pub fn capabilities_summary(capabilities: &ProcessCapabilities) -> String {
     let risk = i18n::t(match capabilities.risk_level() {
-        taskmanager_core::core::process_telemetry::CapabilityRiskLevel::Unknown => {
-            "proc_insights.capabilities_unknown"
-        }
-        taskmanager_core::core::process_telemetry::CapabilityRiskLevel::None => {
-            "proc_insights.capabilities_none"
-        }
-        taskmanager_core::core::process_telemetry::CapabilityRiskLevel::Elevated => {
-            "proc_insights.capabilities_elevated"
-        }
-        taskmanager_core::core::process_telemetry::CapabilityRiskLevel::Critical => {
-            "proc_insights.capabilities_critical"
-        }
+        CapabilityRiskLevel::Unknown => "proc_insights.capabilities_unknown",
+        CapabilityRiskLevel::None => "proc_insights.capabilities_none",
+        CapabilityRiskLevel::Elevated => "proc_insights.capabilities_elevated",
+        CapabilityRiskLevel::Critical => "proc_insights.capabilities_critical",
     });
     let Some(effective) = capabilities.effective_capabilities() else {
         return risk.to_owned();
@@ -483,9 +476,8 @@ pub fn health_score_summary(score: &SystemHealthScore) -> String {
 /// application comparison. It is intentionally an optional line: no warning
 /// is emitted unless both physical path and command line were observed.
 #[must_use]
-pub fn command_identity_summary(item: &taskmanager_core::ProcessItem) -> Option<String> {
-    let comparison =
-        taskmanager_application::process_details_vm::command_identity_comparison(item)?;
+pub fn command_identity_summary(item: &ProcessItem) -> Option<String> {
+    let comparison = command_identity_comparison(item)?;
     Some(format!(
         "{}: {} ≠ {}",
         i18n::t("proc_insights.command_identity"),

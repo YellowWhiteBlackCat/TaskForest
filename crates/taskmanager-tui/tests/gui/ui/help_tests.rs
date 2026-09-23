@@ -4,6 +4,8 @@ use crate::demo_app;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::presentation::command_help;
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -12,7 +14,7 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -50,7 +52,7 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
     // Every shared command except the explicitly-unbound commands is still
     // represented, plus the five terminal-only bindings and the TUI-local
     // overlay bindings.
-    let shared_count = taskmanager_shell::presentation::command_help()
+    let shared_count = command_help()
         .into_iter()
         .filter(|help| !crate::bindings::is_deliberately_unbound(help.command))
         .count();
@@ -164,7 +166,7 @@ fn help_overlay_modal_host_paints_border_and_title() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let popup = Rect::new(4, 2, 60, 14);
     let mut terminal = Terminal::new(TestBackend::new(70, 18)).expect("test terminal");
@@ -190,7 +192,7 @@ fn command_palette_modal_host_paints_border_and_title() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let popup = Rect::new(4, 2, 60, 14);
     // A non-palette control paints no row highlight; the host border and

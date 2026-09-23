@@ -28,6 +28,7 @@ use taskmanager_ui_contract::IconId;
 use super::containers::{KeyHint, Modal};
 use crate::TuiTheme;
 use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
+use taskmanager_shell::presentation::priority_tier_label;
 
 /// The action menu's frozen target: the process row plus the menu cursor.
 #[derive(Clone, Debug)]
@@ -102,7 +103,7 @@ pub fn action_label(action: ProcessMenuAction) -> &'static str {
             // priority_tier is total over the priority variants; the Normal
             // fallback keeps the production tree panic-free.
             let tier = priority_tier(action).unwrap_or(PriorityTier::Normal);
-            taskmanager_shell::presentation::priority_tier_label(tier)
+            priority_tier_label(tier)
         }
         ProcessMenuAction::Affinity => t("proc.affinity"),
         ProcessMenuAction::EfficiencyMode => t("proc.efficiency_mode"),

@@ -4,6 +4,10 @@
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
+use taskmanager_platform_contract::{CapabilityId, SubmissionError, SubmissionErrorKind};
+use taskmanager_telemetry_store::live_graph::{
+    DEFAULT_HISTORY_CAPACITY, MAX_HISTORY_CAPACITY, MIN_HISTORY_CAPACITY, MetricSeries,
+};
 
 fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
     SystemSnapshot {
@@ -22,9 +26,9 @@ fn desktop_notification_submission_failure_is_typed_in_the_status_line() {
     // lane / no DBus service), the shell reports a typed capability error —
     // never a fabricated success.
     let mut app = crate::demo_app();
-    app.report_submission_error(&taskmanager_platform_contract::SubmissionError {
-        capability: taskmanager_platform_contract::CapabilityId::DESKTOP_NOTIFY,
-        kind: taskmanager_platform_contract::SubmissionErrorKind::UnsupportedCapability,
+    app.report_submission_error(&SubmissionError {
+        capability: CapabilityId::DESKTOP_NOTIFY,
+        kind: SubmissionErrorKind::UnsupportedCapability,
     });
     assert!(
         app.feedback_text().contains("alerts.notify"),
@@ -47,33 +51,22 @@ fn set_history_capacity_passes_through_to_the_shared_history_store() {
     let mut app = crate::demo_app();
     // Default construction keeps the legacy 64-sample window until a
     // frontend applies the preference.
-    assert_eq!(
-        app.history.capacity(),
-        taskmanager_telemetry_store::live_graph::DEFAULT_HISTORY_CAPACITY
-    );
+    assert_eq!(app.history.capacity(), DEFAULT_HISTORY_CAPACITY);
     for tick in 0..20u64 {
         let snapshot = snapshot_with_cpu(tick as f32 + 1.0, tick + 1);
         crate::fixture::record_demo_history_frame(&mut app, &snapshot, None, None);
     }
     // An out-of-range request clamps; the shared window keeps the NEWEST ten.
     app.set_history_capacity(0);
-    assert_eq!(
-        app.history.capacity(),
-        taskmanager_telemetry_store::live_graph::MIN_HISTORY_CAPACITY
-    );
-    let series = app
-        .history
-        .series(taskmanager_telemetry_store::live_graph::MetricSeries::CpuUsagePercent);
+    assert_eq!(app.history.capacity(), MIN_HISTORY_CAPACITY);
+    let series = app.history.series(MetricSeries::CpuUsagePercent);
     assert_eq!(
         series,
         (11..=20).map(|value| value as f32).collect::<Vec<_>>(),
         "the newest samples survive the resize"
     );
     app.set_history_capacity(usize::MAX);
-    assert_eq!(
-        app.history.capacity(),
-        taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY
-    );
+    assert_eq!(app.history.capacity(), MAX_HISTORY_CAPACITY);
 }
 
 /// The allocation-free index/read helpers must expose the same visible order

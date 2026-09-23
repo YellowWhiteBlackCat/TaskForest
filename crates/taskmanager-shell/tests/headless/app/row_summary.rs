@@ -2,18 +2,20 @@
 
 use super::*;
 use taskmanager_application::AppPage;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn applications_summary_is_pid_tab_name() {
     let mut shell = ShellApp::default();
     shell.data.processes = Some(
         vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(4242)
                 .name("my_daemon".into())
                 .build(),
@@ -30,7 +32,7 @@ fn applications_summary_is_pid_tab_name() {
 
 #[test]
 fn services_and_startup_summaries_carry_typed_state() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut shell = ShellApp::default();
     shell.data.services = Some(vec![ServiceItem::from_inventory(
         "nm.service",

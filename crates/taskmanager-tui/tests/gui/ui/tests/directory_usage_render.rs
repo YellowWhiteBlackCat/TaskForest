@@ -13,6 +13,7 @@
 //! constructed and asserted against real `TestBackend` output.
 
 use super::frame_text;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 /// With no projection in the shared slot, the Disk device renders the
 /// directory-usage panel's honest idle line — never fabricated entries,
@@ -21,10 +22,7 @@ use super::frame_text;
 fn disk_device_directory_usage_renders_honest_idle_when_no_projection() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::DirectoryUsage(None));
     let text = frame_text(&app, 140, 48);
     assert!(
         text.contains("Directory usage"),
@@ -52,10 +50,7 @@ fn disk_device_directory_usage_renders_honest_idle_when_no_projection() {
 fn directory_usage_panel_does_not_displace_disk_detail() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(None),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::DirectoryUsage(None));
     let text = frame_text(&app, 140, 48);
     assert!(
         text.contains("Directory usage"),

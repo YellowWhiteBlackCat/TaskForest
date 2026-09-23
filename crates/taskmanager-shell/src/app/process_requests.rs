@@ -3,6 +3,7 @@
 use taskmanager_application::InteractionEvent;
 
 use super::*;
+use taskmanager_platform_contract::CapabilityId;
 
 impl ShellApp {
     /// Project the selected Applications row into the shared process-control
@@ -26,8 +27,7 @@ impl ShellApp {
             self.data.processes_slice(),
             active_row,
             &selected,
-            self.data
-                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+            self.data.capability_status(&CapabilityId::PROCESS_CONTROL),
         )
     }
 
@@ -42,8 +42,7 @@ impl ShellApp {
             self.data.processes_slice(),
             None,
             &selected,
-            self.data
-                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+            self.data.capability_status(&CapabilityId::PROCESS_CONTROL),
         )
     }
 
@@ -92,8 +91,7 @@ impl ShellApp {
 
     fn process_control_capability_allowed(&self) -> bool {
         super::process_control::process_control_capability_allowed(
-            self.data
-                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+            self.data.capability_status(&CapabilityId::PROCESS_CONTROL),
         )
     }
 

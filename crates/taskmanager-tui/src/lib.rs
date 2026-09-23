@@ -82,17 +82,32 @@ use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
+use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::{
+    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, ManagedAlertRule, ManagedAlertRuleEdit,
+    ManagedAlertRuleEditOutcome, Modifiers, SurfaceKind, source_notice,
+};
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
     RefreshRequest, i18n::t,
 };
+use taskmanager_core::core::alerts::{
+    AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
+    import_alert_rules_json,
+};
+use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::ProcessCategory;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::text::contains_ascii_ci;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
     matches_process_query,
 };
+use taskmanager_shell::{ShellApp, gpu_chart_metric_gate};
 
 /// Inactivity window (micros) after which the Applications-page prefix jump
 /// resets: two consecutive bare characters within the window extend the
@@ -100,10 +115,10 @@ use taskmanager_shell::{
 pub(crate) const PREFIX_JUMP_WINDOW_MICROS: u64 = 2_000_000;
 
 fn default_category_expansions() -> std::collections::HashSet<String> {
-    taskmanager_core::core::process::ProcessCategory::ALL
+    ProcessCategory::ALL
         .iter()
         .copied()
-        .map(taskmanager_application::process_category_projection::category_expansion_key)
+        .map(category_expansion_key)
         .collect()
 }
 
@@ -112,9 +127,9 @@ fn default_category_expansions() -> std::collections::HashSet<String> {
 /// `ShellApp`).
 pub struct TuiApp {
     /// The renderer-independent shell state machine.
-    shell: taskmanager_shell::ShellApp,
+    shell: ShellApp,
     /// Immutable local-time rules supplied by the native composition root.
-    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: LocalTimeRulesObservation,
     /// The sole TUI-local menu/modal. Shared confirmations and Process
     /// Properties remain authoritative in `application.interaction`.
     local_surface: TuiSurfaceState,
@@ -128,7 +143,7 @@ pub struct TuiApp {
     /// terminal palette from these on every frame.
     pub theme_params: ThemeParams,
     /// Observed native desktop appearance from the platform runtime.
-    pub observed_appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+    pub observed_appearance: Option<DesktopAppearance>,
     /// Non-blocking cursor into the app-host-owned configuration coordinator.
     config_client: Option<ConfigClient>,
     applied_config_revision: Option<ConfigRevision>,
@@ -229,7 +244,7 @@ pub struct TuiApp {
     /// after each refresh. Cleared on page change and when the cursor lands on
     /// a row without a trustworthy identity.
     last_insights_target: Option<FrozenProcessIdentity>,
-    pub(crate) last_service_dependencies_target: Option<taskmanager_core::core::target::ServiceId>,
+    pub(crate) last_service_dependencies_target: Option<ServiceId>,
     /// Monotonic wall-clock (micros) of the last runtime tick, computed once
     /// per loop iteration (never in the render path) and consumed by the
     /// service-log time filter. Defaults to 0 for deterministic headless
@@ -266,14 +281,14 @@ impl TuiApp {
     /// app-host configuration client and local-time observation explicitly.
     #[must_use]
     pub fn new() -> Self {
-        Self::from_shell(taskmanager_shell::ShellApp::new())
+        Self::from_shell(ShellApp::new())
     }
 
     /// Production construction with the native composition edge's shared
     /// non-blocking configuration client.
     #[must_use]
     pub fn new_with_config_client(config_client: ConfigClient) -> Self {
-        let mut app = Self::from_shell(taskmanager_shell::ShellApp::new());
+        let mut app = Self::from_shell(ShellApp::new());
         app.config_client = Some(config_client);
         app.load_config();
         app
@@ -281,18 +296,16 @@ impl TuiApp {
 
     /// Wrap a shell state machine with a fresh TUI surface (no config I/O).
     #[must_use]
-    pub fn from_shell(shell: taskmanager_shell::ShellApp) -> Self {
+    pub fn from_shell(shell: ShellApp) -> Self {
         let mut app = Self::shell_default(shell);
         app.prefs = AppliedPrefs::default();
         app
     }
 
-    fn shell_default(shell: taskmanager_shell::ShellApp) -> Self {
+    fn shell_default(shell: ShellApp) -> Self {
         Self {
             shell,
-            local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
-                0,
-            ),
+            local_time_rules: LocalTimeRulesObservation::unsupported(0),
             local_surface: TuiSurfaceState::default(),
             process_properties_view: None,
             settings_form: SettingsForm::default(),
@@ -348,7 +361,7 @@ impl TuiApp {
         let sessions_revision_before = self.shell.projection().sessions_revision;
         let affinity_state_before = self.shell.process_affinity_state().clone();
         for event in &batch.desktop_appearance_events {
-            let taskmanager_application::DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
+            let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
             self.apply_desktop_appearance(snapshot.value);
         }
         self.shell.apply_platform_batch(batch);
@@ -372,7 +385,7 @@ impl TuiApp {
         // the next paint, so a generation change or a family going dark
         // falls back to the default in the very frame that carried the
         // fact — never one frame later.
-        let gate = taskmanager_shell::gpu_chart_metric_gate(self.viewed_gpu());
+        let gate = gpu_chart_metric_gate(self.viewed_gpu());
         if self.shell.reconcile_gpu_chart_metric(&gate) {
             let selected = self.shell.gpu_chart_metric_selected();
             self.report_notice(
@@ -417,9 +430,7 @@ impl TuiApp {
             ),
             _ => return None,
         };
-        taskmanager_application::source_notice(sources?)?
-            .is_retryable()
-            .then_some(request)
+        source_notice(sources?)?.is_retryable().then_some(request)
     }
 
     /// Proxy with page-change hygiene: leaving the Services page while the
@@ -466,8 +477,8 @@ impl TuiApp {
 
     /// Proxy for the shell's key handler with the same page-change hygiene.
     pub fn handle_local_key(&mut self, event: ShellKeyEvent) -> InputDispatch {
-        if event.key == taskmanager_application::KeyCode::Digit8
-            && event.modifiers == taskmanager_application::Modifiers::ALT
+        if event.key == KeyCode::Digit8
+            && event.modifiers == Modifiers::ALT
             && matches!(self.input_scope(), surface::TuiInputScope::Content)
         {
             if !self.health_open() {
@@ -514,11 +525,7 @@ impl TuiApp {
     /// Proxy for the shell's character router that preserves the TUI's one
     /// input-owner invariant. If a shared surface opens, the inline details
     /// panel and any partial service-log owner release the keyboard.
-    pub fn handle_local_char(
-        &mut self,
-        character: char,
-        modifiers: taskmanager_application::Modifiers,
-    ) -> InputDispatch {
+    pub fn handle_local_char(&mut self, character: char, modifiers: Modifiers) -> InputDispatch {
         let query_before = self.query.clone();
         let effect = self.shell.handle_local_char(character, modifiers);
         if self.page() == AppPage::Applications && self.query != query_before {
@@ -569,63 +576,45 @@ impl TuiApp {
     /// Apply one semantic edit to the canonical managed alert-rule set.
     pub fn edit_alert_rules(
         &mut self,
-        edit: taskmanager_application::ManagedAlertRuleEdit,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
+        edit: ManagedAlertRuleEdit,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
         self.shell.edit_alert_rules(edit)
     }
 
     pub fn add_alert_rule(
         &mut self,
-        rule: taskmanager_core::core::alerts::AlertRule,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
-        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Add(
-            taskmanager_application::ManagedAlertRule::new(rule, true),
-        ))
+        rule: AlertRule,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
     }
 
     pub fn remove_alert_rule(
         &mut self,
         rule_id: String,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
-        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Remove { rule_id })
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
     }
 
-    pub fn export_alert_rules(
-        &self,
-    ) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
-        let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = self
+    pub fn export_alert_rules(&self) -> Result<String, AlertRuleTransferError> {
+        let entries: Vec<AlertRuleTransferEntry> = self
             .projection()
             .alert_center
             .managed_rules()
             .iter()
-            .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
+            .map(AlertRuleTransferEntry::from)
             .collect();
-        taskmanager_core::core::alerts::export_alert_rules_json(&entries)
+        export_alert_rules_json(&entries)
     }
 
     pub fn import_alert_rules(
         &mut self,
         json: &str,
-        mode: taskmanager_application::AlertRuleImportMode,
-    ) -> Result<
-        taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_core::core::alerts::AlertRuleTransferError,
-    > {
-        let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
-        let rules: Vec<taskmanager_application::ManagedAlertRule> = entries
-            .into_iter()
-            .map(taskmanager_application::ManagedAlertRule::from)
-            .collect();
-        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Import { rules, mode })
+        mode: AlertRuleImportMode,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        let entries = import_alert_rules_json(json)?;
+        let rules: Vec<ManagedAlertRule> =
+            entries.into_iter().map(ManagedAlertRule::from).collect();
+        self.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
     }
 
     /// The currently selected rule index in the health overlay. Clamped against
@@ -657,9 +646,7 @@ impl TuiApp {
         let rules = self.projection().alert_center.managed_rules();
         if let Some(managed) = rules.get(index) {
             let rule_id = managed.rule.id.clone();
-            let _ = self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
-                rule_id,
-            });
+            let _ = self.edit_alert_rules(ManagedAlertRuleEdit::Toggle { rule_id });
             true
         } else {
             false
@@ -668,7 +655,7 @@ impl TuiApp {
 
     /// Toggle a managed alert rule by ID.
     pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
-        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: rule_id.into(),
         })
         .is_ok_and(|outcome| outcome.changed())
@@ -691,9 +678,7 @@ impl TuiApp {
     /// Close every TUI-local overlay without touching the shell's modals.
     pub fn close_local_overlays(&mut self) {
         self.dismiss_local_surface();
-        if self.shell.interaction_surface()
-            == Some(taskmanager_application::SurfaceKind::ProcessProperties)
-        {
+        if self.shell.interaction_surface() == Some(SurfaceKind::ProcessProperties) {
             self.shell.dismiss_overlay();
         }
     }
@@ -794,7 +779,7 @@ impl TuiApp {
             .take(rows.len())
             .find(|(_, row)| match row {
                 crate::process_view::ProcessRow::Group { label, .. } => {
-                    taskmanager_core::core::text::contains_ascii_ci(label, &query)
+                    contains_ascii_ci(label, &query)
                 }
                 crate::process_view::ProcessRow::TreeNode { process, .. } => {
                     matches_process_query(process, &query)
@@ -879,7 +864,7 @@ impl Default for TuiApp {
 }
 
 impl Deref for TuiApp {
-    type Target = taskmanager_shell::ShellApp;
+    type Target = ShellApp;
 
     fn deref(&self) -> &Self::Target {
         &self.shell

@@ -5,11 +5,19 @@
 //! untouched.
 
 use super::*;
+use taskmanager_application::{
+    CorrelatedMsrReadoutEvent, CorrelatedRaplPowerEvent, CorrelatedSmbiosMemoryEvent,
+    MsrReadoutEvent, MsrReadoutState, RaplPowerEvent, RaplPowerState, SmbiosMemoryEvent,
+    SmbiosMemoryRequestFailure, SmbiosMemoryState,
+};
+use taskmanager_core::{
+    MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow, RaplPowerSnapshot, SmbiosMemorySnapshot,
+};
 
 fn smbios_memory_event(
     sequence: u64,
-    snapshot: taskmanager_core::SmbiosMemorySnapshot,
-) -> taskmanager_application::CorrelatedSmbiosMemoryEvent {
+    snapshot: SmbiosMemorySnapshot,
+) -> CorrelatedSmbiosMemoryEvent {
     CorrelatedEvent::new(
         PlatformEventContext {
             request_id: RequestId::new(sequence).expect("non-zero fixture request id"),
@@ -18,7 +26,7 @@ fn smbios_memory_event(
             sequence: EventSequence::new(sequence),
             observed_at_ms: 10,
         },
-        taskmanager_application::SmbiosMemoryEvent::Update(snapshot),
+        SmbiosMemoryEvent::Update(snapshot),
     )
 }
 
@@ -38,42 +46,33 @@ fn smbios_memory_snapshots_commit_only_the_active_request() {
     let mut batch = PlatformEventBatch::default();
     batch.smbios_memory_events.push(smbios_memory_event(
         4,
-        taskmanager_core::SmbiosMemorySnapshot::success(8, 8, Vec::new(), None),
+        SmbiosMemorySnapshot::success(8, 8, Vec::new(), None),
     ));
     batch.smbios_memory_events.push(smbios_memory_event(
         5,
-        taskmanager_core::SmbiosMemorySnapshot::failed(
-            FailureKind::PermissionDenied,
-            "user dismissed the prompt",
-        ),
+        SmbiosMemorySnapshot::failed(FailureKind::PermissionDenied, "user dismissed the prompt"),
     ));
 
     app.apply_platform_batch(batch);
 
     assert!(matches!(
         app.smbios_memory_state(),
-        taskmanager_application::SmbiosMemoryState::Failed(failed)
+        SmbiosMemoryState::Failed(failed)
             if matches!(
                 &failed.failure,
-                taskmanager_application::SmbiosMemoryRequestFailure::Provider(failure)
+                SmbiosMemoryRequestFailure::Provider(failure)
                     if failure.kind == FailureKind::PermissionDenied
             )
     ));
 
     app.apply_platform_batch(PlatformEventBatch::default());
     assert!(
-        matches!(
-            app.smbios_memory_state(),
-            taskmanager_application::SmbiosMemoryState::Failed(_)
-        ),
+        matches!(app.smbios_memory_state(), SmbiosMemoryState::Failed(_)),
         "an empty-events batch must leave the request lifecycle untouched"
     );
 }
 
-fn rapl_power_event(
-    sequence: u64,
-    snapshot: taskmanager_core::RaplPowerSnapshot,
-) -> taskmanager_application::CorrelatedRaplPowerEvent {
+fn rapl_power_event(sequence: u64, snapshot: RaplPowerSnapshot) -> CorrelatedRaplPowerEvent {
     CorrelatedEvent::new(
         PlatformEventContext {
             request_id: RequestId::new(sequence).expect("non-zero fixture request id"),
@@ -82,7 +81,7 @@ fn rapl_power_event(
             sequence: EventSequence::new(sequence),
             observed_at_ms: 10,
         },
-        taskmanager_application::RaplPowerEvent::Update(snapshot),
+        RaplPowerEvent::Update(snapshot),
     )
 }
 
@@ -97,13 +96,13 @@ fn rapl_power_reads_commit_only_the_active_request() {
     let mut batch = PlatformEventBatch::default();
     batch.smbios_memory_events.push(smbios_memory_event(
         7,
-        taskmanager_core::SmbiosMemorySnapshot::success(2, 1, Vec::new(), None),
+        SmbiosMemorySnapshot::success(2, 1, Vec::new(), None),
     ));
     batch.rapl_power_events.push(rapl_power_event(
         7,
-        taskmanager_core::RaplPowerSnapshot::success(
+        RaplPowerSnapshot::success(
             250,
-            vec![taskmanager_core::RaplPackageRow {
+            vec![RaplPackageRow {
                 name: "package-1".to_owned(),
                 power_w: 15.5,
                 energy_delta_uj: 3_875_000,
@@ -115,23 +114,17 @@ fn rapl_power_reads_commit_only_the_active_request() {
 
     assert!(matches!(
         app.rapl_power_state(),
-        taskmanager_application::RaplPowerState::Ready(ready)
+        RaplPowerState::Ready(ready)
             if ready.snapshot.packages.len() == 1
                 && ready.snapshot.packages[0].power_w == 15.5
     ));
     assert!(
-        matches!(
-            app.smbios_memory_state(),
-            taskmanager_application::SmbiosMemoryState::Closed
-        ),
+        matches!(app.smbios_memory_state(), SmbiosMemoryState::Closed),
         "a terminal for an inactive smbios session must be dropped, not committed"
     );
 }
 
-fn msr_readout_event(
-    sequence: u64,
-    snapshot: taskmanager_core::MsrReadoutSnapshot,
-) -> taskmanager_application::CorrelatedMsrReadoutEvent {
+fn msr_readout_event(sequence: u64, snapshot: MsrReadoutSnapshot) -> CorrelatedMsrReadoutEvent {
     CorrelatedEvent::new(
         PlatformEventContext {
             request_id: RequestId::new(sequence).expect("non-zero fixture request id"),
@@ -140,7 +133,7 @@ fn msr_readout_event(
             sequence: EventSequence::new(sequence),
             observed_at_ms: 10,
         },
-        taskmanager_application::MsrReadoutEvent::Update(snapshot),
+        MsrReadoutEvent::Update(snapshot),
     )
 }
 
@@ -155,9 +148,9 @@ fn msr_readouts_commit_only_the_active_request() {
     let mut batch = PlatformEventBatch::default();
     batch.rapl_power_events.push(rapl_power_event(
         8,
-        taskmanager_core::RaplPowerSnapshot::success(
+        RaplPowerSnapshot::success(
             250,
-            vec![taskmanager_core::RaplPackageRow {
+            vec![RaplPackageRow {
                 name: "package-1".to_owned(),
                 power_w: 15.5,
                 energy_delta_uj: 3_875_000,
@@ -166,7 +159,7 @@ fn msr_readouts_commit_only_the_active_request() {
     ));
     batch.msr_readout_events.push(msr_readout_event(
         8,
-        taskmanager_core::MsrReadoutSnapshot::success(vec![taskmanager_core::MsrPackageReadout {
+        MsrReadoutSnapshot::success(vec![MsrPackageReadout {
             cpu: 0,
             bclk_mhz: None,
             temperature_c: Some(54.5),
@@ -181,15 +174,12 @@ fn msr_readouts_commit_only_the_active_request() {
 
     assert!(matches!(
         app.msr_readout_state(),
-        taskmanager_application::MsrReadoutState::Ready(ready)
+        MsrReadoutState::Ready(ready)
             if ready.snapshot.packages.len() == 1
                 && ready.snapshot.packages[0].temperature_c == Some(54.5)
     ));
     assert!(
-        matches!(
-            app.rapl_power_state(),
-            taskmanager_application::RaplPowerState::Closed
-        ),
+        matches!(app.rapl_power_state(), RaplPowerState::Closed),
         "a terminal for an inactive rapl session must be dropped, not committed"
     );
 }

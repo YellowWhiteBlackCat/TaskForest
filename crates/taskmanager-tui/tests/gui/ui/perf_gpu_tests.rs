@@ -2,11 +2,18 @@ use super::perf_gpu_support::gpu_fact_lines;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::metrics::{
     GpuEngine, GpuEngineRowsSnapshot, GpuMetrics, GpuScalarObservations, GpuThrottleReason,
     ScalarObservation, SystemSnapshot,
 };
+use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuGraphicsApi};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
+use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
+use taskmanager_test_support::pin_english;
 
 fn observed_gpu() -> GpuMetrics {
     let mut gpu = GpuMetrics::new("card0", "Intel");
@@ -47,10 +54,10 @@ fn observed_gpu() -> GpuMetrics {
     gpu
 }
 
-fn history_for(snapshot: &SystemSnapshot) -> taskmanager_shell::ShellApp {
-    let mut shell = taskmanager_shell::ShellApp::new();
-    taskmanager_shell::fixture::record_demo_history_frame(&mut shell, snapshot, None, None);
-    taskmanager_shell::fixture::record_demo_history_frame(&mut shell, snapshot, None, None);
+fn history_for(snapshot: &SystemSnapshot) -> ShellApp {
+    let mut shell = ShellApp::new();
+    record_demo_history_frame(&mut shell, snapshot, None, None);
+    record_demo_history_frame(&mut shell, snapshot, None, None);
     shell
 }
 
@@ -67,7 +74,7 @@ fn joined(lines: &[Line<'_>]) -> String {
 
 #[test]
 fn full_fact_strip_keeps_every_current_gpu_scalar_together() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
     for fact in [
         "55.0%",
@@ -115,9 +122,9 @@ fn compact_fact_strip_keeps_primary_values_in_two_rows() {
 /// neither row.
 #[test]
 fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut proven = observed_gpu();
-    proven.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+    proven.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.3.290".into()),
         mesa_version: Some("25.1.4".into()),
@@ -138,7 +145,7 @@ fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
     // Unavailable path: only the OpenGL context proved usable, so the Vulkan
     // row is omitted outright instead of rendering a dash placeholder.
     let mut partial = observed_gpu();
-    partial.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+    partial.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: None,
         mesa_version: None,
@@ -166,7 +173,7 @@ fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
 /// driver name without a proven release omits the row instead of a dash.
 #[test]
 fn full_fact_strip_names_a_proven_driver_version() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut proven = observed_gpu();
     proven.driver_version = Some("566.36".into());
     proven.vbios_version = Some("95.0.1".into());
@@ -201,7 +208,7 @@ fn full_fact_strip_names_a_proven_driver_version() {
 #[test]
 fn gpu_capability_rows_render_the_active_locale_copy() {
     let mut gpu = observed_gpu();
-    gpu.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+    gpu.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.3.290".into()),
         mesa_version: Some("25.1.4".into()),
@@ -211,14 +218,14 @@ fn gpu_capability_rows_render_the_active_locale_copy() {
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let en_text = joined(&gpu_fact_lines(
         std::slice::from_ref(&gpu),
         GpuFactDensity::Full,
     ));
     let en_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
 
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+    set_language(Language::Zh);
     let zh_text = joined(&gpu_fact_lines(
         std::slice::from_ref(&gpu),
         GpuFactDensity::Full,
@@ -273,9 +280,9 @@ fn standard_engine_projection_includes_live_and_pmu_rows() {
     let shell = history_for(&snapshot);
     let pmu = GpuEngineRowsSnapshot::success(
         DeviceId::new("card0"),
-        vec![taskmanager_core::core::metrics::GpuEngineMetric {
+        vec![GpuEngineMetric {
             name: "Render Ring".into(),
-            kind: taskmanager_core::core::metrics::GpuEngineKind::Unknown,
+            kind: GpuEngineKind::Unknown,
             utilization_pct: 43.0,
         }],
     );
@@ -284,9 +291,7 @@ fn standard_engine_projection_includes_live_and_pmu_rows() {
         &shell,
         TuiTheme::default(),
         60,
-        taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::Active(
-            &pmu.engines,
-        ),
+        GpuEngineRowsPresentation::Active(&pmu.engines),
     );
     let text = joined(&lines);
     assert!(text.contains("Render/3D") && text.contains("42.0%"));
@@ -298,10 +303,10 @@ fn engine_without_history_is_an_honest_placeholder() {
     let gpu = observed_gpu();
     let lines = gpu_engine_lines(
         &[gpu],
-        &taskmanager_shell::ShellApp::new(),
+        &ShellApp::new(),
         TuiTheme::default(),
         60,
-        taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::PermissionRequired,
+        GpuEngineRowsPresentation::PermissionRequired,
     );
     let engine = lines
         .iter()
@@ -345,7 +350,7 @@ fn standard_layout_adds_engines_only_after_a_ten_row_chart() {
 
 #[test]
 fn utilization_chart_uses_the_real_per_device_history() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let snapshot = SystemSnapshot {
         gpu: vec![observed_gpu()],
         ..SystemSnapshot::default()
@@ -361,7 +366,7 @@ fn utilization_chart_uses_the_real_per_device_history() {
                 &shell,
                 TuiTheme::default(),
                 frame.area(),
-                taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric::DEFAULT,
+                GpuChartMetric::DEFAULT,
             );
         })
         .expect("draw");
@@ -381,7 +386,7 @@ fn utilization_chart_uses_the_real_per_device_history() {
 /// power family paints a watts axis, not the fixed percent ladder.
 #[test]
 fn selected_metric_flips_title_and_axis_unit_in_the_same_frame() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let snapshot = SystemSnapshot {
         gpu: vec![observed_gpu()],
         ..SystemSnapshot::default()
@@ -397,7 +402,7 @@ fn selected_metric_flips_title_and_axis_unit_in_the_same_frame() {
                 &shell,
                 TuiTheme::default(),
                 frame.area(),
-                taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric::Power,
+                GpuChartMetric::Power,
             );
         })
         .expect("draw");
@@ -426,7 +431,7 @@ fn selected_metric_flips_title_and_axis_unit_in_the_same_frame() {
 /// (ADR-034: 不可用序列保持显式不可用投影).
 #[test]
 fn unavailable_selected_family_keeps_the_honest_dash_projection() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let snapshot = SystemSnapshot {
         gpu: vec![observed_gpu()],
         ..SystemSnapshot::default()
@@ -445,7 +450,7 @@ fn unavailable_selected_family_keeps_the_honest_dash_projection() {
                 // The fixture observes every split VRAM pair but never the
                 // overall memory pair — exactly one honest unavailable
                 // family.
-                taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric::Memory,
+                GpuChartMetric::Memory,
             );
         })
         .expect("draw");

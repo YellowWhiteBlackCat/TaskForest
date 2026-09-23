@@ -14,7 +14,12 @@ use taskmanager_platform_conformance::{
 };
 use taskmanager_platform_native::NativePlatformRuntime;
 
-const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
+/// How long the drain may wait for the first live process snapshot. This is a
+/// **liveness** budget, not a latency assertion: the probe proves the native
+/// composition publishes at all, so a busy host (or a loaded CI runner) must
+/// not fail it. The shared runtime publishes in a few hundred milliseconds on
+/// an idle host; the budget only needs to outlast a machine under heavy load.
+const DRAIN_DEADLINE: Duration = Duration::from_secs(30);
 const DRAIN_POLL: Duration = Duration::from_millis(5);
 
 #[cfg(target_os = "linux")]

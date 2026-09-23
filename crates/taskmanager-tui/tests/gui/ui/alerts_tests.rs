@@ -7,6 +7,7 @@ use taskmanager_core::core::metrics::{
 };
 
 use crate::demo_app;
+use taskmanager_application::i18n::{Language, set_language};
 
 fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -15,7 +16,7 @@ fn frame_text(app: &crate::TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal

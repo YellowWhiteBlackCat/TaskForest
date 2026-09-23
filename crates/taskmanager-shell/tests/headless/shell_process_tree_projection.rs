@@ -10,6 +10,7 @@ use crate::{
     ProcessRowId, ProcessTreeRow, SortCol, SortDir, app_tree_expansion_key,
     project_process_tree_rows,
 };
+use taskmanager_core::core::process::ProcessCategory;
 
 fn app_process(pid: u32, name: &str, parent_pid: Option<u32>, cpu: f32) -> ProcessItem {
     let identity =
@@ -68,14 +69,8 @@ fn shared_projection_keeps_one_category_order_and_no_empty_headers() {
         })
         .collect();
     assert_eq!(categories.len(), 2);
-    assert_eq!(
-        categories[0],
-        taskmanager_core::core::process::ProcessCategory::Application
-    );
-    assert_eq!(
-        categories[1],
-        taskmanager_core::core::process::ProcessCategory::Uncategorized
-    );
+    assert_eq!(categories[0], ProcessCategory::Application);
+    assert_eq!(categories[1], ProcessCategory::Uncategorized);
 }
 
 #[test]
@@ -97,9 +92,7 @@ fn shared_projection_retains_unknown_identity_rows_without_fabricating_targets()
     assert_eq!(*row_key, None);
     assert_eq!(
         *parent_key,
-        Some(ProcessRowId::Category(
-            taskmanager_core::core::process::ProcessCategory::Uncategorized
-        ))
+        Some(ProcessRowId::Category(ProcessCategory::Uncategorized))
     );
     assert_eq!(*depth, 1);
 }
@@ -156,7 +149,7 @@ fn shared_projection_preserves_app_parent_and_aggregate_sort_order() {
     assert_eq!(apps[0].0, 10);
     assert_eq!(
         apps[0].1,
-        ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Application)
+        ProcessRowId::Category(ProcessCategory::Application)
     );
     assert_eq!(apps[0].2, Some(51.0));
     assert_eq!(apps[1].0, 20);

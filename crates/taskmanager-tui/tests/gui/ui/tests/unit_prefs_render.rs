@@ -8,13 +8,14 @@ use taskmanager_core::core::metrics::{
     MemoryCompositionObservations, MemoryOptionalObservations, MemoryScalarObservations,
     OptionalObservation, ScalarObservation,
 };
+use taskmanager_shell::fixture::edit_snapshot;
 
 /// Re-seed the demo memory to whole GiB values so the rendered byte and bit
 /// counts are exact (16 total, 4 used, swap 4 total / 1 used).
 fn seed_memory(app: &mut crate::TuiApp) {
     app.perf_device = crate::PerfDevice::Memory;
     let gib = 1024_u64 * 1024 * 1024;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let memory = &mut snapshot.as_mut().expect("demo snapshot").memory;
         memory.apply_observations(
             MemoryScalarObservations {
@@ -130,7 +131,7 @@ fn network_rates_and_totals_honor_units() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Network;
     let gib = 1024_u64 * 1024 * 1024;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let network = snapshot
             .as_mut()
             .expect("demo app should carry a snapshot")

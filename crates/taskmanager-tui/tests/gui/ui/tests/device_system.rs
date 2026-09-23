@@ -5,6 +5,8 @@ use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::metrics::ScalarObservation;
 
 use super::frame_text;
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_shell::fixture::edit_snapshot;
 
 /// The disk panel carries the typed device-health verdict (§2.3 B-1) and the
 /// Removable row for proven removable media (§2.3 B-2); the network panel
@@ -14,7 +16,7 @@ use super::frame_text;
 fn disk_and_network_panels_carry_device_health_and_proven_removability() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let disk = snapshot
             .as_mut()
             .expect("demo snapshot")
@@ -35,7 +37,7 @@ fn disk_and_network_panels_carry_device_health_and_proven_removability() {
     );
 
     app.perf_device = crate::PerfDevice::Network;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let network = snapshot
             .as_mut()
             .expect("demo snapshot")
@@ -67,7 +69,7 @@ fn disk_and_network_panels_carry_device_health_and_proven_removability() {
 fn narrow_frames_keep_the_health_rows_wrapped_not_dropped() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Disk;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let disk = snapshot
             .as_mut()
             .expect("demo snapshot")
@@ -84,7 +86,7 @@ fn narrow_frames_keep_the_health_rows_wrapped_not_dropped() {
     );
 
     app.perf_device = crate::PerfDevice::Network;
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let network = snapshot
             .as_mut()
             .expect("demo snapshot")
@@ -151,7 +153,7 @@ fn system_page_renders_the_storage_section_from_snapshot_disks() {
 fn system_storage_row_keeps_unobserved_byte_figures_as_dashes() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         let mut disk = snapshot
             .disks
@@ -204,13 +206,13 @@ fn system_storage_section_follows_the_active_locale() {
         .lock()
         .expect("lang test guard");
 
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let en_frame = frame_text_in_language(&app, 120, 52);
-    let en_title = taskmanager_application::i18n::t("system.section.storage");
+    let en_title = t("system.section.storage");
 
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+    set_language(Language::Zh);
     let zh_frame = frame_text_in_language(&app, 120, 52);
-    let zh_title = taskmanager_application::i18n::t("system.section.storage");
+    let zh_title = t("system.section.storage");
     drop(guard);
 
     assert_ne!(
@@ -255,13 +257,13 @@ fn system_sections_include_smbios_memory_slots_when_provided() {
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let sections = crate::ui::pages::system_data::system_sections(None, None, None, Some(&smbios));
     drop(guard);
 
     let slots_sec = sections
         .iter()
-        .find(|s| s.title == taskmanager_application::i18n::t("system.memory_slots"))
+        .find(|s| s.title == t("system.memory_slots"))
         .expect("memory slots section must exist");
     assert!(slots_sec.facts.iter().any(|f| f.label == "DIMM_B1"));
     assert!(
@@ -282,7 +284,7 @@ fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     // Error kind mappings to localized feedback keys, with raw sensitive paths
     // never interpolated into the user-facing message.
@@ -311,7 +313,7 @@ fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
         assert_eq!(diagnostic_failure_feedback_key(kind), key);
         let error = DiagnosticBundleError::with_detail(kind, "/root/super/secret/path");
         let msg = diagnostic_failure_message(&error);
-        assert!(msg.contains(taskmanager_application::i18n::t(key)));
+        assert!(msg.contains(t(key)));
         assert!(
             !msg.contains("secret"),
             "raw sensitive paths must never leak into feedback"

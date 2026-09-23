@@ -9,6 +9,7 @@
 use std::env;
 
 use ratatui::style::Color;
+use taskmanager_shell::presentation::icon_glyph;
 use taskmanager_ui_contract::IconId;
 
 /// Color precision available to the terminal renderer.
@@ -113,7 +114,7 @@ impl TuiTerminalProfile {
     #[must_use]
     pub const fn glyph(self, icon: IconId) -> &'static str {
         match self.glyphs {
-            TuiGlyphMode::Unicode => taskmanager_shell::presentation::icon_glyph(icon),
+            TuiGlyphMode::Unicode => icon_glyph(icon),
             TuiGlyphMode::Ascii => ascii_glyph(icon),
         }
     }

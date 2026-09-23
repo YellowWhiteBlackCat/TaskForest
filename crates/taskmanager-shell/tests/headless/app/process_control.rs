@@ -11,6 +11,10 @@ use taskmanager_application::{
     PlatformEventBatch, PlatformEventContext, PlatformFacets, PlatformHandle,
     ProcessControlRequest, ProcessEvent, ProcessFacets,
 };
+use taskmanager_application::{
+    ProcessAffinityControlRequest, ProcessAffinityEvent, ProcessAffinityRequest,
+    ProcessAffinityState, RefreshRequest,
+};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessSignal};
 use taskmanager_platform_contract::{
@@ -18,6 +22,7 @@ use taskmanager_platform_contract::{
     EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
     RequestId, RequestPort, SubmissionError,
 };
+use taskmanager_test_support::pin_english;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -66,10 +71,8 @@ impl<T: CapabilityRequest> RequestPort for RecordingRequests<T> {
 
 fn client_with_process_facets(
     control: Arc<RecordingRequests<ProcessControlRequest>>,
-    affinity: Arc<RecordingRequests<taskmanager_application::ProcessAffinityRequest>>,
-    affinity_control: Arc<
-        RecordingRequests<taskmanager_application::ProcessAffinityControlRequest>,
-    >,
+    affinity: Arc<RecordingRequests<ProcessAffinityRequest>>,
+    affinity_control: Arc<RecordingRequests<ProcessAffinityControlRequest>>,
 ) -> PlatformClient {
     PlatformClient::new(PlatformHandle::new(
         Arc::new(EmptyCapabilities),
@@ -128,19 +131,15 @@ fn selected_demo_target(app: &mut ShellApp) -> FrozenProcessIdentity {
 
 #[test]
 fn end_task_completion_clears_pending_records_feedback_and_requests_refresh() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded.clone(),
         affinity,
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     queue_effect(
@@ -170,9 +169,7 @@ fn end_task_completion_clears_pending_records_feedback_and_requests_refresh() {
     );
     assert_eq!(
         app.take_process_refresh_request(),
-        Some(PlatformEffect::Refresh(
-            taskmanager_application::RefreshRequest::Processes
-        )),
+        Some(PlatformEffect::Refresh(RefreshRequest::Processes)),
         "completion must request a process-list refresh like GPUI"
     );
     assert_eq!(
@@ -184,19 +181,15 @@ fn end_task_completion_clears_pending_records_feedback_and_requests_refresh() {
 
 #[test]
 fn signal_completion_records_typed_signal_feedback() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded.clone(),
         affinity,
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     let effect = app
@@ -219,9 +212,7 @@ fn signal_completion_records_typed_signal_feedback() {
     );
     assert_eq!(
         app.take_process_refresh_request(),
-        Some(PlatformEffect::Refresh(
-            taskmanager_application::RefreshRequest::Processes
-        ))
+        Some(PlatformEffect::Refresh(RefreshRequest::Processes))
     );
 }
 
@@ -232,19 +223,15 @@ fn signal_completion_records_typed_signal_feedback() {
 /// never the user concept.
 #[test]
 fn suspend_resume_completions_keep_their_own_vocabulary() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded.clone(),
         affinity,
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     for (request, completion, kind, label) in [
@@ -291,14 +278,10 @@ fn suspend_resume_completions_keep_their_own_vocabulary() {
 
 #[test]
 fn affinity_control_completion_records_typed_feedback() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity_read = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
-    let affinity_control = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityControlRequest,
-    >::default());
+    let affinity_read = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
+    let affinity_control = Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client =
@@ -349,26 +332,20 @@ fn affinity_control_completion_records_typed_feedback() {
     assert!(app.feedback_text().contains("Affinity succeeded for PID"));
     assert_eq!(
         app.take_process_refresh_request(),
-        Some(PlatformEffect::Refresh(
-            taskmanager_application::RefreshRequest::Processes
-        ))
+        Some(PlatformEffect::Refresh(RefreshRequest::Processes))
     );
 }
 
 #[test]
 fn affinity_read_snapshot_is_stored_fail_closed() {
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity_read = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity_read = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded,
         affinity_read.clone(),
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     let effect = app
@@ -393,7 +370,7 @@ fn affinity_read_snapshot_is_stored_fail_closed() {
             sequence: EventSequence::new(2),
             observed_at_ms: 200,
         },
-        taskmanager_application::ProcessAffinityEvent::Snapshot {
+        ProcessAffinityEvent::Snapshot {
             target: read.target.clone(),
             cpus: vec![2, 3],
         },
@@ -401,7 +378,7 @@ fn affinity_read_snapshot_is_stored_fail_closed() {
     app.apply_platform_batch(batch);
     assert!(matches!(
         app.process_affinity_state(),
-        taskmanager_application::ProcessAffinityState::Ready(ready)
+        ProcessAffinityState::Ready(ready)
             if ready.request_id == request_id
                 && ready.target == read.target
                 && ready.cpus == vec![2, 3]
@@ -417,7 +394,7 @@ fn affinity_read_snapshot_is_stored_fail_closed() {
             sequence: EventSequence::new(3),
             observed_at_ms: 300,
         },
-        taskmanager_application::ProcessAffinityEvent::Snapshot {
+        ProcessAffinityEvent::Snapshot {
             target: read.target,
             cpus: vec![7],
         },
@@ -426,7 +403,7 @@ fn affinity_read_snapshot_is_stored_fail_closed() {
     assert!(
         matches!(
             app.process_affinity_state(),
-            taskmanager_application::ProcessAffinityState::Ready(ready)
+            ProcessAffinityState::Ready(ready)
                 if ready.cpus == vec![2, 3]
         ),
         "an uncorrelated affinity snapshot must not overwrite the stored read"
@@ -435,17 +412,13 @@ fn affinity_read_snapshot_is_stored_fail_closed() {
 
 #[test]
 fn affinity_read_failure_is_typed_and_never_leaves_a_snapshot() {
-    let affinity_read = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity_read = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         Arc::new(RecordingRequests::<ProcessControlRequest>::default()),
         affinity_read.clone(),
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     let effect = app
@@ -472,7 +445,7 @@ fn affinity_read_failure_is_typed_and_never_leaves_a_snapshot() {
 
     assert!(matches!(
         app.process_affinity_state(),
-        taskmanager_application::ProcessAffinityState::Failed {
+        ProcessAffinityState::Failed {
             failure: FailureKind::PermissionDenied,
             last_good: None,
             ..
@@ -483,19 +456,15 @@ fn affinity_read_failure_is_typed_and_never_leaves_a_snapshot() {
 
 #[test]
 fn uncorrelated_outcome_cannot_clear_pending_state_or_confirmations() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded.clone(),
         affinity,
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     queue_effect(
@@ -548,19 +517,15 @@ fn uncorrelated_outcome_cannot_clear_pending_state_or_confirmations() {
 
 #[test]
 fn correlated_failure_records_typed_error_and_clears_pending_without_refresh() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let recorded = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
-    let affinity = Arc::new(RecordingRequests::<
-        taskmanager_application::ProcessAffinityRequest,
-    >::default());
+    let affinity = Arc::new(RecordingRequests::<ProcessAffinityRequest>::default());
     let mut app = crate::demo_app();
     let target = selected_demo_target(&mut app);
     let mut client = client_with_process_facets(
         recorded.clone(),
         affinity,
-        Arc::new(RecordingRequests::<
-            taskmanager_application::ProcessAffinityControlRequest,
-        >::default()),
+        Arc::new(RecordingRequests::<ProcessAffinityControlRequest>::default()),
     );
 
     queue_effect(

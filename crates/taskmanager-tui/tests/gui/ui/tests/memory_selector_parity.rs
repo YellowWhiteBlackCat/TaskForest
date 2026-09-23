@@ -16,6 +16,12 @@ use taskmanager_core::core::sensors::{
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::frame_text;
+use taskmanager_core::core::metrics::NetworkWirelessObservations;
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_core::core::sensors::SensorScale;
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
 
 const WIDE: (u16, u16) = (140, 48);
 const MIB: u64 = 1024 * 1024;
@@ -38,9 +44,9 @@ fn seed_measured_memory(app: &mut crate::TuiApp) {
         .current_used_rate_mib_per_sec(128.5)
         .buffers_bytes(512 * MIB)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 }
 
@@ -61,9 +67,9 @@ fn seed_swap_throughput_rates(
     snapshot.memory = MemoryMetricsFixtureBuilder::from_item(snapshot.memory.clone())
         .scalar_observations(scalars)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 }
 
@@ -141,9 +147,9 @@ fn memory_usage_rate_is_signed_and_noise_gated() {
     snapshot.memory = MemoryMetricsFixtureBuilder::from_item(snapshot.memory.clone())
         .current_used_rate_mib_per_sec(-40.0)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     let draining = frame_text(&app, WIDE.0, WIDE.1);
     assert!(
@@ -157,9 +163,9 @@ fn memory_usage_rate_is_signed_and_noise_gated() {
     snapshot.memory = MemoryMetricsFixtureBuilder::from_item(snapshot.memory.clone())
         .current_used_rate_mib_per_sec(0.01)
         .build();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     let still = frame_text(&app, WIDE.0, WIDE.1);
     assert!(
@@ -293,9 +299,9 @@ fn selector_strip_lists_instances_with_their_own_sparkline() {
     second.model = "TaskDisk 1TB".into();
     second.device_id = "disk:demo:sda".into();
     snapshot.disks.push(second);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let cold = frame_text(&app, WIDE.0, WIDE.1);
@@ -316,12 +322,7 @@ fn selector_strip_lists_instances_with_their_own_sparkline() {
     for timestamp_ms in [1_000_u64, 2_000_u64] {
         let mut measured = recorded.clone();
         measured.timestamp_ms = timestamp_ms;
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &measured,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &measured, None, None);
     }
     let live = frame_text(&app, WIDE.0, WIDE.1);
     assert!(
@@ -338,15 +339,15 @@ fn selector_strip_lists_instances_with_their_own_sparkline() {
 fn selector_strip_lists_battery_and_fan_instances() {
     let mut charged = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(1_000));
     charged.status = "Discharging".into();
-    charged.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(82, 1_000),
+    charged.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(82, 1_000),
         ..Default::default()
     });
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Battery;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
+        ProjectionSeedFact::PowerSupplies(Some(PowerSupplySnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             batteries: vec![charged],
@@ -366,7 +367,7 @@ fn selector_strip_lists_battery_and_fan_instances() {
         "fan1".into(),
         "cpu_fan".into(),
         SensorMeasurementObservation::available(
-            SensorDescriptor::fan_speed(taskmanager_core::core::sensors::SensorScale::IDENTITY),
+            SensorDescriptor::fan_speed(SensorScale::IDENTITY),
             SensorMagnitude::Unsigned(2_400),
             1_000,
         )
@@ -374,9 +375,9 @@ fn selector_strip_lists_battery_and_fan_instances() {
     );
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Fan;
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
             readings: vec![fan],
@@ -408,7 +409,7 @@ fn selector_strip_honors_the_applied_device_visibility() {
     wired.apply_observations(
         NetworkAdapterType::Ethernet,
         wired_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     let mut vpn = snapshot.networks[0].clone();
     vpn.interface_name = "tun0".into();
@@ -416,12 +417,12 @@ fn selector_strip_honors_the_applied_device_visibility() {
     vpn.apply_observations(
         NetworkAdapterType::Vpn,
         vpn_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks = vec![wired, vpn];
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
     app.prefs.units[4] = true;
     app.prefs.units[5] = true;

@@ -8,6 +8,8 @@ use ratatui::layout::Rect;
 
 use super::render_details_for_selection;
 use crate::{TuiApp, TuiTheme};
+use taskmanager_core::process::ProcessItem;
+use taskmanager_shell::ProcessTreeRow;
 
 pub(crate) fn render_process_details(
     frame: &mut Frame<'_>,
@@ -29,8 +31,8 @@ pub(crate) fn render_process_details_with_focus_from_canonical(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[taskmanager_shell::ProcessTreeRow],
-    visible: &[&taskmanager_core::process::ProcessItem],
+    ids: &[ProcessTreeRow],
+    visible: &[&ProcessItem],
 ) {
     let selected =
         crate::process_view::process_view_support::id_process(ids, visible, app.selected);

@@ -17,6 +17,8 @@ use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, The
 
 use crate::TuiApp;
 use crate::TuiTerminalProfile;
+use taskmanager_core::core::appearance::PreferredColorScheme;
+use taskmanager_ui_contract::IconId;
 
 /// Runtime-resolved theme construction parameters (ADR-026): the neutral
 /// skin, the light/dark mode, and the high-contrast axis. The runtime holds
@@ -57,7 +59,7 @@ impl ThemeParams {
         skin: &str,
         mode: &str,
         hc: bool,
-        appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+        appearance: Option<DesktopAppearance>,
     ) -> Self {
         let skin = Skin::ALL
             .into_iter()
@@ -65,9 +67,7 @@ impl ThemeParams {
             .unwrap_or(Skin::Gnome);
         let mode = match mode {
             "System" | "" => match appearance.map(|app| app.color_scheme) {
-                Some(taskmanager_core::core::appearance::PreferredColorScheme::Light) => {
-                    LightDark::Light
-                }
+                Some(PreferredColorScheme::Light) => LightDark::Light,
                 _ => LightDark::Dark,
             },
             "Light" => LightDark::Light,
@@ -260,7 +260,7 @@ impl TuiTheme {
 
     /// Resolve a semantic icon through this frame's glyph repertoire.
     #[must_use]
-    pub const fn glyph(self, icon: taskmanager_ui_contract::IconId) -> &'static str {
+    pub const fn glyph(self, icon: IconId) -> &'static str {
         self.terminal.glyph(icon)
     }
 }

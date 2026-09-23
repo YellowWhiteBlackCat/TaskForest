@@ -21,6 +21,7 @@ use super::containers::{KeyHint, Modal};
 use crate::BatchMenuTarget;
 use crate::TuiTheme;
 use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
+use taskmanager_shell::presentation::priority_tier_label;
 
 /// The actions offered by the batch menu, in display order. Each applies to
 /// the whole marked set; End / Kill are gated behind the confirmation, the
@@ -77,7 +78,7 @@ pub fn action_label(action: BatchMenuAction) -> &'static str {
             // priority_tier is total over the priority variants; the Normal
             // fallback keeps the production tree panic-free.
             let tier = priority_tier(action).unwrap_or(PriorityTier::Normal);
-            taskmanager_shell::presentation::priority_tier_label(tier)
+            priority_tier_label(tier)
         }
         BatchMenuAction::Clear => t("proc.clear_selection"),
     }

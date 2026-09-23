@@ -9,6 +9,11 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
 
 use crate::demo_app;
+use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_shell::SortDir;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -17,7 +22,7 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -44,13 +49,9 @@ fn containers_overlay_renders_rollup_rows_and_typed_state() {
 #[test]
 fn containers_overlay_renders_typed_unavailable_state_honestly() {
     let mut app = demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Containers(Some(
-            ContainerRollup::unavailable(
-                taskmanager_core::core::device_state::DeviceState::default(),
-            ),
-        )),
+        ProjectionSeedFact::Containers(Some(ContainerRollup::unavailable(DeviceState::default()))),
     );
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("unsupported"));
@@ -60,11 +61,9 @@ fn containers_overlay_renders_typed_unavailable_state_honestly() {
 #[test]
 fn containers_overlay_renders_healthy_empty_state() {
     let mut app = demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Containers(Some(
-            ContainerRollup::empty_healthy(1_000),
-        )),
+        ProjectionSeedFact::Containers(Some(ContainerRollup::empty_healthy(1_000))),
     );
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("No containers running on this host."));
@@ -80,10 +79,7 @@ fn containers_overlay_renders_unavailable_fields_as_dashes() {
         container.cpu_percentage = ScalarObservation::unavailable(FailureKind::PermissionDenied);
         container.memory_bytes = ScalarObservation::unavailable(FailureKind::PermissionDenied);
     }
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Containers(containers),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Containers(containers));
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("—"));
     assert!(!text.contains("0.0%"));
@@ -92,7 +88,7 @@ fn containers_overlay_renders_unavailable_fields_as_dashes() {
 #[test]
 fn containers_overlay_caps_rows_and_reports_hidden_count() {
     let (shown, hidden) = container_row_window(203);
-    assert_eq!(shown, taskmanager_application::MAX_CONTAINER_ROWS);
+    assert_eq!(shown, MAX_CONTAINER_ROWS);
     assert_eq!(hidden, 3);
     let label = more_rows_label(hidden);
     assert!(label.contains('3'));
@@ -132,7 +128,7 @@ fn modal_host_paints_borders_icon_title_and_returns_inner() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let popup = Rect::new(2, 1, 30, 8);
     let mut terminal = Terminal::new(TestBackend::new(40, 12)).expect("test terminal");
@@ -195,7 +191,7 @@ fn modal_alert_paints_plain_title_and_the_typed_border_tone() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let popup = Rect::new(2, 1, 24, 5);
     let mut terminal = Terminal::new(TestBackend::new(40, 12)).expect("test terminal");
@@ -225,7 +221,7 @@ fn keyhint_paints_chords_black_on_accent_and_labels_dim() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let mut terminal = Terminal::new(TestBackend::new(40, 1)).expect("test terminal");
     terminal
@@ -268,7 +264,7 @@ fn keyhint_toned_pairs_paint_danger_and_inverse_chords_with_default_labels() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let mut terminal = Terminal::new(TestBackend::new(40, 1)).expect("test terminal");
     terminal
@@ -355,7 +351,7 @@ fn page_frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -369,7 +365,7 @@ fn windowed_table_paints_the_window_clips_rows_and_highlights_the_selection() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     // A 12-high panel paints 8 body rows (2 borders + header + header margin
     // are chrome), centred on the global cursor by the shared window rule.
@@ -385,11 +381,7 @@ fn windowed_table_paints_the_window_clips_rows_and_highlights_the_selection() {
                     theme,
                     panel: TablePanelProjection::new(area, total, selected),
                     title: "Fixture table",
-                    header: sort_header_row(
-                        ["Name", "State"],
-                        theme,
-                        Some((1, taskmanager_shell::SortDir::Desc)),
-                    ),
+                    header: sort_header_row(["Name", "State"], theme, Some((1, SortDir::Desc))),
                     widths: vec![Constraint::Percentage(50), Constraint::Min(10)],
                     column_spacing: 2,
                     state_area: area,
@@ -465,7 +457,7 @@ fn windowed_table_zero_rows_paints_the_state_panel_not_a_bare_header() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let theme = crate::TuiTheme::default();
     let area = Rect::new(1, 1, 38, 4);
     // A page may widen the state area beyond the table's own slot (the

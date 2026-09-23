@@ -4,6 +4,7 @@ use super::super::*;
 use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ServiceUpdate,
 };
+use taskmanager_core::core::services::ServiceLogLevel;
 use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
@@ -49,7 +50,7 @@ fn service_log_open_poll_follow_and_close_follow_the_shared_state_machine() {
         cursor: "j:1".into(),
         realtime_timestamp_micros: Some(1_700_000_000_000_000),
         priority: Some(3),
-        level: taskmanager_core::core::services::ServiceLogLevel::Error,
+        level: ServiceLogLevel::Error,
         message: "bind failed".into(),
     };
     let batch = ServiceLogStreamSnapshot {

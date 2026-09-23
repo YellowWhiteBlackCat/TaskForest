@@ -6,12 +6,14 @@
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
 use taskmanager_shell::presentation::{
     MISSING_VALUE, duration, health_score_for_snapshot, health_score_summary, missing_value,
     optional_bytes,
 };
+use taskmanager_shell::presentation::{kernel_error_summary, smbios_memory_inventory_rows};
 
 pub(crate) struct SystemFact {
     pub(crate) label: String,
@@ -55,7 +57,7 @@ pub(crate) fn system_sections(
     hardware: Option<&HardwareInfo>,
     snapshot: Option<&SystemSnapshot>,
     npu_inventory: Option<&NpuInventorySnapshot>,
-    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
+    smbios_memory: Option<&SmbiosMemorySnapshot>,
 ) -> Vec<SystemFactSection> {
     let window_manager = hardware.and_then(|item| {
         item.window_manager.as_deref().map(|name| {
@@ -161,7 +163,7 @@ pub(crate) fn system_sections(
         device.push_optional_text(key, value);
     }
     if let Some(hardware) = hardware
-        && let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hardware)
+        && let Some(errors) = kernel_error_summary(hardware)
     {
         device.push(t("system.kernel_errors"), errors);
     }
@@ -354,8 +356,7 @@ pub(crate) fn system_sections(
     }
     if let Some(smbios) = smbios_memory {
         let mut smbios_section = SystemFactSection::new("system.memory_slots");
-        for (label, value) in taskmanager_shell::presentation::smbios_memory_inventory_rows(smbios)
-        {
+        for (label, value) in smbios_memory_inventory_rows(smbios) {
             smbios_section.push(label, value);
         }
         if !smbios_section.facts.is_empty() {

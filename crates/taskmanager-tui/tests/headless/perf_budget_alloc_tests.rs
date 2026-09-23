@@ -32,6 +32,7 @@ use taskmanager_core::core::process::{
 };
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_tui::{TuiApp, TuiTheme, render};
 
 /// The counting allocator: forwards to [`System`] and records the count and
@@ -114,7 +115,7 @@ struct TreeFixture {
 }
 
 fn base_process(pid: u32, name: String, cpu: f32) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name)
         .current_cpu_percentage(cpu)

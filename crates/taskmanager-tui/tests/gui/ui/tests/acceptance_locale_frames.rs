@@ -11,6 +11,7 @@ use super::acceptance_support::{
     REFERENCE_HEIGHT, REFERENCE_WIDTH, battery_surfaces, surface_title_key, with_frame_in_language,
 };
 use crate::TuiApp;
+use taskmanager_application::PendingConfirmation;
 
 #[test]
 fn every_titled_overlay_surface_paints_its_localized_title_in_both_locales() {
@@ -98,7 +99,7 @@ fn the_zh_end_task_confirmation_names_the_frozen_process_in_chinese() {
     // expectation is derived from the gate itself rather than a hardcoded
     // row assumption (selection anchoring is owned by the selection layer).
     let frozen = match app.shell.pending_confirmation() {
-        Some(taskmanager_application::PendingConfirmation::EndTask(target)) => target,
+        Some(PendingConfirmation::EndTask(target)) => target,
         other => panic!("an end-task confirmation must be pending, got {other:?}"),
     };
     with_frame_in_language(

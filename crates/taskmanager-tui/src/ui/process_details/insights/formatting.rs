@@ -214,7 +214,8 @@ pub(crate) fn open_files_preview_lines_with_limit(
 /// Format one environment entry as `key=escaped_value`. Newlines and carriage returns
 /// are escaped to keep each entry on a single terminal row.
 pub(crate) fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
-    taskmanager_application::process_details_vm::format_env_entry(entry)
+    use taskmanager_application::process_details_vm::format_env_entry;
+    format_env_entry(entry)
 }
 
 /// Bounded Environment-facet preview: the entry count, then the first

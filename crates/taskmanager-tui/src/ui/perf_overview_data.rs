@@ -9,6 +9,12 @@ use super::units::{
     cache_mib, observed_frequency_for_source, observed_percentage, observed_temperature_for_source,
     spec_ghz,
 };
+use taskmanager_application::RaplPowerState;
+use taskmanager_shell::presentation::{
+    cpu_idle_state_summary, cpu_interrupt_summary, cpu_power_limits_summary,
+    cpu_thermal_throttle_summary, cpu_topology_summary, load_average_basis_summary,
+    pressure_summary,
+};
 
 pub(super) struct CpuMetricFact {
     pub(super) label: &'static str,
@@ -75,7 +81,7 @@ pub(super) struct CpuRailRow {
 /// one presentation in the whole frontend.
 pub(super) fn cpu_live_rail_rows(
     snapshot: &SystemSnapshot,
-    rapl_state: Option<&taskmanager_application::RaplPowerState>,
+    rapl_state: Option<&RaplPowerState>,
 ) -> Vec<CpuRailRow> {
     let mut rows = vec![
         CpuRailRow {
@@ -98,7 +104,7 @@ pub(super) fn cpu_live_rail_rows(
     {
         rows.push(CpuRailRow {
             label: format!("{} (some)", t("perf.stall")),
-            value: taskmanager_shell::presentation::pressure_summary(cpu_pressure),
+            value: pressure_summary(cpu_pressure),
         });
     }
     if let Some(load) = snapshot.load_average.as_ref() {
@@ -121,11 +127,11 @@ pub(super) fn cpu_live_rail_rows(
             },
             CpuRailRow {
                 label: t("system.load_basis").to_owned(),
-                value: taskmanager_shell::presentation::load_average_basis_summary(load),
+                value: load_average_basis_summary(load),
             },
         ]);
     }
-    if let Some(taskmanager_application::RaplPowerState::Ready(rapl)) = rapl_state {
+    if let Some(RaplPowerState::Ready(rapl)) = rapl_state {
         for row in &rapl.snapshot.packages {
             rows.push(CpuRailRow {
                 label: format!("{} {}", row.name, t("common.power")),
@@ -222,7 +228,7 @@ pub(super) fn cpu_spec_rail_rows(
             value: preference.clone(),
         });
     }
-    if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+    if let Some(power_limits) = cpu_power_limits_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.power_limits").to_owned(),
             value: power_limits,
@@ -231,19 +237,19 @@ pub(super) fn cpu_spec_rail_rows(
     // Diagnostic topology counters are lower priority than policy facts. The
     // renderer's measured-cell budget can then leave a visible more-rows hint
     // instead of cutting the governor/limit rows below a wrapped value.
-    if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+    if let Some(topology) = cpu_topology_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.topology").to_owned(),
             value: topology,
         });
     }
-    if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+    if let Some(idle_states) = cpu_idle_state_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.idle_states").to_owned(),
             value: idle_states,
         });
     }
-    if let Some(interrupts) = taskmanager_shell::presentation::cpu_interrupt_summary(cpu) {
+    if let Some(interrupts) = cpu_interrupt_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.interrupts").to_owned(),
             value: interrupts,
@@ -254,7 +260,7 @@ pub(super) fn cpu_spec_rail_rows(
     // fold: a package with no observed counter contributes no segment and an
     // unobserved family omits the row, while an observed package with an
     // unobserved sibling keeps the shared dash.
-    if let Some(throttle) = taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu) {
+    if let Some(throttle) = cpu_thermal_throttle_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.thermal_throttle").to_owned(),
             value: throttle,

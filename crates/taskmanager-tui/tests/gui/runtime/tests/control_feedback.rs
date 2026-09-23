@@ -30,6 +30,11 @@ use taskmanager_platform_contract::{
 
 use crate::render;
 use crate::{TuiApp, TuiTheme};
+use taskmanager_application::{PlatformClient, ProcessEvent};
+use taskmanager_platform_contract::{CapabilityId, CapabilityRequest};
+use taskmanager_shell::fixture::seed_process_batch_loading;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, queue_effect};
+use taskmanager_test_support::pin_english;
 
 /// Render the live frame through the same TestBackend path the render tests
 /// use, pinning English + serializing against the language-flipping i18n test.
@@ -84,7 +89,7 @@ impl<T> Default for RecordingRequests<T> {
     }
 }
 
-impl<T: taskmanager_platform_contract::CapabilityRequest> RequestPort for RecordingRequests<T> {
+impl<T: CapabilityRequest> RequestPort for RecordingRequests<T> {
     type Request = T;
 
     fn try_submit(&self, request: RequestEnvelope<T>) -> Result<(), SubmissionError> {
@@ -109,8 +114,8 @@ fn recorded<T: Clone>(recorder: &RecordingRequests<T>) -> Vec<(RequestId, T)> {
 fn control_client(
     control: Arc<RecordingRequests<ProcessControlRequest>>,
     list: Arc<RecordingRequests<ProcessListRequest>>,
-) -> taskmanager_application::PlatformClient {
-    taskmanager_application::PlatformClient::new(PlatformHandle::new(
+) -> PlatformClient {
+    PlatformClient::new(PlatformHandle::new(
         Arc::new(EmptyCapabilities),
         Arc::new(EmptyEvents),
         PlatformFacets::default().with_process(
@@ -133,7 +138,7 @@ fn press(app: &mut TuiApp, code: ratatui::crossterm::event::KeyCode) -> Option<P
 fn end_task_completion_renders_typed_success_feedback_and_refresh_is_drained() {
     // Pin before the chain starts: the feedback notice text is frozen by
     // `apply_platform_batch`, earlier than `frame_text`'s draw-time pin.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let control = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
     let list = Arc::new(RecordingRequests::<ProcessListRequest>::default());
     let mut client = control_client(control.clone(), list.clone());
@@ -157,7 +162,7 @@ fn end_task_completion_renders_typed_success_feedback_and_refresh_is_drained() {
 
     // The runtime queues it; the provider lane receives the typed request and
     // the shell records the submission for completion correlation.
-    taskmanager_shell::queue_effect(
+    queue_effect(
         &mut app.shell,
         &mut client,
         PlatformEffect::EndTask(target.clone()),
@@ -172,11 +177,11 @@ fn end_task_completion_renders_typed_success_feedback_and_refresh_is_drained() {
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id: *request_id,
-        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
+        capability: CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
-        event: taskmanager_application::ProcessEvent::EndTaskCompleted(target.clone()),
+        event: ProcessEvent::EndTaskCompleted(target.clone()),
     });
     app.apply_platform_batch(batch);
 
@@ -186,14 +191,8 @@ fn end_task_completion_renders_typed_success_feedback_and_refresh_is_drained() {
         .shell
         .feedback_notice()
         .expect("typed feedback recorded");
-    assert_eq!(
-        feedback.source(),
-        taskmanager_shell::FeedbackSource::Control
-    );
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(feedback.source(), FeedbackSource::Control);
+    assert_eq!(feedback.severity(), FeedbackSeverity::Success);
     assert!(feedback.text().contains(&target.pid.to_string()));
     let text = frame_text(&app, 140, 36);
     assert!(
@@ -251,7 +250,7 @@ fn end_task_confirmation_n_and_esc_dismiss_without_an_effect() {
 fn failed_single_control_renders_the_typed_reason_not_debug() {
     // Pin before the failure folds: the notice text freezes at batch-apply
     // time, earlier than `frame_text`'s draw-time pin.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let control = Arc::new(RecordingRequests::<ProcessControlRequest>::default());
     let list = Arc::new(RecordingRequests::<ProcessListRequest>::default());
     let mut client = control_client(control.clone(), list);
@@ -260,7 +259,7 @@ fn failed_single_control_renders_the_typed_reason_not_debug() {
         .shell
         .selected_process_identity()
         .expect("selected row has a frozen identity");
-    taskmanager_shell::queue_effect(
+    queue_effect(
         &mut app.shell,
         &mut client,
         PlatformEffect::EndTask(target.clone()),
@@ -269,7 +268,7 @@ fn failed_single_control_renders_the_typed_reason_not_debug() {
     let mut batch = PlatformEventBatch::default();
     batch.failures.push(OperationFailure {
         request_id,
-        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
+        capability: CapabilityId::PROCESS_CONTROL,
         sequence: EventSequence::new(1),
         kind: FailureKind::PermissionDenied,
         retry: ProviderFailure::from_kind(FailureKind::PermissionDenied).retry(),
@@ -301,7 +300,7 @@ fn failed_single_control_renders_the_typed_reason_not_debug() {
 fn batch_completion_renders_per_item_outcomes_with_typed_failure_reason() {
     // Pin before the batch folds: the notice text freezes at batch-apply
     // time, earlier than `frame_text`'s draw-time pin.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = app_on_processes();
     // Two trustworthy rows so the batch freezes two targets.
     let processes = app
@@ -348,19 +347,15 @@ fn batch_completion_renders_per_item_outcomes_with_typed_failure_reason() {
         ],
     };
     let request_id = RequestId::new(7).expect("non-zero fixture id");
-    taskmanager_shell::fixture::seed_process_batch_loading(
-        &mut app.shell,
-        result.intent.clone(),
-        request_id,
-    );
+    seed_process_batch_loading(&mut app.shell, result.intent.clone(), request_id);
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id,
-        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
+        capability: CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
-        event: taskmanager_application::ProcessEvent::BatchCompleted(result),
+        event: ProcessEvent::BatchCompleted(result),
     });
     app.apply_platform_batch(batch);
 
@@ -390,7 +385,7 @@ fn batch_completion_renders_per_item_outcomes_with_typed_failure_reason() {
 fn fully_applied_batch_renders_success_marker_without_failure_item() {
     // Pin before the batch folds: the notice text freezes at batch-apply
     // time, earlier than `frame_text`'s draw-time pin.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = app_on_processes();
     let identity = app
         .shell
@@ -406,19 +401,15 @@ fn fully_applied_batch_renders_success_marker_without_failure_item() {
         targets: vec![(identity.clone(), ProcessBatchTargetResult::Applied)],
     };
     let request_id = RequestId::new(9).expect("non-zero fixture id");
-    taskmanager_shell::fixture::seed_process_batch_loading(
-        &mut app.shell,
-        result.intent.clone(),
-        request_id,
-    );
+    seed_process_batch_loading(&mut app.shell, result.intent.clone(), request_id);
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id,
-        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
+        capability: CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
-        event: taskmanager_application::ProcessEvent::BatchCompleted(result),
+        event: ProcessEvent::BatchCompleted(result),
     });
     app.apply_platform_batch(batch);
 
@@ -441,15 +432,15 @@ fn fully_applied_batch_renders_success_marker_without_failure_item() {
 /// notice and clears the footer display.
 #[test]
 fn advance_feedback_time_expires_timed_notice_and_clears_footer() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = app_on_processes();
     app.set_feedback_activity("Live activity baseline");
 
     let duration = std::time::Duration::from_secs(5);
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::Timed(duration),
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::Timed(duration),
         "Temporary timed feedback notice",
     );
 
@@ -494,14 +485,14 @@ fn advance_feedback_time_expires_timed_notice_and_clears_footer() {
 /// modal or menu is open.
 #[test]
 fn esc_key_clears_active_notice_via_clear_feedback_notice() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = app_on_processes();
     app.set_feedback_activity("Live activity baseline");
 
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Success,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Success,
+        FeedbackLifecycle::UntilReplaced,
         "Active notice to dismiss with Esc",
     );
 
@@ -537,13 +528,13 @@ fn esc_key_clears_active_notice_via_clear_feedback_notice() {
 /// a subsequent `Esc` press.
 #[test]
 fn esc_key_dismisses_open_modal_before_feedback_notice() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = app_on_processes();
 
     app.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "Notice preserved across modal close",
     );
 

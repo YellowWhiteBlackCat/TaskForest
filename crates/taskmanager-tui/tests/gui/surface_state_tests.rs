@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_application::{AppPage, SurfaceKind};
 
 impl TuiApp {
     pub(crate) const fn service_menu(&self) -> Option<&ServiceMenuTarget> {
@@ -65,13 +66,13 @@ fn local_surface_replaces_atomically_and_stale_close_is_rejected() {
 #[test]
 fn process_properties_visibility_has_one_shared_authority() {
     let mut app = crate::demo_app();
-    app.shell.application.active_page = taskmanager_application::AppPage::Applications;
+    app.shell.application.active_page = AppPage::Applications;
     app.reconcile_applications_cursor();
     assert!(app.open_process_properties());
     assert_eq!(app.local_surface_kind(), None);
     assert_eq!(
         app.shell.interaction_surface(),
-        Some(taskmanager_application::SurfaceKind::ProcessProperties)
+        Some(SurfaceKind::ProcessProperties)
     );
     assert!(app.process_properties().is_some());
 

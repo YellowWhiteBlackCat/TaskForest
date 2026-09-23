@@ -9,6 +9,8 @@ use ratatui::backend::TestBackend;
 
 use crate::ui::render;
 use crate::{TuiApp, TuiTheme};
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test.
@@ -19,7 +21,7 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
@@ -88,8 +90,8 @@ mod projection_render_tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use taskmanager_application::{
-        PlatformEventBatch, SystemTelemetryDomainEvent, SystemTelemetryProjection,
-        SystemTelemetryProjectionApplyResult, SystemTelemetryRevision,
+        PlatformEventBatch, ProjectedSystemTelemetry, SystemTelemetryDomainEvent,
+        SystemTelemetryProjection, SystemTelemetryProjectionApplyResult, SystemTelemetryRevision,
     };
     use taskmanager_core::core::metrics::{CpuMetrics, CpuTelemetryObservation};
 
@@ -99,7 +101,7 @@ mod projection_render_tests {
     fn projection_from(
         revision: SystemTelemetryRevision,
         events: impl IntoIterator<Item = SystemTelemetryDomainEvent>,
-    ) -> taskmanager_application::ProjectedSystemTelemetry {
+    ) -> ProjectedSystemTelemetry {
         let mut reducer = SystemTelemetryProjection::default();
         reducer.begin(revision);
         let mut latest = None;
@@ -117,10 +119,7 @@ mod projection_render_tests {
         latest.expect("fixture should contain an event")
     }
 
-    fn partial_projection(
-        revision: u64,
-        observed_at_ms: u64,
-    ) -> taskmanager_application::ProjectedSystemTelemetry {
+    fn partial_projection(revision: u64, observed_at_ms: u64) -> ProjectedSystemTelemetry {
         let revision = SystemTelemetryRevision::new(revision);
         projection_from(
             revision,
@@ -137,7 +136,8 @@ mod projection_render_tests {
 
     #[test]
     fn partial_projection_render_keeps_last_complete_values_not_zeroes() {
-        let mut app = crate::TuiApp::from_shell(taskmanager_shell::demo_app());
+        use taskmanager_shell::demo_app;
+        let mut app = crate::TuiApp::from_shell(demo_app());
         let mut batch = PlatformEventBatch::default();
         batch
             .system_telemetry_projections
@@ -165,10 +165,7 @@ fn collecting_frame_masks_page_data_until_the_shared_commit_is_ready() {
         .snapshot
         .clone()
         .expect("demo fixture starts with a committed frame");
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     app.application.active_page = AppPage::Applications;
 
     assert!(app.telemetry_frame_state().is_collecting());
@@ -179,9 +176,9 @@ fn collecting_frame_masks_page_data_until_the_shared_commit_is_ready() {
         "partial process facts must stay behind the first-frame mask"
     );
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(committed))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(committed))),
     );
     assert!(app.telemetry_frame_state().is_ready());
     let ready = frame_text(&app, 120, 36);

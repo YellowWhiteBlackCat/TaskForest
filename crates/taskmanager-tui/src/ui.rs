@@ -68,6 +68,10 @@ use crate::TuiTheme;
 use units::{memory_text_pref, observed_percentage};
 
 use perf_selector_instances::perf_selector_instances;
+use taskmanager_application::{PendingConfirmation, SurfaceKind};
+use taskmanager_assets::product::NAME;
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_shell::SortDir;
 
 pub fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme) {
     let plan = TuiFramePlan::build(app, frame.area());
@@ -147,10 +151,11 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
     let input_scope = overlay.scope;
     let popup = overlay.popup;
     match input_scope {
-        crate::TuiInputScope::SharedSurface(
-            taskmanager_application::SurfaceKind::Confirmation(_),
-        ) => match app.shell.pending_confirmation() {
-            Some(taskmanager_application::PendingConfirmation::EndTask(target)) => {
+        crate::TuiInputScope::SharedSurface(SurfaceKind::Confirmation(_)) => match app
+            .shell
+            .pending_confirmation()
+        {
+            Some(PendingConfirmation::EndTask(target)) => {
                 confirmations::render_end_confirmation_at(
                     frame,
                     app,
@@ -160,28 +165,26 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
                     popup,
                 );
             }
-            Some(taskmanager_application::PendingConfirmation::ProcessBatch(intent)) => {
+            Some(PendingConfirmation::ProcessBatch(intent)) => {
                 confirmations::render_batch_confirmation_at(frame, theme, intent, popup);
             }
-            Some(taskmanager_application::PendingConfirmation::ServiceControl(pending)) => {
+            Some(PendingConfirmation::ServiceControl(pending)) => {
                 confirmations::render_service_control_confirmation_at(
                     frame, app, theme, pending, popup,
                 );
             }
-            Some(taskmanager_application::PendingConfirmation::StartupControl(pending)) => {
+            Some(PendingConfirmation::StartupControl(pending)) => {
                 confirmations::render_startup_control_confirmation_at(frame, theme, pending, popup);
             }
-            Some(taskmanager_application::PendingConfirmation::SessionControl(pending)) => {
+            Some(PendingConfirmation::SessionControl(pending)) => {
                 confirmations::render_session_control_confirmation_at(frame, theme, pending, popup);
             }
-            Some(taskmanager_application::PendingConfirmation::SmartSelfTest(pending)) => {
+            Some(PendingConfirmation::SmartSelfTest(pending)) => {
                 confirmations::render_smart_self_test_confirmation_at(frame, theme, pending, popup);
             }
             None => {}
         },
-        crate::TuiInputScope::SharedSurface(
-            taskmanager_application::SurfaceKind::ProcessProperties,
-        ) => {
+        crate::TuiInputScope::SharedSurface(SurfaceKind::ProcessProperties) => {
             if let Some(target) = app.process_properties() {
                 process_properties::render_process_properties_at(
                     frame, target, app, theme, plan.focus, popup,
@@ -556,7 +559,7 @@ pub(super) struct TableRenderProps<'a, const WIDTHS: usize, const HEADERS: usize
     pub(super) widths: [Constraint; WIDTHS],
     pub(super) headers: [&'a str; HEADERS],
     pub(super) selected: usize,
-    pub(super) sort: Option<(usize, taskmanager_shell::SortDir)>,
+    pub(super) sort: Option<(usize, SortDir)>,
 }
 
 pub(super) fn render_table<'a, const WIDTHS: usize, const HEADERS: usize>(
@@ -599,7 +602,7 @@ fn header_row<'a, const N: usize>(
     headers: [&'a str; N],
     accent: Color,
     text_color: Color,
-    sort: Option<(usize, taskmanager_shell::SortDir)>,
+    sort: Option<(usize, SortDir)>,
 ) -> Row<'a> {
     let cells: Vec<Cell> = headers
         .into_iter()
@@ -611,8 +614,8 @@ fn header_row<'a, const N: usize>(
                 && index == column
             {
                 text.push_str(match direction {
-                    taskmanager_shell::SortDir::Asc => " ▲",
-                    taskmanager_shell::SortDir::Desc => " ▼",
+                    SortDir::Asc => " ▲",
+                    SortDir::Desc => " ▼",
                 });
                 style = Style::new()
                     .fg(text_color)
@@ -646,7 +649,7 @@ fn render_too_small(frame: &mut Frame<'_>, theme: TuiTheme, area: Rect) {
     frame.render_widget(
         Paragraph::new(format!(
             "{} TUI needs at least 54×16\n{}",
-            taskmanager_assets::product::NAME,
+            NAME,
             t("empty.terminal_resize_hint")
         ))
         .alignment(Alignment::Center)
@@ -681,10 +684,7 @@ pub(crate) enum DeviceHealth {
     Unsupported,
 }
 
-pub(crate) fn classify_device_state(
-    state: &taskmanager_core::core::device_state::DeviceState,
-) -> DeviceHealth {
-    use taskmanager_core::core::device_state::DeviceState;
+pub(crate) fn classify_device_state(state: &DeviceState) -> DeviceHealth {
     use taskmanager_core::core::failure::FailureKind;
     if state.status == DeviceState::healthy(0).status {
         return DeviceHealth::Healthy;

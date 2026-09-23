@@ -1,5 +1,6 @@
 //! Shared test-only support for the TUI render tests.
 
+use taskmanager_application::ConfigCoordinator;
 /// Serializes the one language-flipping i18n test against the render tests.
 ///
 /// `t()` resolves against a process-global active language, so a test that
@@ -50,7 +51,7 @@ pub(crate) fn set_config_store_client(
     app: &mut crate::TuiApp,
     path: impl Into<std::path::PathBuf>,
 ) {
-    let coordinator = taskmanager_application::ConfigCoordinator::start_path(path.into())
+    let coordinator = ConfigCoordinator::start_path(path.into())
         .expect("start isolated TUI configuration coordinator");
     app.config_client = Some(coordinator.client());
     app.applied_config_revision = None;
