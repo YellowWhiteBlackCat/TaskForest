@@ -71,47 +71,51 @@ fn canonical_process_rows(
 
 // ── fixtures ─────────────────────────────────────────────────────────────
 
-/// Build a `ProcessItem` with every sort-relevant field set. `parent_pid = Some(1)`
-/// and pid 1 is NOT in any fixture below, so each item is an orphan ROOT inside
-/// the canonical uncategorized bucket. Each column is pinned to a STRICTLY DISTINCT value across the
-/// five pids, so every sort key yields an unambiguous total order with no
-/// stable-sort ties.
-#[allow(clippy::too_many_arguments)]
-fn mk(
+/// Every sort-relevant input for one [`ProcessItem`] in the canonical 5-process
+/// dataset. `parent_pid = Some(1)` and pid 1 is NOT in any fixture below, so each
+/// item is an orphan ROOT inside the canonical uncategorized bucket. Each column
+/// is pinned to a STRICTLY DISTINCT value across the five pids, so every sort key
+/// yields an unambiguous total order with no stable-sort ties.
+#[derive(Clone, Copy)]
+struct ProcessFixture {
     pid: u32,
-    name: &str,
-    user: &str,
+    name: &'static str,
+    user: &'static str,
     threads: u32,
     start: u64,
-    status: &str,
+    status: &'static str,
     cpu: f32,
     mem: u64,
-    dr: u64,
-    dw: u64,
-) -> ProcessItem {
+    disk_read: u64,
+    disk_write: u64,
+}
+
+/// Materialize one [`ProcessFixture`] into a `ProcessItem` with every
+/// sort-relevant field set.
+fn mk(fixture: ProcessFixture) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .scalar_observations(ProcessScalarObservations {
-            swap_bytes: ScalarObservation::available(u64::from(pid), 1),
+            swap_bytes: ScalarObservation::available(u64::from(fixture.pid), 1),
             ..ProcessScalarObservations::default()
         })
-        .pid(pid)
+        .pid(fixture.pid)
         .parent_pid(Some(1))
-        .name(name.to_string())
+        .name(fixture.name.to_string())
         .cmdline(String::new())
-        .current_cpu_percentage(cpu)
-        .current_memory_bytes(mem)
-        .current_disk_read_bytes_per_sec(dr)
-        .current_disk_write_bytes_per_sec(dw)
-        .status(status.to_string())
+        .current_cpu_percentage(fixture.cpu)
+        .current_memory_bytes(fixture.mem)
+        .current_disk_read_bytes_per_sec(fixture.disk_read)
+        .current_disk_write_bytes_per_sec(fixture.disk_write)
+        .status(fixture.status.to_string())
         .metadata_observations(
             taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
+                taskmanager_core::core::process::ProcessOwner::opaque(fixture.user.to_string()),
                 None,
                 1,
             ),
         )
-        .current_threads(threads)
-        .current_start_time_secs(start)
+        .current_threads(fixture.threads)
+        .current_start_time_secs(fixture.start)
         .cpu_history(Vec::new())
         .build()
 }
@@ -128,48 +132,66 @@ fn mk(
 /// |  55 | bravo   | dale  |   4 |   400 | Waiting   | 10.0  |  200_000_000| 2000 | 2000 |
 fn sample() -> Vec<ProcessItem> {
     vec![
-        mk(
-            11,
-            "charlie",
-            "zoe",
-            3,
-            300,
-            "Sleeping",
-            5.0,
-            100_000_000,
-            1000,
-            10,
-        ),
-        mk(
-            22, "alpha", "bob", 1, 100, "Running", 50.0, 10_000_000, 10, 1000,
-        ),
-        mk(
-            33,
-            "echo",
-            "alice",
-            5,
-            500,
-            "Zombie",
-            1.0,
-            500_000_000,
-            500,
-            500,
-        ),
-        mk(
-            44, "delta", "eve", 2, 200, "Stopped", 25.0, 50_000_000, 100, 100,
-        ),
-        mk(
-            55,
-            "bravo",
-            "dale",
-            4,
-            400,
-            "Waiting",
-            10.0,
-            200_000_000,
-            2000,
-            2000,
-        ),
+        mk(ProcessFixture {
+            pid: 11,
+            name: "charlie",
+            user: "zoe",
+            threads: 3,
+            start: 300,
+            status: "Sleeping",
+            cpu: 5.0,
+            mem: 100_000_000,
+            disk_read: 1000,
+            disk_write: 10,
+        }),
+        mk(ProcessFixture {
+            pid: 22,
+            name: "alpha",
+            user: "bob",
+            threads: 1,
+            start: 100,
+            status: "Running",
+            cpu: 50.0,
+            mem: 10_000_000,
+            disk_read: 10,
+            disk_write: 1000,
+        }),
+        mk(ProcessFixture {
+            pid: 33,
+            name: "echo",
+            user: "alice",
+            threads: 5,
+            start: 500,
+            status: "Zombie",
+            cpu: 1.0,
+            mem: 500_000_000,
+            disk_read: 500,
+            disk_write: 500,
+        }),
+        mk(ProcessFixture {
+            pid: 44,
+            name: "delta",
+            user: "eve",
+            threads: 2,
+            start: 200,
+            status: "Stopped",
+            cpu: 25.0,
+            mem: 50_000_000,
+            disk_read: 100,
+            disk_write: 100,
+        }),
+        mk(ProcessFixture {
+            pid: 55,
+            name: "bravo",
+            user: "dale",
+            threads: 4,
+            start: 400,
+            status: "Waiting",
+            cpu: 10.0,
+            mem: 200_000_000,
+            disk_read: 2000,
+            disk_write: 2000,
+        }),
     ]
 }
 
@@ -249,10 +271,19 @@ fn canonical_tree_tiebreak_contract_on_equal_primary_keys() {
     // comparator. Equal primary keys therefore resolve by the neutral PID
     // tiebreak, independent of sort direction (except when PID itself is the
     // primary key).
-    let procs = vec![
-        mk(7, "same", "u", 1, 1, "X", 1.0, 1, 1, 1),
-        mk(3, "same", "u", 1, 1, "X", 1.0, 1, 1, 1),
-    ];
+    let base = ProcessFixture {
+        pid: 7,
+        name: "same",
+        user: "u",
+        threads: 1,
+        start: 1,
+        status: "X",
+        cpu: 1.0,
+        mem: 1,
+        disk_read: 1,
+        disk_write: 1,
+    };
+    let procs = vec![mk(base), mk(ProcessFixture { pid: 3, ..base })];
     let collapsed = HashSet::new();
     for &(col, _, _) in expected_orders() {
         let asc: Vec<u32> = canonical_process_rows(&refs(&procs), col, true, &collapsed)
@@ -776,50 +807,53 @@ fn query_no_match_returns_empty() {
 use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::{FailureKind, ScalarObservation};
 
-/// Build a process whose typed observations carry either current values or an
-/// explicit unavailable state.
-#[allow(clippy::too_many_arguments)]
-fn typed_item(
+/// One process whose typed observations carry either a measured value or an
+/// explicit unavailable state, per field. `None` means the platform reported the
+/// field as unavailable (here `PermissionDenied`), never zero.
+struct TypedProcessFixture {
     pid: u32,
-    name: &str,
+    name: &'static str,
     cpu: Option<f32>,
     threads: Option<u32>,
     fds: Option<u32>,
     nice: Option<i32>,
     cpu_time: Option<u64>,
     mem: Option<u64>,
-) -> ProcessItem {
+}
+
+/// Build a process from a [`TypedProcessFixture`].
+fn typed_item(fixture: TypedProcessFixture) -> ProcessItem {
     let observation = |value: Option<u64>| match value {
         Some(value) => ScalarObservation::available(value, 10),
         None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
     };
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
-        .pid(pid)
+        .pid(fixture.pid)
         // Keep every typed fixture as an orphan root so this helper's sort
         // tests exercise one sibling level instead of an accidental pid-1
         // parent/child hierarchy.
         .parent_pid(Some(10_000))
-        .name(name.to_string())
+        .name(fixture.name.to_string())
         .scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(7_500, 10),
-            cpu_percentage: match cpu {
+            cpu_percentage: match fixture.cpu {
                 Some(value) => ScalarObservation::available(value, 10),
                 None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
             },
-            memory_bytes: observation(mem),
-            threads: match threads {
+            memory_bytes: observation(fixture.mem),
+            threads: match fixture.threads {
                 Some(value) => ScalarObservation::available(value, 10),
                 None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
             },
-            fds: match fds {
+            fds: match fixture.fds {
                 Some(value) => ScalarObservation::available(value, 10),
                 None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
             },
-            nice: match nice {
+            nice: match fixture.nice {
                 Some(value) => ScalarObservation::available(value, 10),
                 None => ScalarObservation::unavailable(FailureKind::PermissionDenied),
             },
-            cpu_time_secs: observation(cpu_time),
+            cpu_time_secs: observation(fixture.cpu_time),
             ..Default::default()
         })
         .build()
@@ -828,17 +862,26 @@ fn typed_item(
 #[test]
 fn visible_rows_carry_canonical_typed_observations() {
     let procs = vec![
-        typed_item(
-            1,
-            "typed",
-            Some(5.0),
-            Some(4),
-            None,
-            Some(-3),
-            Some(120),
-            Some(200),
-        ),
-        typed_item(2, "denied", None, None, Some(7), None, None, None),
+        typed_item(TypedProcessFixture {
+            pid: 1,
+            name: "typed",
+            cpu: Some(5.0),
+            threads: Some(4),
+            fds: None,
+            nice: Some(-3),
+            cpu_time: Some(120),
+            mem: Some(200),
+        }),
+        typed_item(TypedProcessFixture {
+            pid: 2,
+            name: "denied",
+            cpu: None,
+            threads: None,
+            fds: Some(7),
+            nice: None,
+            cpu_time: None,
+            mem: None,
+        }),
     ];
 
     let rows = canonical_process_rows(&refs(&procs), SortCol::Name, true, &HashSet::new());
@@ -874,27 +917,36 @@ fn visible_rows_carry_canonical_typed_observations() {
 #[test]
 fn typed_sorting_places_unavailable_values_first_ascending_and_last_descending() {
     let procs = vec![
-        typed_item(
-            1,
-            "a",
-            Some(5.0),
-            Some(4),
-            None,
-            Some(-3),
-            Some(120),
-            Some(200),
-        ),
-        typed_item(2, "b", None, None, None, None, None, None),
-        typed_item(
-            3,
-            "c",
-            Some(1.0),
-            Some(1),
-            None,
-            Some(0),
-            Some(60),
-            Some(100),
-        ),
+        typed_item(TypedProcessFixture {
+            pid: 1,
+            name: "a",
+            cpu: Some(5.0),
+            threads: Some(4),
+            fds: None,
+            nice: Some(-3),
+            cpu_time: Some(120),
+            mem: Some(200),
+        }),
+        typed_item(TypedProcessFixture {
+            pid: 2,
+            name: "b",
+            cpu: None,
+            threads: None,
+            fds: None,
+            nice: None,
+            cpu_time: None,
+            mem: None,
+        }),
+        typed_item(TypedProcessFixture {
+            pid: 3,
+            name: "c",
+            cpu: Some(1.0),
+            threads: Some(1),
+            fds: None,
+            nice: Some(0),
+            cpu_time: Some(60),
+            mem: Some(100),
+        }),
     ];
 
     let asc_cpu: Vec<u32> =
@@ -922,26 +974,26 @@ fn typed_sorting_places_unavailable_values_first_ascending_and_last_descending()
 #[test]
 fn canonical_category_root_sums_only_available_members() {
     let procs = vec![
-        typed_item(
-            11,
-            "same-app",
-            Some(10.0),
-            Some(3),
-            None,
-            Some(-5),
-            Some(30),
-            Some(100),
-        ),
-        typed_item(
-            12,
-            "same-app",
-            Some(20.0),
-            None,
-            Some(7),
-            None,
-            None,
-            Some(200),
-        ),
+        typed_item(TypedProcessFixture {
+            pid: 11,
+            name: "same-app",
+            cpu: Some(10.0),
+            threads: Some(3),
+            fds: None,
+            nice: Some(-5),
+            cpu_time: Some(30),
+            mem: Some(100),
+        }),
+        typed_item(TypedProcessFixture {
+            pid: 12,
+            name: "same-app",
+            cpu: Some(20.0),
+            threads: None,
+            fds: Some(7),
+            nice: None,
+            cpu_time: None,
+            mem: Some(200),
+        }),
     ];
 
     let rows = category_tree_rows(

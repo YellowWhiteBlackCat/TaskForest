@@ -1,5 +1,8 @@
 #![cfg(feature = "test-support")]
-#![allow(linker_messages)]
+// `linker_messages` is emitted by rustc when the platform linker prints a
+// warning (an MSVC concern); scope the allow to that environment instead of
+// silencing it everywhere.
+#![cfg_attr(target_env = "msvc", allow(linker_messages))]
 
 #[path = "gui/gpui_behavior.rs"]
 mod gpui_behavior;
