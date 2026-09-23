@@ -343,18 +343,10 @@ fn a_stuck_child_is_killed_at_the_deadline_with_a_typed_timeout() {
 #[cfg(unix)]
 #[test]
 fn a_runaway_stderr_stream_is_capped() {
-    let mut command = Command::new("sh");
-    command
-        .arg("-c")
-        .arg("exec head -c 262144 /dev/zero >&2")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    match run_bounded(&mut command, Duration::from_secs(10)) {
-        Ok(output) => assert_eq!(output.stderr.len(), STREAM_CAP_BYTES),
-        Err(BoundedChildError::Spawn(error)) if error.kind() == io::ErrorKind::NotFound => {
-            eprintln!("skipping: sh is not installed in this lane");
-        }
-        other => panic!("expected a capped completion, got {other:?}"),
-    }
+    // The bounded drain is the guard against a runaway udevadm diagnostic
+    // ballooning this privileged helper. Feed it far more than the cap and
+    // assert it truncates; this observes the production drain directly rather
+    // than through a child process.
+    let drain = spawn_drain(std::io::Cursor::new(vec![0_u8; STREAM_CAP_BYTES * 4]));
+    assert_eq!(finish_drain(Some(drain)).len(), STREAM_CAP_BYTES);
 }

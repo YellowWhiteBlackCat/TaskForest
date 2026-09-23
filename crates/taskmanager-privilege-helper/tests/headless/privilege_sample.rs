@@ -64,9 +64,7 @@ fn sample_with_no_real_pmu_surfaces_open_failure_honestly() {
         cpu: 0,
         engines: vec![XeEngineCfg {
             label: "Render/3D".to_string(),
-            class: 0,
             class_name: "render".to_string(),
-            instance: 0,
             active_config: 0x2,
             total_config: 0x3,
         }],

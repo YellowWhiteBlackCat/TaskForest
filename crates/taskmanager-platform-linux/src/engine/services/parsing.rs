@@ -389,7 +389,7 @@ pub(super) fn extract_openrc_description(name: &str) -> Option<String> {
 /// * Returns `None` for an empty value (after trim + quote strip), letting the
 ///   caller fall back to its default.
 #[cfg(any(test, feature = "test-support"))]
-#[allow(dead_code)]
+#[cfg_attr(any(test, feature = "test-support"), allow(dead_code))]
 pub fn parse_unit_description(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();

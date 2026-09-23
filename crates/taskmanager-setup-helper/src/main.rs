@@ -350,16 +350,13 @@ const DRAIN_GRACE: Duration = Duration::from_secs(2);
 #[cfg(unix)]
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
-/// One bounded child result (see [`run_bounded`]).
+/// One bounded child result (see [`run_bounded`]). The helper consumes only the
+/// exit status; the bounded stderr drain still runs and joins on every path,
+/// but the success path has no diagnostic consumer.
 #[cfg(unix)]
 #[derive(Debug)]
 struct BoundedChildOutput {
     status_code: Option<i32>,
-    /// Retained for symmetry with the timeout path; the success path has no
-    /// diagnostic consumer, so the drained bytes stay unread by design (the
-    /// drain thread must be joined either way).
-    #[allow(dead_code)]
-    stderr: Vec<u8>,
 }
 
 /// Typed bounded-run failure. This standalone root binary must not depend on
@@ -390,10 +387,12 @@ fn run_bounded(
     let mut child = command.spawn().map_err(BoundedChildError::Spawn)?;
     let stderr_drain = child.stderr.take().map(spawn_drain);
     match wait_with_deadline(&mut child, timeout) {
-        Ok(status_code) => Ok(BoundedChildOutput {
-            status_code,
-            stderr: finish_drain(stderr_drain),
-        }),
+        Ok(status_code) => {
+            // Join the bounded stderr drain on the success path too, but
+            // discard its bytes: only the timeout path reports partial stderr.
+            let _ = finish_drain(stderr_drain);
+            Ok(BoundedChildOutput { status_code })
+        }
         Err(error) if error.kind() == io::ErrorKind::TimedOut => {
             let _ = child.kill();
             let _ = child.wait();

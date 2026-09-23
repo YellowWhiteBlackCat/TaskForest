@@ -31,23 +31,6 @@ impl ControlCommandRunner for NativeControlCommandRunner {
 }
 
 impl ServiceManager {
-    /// Ask the active systemd manager to rescan unit files after an external
-    /// unit change. This is deliberately separate from per-unit lifecycle
-    /// actions: `daemon-reload` targets the manager, never a service name, and
-    /// is unsupported on OpenRC/non-Linux supervisors.
-    #[allow(dead_code)]
-    pub fn reload_daemon() -> Result<(), ProviderFailure> {
-        #[cfg(target_os = "linux")]
-        {
-            let mut runner = NativeControlCommandRunner;
-            reload_daemon_with(Self::detect_init(), &mut runner)
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            Err(ProviderFailure::Unsupported)
-        }
-    }
-
     pub fn control_service(
         target: &ServiceId,
         action: ServiceAction,
@@ -67,7 +50,8 @@ impl ServiceManager {
     }
 }
 
-#[allow(dead_code)]
+#[cfg(any(test, feature = "test-support"))]
+#[cfg_attr(feature = "test-support", allow(dead_code))]
 fn reload_daemon_with(
     detected: Result<InitSystem, FailureKind>,
     runner: &mut impl ControlCommandRunner,

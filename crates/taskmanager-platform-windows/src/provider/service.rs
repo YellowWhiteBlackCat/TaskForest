@@ -55,7 +55,6 @@ const SERVICE_LOG_CHANNEL: &str = "System";
 const SERVICE_LOG_SNAPSHOT_LIMIT: usize = 50;
 /// Largest follow batch — mirrors the Linux stream lane's bounded increment.
 #[cfg(windows)]
-#[allow(dead_code)]
 const SERVICE_LOG_STREAM_LIMIT: usize = 200;
 /// Display bound for one formatted log line.
 #[cfg(any(windows, test))]
@@ -491,7 +490,6 @@ pub struct WinServiceLogStreamProvider;
 /// entry. Anything else is a stale or foreign cursor and is reported as an
 /// identity change instead of replaying or guessing.
 #[cfg(any(windows, test))]
-#[allow(dead_code)]
 fn parse_stream_cursor(after_cursor: Option<&str>) -> Result<Option<u64>, ProviderFailure> {
     after_cursor
         .map(str::parse::<u64>)
@@ -563,7 +561,6 @@ fn truncated_line(line: String) -> String {
 /// Map bounded native entries to the structured stream contract; the cursor
 /// is the event record id string. Pure so the mapping is testable off-Windows.
 #[cfg(any(windows, test))]
-#[allow(dead_code)]
 fn event_log_entries(
     entries: Vec<taskmanager_windows_api::WindowsEventLogEntry>,
 ) -> Vec<ServiceLogEntry> {

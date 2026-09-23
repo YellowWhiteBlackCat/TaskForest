@@ -59,10 +59,10 @@ fn windows_service_log_snapshot(
     Ok(ServiceLogState::from_lines(event_log_lines(&entries)))
 }
 
-// Dead until the registration swap in `provider.rs` (integrator-owned)
-// constructs `WinServiceLogStreamProvider` in production.
+// Reached through the registered `ServiceLogStreamProvider` impl above:
+// `WinServiceProviders::into_runtime` binds its `stream` method in
+// `provider.rs`.
 #[cfg(windows)]
-#[allow(dead_code)]
 fn windows_service_log_stream(
     query: &ServiceLogQuery,
     observed_at_ms: u64,
