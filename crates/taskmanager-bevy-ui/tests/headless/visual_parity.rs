@@ -126,6 +126,13 @@ fn icon_plates_build_and_stamp_onto_spawned_scenes() {
         bevy::asset::Handle::default(),
         "the stamp observer resolved the bitmap handle"
     );
+    // The tofu law is a behavior here, not a source-text scan: an icon entity
+    // mounts a bitmap plate and never a text glyph, so no font can render a
+    // missing-codepoint box in an icon position.
+    assert!(
+        world.get::<bevy::ui::widget::Text>(entity).is_none(),
+        "an icon entity must never carry a text glyph"
+    );
 }
 
 #[test]
