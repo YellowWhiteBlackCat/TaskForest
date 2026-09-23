@@ -242,34 +242,53 @@ pub(crate) struct GraphSceneCache {
     spark: Vec<SparkSceneEntry>,
 }
 
+/// One frame's graph-paint context: the scene store, the gpui paint surface,
+/// the canvas bounds, and the geometry options + slide translation shared by
+/// the static grid, dynamic series, and value-badge passes. Bundled because
+/// every pass needs the same six values, and threading them individually put
+/// each painter past the argument budget.
+pub(super) struct GraphPaintContext<'a> {
+    /// Cross-frame scene store the pass reads and writes.
+    pub(super) cache: &'a mut GraphSceneCache,
+    /// gpui paint surface.
+    pub(super) window: &'a mut Window,
+    /// gpui app context (needed to shape the value-badge text).
+    pub(super) cx: &'a mut App,
+    /// Canvas bounds in window space.
+    pub(super) bounds: Bounds<Pixels>,
+    /// Geometry, scale, and badge options.
+    pub(super) opts: GraphOpts,
+    /// Horizontal slide translation for the in-flight refresh animation.
+    pub(super) slide_offset: Pixels,
+}
+
+/// One series' dynamic paint inputs: the (window-limited) samples identity,
+/// the series color, and the resolved area fill. Bundled so the dynamic
+/// painter takes a series as one value rather than three loose ones.
+struct GraphSeriesInk<'a> {
+    /// Window-limited sample series.
+    samples: &'a Rc<[f32]>,
+    /// Series color (the family token, or the secondary's lifted tint).
+    base: Rgba,
+    /// Resolved area fill background.
+    fill: Background,
+}
+
 /// Paint a graph through the replay cache: rebuild only when the samples
 /// identity, bounds, colors, or geometry-relevant options changed since the
 /// entry was stored; otherwise replay the stored paths. Static grid/fill
 /// geometry is looked up separately so a data revision only rebuilds the
 /// dynamic paths.
-#[allow(clippy::too_many_arguments)]
-pub(super) fn paint_graph_scene(
-    cache: &mut GraphSceneCache,
-    window: &mut Window,
-    cx: &mut App,
-    bounds: Bounds<Pixels>,
-    samples: &Rc<[f32]>,
-    base: Rgba,
-    opts: GraphOpts,
-    slide_offset: Pixels,
-) {
-    let fill = paint_graph_static_scene(cache, window, bounds, base, opts);
+pub(super) fn paint_graph_scene(mut ctx: GraphPaintContext<'_>, samples: &Rc<[f32]>, base: Rgba) {
+    let fill = paint_graph_static_scene(ctx.cache, ctx.window, ctx.bounds, base, ctx.opts);
     paint_graph_dynamic_series(
-        cache,
-        window,
-        cx,
-        bounds,
-        samples,
-        base,
-        opts,
-        fill,
+        &mut ctx,
+        GraphSeriesInk {
+            samples,
+            base,
+            fill,
+        },
         SeriesSlot::Primary,
-        slide_offset,
         Some(BadgeRequest::Value),
     );
 }
@@ -284,30 +303,21 @@ pub(super) fn paint_graph_scene(
 /// composes BOTH directions' newest values when both series carry labels
 /// (see [`compose_badge_text`], mirroring iced's `readout_text`), so a
 /// read/write or rx/tx graph never shows only one direction's current value.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn paint_graph_dual_scene(
-    cache: &mut GraphSceneCache,
-    window: &mut Window,
-    cx: &mut App,
-    bounds: Bounds<Pixels>,
+    mut ctx: GraphPaintContext<'_>,
     primary: &DualGraphSeries<'_>,
     secondary: &DualGraphSeries<'_>,
-    opts: GraphOpts,
-    slide_offset: Pixels,
 ) {
-    let fill = paint_graph_static_scene(cache, window, bounds, primary.base, opts);
-    let secondary_fill = graph_fill_background(secondary.base, opts);
+    let fill = paint_graph_static_scene(ctx.cache, ctx.window, ctx.bounds, primary.base, ctx.opts);
+    let secondary_fill = graph_fill_background(secondary.base, ctx.opts);
     paint_graph_dynamic_series(
-        cache,
-        window,
-        cx,
-        bounds,
-        secondary.samples,
-        secondary.base,
-        opts,
-        secondary_fill,
+        &mut ctx,
+        GraphSeriesInk {
+            samples: secondary.samples,
+            base: secondary.base,
+            fill: secondary_fill,
+        },
         SeriesSlot::Secondary,
-        slide_offset,
         None,
     );
     let directions = match (primary.label, secondary.label) {
@@ -325,41 +335,39 @@ pub(super) fn paint_graph_dual_scene(
         .map(BadgeRequest::Directions)
         .or(Some(BadgeRequest::Value));
     paint_graph_dynamic_series(
-        cache,
-        window,
-        cx,
-        bounds,
-        primary.samples,
-        primary.base,
-        opts,
-        fill,
+        &mut ctx,
+        GraphSeriesInk {
+            samples: primary.samples,
+            base: primary.base,
+            fill,
+        },
         SeriesSlot::Primary,
-        slide_offset,
         badge,
     );
 }
 
 /// Look up (or build and store) ONE series' dynamic scene and paint it,
-/// translated by `slide_offset` when the slide animation is in progress.
-/// `badge` limits the value badge to the series that owns the pill and
-/// selects between the single-value and two-direction readouts.
-#[allow(clippy::too_many_arguments)]
+/// translated by the context's `slide_offset` when the slide animation is in
+/// progress. `badge` limits the value badge to the series that owns the pill
+/// and selects between the single-value and two-direction readouts.
 fn paint_graph_dynamic_series(
-    cache: &mut GraphSceneCache,
-    window: &mut Window,
-    cx: &mut App,
-    bounds: Bounds<Pixels>,
-    samples: &Rc<[f32]>,
-    base: Rgba,
-    opts: GraphOpts,
-    fill: Background,
+    ctx: &mut GraphPaintContext<'_>,
+    ink: GraphSeriesInk<'_>,
     series: SeriesSlot,
-    slide_offset: Pixels,
     badge: Option<BadgeRequest<'_>>,
 ) {
+    let GraphSeriesInk {
+        samples,
+        base,
+        fill,
+    } = ink;
+    let bounds = ctx.bounds;
+    let opts = ctx.opts;
+    let slide_offset = ctx.slide_offset;
+    let value_badge = opts.value_badge;
     let scene_key = GraphSceneKey::for_series(samples, bounds, base, opts, series);
     let key = scene_key.dynamic_key();
-    let store = &mut cache.dynamic;
+    let store = &mut ctx.cache.dynamic;
     let index = match store
         .iter()
         .position(|entry| entry.key == key && Rc::ptr_eq(&entry.samples, samples))
@@ -385,21 +393,21 @@ fn paint_graph_dynamic_series(
     };
     let entry = &mut store[index];
     if slide_offset == px(0.0) {
-        entry.geometry.paint(window);
+        entry.geometry.paint(ctx.window);
     } else {
         entry
             .geometry
-            .paint_translated(window, Point::new(slide_offset, px(0.0)));
+            .paint_translated(ctx.window, Point::new(slide_offset, px(0.0)));
     }
-    if let Some(request) = badge.filter(|_| opts.value_badge) {
+    if let Some(request) = badge.filter(|_| value_badge) {
         let directions = match request {
             BadgeRequest::Value => None,
             BadgeRequest::Directions(directions) => Some(directions),
         };
-        let font_size = window.text_style().font_size;
+        let font_size = ctx.window.text_style().font_size;
         draw_value_badge(
-            window,
-            cx,
+            ctx.window,
+            ctx.cx,
             BadgePaintInputs {
                 bounds,
                 samples: samples.as_ref(),

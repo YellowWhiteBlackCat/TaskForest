@@ -13,7 +13,7 @@ use taskmanager_ui_contract::IconId;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::graph::{
-    GraphCacheHandle, GraphHover, GraphOpts, graph_element_hover, graph_hover,
+    GraphCacheHandle, GraphHover, GraphHoverElement, GraphOpts, graph_element_hover, graph_hover,
 };
 use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
 use crate::gpui_app::root::{RootView, TopPage};
@@ -444,22 +444,22 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         )
         .child(elements::graph_card_with_state(
             theme,
-            graph_element_hover(
-                history_graph_id(metric),
-                history_graph_id(metric),
-                std::rc::Rc::clone(&samples),
-                taskmanager_ui::theme_binding::rgba(color),
-                GraphOpts {
+            graph_element_hover(GraphHoverElement {
+                id: history_graph_id(metric).into(),
+                slide_key: history_graph_id(metric).into(),
+                samples: std::rc::Rc::clone(&samples),
+                base: taskmanager_ui::theme_binding::rgba(color),
+                opts: GraphOpts {
                     max: max.max(1.0),
                     gradient_fill: true,
                     ref_lines: true,
                     smooth: true,
                     ..GraphOpts::default()
                 },
-                metric_hover_format(unit),
-                hover_slot,
-                graph_cache,
-            ),
+                format_value: metric_hover_format(unit),
+                slot: hover_slot,
+                cache: graph_cache,
+            }),
             &samples,
         ))
 }

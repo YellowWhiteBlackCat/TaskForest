@@ -302,20 +302,42 @@ fn details_section_tabs(
     row
 }
 
+/// One Properties-dialog 60-second history graph: the row's display metadata
+/// (label, current/peak/unit strings), the raw sample series, the sparkline
+/// color, and the cross-frame graph cache.
+struct PropHistoryGraphProps<'a> {
+    /// Active theme.
+    theme: &'a Theme,
+    /// Row label (e.g. "CPU", "Memory").
+    label: &'a str,
+    /// Formatted current value.
+    current: String,
+    /// Formatted peak value.
+    peak: String,
+    /// Display unit label (e.g. "%", "B", bytes-per-second).
+    unit: &'a str,
+    /// Raw 60-second sample series feeding the sparkline.
+    samples: &'a std::rc::Rc<[f32]>,
+    /// Sparkline stroke color.
+    color: Rgba,
+    /// Cross-frame graph scene cache.
+    graph_cache: GraphCacheHandle,
+}
+
 /// One full-width 60-second resource graph with explicit current, peak, and
 /// unit metadata. Values are formatted by the caller while the original f32
 /// series feeds the sparkline unchanged.
-#[allow(clippy::too_many_arguments)]
-fn prop_history_graph(
-    t: &Theme,
-    label: &str,
-    current: String,
-    peak: String,
-    unit: &str,
-    samples: &std::rc::Rc<[f32]>,
-    color: Rgba,
-    graph_cache: GraphCacheHandle,
-) -> Div {
+fn prop_history_graph(props: PropHistoryGraphProps<'_>) -> Div {
+    let PropHistoryGraphProps {
+        theme: t,
+        label,
+        current,
+        peak,
+        unit,
+        samples,
+        color,
+        graph_cache,
+    } = props;
     div()
         .flex()
         .flex_col()
@@ -481,49 +503,49 @@ fn details_performance(
         .gap(taskmanager_ui::theme_binding::definite_length(
             tokens::SPACE_6,
         ))
-        .child(prop_history_graph(
-            t,
-            i18n::t("common.cpu"),
-            vm_display(&vm, ProcessDetailsField::Cpu),
-            peaks.cpu,
-            "%",
-            &histories.cpu,
-            taskmanager_ui::theme_binding::rgba(t.cpu),
-            graph_cache.clone(),
-        ))
-        .child(prop_history_graph(
-            t,
-            i18n::t("common.memory"),
-            vm_display(&vm, ProcessDetailsField::Memory),
-            peaks.memory,
+        .child(prop_history_graph(PropHistoryGraphProps {
+            theme: t,
+            label: i18n::t("common.cpu"),
+            current: vm_display(&vm, ProcessDetailsField::Cpu),
+            peak: peaks.cpu,
+            unit: "%",
+            samples: &histories.cpu,
+            color: taskmanager_ui::theme_binding::rgba(t.cpu),
+            graph_cache: graph_cache.clone(),
+        }))
+        .child(prop_history_graph(PropHistoryGraphProps {
+            theme: t,
+            label: i18n::t("common.memory"),
+            current: vm_display(&vm, ProcessDetailsField::Memory),
+            peak: peaks.memory,
             // The tiered neutral ladder carries its own magnitude unit
             // (KiB/MiB/GiB), so the legend shows the family's base unit the
             // way the CPU graph shows "%".
-            "B",
-            &histories.memory,
-            taskmanager_ui::theme_binding::rgba(t.memory),
-            graph_cache.clone(),
-        ))
-        .child(prop_history_graph(
-            t,
-            i18n::t("proc.disk_read"),
-            vm_display(&vm, ProcessDetailsField::DiskReadRate),
-            peaks.disk_read,
-            i18n::t("prop.bytes_per_second"),
-            &histories.disk_read,
-            taskmanager_ui::theme_binding::rgba(t.disk),
-            graph_cache.clone(),
-        ))
-        .child(prop_history_graph(
-            t,
-            i18n::t("proc.disk_write"),
-            vm_display(&vm, ProcessDetailsField::DiskWriteRate),
-            peaks.disk_write,
-            i18n::t("prop.bytes_per_second"),
-            &histories.disk_write,
-            taskmanager_ui::theme_binding::rgba(t.disk),
+            unit: "B",
+            samples: &histories.memory,
+            color: taskmanager_ui::theme_binding::rgba(t.memory),
+            graph_cache: graph_cache.clone(),
+        }))
+        .child(prop_history_graph(PropHistoryGraphProps {
+            theme: t,
+            label: i18n::t("proc.disk_read"),
+            current: vm_display(&vm, ProcessDetailsField::DiskReadRate),
+            peak: peaks.disk_read,
+            unit: i18n::t("prop.bytes_per_second"),
+            samples: &histories.disk_read,
+            color: taskmanager_ui::theme_binding::rgba(t.disk),
+            graph_cache: graph_cache.clone(),
+        }))
+        .child(prop_history_graph(PropHistoryGraphProps {
+            theme: t,
+            label: i18n::t("proc.disk_write"),
+            current: vm_display(&vm, ProcessDetailsField::DiskWriteRate),
+            peak: peaks.disk_write,
+            unit: i18n::t("prop.bytes_per_second"),
+            samples: &histories.disk_write,
+            color: taskmanager_ui::theme_binding::rgba(t.disk),
             graph_cache,
-        ))
+        }))
 }
 
 fn details_command(

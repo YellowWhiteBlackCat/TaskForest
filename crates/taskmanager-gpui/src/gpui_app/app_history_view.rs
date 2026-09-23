@@ -288,15 +288,18 @@ fn header_row(
     columns: AppHistoryColumns,
 ) -> Div {
     row_skeleton(
-        theme,
-        i18n::t("common.name"),
-        i18n::t("history.application.peak_cpu"),
-        i18n::t("history.application.peak_memory"),
-        i18n::t("history.application.peak_processes"),
+        HistoryRowSpec {
+            theme,
+            ui_size,
+            columns,
+            is_header: true,
+            name: i18n::t("common.name"),
+            verified: true,
+            process_count: i18n::t("history.application.peak_processes"),
+            cpu: i18n::t("history.application.peak_cpu"),
+            memory: i18n::t("history.application.peak_memory"),
+        },
         i18n::t("proc.trend"),
-        true,
-        ui_size,
-        columns,
     )
 }
 
@@ -358,16 +361,18 @@ fn row_for_projected(
             format!("{:.0}", value.round())
         });
     let mut rendered = row_skeleton_with_count(
-        theme,
-        &row.name,
-        row.verified,
-        &count,
-        &cpu,
-        &memory,
+        HistoryRowSpec {
+            theme,
+            ui_size,
+            columns,
+            is_header: false,
+            name: &row.name,
+            verified: row.verified,
+            process_count: &count,
+            cpu: &cpu,
+            memory: &memory,
+        },
         trend_cell_from_samples(theme, &row.cpu_samples, ui_size, graph_cache),
-        false,
-        ui_size,
-        columns,
     );
     if row_index % 2 == 1 {
         rendered = rendered.bg(taskmanager_ui::theme_binding::fill(theme.zebra_bg()));
@@ -403,21 +408,43 @@ fn trend_cell_from_samples(
     }
 }
 
-// The skeleton's cell set mirrors the table's visible-column contract
-// one-to-one; folding cells into a struct would hide that mapping.
-#[allow(clippy::too_many_arguments)]
-fn row_skeleton_with_count(
-    theme: &Theme,
-    name: &str,
-    verified: bool,
-    process_count: &str,
-    cpu: &str,
-    memory: &str,
-    trend: Div,
-    is_header: bool,
+/// One app-history table row's shared render inputs: the table chrome (theme,
+/// ambient UI size, visible columns, header flag) plus the formatted name and
+/// peak-metric cells. The trend cell is passed separately because the header
+/// renders a text label while a data row renders a sparkline element.
+struct HistoryRowSpec<'a> {
+    /// Active theme (cell colors, zebra/border surfaces, palette).
+    theme: &'a Theme,
+    /// Ambient UI size selecting the header vs body font sizes.
     ui_size: taskmanager_theme::tokens::UiSize,
+    /// Which metric columns the table currently shows.
     columns: AppHistoryColumns,
-) -> Div {
+    /// Header styling (dim + bold + sidebar background) vs data-row styling.
+    is_header: bool,
+    /// Row name; the header row carries the name-column label here.
+    name: &'a str,
+    /// Whether the application identity is verified (data rows only).
+    verified: bool,
+    /// Formatted process-peak cell.
+    process_count: &'a str,
+    /// Formatted peak-CPU cell.
+    cpu: &'a str,
+    /// Formatted peak-memory cell.
+    memory: &'a str,
+}
+
+fn row_skeleton_with_count(spec: HistoryRowSpec<'_>, trend: Div) -> Div {
+    let HistoryRowSpec {
+        theme,
+        ui_size,
+        columns,
+        is_header,
+        name,
+        verified,
+        process_count,
+        cpu,
+        memory,
+    } = spec;
     let background = if is_header {
         theme.sidebar_bg
     } else {
@@ -502,19 +529,8 @@ fn row_skeleton_with_count(
 }
 
 // Same cell-per-visible-column mapping as [`row_skeleton_with_count`].
-#[allow(clippy::too_many_arguments)]
-fn row_skeleton(
-    theme: &Theme,
-    name: &str,
-    cpu: &str,
-    memory: &str,
-    process_count: &str,
-    trend: &str,
-    is_header: bool,
-    ui_size: taskmanager_theme::tokens::UiSize,
-    columns: AppHistoryColumns,
-) -> Div {
-    let weight = if is_header {
+fn row_skeleton(spec: HistoryRowSpec<'_>, trend: &str) -> Div {
+    let weight = if spec.is_header {
         tokens::FONT_WEIGHT_BOLD
     } else {
         tokens::FONT_WEIGHT_NORMAL
@@ -523,27 +539,16 @@ fn row_skeleton(
         .w(px(TREND_W))
         .min_w(px(0.0))
         .text_size(taskmanager_ui::theme_binding::absolute(
-            ui_size.header_font_size(),
+            spec.ui_size.header_font_size(),
         ))
-        .text_color(taskmanager_ui::theme_binding::hsla(if is_header {
-            theme.fg_dim
+        .text_color(taskmanager_ui::theme_binding::hsla(if spec.is_header {
+            spec.theme.fg_dim
         } else {
-            theme.fg
+            spec.theme.fg
         }))
         .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
         .child(trend.to_owned());
-    row_skeleton_with_count(
-        theme,
-        name,
-        true,
-        process_count,
-        cpu,
-        memory,
-        trend_label,
-        is_header,
-        ui_size,
-        columns,
-    )
+    row_skeleton_with_count(spec, trend_label)
 }
 
 fn fixed_cell(
