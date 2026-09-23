@@ -699,6 +699,20 @@ order, each requiring its own decision:
   vocabulary. The side table exists only because the Rust consumer of
   `feature_evidence.tsv` accepts exactly five columns; if the two ever
   disagree, the primary table is the authority.
+- An interaction row carries **one** anchor, so its `paths` tokens must describe
+  what that anchor really drives. A terminal shape whose click only selects (it
+  never toggles, hovers or drags) must not claim `pointer` on a toggle or
+  projection case: TUI's pointer path is anchored by its own case
+  (`mc00-tui-nav-click`), and the toggle/aggregate rows carry `success`/
+  `success|toggle` only.
+- Two interaction anchors record a deliberate evidence form rather than a
+  missing one: `bev-tofu-law` anchors the spawned-icon scene (a bitmap
+  `ImageNode` with no text glyph — the behavior the tofu law protects), while
+  the source-codepoint scan stays in the suite as a static guard rather than an
+  anchor; `iced mc03-icons` anchors the shared asset registry because iced's
+  `icon()` returns an `Element` with no headless readback. Neither is a
+  fabricated anchor, and both are recorded here so a reader does not mistake
+  them for behavioral frame evidence.
 
 ## Local gate route
 

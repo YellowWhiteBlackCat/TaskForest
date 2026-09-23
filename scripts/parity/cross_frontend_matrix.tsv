@@ -161,7 +161,7 @@ interaction	bev-table-search-display	bevy	-	lib	pages::processes::tests::the_sea
 interaction	bev-icon-plates	bevy	-	lib	visual_parity_tests::every_drawn_icon_resolves_to_a_correctly_sized_bitmap	identity|render|success	-	identity	
 interaction	bev-icon-stamp	bevy	-	lib	visual_parity_tests::icon_plates_build_and_stamp_onto_spawned_scenes	render|lifecycle|success	-	render	
 interaction	bev-nav-vocabulary	bevy	-	lib	visual_parity_tests::the_nav_tab_set_is_the_shared_page_vocabulary_onto_shared_icons	route|identity|success	-	route	
-interaction	bev-tofu-law	bevy	-	lib	visual_parity_tests::source_carries_no_decoration_codepoints_in_code_position	render|identity|failure	-	render	
+interaction	bev-tofu-law	bevy	-	lib	visual_parity_tests::icon_plates_build_and_stamp_onto_spawned_scenes	render|identity|failure	-	render	
 interaction	bev-bounded-lines	bevy	-	lib	visual_parity_tests::bounded_fact_lines_carry_the_single_line_contract	render|layout|success	-	render	
 interaction	bev-sort-indicator	bevy	-	lib	widgets::table::tests::the_sort_indicator_rests_on_exactly_one_column_with_a_typed_direction	projection|render|success	-	projection	
 interaction	bev-log-open-selected	bevy	-	lib	pages::services::service_logs_tests::the_open_affordance_targets_the_selected_service_and_submits_one_follow	render|selection|success	-	render	
@@ -185,9 +185,9 @@ interaction	mc02-tui-smart-gate	tui	P0-MC-02	lib	runtime::tests::smart_self_test
 interaction	mc02-tui-scan-cancel	tui	P0-MC-02	lib	runtime::tests::directory_usage::d_while_scanning_yields_directory_usage_cancel_for_the_active_scan_id	cancel	-	cancel	
 interaction	mc02-tui-directory-usage	tui	P0-MC-02	lib	ui::tests::directory_usage_render::directory_usage_renders_measured_entries_status_and_totals_when_projected	success	-	success	
 interaction	mc02-tui-hotplug	tui	P0-MC-02	lib	identity_tests::disk_hot_unplug_falls_back_to_the_first_still_backed_resource	failure|lifecycle|recovery	-	failure	
-interaction	mc03-tui-tree-toggle	tui	P0-MC-03	lib	runtime::tests::group_view::enter_and_right_toggle_the_category_header	success|pointer|toggle	-	success	
+interaction	mc03-tui-tree-toggle	tui	P0-MC-03	lib	runtime::tests::group_view::enter_and_right_toggle_the_category_header	success|toggle	-	success	
 interaction	mc03-tui-tree-collapse	tui	P0-MC-03	lib	process_view::tests::collapsing_a_process_node_hides_its_recursive_subtree	success|toggle	-	success	
-interaction	mc03-tui-app-aggregate	tui	P0-MC-03	lib	process_view::tests::application_aggregate_is_pidless_but_process_children_keep_identity	success|pointer	-	success	
+interaction	mc03-tui-app-aggregate	tui	P0-MC-03	lib	process_view::tests::application_aggregate_is_pidless_but_process_children_keep_identity	success	-	success	
 interaction	mc03-tui-search-focus	tui	P0-MC-03	lib	runtime::tests::search_match::enter_with_an_active_search_jumps_to_the_next_matching_row	success|keyboard|focus	-	success	
 interaction	mc03-tui-search-clear	tui	P0-MC-03	lib	runtime::tests::search_match::esc_clears_the_query_first_then_closes_the_field	cancel|keyboard	-	cancel	
 interaction	mc03-tui-swap-truth	tui	P0-MC-03	lib	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	success|failure	-	success	
