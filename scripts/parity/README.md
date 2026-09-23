@@ -39,10 +39,15 @@ against real test discovery.
   carries the per-frontend interaction matrices as one list with a `frontend`
   dimension, including the **TUI rows that never had a per-frontend matrix**
   (anchors declared by hand against real `cargo nextest list` discovery; cases
-  without a discoverable anchor are marked `pending`). The original
+  without a discoverable anchor are marked `pending`). It is the structural
+  authority for the interaction contract: the Rust GPUI projection gate
+  (`tests/logic/gpui_interaction_matrix_test.rs`) reads this file (filtered to
+  `frontend == "gpui"`) and the Rust `ContractTag` conformance reads its
+  `contract_tag`/`paths` columns. The original
   `scripts/{gpui,iced,bevy}_interaction_matrix.tsv` stay committed as
-  **compatibility views** (read by the existing accept scripts and validators)
-  until the S5 retirement wave moves those callers.
+  **compatibility views** read only by the accept chain (the GPUI accept script
+  and its per-target receipt validator) until the S5 retirement wave deletes
+  them in one cutover.
 - `resolve_frontend_evidence.py` — Layer B resolver. It compares declared
   `behavior` anchors with `cargo nextest list` output and fails on dangling
   anchors (R4) or target/frontend mismatches (R6). With `--interaction-matrix`
@@ -442,6 +447,37 @@ deleted interaction anchor is `dangling`). The old per-frontend matrices stay
 authoritative for the accept scripts until the S5 retirement wave moves those
 callers; the gate no longer waits for that wave to check the unified list.
 
+### Structural authority and the GPUI per-target receipt (D6 phases 1-2)
+
+The interaction contract's structural rules now have exactly one address each,
+and none of them is a per-frontend Python validator:
+
+- **Row well-formedness** (schema, `subject_kind`, `frontend`, `target`,
+  `contract_tag == first paths token`, `(frontend, case_id)` uniqueness) is
+  enforced by `read_interaction_matrix` in the resolver, fail-closed.
+- **Token vocabulary** is enforced by the Rust `ContractTag` conformance test
+  over this matrix's `contract_tag` and `paths` columns; the GPUI projection
+  gate additionally pins the stricter interaction subset its rows must stay
+  inside.
+- **GPUI projection rules** (pinned row count, interaction path vocabulary,
+  stable lowercase kebab-case case-id discipline, requirement coverage,
+  capture-scenario membership) are enforced by
+  `tests/logic/gpui_interaction_matrix_test.rs`, which now reads
+  `cross_frontend_matrix.tsv` filtered to `frontend == "gpui"`. It no longer
+  reads `scripts/gpui_interaction_matrix.tsv`; the per-frontend file stays in
+  place for the accept chain only.
+- **Anchor resolution** (including the GPUI stable case-prefix channel) is
+  enforced by the resolver against `cargo nextest list`.
+
+`scripts/validate_gpui_interaction_matrix.py` therefore keeps only the one
+guarantee no other check owns: **every discovered GPUI interaction anchor ran to
+`ok` in its own nextest target (`gui` or `lib`)**. A flat discovery set cannot
+prove target ownership, so the accept script passes the two target discovery
+artifacts and the two run logs separately. Its former structural rules and
+`ALLOWED_PATHS` copy are gone, and it no longer takes `--requirements` or
+`--capture-matrix`. The unregistered-tagged-test completeness scan stays with
+the receipt because the resolver does not own it (see "S5 status" below).
+
 ### Transition semantics before S5 (D3/D4)
 
 Two unified-matrix conventions are declared here as the accepted **transition
@@ -709,19 +745,25 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   stay routed while they remain compatibility assets, so the new wiring can
   never be weaker than the assets it is replacing.
 
-### S5 status and remaining steps (W23-B)
+### S5 status and remaining steps (W23-B; D6 phases 1-2 delivered 2026-09-23)
 
 Delivered: (S5-1) the unified driver is committed and the GPUI/Bevy interaction
 stages of `local-gates.sh` run it; (S4) the unified matrix is the resolver's
 declaration source; (W11-C) the gate consumes the unified matrix; (W23-B) the
-feature co-anchor side table closes the cross-anchor record. Remaining, in
-order, each requiring its own decision:
+feature co-anchor side table closes the cross-anchor record; (D6 phase 1) the
+Rust GPUI projection gate reads the unified matrix, not the per-frontend view;
+(D6 phase 2) the GPUI validator's structural rules and `ALLOWED_PATHS` copy are
+folded into the authoritative sources, leaving only the per-target `ok`-event
+receipt. Remaining, in order, each requiring its own decision:
 
-1. **D6 window**: retire the three per-frontend matrices and the embedded
-   validators (`validate_gpui_interaction_matrix.py` structure rules, the
-   Iced/Bevy in-script validators), migrate `scripts/windows/local-gates.sh`
-   off the legacy gate, and delete the compatibility views in one cutover
-   (AGENTS forbids a standing second address).
+1. **D6 window (phases 3-6)**: switch the GPUI accept chain to the unified
+   matrix, delete the three per-frontend matrices and the now-receipt-only GPUI
+   validator (plus the Iced/Bevy in-script validators), migrate
+   `scripts/windows/local-gates.sh` off the legacy gate (needs a Windows host),
+   and delete the compatibility views in one cutover (AGENTS forbids a standing
+   second address). After phases 1-2 the compatibility views are read only by
+   the accept chain, so nothing but the per-target receipt's matrix source
+   blocks the deletion.
 2. **D1 (resolved as partial mapping + exemption)**: the genuine Bevy rows are
    declared (bevy 4/8). The remaining work is the four exempt pairs: declare new
    cases anchored to the real Performance/disk/GPU/settings Bevy tests, or keep
@@ -731,7 +773,10 @@ order, each requiring its own decision:
    rows get hand-verified explicit `test_name` ids.
 4. **Target ownership**: teach the resolver (or the driver) to carry the
    `gui`/`lib` target of each discovery artifact so a cross-target rename
-   cannot pass on a flat discovery set.
+   cannot pass on a flat discovery set. Until then the GPUI validator's
+   per-target receipt is the only target-ownership guarantee (D6 phase 2 kept
+   it for exactly this reason), and the unregistered-tagged-test completeness
+   scan stays with it because the resolver does not own that rule.
 5. **Co-anchor fold-in**: when a `crates/**` window can change the Rust
    consumer, fold `feature_evidence_co_anchors.tsv` into
    `feature_evidence.tsv` as a sixth column in one cutover (consumer, resolver,

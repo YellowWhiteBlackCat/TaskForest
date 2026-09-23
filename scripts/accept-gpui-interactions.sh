@@ -83,10 +83,11 @@ timeout --kill-after=10s 20m cargo nextest list --locked --profile ci \
     -p taskmanager-gpui --lib \
     --message-format json >"$RUN_DIR/lib-list.json"
 
+# Structural authority lives in the unified matrix, the Rust `ContractTag`
+# conformance and the Rust GPUI projection gate; this validator keeps only the
+# per-target (`gui`/`lib`) `ok`-event receipt.
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
     --matrix scripts/gpui_interaction_matrix.tsv \
-    --requirements scripts/interaction_requirements.tsv \
-    --capture-matrix scripts/capture_scenarios.tsv \
     --gui-list "$RUN_DIR/gui-list.json" \
     --lib-list "$RUN_DIR/lib-list.json" \
     --receipt "$RUN_DIR/matrix-validation.json"
@@ -105,8 +106,6 @@ run_nextest "$RUN_DIR/lib-run.log" -p taskmanager-gpui --lib
 
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
     --matrix scripts/gpui_interaction_matrix.tsv \
-    --requirements scripts/interaction_requirements.tsv \
-    --capture-matrix scripts/capture_scenarios.tsv \
     --gui-list "$RUN_DIR/gui-list.json" \
     --lib-list "$RUN_DIR/lib-list.json" \
     --run-log "$RUN_DIR/gui-run.log" \
