@@ -51,7 +51,7 @@ use taskmanager_platform_contract::{
     SubmissionError,
 };
 
-use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::{MISSING_VALUE, cpu_thermal_throttle_summary};
 use taskmanager_shell::{ShellApp, demo_app};
 use taskmanager_theme::Theme;
 
@@ -330,11 +330,12 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
 }
 
 /// The `power.thermal-throttle-events` delivery: the Performance CPU
-/// diagnostic strip renders the cumulative package/per-core trigger counters
-/// per package from the shared projection. The mounted row keeps the shared
-/// dash while no package observed a counter (never a fabricated 0); a folded
-/// package observation rewrites the mounted text; an unobserved sibling
-/// counter stays a labeled dash.
+/// diagnostic strip renders the shared
+/// [`cpu_thermal_throttle_summary`] fold (whose exact value form — per-package
+/// segments including the labeled dash for an unobserved sibling counter,
+/// never a fabricated zero — is pinned once by the shell rule test). The
+/// mounted row keeps the shared dash while no package observed a counter; a
+/// folded package observation rewrites the mounted text with the shared fold.
 #[test]
 fn cpu_thermal_throttle_counters_render_with_honest_absence() {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
@@ -357,6 +358,8 @@ fn cpu_thermal_throttle_counters_render_with_honest_absence() {
     package_only.package_throttle_count = Some(12);
     package_only.core_throttle_count = None;
     cpu.packages = vec![observed, package_only];
+    let expected =
+        cpu_thermal_throttle_summary(&cpu).expect("observed counters must produce the shared fold");
     let memory = memory_metrics(at, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
     fold_and_trigger(
         &mut app,
@@ -368,8 +371,8 @@ fn cpu_thermal_throttle_counters_render_with_honest_absence() {
     );
     assert_eq!(
         dyn_text_value(app.world_mut(), &field).as_deref(),
-        Some("S0 Package 7 · Core 3 | S1 Package 12 · Core —"),
-        "the folded counters must reach the mounted DynText row"
+        Some(expected.as_str()),
+        "the folded counters must reach the mounted DynText row as the shared fold"
     );
 }
 

@@ -7,7 +7,7 @@ use taskmanager_application::{
     MsrReadoutRequestFailure, MsrReadoutState, RaplPowerRequestFailure, RaplPowerState,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{CpuMetrics, CpuTemperatureSource};
+use taskmanager_core::core::metrics::CpuTemperatureSource;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::TrendSeries;
@@ -83,34 +83,6 @@ pub(super) fn cpu_headline_label_value(
 
 pub(super) const HEADLINE_CHART_FLOOR: f32 = 240.0;
 pub(super) const HEADLINE_CHART_PRESENCE: f32 = 300.0;
-
-/// Compact per-package summary of the cumulative CPU thermal-throttle trigger
-/// counters (`power.thermal-throttle-events`): one `S{package_id}` segment per
-/// package that observed at least one counter, naming the package-level and
-/// per-core event counts. A projection with no observed counter returns `None`
-/// so the caller omits the row (never a fabricated zero); an observed package
-/// with an unobserved sibling keeps the shared dash.
-pub(crate) fn cpu_throttle_summary(cpu: &CpuMetrics) -> Option<String> {
-    let mut packages = Vec::new();
-    for package in &cpu.packages {
-        if package.package_throttle_count.is_none() && package.core_throttle_count.is_none() {
-            continue;
-        }
-        let package_count = package
-            .package_throttle_count
-            .map_or_else(missing_value, |value| value.to_string());
-        let core_count = package
-            .core_throttle_count
-            .map_or_else(missing_value, |value| value.to_string());
-        packages.push(format!(
-            "S{} {} {package_count} · {} {core_count}",
-            package.package_id,
-            t("cpu.throttle_package"),
-            t("cpu.throttle_core"),
-        ));
-    }
-    (!packages.is_empty()).then(|| packages.join(" | "))
-}
 
 pub(super) fn gauge(
     title: &'static str,

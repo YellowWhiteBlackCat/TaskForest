@@ -130,6 +130,52 @@ fn topology_and_interrupt_summaries_keep_pairing_and_distribution_visible() {
     assert_eq!(compact, "Total 100 · CPU0 80 (80%)");
 }
 
+/// The `power.thermal-throttle-events` counters fold into one shared value:
+/// one `S{package_id}` segment per observed package joined with ` | `, the
+/// labeled dash for an unobserved sibling counter, and `None` when no package
+/// observed a counter. A measured zero is an observation and stays visible —
+/// only an unobserved counter may become the dash.
+#[test]
+fn thermal_throttle_summary_keeps_package_ids_dashes_and_honest_absence() {
+    i18n::set_language(i18n::Language::En);
+
+    // No package observed any counter: the whole summary is absent, not a
+    // list of fabricated zeros.
+    let mut cpu = CpuMetrics::default();
+    cpu.packages = vec![CpuPackageMetrics::new(0), CpuPackageMetrics::new(3)];
+    assert_eq!(cpu_thermal_throttle_summary(&cpu), None);
+
+    // Per-package segments carry the package id and both counters; the
+    // unobserved sibling keeps its labeled dash and the package with no
+    // observed counter contributes no segment at all.
+    let mut observed = CpuPackageMetrics::new(0);
+    observed.package_throttle_count = Some(7);
+    observed.core_throttle_count = Some(3);
+    let mut package_only = CpuPackageMetrics::new(1);
+    package_only.package_throttle_count = Some(12);
+    let mut cold = CpuPackageMetrics::new(2);
+    cold.package_throttle_count = None;
+    cold.core_throttle_count = None;
+    cpu.packages = vec![observed, package_only, cold];
+    let summary = cpu_thermal_throttle_summary(&cpu).expect("observed counters must fold");
+    assert_eq!(summary, "S0 Package 7 · Core 3 | S1 Package 12 · Core —");
+    assert!(
+        !summary.contains("Core 0"),
+        "an unobserved counter must not become a fabricated zero: {summary}"
+    );
+
+    // A real zero counter is an observation: it stays a number beside its
+    // own package id rather than collapsing into the dash.
+    let mut measured_zero = CpuPackageMetrics::new(4);
+    measured_zero.package_throttle_count = Some(0);
+    measured_zero.core_throttle_count = Some(0);
+    cpu.packages = vec![measured_zero];
+    assert_eq!(
+        cpu_thermal_throttle_summary(&cpu).as_deref(),
+        Some("S4 Package 0 · Core 0")
+    );
+}
+
 #[test]
 fn priority_tier_labels_resolve_non_empty_and_distinct_for_every_tier() {
     // Pin English so the "not the raw key" check is deterministic on any

@@ -250,43 +250,17 @@ pub(super) fn cpu_spec_rail_rows(
         });
     }
     // The cumulative thermal-throttle trigger counters (`power.thermal-throttle-events`)
-    // follow the same diagnostic-counter discipline: a package with no observed
-    // counter contributes no segment and an unobserved family omits the row,
-    // while an observed package with an unobserved sibling keeps the shared dash.
-    if let Some(throttle) = thermal_throttle_summary(cpu) {
+    // follow the same diagnostic-counter discipline through the shared shell
+    // fold: a package with no observed counter contributes no segment and an
+    // unobserved family omits the row, while an observed package with an
+    // unobserved sibling keeps the shared dash.
+    if let Some(throttle) = taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu) {
         rows.push(CpuRailRow {
             label: t("cpu.thermal_throttle").to_owned(),
             value: throttle,
         });
     }
     rows
-}
-
-/// Compact per-package summary of the cumulative CPU thermal-throttle trigger
-/// counters, exactly the gpui `thermal_throttle_summary` fold: one
-/// `S{package_id}` segment per package that observed at least one counter. A
-/// missing sibling counter keeps the shared dash and a package with no observed
-/// counter never fabricates a zero.
-fn thermal_throttle_summary(cpu: &CpuMetrics) -> Option<String> {
-    let mut packages = Vec::new();
-    for package in &cpu.packages {
-        if package.package_throttle_count.is_none() && package.core_throttle_count.is_none() {
-            continue;
-        }
-        let package_count = package
-            .package_throttle_count
-            .map_or_else(missing_value, |value| value.to_string());
-        let core_count = package
-            .core_throttle_count
-            .map_or_else(missing_value, |value| value.to_string());
-        packages.push(format!(
-            "S{} {} {package_count} · {} {core_count}",
-            package.package_id,
-            t("cpu.throttle_package"),
-            t("cpu.throttle_core"),
-        ));
-    }
-    (!packages.is_empty()).then(|| packages.join(" | "))
 }
 
 /// One aligned row per heterogeneous core class, only when the topology

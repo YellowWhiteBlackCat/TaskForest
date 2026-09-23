@@ -20,6 +20,7 @@ use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
 mod constants;
+mod cpu;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
 mod network;
@@ -30,6 +31,7 @@ mod telemetry;
 pub mod trend;
 
 pub use constants::MISSING_VALUE;
+pub use cpu::*;
 pub use network::*;
 pub use process::*;
 pub use storage::*;
