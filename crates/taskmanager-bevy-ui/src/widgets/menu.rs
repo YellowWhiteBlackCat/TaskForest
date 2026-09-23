@@ -5,18 +5,18 @@
 //! — popups dismiss on focus loss, open on menu-button clicks, and navigate
 //! through `TabGroup` focus, all of which ride the picking/IME queues only a
 //! windowed composition registers (see the `FrontendWindowPlugin` note in
-//! [`crate::window`]). This frontend's menu contract is keyboard-first with
+//! `crate::window`). This frontend's menu contract is keyboard-first with
 //! typed confirm/cancel outcomes that the destructive-action wiring can gate
 //! behind the shell's confirmation seam, and it must stay exercisable in the
 //! headless composition. The official `Checkbox`/`RadioButton` primitives
 //! remain the state vocabulary where they fit (see the pages); the menu is
 //! the documented own-composition case.
 //!
-//! Split per the widget-layer contract: the [`MenuState`] core is plain data
-//! with zero bevy deps (the headless-test surface); [`menu_scene_at`] is the
+//! Split per the widget-layer contract: the `MenuState` core is plain data
+//! with zero bevy deps (the headless-test surface); `menu_scene_at` is the
 //! bsn! adapter themed exclusively through [`crate::palette`] tokens. The
 //! widget never talks to the platform and never mutates shell state —
-//! activation flows back to the caller as [`MenuOutcome`].
+//! activation flows back to the caller as `MenuOutcome`.
 
 use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;

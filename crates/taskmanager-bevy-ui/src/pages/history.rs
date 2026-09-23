@@ -7,7 +7,7 @@
 //! owns the lifecycle adapter, a bounded render model, and the `bsn!` scene.
 //!
 //! The `AppHistory` route is registered in `pages.rs`/`app.rs`; the window
-//! composition installs [`HistoryRuntime`] plus [`HistoryProjectionResource`].
+//! composition installs `HistoryRuntime` plus `HistoryProjectionResource`.
 //! The page still keeps the distinction between a mounted route and continuous
 //! real in-process persistence evidence explicit.
 

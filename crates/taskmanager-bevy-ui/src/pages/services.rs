@@ -7,23 +7,23 @@
 //! translation. Bypassing that accessor is the wrong-row defect class this
 //! page must never reintroduce.
 //!
-//! **Refresh**: the [`ServicesPageRoot`] insert hook registers the page's
-//! observers exactly once per `World`; [`ShellProjectionFolded`] repaints the
+//! **Refresh**: the `ServicesPageRoot` insert hook registers the page's
+//! observers exactly once per `World`; `ShellProjectionFolded` repaints the
 //! table body only when the services-domain revision advanced, so idle frames
 //! and unrelated batches leave the tree untouched (zero redraw at rest).
 //!
 //! **Interaction seams** (对接点): pointer picking and per-page key routing
 //! fire the page-local events
-//! [`ServiceSortClicked`], [`ServiceRowClicked`] and [`ServiceSelectionMoved`]
+//! `ServiceSortClicked`, `ServiceRowClicked` and `ServiceSelectionMoved`
 //! — everything downstream of those events is live here. The action-menu
-//! surface reads the current target from the [`ServiceSelection`] resource;
+//! surface reads the current target from the `ServiceSelection` resource;
 //! destructive verbs then route through the shell's existing
 //! `select_service_control` gate. This page never mutates platform state.
 //!
 //! **Colors**: every fill and ink comes from `context.palette` roles. The
 //! palette has no success/danger tokens yet, so the status chips derive from
-//! palette-owned roles (accent/scrim/dim); when [`crate::palette::UiPalette`]
-//! grows semantic status tokens, [`chip_fill`] is the one function to
+//! palette-owned roles (accent/scrim/dim); when `crate::palette::UiPalette`
+//! grows semantic status tokens, `chip_fill` is the one function to
 //! re-target.
 
 use crate::widgets::controls::{ControlTone, ControlVisual};

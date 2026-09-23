@@ -3,12 +3,12 @@
 //! Every frame, before anything renders, the frontend drains the platform
 //! event port with non-blocking `try_recv` batches, folds each batch into the
 //! shared shell track, and commits the frame's refresh intents. The seam core
-//! ([`run_drain_cycle`]) is a plain function over the application client and
+//! (`run_drain_cycle`) is a plain function over the application client and
 //! the shell — no window, no bevy — so the drain contract is testable
-//! headlessly; only the thin [`drain_system`] adapter below touches the bevy
+//! headlessly; only the thin `drain_system` adapter below touches the bevy
 //! `World`, and it forwards the folded state into the UI through two observer
-//! events: [`CapabilitySummaryChanged`] (the capability inventory line) and
-//! [`ShellProjectionFolded`] (the pages' data-refresh trigger).
+//! events: `CapabilitySummaryChanged` (the capability inventory line) and
+//! `ShellProjectionFolded` (the pages' data-refresh trigger).
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

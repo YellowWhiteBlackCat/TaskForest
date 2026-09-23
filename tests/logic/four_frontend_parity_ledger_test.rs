@@ -72,7 +72,6 @@ impl Facet {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
 enum Status {
     Ready,
     Partial,
@@ -84,7 +83,6 @@ struct LedgerEntry {
     facet: Facet,
     frontend: Frontend,
     status: Status,
-    #[allow(dead_code)]
     reason: &'static str,
     evidence: &'static str,
 }
@@ -483,6 +481,24 @@ fn every_facet_frontend_combination_has_exactly_one_entry() {
 
 #[test]
 fn all_milestone_3_entries_are_ready_with_evidence() {
+    // Milestone 3 claims 100% four-frontend parity, so pin the distribution the
+    // ledger schema can express: every cell is Ready and none is Partial/Missing.
+    let ready = LEDGER
+        .iter()
+        .filter(|entry| entry.status == Status::Ready)
+        .count();
+    let partial = LEDGER
+        .iter()
+        .filter(|entry| entry.status == Status::Partial)
+        .count();
+    let missing = LEDGER
+        .iter()
+        .filter(|entry| entry.status == Status::Missing)
+        .count();
+    assert_eq!(ready, LEDGER.len(), "every ledger entry must be Ready");
+    assert_eq!(partial, 0, "no ledger entry may be Partial");
+    assert_eq!(missing, 0, "no ledger entry may be Missing");
+
     for entry in &LEDGER {
         assert_eq!(
             entry.status,
@@ -494,6 +510,15 @@ fn all_milestone_3_entries_are_ready_with_evidence() {
         assert!(
             !entry.evidence.trim().is_empty(),
             "Ready entry {:?} on {:?} must have non-empty evidence",
+            entry.facet,
+            entry.frontend
+        );
+        // A Ready cell needs no justification: the reason slot is reserved for
+        // Partial/Missing cells, so it must be empty exactly when Ready.
+        assert_eq!(
+            entry.reason.is_empty(),
+            entry.status == Status::Ready,
+            "entry {:?} on {:?} must carry a reason iff it is not Ready",
             entry.facet,
             entry.frontend
         );

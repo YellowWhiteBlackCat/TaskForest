@@ -6,22 +6,22 @@
 //! seeded from the shell snapshot at mount; everything dynamic is bound
 //! through observers — never polling:
 //!
-//! - **Data refresh**: [`bootstrap_processes_page`] runs when the rows root
+//! - **Data refresh**: `bootstrap_processes_page` runs when the rows root
 //!   lands (an `on(On<Add, ProcessRowsRoot>)` entity observer) and spawns the
-//!   page's global [`ShellProjectionFolded`] observer as a child of the root,
+//!   page's global `ShellProjectionFolded` observer as a child of the root,
 //!   so it lives and dies with the mounted page (a route change despawns the
 //!   page recursively). Idle frames — no folded batches — redraw nothing.
 //! - **Input seams**: the keyboard arrives through [`crate::input`], which
 //!   drives the shell's own routers (`handle_local_key` / `handle_local_char`
 //!   — arrows, Delete gate, search typing, y/n/Esc confirmation); the
-//!   [`input`] submodule bridges pointer picking and wheel scrolling into the
-//!   typed `EntityEvent` seams below — [`ProcessSelectRow`],
-//!   [`ProcessScrollIntent`] — and re-renders shell mutations through
+//!   `input` submodule bridges pointer picking and wheel scrolling into the
+//!   typed `EntityEvent` seams below — `ProcessSelectRow`,
+//!   `ProcessScrollIntent` — and re-renders shell mutations through
 //!   `ShellInteractionApplied`. Each seam observer reduces through the SAME
 //!   public shell reducers the TUI keyboard path uses (`move_selection`,
 //!   `select_row`, `push_search_text`).
 //! - **Selection identity**: every accepted selection change publishes
-//!   [`ProcessSelectionChanged`]. The sibling [`details`] component consumes
+//!   `ProcessSelectionChanged`. The sibling `details` component consumes
 //!   it, reuses the shared process-details VM, and requests matching frozen
 //!   process insights through the app-host client.
 //!

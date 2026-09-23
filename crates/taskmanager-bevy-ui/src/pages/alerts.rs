@@ -15,12 +15,12 @@
 //!
 //! **Refresh contract.** The page content is mounted once per route
 //! residence; live data reaches it through observers carried by the page
-//! itself ([`page_observer`]): the fold observer ([`alerts_fold_observer`])
-//! reacts to [`crate::drain::ShellProjectionFolded`] — submit queued
+//! itself (`page_observer`): the fold observer (`alerts_fold_observer`)
+//! reacts to `crate::drain::ShellProjectionFolded` — submit queued
 //! notifications, then ask the app shell's route machinery to remount the
 //! mounted page so the freshly folded projection renders. Idle frames fold
 //! nothing, fire nothing, and redraw nothing. The toggle observer
-//! ([`rule_toggle_observer`]) resolves `bevy_ui_widgets` checkbox
+//! (`rule_toggle_observer`) resolves `bevy_ui_widgets` checkbox
 //! activations back to their rules and applies the canonical edit. Observer
 //! lifetime equals page lifetime: the route observers despawn the content
 //! subtree (and with it every page observer) on each remount.

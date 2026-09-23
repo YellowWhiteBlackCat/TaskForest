@@ -5,7 +5,7 @@
 //! for its headless suites. These gates import `taskmanager_gpui` directly,
 //! which is exactly the product dependency closure they are gating.
 
-#![allow(linker_messages)]
+#![cfg_attr(target_env = "msvc", allow(linker_messages))]
 
 #[path = "../../../../tests/logic/columns_metadata_test.rs"]
 mod columns_metadata_test;

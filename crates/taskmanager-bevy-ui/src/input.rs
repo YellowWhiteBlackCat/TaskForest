@@ -10,7 +10,7 @@
 //! The adapter owns exactly five frontend-local facts:
 //!
 //! 1. **Route authority**: Alt+1..8 / bare `P` switch this frontend's own
-//!    route ([`crate::app::Page`]; the shared `AppPage` vocabulary has no
+//!    route (`crate::app::Page`; the shared `AppPage` vocabulary has no
 //!    Processes / Settings / Alerts page shape). The same page action is
 //!    applied to the shell so `CommandScope` derivation in `dispatch_key`
 //!    follows the visible page.
@@ -24,14 +24,14 @@
 //!    Enter stays out of the Applications arm: the shell owns it there (tree
 //!    expansion, next search match).
 //! 4. **Effect bridge**: platform effects returned by the shell cross to the
-//!    platform client through [`PendingEffects`], drained by the `PreUpdate`
+//!    platform client through `PendingEffects`, drained by the `PreUpdate`
 //!    drain system — the one place that holds the client lock (charter
 //!    boundary 4).
 //! 5. **Re-render signal**: any shell mutation triggers
-//!    [`ShellInteractionApplied`] so mounted pages rebuild from the folded
+//!    `ShellInteractionApplied` so mounted pages rebuild from the folded
 //!    state (never polling).
 //!
-//! The keyboard adapter itself lives in the [`dispatch`] submodule: it owns
+//! The keyboard adapter itself lives in the `dispatch` submodule: it owns
 //! the per-press frame and the ordered arm chain, where each arm is one
 //! small method whose doc comment carries the precedence number from the
 //! parity contract.

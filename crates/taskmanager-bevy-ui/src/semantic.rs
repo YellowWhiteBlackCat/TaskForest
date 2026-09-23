@@ -3,13 +3,13 @@
 //!
 //! Two artifacts, one authority (the shell):
 //!
-//! 1. **The snapshot** ([`SemanticSnapshotResource`]): the ui-contract
+//! 1. **The snapshot** (`SemanticSnapshotResource`): the ui-contract
 //!    semantic tree — bounded process rows, the status announcement, and the
 //!    armed confirmation modal — rebuilt only when its inputs' revision key
 //!    changes. This is the renderer-neutral surface other frontends publish
 //!    and behavior tests consume.
 //! 2. **The nodes**: `bevy_a11y::AccessibilityNode` components on table rows
-//!    (see [`process_row_node`]), which Bevy's winit AccessKit bridge (the
+//!    (see `process_row_node`), which Bevy's winit AccessKit bridge (the
 //!    `accesskit_unix` feature on Linux) publishes to the platform tree. The
 //!    windowed composition adds `AccessibilityPlugin`; headless compositions
 //!    stay inert components.

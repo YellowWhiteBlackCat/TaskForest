@@ -5,17 +5,17 @@
 //! `context.shell`, style comes only from `context.palette`, and dynamic
 //! refresh is observer-driven — never a per-frame poll:
 //!
-//! - **mount**: [`scene::content`] builds the static `bsn!` tree once from the
+//! - **mount**: `scene::content` builds the static `bsn!` tree once from the
 //!   current projection. Every value that can change later sits behind a
-//!   self-describing marker ([`DynText`], [`SparkStrip`], [`DynBlock`],
-//!   [`CurveGate`]) naming the fact it renders.
+//!   self-describing marker (`DynText`, `SparkStrip`, `DynBlock`,
+//!   `CurveGate`) naming the fact it renders.
 //! - **bind**: the root's `on_insert` hook registers this page's observer on
-//!   [`crate::drain::ShellProjectionFolded`] exactly once per `World`
+//!   `crate::drain::ShellProjectionFolded` exactly once per `World`
 //!   (guarded by a resource), keeping the page module self-contained — no
 //!   shared-file edit, and unmounted frames do zero work because the markers
 //!   no longer exist.
-//! - **refresh**: [`refresh_on_fold`] re-reads the shell through
-//!   [`crate::app::ShellTrack`] only when the drain actually folded batches,
+//! - **refresh**: `refresh_on_fold` re-reads the shell through
+//!   `crate::app::ShellTrack` only when the drain actually folded batches,
 //!   rewrites texts in place (equality-guarded so identical facts are not
 //!   change-detected), resizes sparkline bars while the sample count still
 //!   matches (rebuilding only when the window warms or the capacity changes),
@@ -29,7 +29,7 @@
 //! the memory/swap breakdown comes from `taskmanager_shell::memory` (the
 //! saturating single source), and byte/temperature/power/clock strings come
 //! from `taskmanager_shell::presentation` (ADR-020). The one local formatter
-//! is [`metrics::observed_percentage`] — no shared percent entry exists (the TUI keeps
+//! is `metrics::observed_percentage` — no shared percent entry exists (the TUI keeps
 //! its own copy in `ui/units.rs`), so this page owns one with the same shape.
 
 use bevy::ecs::component::Component;

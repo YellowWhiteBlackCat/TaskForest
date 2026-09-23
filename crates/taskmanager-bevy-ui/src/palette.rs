@@ -8,7 +8,7 @@
 //!
 //! bevy values appear only at this adapter's output; they stay inside the
 //! crate and out of the crate's public API. Product component semantics
-//! (nav rail, tables, dialogs) consume [`UiPalette`] — never the official
+//! (nav rail, tables, dialogs) consume `UiPalette` — never the official
 //! Feathers skin system, which this frontend does not adopt.
 
 use bevy::color::Color;

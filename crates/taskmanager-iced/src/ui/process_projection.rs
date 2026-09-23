@@ -45,8 +45,14 @@ use taskmanager_shell::{
 /// `visible_processes()` list — so selection, focus, and the shared action
 /// paths (`Enter` properties, `Delete` end-task, batch verbs) always resolve
 /// to the process the row actually renders.
+///
+/// The variants carry structure and identity only: the pre-formatted display
+/// cells live in [`ProcessProjection`]'s parallel `row_cells` table (keyed by
+/// the same `flat_index` as [`ProcessProjection::process_facts`]). Keeping the
+/// ~15 `String` cells out of the variant keeps both variants small; the hot
+/// `Tree` variant dominates the `Vec`, so boxing its payload would only add an
+/// allocation and indirection to every process row.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum ProjectedRow {
     /// A category or application aggregate header. The summed
     /// observation cells are carried here (computed once by the projection)
@@ -90,8 +96,6 @@ pub(crate) enum ProjectedRow {
         /// frontend-local collapsed-pid set).
         collapsed: bool,
         parent_pid: Option<u32>,
-        /// Pre-formatted display strings (see [`RowCells`]).
-        cells: RowCells,
     },
 }
 
@@ -264,7 +268,6 @@ fn projected_row_from_shared(
                 has_children,
                 collapsed,
                 parent_pid,
-                cells: build_row_cells_with_rules(process, local_time_rules),
             })
         }
     }
@@ -353,10 +356,16 @@ pub(crate) fn build_row_cells_with_rules(
 }
 
 /// The ordered rows the Applications table renders in the active view mode.
+///
+/// `rows` carries the structure; `process_facts` and `row_cells` are the
+/// projection-owned per-flat-row content tables (both indexed by a row's
+/// `flat_index`). Keeping the row content out of [`ProjectedRow`] holds the
+/// enum's size down without pushing the hot `Tree` payload onto the heap.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct ProcessProjection {
     rows: Vec<ProjectedRow>,
     process_facts: Vec<ProcessRowFacts>,
+    row_cells: Vec<RowCells>,
 }
 
 impl ProcessProjection {
@@ -375,6 +384,10 @@ impl ProcessProjection {
         let process_facts = flat
             .iter()
             .map(|process| ProcessRowFacts::from_process(process))
+            .collect();
+        let row_cells = flat
+            .iter()
+            .map(|process| build_row_cells_with_rules(process, local_time_rules))
             .collect();
         let shared_rows =
             project_process_tree_rows(flat, expanded_groups, expanded_tree, sort, observed_at_ms);
@@ -400,6 +413,7 @@ impl ProcessProjection {
         Self {
             rows,
             process_facts,
+            row_cells,
         }
     }
 
@@ -414,6 +428,14 @@ impl ProcessProjection {
     #[must_use]
     pub(crate) fn process_facts(&self, flat_index: usize) -> Option<&ProcessRowFacts> {
         self.process_facts.get(flat_index)
+    }
+
+    /// Resolve the pre-formatted display cells for one flat visible-row index.
+    /// Kept beside [`Self::process_facts`] so the renderer never reformats
+    /// strings per frame; the `Tree` variant names the index, not the payload.
+    #[must_use]
+    pub(crate) fn row_cells(&self, flat_index: usize) -> Option<&RowCells> {
+        self.row_cells.get(flat_index)
     }
 
     /// The visual position of the row backed by `flat_index` (the shared

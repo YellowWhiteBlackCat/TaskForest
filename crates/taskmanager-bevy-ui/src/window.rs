@@ -505,26 +505,29 @@ fn style_text_role(
     ink.0 = color;
 }
 
+/// Interactive controls whose interaction or selected state changed this
+/// frame. A named alias keeps the skin system's signature readable; the raw
+/// tuple would trip `clippy::type_complexity`.
+type ChangedControlVisuals<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static ControlVisual,
+        Option<&'static PickingInteraction>,
+        Has<Pressed>,
+        &'static mut BackgroundColor,
+    ),
+    Or<(
+        Changed<ControlVisual>,
+        Changed<PickingInteraction>,
+        Changed<Pressed>,
+    )>,
+>;
+
 /// Repaint only product-owned interactive controls whose interaction or
 /// selected state changed. Bevy's `Button` provides the required
 /// `Interaction`/`Pressed` state; this system supplies the shared BSN skin.
-#[allow(clippy::type_complexity)]
-fn sync_control_visuals(
-    palette: Res<WindowPalette>,
-    mut controls: Query<
-        (
-            &ControlVisual,
-            Option<&PickingInteraction>,
-            Has<Pressed>,
-            &mut BackgroundColor,
-        ),
-        Or<(
-            Changed<ControlVisual>,
-            Changed<PickingInteraction>,
-            Changed<Pressed>,
-        )>,
-    >,
-) {
+fn sync_control_visuals(palette: Res<WindowPalette>, mut controls: ChangedControlVisuals<'_, '_>) {
     for (visual, interaction, pressed, mut fill) in &mut controls {
         fill.0 = control_background(
             visual,
