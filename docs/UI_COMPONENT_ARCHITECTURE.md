@@ -38,11 +38,19 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 
 `taskmanager-ui` 拥有每条能力的语义，但这不等于每个能力都挂载了同名参考组件。能力注册表在
 语义合同（semantic contract）与已挂载组件（mounted component）之间做 typed 区分：
-`ComponentCapability::reference_path` 指向定义该能力语义的模块；当没有任何前端挂载该组件、
-各端各自组合同一套语义时，该能力登记为语义合同（`is_semantic_contract`，当前只有 `SearchInput`）。
-参考端 GPUI 对语义合同能力声明 `Ported`（前端本地组合），不得声明 `Reference`；把“参考文件存在”
-当成“参考端挂载了控件”会触发 `ReferenceComponentNotMounted` 门禁。语义合同集合只按证据增长，
-未登记的能力沿用其既有参考声明，不等于已证明组件被挂载。
+`ComponentCapability::reference_path` 指向定义该能力语义的模块；当没有任何生产路径挂载该组件、
+各端各自组合同一套语义时，该能力登记为语义合同（`is_semantic_contract`）。参考端 GPUI 对
+语义合同能力声明 `Ported`（前端本地组合），不得声明 `Reference`；把“参考文件存在”当成
+“参考端挂载了控件”会触发 `ReferenceComponentNotMounted` 门禁。只有真实生产路径挂载
+`reference_path` 组件时，`Reference` 才成立。
+
+当前已审计的语义合同集合（唯一权威是 `is_semantic_contract`，由
+`only_the_audited_capabilities_are_semantic_contracts` 钉住）：`SearchInput`（GPUI 组合
+`list_view::search_box_sized`）、`Checkbox`（GPUI 用 checked 菜单项与开关 pill 组合二态选择）、
+`Tree`（GPUI 用进程树行投影实现展开/收起）、`VirtualList`（已挂载表格渲染 gpui `uniform_list`，
+参考模块只提供可见区间与滚动句柄算法）。其余能力保留 `Reference`，因为审计确认参考端有真实生产
+消费者挂载其组件。该集合是审计结果而非白名单：未登记不表示组件已挂载，新增能力或参考组件改挂载点时
+必须在同一变更重做审计并更新注册表与测试。
 
 ## 尺寸与密度合同
 
