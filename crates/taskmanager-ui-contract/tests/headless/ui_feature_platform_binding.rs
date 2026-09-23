@@ -16,7 +16,7 @@ use crate::feature_coverage::FeatureId;
 /// variants carry a non-empty note that `note()` returns.
 #[test]
 fn platform_binding_is_total_typed_and_explained() {
-    assert_eq!(FeatureId::ALL.len(), 75);
+    assert_eq!(FeatureId::ALL.len(), 76);
     let mut requires = 0usize;
     let mut not_applicable = 0usize;
     let mut not_in_vocabulary = 0usize;
@@ -71,7 +71,7 @@ fn platform_binding_is_total_typed_and_explained() {
     }
     assert_eq!(
         (requires, not_applicable, not_in_vocabulary),
-        (66, 8, 1),
+        (67, 8, 1),
         "binding-shape counts are part of the contract; changing one is a conscious registry change"
     );
     assert_eq!(

@@ -298,14 +298,24 @@ Anchored batches (2026-09-22):
   Linux-only `telemetry.cpu.throttle` lane keeps each cell host-derived.
   This takes the table to 71 anchored rows (gpui 16, iced 18, tui 20,
   bevy 17).
+- W28-A batch (2026-09-23): the `memory.process-swap-charge` ownership
+  addition. The per-process swap charge is a real typed fact every shape
+  renders in its Apps-table Swap column; it was unclaimed because
+  `memory.breakdown-rss-pss` explicitly excludes it and `storage.swap-throughput`
+  is system-level. The new feature anchors Iced's
+  `apps_resource_projection_preserves_typed_pss_swap_and_measured_zero` and
+  TUI's `apps_table_projects_typed_pss_and_swap_without_zero_fallbacks`; GPUI
+  and Bevy render the cell but have no discoverable test proving the observed
+  charge, so both are recorded as explicit `pending` gaps.
 
-The table now carries **71 anchored + 0 `pending`** rows (per frontend: gpui 16,
-iced 18, tui 20, bevy 17 anchored; no surveyed gap). Every registered cell is
-committed evidence; a new near-miss must again be recorded as an explicit
-`pending` row. Every other source-complete cell keeps its G2 finding until a
-real test is anchored; the batches are a bounded delivery, never a blanket
-`Ready` claim. A `pending` row is a survey record, not a delivery claim, and it
-never becomes an anchor.
+The table now carries **73 anchored + 2 `pending`** rows (per frontend: gpui 16,
+iced 19, tui 21, bevy 17 anchored; the two surveyed gaps are the GPUI and Bevy
+`memory.process-swap-charge` cells). Every registered cell is committed
+evidence; a new near-miss must again be recorded as an explicit `pending` row.
+Every other source-complete cell keeps its G2 finding until a real test is
+anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
+`pending` row is a survey record, not a delivery claim, and it never becomes an
+anchor.
 
 ### Feature co-anchors (`feature_evidence_co_anchors.tsv`, W23-B)
 

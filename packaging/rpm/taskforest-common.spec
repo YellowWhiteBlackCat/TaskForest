@@ -20,6 +20,17 @@ Summary:    Shared data assets for the TaskForest frontends
 License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
 Source0:    taskforest-tree.tar.gz
+# The shared hicolor icon set moved out of the frontend RPMs into this data
+# package at 0.2.0. A single `dnf upgrade` transaction moves the file cleanly
+# because RPM ignores a conflict whose old owner is upgraded in the same
+# transaction, but a host that upgrades one frontend without the others would
+# otherwise hit an implicit file conflict. The versioned conflict makes the
+# resolver upgrade the old owner instead; `Obsoletes` is deliberately absent
+# because it would erase the frontend product rather than upgrade it. Boundary
+# is the first release that ships this package (CHANGELOG 0.2.0); it must not
+# float with the current version. Fedora Packaging:Conflicts, "Splitting
+# Packages".
+Conflicts:  taskforest < 0.2.0, taskforest-i < 0.2.0, taskforest-b < 0.2.0
 ExclusiveArch: x86_64 aarch64
 
 %description

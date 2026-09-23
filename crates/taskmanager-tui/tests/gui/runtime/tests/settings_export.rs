@@ -33,6 +33,61 @@ fn wait_for_config(
     panic!("configuration predicate was not published");
 }
 
+/// Build a TUI app whose injected config store can never write: the config
+/// file's parent path is a regular file, so every commit fails with
+/// `ConfigStoreErrorKind::CreateDirectory`. Returns the app and its fixture
+/// root (the caller removes the root).
+fn app_with_unwritable_config(tag: &str) -> (TuiApp, std::path::PathBuf) {
+    let root = crate::ui::test_support::repo_temp_dir().join(format!(
+        "taskmanager-tui-save-fail-{tag}-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).expect("fixture root");
+    let blocking_parent = root.join("config-dir");
+    std::fs::write(&blocking_parent, "not a directory").expect("blocking file");
+    let mut app = crate::demo_app();
+    crate::ui::test_support::install_config_store(&mut app, blocking_parent.join("config.json"));
+    (app, root)
+}
+
+/// Submit one settings patch and drain until its typed `SaveFailed`
+/// publication surfaces a save error. Returns the resolved message.
+///
+/// `language_index` is driven through the form so the settings save's language
+/// write-through pins the active locale (the form owns that choice; the store
+/// snapshot stays at its default because the write never lands).
+fn submit_save_and_wait_for_error(app: &mut TuiApp, language_index: usize) -> String {
+    app.begin_settings_edit();
+    app.settings_form.skin = 1;
+    app.settings_form.language = language_index;
+    assert!(
+        app.apply_settings_form(),
+        "the patch is queued even when the filesystem write fails"
+    );
+    for _ in 0..64 {
+        if let Some(error) = app.settings_form.save_error.clone() {
+            return error;
+        }
+        let drain = app
+            .config_client
+            .as_mut()
+            .expect("injected config client")
+            .wait_for_drain(std::time::Duration::from_secs(2));
+        match drain {
+            taskmanager_application::ConfigDrain::Empty => {}
+            taskmanager_application::ConfigDrain::Publications(publications) => {
+                for publication in publications {
+                    app.apply_config_publication(&publication);
+                }
+            }
+            taskmanager_application::ConfigDrain::ResyncRequired { latest, .. } => {
+                app.apply_config_publication(&latest);
+            }
+        }
+    }
+    panic!("a save-failure publication was not observed");
+}
+
 #[test]
 fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
     let dir = crate::ui::test_support::repo_temp_dir().join(format!(
@@ -728,4 +783,39 @@ fn language_choice_round_trips_through_the_settings_path() {
 
     set_language(Language::En);
     assert!(std::fs::remove_dir_all(dir).is_ok());
+}
+
+/// A typed `SaveFailed` publication must render through
+/// `t("tui.settings_save_failed")`, not a hardcoded English literal. Asserting
+/// the resolved message in BOTH locales is the proof: an English-only
+/// hardcoded string passes the `en` case but fails the `zh` case, and
+/// removing the key makes `t` fall back to the raw key literal in both.
+#[test]
+fn settings_save_failure_message_is_localized() {
+    use taskmanager_application::i18n::{Language, set_language};
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+
+    set_language(Language::En);
+    let (mut app, root) = app_with_unwritable_config("en");
+    assert_eq!(
+        submit_save_and_wait_for_error(&mut app, 0),
+        "save failed: create_directory",
+        "the en failure message must be the catalog value"
+    );
+    drop(app);
+    assert!(std::fs::remove_dir_all(root).is_ok());
+
+    set_language(Language::Zh);
+    let (mut app, root) = app_with_unwritable_config("zh");
+    assert_eq!(
+        submit_save_and_wait_for_error(&mut app, 1),
+        "保存失败：create_directory",
+        "the zh failure message must be the catalog value"
+    );
+    drop(app);
+    assert!(std::fs::remove_dir_all(root).is_ok());
+
+    set_language(Language::En);
 }

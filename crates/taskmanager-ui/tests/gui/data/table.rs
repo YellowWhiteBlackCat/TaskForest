@@ -377,41 +377,71 @@ async fn keyboard_escape_clears_selection(cx: &mut TestAppContext) {
     });
 }
 
+/// Handler-contract test for the table's row left-click path.
+///
+/// The headless GPUI test platform hard-codes `click_count: 1` and never
+/// derives a native multi-click count (that lives in the platform backends),
+/// so a real double-click gesture cannot be driven here. This test calls
+/// `on_row_left_click` directly with a synthetic `ClickEvent` and proves the
+/// handler contract: a count-2 event selects the row and emits
+/// `DoubleClickedRow`, while a count-1 event selects but emits nothing. The
+/// native click-count derivation itself stays unproven headlessly.
 #[gpui::test]
-async fn row_double_click_emits_event(cx: &mut TestAppContext) {
+async fn row_left_click_handler_emits_double_click_only_for_a_count_two_event(
+    cx: &mut TestAppContext,
+) {
     let table = setup(cx);
-    let received = Rc::new(RefCell::new(None::<TableEvent>));
+    let received = Rc::new(RefCell::new(Vec::<TableEvent>::new()));
     let sink = received.clone();
     cx.update(|cx| {
         cx.subscribe(&table, move |_, event: &TableEvent, _| {
-            *sink.borrow_mut() = Some(event.clone());
+            sink.borrow_mut().push(event.clone());
         })
         .detach();
     });
-    table.update(cx, |table, cx| {
-        table.set_selected_row(2, cx);
-        let click = ClickEvent::Mouse(MouseClickEvent {
+    // Synthetic clicks: the test injects the count the native platform would
+    // derive, so the assertions below are handler-contract evidence only.
+    let mouse_click = |click_count: usize| {
+        ClickEvent::Mouse(MouseClickEvent {
             down: MouseDownEvent {
                 button: MouseButton::Left,
                 position: point(px(0.0), px(0.0)),
                 modifiers: Modifiers::default(),
-                click_count: 2,
+                click_count,
                 first_mouse: false,
             },
             up: MouseUpEvent {
                 button: MouseButton::Left,
                 position: point(px(0.0), px(0.0)),
                 modifiers: Modifiers::default(),
-                click_count: 2,
+                click_count,
             },
-        });
-        table.on_row_left_click(&click, 2, cx);
+        })
+    };
+    table.update(cx, |table, cx| {
+        // A synthetic single click selects the row and emits nothing.
+        table.on_row_left_click(&mouse_click(1), 2, cx);
+        assert_eq!(table.selected_row(), Some(2));
+        // A synthetic count-2 click selects the row and emits the typed event.
+        table.on_row_left_click(&mouse_click(2), 3, cx);
+        assert_eq!(table.selected_row(), Some(3));
     });
     cx.run_until_parked();
-    assert!(matches!(
-        *received.borrow(),
-        Some(TableEvent::DoubleClickedRow(2))
-    ));
+    let events = received.borrow();
+    // Every left click selects (SelectRow); only the synthetic count-2 click
+    // may additionally emit DoubleClickedRow.
+    let double_clicked_rows: Vec<usize> = events
+        .iter()
+        .filter_map(|event| match event {
+            TableEvent::DoubleClickedRow(ix) => Some(*ix),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        double_clicked_rows,
+        vec![3],
+        "only the synthetic count-2 click may emit DoubleClickedRow; got {events:?}"
+    );
 }
 
 #[test]

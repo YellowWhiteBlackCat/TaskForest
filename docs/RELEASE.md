@@ -85,6 +85,22 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 3. `packaging/arch/stage-package-sim.sh` 检查 manifest、权限和 polkit `exec.path`；
 4. 发布包只包含 DEB/RPM 的系统安装树；正式发布面不包含便携包或后台服务。
 
+## 跨代升级
+
+0.2.0 起共享图标资产由 `taskforest-common` 独占，而 ≤0.1.3 的
+`taskforest`/`taskforest-i`/`taskforest-b` 仍自带该路径。升级由新数据包声明接管，
+避免包管理器报文件归属冲突或留下两代并存的归属：
+
+- DEB：`taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0`），
+  符合 Debian Policy 7.6.1 的拆包规则；
+- RPM：`taskforest-common` 声明版本化 `Conflicts`（`< 0.2.0`），让 dnf 在同一
+  事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting Packages」）；不使用
+  `Obsoletes`，因为它会删除前端产品而非升级；
+- MSI：不涉及拆包；`MajorUpgrade` 配合 `AllowSameVersionUpgrades` 与固定的
+  `UpgradeCode`/组件 GUID 已覆盖代际替换，四端各持独立 `UpgradeCode` 以并存。
+
+`taskforest-t` 从未承载共享路径，不列入；Arch 为单体包，自带图标，无拆包。
+
 ## Windows MSI
 
 WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。该文件对四端参数化，

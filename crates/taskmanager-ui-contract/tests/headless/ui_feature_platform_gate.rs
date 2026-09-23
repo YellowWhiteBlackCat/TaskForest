@@ -641,6 +641,11 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// W25-A batch promoted `power.thermal-throttle-events` from its surveyed
 /// `Unsupported` gap to the four shapes' real CPU-counter surfaces (GPUI
 /// reference; Iced/TUI/Bevy ported) with one fresh anchor per shape.
+/// The W28-A batch registered `memory.process-swap-charge` as the single
+/// authority for the per-process swap charge the four shapes already render,
+/// anchored the Iced and TUI Apps-table swap cells on their real tests, and
+/// recorded the GPUI and Bevy cells as explicit `pending` gaps (no
+/// discoverable test proves the observed charge there yet).
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -661,13 +666,13 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        71,
+        73,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
         (FrontendShape::Gpui, 16usize),
-        (FrontendShape::Iced, 18),
-        (FrontendShape::Tui, 20),
+        (FrontendShape::Iced, 19),
+        (FrontendShape::Tui, 21),
         (FrontendShape::Bevy, 17),
     ] {
         assert_eq!(
@@ -680,14 +685,19 @@ fn the_first_anchor_batch_is_a_conscious_census() {
             frontend.name()
         );
     }
-    // The survey is closed: every registered cell carries a committed anchor.
-    // This is a census, never a relaxation - a new surveyed near-miss must be
-    // committed as an explicit `pending` row again, and the pending shape
-    // stays covered by the parser counterexamples and the synthetic
-    // evidence-closure witness below.
+    // The W28-A per-process swap addition (`memory.process-swap-charge`) is
+    // anchored on the two shapes whose delivered surface a real test proves
+    // (Iced and TUI, both on their Apps-table swap cells). GPUI and Bevy
+    // render the swap cell but have no discoverable test that proves the
+    // observed charge (GPUI only pins the column auto-hide rule and a capture
+    // fixture; Bevy only pins the honest-dash branch), so their cells are
+    // committed as explicit `pending` gaps rather than fabricated anchors. A
+    // new surveyed near-miss must again be committed as an explicit `pending`
+    // row, and the pending shape stays covered by the parser counterexamples
+    // and the synthetic evidence-closure witness below.
     assert_eq!(
         table.pending_count(),
-        0,
+        2,
         "the surveyed pending-gap census moved"
     );
 }

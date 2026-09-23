@@ -446,7 +446,7 @@ fn an_empty_surface_yields_no_ready_cells() {
         }
     }
     assert_eq!(ready, 0, "no undeclared source may ever fold to Ready");
-    assert_eq!(unsupported, 66 * PlatformAxis::ALL.len());
+    assert_eq!(unsupported, 67 * PlatformAxis::ALL.len());
     // `tracing.cpu-flame-graph` is the only remaining vocabulary-gap feature:
     // its cells are counted once per platform.
     assert_eq!(unregistered, PlatformAxis::ALL.len());

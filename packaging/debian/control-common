@@ -3,6 +3,8 @@ Version: __VERSION__
 Section: admin
 Priority: optional
 Architecture: __ARCH__
+Replaces: taskforest (<< 0.2.0), taskforest-i (<< 0.2.0), taskforest-b (<< 0.2.0)
+Breaks: taskforest (<< 0.2.0), taskforest-i (<< 0.2.0), taskforest-b (<< 0.2.0)
 Recommends: polkitd
 Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
 Installed-Size: __INSTALLED_SIZE__

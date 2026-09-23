@@ -180,7 +180,8 @@ impl super::FeatureId {
             // anonymous-huge-page charge are row scalars in the same family.
             Self::MemoryBreakdownRssPss
             | Self::MemoryPageFaults
-            | Self::MemoryTransparentHugePages => Requires(PROCESS_ROW_LANES),
+            | Self::MemoryTransparentHugePages
+            | Self::MemoryProcessSwapCharge => Requires(PROCESS_ROW_LANES),
             Self::MemoryVmaMap => Requires(MEMORY_VMA_LANES),
             Self::MemoryLeakTrend => NotApplicable(
                 "the leak trend is derived from the shared history projection; \
