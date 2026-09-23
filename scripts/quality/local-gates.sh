@@ -569,6 +569,16 @@ fi
 if maybe clippy-ratchet; then
     run_stage clippy-ratchet quick run_py scripts/quality/clippy_ratchet_guard.py
 fi
+if maybe allow-ceiling-self; then
+    # The clippy ratchet guards the *thresholds*; this guard proves dead code is
+    # scoped or gone rather than silenced. The self-test proves it goes red on a
+    # new bare `dead_code`, on a raised per-kind count, on an unknown kind, and
+    # that it fails closed (exit 2) on an attribute it cannot read.
+    run_stage allow-ceiling-self quick run_py scripts/quality/allow_ceiling_guard.py --self-test
+fi
+if maybe allow-ceiling; then
+    run_stage allow-ceiling quick run_py scripts/quality/allow_ceiling_guard.py
+fi
 if maybe production-config-wiring-self; then
     # clippy-parity proves the clippy *command* is the same on both hosts; this
     # guard proves the production-config helper is still *wired into* both hosts
