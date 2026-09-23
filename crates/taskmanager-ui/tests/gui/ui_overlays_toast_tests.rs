@@ -28,25 +28,33 @@ async fn auto_dismiss_arms_duration(cx: &mut TestAppContext) {
     assert_eq!(duration, Some(Duration::from_millis(10)));
 }
 
-/// Emitting the typed event from a state mutation reaches subscribers
-/// after the executor processes the emission.
+/// Subscriber-delivery lock for the toast's typed `Dismissed` payload.
+///
+/// The real auto-dismiss path awaits `smol::Timer`, which the headless test
+/// clock cannot advance, so the timer→emit wiring cannot be driven here (see
+/// `auto_dismiss_arms_duration` for the arming half). This test emits the
+/// typed event directly and proves the payload reaches a subscriber carrying
+/// the toast's id; it does not prove the timer fires it.
 #[gpui::test]
-async fn dismiss_event_carries_the_id(cx: &mut TestAppContext) {
+async fn synthetic_dismissed_event_reaches_subscribers_with_the_toast_id(cx: &mut TestAppContext) {
     let toast = cx.new(|cx| ToastState::new(9, "bye", ToastKind::Danger, cx));
     let received = Rc::new(RefCell::new(None::<ToastEvent>));
     let sink = received.clone();
     cx.update(|cx| {
-        let _sub = cx.subscribe(&toast, move |_, event: &ToastEvent, _cx| {
+        cx.subscribe(&toast, move |_, event: &ToastEvent, _cx| {
             *sink.borrow_mut() = Some(*event);
-        });
+        })
+        .detach();
     });
-    // Emit synchronously through the entity update.
+
     toast.update(cx, |toast, cx| {
         cx.emit(ToastEvent::Dismissed { id: toast.id });
     });
-    // Emission is delivered asynchronously; assert the state mutation
-    // itself is the source of truth for the id.
-    let id = toast.read_with(cx, |toast, _| toast.id());
-    assert_eq!(id, 9);
-    let _ = sink;
+    cx.run_until_parked();
+
+    assert_eq!(
+        *received.borrow(),
+        Some(ToastEvent::Dismissed { id: 9 }),
+        "the typed Dismissed event must reach subscribers with the toast id"
+    );
 }
