@@ -19,6 +19,21 @@ use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::ProcessListProvider;
 
 use super::{PROCESS_LIST_PROVIDER, source};
+use taskmanager_core::ApplicationIconAsset;
+use taskmanager_core::ApplicationIconFormat;
+use taskmanager_core::ProcessApplicationIdentity;
+use taskmanager_core::ProcessOwner;
+use taskmanager_core::ProcessOwnerIdentity;
+use taskmanager_windows_api::ProcessPriorityClass;
+use taskmanager_windows_api::WindowsApiError;
+use taskmanager_windows_api::enumerate_all_process_thread_counts;
+use taskmanager_windows_api::extract_process_icon_bmp;
+#[cfg(windows)]
+use taskmanager_windows_api::process_creation_time_100ns;
+#[cfg(windows)]
+use taskmanager_windows_api::process_handle_count;
+use taskmanager_windows_api::process_priority;
+use taskmanager_windows_api::query_process_user;
 
 /// Process list from `sysinfo`: PID, parent, name, command line, CPU/memory,
 /// start time, per-process disk totals and executable path are all real.
@@ -43,7 +58,7 @@ pub struct WinProcessListProvider {
     /// a prior process's handle count during the deferred ticks.
     previous_fds: HashMap<u32, (u64, ScalarObservation<u32>)>,
     previous_users: HashMap<u32, (u64, String)>,
-    icon_cache: HashMap<PathBuf, Option<taskmanager_core::ApplicationIconAsset>>,
+    icon_cache: HashMap<PathBuf, Option<ApplicationIconAsset>>,
     fd_tick: u32,
     histories: ProcessHistoryStore,
     history_started_at: Instant,
@@ -86,7 +101,7 @@ impl ProcessListProvider for WinProcessListProvider {
         let mut current_pids = std::collections::HashSet::new();
         let mut next_fds = HashMap::new();
         let mut next_users = HashMap::new();
-        let thread_counts = taskmanager_windows_api::enumerate_all_process_thread_counts();
+        let thread_counts = enumerate_all_process_thread_counts();
 
         for (pid, process) in self.system.processes() {
             let pid_value = pid.as_u32();
@@ -131,20 +146,19 @@ impl ProcessListProvider for WinProcessListProvider {
             {
                 next_fds.insert(pid_value, (token, fd_observation));
             }
-            let nice_obs =
-                if let Ok(priority) = taskmanager_windows_api::process_priority(pid_value) {
-                    let val = match priority {
-                        taskmanager_windows_api::ProcessPriorityClass::Realtime => -20,
-                        taskmanager_windows_api::ProcessPriorityClass::High => -15,
-                        taskmanager_windows_api::ProcessPriorityClass::AboveNormal => -5,
-                        taskmanager_windows_api::ProcessPriorityClass::Normal => 0,
-                        taskmanager_windows_api::ProcessPriorityClass::BelowNormal => 5,
-                        taskmanager_windows_api::ProcessPriorityClass::Idle => 15,
-                    };
-                    ScalarObservation::available(val, observed_at_ms)
-                } else {
-                    ScalarObservation::unavailable(FailureKind::Unsupported)
+            let nice_obs = if let Ok(priority) = process_priority(pid_value) {
+                let val = match priority {
+                    ProcessPriorityClass::Realtime => -20,
+                    ProcessPriorityClass::High => -15,
+                    ProcessPriorityClass::AboveNormal => -5,
+                    ProcessPriorityClass::Normal => 0,
+                    ProcessPriorityClass::BelowNormal => 5,
+                    ProcessPriorityClass::Idle => 15,
                 };
+                ScalarObservation::available(val, observed_at_ms)
+            } else {
+                ScalarObservation::unavailable(FailureKind::Unsupported)
+            };
 
             // Whole-table enumeration failure, or a PID missing from the
             // snapshot because it exited mid-refresh, is typed-unavailable;
@@ -154,13 +168,13 @@ impl ProcessListProvider for WinProcessListProvider {
                     Some(count) => ScalarObservation::available(count, observed_at_ms),
                     None => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
                 },
-                Err(taskmanager_windows_api::WindowsApiError::PermissionDenied) => {
+                Err(WindowsApiError::PermissionDenied) => {
                     ScalarObservation::unavailable(FailureKind::PermissionDenied)
                 }
-                Err(taskmanager_windows_api::WindowsApiError::IdentityChanged) => {
+                Err(WindowsApiError::IdentityChanged) => {
                     ScalarObservation::unavailable(FailureKind::IdentityChanged)
                 }
-                Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
+                Err(WindowsApiError::Unsupported) => {
                     ScalarObservation::unavailable(FailureKind::Unsupported)
                 }
                 Err(_) => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
@@ -211,10 +225,10 @@ impl ProcessListProvider for WinProcessListProvider {
                 if *start == start_time_secs {
                     Some(u.clone())
                 } else {
-                    taskmanager_windows_api::query_process_user(pid_value).ok()
+                    query_process_user(pid_value).ok()
                 }
             } else {
-                taskmanager_windows_api::query_process_user(pid_value).ok()
+                query_process_user(pid_value).ok()
             };
             if let Some(ref u) = user_name {
                 next_users.insert(pid_value, (start_time_secs, u.clone()));
@@ -222,8 +236,8 @@ impl ProcessListProvider for WinProcessListProvider {
 
             let owner = match user_name {
                 Some(u) => ProcessMetadataObservation::available(
-                    taskmanager_core::ProcessOwner {
-                        identity: taskmanager_core::ProcessOwnerIdentity::Opaque(u.clone()),
+                    ProcessOwner {
+                        identity: ProcessOwnerIdentity::Opaque(u.clone()),
                         label: Some(u),
                     },
                     observed_at_ms,
@@ -245,13 +259,8 @@ impl ProcessListProvider for WinProcessListProvider {
                     let path_buf = PathBuf::from(path);
                     let asset_opt = self.icon_cache.entry(path_buf.clone()).or_insert_with(|| {
                         let path_str = path.to_string_lossy();
-                        if let Ok(bytes) =
-                            taskmanager_windows_api::extract_process_icon_bmp(&path_str)
-                        {
-                            taskmanager_core::ApplicationIconAsset::from_bytes(
-                                taskmanager_core::ApplicationIconFormat::Bmp,
-                                bytes,
-                            )
+                        if let Ok(bytes) = extract_process_icon_bmp(&path_str) {
+                            ApplicationIconAsset::from_bytes(ApplicationIconFormat::Bmp, bytes)
                         } else {
                             None
                         }
@@ -262,12 +271,8 @@ impl ProcessListProvider for WinProcessListProvider {
                         .unwrap_or(item.name.as_str());
                     let display_name = stem.to_string();
                     let launcher_id = path.to_string_lossy().into_owned();
-                    let identity = taskmanager_core::ProcessApplicationIdentity::new(
-                        launcher_id,
-                        display_name,
-                        None,
-                    )
-                    .map(|id| id.with_icon_resolution(asset_opt.clone(), None));
+                    let identity = ProcessApplicationIdentity::new(launcher_id, display_name, None)
+                        .map(|id| id.with_icon_resolution(asset_opt.clone(), None));
 
                     match identity {
                         Some(id) => ProcessMetadataObservation::available(id, observed_at_ms),
@@ -280,11 +285,8 @@ impl ProcessListProvider for WinProcessListProvider {
                         .trim_end_matches(".exe")
                         .trim_end_matches(".EXE")
                         .to_string();
-                    let identity = taskmanager_core::ProcessApplicationIdentity::new(
-                        item.name.clone(),
-                        display_name,
-                        None,
-                    );
+                    let identity =
+                        ProcessApplicationIdentity::new(item.name.clone(), display_name, None);
                     match identity {
                         Some(id) => ProcessMetadataObservation::available(id, observed_at_ms),
                         None => ProcessMetadataObservation::absent(observed_at_ms),
@@ -337,15 +339,15 @@ fn observe_fd_count(
     let current = if want_fd_count {
         #[cfg(windows)]
         {
-            match taskmanager_windows_api::process_handle_count(process.pid().as_u32()) {
+            match process_handle_count(process.pid().as_u32()) {
                 Ok(count) => ScalarObservation::available(count, observed_at_ms),
-                Err(taskmanager_windows_api::WindowsApiError::PermissionDenied) => {
+                Err(WindowsApiError::PermissionDenied) => {
                     ScalarObservation::unavailable(FailureKind::PermissionDenied)
                 }
-                Err(taskmanager_windows_api::WindowsApiError::IdentityChanged) => {
+                Err(WindowsApiError::IdentityChanged) => {
                     ScalarObservation::unavailable(FailureKind::IdentityChanged)
                 }
-                Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
+                Err(WindowsApiError::Unsupported) => {
                     ScalarObservation::unavailable(FailureKind::Unsupported)
                 }
                 Err(_) => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
@@ -399,15 +401,15 @@ fn process_start_token(
 ) -> ScalarObservation<u64> {
     #[cfg(windows)]
     {
-        match taskmanager_windows_api::process_creation_time_100ns(pid) {
+        match process_creation_time_100ns(pid) {
             Ok(token) => ScalarObservation::available(token, observed_at_ms),
-            Err(taskmanager_windows_api::WindowsApiError::PermissionDenied) => {
+            Err(WindowsApiError::PermissionDenied) => {
                 ScalarObservation::unavailable(FailureKind::PermissionDenied)
             }
-            Err(taskmanager_windows_api::WindowsApiError::IdentityChanged) => {
+            Err(WindowsApiError::IdentityChanged) => {
                 ScalarObservation::unavailable(FailureKind::IdentityChanged)
             }
-            Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
+            Err(WindowsApiError::Unsupported) => {
                 ScalarObservation::unavailable(FailureKind::Unsupported)
             }
             Err(_) => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),

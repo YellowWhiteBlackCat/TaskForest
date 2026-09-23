@@ -15,6 +15,8 @@ use taskmanager_core::{
 
 use super::*;
 use crate::TelemetryStore;
+use taskmanager_core::DiskScalarObservations;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn stamp(revision: u64) -> CorrelatedTelemetryStamp {
     CorrelatedTelemetryStamp::from_accepted_event(revision, revision.saturating_mul(10))
@@ -102,11 +104,11 @@ fn fan_reading(
 }
 
 fn healthy_disk(device_id: &str, generation: u64, activity: f32) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(generation))
         .device_state(DeviceState::healthy(10))
-        .scalar_observations(taskmanager_core::DiskScalarObservations {
+        .scalar_observations(DiskScalarObservations {
             active_time_pct: ScalarObservation::available(activity, 10),
             ..Default::default()
         })
@@ -119,11 +121,11 @@ fn healthy_disk_with_rate(
     read_bytes_per_sec: u64,
     write_bytes_per_sec: u64,
 ) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(generation))
         .device_state(DeviceState::healthy(10))
-        .scalar_observations(taskmanager_core::DiskScalarObservations {
+        .scalar_observations(DiskScalarObservations {
             read_bytes_per_sec: ScalarObservation::available(read_bytes_per_sec, 10),
             write_bytes_per_sec: ScalarObservation::available(write_bytes_per_sec, 10),
             ..Default::default()

@@ -59,6 +59,11 @@ use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
 use crate::palette::{UiPalette, space_8, ui_palette};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_application::ConfigSubmissionStatus;
+use taskmanager_application::ConfigSubmitError;
+use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::appearance::PreferredColorScheme;
 
 /// The telemetry refresh-cadence choices (ms), in display order — the same
 /// four steps the TUI settings form exposes.
@@ -111,7 +116,7 @@ pub(crate) struct ThemePreferences {
     /// Explicit skin choice, or `None` to follow default GNOME skin.
     pub(crate) skin: Option<Skin>,
     pub(crate) hc: bool,
-    pub(crate) observed_appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+    pub(crate) observed_appearance: Option<DesktopAppearance>,
 }
 
 impl ThemePreferences {
@@ -124,9 +129,7 @@ impl ThemePreferences {
     pub(crate) fn effective_mode(&self) -> LightDark {
         self.mode
             .unwrap_or_else(|| match self.observed_appearance.map(|a| a.color_scheme) {
-                Some(taskmanager_core::core::appearance::PreferredColorScheme::Light) => {
-                    LightDark::Light
-                }
+                Some(PreferredColorScheme::Light) => LightDark::Light,
                 _ => LightDark::Dark,
             })
     }
@@ -202,12 +205,7 @@ pub(crate) enum SettingsField {
 pub(crate) fn patch_persisted_config<F>(
     runtime: Option<&SharedRuntimeHandle>,
     patch: F,
-) -> Option<
-    Result<
-        taskmanager_application::ConfigSubmissionStatus,
-        taskmanager_application::ConfigSubmitError,
-    >,
->
+) -> Option<Result<ConfigSubmissionStatus, ConfigSubmitError>>
 where
     F: FnOnce(&mut Config),
 {
@@ -216,7 +214,7 @@ where
     let client = config_guard.as_mut()?;
 
     if client.snapshot().is_none() {
-        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
+        let _ = client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT);
     } else {
         let _ = client.drain();
     }

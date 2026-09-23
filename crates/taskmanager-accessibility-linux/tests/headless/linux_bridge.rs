@@ -14,12 +14,13 @@
 #![cfg(target_os = "linux")]
 
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
+use taskmanager_ui_contract::SemanticSnapshot;
 use taskmanager_ui_contract::{
     AccessibilityBridge, AccessibilityBridgeStatus, GraphSummary, ProcessRowInput,
     SemanticSnapshotBuilder,
 };
 
-fn sample_snapshot() -> taskmanager_ui_contract::SemanticSnapshot {
+fn sample_snapshot() -> SemanticSnapshot {
     SemanticSnapshotBuilder::new(1)
         .application_name("TaskForest")
         .process_row(ProcessRowInput {

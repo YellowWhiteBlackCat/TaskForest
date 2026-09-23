@@ -13,6 +13,8 @@
 
 use std::process::ExitCode;
 
+use taskmanager_bevy_ui::run_demo_window;
+use taskmanager_bevy_ui::run_window;
 use taskmanager_cli::{FrontendHandlers, run};
 
 /// Launch the Bevy window. The desktop `app_id` is accepted and ignored so
@@ -21,9 +23,9 @@ use taskmanager_cli::{FrontendHandlers, run};
 fn run_gui(app_id: Option<String>, demo: bool) {
     let _ = app_id;
     let code = if demo {
-        taskmanager_bevy_ui::run_demo_window()
+        run_demo_window()
     } else {
-        taskmanager_bevy_ui::run_window()
+        run_window()
     };
     if code != ExitCode::SUCCESS {
         std::process::exit(1);

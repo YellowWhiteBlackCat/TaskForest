@@ -1,5 +1,7 @@
 use super::*;
 use taskmanager_core::tray::{TrayIconData, TrayMenuItem, TrayMenuSpec};
+use taskmanager_tray_muda::decode_menu_id;
+use taskmanager_tray_muda::menu_id_for;
 
 // Only consumed by the `cfg(not(target_os = "windows"))` test below, so the
 // helper is dead text when the suite is checked against a windows target.
@@ -17,11 +19,8 @@ fn spec_with_menu(items: Vec<TrayMenuItem>) -> TraySpec {
 
 #[test]
 fn menu_ids_round_trip_for_ours_only() {
-    assert_eq!(
-        taskmanager_tray_muda::decode_menu_id(&taskmanager_tray_muda::menu_id_for(42)),
-        Some(42)
-    );
-    assert_eq!(taskmanager_tray_muda::decode_menu_id("other-app:7"), None);
+    assert_eq!(decode_menu_id(&menu_id_for(42)), Some(42));
+    assert_eq!(decode_menu_id("other-app:7"), None);
 }
 
 #[test]

@@ -39,6 +39,8 @@ use crate::engine::process::{
 use taskmanager_core::ProcessIdentity;
 
 use super::process_target::validate_process_identity;
+use taskmanager_afpacket::PacketSource;
+use taskmanager_escalation::polkit::ForeignProcessControlOperation;
 
 pub(super) struct ProcfsProcessListProvider {
     pub(super) process_manager: ProcessManager,
@@ -126,7 +128,7 @@ impl ProcessNetworkEscalationProvider for NativeProcessNetworkEscalationProvider
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             *accounting = Box::new(AfPacketAccountingBackend::start_from_source(
-                taskmanager_afpacket::PacketSource::from_owned_fd(fd),
+                PacketSource::from_owned_fd(fd),
                 &self.proc_root,
             ));
             Ok(())
@@ -536,12 +538,8 @@ impl ProcessControlProvider for NativeProcessControlProvider {
             validate_process_identity(&mut self.process_manager, &target)?;
             validate_exact_start_token(&target).map_err(ProviderFailure::from_kind)?;
             let direct = ProcessManager::terminate_process(target.pid);
-            finish_with_escalation(
-                &target,
-                taskmanager_escalation::polkit::ForeignProcessControlOperation::End,
-                direct,
-            )
-            .map_err(ProviderFailure::from_kind)
+            finish_with_escalation(&target, ForeignProcessControlOperation::End, direct)
+                .map_err(ProviderFailure::from_kind)
         }
         #[cfg(not(target_os = "linux"))]
         {

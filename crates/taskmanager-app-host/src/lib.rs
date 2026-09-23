@@ -63,19 +63,24 @@ pub use presentation::{
 pub use process_termination::{ProcessTermination, ProcessTerminationInstallError};
 use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};
+use taskmanager_core::core::tray::TrayEvent;
+use taskmanager_core::core::tray::TraySpec;
+use taskmanager_platform_native::capability_surface;
 use window_capture_runtime::WindowCaptureCoordinator;
 pub use window_capture_runtime::{WindowCaptureClient, WindowCaptureRuntimeStartError};
 
 /// Register an in-process window frame capture hook from the active UI renderer.
 pub fn register_in_process_capture(f: InProcessCaptureFn) {
-    taskmanager_platform_native::register_in_process_capture(f);
+    use taskmanager_platform_native::register_in_process_capture;
+    register_in_process_capture(f);
 }
 
 pub fn spawn_tray(
-    spec: taskmanager_core::core::tray::TraySpec,
-    events: std::sync::mpsc::Sender<taskmanager_core::core::tray::TrayEvent>,
+    spec: TraySpec,
+    events: std::sync::mpsc::Sender<TrayEvent>,
 ) -> Result<Box<dyn TrayController>, TrayFailure> {
-    taskmanager_platform_native::tray::spawn_tray(spec, events)
+    use taskmanager_platform_native::tray::spawn_tray;
+    spawn_tray(spec, events)
 }
 
 /// The selected native adapter's static capability registration surface (layer
@@ -87,14 +92,15 @@ pub fn spawn_tray(
 /// snapshot, which platform conformance checks separately.
 #[must_use]
 pub fn native_capability_surface() -> PlatformCapabilitySurface {
-    taskmanager_platform_native::capability_surface()
+    capability_surface()
 }
 
 pub fn acquire_single_instance(
     instance_name: &str,
     events: std::sync::mpsc::Sender<InstanceEvent>,
 ) -> Result<InstanceRole, InstanceFailure> {
-    taskmanager_platform_native::instance::acquire_single_instance(instance_name, events)
+    use taskmanager_platform_native::instance::acquire_single_instance;
+    acquire_single_instance(instance_name, events)
 }
 
 /// Invalidation policy for the host-owned local-time rules cache.

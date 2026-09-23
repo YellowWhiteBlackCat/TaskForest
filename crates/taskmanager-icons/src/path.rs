@@ -54,7 +54,8 @@ pub const fn path(icon: IconId) -> &'static str {
 /// renderers must not turn an asset lookup failure into a panic.
 #[must_use]
 pub fn asset_bytes(icon: IconId) -> Option<&'static [u8]> {
-    taskmanager_assets::asset_bytes(path(icon))
+    use taskmanager_assets::asset_bytes;
+    asset_bytes(path(icon))
 }
 
 #[cfg(test)]

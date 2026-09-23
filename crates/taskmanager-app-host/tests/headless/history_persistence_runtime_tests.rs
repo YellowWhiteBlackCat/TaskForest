@@ -11,6 +11,8 @@ use super::{
     HistoryPersistenceWorkerState, RecordCommand, flush_backend, record_backend,
     saturating_increment,
 };
+use taskmanager_history_store::HistoryStoreError;
+use taskmanager_history_store::HistoryStoreErrorKind;
 
 struct RecordingBackend {
     record_tx: std::sync::mpsc::Sender<(HistorySeriesKey, HistoricalSample)>,
@@ -22,7 +24,7 @@ impl HistoryPersistenceBackend for RecordingBackend {
         BackendRecordOutcome::Accepted
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
         Ok(())
     }
 }
@@ -62,7 +64,7 @@ impl HistoryPersistenceBackend for BlockingFlushBackend {
         BackendRecordOutcome::Accepted
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
         self.entered.wait();
         self.release.wait();
         Ok(())
@@ -103,7 +105,7 @@ impl HistoryPersistenceBackend for FlushSignalingBackend {
         BackendRecordOutcome::Accepted
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
         let _ = self.flush_tx.send(());
         Ok(())
     }
@@ -170,9 +172,9 @@ impl HistoryPersistenceBackend for FailingHealthBackend {
         BackendRecordOutcome::Rejected(Arc::from("fixture record limit"))
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
-        Err(taskmanager_history_store::HistoryStoreError::new(
-            taskmanager_history_store::HistoryStoreErrorKind::Write,
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
+        Err(HistoryStoreError::new(
+            HistoryStoreErrorKind::Write,
             "界".repeat(600),
         ))
     }
@@ -224,8 +226,7 @@ fn ingress_drop_counter_saturates_instead_of_wrapping() {
 
 struct RecoveryBackend {
     record_outcomes: std::collections::VecDeque<BackendRecordOutcome>,
-    flush_outcomes:
-        std::collections::VecDeque<Result<(), taskmanager_history_store::HistoryStoreError>>,
+    flush_outcomes: std::collections::VecDeque<Result<(), HistoryStoreError>>,
 }
 
 impl HistoryPersistenceBackend for RecoveryBackend {
@@ -235,7 +236,7 @@ impl HistoryPersistenceBackend for RecoveryBackend {
             .unwrap_or(BackendRecordOutcome::Accepted)
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
         self.flush_outcomes.pop_front().unwrap_or(Ok(()))
     }
 }
@@ -260,8 +261,8 @@ fn record_and_flush_failures_recover_as_independent_partitions() {
             BackendRecordOutcome::Accepted,
         ]),
         flush_outcomes: std::collections::VecDeque::from([
-            Err(taskmanager_history_store::HistoryStoreError::new(
-                taskmanager_history_store::HistoryStoreErrorKind::Write,
+            Err(HistoryStoreError::new(
+                HistoryStoreErrorKind::Write,
                 "flush failure",
             )),
             Ok(()),
@@ -381,7 +382,7 @@ impl HistoryPersistenceBackend for PanickingRecordBackend {
         panic!("fixture writer record fault");
     }
 
-    fn flush(&mut self, _now_ms: u64) -> Result<(), taskmanager_history_store::HistoryStoreError> {
+    fn flush(&mut self, _now_ms: u64) -> Result<(), HistoryStoreError> {
         Ok(())
     }
 }

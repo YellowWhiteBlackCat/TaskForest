@@ -36,6 +36,9 @@ use taskmanager_theme::{LightDark, Skin, Theme};
 use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, resolve_demo_theme};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 /// Headless-only infrastructure composition. The production launcher owns
 /// these plugins through `DefaultPlugins`; keeping this in the test module
@@ -329,9 +332,9 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
         .non_send_mut::<crate::app::FrontendTrack>()
         .shell
         .report_notice(
-            taskmanager_shell::FeedbackSource::Interaction,
-            taskmanager_shell::FeedbackSeverity::Info,
-            taskmanager_shell::FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
+            FeedbackSource::Interaction,
+            FeedbackSeverity::Info,
+            FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
             "Screenshot captured",
         );
 

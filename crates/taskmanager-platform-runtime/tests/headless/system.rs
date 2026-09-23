@@ -15,6 +15,17 @@ use taskmanager_platform_contract::{CapabilityId, RequestEnvelope, RequestId};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
+use taskmanager_core::CpuTelemetryObservation;
+use taskmanager_core::CpuThrottlePackageCounters;
+use taskmanager_core::CpuThrottleSnapshot;
+use taskmanager_core::MemoryTelemetryObservation;
+use taskmanager_core::MsrPackageReadout;
+use taskmanager_core::MsrReadoutSnapshot;
+use taskmanager_core::RaplPackageRow;
+use taskmanager_core::RaplPowerSnapshot;
+use taskmanager_core::SmbiosMemorySnapshot;
+use taskmanager_core::SmbiosModuleRow;
+use taskmanager_core::StorageTelemetryObservation;
 
 fn fixed_clock() -> u64 {
     17
@@ -123,21 +134,21 @@ fn slow_storage_lane_does_not_block_cpu_completion() {
                 |_observed_at_ms| Err(ProviderFailure::Unsupported),
                 |observed_at_ms| {
                     assert_eq!(observed_at_ms, fixed_clock());
-                    Ok(taskmanager_core::CpuTelemetryObservation::unavailable(
+                    Ok(CpuTelemetryObservation::unavailable(
                         FailureKind::Unsupported,
                         Vec::new(),
                     ))
                 },
                 |observed_at_ms| {
                     assert_eq!(observed_at_ms, fixed_clock());
-                    Ok(taskmanager_core::MemoryTelemetryObservation::unavailable(
+                    Ok(MemoryTelemetryObservation::unavailable(
                         FailureKind::Unsupported,
                         Vec::new(),
                     ))
                 },
                 |_observed_at_ms| {
                     thread::sleep(Duration::from_millis(150));
-                    Ok(taskmanager_core::StorageTelemetryObservation::unavailable(
+                    Ok(StorageTelemetryObservation::unavailable(
                         FailureKind::Unsupported,
                         Vec::new(),
                         Vec::new(),
@@ -335,13 +346,13 @@ fn smbios_memory_lane_emits_update_event_for_a_refresh_request() {
             ),
             SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_smbios_memory(
                 || {
-                    Ok(taskmanager_core::SmbiosMemorySnapshot::success(
+                    Ok(SmbiosMemorySnapshot::success(
                         4,
                         2,
-                        vec![taskmanager_core::SmbiosModuleRow {
+                        vec![SmbiosModuleRow {
                             slot: 1,
                             size_mb: Some(32_768),
-                            ..taskmanager_core::SmbiosModuleRow::default()
+                            ..SmbiosModuleRow::default()
                         }],
                         None,
                     ))
@@ -412,9 +423,9 @@ fn rapl_power_lane_emits_update_event_for_a_refresh_request() {
             ),
             SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_rapl_power(
                 || {
-                    Ok(taskmanager_core::RaplPowerSnapshot::success(
+                    Ok(RaplPowerSnapshot::success(
                         250,
-                        vec![taskmanager_core::RaplPackageRow {
+                        vec![RaplPackageRow {
                             name: "package-1".to_owned(),
                             power_w: 9.5,
                             energy_delta_uj: 2_375_000,
@@ -487,17 +498,15 @@ fn msr_readout_lane_emits_update_event_for_a_refresh_request() {
             ),
             SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_msr_readout(
                 || {
-                    Ok(taskmanager_core::MsrReadoutSnapshot::success(vec![
-                        taskmanager_core::MsrPackageReadout {
-                            cpu: 1,
-                            bclk_mhz: None,
-                            temperature_c: Some(54.5),
-                            multiplier: Some(42.0),
-                            multiplier_min: Some(8.0),
-                            multiplier_max: Some(58.0),
-                            vcore_v: Some(1.219),
-                        },
-                    ]))
+                    Ok(MsrReadoutSnapshot::success(vec![MsrPackageReadout {
+                        cpu: 1,
+                        bclk_mhz: None,
+                        temperature_c: Some(54.5),
+                        multiplier: Some(42.0),
+                        multiplier_min: Some(8.0),
+                        multiplier_max: Some(58.0),
+                        vcore_v: Some(1.219),
+                    }]))
                 },
             ),
         ),
@@ -568,8 +577,8 @@ fn cpu_throttle_lane_emits_update_event_for_a_refresh_request() {
             ),
             SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_cpu_throttle(
                 || {
-                    Ok(taskmanager_core::CpuThrottleSnapshot::success(vec![
-                        taskmanager_core::CpuThrottlePackageCounters {
+                    Ok(CpuThrottleSnapshot::success(vec![
+                        CpuThrottlePackageCounters {
                             package_id: 1,
                             package_throttle_count: Some(7),
                             core_throttle_count: None,

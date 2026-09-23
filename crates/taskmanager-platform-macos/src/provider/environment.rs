@@ -38,6 +38,7 @@ const STARTUP_INVENTORY_PROVIDER: ProviderId =
     ProviderId::borrowed("macos.startup.inventory.plist");
 const SESSION_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("macos.session.inventory.who");
 
+use taskmanager_core::StartupImpactUnknownReason;
 use taskmanager_platform_portable::run_with_timeout;
 
 /// LaunchAgents (user scope) and LaunchDaemons (system scope) directories.
@@ -146,7 +147,7 @@ impl StartupInventoryProvider for MacStartupInventoryProvider {
                     locator: StartupEntryLocator::new(path.display().to_string()),
                     impact: StartupImpact::None,
                     impact_evidence: StartupImpactEvidence::Unknown {
-                        reason: taskmanager_core::StartupImpactUnknownReason::NotInstrumented,
+                        reason: StartupImpactUnknownReason::NotInstrumented,
                     },
                 });
             }

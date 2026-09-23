@@ -1,5 +1,6 @@
 use super::*;
 use taskmanager_core::FailureKind;
+use taskmanager_core::ProviderId;
 
 fn complete_readout(pci_bus_id: &str) -> NvmlDeviceReadout {
     NvmlDeviceReadout {
@@ -195,12 +196,12 @@ fn multi_card_pci_identity_merges_stably_independent_of_nvml_order() {
     let mut right = left.clone();
     merge_provider_samples(
         &mut left,
-        taskmanager_core::ProviderId::borrowed("linux.gpu.nvml"),
+        ProviderId::borrowed("linux.gpu.nvml"),
         vec![assembled("00000000:03:00.0"), assembled("00000000:04:00.0")],
     );
     merge_provider_samples(
         &mut right,
-        taskmanager_core::ProviderId::borrowed("linux.gpu.nvml"),
+        ProviderId::borrowed("linux.gpu.nvml"),
         vec![assembled("00000000:04:00.0"), assembled("00000000:03:00.0")],
     );
 

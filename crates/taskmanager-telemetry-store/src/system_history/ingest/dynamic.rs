@@ -13,6 +13,7 @@ use crate::system_history::{
     CorrelatedTelemetryStamp, DeviceMetricHistory, DynamicHistoryDomain, DynamicIngestionError,
     DynamicIngestionReport, MAX_DYNAMIC_HISTORY_IDENTITIES,
 };
+use taskmanager_core::DeviceStatus;
 
 impl CorrelatedSystemTelemetryIngestor {
     /// Append application-correlated battery observations to runtime-device history.
@@ -32,7 +33,7 @@ impl CorrelatedSystemTelemetryIngestor {
                     &self.inner.battery_power_w,
                     &self.inner.battery_health_pct,
                 ];
-                if snapshot.state.status == taskmanager_core::DeviceStatus::Healthy {
+                if snapshot.state.status == DeviceStatus::Healthy {
                     let known = snapshot
                         .device_lifecycles
                         .keys()
@@ -152,7 +153,7 @@ impl CorrelatedSystemTelemetryIngestor {
                     &self.inner.fan_pwm_pct,
                     &self.inner.fan_temperature_c,
                 ];
-                if snapshot.state.status == taskmanager_core::DeviceStatus::Healthy {
+                if snapshot.state.status == DeviceStatus::Healthy {
                     let known = snapshot
                         .readings
                         .iter()

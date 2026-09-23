@@ -47,6 +47,9 @@ pub use insights::{
     WinProcessEnvironmentProvider, WinProcessOpenFilesProvider, WinProcessThreadsProvider,
 };
 pub use list::WinProcessListProvider;
+use taskmanager_platform_runtime::ProcessExecutors;
+#[cfg(windows)]
+use taskmanager_windows_api::process_creation_time_100ns;
 
 const PROCESS_LIST_PROVIDER: ProviderId = ProviderId::borrowed("windows.process.list.sysinfo");
 const PROCESS_RESOURCE_MEMORY_PROVIDER: ProviderId =
@@ -102,8 +105,7 @@ pub(crate) fn validate_process_target(
         .ok_or(ProviderFailure::IdentityChanged)?;
     #[cfg(windows)]
     {
-        let actual = taskmanager_windows_api::process_creation_time_100ns(target.pid)
-            .map_err(map_windows_api_failure)?;
+        let actual = process_creation_time_100ns(target.pid).map_err(map_windows_api_failure)?;
         if actual != expected {
             return Err(ProviderFailure::IdentityChanged);
         }
@@ -122,8 +124,7 @@ fn validate_process_target_after(
 ) -> Result<(), ProviderFailure> {
     #[cfg(windows)]
     {
-        let actual = taskmanager_windows_api::process_creation_time_100ns(target.pid)
-            .map_err(map_windows_api_failure)?;
+        let actual = process_creation_time_100ns(target.pid).map_err(map_windows_api_failure)?;
         if actual != expected {
             return Err(ProviderFailure::IdentityChanged);
         }
@@ -338,8 +339,8 @@ impl WinProcessProviders {
         }
     }
 
-    pub(crate) fn into_runtime(self) -> taskmanager_platform_runtime::ProcessExecutors {
-        taskmanager_platform_runtime::ProcessExecutors::new(
+    pub(crate) fn into_runtime(self) -> ProcessExecutors {
+        ProcessExecutors::new(
             self.observations.into_runtime(),
             self.controls.into_runtime(),
         )

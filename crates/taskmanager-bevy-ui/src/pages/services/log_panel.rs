@@ -41,6 +41,7 @@ use crate::input::PendingEffects;
 use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_core::core::services::ServiceLogLevel;
 
 // ---- pure view model -------------------------------------------------------
 
@@ -201,11 +202,10 @@ fn entry_stamp(entry: &ServiceLogEntry) -> String {
 
 fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene + use<> {
     let ink = match entry.level {
-        taskmanager_core::core::services::ServiceLogLevel::Error => palette.danger_color,
-        taskmanager_core::core::services::ServiceLogLevel::Warning => palette.warning_color,
-        taskmanager_core::core::services::ServiceLogLevel::Info => palette.body_color,
-        taskmanager_core::core::services::ServiceLogLevel::Debug
-        | taskmanager_core::core::services::ServiceLogLevel::Unknown => palette.dim_color,
+        ServiceLogLevel::Error => palette.danger_color,
+        ServiceLogLevel::Warning => palette.warning_color,
+        ServiceLogLevel::Info => palette.body_color,
+        ServiceLogLevel::Debug | ServiceLogLevel::Unknown => palette.dim_color,
     };
     bsn! {
         Node {

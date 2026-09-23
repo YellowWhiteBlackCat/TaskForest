@@ -23,6 +23,8 @@ use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPubli
 use crate::Queued;
 use crate::config::{CapabilityRoute, DeliveryClass};
 use crate::health::CapabilityHealth;
+use taskmanager_application::DirectoryUsageEvent;
+use taskmanager_application::ShellEvent;
 
 #[path = "delivery/worker_lifecycle.rs"]
 mod worker_lifecycle;
@@ -470,15 +472,13 @@ fn successfully_published_progress_renews_the_target_lease_from_monotonic_time()
             request,
             CapabilityId::DIRECTORY_USAGE,
             ProviderId::borrowed("fixture.directory"),
-            PlatformEvent::DirectoryUsage(taskmanager_application::DirectoryUsageEvent::Update(
-                DirectoryUsageSnapshot {
-                    scan_id: DirectoryScanId::new(request.get()),
-                    root: "/fixture/long-running".into(),
-                    status: DirectoryScanStatus::Scanning,
-                    entries: Vec::new(),
-                    totals: DirectoryScanTotals::fresh(1),
-                },
-            )),
+            PlatformEvent::DirectoryUsage(DirectoryUsageEvent::Update(DirectoryUsageSnapshot {
+                scan_id: DirectoryScanId::new(request.get()),
+                root: "/fixture/long-running".into(),
+                status: DirectoryScanStatus::Scanning,
+                entries: Vec::new(),
+                totals: DirectoryScanTotals::fresh(1),
+            },)),
         ),
         LaneFlow::Continue
     );
@@ -626,7 +626,7 @@ fn duplicate_catalog_routes_keep_one_descriptor_and_first_provider_authority() {
 fn mismatched_success_payloads_fail_closed_before_health_publication() {
     let (publisher, control_rx, _, catalog) = fixture();
     let provider = ProviderId::borrowed("fixture.process-control");
-    let mismatched = || PlatformEvent::Shell(taskmanager_application::ShellEvent::TargetOpened);
+    let mismatched = || PlatformEvent::Shell(ShellEvent::TargetOpened);
     let first = RequestId::new(40).expect("fixture id");
     reserve_fixture_owner(&catalog, &CapabilityId::PROCESS_CONTROL, first);
     assert_eq!(
@@ -722,7 +722,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
                     Vec::new(),
                 )),
             }),
-            CapabilityHealth::Degraded(taskmanager_core::FailureKind::PermissionDenied),
+            CapabilityHealth::Degraded(FailureKind::PermissionDenied),
         ),
         LaneFlow::Continue
     );
@@ -736,7 +736,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
         .expect("telemetry capability");
     assert_eq!(
         descriptor.status,
-        CapabilityStatus::Degraded(taskmanager_core::FailureKind::PermissionDenied)
+        CapabilityStatus::Degraded(FailureKind::PermissionDenied)
     );
     assert_eq!(descriptor.last_success_at_ms, Some(fixed_clock()));
 }
@@ -824,7 +824,7 @@ fn failed_publication_retains_the_envelope_sequence_after_detachment() {
     assert_eq!(sequence, EventSequence::new(1));
     assert_eq!(failure.sequence, sequence);
     assert_eq!(failure.request_id, request_id);
-    assert_eq!(failure.kind, taskmanager_core::FailureKind::TimedOut);
+    assert_eq!(failure.kind, FailureKind::TimedOut);
 }
 
 #[test]

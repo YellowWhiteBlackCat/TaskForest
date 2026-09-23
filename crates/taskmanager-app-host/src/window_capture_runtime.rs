@@ -17,6 +17,7 @@ use taskmanager_application::window_capture::{
 use taskmanager_platform_contract::{WindowCaptureFailure, WindowCaptureReceipt};
 
 use crate::worker_fault::catch_worker_panic;
+use taskmanager_platform_native::capture_current_window_png;
 
 pub const WINDOW_CAPTURE_COMMAND_CAPACITY: usize = 2;
 const WINDOW_CAPTURE_COMPLETION_CAPACITY: usize = 2;
@@ -132,9 +133,7 @@ impl fmt::Debug for WindowCaptureCoordinator {
 
 impl WindowCaptureCoordinator {
     pub(crate) fn start() -> Result<Self, WindowCaptureRuntimeStartError> {
-        Self::start_with_executor(Arc::new(|stage| {
-            taskmanager_platform_native::capture_current_window_png(stage)
-        }))
+        Self::start_with_executor(Arc::new(capture_current_window_png))
     }
 
     fn start_with_executor(

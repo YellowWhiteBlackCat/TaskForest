@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ProviderId;
 
 #[test]
 fn provider_pci_identity_normalizes_to_linux_sysfs_shape() {
@@ -49,7 +50,7 @@ fn a_sparse_secondary_identity_provider_does_not_erase_richer_pci_identity() {
     let mut gpus = vec![baseline];
     merge_provider_samples(
         &mut gpus,
-        taskmanager_core::ProviderId::borrowed("fixture.sparse-identity"),
+        ProviderId::borrowed("fixture.sparse-identity"),
         vec![GpuProviderSample {
             metrics: GpuMetrics::new(device_id, "Intel"),
             fields: vec![GpuMetricField::Identity],
@@ -118,7 +119,7 @@ fn nvml_sample_enriches_matching_pci_device_without_duplicate() {
     });
     merge_provider_samples(
         &mut gpus,
-        taskmanager_core::ProviderId::borrowed("fixture.nvml"),
+        ProviderId::borrowed("fixture.nvml"),
         vec![GpuProviderSample {
             metrics: enriched,
             fields: vec![

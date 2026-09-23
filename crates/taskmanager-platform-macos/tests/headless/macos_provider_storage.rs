@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_core::DiskMetrics;
+use taskmanager_core::metrics::SmartAvailability;
 
 #[test]
 fn smartctl_tokens_are_stable() {
@@ -30,12 +32,9 @@ fn smart_json_maps_nvme_fields() {
             "critical_warning": 3
         }
     });
-    let mut row = taskmanager_core::DiskMetrics::default();
+    let mut row = DiskMetrics::default();
     apply_smart_json(&mut row, &json, 10);
-    assert_eq!(
-        row.smart_availability,
-        taskmanager_core::metrics::SmartAvailability::Available
-    );
+    assert_eq!(row.smart_availability, SmartAvailability::Available);
     assert_eq!(row.smart_temperature_c, Some(42.0));
     assert_eq!(row.smart_power_on_hours, Some(1234));
     assert_eq!(row.smart_percent_used, Some(12.0));
@@ -45,12 +44,9 @@ fn smart_json_maps_nvme_fields() {
 #[test]
 fn smart_json_absent_sections_stay_absent() {
     let json: serde_json::Value = serde_json::json!({ "model_name": "x" });
-    let mut row = taskmanager_core::DiskMetrics::default();
+    let mut row = DiskMetrics::default();
     apply_smart_json(&mut row, &json, 10);
-    assert_eq!(
-        row.smart_availability,
-        taskmanager_core::metrics::SmartAvailability::Available
-    );
+    assert_eq!(row.smart_availability, SmartAvailability::Available);
     assert_eq!(row.smart_temperature_c, None);
     assert_eq!(row.smart_critical_warning, None);
 }

@@ -13,6 +13,8 @@ use taskmanager_core::{
 use super::{LinuxSystemDomainCollector, SourceQuality, device_quality, lifecycle_snapshot};
 use crate::engine::collector::lifecycle::reconcile_devices;
 use crate::engine::hardware::GpuProviderRegistry;
+use taskmanager_core::FailureKind;
+use taskmanager_core::SourceOutcome;
 
 /// GPU-only collector owning the runtime-selected all-hardware provider
 /// registry and GPU lifecycle state.
@@ -61,14 +63,10 @@ impl LinuxSystemDomainCollector for LinuxGpuTelemetryCollector {
         let lifecycles = lifecycle_snapshot(&self.lifecycles);
         let quality = device_quality(
             match refresh {
-                DeviceRefreshOutcome::Complete => taskmanager_core::SourceOutcome::Available,
-                DeviceRefreshOutcome::Unavailable(status) => {
-                    taskmanager_core::SourceOutcome::Unavailable(
-                        status
-                            .failure()
-                            .unwrap_or(taskmanager_core::FailureKind::ProviderFault),
-                    )
-                }
+                DeviceRefreshOutcome::Complete => SourceOutcome::Available,
+                DeviceRefreshOutcome::Unavailable(status) => SourceOutcome::Unavailable(
+                    status.failure().unwrap_or(FailureKind::ProviderFault),
+                ),
             },
             !metrics.is_empty(),
             &snapshot.sources,

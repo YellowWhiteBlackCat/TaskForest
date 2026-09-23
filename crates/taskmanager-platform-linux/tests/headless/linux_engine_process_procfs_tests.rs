@@ -44,6 +44,7 @@ fn nth_fields_extracts_only_the_wanted_positions() {
 }
 
 use super::*;
+use taskmanager_core::ProcessSchedulingPolicy;
 
 fn proc_stat(threads: u32, start_ticks: u64, user: u64, system: u64, nice: i32) -> String {
     let mut fields = vec!["0".to_owned(); 20];
@@ -88,10 +89,7 @@ fn parse_proc_stat_extracts_scheduling_policy_when_available() {
     fields[38] = "1".to_string(); // SCHED_FIFO
     let text = format!("123 (realtime) {}", fields.join(" "));
     let parsed = parse_proc_stat(&text).expect("parsed");
-    assert_eq!(
-        parsed.policy,
-        Some(taskmanager_core::ProcessSchedulingPolicy::Fifo)
-    );
+    assert_eq!(parsed.policy, Some(ProcessSchedulingPolicy::Fifo));
     assert_eq!(parsed.minflt, 420);
     assert_eq!(parsed.majflt, 15);
 }

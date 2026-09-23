@@ -1,6 +1,9 @@
 //! Device generation and optional-enrichment history regressions.
 
 use super::*;
+use taskmanager_core::SmartAvailability;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 #[test]
 fn absent_device_writes_a_gap_and_reappearance_resets_generation_history() {
@@ -178,7 +181,7 @@ fn aggregate_io_rates_gap_on_partial_devices_but_empty_inventory_is_zero() {
             &StorageTelemetryObservation::current(
                 vec![
                     healthy_disk_with_rate(disk_ok, 1, 7, 5),
-                    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+                    DiskMetricsFixtureBuilder::new()
                         .device_id(disk_gap.to_owned())
                         .device_generation(DeviceGeneration::new(1))
                         .device_state(DeviceState::healthy(10))
@@ -192,7 +195,7 @@ fn aggregate_io_rates_gap_on_partial_devices_but_empty_inventory_is_zero() {
         )
         .expect("mixed storage observation");
     let network = |device_id: &str, rx, tx| {
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(Arc::from(device_id))
             .device_generation(DeviceGeneration::new(1))
             .device_state(DeviceState::healthy(10))
@@ -280,11 +283,11 @@ fn smart_temperature_history_is_scoped_to_disk_identity() {
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
     let observation = |observed_at_ms, temperature_a, temperature_b| {
         let disk = |device_id: &str, temperature_c| {
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id(device_id.to_owned())
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState::healthy(observed_at_ms))
-                .smart_availability(taskmanager_core::SmartAvailability::Available)
+                .smart_availability(SmartAvailability::Available)
                 .smart_state(DeviceState::healthy(observed_at_ms))
                 .smart_temperature_c(Some(temperature_c))
                 .build()
@@ -333,11 +336,11 @@ fn smart_temperature_cache_and_failed_refresh_append_gaps() {
     let observation = |storage_observed_at_ms, smart_state, temperature_c| {
         StorageTelemetryObservation::current(
             vec![
-                taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+                DiskMetricsFixtureBuilder::new()
                     .device_id(device_id.to_owned())
                     .device_generation(DeviceGeneration::new(1))
                     .device_state(DeviceState::healthy(storage_observed_at_ms))
-                    .smart_availability(taskmanager_core::SmartAvailability::Available)
+                    .smart_availability(SmartAvailability::Available)
                     .smart_state(smart_state)
                     .smart_temperature_c(Some(temperature_c))
                     .build(),
@@ -372,11 +375,11 @@ fn smart_temperature_cache_and_failed_refresh_append_gaps() {
 
     let partial = StorageTelemetryObservation::partial(
         vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id(device_id.to_owned())
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState::healthy(130))
-                .smart_availability(taskmanager_core::SmartAvailability::Available)
+                .smart_availability(SmartAvailability::Available)
                 .smart_state(DeviceState {
                     status: DeviceStatus::Stale,
                     last_success_ms: Some(120),
@@ -635,7 +638,7 @@ fn every_domain_has_an_independent_typed_ingestion_lane() {
         MemoryTelemetryObservation::current(observed_memory(100, 0, 0, 0, 10), 10, Vec::new());
     let network = NetworkTelemetryObservation::current(
         vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id(Arc::from(device_id))
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState {
@@ -729,7 +732,7 @@ fn every_domain_has_an_independent_typed_ingestion_lane() {
 
 #[test]
 fn aggregate_network_history_excludes_loopback_but_keeps_physical_rates() {
-    let physical = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let physical = NetworkMetricsFixtureBuilder::new()
         .device_id(Arc::from("net:physical"))
         .device_generation(DeviceGeneration::new(1))
         .adapter_type(NetworkAdapterType::Ethernet)
@@ -739,7 +742,7 @@ fn aggregate_network_history_excludes_loopback_but_keeps_physical_rates() {
             ..Default::default()
         })
         .build();
-    let loopback = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let loopback = NetworkMetricsFixtureBuilder::new()
         .device_id(Arc::from("net:loopback"))
         .device_generation(DeviceGeneration::new(1))
         .adapter_type(NetworkAdapterType::Loopback)

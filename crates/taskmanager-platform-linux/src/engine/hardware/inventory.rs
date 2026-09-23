@@ -39,6 +39,9 @@ use system_info::{
     detect_window_manager, detect_window_manager_version, normalize_desktop_environment,
     normalize_optional_text, normalize_virtual_terminal,
 };
+use taskmanager_core::DisplayInfo;
+use taskmanager_core::KernelLogEntry;
+use taskmanager_core::KernelLogPriority;
 
 const SYSTEM_PROVIDER: &str = "linux.hardware.system";
 const KERNEL_PROVIDER: &str = "linux.hardware.kernel";
@@ -501,7 +504,7 @@ impl InventorySource for FirmwareSource {
 struct DisplaySource;
 
 impl InventorySource for DisplaySource {
-    type Value = Vec<taskmanager_core::DisplayInfo>;
+    type Value = Vec<DisplayInfo>;
 
     fn collect(&mut self, context: &InventoryContext<'_>) -> SourceFragment<Self::Value> {
         // Hardware inventory is static: DRM/EDID owns monitor identity and
@@ -596,7 +599,7 @@ impl HardwareInventoryCollector {
 /// Read only the kernel error priorities required by the health surface. No
 /// shell interpreter is involved and the command is bounded; failure is kept
 /// as `None`, while a successful empty response is `Some(empty)`.
-fn collect_kernel_errors() -> Option<Vec<taskmanager_core::KernelLogEntry>> {
+fn collect_kernel_errors() -> Option<Vec<KernelLogEntry>> {
     let mut command = Command::new("dmesg");
     command.args([
         "--level=emerg,alert,crit,err",
@@ -612,11 +615,11 @@ fn collect_kernel_errors() -> Option<Vec<taskmanager_core::KernelLogEntry>> {
     )))
 }
 
-fn parse_kernel_errors(text: &str) -> Vec<taskmanager_core::KernelLogEntry> {
+fn parse_kernel_errors(text: &str) -> Vec<KernelLogEntry> {
     text.lines()
         .filter_map(|line| {
             let (timestamp_seconds, priority, message) = parse_kernel_line(line)?;
-            let mut entry = taskmanager_core::KernelLogEntry::new(priority, message)?;
+            let mut entry = KernelLogEntry::new(priority, message)?;
             entry.timestamp_seconds = timestamp_seconds;
             Some(entry)
         })
@@ -624,19 +627,17 @@ fn parse_kernel_errors(text: &str) -> Vec<taskmanager_core::KernelLogEntry> {
         .collect()
 }
 
-fn parse_kernel_line(
-    line: &str,
-) -> Option<(Option<u64>, taskmanager_core::KernelLogPriority, &str)> {
+fn parse_kernel_line(line: &str) -> Option<(Option<u64>, KernelLogPriority, &str)> {
     let line = line.trim();
     let (priority, line) = if let Some(rest) = line.strip_prefix('<') {
         let (number, rest) = rest.split_once('>')?;
         let priority = number
             .parse::<u8>()
             .ok()
-            .and_then(taskmanager_core::KernelLogPriority::from_number)?;
+            .and_then(KernelLogPriority::from_number)?;
         (priority, rest.trim())
     } else {
-        (taskmanager_core::KernelLogPriority::Error, line)
+        (KernelLogPriority::Error, line)
     };
     let (timestamp_seconds, message) = if let Some(rest) = line.strip_prefix('[') {
         let (timestamp, rest) = rest.split_once(']')?;

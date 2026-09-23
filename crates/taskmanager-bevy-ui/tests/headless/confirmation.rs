@@ -36,6 +36,16 @@ use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
 use crate::window::{FeedbackLine, FrontendWindowPlugin};
+use taskmanager_application::PendingConfirmation;
+use taskmanager_application::PlatformEffect;
+use taskmanager_application::SmartControlRequest;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::DeviceGeneration;
+use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -147,8 +157,7 @@ fn activate(app: &mut App, entity: Entity) {
 
 #[test]
 fn the_armed_view_echoes_the_frozen_target() {
-    let pending =
-        taskmanager_application::PendingConfirmation::EndTask(frozen_identity(4242, "cargo"));
+    let pending = PendingConfirmation::EndTask(frozen_identity(4242, "cargo"));
     let view =
         PendingConfirmationView::from_pending(&pending).expect("EndTask renders a dialog view");
     assert!(
@@ -171,11 +180,9 @@ fn the_armed_view_echoes_the_frozen_target() {
                 .map(|&pid| frozen_identity(pid, "worker"))
                 .collect(),
         };
-        PendingConfirmationView::from_pending(
-            &taskmanager_application::PendingConfirmation::ProcessBatch(intent),
-        )
-        .expect("a frozen batch renders a dialog view")
-        .target_key
+        PendingConfirmationView::from_pending(&PendingConfirmation::ProcessBatch(intent))
+            .expect("a frozen batch renders a dialog view")
+            .target_key
     };
     assert_eq!(
         freeze([900, 300]),
@@ -197,14 +204,14 @@ fn batch_confirmation_names_the_requested_action() {
         ProcessBatchAction::Kill,
         ProcessBatchAction::Suspend,
         ProcessBatchAction::Resume,
-        ProcessBatchAction::SetPriority(taskmanager_core::core::process::PriorityTier::High),
+        ProcessBatchAction::SetPriority(PriorityTier::High),
     ] {
         let intent = ProcessBatchIntent {
             action,
             scope: Default::default(),
             targets: vec![frozen_identity(4242, "worker")],
         };
-        let pending = taskmanager_application::PendingConfirmation::ProcessBatch(intent);
+        let pending = PendingConfirmation::ProcessBatch(intent);
         let view = PendingConfirmationView::from_pending(&pending)
             .expect("every process batch action has a confirmation view");
         let expected = process_batch_action_label(action);
@@ -215,9 +222,7 @@ fn batch_confirmation_names_the_requested_action() {
         );
         if action != ProcessBatchAction::Kill {
             assert!(
-                !view
-                    .body
-                    .contains(taskmanager_application::i18n::t("proc.kill")),
+                !view.body.contains(t("proc.kill")),
                 "non-kill action {expected:?} must not use kill copy: {}",
                 view.body
             );
@@ -325,14 +330,14 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
 
 #[test]
 fn smart_self_test_confirmation_view_and_confirm_armed() {
-    let intent = taskmanager_core::core::system_health::SmartSelfTestIntent {
-        device_id: taskmanager_core::core::identity::DeviceId::new("disk-0"),
-        device_generation: taskmanager_core::core::DeviceGeneration::new(1),
-        device_key: taskmanager_core::core::StorageDeviceKey::new("nvme0n1"),
+    let intent = SmartSelfTestIntent {
+        device_id: DeviceId::new("disk-0"),
+        device_generation: DeviceGeneration::new(1),
+        device_key: StorageDeviceKey::new("nvme0n1"),
         display_name: "Samsung SSD 980".to_owned(),
-        kind: taskmanager_core::core::smart::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     };
-    let pending = taskmanager_application::PendingConfirmation::SmartSelfTest(intent.clone());
+    let pending = PendingConfirmation::SmartSelfTest(intent.clone());
     let view = PendingConfirmationView::from_pending(&pending).expect("SmartSelfTest renders view");
     assert_eq!(view.kind, ConfirmationKind::SmartSelfTest);
     assert_eq!(view.title, "SMART self-test");
@@ -350,8 +355,8 @@ fn smart_self_test_confirmation_view_and_confirm_armed() {
     let effect = super::confirm_armed(&mut shell, ConfirmationKind::SmartSelfTest);
     assert!(matches!(
         effect,
-        Some(taskmanager_application::PlatformEffect::SmartControl(
-            taskmanager_application::SmartControlRequest::StartSelfTest(ref i)
+        Some(PlatformEffect::SmartControl(
+            SmartControlRequest::StartSelfTest(ref i)
         )) if i.display_name == "Samsung SSD 980"
     ));
     assert_eq!(shell.confirmation_kind(), None);

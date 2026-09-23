@@ -3,6 +3,7 @@ use super::*;
 use std::io::Write;
 #[cfg(unix)]
 use std::path::PathBuf;
+use taskmanager_core::core::time::unix_millis;
 
 #[cfg(unix)]
 const MODE_ENV: &str = "TASKFOREST_PORTABLE_COMMAND_FIXTURE";
@@ -11,7 +12,7 @@ const MARKER_ENV: &str = "TASKFOREST_PORTABLE_COMMAND_MARKER";
 
 #[cfg(unix)]
 fn wall_clock_ms() -> u64 {
-    taskmanager_core::core::time::unix_millis(std::time::SystemTime::now())
+    unix_millis(std::time::SystemTime::now())
 }
 
 #[cfg(unix)]

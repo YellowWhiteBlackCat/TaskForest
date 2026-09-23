@@ -16,6 +16,7 @@ use crate::delivery::RuntimeCapabilityCatalog;
 use crate::delivery::worker::{
     LaneStartRegistry, PROCESS_WORKER_LIMIT, WorkerQuota, WorkerRuntime, WorkerSpawnError,
 };
+use taskmanager_platform_contract::RequestTracking;
 
 struct WorkerExitSignal(crossbeam_channel::Sender<()>);
 
@@ -207,12 +208,7 @@ fn reserve(
         .ecs_scheduler_handle()
         .lock()
         .expect("scheduler lock")
-        .admit_submission_with_tracking(
-            capability,
-            request,
-            0,
-            taskmanager_platform_contract::RequestTracking::Capability,
-        )
+        .admit_submission_with_tracking(capability, request, 0, RequestTracking::Capability)
 }
 
 #[test]

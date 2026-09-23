@@ -13,14 +13,30 @@ use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::StorageTelemetryProvider;
 
 use super::{STORAGE_TELEMETRY_PROVIDER, available_source, unavailable_source};
+use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskmanager_core::DeviceId;
+use taskmanager_core::DeviceLifecycleRegistry;
+use taskmanager_core::DeviceRefreshOutcome;
+use taskmanager_core::DeviceState;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::DiskPartition;
+use taskmanager_core::DiskPartitionScalarObservations;
+use taskmanager_core::DiskScalarObservations;
+use taskmanager_core::ProviderId;
+use taskmanager_core::SmartAvailability;
+use taskmanager_core::storage::StorageConnection;
+use taskmanager_windows_api::WindowsDiskPerformance;
+use taskmanager_windows_api::query_disk_device_info;
+use taskmanager_windows_api::query_disk_performance;
+use taskmanager_windows_api::query_disk_smart_info;
 
 /// Capacity, throughput, IOPS, active-time, and response-time telemetry for Windows disks.
 pub struct WinStorageTelemetryProvider {
     disks: sysinfo::Disks,
     last_refresh: Option<Instant>,
     io_ready: HashSet<String>,
-    perf_samples: HashMap<String, (taskmanager_windows_api::WindowsDiskPerformance, Instant)>,
-    lifecycles: taskmanager_core::DeviceLifecycleRegistry,
+    perf_samples: HashMap<String, (WindowsDiskPerformance, Instant)>,
+    lifecycles: DeviceLifecycleRegistry,
 }
 
 impl WinStorageTelemetryProvider {
@@ -30,9 +46,7 @@ impl WinStorageTelemetryProvider {
             last_refresh: None,
             io_ready: HashSet::new(),
             perf_samples: HashMap::new(),
-            lifecycles: taskmanager_core::DeviceLifecycleRegistry::new(
-                taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS,
-            ),
+            lifecycles: DeviceLifecycleRegistry::new(DEFAULT_DEVICE_ABSENCE_RETENTION_MS),
         }
     }
 }
@@ -61,7 +75,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
         for disk in self.disks.list() {
             let usage = disk.usage();
             let device_id = format!("windows:disk:{}", disk.mount_point().display());
-            let device_state = taskmanager_core::DeviceState::healthy(observed_at_ms);
+            let device_state = DeviceState::healthy(observed_at_ms);
             let lifecycle =
                 self.lifecycles
                     .observe(device_id.as_str(), device_state, observed_at_ms);
@@ -76,25 +90,22 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
             let available_bytes = disk.available_space();
             let used_bytes = total_bytes.saturating_sub(available_bytes);
 
-            let mut partition = taskmanager_core::DiskPartition::new(mount_point.clone());
-            partition.device_id =
-                taskmanager_core::DiskPartition::stable_id(&device_id, &mount_point);
+            let mut partition = DiskPartition::new(mount_point.clone());
+            partition.device_id = DiskPartition::stable_id(&device_id, &mount_point);
             partition.parent_device_id = device_id.clone();
-            partition.device_state = taskmanager_core::DeviceState::healthy(observed_at_ms);
+            partition.device_state = DeviceState::healthy(observed_at_ms);
             partition.mount_point = mount_point.clone();
             partition.fs_type = fs_type.clone();
-            partition.apply_scalar_observations(
-                taskmanager_core::DiskPartitionScalarObservations {
-                    capacity_bytes: ScalarObservation::available(total_bytes, observed_at_ms),
-                    free_bytes: ScalarObservation::available(available_bytes, observed_at_ms),
-                    used_bytes: ScalarObservation::available(used_bytes, observed_at_ms),
-                },
-            );
+            partition.apply_scalar_observations(DiskPartitionScalarObservations {
+                capacity_bytes: ScalarObservation::available(total_bytes, observed_at_ms),
+                free_bytes: ScalarObservation::available(available_bytes, observed_at_ms),
+                used_bytes: ScalarObservation::available(used_bytes, observed_at_ms),
+            });
 
             let drive_letter = mount_point.trim_end_matches('\\').trim_end_matches('/');
-            let native_perf = taskmanager_windows_api::query_disk_performance(drive_letter).ok();
-            let native_device = taskmanager_windows_api::query_disk_device_info(drive_letter).ok();
-            let native_smart = taskmanager_windows_api::query_disk_smart_info(drive_letter).ok();
+            let native_perf = query_disk_performance(drive_letter).ok();
+            let native_device = query_disk_device_info(drive_letter).ok();
+            let native_smart = query_disk_smart_info(drive_letter).ok();
 
             let (iops_obs, active_time_obs, response_time_obs) = if let Some(curr_perf) =
                 native_perf
@@ -168,7 +179,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
             let (model, disk_type, connection, is_removable) = if let Some(ref dev) = native_device
             {
                 use taskmanager_core::storage::{
-                    StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
+                    StorageDeviceKind, StorageInterconnect, StorageProtocol,
                 };
                 use taskmanager_windows_api::{WindowsDiskBusType, WindowsDiskMediaType};
 
@@ -212,7 +223,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
                 (
                     disk.name().to_string_lossy().into_owned(),
                     disk_kind_label(disk.kind()).to_string(),
-                    taskmanager_core::storage::StorageConnection::default(),
+                    StorageConnection::default(),
                     disk.is_removable(),
                 )
             };
@@ -232,12 +243,10 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
                 row.smart_temperature_c = smart.temperature_c;
                 row.smart_percent_used = smart.percentage_used.map(|p| p as f32);
                 row.smart_critical_warning = Some(smart.critical_warning != 0);
-                row.smart_availability = taskmanager_core::SmartAvailability::Available;
-                row.smart_provider = Some(taskmanager_core::ProviderId::borrowed(
-                    "windows.storage.smart",
-                ));
+                row.smart_availability = SmartAvailability::Available;
+                row.smart_provider = Some(ProviderId::borrowed("windows.storage.smart"));
             }
-            row.apply_scalar_observations(taskmanager_core::DiskScalarObservations {
+            row.apply_scalar_observations(DiskScalarObservations {
                 capacity_bytes: ScalarObservation::available(disk.total_space(), observed_at_ms),
                 available_bytes: ScalarObservation::available(
                     disk.available_space(),
@@ -267,17 +276,15 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
         }
 
         let outcome = if metrics.is_empty() {
-            taskmanager_core::DeviceRefreshOutcome::Unavailable(
-                taskmanager_core::DeviceStatus::Stale,
-            )
+            DeviceRefreshOutcome::Unavailable(DeviceStatus::Stale)
         } else {
-            taskmanager_core::DeviceRefreshOutcome::Complete
+            DeviceRefreshOutcome::Complete
         };
         let _delta = self.lifecycles.finish_refresh(outcome, observed_at_ms);
         let lifecycles = self
             .lifecycles
             .iter()
-            .map(|(id, l)| (taskmanager_core::DeviceId::new(id), *l))
+            .map(|(id, l)| (DeviceId::new(id), *l))
             .collect::<std::collections::BTreeMap<_, _>>();
 
         let sources = if metrics.is_empty() {

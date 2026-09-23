@@ -1,17 +1,21 @@
 use super::*;
+use taskmanager_core::SmartProviderFailureKind;
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::smart::DiskSmart;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
 fn apply_smart_copies_availability_with_optional_fields() {
     let smart = DiskSmart {
-        availability: taskmanager_core::core::metrics::SmartAvailability::MissingTool,
+        availability: SmartAvailability::MissingTool,
         state: DeviceState {
-            status: taskmanager_core::core::device_state::DeviceStatus::MissingTool,
+            status: DeviceStatus::MissingTool,
             last_success_ms: Some(100),
         },
         provider: Some(ProviderId::borrowed("fixture.smart")),
-        failure: Some(taskmanager_core::SmartProviderFailureKind::MissingTool),
+        failure: Some(SmartProviderFailureKind::MissingTool),
         temperature_c: None,
         temperature_sensors_c: Vec::new(),
         critical_warning: None,
@@ -23,17 +27,14 @@ fn apply_smart_copies_availability_with_optional_fields() {
         unsafe_shutdowns: None,
         ata_attributes: None,
     };
-    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
-        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+    let mut disk = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
         .smart_temperature_c(Some(42.0))
         .build();
 
     apply_smart(&mut disk, &smart);
 
-    assert_eq!(
-        disk.smart_availability,
-        taskmanager_core::core::metrics::SmartAvailability::MissingTool
-    );
+    assert_eq!(disk.smart_availability, SmartAvailability::MissingTool);
     assert_eq!(disk.smart_temperature_c, None);
     assert_eq!(
         disk.smart_provider
@@ -43,7 +44,7 @@ fn apply_smart_copies_availability_with_optional_fields() {
     );
     assert_eq!(
         disk.smart_failure,
-        Some(taskmanager_core::SmartProviderFailureKind::MissingTool)
+        Some(SmartProviderFailureKind::MissingTool)
     );
 }
 

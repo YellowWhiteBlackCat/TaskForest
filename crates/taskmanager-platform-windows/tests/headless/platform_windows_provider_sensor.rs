@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_platform_conformance::assert_device_discovery_consistent;
 
 #[test]
 fn live_win_sensor_provider_refresh() {
@@ -6,8 +7,7 @@ fn live_win_sensor_provider_refresh() {
     let result = provider.refresh(1000);
     assert!(result.is_ok());
     let snap = result.unwrap();
-    taskmanager_platform_conformance::assert_device_discovery_consistent(&snap)
-        .expect("Windows sensor discovery must be coherent");
+    assert_device_discovery_consistent(&snap).expect("Windows sensor discovery must be coherent");
     eprintln!(
         "LIVE WIN SENSOR TELEMETRY: status={:?}, readings count={}",
         snap.discovery().outcome,

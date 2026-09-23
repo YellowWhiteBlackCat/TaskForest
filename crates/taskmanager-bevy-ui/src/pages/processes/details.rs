@@ -128,10 +128,7 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
         };
     };
 
-    let vm = process_details_rows(
-        process,
-        &taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let vm = process_details_rows(process, &UnitPreferences::default());
     let mut overview: Vec<DetailRow> = OVERVIEW_FIELDS
         .iter()
         .map(|(field, label)| DetailRow {
@@ -139,7 +136,7 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
             value: detail_value(&vm, *field).text_or(MISSING_VALUE).to_owned(),
         })
         .collect();
-    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+    if let Some(summary) = command_identity_summary(process) {
         overview.push(DetailRow {
             label: t("proc_insights.command_identity").to_owned(),
             value: summary,
@@ -165,9 +162,7 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
     }
 }
 
-fn insight_cards(
-    projection: Option<&taskmanager_application::ProjectedProcessInsights>,
-) -> Vec<InsightCard> {
+fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCard> {
     let collecting = t("proc_insights.collecting").to_owned();
     let network_card = match projection.map(|value| &value.network) {
         None | Some(ProcessInsightFacetState::Pending) => InsightCard {
@@ -286,6 +281,10 @@ fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
 
 mod formatting;
 pub(crate) use formatting::*;
+use taskmanager_application::ProjectedProcessInsights;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::presentation::command_identity_summary;
+use taskmanager_shell::queue_effect;
 
 // ---- observer bridge ----------------------------------------------------
 
@@ -389,7 +388,7 @@ fn queue_selected_process_insights(
         return;
     };
     let mut client = runtime.shared.lock_client();
-    taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
+    queue_effect(&mut track.shell, &mut client, effect);
 }
 
 fn rebuild(
@@ -600,7 +599,7 @@ fn on_network_escalate_activated(
         return;
     };
     let mut client = runtime.shared.lock_client();
-    taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
+    queue_effect(&mut track.shell, &mut client, effect);
 }
 
 fn refresh_button_scene(palette: &UiPalette) -> impl Scene + use<> {

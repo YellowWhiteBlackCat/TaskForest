@@ -13,6 +13,14 @@ use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::CpuTelemetryProvider;
 
 use super::{CPU_TELEMETRY_PROVIDER, available_source, unavailable_source};
+use taskmanager_core::CpuPerformancePolicy;
+use taskmanager_core::CpuScalarObservations;
+use taskmanager_windows_api::WindowsProcessorTopology;
+use taskmanager_windows_api::active_power_scheme_name;
+use taskmanager_windows_api::effective_power_overlay_name;
+use taskmanager_windows_api::processor_topology;
+use taskmanager_windows_api::query_acpi_thermal_zones;
+use taskmanager_windows_api::query_cpu_dynamic_frequencies;
 
 /// CPU telemetry from `sysinfo` (per-core usage and live frequency via safe
 /// Windows wrappers). Temperature and power stay typed unavailable until a safe
@@ -20,7 +28,7 @@ use super::{CPU_TELEMETRY_PROVIDER, available_source, unavailable_source};
 pub struct WinCpuTelemetryProvider {
     system: sysinfo::System,
     advertised_max_mhz: Option<u64>,
-    topology: Option<taskmanager_windows_api::WindowsProcessorTopology>,
+    topology: Option<WindowsProcessorTopology>,
     /// Instant of the baseline sysinfo sample taken at construction. Usage is
     /// a delta between two samples at least MINIMUM_CPU_UPDATE_INTERVAL apart;
     /// before that window the first reading is meaningless (it reads as a full
@@ -32,7 +40,7 @@ pub struct WinCpuTelemetryProvider {
 impl WinCpuTelemetryProvider {
     pub fn new() -> Self {
         let (_, advertised_max_mhz) = super::cpu_info::advertised_frequencies_mhz();
-        let topology = taskmanager_windows_api::processor_topology().ok();
+        let topology = processor_topology().ok();
         let mut system = sysinfo::System::new();
         system.refresh_cpu_all();
         Self {
@@ -64,7 +72,7 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
             .filter(|brand| !brand.is_empty());
         let core_count = core_usages.len();
 
-        let pdh_sample = taskmanager_windows_api::query_cpu_dynamic_frequencies().ok();
+        let pdh_sample = query_cpu_dynamic_frequencies().ok();
         let per_core_freq: Vec<Option<u64>> = if let Some(sample) = pdh_sample {
             if !sample.per_core_frequency_mhz.is_empty() {
                 sample
@@ -107,14 +115,12 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
             })
             .or_else(sysinfo::System::physical_core_count);
 
-        let active_policy = taskmanager_windows_api::active_power_scheme_name().ok();
+        let active_policy = active_power_scheme_name().ok();
         // The effective power overlay (performance power slider) is the
         // Windows counterpart of cpufreq's energy_performance_preference; an
         // unmapped or unqueryable overlay stays an honest None, never a guess.
-        let energy_preference = taskmanager_windows_api::effective_power_overlay_name()
-            .ok()
-            .flatten();
-        let performance_policy = taskmanager_core::CpuPerformancePolicy {
+        let energy_preference = effective_power_overlay_name().ok().flatten();
+        let performance_policy = CpuPerformancePolicy {
             frequency_implementation: Some("Windows Power Manager (powrprof)".into()),
             active_policy,
             energy_preference,
@@ -128,7 +134,7 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
             observed_at_ms,
             usage_ready,
         );
-        let thermal_zones = taskmanager_windows_api::query_acpi_thermal_zones().ok();
+        let thermal_zones = query_acpi_thermal_zones().ok();
         let mut thermal_temp = thermal_zones.as_ref().and_then(|zones| {
             let temps: Vec<f32> = zones.iter().map(|z| z.temperature_c).collect();
             if temps.is_empty() {
@@ -194,7 +200,7 @@ impl CpuScalarObservationFactory {
         advertised_max_mhz: Option<u64>,
         observed_at_ms: u64,
         usage_ready: bool,
-    ) -> taskmanager_core::CpuScalarObservations {
+    ) -> CpuScalarObservations {
         let global = core_usages.iter().sum::<f32>() / core_usages.len().max(1) as f32;
         let live_freqs: Vec<u64> = per_core_freq.iter().copied().flatten().collect();
         let max_freq = live_freqs.iter().copied().max();
@@ -247,7 +253,7 @@ impl CpuScalarObservationFactory {
         } else {
             ScalarObservationGroup::unavailable(FailureKind::TemporarilyUnavailable)
         };
-        taskmanager_core::CpuScalarObservations {
+        CpuScalarObservations {
             global_usage_pct,
             core_usage_group,
             frequency_mhz: match max_freq {

@@ -1,7 +1,11 @@
 use super::*;
+#[cfg(windows)]
+use taskmanager_core::StartupImpactUnknownReason;
 use taskmanager_core::{
     DeviceState, DeviceStatus, SessionControlAction, SessionId, StartupEvidenceFailure,
 };
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsStartupTask;
 
 #[test]
 fn win_environment_providers_degrade_honestly_off_windows() {
@@ -135,7 +139,7 @@ fn startup_folder_resolution_failure_is_not_reported_as_complete() {
 #[cfg(windows)]
 #[test]
 fn scheduled_task_rows_carry_stable_ids_and_unprovable_scope() {
-    let entry = scheduled_task_entry(taskmanager_windows_api::WindowsStartupTask {
+    let entry = scheduled_task_entry(WindowsStartupTask {
         task_path: "\\Microsoft\\Windows\\TestTask".to_string(),
         name: Some("TestTask".to_string()),
         enabled: false,
@@ -150,7 +154,7 @@ fn scheduled_task_rows_carry_stable_ids_and_unprovable_scope() {
     assert!(!entry.enabled);
     // A task without a carried display name falls back to its own name
     // portion; degenerate identities stay typed ProviderFault rows.
-    let nameless = scheduled_task_entry(taskmanager_windows_api::WindowsStartupTask {
+    let nameless = scheduled_task_entry(WindowsStartupTask {
         task_path: "\\TestTask".to_string(),
         name: None,
         enabled: true,
@@ -159,7 +163,7 @@ fn scheduled_task_rows_carry_stable_ids_and_unprovable_scope() {
     .expect("the path's name portion is the fallback display name");
     assert_eq!(nameless.name, "TestTask");
     assert_eq!(
-        scheduled_task_entry(taskmanager_windows_api::WindowsStartupTask {
+        scheduled_task_entry(WindowsStartupTask {
             task_path: "\\".to_string(),
             name: None,
             enabled: true,
@@ -187,7 +191,7 @@ fn unsupported_startup_sources_report_typed_unsupported() {
         locator: StartupEntryLocator::new("\\Microsoft\\Windows\\TestTask"),
         impact: StartupImpact::None,
         impact_evidence: StartupImpactEvidence::Unknown {
-            reason: taskmanager_core::StartupImpactUnknownReason::Unsupported,
+            reason: StartupImpactUnknownReason::Unsupported,
         },
     };
     assert_eq!(
@@ -209,7 +213,7 @@ fn unsupported_startup_sources_report_typed_unsupported() {
         locator: StartupEntryLocator::new("win:folder:__taskforest_absent_item__.lnk"),
         impact: StartupImpact::None,
         impact_evidence: StartupImpactEvidence::Unknown {
-            reason: taskmanager_core::StartupImpactUnknownReason::Unsupported,
+            reason: StartupImpactUnknownReason::Unsupported,
         },
     };
     assert_eq!(

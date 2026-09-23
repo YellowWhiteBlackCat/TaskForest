@@ -14,6 +14,7 @@ use super::{
     CompletionOwner, CompletionVerdict, DEFAULT_IN_FLIGHT_LEASE_MS, EcsAdmissionError,
     RuntimeEcsScheduler, StalledSubject,
 };
+use taskmanager_platform_contract::MAX_RECENT_SCHEDULING_STALLS;
 
 #[derive(Clone)]
 struct ModelJob {
@@ -205,9 +206,6 @@ fn fixed_seed_lifecycle_model_preserves_ownership_bounds_and_monotonic_leases() 
         assert_eq!(snapshot.active_target_jobs, model.len() as u64);
         assert!(model.len() <= DEFAULT_ACTIVE_TARGET_LIMIT_PER_CAPABILITY);
         assert!(snapshot.target_high_water <= DEFAULT_ACTIVE_TARGET_LIMIT_PER_CAPABILITY as u64);
-        assert!(
-            snapshot.recent_stalls.len()
-                <= taskmanager_platform_contract::MAX_RECENT_SCHEDULING_STALLS
-        );
+        assert!(snapshot.recent_stalls.len() <= MAX_RECENT_SCHEDULING_STALLS);
     }
 }

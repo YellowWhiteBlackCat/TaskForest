@@ -1,6 +1,7 @@
 //! Performance chart-card and grid scene builders.
 
 use super::*;
+use taskmanager_shell::presentation::trend::window;
 
 /// Design width of the curve strip in px. bevy_ui flex cannot report a
 /// computed node width to the fold observer (the same M1 constraint as the
@@ -25,7 +26,7 @@ pub(crate) fn curve_card_scene(
     // grammar as GPUI's graphs, honest gaps included.
     let segments = if curve_warm(&samples) {
         crate::widgets::chart::line_segments_scaled(
-            &taskmanager_shell::presentation::trend::window(&shell.history, curve.series()),
+            &window(&shell.history, curve.series()),
             CHART_STRIP_WIDTH_PX,
             strip_height,
             MAX_CHART_POINTS,

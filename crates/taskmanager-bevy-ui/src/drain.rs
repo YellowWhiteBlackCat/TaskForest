@@ -22,6 +22,12 @@ use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, SharedRuntimeHandle};
 use crate::window::WindowPalette;
+use taskmanager_application::AppAction;
+use taskmanager_application::DesktopAppearanceEvent;
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::tray::TrayEvent;
+use taskmanager_shell::QuitReason;
+use taskmanager_shell::queue_effect;
 
 /// Upper bound on how many non-empty event batches one frame drains.
 ///
@@ -71,7 +77,7 @@ pub(crate) struct DrainCycle {
     /// Whether a scheduled or post-control refresh intent left this frame.
     pub(crate) refresh_submitted: bool,
     /// Latest observed desktop appearance from the platform runtime.
-    pub(crate) appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+    pub(crate) appearance: Option<DesktopAppearance>,
 }
 
 /// One frame's drain: capability fold, bounded batch drain, refresh intents.
@@ -100,8 +106,7 @@ pub(crate) fn run_drain_cycle(
                     break;
                 }
                 for event in &batch.desktop_appearance_events {
-                    let taskmanager_application::DesktopAppearanceEvent::Snapshot(snapshot) =
-                        &event.event;
+                    let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
                     last_appearance = Some(snapshot.value);
                 }
                 shell.apply_platform_batch(batch);
@@ -122,22 +127,22 @@ pub(crate) fn run_drain_cycle(
         refresh_submitted |= !client.run_scheduled_refresh(now_ms).is_empty();
     }
     if let Some(effect) = shell.take_process_refresh_request() {
-        taskmanager_shell::queue_effect(shell, client, effect);
+        queue_effect(shell, client, effect);
         refresh_submitted = true;
     }
     if let Some(effect) = shell.take_startup_refresh_request() {
-        taskmanager_shell::queue_effect(shell, client, effect);
+        queue_effect(shell, client, effect);
         refresh_submitted = true;
     }
     if let Some(effect) = shell.take_session_refresh_request() {
-        taskmanager_shell::queue_effect(shell, client, effect);
+        queue_effect(shell, client, effect);
         refresh_submitted = true;
     }
     // The open service-log stream's throttled follow: the shell owns the
     // 1 Hz cadence and the cursor dedup; the drain only carries the request
     // across the same queue_effect seam.
     if let Some(effect) = shell.poll_service_log(now_ms) {
-        taskmanager_shell::queue_effect(shell, client, effect);
+        queue_effect(shell, client, effect);
     }
     DrainCycle {
         folded_batches,
@@ -229,21 +234,17 @@ pub(crate) fn drain_system(
     if let Some(tray_res) = tray.as_mut() {
         tray_res.sync_pause_checkmark(track.shell.paused());
         for event in tray_res.drain_events() {
-            if let taskmanager_core::core::tray::TrayEvent::MenuActivated { id } = event
+            if let TrayEvent::MenuActivated { id } = event
                 && let Some(intent) = crate::tray::resolve_tray_action(id)
             {
                 match intent {
                     crate::tray::TrayIntent::Show => {}
                     crate::tray::TrayIntent::TogglePause => {
-                        let _ = track
-                            .shell
-                            .apply_action(taskmanager_application::AppAction::TogglePause);
+                        let _ = track.shell.apply_action(AppAction::TogglePause);
                         tray_res.sync_pause_checkmark(track.shell.paused());
                     }
                     crate::tray::TrayIntent::Quit => {
-                        track
-                            .shell
-                            .request_quit(taskmanager_shell::QuitReason::Tray);
+                        track.shell.request_quit(QuitReason::Tray);
                     }
                 }
             }
@@ -252,7 +253,7 @@ pub(crate) fn drain_system(
 
     let mut client = runtime.shared.lock_client();
     if !track.initial_refresh_submitted {
-        taskmanager_shell::queue_effect(
+        queue_effect(
             &mut track.shell,
             &mut client,
             PlatformEffect::Refresh(RefreshRequest::Dashboard),
@@ -264,7 +265,7 @@ pub(crate) fn drain_system(
     // one place that holds the client lock — the same `queue_effect` seam
     // every frontend effect uses.
     for effect in pending.0.drain(..) {
-        taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
+        queue_effect(&mut track.shell, &mut client, effect);
     }
     if cycle.folded_batches > 0 {
         commands.trigger(ShellProjectionFolded);

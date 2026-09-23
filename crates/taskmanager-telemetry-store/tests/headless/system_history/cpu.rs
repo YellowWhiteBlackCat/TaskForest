@@ -1,6 +1,7 @@
 //! Correlated CPU, host, and independent-domain history regressions.
 
 use super::*;
+use taskmanager_core::MAX_TRACKED_LOGICAL_CPUS;
 
 #[test]
 fn correlated_history_is_bounded_oldest_first_and_not_prefilled() {
@@ -453,7 +454,7 @@ fn per_core_temperature_and_frequency_histories_append_and_gap() {
 #[test]
 fn correlated_per_core_history_has_a_hard_outer_cardinality_bound() {
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(1);
-    let reported = taskmanager_core::MAX_TRACKED_LOGICAL_CPUS + 1;
+    let reported = MAX_TRACKED_LOGICAL_CPUS + 1;
     let cpu = CpuTelemetryObservation::current(
         CpuMetrics::from_observations(CpuScalarObservations {
             core_usage_group: available_group(vec![1.0; reported], 10),
@@ -474,14 +475,14 @@ fn correlated_per_core_history_has_a_hard_outer_cardinality_bound() {
     );
     assert_eq!(
         store.system_history.cpu_core_usage().len(),
-        taskmanager_core::MAX_TRACKED_LOGICAL_CPUS
+        MAX_TRACKED_LOGICAL_CPUS
     );
     assert_eq!(
         store.system_history.cpu_core_temperature().len(),
-        taskmanager_core::MAX_TRACKED_LOGICAL_CPUS
+        MAX_TRACKED_LOGICAL_CPUS
     );
     assert_eq!(
         store.system_history.cpu_core_frequency_mhz().len(),
-        taskmanager_core::MAX_TRACKED_LOGICAL_CPUS
+        MAX_TRACKED_LOGICAL_CPUS
     );
 }

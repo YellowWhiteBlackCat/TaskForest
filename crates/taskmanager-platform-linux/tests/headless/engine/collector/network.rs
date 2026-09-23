@@ -1,5 +1,9 @@
 use super::*;
 use taskmanager_core::DeviceRefreshOutcome;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::OptionalObservationState;
+use taskmanager_core::ScalarAvailability;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn interface(name: &str, arp_type: u64) -> SysfsInterface {
     SysfsInterface {
@@ -79,7 +83,7 @@ fn enrichment_failures_do_not_remove_a_sysfs_discovered_nic() {
             .wireless_observations()
             .association
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::MissingDependency)
+        ScalarAvailability::Unavailable(FailureKind::MissingDependency)
     );
     assert_eq!(
         DeviceRefreshOutcome::from_discovery_outcome(snapshot.discovery().outcome),
@@ -123,15 +127,15 @@ fn failed_sysfs_refresh_retains_cache_but_cannot_confirm_absence() {
     assert_eq!(failed.interfaces[0].name.as_ref(), "enp1s0");
     assert_eq!(
         failed.interfaces[0].link_speed.availability(),
-        taskmanager_core::ScalarAvailability::Stale(FailureKind::PermissionDenied)
+        ScalarAvailability::Stale(FailureKind::PermissionDenied)
     );
     assert_eq!(
         failed.interfaces[0].link_up.availability(),
-        taskmanager_core::ScalarAvailability::Stale(FailureKind::PermissionDenied)
+        ScalarAvailability::Stale(FailureKind::PermissionDenied)
     );
     assert_eq!(
         DeviceRefreshOutcome::from_discovery_outcome(failed.outcome),
-        DeviceRefreshOutcome::Unavailable(taskmanager_core::DeviceStatus::PermissionDenied)
+        DeviceRefreshOutcome::Unavailable(DeviceStatus::PermissionDenied)
     );
 }
 
@@ -332,7 +336,7 @@ fn typed_observation_retention_is_stable_id_scoped_and_resets_on_lifecycle_bound
     let device_id = "net:mac:aa:bb:cc:dd:ee:ff";
     let mut state = NetworkObservationState::default();
     let mut first = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(device_id.into())
             .interface_name("wlan0".into())
             .scalar_observations(NetworkScalarObservations {
@@ -350,7 +354,7 @@ fn typed_observation_retention_is_stable_id_scoped_and_resets_on_lifecycle_bound
     state.reconcile(&mut first);
 
     let mut renamed = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(device_id.into())
             .interface_name("wlp2s0".into())
             .scalar_observations(NetworkScalarObservations::unavailable(
@@ -368,17 +372,17 @@ fn typed_observation_retention_is_stable_id_scoped_and_resets_on_lifecycle_bound
             .scalar_observations()
             .rx_bytes_per_sec
             .availability(),
-        taskmanager_core::ScalarAvailability::Stale(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Stale(FailureKind::TemporarilyUnavailable)
     );
     assert_eq!(
         renamed[0].wireless_observations().ssid.last_known_state(),
-        &taskmanager_core::OptionalObservationState::Present("studio".into())
+        &OptionalObservationState::Present("studio".into())
     );
     assert_eq!(renamed[0].current_ssid(), None);
 
     state.reset_absent(&[DeviceId::new(device_id)]);
     let mut reattached = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(device_id.into())
             .interface_name("wlan0".into())
             .scalar_observations(NetworkScalarObservations::unavailable(
@@ -396,18 +400,18 @@ fn typed_observation_retention_is_stable_id_scoped_and_resets_on_lifecycle_bound
             .scalar_observations()
             .rx_bytes_per_sec
             .availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
     assert_eq!(
         reattached[0]
             .wireless_observations()
             .ssid
             .last_known_state(),
-        &taskmanager_core::OptionalObservationState::Unknown
+        &OptionalObservationState::Unknown
     );
 
     let mut first_current_in_new_generation = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(device_id.into())
             .interface_name("wlan0".into())
             .scalar_observations(NetworkScalarObservations {
@@ -418,7 +422,7 @@ fn typed_observation_retention_is_stable_id_scoped_and_resets_on_lifecycle_bound
     ];
     state.reconcile(&mut first_current_in_new_generation);
     let mut failed_again = vec![
-        taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        NetworkMetricsFixtureBuilder::new()
             .device_id(device_id.into())
             .interface_name("wlan0".into())
             .scalar_observations(NetworkScalarObservations::unavailable(
@@ -594,7 +598,7 @@ fn wifi_without_sysfs_speed_and_without_iw_bitrate_keeps_typed_unavailable() {
     );
     assert_eq!(
         metric.scalar_observations().link_speed_mbps.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported),
+        ScalarAvailability::Unavailable(FailureKind::Unsupported),
         "the typed sysfs Unavailable state is preserved, not overwritten with a fabricated 0"
     );
     assert_eq!(

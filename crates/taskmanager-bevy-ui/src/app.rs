@@ -65,6 +65,7 @@ use taskmanager_application::{
 };
 
 use taskmanager_shell::ShellApp;
+use taskmanager_ui_contract::IconId;
 
 use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
@@ -74,6 +75,8 @@ use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::picking::Pickable;
 use bevy::window::{PrimaryWindow, Window};
+use taskmanager_application::i18n::t;
+use taskmanager_shell::page_help;
 
 /// `'static` borrow of the process-wide runtime, held in the bevy `World` so
 /// window rebuilds reuse the cached handle (charter boundary 5).
@@ -192,15 +195,12 @@ impl Page {
     #[must_use]
     pub(crate) fn nav_label(self) -> String {
         if let Some(page) = self.shared_page()
-            && let Some(help) = taskmanager_shell::page_help()
-                .iter()
-                .find(|help| help.page == page)
+            && let Some(help) = page_help().iter().find(|help| help.page == page)
         {
             return help.label.to_owned();
         }
-        self.local_label_key().map_or_else(String::new, |key| {
-            taskmanager_application::i18n::t(key).to_owned()
-        })
+        self.local_label_key()
+            .map_or_else(String::new, |key| t(key).to_owned())
     }
 
     /// The local locale key for a frontend-owned route, or `None` for a route
@@ -677,8 +677,7 @@ pub(crate) const NAV_TABS: &[Page] = &[
 
 /// The semantic icon identity for a route. Total over `Page` so trailing
 /// affordances (Alerts, Settings) resolve through the same table.
-pub(crate) fn tab_icon(page: Page) -> taskmanager_ui_contract::IconId {
-    use taskmanager_ui_contract::IconId;
+pub(crate) fn tab_icon(page: Page) -> IconId {
     match page {
         Page::Performance => IconId::Performance,
         Page::Processes => IconId::Applications,

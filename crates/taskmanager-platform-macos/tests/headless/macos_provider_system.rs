@@ -1,21 +1,22 @@
 use super::*;
 use std::collections::HashMap;
+use taskmanager_core::CpuInstructionFeature;
 
 #[test]
 fn sysctl_optional_keys_are_unique_and_never_cover_x86_only_features() {
     let mut seen = std::collections::HashSet::new();
-    for feature in taskmanager_core::CpuInstructionFeature::ALL {
+    for feature in CpuInstructionFeature::ALL {
         if let Some(key) = sysctl_optional_key(*feature) {
             assert!(seen.insert(key), "duplicate sysctl key {key}");
         }
     }
     assert_eq!(
-        sysctl_optional_key(taskmanager_core::CpuInstructionFeature::Sse41),
+        sysctl_optional_key(CpuInstructionFeature::Sse41),
         None,
         "macOS has no hw.optional key for SSE4.1; it must stay unreported"
     );
     assert_eq!(
-        sysctl_optional_key(taskmanager_core::CpuInstructionFeature::Neon),
+        sysctl_optional_key(CpuInstructionFeature::Neon),
         Some("hw.optional.neon")
     );
 }

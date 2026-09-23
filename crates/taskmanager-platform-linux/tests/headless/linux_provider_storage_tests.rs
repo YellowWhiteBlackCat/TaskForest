@@ -3,19 +3,21 @@ use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::storage_health::{FilesystemHealth, FilesystemHealthSnapshot};
 
 use super::{aggregate_device_status, filesystem_health_sources};
+use taskmanager_core::core::storage_health::FilesystemBackingKind;
+use taskmanager_core::core::storage_health::FilesystemHealthStatus;
 
 fn fs(fs_type: &str, integrity: DeviceStatus) -> FilesystemHealth {
     FilesystemHealth {
         mount_point: "/mnt/test".into(),
         source: None,
         fs_type: fs_type.into(),
-        backing_kind: taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
+        backing_kind: FilesystemBackingKind::Unknown,
         read_only: None,
         error_count: None,
         inode_used: None,
         inode_total: None,
         inode_usage_percent: None,
-        status: taskmanager_core::core::storage_health::FilesystemHealthStatus::Healthy,
+        status: FilesystemHealthStatus::Healthy,
         state: DeviceState {
             status: DeviceStatus::Healthy,
             last_success_ms: None,

@@ -21,6 +21,7 @@
 use taskmanager_core::{
     DeviceId, FailureKind, GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot,
 };
+use taskmanager_escalation::polkit::PerfHelperErrorKind;
 use taskmanager_escalation::polkit::{PerfHelperOutcome, PolkitGate, invoke_perf_helper};
 use taskmanager_escalation::{
     EscalationAvailability, EscalationDenialReason, EscalationFeature, PrivilegeGate,
@@ -60,7 +61,7 @@ impl GpuEngineRowsProvider for NativeGpuEngineRowsProvider {
     fn read_engine_rows(
         &mut self,
         device_id: &DeviceId,
-    ) -> Result<GpuEngineRowsSnapshot, taskmanager_platform_contract::ProviderFailure> {
+    ) -> Result<GpuEngineRowsSnapshot, ProviderFailure> {
         match (self.probe)() {
             EscalationAvailability::Available
             | EscalationAvailability::RequiresEscalation(EscalationFeature::IntelPmu) => {
@@ -129,14 +130,9 @@ fn result_from_outcome(
                 .collect(),
         )),
         PerfHelperOutcome::HelperError(error) => Err(match error.kind {
-            taskmanager_escalation::polkit::PerfHelperErrorKind::PermissionDenied => {
-                ProviderFailure::PermissionDenied
-            }
-            taskmanager_escalation::polkit::PerfHelperErrorKind::NoPmu => {
-                ProviderFailure::Unsupported
-            }
-            taskmanager_escalation::polkit::PerfHelperErrorKind::OpenFailed
-            | taskmanager_escalation::polkit::PerfHelperErrorKind::ReadFailed => {
+            PerfHelperErrorKind::PermissionDenied => ProviderFailure::PermissionDenied,
+            PerfHelperErrorKind::NoPmu => ProviderFailure::Unsupported,
+            PerfHelperErrorKind::OpenFailed | PerfHelperErrorKind::ReadFailed => {
                 ProviderFailure::ProviderFault
             }
         }),

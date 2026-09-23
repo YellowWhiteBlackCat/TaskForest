@@ -28,6 +28,10 @@ use std::time::Duration;
 use taskmanager_core::tray::TrayActionId;
 use taskmanager_core::tray::{TrayEvent, TraySpec};
 use taskmanager_platform_contract::{TrayController, TrayFailure};
+#[cfg(windows)]
+use taskmanager_tray_muda::{RadioState, build_menu, decode_menu_id};
+#[cfg(windows)]
+use taskmanager_windows_api::pump_pending_messages;
 
 /// How long the host thread waits for the next command before pumping window
 /// messages again. 20 ms bounds command latency without busy-spinning.
@@ -98,7 +102,7 @@ fn host_main(
     let _ = ready_tx.send(Ok(()));
     loop {
         // Deliver Shell_NotifyIcon callbacks to the hidden tray window.
-        let _ = taskmanager_windows_api::pump_pending_messages();
+        let _ = pump_pending_messages();
         forward_tray_events(&events);
         match command_rx.recv_timeout(HOST_POLL_INTERVAL) {
             Ok(Command::SetVisible(visible)) => {
@@ -137,7 +141,7 @@ fn forward_tray_events(events: &Sender<TrayEvent>) {
         }
     }
     while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
-        if let Some(id) = taskmanager_tray_muda::decode_menu_id(event.id.as_ref()) {
+        if let Some(id) = decode_menu_id(event.id.as_ref()) {
             let _ = events.send(TrayEvent::MenuActivated { id });
         }
     }
@@ -147,7 +151,7 @@ fn forward_tray_events(events: &Sender<TrayEvent>) {
 #[cfg(windows)]
 struct NativeTray {
     icon: tray_icon::TrayIcon,
-    radio: taskmanager_tray_muda::RadioState,
+    radio: RadioState,
 }
 
 #[cfg(windows)]
@@ -160,7 +164,7 @@ impl NativeTray {
         )
         .map_err(|_| TrayFailure::Rejected)?;
 
-        let built = taskmanager_tray_muda::build_menu(spec.menu())?;
+        let built = build_menu(spec.menu())?;
 
         let mut builder = tray_icon::TrayIconBuilder::new()
             .with_icon(icon)

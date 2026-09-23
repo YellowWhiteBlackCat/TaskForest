@@ -19,6 +19,7 @@ use catalog::*;
 use failures::{classify_io, record_failure, shared_failure, stronger_metadata_failure};
 use icons::resolve_icon_asset_from_dirs;
 use matching::select_candidate;
+use taskmanager_core::ApplicationIconAsset;
 
 const APPLICATION_CACHE_TTL_MS: u64 = 30_000;
 const APPLICATION_CACHE_RETRY_MS: u64 = 5_000;
@@ -39,7 +40,7 @@ struct CatalogEntry {
 
 #[derive(Clone, Debug, Default)]
 struct CachedIconResolution {
-    asset: Option<taskmanager_core::ApplicationIconAsset>,
+    asset: Option<ApplicationIconAsset>,
     failure: Option<ProcessMetadataFailure>,
 }
 

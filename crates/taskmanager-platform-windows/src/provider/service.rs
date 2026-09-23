@@ -38,6 +38,10 @@ mod log_runtime;
 #[cfg(windows)]
 use taskmanager_windows_api::{ServiceStartMode, WindowsApiError};
 
+#[cfg(any(windows, test))]
+use taskmanager_windows_api::WindowsEventLogEntry;
+#[cfg(windows)]
+use taskmanager_windows_api::set_service_start_mode;
 #[cfg(windows)]
 use windows_service::service::{ServiceAccess, ServiceStartType, ServiceState};
 #[cfg(windows)]
@@ -383,7 +387,7 @@ fn control_scm(service_id: &ServiceId, action: ServiceAction) -> Result<(), Prov
         ServiceAction::Disable => Some(ServiceStartMode::Disabled),
         _ => None,
     } {
-        return taskmanager_windows_api::set_service_start_mode(service_id.as_str(), mode)
+        return set_service_start_mode(service_id.as_str(), mode)
             .map_err(map_service_start_mode_error);
     }
 
@@ -526,7 +530,7 @@ fn priority_log_level(priority: Option<u8>) -> ServiceLogLevel {
 /// boundary could format one, the rendered event data when it could not, and
 /// an identification line — never invented content — when neither exists.
 #[cfg(any(windows, test))]
-fn event_log_message(entry: &taskmanager_windows_api::WindowsEventLogEntry) -> String {
+fn event_log_message(entry: &WindowsEventLogEntry) -> String {
     if !entry.message.is_empty() {
         return entry.message.clone();
     }
@@ -561,9 +565,7 @@ fn truncated_line(line: String) -> String {
 /// Map bounded native entries to the structured stream contract; the cursor
 /// is the event record id string. Pure so the mapping is testable off-Windows.
 #[cfg(any(windows, test))]
-fn event_log_entries(
-    entries: Vec<taskmanager_windows_api::WindowsEventLogEntry>,
-) -> Vec<ServiceLogEntry> {
+fn event_log_entries(entries: Vec<WindowsEventLogEntry>) -> Vec<ServiceLogEntry> {
     entries
         .into_iter()
         .map(|entry| {
@@ -581,7 +583,7 @@ fn event_log_entries(
 
 /// Format one bounded snapshot line per entry, chronological order preserved.
 #[cfg(any(windows, test))]
-fn event_log_lines(entries: &[taskmanager_windows_api::WindowsEventLogEntry]) -> Vec<String> {
+fn event_log_lines(entries: &[WindowsEventLogEntry]) -> Vec<String> {
     entries
         .iter()
         .map(|entry| {

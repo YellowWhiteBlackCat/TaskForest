@@ -3,6 +3,9 @@
 use std::collections::HashMap;
 
 use super::*;
+use taskmanager_core::ProcessScalarObservations;
+use taskmanager_core::ScalarObservation;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn per_process_stat_failures_cannot_become_an_available_source() {
@@ -77,15 +80,12 @@ fn failed_boot_time_source_cannot_make_unknown_identity_look_available() {
 fn previous_items_index_matches_the_right_previous_tick_row_for_thousand_plus_pids() {
     let items: Vec<ProcessItem> = (0..1200)
         .map(|index| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(index + 1)
                 .name(format!("worker-{index}"))
-                .scalar_observations(taskmanager_core::ProcessScalarObservations {
-                    start_token: taskmanager_core::ScalarObservation::available(
-                        u64::from(index) + 1000,
-                        10,
-                    ),
-                    ..taskmanager_core::ProcessScalarObservations::default()
+                .scalar_observations(ProcessScalarObservations {
+                    start_token: ScalarObservation::available(u64::from(index) + 1000, 10),
+                    ..ProcessScalarObservations::default()
                 })
                 .build()
         })
@@ -113,11 +113,11 @@ fn previous_items_index_matches_the_right_previous_tick_row_for_thousand_plus_pi
 #[test]
 fn previous_items_index_preserves_first_match_semantics_for_duplicate_pids() {
     let items = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(7)
             .name("first".to_owned())
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(7)
             .name("second".to_owned())
             .build(),
@@ -430,4 +430,49 @@ fn fd_source_stays_available_across_decimation_skip_ticks_on_box() {
             );
         }
     }
+}
+
+/// The one-time rate-baseline warmup must make the FIRST published snapshot
+/// carry current rates, and must not consume the fd decimation slot: the first
+/// published tick stays the full-read tick.
+#[test]
+fn first_published_refresh_carries_rates_and_keeps_the_fd_full_read() {
+    let own_pid = std::process::id();
+    let mut manager = ProcessManager::new();
+    let snapshot = manager.refresh();
+
+    assert!(
+        snapshot.items.iter().any(|item| item
+            .scalar_observations()
+            .cpu_percentage
+            .current_value()
+            .is_some()),
+        "the first published snapshot must already carry current CPU rates \
+         instead of an all-unavailable first frame"
+    );
+
+    let fd_source = snapshot
+        .sources
+        .iter()
+        .find(|status| status.provider == PROCESS_FD_PROVIDER)
+        .map(|status| status.outcome);
+    assert!(
+        matches!(
+            fd_source,
+            Some(SourceOutcome::Available | SourceOutcome::Partial(_))
+        ),
+        "the warmup must not consume the fd decimation slot; the first \
+         published tick must be the full-read tick, got {fd_source:?}"
+    );
+
+    let own = snapshot
+        .items
+        .iter()
+        .find(|item| item.pid == own_pid)
+        .expect("the test's own pid must be enumerated");
+    assert!(
+        own.scalar_observations().fds.availability().is_current(),
+        "own-pid fd must be freshly read on the first published tick, got {:?}",
+        own.scalar_observations().fds.availability()
+    );
 }

@@ -37,11 +37,13 @@ mod bridge;
 pub use bridge::LinuxAccessKitBridge;
 
 #[cfg(not(target_os = "linux"))]
-pub type LinuxAccessKitBridge = taskmanager_ui_contract::DetachedAccessibilityBridge;
+pub type LinuxAccessKitBridge = DetachedAccessibilityBridge;
 
 // Re-export the pure mapping entry points at the crate root so frontends can
 // build a `TreeUpdate` without naming the inner module.
 pub use mapping::{snapshot_to_tree_update, stable_node_id};
+#[cfg(not(target_os = "linux"))]
+use taskmanager_ui_contract::DetachedAccessibilityBridge;
 
 /// Status of the accesskit bridge on the current target.
 ///

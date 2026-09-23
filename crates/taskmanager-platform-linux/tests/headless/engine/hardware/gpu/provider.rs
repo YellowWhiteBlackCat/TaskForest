@@ -13,6 +13,7 @@ use super::nvidia::NVIDIA_PROCFS_PROVIDER_ID;
 #[cfg(feature = "nvidia")]
 use super::nvidia::NVML_PROVIDER_ID;
 use super::{GpuProviderFailure, GpuProviderRegistry, GpuTelemetryProvider};
+use taskmanager_core::SourceOutcome;
 
 struct FixtureProvider {
     id: &'static str,
@@ -156,10 +157,7 @@ fn failed_enrichment_preserves_baseline_and_reports_partial_state() {
     }));
     assert!(snapshot.sources.iter().any(|source| {
         source.provider.as_str() == "fixture.enrichment"
-            && source.outcome
-                == taskmanager_core::SourceOutcome::Unavailable(
-                    taskmanager_core::FailureKind::MissingDependency,
-                )
+            && source.outcome == SourceOutcome::Unavailable(FailureKind::MissingDependency)
             && source.item_count == 0
     }));
 }

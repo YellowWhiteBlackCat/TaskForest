@@ -9,6 +9,7 @@ use super::super::{GpuProviderSample, build_drm_identity_metrics, scan_drm_cards
 use super::drm::verify_directory;
 use super::{GpuProviderFailure, GpuTelemetryProvider};
 use crate::engine::hardware::gpu::api::probe_graphics_api;
+use taskmanager_core::GpuGraphicsApi;
 
 pub(super) const GRAPHICS_API_PROVIDER_ID: ProviderId =
     ProviderId::borrowed("linux.gpu.graphics-api.runtime");
@@ -17,7 +18,7 @@ pub(super) struct GraphicsApiProvider {
     root: PathBuf,
     module_root: PathBuf,
     probed: bool,
-    facts: Option<taskmanager_core::GpuGraphicsApi>,
+    facts: Option<GpuGraphicsApi>,
 }
 
 impl GraphicsApiProvider {

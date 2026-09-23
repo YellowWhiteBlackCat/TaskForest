@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::atomic::{AtomicU64, Ordering};
+use taskmanager_core::ScalarAvailability;
 
 static SCRATCH: AtomicU64 = AtomicU64::new(0);
 
@@ -56,7 +57,7 @@ fn full_sysfs_shape_reports_driver_and_typed_unsupported_utilization() {
     assert_eq!(device.brand, None);
     assert_eq!(
         device.utilization_pct.availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
 }
 

@@ -5,6 +5,17 @@ use super::target_observation::{
     WinProcessAffinityProvider, WinProcessIsolationProvider, WinProcessNetworkProvider,
 };
 use super::*;
+use taskmanager_application::ProcessControlRequest;
+use taskmanager_core::DeviceStatus;
+use taskmanager_core::MAX_ENVIRONMENT_BYTES;
+use taskmanager_core::MAX_ENVIRONMENT_ENTRIES;
+use taskmanager_core::OpenFileEntry;
+use taskmanager_core::ResourceGroupLimitRequest;
+use taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_BYTES;
+use taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_ENTRIES;
+use taskmanager_windows_api::WindowsProcessEnvironmentBlock;
+#[cfg(windows)]
+use taskmanager_windows_api::process_creation_time_100ns;
 
 fn frozen(pid: u32) -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(pid, "test", 1, 1).expect("valid test identity")
@@ -12,8 +23,7 @@ fn frozen(pid: u32) -> FrozenProcessIdentity {
 
 #[cfg(windows)]
 fn live_frozen(pid: u32) -> FrozenProcessIdentity {
-    let token = taskmanager_windows_api::process_creation_time_100ns(pid)
-        .expect("current process creation time");
+    let token = process_creation_time_100ns(pid).expect("current process creation time");
     FrozenProcessIdentity::from_authoritative_parts(pid, "test", 1, token)
         .expect("valid live identity")
 }
@@ -45,10 +55,7 @@ fn win_process_insight_providers_reject_a_wrong_creation_token() {
     }
 
     let mut resource_control = WinProcessResourceControlProvider;
-    let outcome = resource_control.apply_limits(
-        &frozen(1),
-        &taskmanager_core::ResourceGroupLimitRequest::default(),
-    );
+    let outcome = resource_control.apply_limits(&frozen(1), &ResourceGroupLimitRequest::default());
     // The wrong frozen token is rejected before any job is created or
     // released; off-Windows the whole lane is the typed dormant fallback.
     #[cfg(windows)]
@@ -112,14 +119,14 @@ fn open_files_projection_maps_kinds_keeps_unreadable_and_sorts_by_fd() {
 
     let value = open_files_value_from_boundary(raw, 5000);
 
-    assert_eq!(value.state.status, taskmanager_core::DeviceStatus::Healthy);
+    assert_eq!(value.state.status, DeviceStatus::Healthy);
     assert_eq!(value.state.last_success_ms, Some(5000));
     // Ascending fd order regardless of snapshot order.
     let fds: Vec<u32> = value.entries.iter().map(|entry| entry.fd).collect();
     assert_eq!(fds, vec![0x30, 0x80, 0x120]);
     assert_eq!(
         value.entries[0],
-        taskmanager_core::OpenFileEntry {
+        OpenFileEntry {
             fd: 0x30,
             kind: OpenFileKind::Other,
             target: None,
@@ -290,7 +297,7 @@ fn process_control_requests_dispatch_to_provider_methods() {
         provider.send_signal(&frozen(1), ProcessSignal::Interrupt),
         Err(ProviderFailure::Unsupported)
     );
-    let _ = taskmanager_application::ProcessControlRequest::EndTask(frozen(1));
+    let _ = ProcessControlRequest::EndTask(frozen(1));
 }
 
 #[test]
@@ -373,7 +380,7 @@ fn win_process_environment_provider_rejects_a_wrong_creation_token() {
 
 #[test]
 fn environment_projection_keeps_order_honest_absence_and_truncation() {
-    let raw = taskmanager_windows_api::WindowsProcessEnvironmentBlock {
+    let raw = WindowsProcessEnvironmentBlock {
         working_directory: Some(r"C:\work".to_string()),
         entries: vec![
             ("PATH".to_string(), r"C:\bin".to_string()),
@@ -383,7 +390,7 @@ fn environment_projection_keeps_order_honest_absence_and_truncation() {
     };
     let value = environment_value_from_boundary(raw, 7000);
 
-    assert_eq!(value.state.status, taskmanager_core::DeviceStatus::Healthy);
+    assert_eq!(value.state.status, DeviceStatus::Healthy);
     assert_eq!(value.state.last_success_ms, Some(7000));
     assert_eq!(
         value.working_directory,
@@ -398,7 +405,7 @@ fn environment_projection_keeps_order_honest_absence_and_truncation() {
 
     // An unreadable cwd stays an honest None; it is never "/" or the exe dir.
     let absent = environment_value_from_boundary(
-        taskmanager_windows_api::WindowsProcessEnvironmentBlock {
+        WindowsProcessEnvironmentBlock {
             working_directory: None,
             entries: Vec::new(),
             truncated_count: 0,
@@ -413,14 +420,8 @@ fn environment_projection_keeps_order_honest_absence_and_truncation() {
 fn windows_environment_budgets_mirror_the_core_contract_caps() {
     // The contract owns the byte/entry budgets; this pins the boundary's
     // copies to it so the two authorities cannot drift apart silently.
-    assert_eq!(
-        taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_BYTES,
-        taskmanager_core::MAX_ENVIRONMENT_BYTES
-    );
-    assert_eq!(
-        taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_ENTRIES,
-        taskmanager_core::MAX_ENVIRONMENT_ENTRIES
-    );
+    assert_eq!(MAX_PROCESS_ENVIRONMENT_BYTES, MAX_ENVIRONMENT_BYTES);
+    assert_eq!(MAX_PROCESS_ENVIRONMENT_ENTRIES, MAX_ENVIRONMENT_ENTRIES);
 }
 
 #[test]

@@ -16,6 +16,7 @@ use proptest::string::string_regex;
 use taskmanager_core::core::metrics::SmartAvailability;
 
 use super::{parse_ata_attributes, parse_smartctl_json, smartctl_device_path};
+use taskmanager_core::core::smart::DiskSmart;
 
 /// Any byte sequence up to `max_bytes`, lossily converted to UTF-8. Models the
 /// shell-out boundary: corrupt stdout either becomes a replacement char or
@@ -51,7 +52,7 @@ fn arbitrary_json_value(depth: usize) -> BoxedStrategy<serde_json::Value> {
 
 /// The observed sample must never claim availability that the input did not
 /// support: every field is either derived from the text or absent.
-fn assert_parsed_sample_is_grounded(smart: &taskmanager_core::core::smart::DiskSmart) {
+fn assert_parsed_sample_is_grounded(smart: &DiskSmart) {
     assert_eq!(smart.availability, SmartAvailability::Available);
     assert!(
         smart.temperature_c.is_some()

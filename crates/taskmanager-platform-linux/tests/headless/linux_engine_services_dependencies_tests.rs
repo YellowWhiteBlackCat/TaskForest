@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use super::*;
+use taskmanager_core::ServiceRelationKind;
 
 struct FakeRunner {
     outcomes: VecDeque<DependencyCommandResult>,
@@ -132,7 +133,7 @@ fn a_later_request_recovers_after_a_transient_failure() {
     .expect("the later successful query must recover");
     assert_eq!(
         recovered
-            .relation_targets(&taskmanager_core::ServiceRelationKind::Requires)
+            .relation_targets(&ServiceRelationKind::Requires)
             .map(|target| target.as_str())
             .collect::<Vec<_>>(),
         [crate::engine::services::target::systemd_unit_id("network.target").as_str()]

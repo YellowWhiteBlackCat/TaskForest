@@ -13,6 +13,7 @@ use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use super::{UiPalette, theme_color, ui_palette};
+use taskmanager_theme::Color;
 
 /// The light-mode counterpart of `Theme::dark()`'s construction: same skin,
 /// fonts and contrast, opposite mode.
@@ -25,7 +26,7 @@ fn light_theme() -> Theme {
     )
 }
 
-fn assert_same_color(bevy_color: bevy::color::Color, token: taskmanager_theme::Color) {
+fn assert_same_color(bevy_color: bevy::color::Color, token: Color) {
     let Srgba {
         red,
         green,

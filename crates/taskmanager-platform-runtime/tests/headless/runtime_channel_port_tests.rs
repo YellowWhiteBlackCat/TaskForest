@@ -56,6 +56,8 @@ impl CapabilityRequest for UnownedFixtureRequest {
 }
 
 use crate::delivery::LaneFlow;
+use taskmanager_core::FailureKind;
+use taskmanager_core::HardwareInfo;
 
 #[test]
 fn invalid_target_scope_never_reaches_the_lane_or_ecs() {
@@ -549,12 +551,10 @@ fn failed_scheduled_submission_cannot_rollback_an_interleaved_explicit_owner() {
     let terminal_event = || {
         PlatformEvent::HardwareInventory(HardwareInventoryEvent::Snapshot(Box::new(
             CompositeSourceSnapshot::new(
-                taskmanager_core::HardwareInfo::default(),
+                HardwareInfo::default(),
                 vec![SourceStatus {
                     provider: ProviderId::borrowed("fixture.runtime"),
-                    outcome: SourceOutcome::Unavailable(
-                        taskmanager_core::FailureKind::TemporarilyUnavailable,
-                    ),
+                    outcome: SourceOutcome::Unavailable(FailureKind::TemporarilyUnavailable),
                     item_count: 0,
                 }],
             ),

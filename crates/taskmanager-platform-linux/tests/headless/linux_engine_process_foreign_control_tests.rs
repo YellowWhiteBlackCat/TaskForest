@@ -1,5 +1,6 @@
 use super::*;
 use taskmanager_core::PriorityTier;
+use taskmanager_escalation::polkit::ForeignProcessSignal;
 
 fn target() -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(42, "worker", 1, 9_000).expect("valid identity")
@@ -13,9 +14,7 @@ fn batch_and_signal_operations_preserve_typed_action() {
     );
     assert_eq!(
         signal_operation(ProcessSignal::User2),
-        ForeignProcessControlOperation::Signal(
-            taskmanager_escalation::polkit::ForeignProcessSignal::User2
-        )
+        ForeignProcessControlOperation::Signal(ForeignProcessSignal::User2)
     );
     assert_eq!(
         affinity_operation(&[1, 3]),

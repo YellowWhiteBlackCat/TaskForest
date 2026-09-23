@@ -53,6 +53,7 @@ use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskmanager_application::PlatformEventBatch;
 
 // ---- fixtures ----
 
@@ -70,9 +71,9 @@ fn service_item(id: &str, name: &str, status: ServiceStatus) -> ServiceItem {
 
 fn shelved_shell(items: &[ServiceItem]) -> ShellApp {
     let mut shell = ShellApp::new();
-    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
+    shell.apply_platform_batch(PlatformEventBatch {
         service_events: vec![correlated_service_snapshot(items.to_vec())],
-        ..taskmanager_application::PlatformEventBatch::default()
+        ..PlatformEventBatch::default()
     });
     shell
 }

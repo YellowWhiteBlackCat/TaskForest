@@ -41,9 +41,7 @@ fn multi_target_health_is_independent_of_device_or_issue_order() {
     assert_eq!(batch_health(&left, true), batch_health(&right, true));
     assert_eq!(
         batch_health(&left, false),
-        CapabilityHealth::Unavailable(
-            taskmanager_platform_contract::ProviderFailure::PermissionDenied
-        )
+        CapabilityHealth::Unavailable(ProviderFailure::PermissionDenied)
     );
 }
 
@@ -82,7 +80,7 @@ fn capacity_rejection_happens_before_the_drive_side_effect() {
             &mut provider,
             1,
         ),
-        Err(taskmanager_platform_contract::ProviderFailure::Rejected)
+        Err(ProviderFailure::Rejected)
     ));
     assert_eq!(
         provider_calls.load(Ordering::Relaxed),
@@ -93,3 +91,4 @@ fn capacity_rejection_happens_before_the_drive_side_effect() {
 }
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
+use taskmanager_platform_contract::ProviderFailure;

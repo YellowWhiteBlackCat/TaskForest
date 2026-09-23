@@ -1,6 +1,15 @@
 //! Startup-entry and session control lane isolation contracts.
 
 use super::*;
+use taskmanager_application::SessionEvent;
+use taskmanager_application::StartupEvent;
+use taskmanager_application::StartupEvidenceEvent;
+use taskmanager_core::StartupControlPolicy;
+use taskmanager_core::StartupImpact;
+use taskmanager_core::StartupImpactEvidence;
+use taskmanager_core::StartupImpactUnknownReason;
+use taskmanager_core::StartupScope;
+use taskmanager_core::StartupSource;
 
 #[test]
 fn environment_catalog_keeps_five_distinct_registration_identities() {
@@ -54,7 +63,7 @@ fn startup_evidence_has_an_independent_clocked_provider_chain() {
     assert!(matches!(
         event.outcome,
         Ok(PlatformEvent::StartupEvidence(
-            taskmanager_application::StartupEvidenceEvent::Snapshot(_)
+            StartupEvidenceEvent::Snapshot(_)
         ))
     ));
     let times = observed_times.lock().expect("startup evidence times");
@@ -92,13 +101,13 @@ fn startup_and_session_controls_are_non_blocking_and_correlated() {
                     name: "demo".into(),
                     exec: "demo".into(),
                     enabled: false,
-                    source: taskmanager_core::StartupSource::DesktopEntry,
-                    scope: taskmanager_core::StartupScope::User,
-                    control_policy: taskmanager_core::StartupControlPolicy::Direct,
+                    source: StartupSource::DesktopEntry,
+                    scope: StartupScope::User,
+                    control_policy: StartupControlPolicy::Direct,
                     locator: "/tmp/demo.desktop".into(),
-                    impact: taskmanager_core::StartupImpact::None,
-                    impact_evidence: taskmanager_core::StartupImpactEvidence::Unknown {
-                        reason: taskmanager_core::StartupImpactUnknownReason::NotInstrumented,
+                    impact: StartupImpact::None,
+                    impact_evidence: StartupImpactEvidence::Unknown {
+                        reason: StartupImpactUnknownReason::NotInstrumented,
                     },
                 },
                 enabled: true,
@@ -135,13 +144,13 @@ fn startup_and_session_controls_are_non_blocking_and_correlated() {
     assert!(events.iter().any(|event| matches!(
         event.outcome,
         Ok(PlatformEvent::Startup(
-            taskmanager_application::StartupEvent::Control(ref outcome)
+            StartupEvent::Control(ref outcome)
         )) if outcome.request_id == startup_id && outcome.result.is_ok()
     )));
     assert!(events.iter().any(|event| matches!(
         event.outcome,
         Ok(PlatformEvent::Sessions(
-            taskmanager_application::SessionEvent::Control(ref outcome)
+            SessionEvent::Control(ref outcome)
         )) if outcome.request_id == session_id
             && outcome.result == Err(FailureKind::PermissionDenied)
     )));

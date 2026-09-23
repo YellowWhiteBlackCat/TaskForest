@@ -1,5 +1,6 @@
 //! Shared Linux policy for revalidating a frozen process target before use.
 
+use taskmanager_core::FailureKind;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::ProviderFailure;
@@ -57,8 +58,7 @@ fn snapshot_failure(sources: &[SourceStatus]) -> ProviderFailure {
         .unwrap_or(ProviderFailure::ProviderFault)
 }
 
-const fn failure_priority(failure: taskmanager_core::FailureKind) -> u8 {
-    use taskmanager_core::FailureKind;
+const fn failure_priority(failure: FailureKind) -> u8 {
     match failure {
         FailureKind::RequiresEscalation => 9,
         FailureKind::PermissionDenied => 8,

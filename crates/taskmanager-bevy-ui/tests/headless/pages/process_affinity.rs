@@ -7,6 +7,7 @@ use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
 
 use super::affinity::{ProcessAffinityModalState, affinity_modal_scene};
+use taskmanager_theme::Theme;
 
 fn dummy_identity(pid: u32, name: &str) -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(pid, name, 1, 1).expect("valid dummy identity")
@@ -68,7 +69,7 @@ fn affinity_modal_scene_renders_without_panic() {
         mask_observed: true,
     };
 
-    let theme = taskmanager_theme::Theme::default();
+    let theme = Theme::default();
     let palette = crate::palette::ui_palette(&theme);
     let _scene = affinity_modal_scene(&session, &palette);
 }

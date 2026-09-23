@@ -1,6 +1,8 @@
 use super::*;
 use std::io;
 use std::sync::Mutex;
+#[cfg(windows)]
+use taskmanager_platform_conformance::assert_identity_change_is_side_effect_free;
 
 /// Mock spawner that records the select argument and returns a chosen
 /// outcome. Injected instead of the real `Command` so the provider's mapping
@@ -104,10 +106,8 @@ fn reveal_rejects_a_reused_pid_before_spawning_explorer() {
     let before = recorder.args.lock().expect("recorder args").len() as u64;
     let result = provider.reveal_process(&wrong, Some(std::path::Path::new(r"C:\target.exe")));
     let after = recorder.args.lock().expect("recorder args").len() as u64;
-    taskmanager_platform_conformance::assert_identity_change_is_side_effect_free(
-        &result, before, after,
-    )
-    .expect("reveal must reject a replacement before spawning explorer");
+    assert_identity_change_is_side_effect_free(&result, before, after)
+        .expect("reveal must reject a replacement before spawning explorer");
 }
 
 #[test]

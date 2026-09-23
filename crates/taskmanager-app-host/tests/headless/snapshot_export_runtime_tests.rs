@@ -9,10 +9,10 @@ use taskmanager_application::snapshot_export::{
 use taskmanager_core::{ProcessItem, SystemSnapshot};
 
 use super::*;
+use taskmanager_application::snapshot_export::SnapshotExportDisposition;
+use taskmanager_application::snapshot_export::SnapshotExportRequest;
 
-fn request(
-    target: SnapshotExportTarget,
-) -> taskmanager_application::snapshot_export::SnapshotExportRequest {
+fn request(target: SnapshotExportTarget) -> SnapshotExportRequest {
     let mut controller = SnapshotExportController::new();
     controller
         .begin(SnapshotExportPayload::new(
@@ -51,7 +51,7 @@ fn app_host_worker_writes_all_three_artifacts_off_the_caller_thread() {
     client.outstanding = client.outstanding.saturating_sub(1);
     assert_eq!(
         controller.complete(completion),
-        taskmanager_application::snapshot_export::SnapshotExportDisposition::Applied
+        SnapshotExportDisposition::Applied
     );
     assert!(matches!(
         controller.state(),

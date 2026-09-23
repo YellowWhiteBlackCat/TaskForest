@@ -6,6 +6,7 @@
 //! never trigger escalation.
 
 use taskmanager_core::{FailureKind, FrozenProcessIdentity, ProcessBatchAction, ProcessSignal};
+use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::{
     ForeignProcessControlFailure, ForeignProcessControlOperation, ForeignProcessControlOutcome,
     ForeignProcessControlTarget, invoke_foreign_process_control,
@@ -69,21 +70,13 @@ pub(crate) fn finish_with_escalation(
         ForeignProcessControlOutcome::Applied => Ok(()),
         ForeignProcessControlOutcome::Failed { kind, .. } => Err(map_failure(kind)),
         ForeignProcessControlOutcome::Unavailable { reason, .. } => Err(match reason {
-            taskmanager_escalation::EscalationDenialReason::Unsupported => FailureKind::Unsupported,
-            taskmanager_escalation::EscalationDenialReason::PermissionDenied => {
-                FailureKind::PermissionDenied
-            }
-            taskmanager_escalation::EscalationDenialReason::AuthorizationUnavailable => {
-                FailureKind::TemporarilyUnavailable
-            }
+            EscalationDenialReason::Unsupported => FailureKind::Unsupported,
+            EscalationDenialReason::PermissionDenied => FailureKind::PermissionDenied,
+            EscalationDenialReason::AuthorizationUnavailable => FailureKind::TemporarilyUnavailable,
             // Keep helper absence distinct in the shared data contract: the
             // user may install/enable the one-feature helper later.
-            taskmanager_escalation::EscalationDenialReason::HelperUnavailable => {
-                FailureKind::RequiresEscalation
-            }
-            taskmanager_escalation::EscalationDenialReason::HelperProtocolViolation => {
-                FailureKind::ProviderFault
-            }
+            EscalationDenialReason::HelperUnavailable => FailureKind::RequiresEscalation,
+            EscalationDenialReason::HelperProtocolViolation => FailureKind::ProviderFault,
         }),
     }
 }

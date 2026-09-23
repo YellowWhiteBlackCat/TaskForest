@@ -22,6 +22,12 @@ use taskmanager_shell::{
 
 use crate::menu_modal::{ActionMenuContext, MenuModal};
 use crate::widgets::menu::{MenuItem, MenuSpec};
+use taskmanager_application::ProcessAffinityRequest;
+use taskmanager_application::ResourceRevealRequest;
+use taskmanager_application::UrlOpenRequest;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_shell::presentation::priority_tier_label;
+use taskmanager_shell::presentation::search_url_for;
 
 /// The shared control verbs, in the same display order as the TUI/GPUI
 /// process menus: end task, end process tree, the suspend/resume pair, force
@@ -71,9 +77,7 @@ fn action_label(action: ProcessMenuAction) -> String {
         ProcessMenuAction::Suspend => process_batch_action_label(ProcessBatchAction::Suspend),
         ProcessMenuAction::Resume => process_batch_action_label(ProcessBatchAction::Resume),
         ProcessMenuAction::Kill => process_batch_action_label(ProcessBatchAction::Kill),
-        ProcessMenuAction::Priority(tier) => {
-            taskmanager_shell::presentation::priority_tier_label(tier).to_owned()
-        }
+        ProcessMenuAction::Priority(tier) => priority_tier_label(tier).to_owned(),
         ProcessMenuAction::EfficiencyMode => t("proc.efficiency_mode").to_owned(),
         ProcessMenuAction::OpenLocation => t("proc.open_location").to_owned(),
         ProcessMenuAction::SearchOnline => t("proc.search_online").to_owned(),
@@ -158,17 +162,12 @@ impl ActionMenuContext for ProcessMenuCtx {
                 .collect(),
             ProcessMenuAction::OpenLocation => {
                 if let Some(process) = shell.visible_process_at(shell.selected)
-                    && let Some(target) =
-                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
-                            process,
-                        )
+                    && let Some(target) = FrozenProcessIdentity::from_process(process)
                 {
-                    return vec![PlatformEffect::RevealResource(
-                        taskmanager_application::ResourceRevealRequest {
-                            target,
-                            cached_executable: process.current_exe_path().map(ToOwned::to_owned),
-                        },
-                    )];
+                    return vec![PlatformEffect::RevealResource(ResourceRevealRequest {
+                        target,
+                        cached_executable: process.current_exe_path().map(ToOwned::to_owned),
+                    })];
                 }
                 Vec::new()
             }
@@ -176,24 +175,19 @@ impl ActionMenuContext for ProcessMenuCtx {
                 if let Some(process) = shell.visible_process_at(shell.selected)
                     && !process.name.trim().is_empty()
                 {
-                    return vec![PlatformEffect::OpenUrl(
-                        taskmanager_application::UrlOpenRequest {
-                            url: taskmanager_shell::presentation::search_url_for(&process.name),
-                        },
-                    )];
+                    return vec![PlatformEffect::OpenUrl(UrlOpenRequest {
+                        url: search_url_for(&process.name),
+                    })];
                 }
                 Vec::new()
             }
             ProcessMenuAction::Affinity => {
                 if let Some(process) = shell.visible_process_at(shell.selected)
-                    && let Some(target) =
-                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
-                            process,
-                        )
+                    && let Some(target) = FrozenProcessIdentity::from_process(process)
                 {
-                    return vec![PlatformEffect::ProcessAffinity(
-                        taskmanager_application::ProcessAffinityRequest { target },
-                    )];
+                    return vec![PlatformEffect::ProcessAffinity(ProcessAffinityRequest {
+                        target,
+                    })];
                 }
                 Vec::new()
             }

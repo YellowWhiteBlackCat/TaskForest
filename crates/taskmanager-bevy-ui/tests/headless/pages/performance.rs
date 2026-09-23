@@ -69,17 +69,28 @@ use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskmanager_application::ConfirmationKind;
+use taskmanager_application::PlatformEffect;
+use taskmanager_application::SmartControlRequest;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
+use taskmanager_core::core::DeviceGeneration;
+use taskmanager_core::core::SystemSnapshot;
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_platform_contract::RequestEnvelope;
+use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::presentation::trend::window;
 
 const GIB: u64 = 1024 * 1024 * 1024;
 
 /// The strip's polyline projection over the shell's series — the same
 /// bounded, gap-aware call the render path makes (design strip geometry).
 fn curve_segments(
-    shell: &taskmanager_shell::ShellApp,
+    shell: &ShellApp,
     curve: SystemCurve,
 ) -> Vec<crate::widgets::chart::ChartSegment> {
     line_segments(
-        &taskmanager_shell::presentation::trend::window(&shell.history, curve.series()),
+        &window(&shell.history, curve.series()),
         super::scene::chart::CHART_STRIP_WIDTH_PX,
         34.0 * 3.0,
         MAX_CHART_POINTS,
@@ -338,7 +349,7 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
 /// folded package observation rewrites the mounted text with the shared fold.
 #[test]
 fn cpu_thermal_throttle_counters_render_with_honest_absence() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let field = DynField::Cpu(CpuField::ThermalThrottle);
     let mut app = headless_perf_app();
     app.update();
@@ -480,10 +491,7 @@ struct QuietRequests;
 impl RequestPort for QuietRequests {
     type Request = HostTelemetryRequest;
 
-    fn try_submit(
-        &self,
-        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
-    ) -> Result<(), SubmissionError> {
+    fn try_submit(&self, _request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         Ok(())
     }
 }
@@ -1045,7 +1053,7 @@ fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
     }
 
     // Nothing measured yet: an empty layout, never NaN widths.
-    let zero = taskmanager_core::core::metrics::MemoryMetrics::default();
+    let zero = MemoryMetrics::default();
     assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
 }
 
@@ -1058,19 +1066,19 @@ fn smart_self_test_request_arms_confirmation_and_confirm_emits_effect() {
     disk.device_id = "disk-samsung-980".to_owned();
     disk.name = "nvme0n1".to_owned();
     disk.model = "Samsung SSD 980 Pro".to_owned();
-    disk.device_generation = taskmanager_core::core::DeviceGeneration::new(2);
+    disk.device_generation = DeviceGeneration::new(2);
 
-    let snapshot = taskmanager_core::core::SystemSnapshot {
+    let snapshot = SystemSnapshot {
         disks: vec![disk],
         ..Default::default()
     };
-    taskmanager_shell::fixture::edit_snapshot(&mut shell, |s| *s = Some(snapshot));
+    edit_snapshot(&mut shell, |s| *s = Some(snapshot));
 
     // Requesting a non-existent disk fails
     assert!(!super::request_smart_self_test(
         &mut shell,
         "non-existent-disk",
-        taskmanager_core::core::smart::SmartSelfTestKind::Short,
+        SmartSelfTestKind::Short,
     ));
     assert_eq!(shell.confirmation_kind(), None);
 
@@ -1078,25 +1086,22 @@ fn smart_self_test_request_arms_confirmation_and_confirm_emits_effect() {
     assert!(super::request_smart_self_test(
         &mut shell,
         "disk-samsung-980",
-        taskmanager_core::core::smart::SmartSelfTestKind::Short,
+        SmartSelfTestKind::Short,
     ));
     assert_eq!(
         shell.confirmation_kind(),
-        Some(taskmanager_application::ConfirmationKind::SmartSelfTest)
+        Some(ConfirmationKind::SmartSelfTest)
     );
 
     // Confirming emits PlatformEffect::SmartControl
-    let effect = crate::confirmation::confirm_armed(
-        &mut shell,
-        taskmanager_application::ConfirmationKind::SmartSelfTest,
-    );
+    let effect = crate::confirmation::confirm_armed(&mut shell, ConfirmationKind::SmartSelfTest);
     assert!(matches!(
         effect,
-        Some(taskmanager_application::PlatformEffect::SmartControl(
-            taskmanager_application::SmartControlRequest::StartSelfTest(ref intent)
+        Some(PlatformEffect::SmartControl(
+            SmartControlRequest::StartSelfTest(ref intent)
         )) if intent.display_name == "Samsung SSD 980 Pro"
             && intent.device_id.as_str() == "disk-samsung-980"
-            && intent.kind == taskmanager_core::core::smart::SmartSelfTestKind::Short
+            && intent.kind == SmartSelfTestKind::Short
     ));
     assert_eq!(shell.confirmation_kind(), None);
 }
@@ -1111,13 +1116,13 @@ fn key_t_on_performance_page_arms_smart_self_test_for_disk() {
     disk.device_id = "disk-nvme-0".to_owned();
     disk.name = "nvme0n1".to_owned();
     disk.model = "Fast NVMe".to_owned();
-    disk.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+    disk.device_generation = DeviceGeneration::new(1);
 
-    let snapshot = taskmanager_core::core::SystemSnapshot {
+    let snapshot = SystemSnapshot {
         disks: vec![disk],
         ..Default::default()
     };
-    taskmanager_shell::fixture::edit_snapshot(
+    edit_snapshot(
         &mut app.world_mut().non_send_mut::<FrontendTrack>().shell,
         |s| *s = Some(snapshot),
     );
@@ -1149,7 +1154,7 @@ fn key_t_on_performance_page_arms_smart_self_test_for_disk() {
     let track = app.world().non_send::<FrontendTrack>();
     assert_eq!(
         track.shell.confirmation_kind(),
-        Some(taskmanager_application::ConfirmationKind::SmartSelfTest)
+        Some(ConfirmationKind::SmartSelfTest)
     );
     let pending = track
         .shell
@@ -1157,8 +1162,5 @@ fn key_t_on_performance_page_arms_smart_self_test_for_disk() {
         .expect("pending intent");
     assert_eq!(pending.device_id.as_str(), "disk-nvme-0");
     assert_eq!(pending.display_name, "Fast NVMe");
-    assert_eq!(
-        pending.kind,
-        taskmanager_core::core::smart::SmartSelfTestKind::Short
-    );
+    assert_eq!(pending.kind, SmartSelfTestKind::Short);
 }

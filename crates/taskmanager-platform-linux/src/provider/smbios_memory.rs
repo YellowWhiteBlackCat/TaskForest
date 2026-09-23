@@ -17,7 +17,9 @@
 //! but the live privileged read needs sudo and is an integrator on-box receipt
 //! item. No fabricated rows exist on any path: failures stay typed failures.
 
+use taskmanager_core::FailureKind;
 use taskmanager_core::{DmiIdentityFacts, SmbiosMemorySnapshot, SmbiosModuleRow};
+use taskmanager_escalation::polkit;
 use taskmanager_escalation::polkit::{
     PolkitGate, SmbiosHelperErrorKind, SmbiosHelperOutcome, invoke_smbios_helper,
 };
@@ -84,14 +86,14 @@ fn capability_status_from_availability(availability: EscalationAvailability) -> 
         EscalationAvailability::Denied { reason } => match reason {
             EscalationDenialReason::Unsupported => CapabilityStatus::Unsupported,
             EscalationDenialReason::PermissionDenied => {
-                CapabilityStatus::Degraded(taskmanager_core::FailureKind::PermissionDenied)
+                CapabilityStatus::Degraded(FailureKind::PermissionDenied)
             }
             EscalationDenialReason::AuthorizationUnavailable => {
                 CapabilityStatus::TemporarilyUnavailable
             }
             EscalationDenialReason::HelperUnavailable => CapabilityStatus::MissingDependency,
             EscalationDenialReason::HelperProtocolViolation => {
-                CapabilityStatus::Degraded(taskmanager_core::FailureKind::ProviderFault)
+                CapabilityStatus::Degraded(FailureKind::ProviderFault)
             }
         },
     }
@@ -143,8 +145,8 @@ fn result_from_outcome(
 /// Map the escalation seam's parsed identity struct onto the core fact,
 /// field-by-field (one fact, one authority: core owns the typed fact; the
 /// escalation crate owns only the wire shape).
-fn identity_row(identity: &taskmanager_escalation::polkit::DmiIdentityFacts) -> DmiIdentityFacts {
-    let taskmanager_escalation::polkit::DmiIdentityFacts {
+fn identity_row(identity: &polkit::DmiIdentityFacts) -> DmiIdentityFacts {
+    let polkit::DmiIdentityFacts {
         bios_vendor,
         bios_version,
         bios_date,

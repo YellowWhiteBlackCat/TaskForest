@@ -18,6 +18,7 @@ use std::fmt;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use taskmanager_app_host::NativeAppHost;
+use taskmanager_application::SystemFacets;
 use taskmanager_application::{
     ConfigClient, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
     PlatformHandle,
@@ -207,10 +208,8 @@ pub fn demo_platform_runtime() -> &'static SharedRuntime {
         SharedRuntime::new(PlatformClient::new(PlatformHandle::new(
             std::sync::Arc::new(DemoCapabilities),
             std::sync::Arc::new(DemoEvents),
-            PlatformFacets::default().with_system(
-                taskmanager_application::SystemFacets::default()
-                    .with_host(std::sync::Arc::new(DemoRequests)),
-            ),
+            PlatformFacets::default()
+                .with_system(SystemFacets::default().with_host(std::sync::Arc::new(DemoRequests))),
         )))
     })
 }

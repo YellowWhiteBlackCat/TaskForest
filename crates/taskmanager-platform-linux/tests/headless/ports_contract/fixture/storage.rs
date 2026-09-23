@@ -2,6 +2,7 @@
 //! directory-usage scan lane.
 
 use super::*;
+use taskmanager_core::SmartSelfTestPhase;
 
 impl DirectoryUsageProvider for FakeProvider {
     fn scan_chunk(
@@ -55,7 +56,7 @@ impl SmartSelfTestControlProvider for FakeProvider {
         }
         Ok(SmartSelfTestReport {
             state: DeviceState::healthy(observed_at_ms),
-            phase: taskmanager_core::SmartSelfTestPhase::Running,
+            phase: SmartSelfTestPhase::Running,
             kind: Some(intent.kind),
             ..SmartSelfTestReport::default()
         })

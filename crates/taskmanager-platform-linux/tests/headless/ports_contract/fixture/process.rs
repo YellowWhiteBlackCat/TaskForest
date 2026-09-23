@@ -2,9 +2,14 @@
 //! isolation), affinity, and control.
 
 use super::*;
+use taskmanager_core::ProcessBatchIntent;
+use taskmanager_core::ProcessBatchResult;
+use taskmanager_core::ProcessBatchTargetResult;
 use taskmanager_core::ProcessResourceObservations;
+use taskmanager_core::ProcessSignal;
 use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_platform_provider::ProcessEnvironmentProvider;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 impl ProcessListProvider for FakeProvider {
     fn refresh(
@@ -14,7 +19,7 @@ impl ProcessListProvider for FakeProvider {
         self.process_refresh_started.store(true, Ordering::Release);
         thread::sleep(self.delay);
         let items = vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(42)
                 .name("worker".into())
                 .build(),
@@ -225,23 +230,23 @@ impl ProcessControlProvider for FakeProvider {
 
     fn execute_batch(
         &mut self,
-        intent: taskmanager_core::ProcessBatchIntent,
-    ) -> Result<taskmanager_core::ProcessBatchResult, ProviderFailure> {
+        intent: ProcessBatchIntent,
+    ) -> Result<ProcessBatchResult, ProviderFailure> {
         self.process_control_started.store(true, Ordering::Release);
         thread::sleep(self.process_control_delay);
         let targets = intent
             .targets
             .iter()
             .cloned()
-            .map(|target| (target, taskmanager_core::ProcessBatchTargetResult::Applied))
+            .map(|target| (target, ProcessBatchTargetResult::Applied))
             .collect();
-        Ok(taskmanager_core::ProcessBatchResult { intent, targets })
+        Ok(ProcessBatchResult { intent, targets })
     }
 
     fn send_signal(
         &mut self,
         target: &FrozenProcessIdentity,
-        signal: taskmanager_core::ProcessSignal,
+        signal: ProcessSignal,
     ) -> Result<(), ProviderFailure> {
         if let Ok(mut signaled) = self.signaled.lock() {
             signaled.push((target.pid, signal));

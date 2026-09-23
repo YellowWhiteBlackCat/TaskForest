@@ -1,12 +1,18 @@
 //! Formatter helpers for Bevy Process Insights cards.
 
+use taskmanager_application::process_details_vm::render_environment_variable;
 use taskmanager_application::{i18n::t, project_process_resources};
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, IsolationKind, LimitValue,
     ProcessEnvironment, ProcessGpuSnapshot, ProcessIsolation, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreadInfo, ProcessThreads,
 };
+use taskmanager_shell::presentation::capabilities_summary;
+use taskmanager_shell::presentation::namespaces_summary;
+use taskmanager_shell::presentation::network_connection_counters_summary;
+use taskmanager_shell::presentation::sandbox_details_summary;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 
 pub(crate) fn threads_summary(threads: &ProcessThreads) -> String {
@@ -46,7 +52,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
     if let Some(nanos) = thread.run_queue_wait_ns {
         let kind = thread
             .wait_kind
-            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .map(ThreadWaitKind::as_str)
             .unwrap_or("wait");
         line.push_str(&format!("  {kind} {:.1}ms", nanos as f64 / 1_000_000.0));
     }
@@ -125,8 +131,7 @@ pub(crate) fn network_summary(network: &ProcessNetworkSnapshot) -> String {
         lines.push("…".to_owned());
     }
     if let Some(counters) = network.connection_counters.as_ref()
-        && let Some(summary) =
-            taskmanager_shell::presentation::network_connection_counters_summary(counters)
+        && let Some(summary) = network_connection_counters_summary(counters)
     {
         lines.push(summary);
     }
@@ -350,17 +355,17 @@ pub(crate) fn isolation_summary(isolation: &ProcessIsolation) -> String {
         security.push(format!(
             "{}: {}",
             t("proc_insights.capabilities"),
-            taskmanager_shell::presentation::capabilities_summary(capabilities),
+            capabilities_summary(capabilities),
         ));
     }
     if let Some(namespaces) = isolation.namespaces.as_ref() {
         security.push(format!(
             "{}: {}",
             t("proc_insights.namespaces"),
-            taskmanager_shell::presentation::namespaces_summary(namespaces),
+            namespaces_summary(namespaces),
         ));
     }
-    if let Some(details) = taskmanager_shell::presentation::sandbox_details_summary(isolation) {
+    if let Some(details) = sandbox_details_summary(isolation) {
         security.push(format!("{}: {details}", t("proc_insights.sandbox_details")));
     }
     if security.is_empty() {
@@ -385,12 +390,7 @@ pub(crate) fn environment_summary(environment: &ProcessEnvironment) -> String {
     };
     let mut lines = vec![header];
     for entry in environment.entries.iter().take(3) {
-        lines.push(
-            taskmanager_application::process_details_vm::render_environment_variable(
-                &entry.key,
-                &entry.value,
-            ),
-        );
+        lines.push(render_environment_variable(&entry.key, &entry.value));
     }
     if environment.entries.len() > 3 || environment.truncated_count > 0 {
         lines.push("…".to_owned());

@@ -77,6 +77,7 @@ use provider_registration::{
     fixture_environment_provider, fixture_process_provider, fixture_service_provider,
     fixture_system_provider,
 };
+use taskmanager_core::SmartSelfTestKind;
 #[path = "ports_contract/service_inventory.rs"]
 mod service_inventory;
 #[path = "ports_contract/smart_tracking.rs"]
@@ -670,7 +671,7 @@ fn health_capabilities_are_independent_correlated_facets() {
         device_generation: DeviceGeneration::INITIAL,
         device_key: "fixture-device".into(),
         display_name: "Fixture disk".into(),
-        kind: taskmanager_core::SmartSelfTestKind::Short,
+        kind: SmartSelfTestKind::Short,
     };
     handle
         .smart_control()

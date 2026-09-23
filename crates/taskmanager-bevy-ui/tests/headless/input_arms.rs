@@ -45,6 +45,9 @@ use crate::pages::sessions::SessionSelection;
 use crate::pages::sessions::menu::SessionMenuModal;
 use crate::pages::startup::StartupSelection;
 use crate::pages::startup::menu::StartupMenuModal;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 
 // ---- fixtures, harness, and consequence readers ----------------------------
 
@@ -351,9 +354,9 @@ fn arm_0b_service_log_chords_own_the_services_page() {
 fn arm_0b_panel_blocks_table_motion_and_closes_before_the_feedback_notice() {
     let mut shell = services_shell();
     shell.report_notice(
-        taskmanager_shell::FeedbackSource::Interaction,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        FeedbackSource::Interaction,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
         "notice across the log panel",
     );
     let mut app = routed_app(shell, Page::Services);

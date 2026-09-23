@@ -1,29 +1,33 @@
 use super::*;
 use taskmanager_core::DeviceStatus;
+use taskmanager_core::IsolationKind;
+use taskmanager_windows_api::WindowsComputeAccelerator;
+use taskmanager_windows_api::WindowsGpuEngineDetail;
+use taskmanager_windows_api::WindowsGpuEngineSample;
 
 #[test]
 fn pdh_engine_breakdown_maps_to_typed_engine_rows() {
-    let sample = taskmanager_windows_api::WindowsGpuEngineSample {
+    let sample = WindowsGpuEngineSample {
         luid: 0x10,
         utilization_pct: 42.0,
         engines: vec![
-            taskmanager_windows_api::WindowsGpuEngineDetail {
+            WindowsGpuEngineDetail {
                 engine_name: "3D".into(),
                 utilization_pct: 42.0,
             },
-            taskmanager_windows_api::WindowsGpuEngineDetail {
+            WindowsGpuEngineDetail {
                 engine_name: "Video Decode".into(),
                 utilization_pct: 7.5,
             },
-            taskmanager_windows_api::WindowsGpuEngineDetail {
+            WindowsGpuEngineDetail {
                 engine_name: "Copy".into(),
                 utilization_pct: 3.25,
             },
-            taskmanager_windows_api::WindowsGpuEngineDetail {
+            WindowsGpuEngineDetail {
                 engine_name: "Neural".into(),
                 utilization_pct: 1.0,
             },
-            taskmanager_windows_api::WindowsGpuEngineDetail {
+            WindowsGpuEngineDetail {
                 engine_name: String::new(),
                 utilization_pct: 99.0,
             },
@@ -136,9 +140,7 @@ fn live_container_provider_refreshes_a_typed_wsl_rollup() {
         assert!(
             matches!(
                 container.runtime,
-                Some(
-                    taskmanager_core::IsolationKind::Wsl | taskmanager_core::IsolationKind::Docker
-                )
+                Some(IsolationKind::Wsl | IsolationKind::Docker)
             ),
             "a WSL distro stays in the wsl/docker runtime family"
         );
@@ -148,7 +150,7 @@ fn live_container_provider_refreshes_a_typed_wsl_rollup() {
 
 #[test]
 fn setupapi_accelerator_maps_to_a_discovery_first_npu_device() {
-    let device = npu_device_from_setupapi(taskmanager_windows_api::WindowsComputeAccelerator {
+    let device = npu_device_from_setupapi(WindowsComputeAccelerator {
         instance_path: "ACPI\\INTC1070\\1".into(),
         friendly_name: Some("Intel(R) AI Boost".into()),
         driver_desc: Some("Intel(R) AI Boost".into()),

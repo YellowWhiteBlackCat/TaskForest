@@ -18,6 +18,7 @@ use super::{
     nvme_controller_from_name, parse_leading_f32, parse_leading_u64, parse_smart_log_stdout,
     stderr_is_permission_denied,
 };
+use taskmanager_core::core::smart::DiskSmart;
 
 /// Any byte sequence up to `max_bytes`, lossily converted to UTF-8 — the
 /// widest input shape the shell-out boundary can deliver to the parser.
@@ -26,7 +27,7 @@ fn utf8_lossy_bytes(max_bytes: usize) -> impl Strategy<Value = String> {
         .prop_map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
-fn assert_grounded(smart: &taskmanager_core::core::smart::DiskSmart) {
+fn assert_grounded(smart: &DiskSmart) {
     assert_eq!(smart.availability, SmartAvailability::Available);
     assert!(
         smart.failure.is_none(),

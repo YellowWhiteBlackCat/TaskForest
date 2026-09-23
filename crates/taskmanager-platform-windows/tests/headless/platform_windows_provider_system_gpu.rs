@@ -1,10 +1,10 @@
 use super::*;
+use taskmanager_core::GpuScalarObservations;
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsGpuAdapterMemorySample;
+use taskmanager_windows_api::WindowsPciAddress;
 
-fn dxgi_sample(
-    luid: u64,
-    name: &str,
-    pci_address: taskmanager_windows_api::WindowsPciAddress,
-) -> DxgiGpuSample {
+fn dxgi_sample(luid: u64, name: &str, pci_address: WindowsPciAddress) -> DxgiGpuSample {
     DxgiGpuSample {
         pci_address: Some(pci_address),
         metrics: GpuMetrics::new(format!("windows:gpu:dxgi:{luid:016x}"), name),
@@ -13,12 +13,12 @@ fn dxgi_sample(
 
 #[test]
 fn mixed_nvml_and_dxgi_keeps_complete_luid_inventory_and_enriches_exact_match() {
-    let nvidia_address = taskmanager_windows_api::WindowsPciAddress {
+    let nvidia_address = WindowsPciAddress {
         bus: 1,
         device: 0,
         function: 0,
     };
-    let intel_address = taskmanager_windows_api::WindowsPciAddress {
+    let intel_address = WindowsPciAddress {
         bus: 0,
         device: 2,
         function: 0,
@@ -28,9 +28,9 @@ fn mixed_nvml_and_dxgi_keeps_complete_luid_inventory_and_enriches_exact_match() 
         dxgi_sample(0x20, "Intel Arc B390", intel_address),
     ];
     let mut nvml_metrics = GpuMetrics::new("must-not-become-inventory-identity", "NVIDIA RTX");
-    nvml_metrics.apply_scalar_observations(taskmanager_core::GpuScalarObservations {
+    nvml_metrics.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(37.0, 1),
-        ..taskmanager_core::GpuScalarObservations::default()
+        ..GpuScalarObservations::default()
     });
     nvml_metrics.driver_version = Some("566.36".into());
     nvml_metrics.provenance = vec![
@@ -73,19 +73,19 @@ fn mixed_nvml_and_dxgi_keeps_complete_luid_inventory_and_enriches_exact_match() 
 
 #[test]
 fn unmatched_nvml_sample_is_partial_and_cannot_copy_to_a_sibling() {
-    let dxgi_address = taskmanager_windows_api::WindowsPciAddress {
+    let dxgi_address = WindowsPciAddress {
         bus: 1,
         device: 0,
         function: 0,
     };
     let dxgi = vec![dxgi_sample(0x10, "NVIDIA sibling", dxgi_address)];
     let mut unmatched = GpuMetrics::new("", "different PCI function");
-    unmatched.apply_scalar_observations(taskmanager_core::GpuScalarObservations {
+    unmatched.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(99.0, 1),
         ..Default::default()
     });
     let nvml = vec![NvmlGpuSample {
-        pci_address: taskmanager_windows_api::WindowsPciAddress {
+        pci_address: WindowsPciAddress {
             function: 1,
             ..dxgi_address
         },
@@ -133,13 +133,13 @@ fn nvml_throttle_bits_preserve_confirmed_empty_known_and_future_states() {
 #[test]
 fn pdh_memory_sample_matches_dxgi_names_without_fabrication() {
     let samples = vec![
-        taskmanager_windows_api::WindowsGpuAdapterMemorySample {
+        WindowsGpuAdapterMemorySample {
             instance_name: "Intel(R) Arc(TM) Graphics".into(),
             luid: Some(0x0000_0000_0001_3126),
             dedicated_usage_bytes: Some(1234),
             shared_usage_bytes: Some(5678),
         },
-        taskmanager_windows_api::WindowsGpuAdapterMemorySample {
+        WindowsGpuAdapterMemorySample {
             instance_name: "NVIDIA GeForce RTX 5090".into(),
             luid: Some(0x0000_0000_0001_3555),
             dedicated_usage_bytes: Some(999),

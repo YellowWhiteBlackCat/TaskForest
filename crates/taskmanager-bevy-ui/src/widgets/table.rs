@@ -23,6 +23,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskmanager_shell::SortCol;
 use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::app::FrontendTrack;
@@ -199,8 +200,7 @@ pub(crate) fn sorted_direction(
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessSortHeader(pub(crate) &'static str);
 
-pub(crate) fn sort_col_from_id(id: &str) -> Option<taskmanager_shell::SortCol> {
-    use taskmanager_shell::SortCol;
+pub(crate) fn sort_col_from_id(id: &str) -> Option<SortCol> {
     match id {
         "Name" => Some(SortCol::Name),
         "User" => Some(SortCol::User),

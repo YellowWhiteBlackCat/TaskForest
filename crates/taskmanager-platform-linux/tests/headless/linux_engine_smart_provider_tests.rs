@@ -1,6 +1,7 @@
 use super::*;
 use crate::engine::hardware::classify_storage_connection;
 use crate::engine::smart::transport::{SmartctlDeviceType, smartctl_strategy_for_connection};
+use taskmanager_core::StorageDeviceKind;
 
 #[test]
 fn standard_registry_routes_by_protocol_without_vendor_selection() {
@@ -115,7 +116,7 @@ fn usb_bridge_routing_preserves_tunneled_protocol_without_vendor_selection() {
             connection: StorageConnection::new(
                 protocol,
                 StorageInterconnect::Usb,
-                taskmanager_core::StorageDeviceKind::Physical,
+                StorageDeviceKind::Physical,
             ),
         };
         let selected = registry

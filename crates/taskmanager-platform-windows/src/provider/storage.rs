@@ -40,6 +40,7 @@ use taskmanager_platform_runtime::{
 use taskmanager_platform_portable::BoundedCommandError;
 
 use crate::command::run_with_timeout;
+use taskmanager_core::core::storage_health::FilesystemBackingKind;
 
 const FILESYSTEM_HEALTH_PROVIDER: ProviderId =
     ProviderId::borrowed("windows.storage.filesystem.sysinfo");
@@ -70,8 +71,7 @@ impl FilesystemHealthProvider for WinFilesystemHealthProvider {
                     mount_point: PathBuf::from(disk.mount_point()),
                     source: None,
                     fs_type: disk.file_system().to_string_lossy().into_owned(),
-                    backing_kind:
-                        taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
+                    backing_kind: FilesystemBackingKind::Unknown,
                     read_only: Some(read_only),
                     error_count: None,
                     inode_used: None,

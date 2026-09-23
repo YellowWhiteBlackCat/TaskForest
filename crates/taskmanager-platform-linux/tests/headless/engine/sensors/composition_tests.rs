@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 
 #[cfg(target_os = "linux")]
 fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {
@@ -193,8 +194,7 @@ fn live_sensor_source_receipt_preserves_typed_truth() {
     );
     assert_eq!(source.discovery().provider, SYSFS_INVENTORY_PROVIDER);
     assert!(source.value.readings.iter().all(|reading| {
-        reading.measurement_observation().availability()
-            != taskmanager_core::ScalarAvailability::Unknown
+        reading.measurement_observation().availability() != ScalarAvailability::Unknown
     }));
     assert_eq!(
         source
@@ -205,9 +205,9 @@ fn live_sensor_source_receipt_preserves_typed_truth() {
         source.discovered_devices().len()
     );
     assert!(source.value.thermal_control.zones.iter().all(|zone| {
-        zone.label.availability() != taskmanager_core::ScalarAvailability::Unknown
-            && zone.mode.availability() != taskmanager_core::ScalarAvailability::Unknown
-            && zone.policy.availability() != taskmanager_core::ScalarAvailability::Unknown
+        zone.label.availability() != ScalarAvailability::Unknown
+            && zone.mode.availability() != ScalarAvailability::Unknown
+            && zone.policy.availability() != ScalarAvailability::Unknown
     }));
     assert!(
         source
@@ -216,13 +216,10 @@ fn live_sensor_source_receipt_preserves_typed_truth() {
             .cooling_devices
             .iter()
             .all(|device| {
-                device.kind.availability() != taskmanager_core::ScalarAvailability::Unknown
-                    && device.current_state.availability()
-                        != taskmanager_core::ScalarAvailability::Unknown
-                    && device.maximum_state.availability()
-                        != taskmanager_core::ScalarAvailability::Unknown
-                    && device.activity.availability()
-                        != taskmanager_core::ScalarAvailability::Unknown
+                device.kind.availability() != ScalarAvailability::Unknown
+                    && device.current_state.availability() != ScalarAvailability::Unknown
+                    && device.maximum_state.availability() != ScalarAvailability::Unknown
+                    && device.activity.availability() != ScalarAvailability::Unknown
             })
     );
 }

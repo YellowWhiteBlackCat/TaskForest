@@ -125,7 +125,7 @@ fn suspend_submits_the_neutral_batch_action_without_arming_the_gate() {
 
     assert!(modal.session.is_none(), "a committed menu closes");
     assert_eq!(effects.len(), 1, "exactly one batch effect is queued");
-    let taskmanager_application::PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
+    let PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
         panic!(
             "a suspend pick submits the batch track, got {:?}",
             effects[0]
@@ -172,7 +172,7 @@ fn the_priority_picks_submit_the_neutral_set_priority_request() {
     }
     let mut effects = Vec::new();
     let _ = modal.drive(&mut shell, KeyCode::Enter, &mut effects);
-    let taskmanager_application::PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
+    let PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
         panic!(
             "a priority pick submits the batch track, got {:?}",
             effects[0]
@@ -191,7 +191,7 @@ fn the_priority_picks_submit_the_neutral_set_priority_request() {
     }
     let mut effects = Vec::new();
     let _ = modal.drive(&mut shell, KeyCode::Enter, &mut effects);
-    let taskmanager_application::PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
+    let PlatformEffect::ExecuteBatch(intent) = &effects[0] else {
         panic!(
             "a priority pick submits the batch track, got {:?}",
             effects[0]
@@ -241,6 +241,7 @@ fn the_frozen_identity_travels_with_the_session() {
 }
 
 // ---- multi-select batch tests ----
+use taskmanager_application::PlatformEffect;
 use taskmanager_core::core::process::ProcessLiveKey;
 
 fn multi_shelved_shell() -> ShellApp {
@@ -250,9 +251,7 @@ fn multi_shelved_shell() -> ShellApp {
     fixture::edit_processes(&mut shell, |shelved| {
         *shelved = Some(vec![p1, p2]);
     });
-    let _ = shell.apply_action(AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     // Mark both processes for multi-select
     assert!(shell.select_row(0));
     assert!(shell.toggle_row_selection(1));

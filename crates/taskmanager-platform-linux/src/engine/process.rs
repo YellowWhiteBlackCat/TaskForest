@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
 use sysinfo::{ProcessRefreshKind, ProcessStatus, System};
@@ -50,6 +50,8 @@ use observation::{observe_clock_ticks, observe_process_scalars};
 use previous::{PreviousItems, PreviousProcessView};
 pub(crate) use procfs::validate_exact_start_token;
 use rates::ProcessRateState;
+use taskmanager_core::ScalarObservation;
+use taskmanager_core::core::time::unix_millis;
 use tree::{io_failure, read_boot_time_secs};
 
 /// Owner-label map from `/etc/passwd`, cached across ticks.
@@ -128,6 +130,17 @@ impl BootTimeCache {
     }
 }
 
+/// Why one process-inventory read is running.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RefreshPurpose {
+    /// One-time warmup read whose result is discarded. It seeds the cumulative
+    /// rate baselines but must not advance any per-published-tick side effect
+    /// (fd decimation, histories, previous-item retention).
+    SeedRateBaseline,
+    /// A normal, publishable refresh.
+    Publish,
+}
+
 pub struct ProcessManager {
     system: System,
     histories: ProcessHistoryStore,
@@ -143,6 +156,9 @@ pub struct ProcessManager {
     /// is a low-frequency-drift column; sampling it ~1×/s bounds syscall cost
     /// while intermediate ticks reuse the retained previous value.
     fd_tick: u32,
+    /// Whether the one-time cumulative-counter warmup has run. See
+    /// [`ProcessManager::refresh_at`].
+    rate_baseline_warmed: bool,
 }
 
 impl Default for ProcessManager {
@@ -176,22 +192,56 @@ impl ProcessManager {
             memory_maps: MemoryMaps::default(),
             applications: ApplicationCatalog::default(),
             fd_tick: 0,
+            rate_baseline_warmed: false,
         }
     }
 
     pub fn refresh(&mut self) -> PartialSourceSnapshot<ProcessItem> {
-        self.refresh_at(taskmanager_core::core::time::unix_millis(
-            std::time::SystemTime::now(),
-        ))
+        self.refresh_at(unix_millis(std::time::SystemTime::now()))
     }
 
+    /// Read one process inventory snapshot.
+    ///
+    /// The first call also performs a one-time **rate-baseline warmup**: the
+    /// cumulative-counter estimator can only produce a rate from two samples, so
+    /// a first published snapshot would otherwise carry an unavailable CPU/disk
+    /// rate for every process. A frontend whose active sort column is a rate —
+    /// GPUI defaults to CPU descending — would then render one order and
+    /// silently reorder the whole table on the next tick, which reads as
+    /// first-entry data misalignment. Seeding the baselines and measuring over
+    /// [`RATE_BASELINE_WARMUP`] makes the first *published* snapshot already
+    /// carry real rates; the warmup read itself is discarded and does not
+    /// advance the fd decimation, the histories, or previous-item retention.
     pub fn refresh_at(&mut self, observed_at_ms: u64) -> PartialSourceSnapshot<ProcessItem> {
+        if self.rate_baseline_warmed {
+            return self.refresh_once(observed_at_ms, RefreshPurpose::Publish);
+        }
+        self.rate_baseline_warmed = true;
+        let _ = self.refresh_once(observed_at_ms, RefreshPurpose::SeedRateBaseline);
+        std::thread::sleep(RATE_BASELINE_WARMUP);
+        // Advance on the SAME clock the caller supplied (the runtime's
+        // `clock_ms`) rather than a second wall-clock source, so the published
+        // observation timestamps and the warmup delta stay on one timeline.
+        let published_at_ms = observed_at_ms.saturating_add(RATE_BASELINE_WARMUP_MS);
+        self.refresh_once(published_at_ms, RefreshPurpose::Publish)
+    }
+
+    fn refresh_once(
+        &mut self,
+        observed_at_ms: u64,
+        purpose: RefreshPurpose,
+    ) -> PartialSourceSnapshot<ProcessItem> {
+        let seed_only = purpose == RefreshPurpose::SeedRateBaseline;
         // The per-process fd scan is deferred to every Nth tick. The first tick
         // (fd_tick == 0) is always a full read so a freshly-seen pid establishes
         // a value before any deferral. wrapping_add/rem_euclid keep this
-        // panic-free across arbitrarily long uptimes.
-        let want_fd_count = self.fd_tick.rem_euclid(FD_COUNT_REFRESH_EVERY_N_TICKS) == 0;
-        self.fd_tick = self.fd_tick.wrapping_add(1);
+        // panic-free across arbitrarily long uptimes. The one-time warmup is not
+        // a published tick, so it must not consume a decimation slot.
+        let want_fd_count =
+            !seed_only && self.fd_tick.rem_euclid(FD_COUNT_REFRESH_EVERY_N_TICKS) == 0;
+        if !seed_only {
+            self.fd_tick = self.fd_tick.wrapping_add(1);
+        }
         let procfs_probe = match probe_procfs() {
             Err(failure) => {
                 self.rates.clear();
@@ -209,8 +259,10 @@ impl ProcessManager {
             Ok(probe) => probe,
         };
 
-        self.histories
-            .begin_refresh(self.history_started_at.elapsed());
+        if !seed_only {
+            self.histories
+                .begin_refresh(self.history_started_at.elapsed());
+        }
         // The process inventory never consumes per-thread `sysinfo::Process`
         // rows; it reads the aggregate thread count from procfs separately.
         // Asking sysinfo for tasks multiplies its internal process map and
@@ -319,22 +371,21 @@ impl ProcessManager {
                 .unwrap_or_else(ProcessMemoryObservation::unavailable);
             let mut scalar_observations = scalar_observations;
             scalar_observations.memory_pss_bytes = match memory_observation.pss {
-                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
-                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
+                Ok(value) => ScalarObservation::available(value, observed_at_ms),
+                Err(failure) => ScalarObservation::unavailable(failure),
             };
             scalar_observations.memory_uss_bytes = match memory_observation.uss {
-                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
-                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
+                Ok(value) => ScalarObservation::available(value, observed_at_ms),
+                Err(failure) => ScalarObservation::unavailable(failure),
             };
-            scalar_observations.memory_anon_huge_pages_bytes = match memory_observation
-                .anon_huge_pages
-            {
-                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
-                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
-            };
+            scalar_observations.memory_anon_huge_pages_bytes =
+                match memory_observation.anon_huge_pages {
+                    Ok(value) => ScalarObservation::available(value, observed_at_ms),
+                    Err(failure) => ScalarObservation::unavailable(failure),
+                };
             scalar_observations.swap_bytes = match memory_observation.swap {
-                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
-                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
+                Ok(value) => ScalarObservation::available(value, observed_at_ms),
+                Err(failure) => ScalarObservation::unavailable(failure),
             };
             if let (Ok(current_token), Some(previous)) = (current_start_token, previous)
                 && previous.current_start_token() == Some(current_token)
@@ -384,21 +435,27 @@ impl ProcessManager {
             item.apply_metadata_observations(metadata_observations);
             item.apply_application_identity(application_identity);
             item.apply_scalar_observations(scalar_observations);
-            let history =
-                ProcessLiveKey::from_process(&item).map_or_else(Default::default, |identity| {
-                    self.histories
-                        .record(identity, ProcessHistorySample::from_process(&item))
-                });
-            item.cpu_history = history.cpu;
-            item.mem_history = history.memory;
-            item.disk_history = history.disk;
-            item.disk_read_history = history.disk_read;
-            item.disk_write_history = history.disk_write;
+            if !seed_only {
+                let history =
+                    ProcessLiveKey::from_process(&item).map_or_else(Default::default, |identity| {
+                        self.histories
+                            .record(identity, ProcessHistorySample::from_process(&item))
+                    });
+                item.cpu_history = history.cpu;
+                item.mem_history = history.memory;
+                item.disk_history = history.disk;
+                item.disk_read_history = history.disk_read;
+                item.disk_write_history = history.disk_write;
+            }
             items.push(item);
         }
-        self.histories.finish_refresh();
+        if !seed_only {
+            self.histories.finish_refresh();
+        }
         let current_pids = items.iter().map(|item| item.pid).collect();
-        self.rates.retain_pids(&current_pids);
+        if !seed_only {
+            self.rates.retain_pids(&current_pids);
+        }
         let item_count = items.len();
         let inventory_outcome = match procfs_probe {
             ProcfsProbe::Complete if items.is_empty() => SourceOutcome::Empty,
@@ -484,10 +541,27 @@ impl ProcessManager {
                 process_application.populated,
             ),
         ];
-        self.previous_items.sync_from(&items);
+        if !seed_only {
+            self.previous_items.sync_from(&items);
+        }
         PartialSourceSnapshot::new(items, sources)
     }
 }
+
+/// Bounded one-time warmup window used before the first published process
+/// snapshot.
+///
+/// The rate estimator can only derive a value from two cumulative-counter
+/// samples. Publishing the very first sample as a full snapshot gives every
+/// process an unavailable CPU/disk rate, so a frontend whose active sort column
+/// is a rate (GPUI defaults to CPU descending) renders one order and silently
+/// reorders the table on the next tick. Seeding the baselines and measuring the
+/// same counters over this bounded window makes the first published snapshot
+/// already carry real rates. It is short enough to stay imperceptible next to
+/// the default 1 s refresh cadence and long enough for a meaningful CPU delta at
+/// typical `USER_HZ` values.
+const RATE_BASELINE_WARMUP_MS: u64 = 250;
+const RATE_BASELINE_WARMUP: Duration = Duration::from_millis(RATE_BASELINE_WARMUP_MS);
 
 const PASSWD_CACHE_TTL_MS: u64 = 30_000;
 const PASSWD_CACHE_RETRY_MS: u64 = 5_000;

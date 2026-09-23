@@ -4,6 +4,7 @@ use taskmanager_core::{
     SystemObservationState,
 };
 use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn partial_network_snapshot(
     _networks: &Networks,
@@ -14,7 +15,7 @@ fn partial_network_snapshot(
     let device_id = DeviceId::new("network:fixture");
     DeviceSourceSnapshot::from_discovery(
         vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id(device_id.as_str().into())
                 .device_state(DeviceState::healthy(now_ms))
                 .interface_name("fixture0".into())

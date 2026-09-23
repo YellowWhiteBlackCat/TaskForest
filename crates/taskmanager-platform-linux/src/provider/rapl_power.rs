@@ -18,6 +18,7 @@
 //! but the live privileged read needs sudo and is an integrator on-box receipt
 //! item. No fabricated watt figures exist on any path.
 
+use taskmanager_core::FailureKind;
 use taskmanager_core::{RaplPackageRow, RaplPowerSnapshot};
 use taskmanager_escalation::polkit::{
     PolkitGate, RaplHelperErrorKind, RaplHelperOutcome, invoke_rapl_helper,
@@ -85,14 +86,14 @@ fn capability_status_from_availability(availability: EscalationAvailability) -> 
         EscalationAvailability::Denied { reason } => match reason {
             EscalationDenialReason::Unsupported => CapabilityStatus::Unsupported,
             EscalationDenialReason::PermissionDenied => {
-                CapabilityStatus::Degraded(taskmanager_core::FailureKind::PermissionDenied)
+                CapabilityStatus::Degraded(FailureKind::PermissionDenied)
             }
             EscalationDenialReason::AuthorizationUnavailable => {
                 CapabilityStatus::TemporarilyUnavailable
             }
             EscalationDenialReason::HelperUnavailable => CapabilityStatus::MissingDependency,
             EscalationDenialReason::HelperProtocolViolation => {
-                CapabilityStatus::Degraded(taskmanager_core::FailureKind::ProviderFault)
+                CapabilityStatus::Degraded(FailureKind::ProviderFault)
             }
         },
     }

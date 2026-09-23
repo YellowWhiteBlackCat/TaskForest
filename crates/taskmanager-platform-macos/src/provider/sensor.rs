@@ -5,6 +5,7 @@
 //! Fan speeds have no safe accessor and stay absent (ADR-019).
 
 use taskmanager_application::SensorRequest;
+use taskmanager_core::DeviceId;
 use taskmanager_core::{
     DeviceGeneration, DeviceState, DeviceStatus, FailureKind, ProviderId, SensorCenterSnapshot,
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
@@ -40,7 +41,7 @@ impl SensorProvider for MacSensorProvider {
                 ambiguous_identities += 1;
                 continue;
             }
-            let device_id = taskmanager_core::DeviceId::new(format!("macos:sensor:{normalized}"));
+            let device_id = DeviceId::new(format!("macos:sensor:{normalized}"));
             let valid_temperature =
                 temperature.filter(|value| value.is_finite() && (-100.0..=250.0).contains(value));
             if temperature.is_some() && valid_temperature.is_none() {

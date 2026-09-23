@@ -19,6 +19,8 @@ use taskmanager_platform_contract::{
 
 use super::*;
 use crate::{ProcessProviderBindings, ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
+use taskmanager_application::PlatformHandle;
+use taskmanager_platform_contract::EventEnvelope;
 
 const CLOCK_MS: u64 = 4_242;
 
@@ -94,9 +96,7 @@ fn registered_process_provider(capability: &CapabilityId) -> ProviderId {
     }
 }
 
-fn assert_registered_process_provider(
-    event: &taskmanager_platform_contract::EventEnvelope<PlatformEvent>,
-) {
+fn assert_registered_process_provider(event: &EventEnvelope<PlatformEvent>) {
     assert_eq!(
         event.provider,
         Some(registered_process_provider(&event.capability))
@@ -131,7 +131,7 @@ fn process_catalog_keeps_distinct_registered_provider_identities() {
     }
 }
 
-fn spawn_fixture(state: FixtureState) -> (taskmanager_application::PlatformHandle, FixtureState) {
+fn spawn_fixture(state: FixtureState) -> (PlatformHandle, FixtureState) {
     let runtime = crate::ChannelRuntime::new(process_bindings(), RuntimeConfig::new(fixed_clock));
     let crate::ChannelRuntime {
         handle,
@@ -383,9 +383,7 @@ fn frozen_process() -> FrozenProcessIdentity {
         .expect("fixture identity")
 }
 
-fn wait_event(
-    handle: &taskmanager_application::PlatformHandle,
-) -> taskmanager_platform_contract::EventEnvelope<PlatformEvent> {
+fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
     crate::wait_for!("process runtime event", || {
         handle.events().try_recv().expect("connected event port")
     })

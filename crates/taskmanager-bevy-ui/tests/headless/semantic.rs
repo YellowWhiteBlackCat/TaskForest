@@ -17,43 +17,43 @@ use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 use super::build_snapshot;
 use crate::confirmation::PendingConfirmationView;
+use taskmanager_accessibility_linux::snapshot_to_tree_update;
+use taskmanager_application::AppAction;
+use taskmanager_application::AppPage;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::process_semantic_key;
+use taskmanager_ui_contract::AccessibilityActionRejection;
+use taskmanager_ui_contract::AccessibilityActionRequest;
 
 /// Validate and execute one assistive-technology action against the frozen
 /// semantic snapshot. The windowed composition does not yet route an AT
 /// ingress here, so the applier lives with the tests that exercise it.
 fn apply_accessibility_action(
     track: &mut crate::app::FrontendTrack,
-    request: &taskmanager_ui_contract::AccessibilityActionRequest,
+    request: &AccessibilityActionRequest,
     snapshot: &super::SemanticSnapshot,
-) -> Result<(), taskmanager_ui_contract::AccessibilityActionRejection> {
+) -> Result<(), AccessibilityActionRejection> {
     request.validate_against(snapshot)?;
 
     if let Some(identity) = track.shell.visible_processes().iter().find_map(|process| {
-        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
-            == request.node.as_str())
-        .then(|| taskmanager_core::core::process::ProcessLiveKey::from_process(process))
-        .flatten()
+        (format!("row:{}", process_semantic_key(process)) == request.node.as_str())
+            .then(|| ProcessLiveKey::from_process(process))
+            .flatten()
     }) {
         match request.action {
-            taskmanager_ui_contract::SemanticAction::Focus
-            | taskmanager_ui_contract::SemanticAction::Select => {
+            SemanticAction::Focus | SemanticAction::Select => {
                 let _ = track
                     .shell
-                    .apply_action(taskmanager_application::AppAction::SelectPage(
-                        taskmanager_application::AppPage::Applications,
-                    ));
-                let _ = track
-                    .shell
-                    .select_row_id(taskmanager_shell::ProcessRowId::Process(identity));
+                    .apply_action(AppAction::SelectPage(AppPage::Applications));
+                let _ = track.shell.select_row_id(ProcessRowId::Process(identity));
             }
             _ => {}
         }
         return Ok(());
     }
 
-    if request.action == taskmanager_ui_contract::SemanticAction::Dismiss
-        && request.node.as_str().starts_with("modal:")
-    {
+    if request.action == SemanticAction::Dismiss && request.node.as_str().starts_with("modal:") {
         track.shell.dismiss_overlay();
     }
     Ok(())
@@ -75,9 +75,7 @@ fn fixture_process(pid: u32, name: &str, cpu: f32) -> ProcessItem {
 fn shell_with(items: Vec<ProcessItem>) -> ShellApp {
     let mut shell = ShellApp::new();
     fixture::edit_processes(&mut shell, |processes| *processes = Some(items));
-    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
-        taskmanager_application::AppPage::Applications,
-    ));
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     shell
 }
 
@@ -171,7 +169,7 @@ fn arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss() {
     );
 
     // Arm the gate through the same shared action the Delete chord fires.
-    let _ = shell.apply_action(taskmanager_application::AppAction::RequestEndTask);
+    let _ = shell.apply_action(AppAction::RequestEndTask);
     let pending = shell
         .pending_confirmation()
         .expect("the gate armed for the selected process")
@@ -206,7 +204,7 @@ fn mapped_tree_is_well_formed_under_accesskit_consumer_oracle() {
         fixture_process(200, "beta", 3.0),
     ]);
     let snapshot = build_snapshot(&shell).expect("valid snapshot");
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let update = snapshot_to_tree_update(&snapshot);
     let tree = accesskit_consumer::Tree::new(update, false);
 
     let root = tree.state().root();
@@ -252,7 +250,7 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
     };
     let snapshot = build_snapshot(&track.shell).expect("valid snapshot");
 
-    let request = taskmanager_ui_contract::AccessibilityActionRequest {
+    let request = AccessibilityActionRequest {
         snapshot_revision: snapshot.revision(),
         node: row_id(200),
         action: SemanticAction::Select,
@@ -261,19 +259,17 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
     apply_accessibility_action(&mut track, &request, &snapshot).expect("matching AT action");
     assert_eq!(
         track.shell.selected_row,
-        Some(taskmanager_shell::ProcessRowId::Process(
-            taskmanager_core::core::process::ProcessLiveKey::from_parts(200, 2_000_000).unwrap()
+        Some(ProcessRowId::Process(
+            ProcessLiveKey::from_parts(200, 2_000_000).unwrap()
         ))
     );
 
     // Modal dismiss
-    let _ = track
-        .shell
-        .apply_action(taskmanager_application::AppAction::RequestEndTask);
+    let _ = track.shell.apply_action(AppAction::RequestEndTask);
     let modal_snapshot = build_snapshot(&track.shell).expect("modal snapshot");
     let pending = track.shell.pending_confirmation().unwrap();
     let view = PendingConfirmationView::from_pending(pending).unwrap();
-    let dismiss_request = taskmanager_ui_contract::AccessibilityActionRequest {
+    let dismiss_request = AccessibilityActionRequest {
         snapshot_revision: modal_snapshot.revision(),
         node: SemanticNodeId::owned(format!("modal:{}", view.target_key)),
         action: SemanticAction::Dismiss,

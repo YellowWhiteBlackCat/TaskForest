@@ -790,5 +790,6 @@ fn route<R: CapabilityRequest>(
 /// the ECS catalog so their lifecycle is correlated, but they do not become
 /// background work merely because a provider exists.
 fn default_automatic_cadence_ms(capability: &CapabilityId) -> Option<u64> {
-    taskmanager_application::default_automatic_cadence_ms(capability)
+    use taskmanager_application::default_automatic_cadence_ms;
+    default_automatic_cadence_ms(capability)
 }

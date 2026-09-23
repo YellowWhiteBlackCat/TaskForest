@@ -62,6 +62,12 @@ use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout}
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
+use taskmanager_app_host::acquire_single_instance;
+use taskmanager_application::i18n::t;
+use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
+use taskmanager_assets::embedded_fonts;
+use taskmanager_platform_contract::InstanceRole;
+use taskmanager_shell::ShellApp;
 
 /// The resolved token palette, injected as a resource for spawn systems.
 #[derive(Resource)]
@@ -197,9 +203,9 @@ fn demo_theme_from_env() -> Theme {
 fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     let _instance_guard = if !demo {
         let (tx, _rx) = std::sync::mpsc::channel();
-        match taskmanager_app_host::acquire_single_instance(product::BEVY_NAME, tx) {
-            Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => Some(guard),
-            Ok(taskmanager_platform_contract::InstanceRole::Secondary) => {
+        match acquire_single_instance(product::BEVY_NAME, tx) {
+            Ok(InstanceRole::Primary(guard)) => Some(guard),
+            Ok(InstanceRole::Secondary) => {
                 eprintln!("taskforest-b: already running, waking existing instance");
                 return ExitCode::SUCCESS;
             }
@@ -312,7 +318,7 @@ fn capture_wants_service_logs() -> bool {
 /// Capture fixture: open the log stream for the first demo service and
 /// pre-fill the feed with a bounded, deterministic journal excerpt. The
 /// scenario renders the real panel over this state; production never runs it.
-fn seed_service_log_fixture(shell: &mut taskmanager_shell::ShellApp) {
+fn seed_service_log_fixture(shell: &mut ShellApp) {
     use taskmanager_core::core::services::{
         ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
         ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
@@ -441,7 +447,7 @@ impl Plugin for FrontendWindowPlugin {
                 }
                 shell
             } else {
-                taskmanager_shell::ShellApp::new()
+                ShellApp::new()
             },
             initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
             process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
@@ -499,7 +505,7 @@ impl Plugin for FrontendWindowPlugin {
 /// bevy font store. `embedded_fonts()` yields MiSans VF followed by Roboto
 /// Mono, the same UI/metric-role order used by GPUI and Iced.
 fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<PlaceholderFonts>) {
-    let mut embedded = taskmanager_assets::embedded_fonts().into_iter();
+    let mut embedded = embedded_fonts().into_iter();
     handles.ui = embedded
         .next()
         .map(|bytes| fonts.add(Font::from_bytes(bytes.into_owned())));
@@ -510,20 +516,14 @@ fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<
         eprintln!(
             "taskforest-b: embedded font table empty (expected the {} face); \
              text falls back to the default font source",
-            taskmanager_assets::EMBEDDED_FONT_FAMILIES
-                .first()
-                .copied()
-                .unwrap_or("ui")
+            EMBEDDED_FONT_FAMILIES.first().copied().unwrap_or("ui")
         );
     }
     if handles.mono.is_none() {
         eprintln!(
             "taskforest-b: embedded mono face missing (expected the {} face); \
              metric text falls back to the UI face",
-            taskmanager_assets::EMBEDDED_FONT_FAMILIES
-                .get(1)
-                .copied()
-                .unwrap_or("mono")
+            EMBEDDED_FONT_FAMILIES.get(1).copied().unwrap_or("mono")
         );
     }
 }
@@ -731,9 +731,9 @@ fn spawn_app_shell(
 ) {
     commands.spawn(Camera2d);
     let summary = if demo.is_some() {
-        taskmanager_application::i18n::t("status.demo_snapshot").to_owned()
+        t("status.demo_snapshot").to_owned()
     } else {
-        taskmanager_application::i18n::t("status.waiting_for_snapshot").to_owned()
+        t("status.waiting_for_snapshot").to_owned()
     };
     commands.spawn_scene(app_shell_scene(&palette.inner, route.page, summary));
 }

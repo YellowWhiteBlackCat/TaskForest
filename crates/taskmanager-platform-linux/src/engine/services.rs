@@ -59,6 +59,8 @@ use taskmanager_core::core::services::{
     ServiceLogStreamEnd, ServiceLogStreamSnapshot,
 };
 
+use taskmanager_core::ServiceId;
+use taskmanager_platform_contract::ProviderFailure;
 #[cfg(target_os = "linux")]
 use taskmanager_platform_portable::BoundedCommandError;
 #[cfg(unix)]
@@ -137,14 +139,12 @@ impl ServiceManager {
     /// This method is blocking by design and product code calls it only from
     /// the shared service runtime lane. The spawned command is killed after
     /// [`SERVICE_LOG_TIMEOUT`].
-    pub fn fetch_logs(
-        target: &taskmanager_core::ServiceId,
-    ) -> Result<ServiceLogState, taskmanager_platform_contract::ProviderFailure> {
+    pub fn fetch_logs(target: &ServiceId) -> Result<ServiceLogState, ProviderFailure> {
         #[cfg(target_os = "linux")]
         {
             let target = target::resolve_active_service_target(target)?;
             if target.init() != InitSystem::Systemd {
-                return Err(taskmanager_platform_contract::ProviderFailure::Unsupported);
+                return Err(ProviderFailure::Unsupported);
             }
             let unit = target.native();
             let mut command = Command::new("journalctl");
@@ -168,7 +168,7 @@ impl ServiceManager {
         #[cfg(not(target_os = "linux"))]
         {
             let _ = target;
-            Err(taskmanager_platform_contract::ProviderFailure::Unsupported)
+            Err(ProviderFailure::Unsupported)
         }
     }
 
@@ -177,7 +177,7 @@ impl ServiceManager {
     pub fn fetch_log_stream(
         query: &ServiceLogQuery,
         observed_at_ms: u64,
-    ) -> Result<ServiceLogStreamState, taskmanager_platform_contract::ProviderFailure> {
+    ) -> Result<ServiceLogStreamState, ProviderFailure> {
         log_stream::fetch(query, observed_at_ms)
     }
 

@@ -5,6 +5,7 @@ use taskmanager_platform_contract::ProviderFailure;
 
 use super::init_runtime::detection_provider_failure;
 use super::{InitSystem, ServiceManager};
+use taskmanager_core::FailureKind;
 
 const SYSTEMD_PREFIX: &str = "linux.service.systemd:";
 const SYSTEMD_USER_PREFIX: &str = "linux.service.systemd-user:";
@@ -88,7 +89,7 @@ pub(super) fn resolve_active_service_target(
 
 pub(super) fn resolve_service_target_for_detection(
     target: &ServiceId,
-    detection: Result<InitSystem, taskmanager_core::FailureKind>,
+    detection: Result<InitSystem, FailureKind>,
 ) -> Result<ResolvedServiceTarget, ProviderFailure> {
     let resolved = resolve_service_target(target)?;
     verify_detected_init(detection, resolved.init())?;
@@ -96,7 +97,7 @@ pub(super) fn resolve_service_target_for_detection(
 }
 
 fn verify_detected_init(
-    detection: Result<InitSystem, taskmanager_core::FailureKind>,
+    detection: Result<InitSystem, FailureKind>,
     expected: InitSystem,
 ) -> Result<(), ProviderFailure> {
     match detection {

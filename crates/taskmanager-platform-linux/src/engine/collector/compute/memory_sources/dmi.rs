@@ -11,6 +11,7 @@ use super::{
     DMI_SLOTS_TOTAL_FIELD, DMI_SLOTS_USED_FIELD, DMI_SPEED_FIELD, DmiMemoryObservation,
     FailureSummary, classify_io, classify_smbios_io, read_optional_u64, source_status,
 };
+use taskmanager_smbios_tables::parse_memory_device;
 
 /// Merge the udev-database facts into a raw-DMI observation: udev values win
 /// (configured speed over maximum, exact slots), raw-DMI fills gaps only.
@@ -127,8 +128,7 @@ pub(super) fn observe_dmi_memory_from_paths(
                         // drift on offsets or sentinel semantics. A record
                         // the parser rejects is still a counted slot (the
                         // 17-N entry exists) but contributes no fields.
-                        if let Some(record) = taskmanager_smbios_tables::parse_memory_device(&bytes)
-                        {
+                        if let Some(record) = parse_memory_device(&bytes) {
                             if record.size_mb.is_some() {
                                 type17_used = type17_used.saturating_add(1);
                             }

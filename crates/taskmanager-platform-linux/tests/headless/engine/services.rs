@@ -3,6 +3,10 @@
 use super::*;
 use std::thread;
 use std::time::Instant;
+use taskmanager_core::FailureKind;
+use taskmanager_core::ServiceFailureCause;
+use taskmanager_core::ServiceId;
+use taskmanager_core::ServiceRelationKind;
 use taskmanager_core::core::services::{ServiceOomCause, ServiceRelationEdge};
 
 #[test]
@@ -148,9 +152,9 @@ fn detect_init_returns_known_variant() {
     assert!(matches!(
         init,
         Ok(InitSystem::Systemd | InitSystem::Openrc | InitSystem::Unsupported)
-            | Err(taskmanager_core::FailureKind::MissingDependency)
-            | Err(taskmanager_core::FailureKind::PermissionDenied)
-            | Err(taskmanager_core::FailureKind::ProviderFault)
+            | Err(FailureKind::MissingDependency)
+            | Err(FailureKind::PermissionDenied)
+            | Err(FailureKind::ProviderFault)
     ));
 }
 
@@ -396,7 +400,7 @@ fn parse_systemctl_diagnostics_preserves_failure_and_activation_evidence() {
     assert!(diagnostics.has_timer_activation());
     assert_eq!(
         diagnostics.failure_cause(),
-        Some(taskmanager_core::ServiceFailureCause::OomKilled)
+        Some(ServiceFailureCause::OomKilled)
     );
 }
 
@@ -414,12 +418,12 @@ fn parse_systemctl_inventory_attaches_typed_relations_and_preserves_scope() {
     let records = parse_systemctl_show_inventory(&output, false);
     assert_eq!(records.len(), 2);
     assert!(records[0].2.edges().contains(&ServiceRelationEdge::new(
-        taskmanager_core::ServiceRelationKind::Before,
-        taskmanager_core::ServiceId::new("linux.service.systemd:b.service"),
+        ServiceRelationKind::Before,
+        ServiceId::new("linux.service.systemd:b.service"),
     )));
     assert!(records[0].2.edges().contains(&ServiceRelationEdge::new(
-        taskmanager_core::ServiceRelationKind::Requires,
-        taskmanager_core::ServiceId::new("linux.service.systemd:b.service"),
+        ServiceRelationKind::Requires,
+        ServiceId::new("linux.service.systemd:b.service"),
     )));
 
     let user_records = parse_systemctl_show_inventory("Id=a.service\nRequires=b.service\n", true);

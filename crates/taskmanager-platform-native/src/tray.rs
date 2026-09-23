@@ -31,14 +31,17 @@ pub fn spawn_tray(
 ) -> Result<Box<dyn TrayController>, TrayFailure> {
     #[cfg(target_os = "linux")]
     {
-        taskmanager_platform_linux::tray::spawn_tray(spec, events)
+        use taskmanager_platform_linux::tray::spawn_tray;
+        spawn_tray(spec, events)
     }
     #[cfg(target_os = "macos")]
     {
-        taskmanager_platform_macos::tray::spawn_tray(spec, events)
+        use taskmanager_platform_macos::tray::spawn_tray;
+        spawn_tray(spec, events)
     }
     #[cfg(target_os = "windows")]
     {
-        taskmanager_platform_windows::tray::spawn_tray(spec, events)
+        use taskmanager_platform_windows::tray::spawn_tray;
+        spawn_tray(spec, events)
     }
 }

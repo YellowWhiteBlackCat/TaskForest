@@ -9,6 +9,7 @@ use taskmanager_core::core::tray::{TrayActionId, TrayEvent, TrayMenuItem};
 use taskmanager_platform_contract::{TrayController, TrayFailure};
 
 use super::*;
+use taskmanager_application::i18n::t;
 
 // The polymorphic `TrayControllerTarget` impls the tray tests exercise live
 // here, in the test tree: production only ever syncs through `TrayResource`.
@@ -115,10 +116,7 @@ fn tray_icon_pixels_has_valid_dimensions_and_opacity() {
 fn bevy_tray_spec_uses_bevy_product_identity_and_localized_items() {
     let spec = build_tray_spec(false).expect("tray spec should build successfully");
     assert_eq!(spec.title(), Some(product::BEVY_NAME));
-    assert_eq!(
-        spec.tooltip(),
-        Some(taskmanager_application::i18n::t("tray.tooltip"))
-    );
+    assert_eq!(spec.tooltip(), Some(t("tray.tooltip")));
     assert!(!spec.show_menu_on_left_click());
 
     let items = spec.menu().items();
@@ -127,7 +125,7 @@ fn bevy_tray_spec_uses_bevy_product_identity_and_localized_items() {
     match &items[0] {
         TrayMenuItem::Action { id, label, enabled } => {
             assert_eq!(*id, TRAY_ACTION_SHOW);
-            assert_eq!(label, taskmanager_application::i18n::t("tray.show_window"));
+            assert_eq!(label, t("tray.show_window"));
             assert!(enabled);
         }
         other => panic!("expected Show Action item, got {other:?}"),
@@ -141,10 +139,7 @@ fn bevy_tray_spec_uses_bevy_product_identity_and_localized_items() {
             enabled,
         } => {
             assert_eq!(*id, TRAY_ACTION_PAUSE);
-            assert_eq!(
-                label,
-                taskmanager_application::i18n::t("tray.pause_refresh")
-            );
+            assert_eq!(label, t("tray.pause_refresh"));
             assert!(!checked);
             assert!(enabled);
         }
@@ -156,7 +151,7 @@ fn bevy_tray_spec_uses_bevy_product_identity_and_localized_items() {
     match &items[3] {
         TrayMenuItem::Action { id, label, enabled } => {
             assert_eq!(*id, TRAY_ACTION_QUIT);
-            assert_eq!(label, taskmanager_application::i18n::t("tray.quit"));
+            assert_eq!(label, t("tray.quit"));
             assert!(enabled);
         }
         other => panic!("expected Quit Action item, got {other:?}"),

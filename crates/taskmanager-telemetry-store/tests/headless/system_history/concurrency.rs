@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
+use taskmanager_core::HistoryMetric;
 use taskmanager_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
 
 /// Persistence probe that stops revision 1 after its fixed CPU rings were
@@ -167,7 +168,7 @@ fn same_domain_writers_commit_in_order_and_hide_in_flight_watermarks() {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .iter()
-            .filter(|(key, _)| key.metric() == taskmanager_core::HistoryMetric::CpuUsagePct)
+            .filter(|(key, _)| key.metric() == HistoryMetric::CpuUsagePct)
             .map(|(_, sample)| sample.revision)
             .collect::<Vec<_>>(),
         [1, 2],

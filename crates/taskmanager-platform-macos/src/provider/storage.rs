@@ -88,8 +88,7 @@ impl FilesystemHealthProvider for MacFilesystemHealthProvider {
                     mount_point: PathBuf::from(disk.mount_point()),
                     source: None,
                     fs_type: disk.file_system().to_string_lossy().into_owned(),
-                    backing_kind:
-                        taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
+                    backing_kind: FilesystemBackingKind::Unknown,
                     read_only: Some(read_only),
                     error_count: None,
                     inode_used: None,
@@ -277,11 +276,11 @@ impl Drop for MacStorageTelemetryProvider {
     }
 }
 
-impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelemetryProvider {
+impl StorageTelemetryProvider for MacStorageTelemetryProvider {
     fn refresh(
         &mut self,
         observed_at_ms: u64,
-    ) -> Result<taskmanager_core::StorageTelemetryObservation, ProviderFailure> {
+    ) -> Result<StorageTelemetryObservation, ProviderFailure> {
         let disks = sysinfo::Disks::new_with_refreshed_list();
         let whole_disks = diskutil_mount_to_whole_disk();
         // Reap any finished iostat child so we don't claim sampler activity
@@ -297,8 +296,7 @@ impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelem
             .unwrap_or(None);
         let mut metrics = Vec::with_capacity(disks.list().len());
         for disk in disks.list() {
-            let mut row =
-                taskmanager_core::DiskMetrics::new(disk.name().to_string_lossy().into_owned());
+            let mut row = DiskMetrics::new(disk.name().to_string_lossy().into_owned());
             row.device_id = format!("macos:disk:{}", disk.mount_point().display());
             row.disk_type = disk_kind_label(disk.kind()).to_string();
             row.mount_point = disk.mount_point().display().to_string();
@@ -313,50 +311,27 @@ impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelem
             let iops = if sampler_active {
                 let whole = whole_disks.get(&row.mount_point);
                 match whole.and_then(|id| latest_rates.as_ref().and_then(|map| map.get(id))) {
-                    Some(rates) => {
-                        taskmanager_core::ScalarObservation::available(rates.iops, observed_at_ms)
-                    }
-                    None => taskmanager_core::ScalarObservation::unavailable(
-                        FailureKind::TemporarilyUnavailable,
-                    ),
+                    Some(rates) => ScalarObservation::available(rates.iops, observed_at_ms),
+                    None => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
                 }
             } else {
-                taskmanager_core::ScalarObservation::unavailable(FailureKind::MissingDependency)
+                ScalarObservation::unavailable(FailureKind::MissingDependency)
             };
-            row.apply_scalar_observations(taskmanager_core::DiskScalarObservations {
-                capacity_bytes: taskmanager_core::ScalarObservation::available(
-                    disk.total_space(),
-                    observed_at_ms,
-                ),
-                available_bytes: taskmanager_core::ScalarObservation::available(
+            row.apply_scalar_observations(DiskScalarObservations {
+                capacity_bytes: ScalarObservation::available(disk.total_space(), observed_at_ms),
+                available_bytes: ScalarObservation::available(
                     disk.available_space(),
                     observed_at_ms,
                 ),
-                read_bytes_per_sec: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                write_bytes_per_sec: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
+                read_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+                write_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
                 iops,
-                active_time_pct: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                response_time_ms: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                average_queue_depth: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                service_time_ms: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                read_merges_per_sec: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
-                write_merges_per_sec: taskmanager_core::ScalarObservation::unavailable(
-                    FailureKind::Unsupported,
-                ),
+                active_time_pct: ScalarObservation::unavailable(FailureKind::Unsupported),
+                response_time_ms: ScalarObservation::unavailable(FailureKind::Unsupported),
+                average_queue_depth: ScalarObservation::unavailable(FailureKind::Unsupported),
+                service_time_ms: ScalarObservation::unavailable(FailureKind::Unsupported),
+                read_merges_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+                write_merges_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
             });
             metrics.push(row);
         }
@@ -375,13 +350,11 @@ impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelem
                     smart_rows += 1;
                 }
                 Err(ProviderFailure::MissingDependency) => {
-                    row.smart_availability =
-                        taskmanager_core::metrics::SmartAvailability::MissingTool;
+                    row.smart_availability = SmartAvailability::MissingTool;
                     smart_failures += 1;
                 }
                 Err(ProviderFailure::PermissionDenied) => {
-                    row.smart_availability =
-                        taskmanager_core::metrics::SmartAvailability::PermissionDenied;
+                    row.smart_availability = SmartAvailability::PermissionDenied;
                     smart_failures += 1;
                 }
                 Err(_) => {
@@ -407,7 +380,7 @@ impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelem
                 FailureKind::MissingDependency,
             ));
         }
-        Ok(taskmanager_core::StorageTelemetryObservation::current(
+        Ok(StorageTelemetryObservation::current(
             metrics,
             observed_at_ms,
             sources,
@@ -443,12 +416,8 @@ fn unavailable_source(provider: ProviderId, failure: FailureKind) -> SourceStatu
 
 /// Map smartctl JSON onto the DiskMetrics smart_* projections. ATA and NVMe
 /// schemas differ; missing sections stay absent, never fabricated.
-fn apply_smart_json(
-    row: &mut taskmanager_core::DiskMetrics,
-    json: &serde_json::Value,
-    observed_at_ms: u64,
-) {
-    row.smart_availability = taskmanager_core::metrics::SmartAvailability::Available;
+fn apply_smart_json(row: &mut DiskMetrics, json: &serde_json::Value, observed_at_ms: u64) {
+    row.smart_availability = SmartAvailability::Available;
     row.smart_state = DeviceState::healthy(observed_at_ms);
     row.smart_provider = Some(SMART_OBSERVATION_PROVIDER);
     row.smart_temperature_c = json
@@ -584,6 +553,13 @@ impl SmartSelfTestObservationProvider for MacSmartSelfTestObservationProvider {
 /// The type is re-exported here so the existing storage composition and the
 /// `pub use storage::{..., MacDirectoryUsageProvider, ...}` facade stay stable.
 pub use crate::provider::directory_usage::MacDirectoryUsageProvider;
+use taskmanager_core::DiskMetrics;
+use taskmanager_core::DiskScalarObservations;
+use taskmanager_core::ScalarObservation;
+use taskmanager_core::StorageTelemetryObservation;
+use taskmanager_core::core::storage_health::FilesystemBackingKind;
+use taskmanager_core::metrics::SmartAvailability;
+use taskmanager_platform_provider::StorageTelemetryProvider;
 
 fn parse_phase(status: &str) -> SmartSelfTestPhase {
     let lower = status.to_ascii_lowercase();

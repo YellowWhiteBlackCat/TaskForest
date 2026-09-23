@@ -1,5 +1,7 @@
 use super::*;
+use taskmanager_core::ScalarAvailability;
 use taskmanager_core::core::sensors::{SensorQuantity, SensorScale, refresh_sensor_center_state};
+use taskmanager_platform_conformance::assert_device_discovery_consistent;
 
 fn read_fixture(name: &str, result: std::io::Result<String>, now_ms: u64) -> SensorReading {
     let channel = hwmon::parse_channel(name).expect("standard hwmon fixture channel");
@@ -70,7 +72,7 @@ fn malformed_overflow_and_physical_type_conflicts_are_unavailable() {
         let reading = read_fixture(name, Ok(raw.into()), 10);
         assert_eq!(
             reading.measurement_observation().availability(),
-            taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault),
+            ScalarAvailability::Unavailable(FailureKind::ProviderFault),
             "{name}={raw}"
         );
     }
@@ -87,7 +89,7 @@ fn permission_failure_is_typed_not_zero() {
     assert_eq!(reading.state().status, DeviceStatus::PermissionDenied);
     assert_eq!(
         reading.measurement_observation().availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
     assert_eq!(reading.measurement_observation().last_success_ms(), None);
 }
@@ -100,13 +102,13 @@ fn valid_zero_and_malformed_text_have_distinct_typed_truth() {
     assert_eq!(zero.current_number(), Some(0.0));
     assert_eq!(
         zero.measurement_observation().availability(),
-        taskmanager_core::ScalarAvailability::Available
+        ScalarAvailability::Available
     );
     assert_eq!(zero.measurement_observation().last_success_ms(), Some(100));
     assert_eq!(malformed.current_measurement(), None);
     assert_eq!(
         malformed.measurement_observation().availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+        ScalarAvailability::Unavailable(FailureKind::ProviderFault)
     );
 }
 
@@ -121,7 +123,7 @@ fn disappearing_input_is_temporary_not_zero_or_device_absence() {
     assert_eq!(missing.current_measurement(), None);
     assert_eq!(
         missing.measurement_observation().availability(),
-        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
     );
 }
 
@@ -242,7 +244,7 @@ fn empty_hwmon_inventory_is_authoritative_empty_and_healthy() {
     let source = collect_sensor_center_source_from(&root, 10);
     assert_eq!(source.discovery().outcome, SourceOutcome::Empty);
     assert_eq!(source.value.state, DeviceState::healthy(10));
-    taskmanager_platform_conformance::assert_device_discovery_consistent(&source)
+    assert_device_discovery_consistent(&source)
         .expect("empty Linux sensor discovery must be coherent");
     std::fs::remove_dir_all(root).ok();
 }
@@ -307,8 +309,7 @@ fn fake_hwmon_tree_collects_dynamic_channels_with_stable_physical_ids() {
         3
     );
     assert!(first.readings.iter().all(|reading| {
-        reading.measurement_observation().availability()
-            != taskmanager_core::ScalarAvailability::Unknown
+        reading.measurement_observation().availability() != ScalarAvailability::Unknown
     }));
     let voltage = first
         .readings

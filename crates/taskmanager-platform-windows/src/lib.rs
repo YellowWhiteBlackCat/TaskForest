@@ -55,9 +55,10 @@ pub use config::{user_config_path, user_history_dir, user_locale_name};
 pub use local_time::local_time_rules;
 pub use provider::capability_surface;
 pub use provider::{WindowsProviderRegistry, WindowsProviderRegistryParams};
+use taskmanager_core::core::time::unix_millis;
 
 fn wall_clock_ms() -> u64 {
-    taskmanager_core::core::time::unix_millis(std::time::SystemTime::now())
+    unix_millis(std::time::SystemTime::now())
 }
 
 /// Composition entry point for the Windows runtime.

@@ -21,6 +21,8 @@ use super::tests::{block_keys, dyn_text_value};
 use super::{DynField, Section, section_keys};
 use crate::app::PageContext;
 use crate::palette::ui_palette;
+use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::effective_smart_status;
 
 /// A bare scene world for the page-assembly tests (the same minimal
 /// composition `performance.rs` uses for its mounted-scene tests).
@@ -125,9 +127,9 @@ fn disk_caption_renders_observed_smart_evidence_rows() {
         availability_caption.contains(&format!(
             "{} {}",
             t("disk.smart_status"),
-            t(taskmanager_shell::presentation::device_status_i18n_key(
-                taskmanager_shell::presentation::effective_smart_status(&available_only)
-            ))
+            t(device_status_i18n_key(effective_smart_status(
+                &available_only
+            )))
         )),
         "reported availability must paint the shared SMART status: {availability_caption}"
     );

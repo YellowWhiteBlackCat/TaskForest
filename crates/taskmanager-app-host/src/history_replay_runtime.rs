@@ -15,6 +15,7 @@ use taskmanager_application::{
 use taskmanager_history_store::{HistoryQuery, HistoryStoreError, HistoryStoreErrorKind};
 
 use crate::worker_fault::catch_worker_panic;
+use taskmanager_application::history_decimation::stride_envelope_positions;
 
 pub const HISTORY_REPLAY_COMMAND_CAPACITY: usize = 4;
 const HISTORY_REPLAY_COMPLETION_CAPACITY: usize = 4;
@@ -293,10 +294,7 @@ fn query_rows(
             .iter()
             .map(|sample| sample.value.map_or(f32::NAN, |value| value as f32))
             .collect();
-        let positions = taskmanager_application::history_decimation::stride_envelope_positions(
-            &raw,
-            MAX_HISTORY_REPLAY_POINTS,
-        );
+        let positions = stride_envelope_positions(&raw, MAX_HISTORY_REPLAY_POINTS);
         let samples = positions
             .iter()
             .filter_map(|position| raw.get(*position).copied())

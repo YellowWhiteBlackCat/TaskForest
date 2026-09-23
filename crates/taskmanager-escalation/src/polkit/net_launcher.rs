@@ -130,7 +130,7 @@ impl NetLauncherProcess for PkexecNetLauncher {
         stream.set_nonblocking(false)?;
         // A recv timeout so a launcher that connected but failed to send surfaces.
         stream.set_read_timeout(Some(Duration::from_secs(RECV_TIMEOUT_SECS)))?;
-        let fd = taskmanager_fd_bridge::recv_fd(&stream)?;
+        let fd = recv_fd(&stream)?;
         // ACK so the launcher may exit — closes the close-before-transfer race
         // (the kernel has now duplicated the fd into our table). Best-effort:
         // a failed ACK write never invalidates an fd the kernel already gave us.
@@ -164,6 +164,7 @@ mod launcher_internals {
     use std::os::linux::net::SocketAddrExt;
     use std::os::unix::net::{SocketAddr, UnixListener, UnixStream};
     use std::time::{Duration, Instant};
+    use taskmanager_fd_bridge::peer_credentials;
 
     /// Randomly named abstract handoff socket (the safe half of the ADR-025
     /// hardening): a `\0`-prefixed kernel-abstract name built from a fixed
@@ -300,7 +301,7 @@ mod launcher_internals {
         loop {
             match listener.accept() {
                 Ok((stream, _)) => {
-                    let credentials = taskmanager_fd_bridge::peer_credentials(&stream)?;
+                    let credentials = peer_credentials(&stream)?;
                     if credentials.uid == 0 {
                         return Ok(stream);
                     }
@@ -349,6 +350,7 @@ mod launcher_internals {
 
 #[cfg(target_os = "linux")]
 use launcher_internals::{HandoffName, PkexecChild, accept_privileged_peer, bind_handoff_listener};
+use taskmanager_fd_bridge::recv_fd;
 
 /// Drive one net-launcher invocation through `process` and map the raw result to
 /// a typed [`NetLauncherOutcome`]. A received fd is

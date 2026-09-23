@@ -18,6 +18,14 @@ use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::HardwareInventoryProvider;
 
 use super::{HARDWARE_INVENTORY_PROVIDER, available_source, unavailable_source};
+use taskmanager_core::CoreBreakdown;
+use taskmanager_core::CpuType;
+use taskmanager_platform_portable::EdidFacts;
+use taskmanager_platform_portable::parse_edid;
+use taskmanager_windows_api::WindowsApiError;
+use taskmanager_windows_api::WindowsCpuType;
+use taskmanager_windows_api::enumerate_display_monitors;
+use taskmanager_windows_api::processor_topology;
 
 const DISPLAY_INVENTORY_PROVIDER: ProviderId =
     ProviderId::borrowed("windows.hardware.display.enum-registry");
@@ -71,11 +79,11 @@ impl HardwareInventoryProvider for WinHardwareInventoryProvider {
         // Static base comes only from a static source (CPUID 0x16 /
         // PROCESSOR_POWER_INFORMATION.MaxMhz); a live sample is never a base.
         let (base_frequency_mhz, _) = super::cpu_info::advertised_frequencies_mhz();
-        let native_topology = taskmanager_windows_api::processor_topology().ok();
+        let native_topology = processor_topology().ok();
         let core_breakdown = native_topology
             .as_ref()
             .and_then(|facts| facts.core_breakdown)
-            .map(|b| taskmanager_core::CoreBreakdown {
+            .map(|b| CoreBreakdown {
                 p_cores: b.p_cores,
                 e_cores: b.e_cores,
                 lp_cores: b.lp_cores,
@@ -87,18 +95,10 @@ impl HardwareInventoryProvider for WinHardwareInventoryProvider {
                     .cpu_types
                     .iter()
                     .map(|kind| match kind {
-                        taskmanager_windows_api::WindowsCpuType::Performance => {
-                            taskmanager_core::CpuType::Performance
-                        }
-                        taskmanager_windows_api::WindowsCpuType::Efficient => {
-                            taskmanager_core::CpuType::Efficient
-                        }
-                        taskmanager_windows_api::WindowsCpuType::LowPower => {
-                            taskmanager_core::CpuType::LowPower
-                        }
-                        taskmanager_windows_api::WindowsCpuType::Unknown => {
-                            taskmanager_core::CpuType::Unknown
-                        }
+                        WindowsCpuType::Performance => CpuType::Performance,
+                        WindowsCpuType::Efficient => CpuType::Efficient,
+                        WindowsCpuType::LowPower => CpuType::LowPower,
+                        WindowsCpuType::Unknown => CpuType::Unknown,
                     })
                     .collect::<Vec<_>>()
             })
@@ -276,7 +276,7 @@ fn package_count_facts_for_target() -> (Option<u64>, SourceStatus) {
 /// re-enumeration and reboot, unique per monitor+port); the GDI device name
 /// is the fallback when the monitor reports no instance.
 fn collect_displays() -> (Vec<DisplayInfo>, SourceStatus) {
-    let monitors = match taskmanager_windows_api::enumerate_display_monitors() {
+    let monitors = match enumerate_display_monitors() {
         Ok(monitors) => monitors,
         Err(failure) => {
             return (
@@ -294,9 +294,9 @@ fn collect_displays() -> (Vec<DisplayInfo>, SourceStatus) {
             .clone()
             .unwrap_or_else(|| monitor.device_name.clone());
         let display = match monitor.edid.as_deref() {
-            Some(edid) => match taskmanager_platform_portable::parse_edid(edid) {
+            Some(edid) => match parse_edid(edid) {
                 Some(facts) => {
-                    let taskmanager_platform_portable::EdidFacts {
+                    let EdidFacts {
                         manufacturer,
                         model,
                         serial,
@@ -382,10 +382,10 @@ const fn failure_priority(failure: FailureKind) -> u8 {
     }
 }
 
-fn display_failure_kind(failure: taskmanager_windows_api::WindowsApiError) -> FailureKind {
+fn display_failure_kind(failure: WindowsApiError) -> FailureKind {
     match failure {
-        taskmanager_windows_api::WindowsApiError::PermissionDenied => FailureKind::PermissionDenied,
-        taskmanager_windows_api::WindowsApiError::Unsupported => FailureKind::Unsupported,
+        WindowsApiError::PermissionDenied => FailureKind::PermissionDenied,
+        WindowsApiError::Unsupported => FailureKind::Unsupported,
         _ => FailureKind::TemporarilyUnavailable,
     }
 }

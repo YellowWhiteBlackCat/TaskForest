@@ -27,6 +27,7 @@ pub(crate) use host::LinuxHostTelemetryCollector;
 pub(crate) use memory::LinuxMemoryTelemetryCollector;
 pub(crate) use network::LinuxNetworkTelemetryCollector;
 pub(crate) use storage::LinuxStorageTelemetryCollector;
+use taskmanager_core::DeviceLifecycleRegistry;
 
 /// Uniform synchronous boundary used by the six independent provider lanes.
 ///
@@ -154,9 +155,7 @@ impl ProviderStateTracker {
     }
 }
 
-fn lifecycle_snapshot(
-    registry: &taskmanager_core::DeviceLifecycleRegistry,
-) -> BTreeMap<DeviceId, DeviceLifecycle> {
+fn lifecycle_snapshot(registry: &DeviceLifecycleRegistry) -> BTreeMap<DeviceId, DeviceLifecycle> {
     registry
         .iter()
         .map(|(id, lifecycle)| (DeviceId::new(id), *lifecycle))

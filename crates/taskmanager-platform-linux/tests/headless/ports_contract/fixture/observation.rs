@@ -2,6 +2,7 @@
 //! telemetry and hardware inventory.
 
 use super::*;
+use taskmanager_core::GpuEngineKind;
 
 impl HostTelemetryProvider for FakeProvider {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<HostRuntimeObservation, ProviderFailure> {
@@ -200,7 +201,7 @@ impl GpuEngineRowsProvider for FakeProvider {
             device_id.clone(),
             vec![GpuEngineMetric {
                 name: "fixture engine".to_owned(),
-                kind: taskmanager_core::GpuEngineKind::Unknown,
+                kind: GpuEngineKind::Unknown,
                 utilization_pct: 50.0,
             }],
         ))

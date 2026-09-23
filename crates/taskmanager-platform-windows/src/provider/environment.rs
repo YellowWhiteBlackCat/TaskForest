@@ -24,6 +24,8 @@ use taskmanager_application::{
     SessionControlRequest, SessionInventoryRequest, StartupControlRequest, StartupEvidenceRequest,
     StartupInventoryRequest,
 };
+#[cfg(windows)]
+use taskmanager_core::StartupImpactUnknownReason;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{FailureKind, ProviderId, StartupEntry};
 #[cfg(windows)]
@@ -39,6 +41,15 @@ use taskmanager_platform_provider::{
 use taskmanager_platform_runtime::{
     EnvironmentExecutors, EnvironmentProviderBindings, ProviderRegistration,
 };
+#[cfg(windows)]
+use taskmanager_windows_api::KnownFolder;
+use taskmanager_windows_api::WindowsApiError;
+#[cfg(windows)]
+use taskmanager_windows_api::WindowsStartupTask;
+#[cfg(windows)]
+use taskmanager_windows_api::enumerate_startup_tasks;
+#[cfg(windows)]
+use taskmanager_windows_api::known_folder_path;
 
 mod boot_evidence;
 mod sessions;
@@ -128,8 +139,7 @@ impl WinStartupInventoryProvider {
 
 #[cfg(windows)]
 fn user_startup_folder() -> Result<PathBuf, FailureKind> {
-    taskmanager_windows_api::known_folder_path(taskmanager_windows_api::KnownFolder::Startup)
-        .map_err(|error| map_windows_api_failure(error).kind())
+    known_folder_path(KnownFolder::Startup).map_err(|error| map_windows_api_failure(error).kind())
 }
 
 #[cfg(windows)]
@@ -192,7 +202,7 @@ fn scan_registry(
             locator: StartupEntryLocator::new(format!("{id_prefix}:{name}")),
             impact: StartupImpact::None,
             impact_evidence: StartupImpactEvidence::Unknown {
-                reason: taskmanager_core::StartupImpactUnknownReason::Unsupported,
+                reason: StartupImpactUnknownReason::Unsupported,
             },
         });
     }
@@ -259,7 +269,7 @@ fn scan_startup_folder(
             locator: StartupEntryLocator::new(format!("win:folder:{name}")),
             impact: StartupImpact::None,
             impact_evidence: StartupImpactEvidence::Unknown {
-                reason: taskmanager_core::StartupImpactUnknownReason::Unsupported,
+                reason: StartupImpactUnknownReason::Unsupported,
             },
         });
     }
@@ -272,7 +282,7 @@ fn scan_startup_folder(
 /// the remaining sources as a complete inventory.
 #[cfg(windows)]
 fn scan_scheduled_tasks(entries: &mut Vec<StartupEntry>) -> Option<FailureKind> {
-    let tasks = match taskmanager_windows_api::enumerate_startup_tasks() {
+    let tasks = match enumerate_startup_tasks() {
         Ok(tasks) => tasks,
         Err(error) => return Some(map_windows_api_failure(error).kind()),
     };
@@ -299,9 +309,7 @@ fn scan_scheduled_tasks(entries: &mut Vec<StartupEntry>) -> Option<FailureKind> 
 /// surface does not expose yet. Task mutation stays unsupported until a
 /// control seam for the task store is chartered.
 #[cfg(windows)]
-fn scheduled_task_entry(
-    task: taskmanager_windows_api::WindowsStartupTask,
-) -> Result<StartupEntry, FailureKind> {
+fn scheduled_task_entry(task: WindowsStartupTask) -> Result<StartupEntry, FailureKind> {
     let path = task.task_path;
     if path.is_empty() || path.len() > MAX_STARTUP_TEXT_BYTES {
         return Err(FailureKind::ProviderFault);
@@ -329,7 +337,7 @@ fn scheduled_task_entry(
         locator: StartupEntryLocator::new(path),
         impact: StartupImpact::None,
         impact_evidence: StartupImpactEvidence::Unknown {
-            reason: taskmanager_core::StartupImpactUnknownReason::Unsupported,
+            reason: StartupImpactUnknownReason::Unsupported,
         },
     })
 }
@@ -633,21 +641,16 @@ pub struct WinSessionInventoryProvider;
 /// therefore takes no session id.
 pub struct WinSessionControlProvider;
 
-fn map_windows_api_failure(error: taskmanager_windows_api::WindowsApiError) -> ProviderFailure {
+fn map_windows_api_failure(error: WindowsApiError) -> ProviderFailure {
     match error {
-        taskmanager_windows_api::WindowsApiError::Unsupported => ProviderFailure::MissingDependency,
-        taskmanager_windows_api::WindowsApiError::PermissionDenied => {
-            ProviderFailure::PermissionDenied
-        }
-        taskmanager_windows_api::WindowsApiError::IdentityChanged
-        | taskmanager_windows_api::WindowsApiError::InvalidInput => {
+        WindowsApiError::Unsupported => ProviderFailure::MissingDependency,
+        WindowsApiError::PermissionDenied => ProviderFailure::PermissionDenied,
+        WindowsApiError::IdentityChanged | WindowsApiError::InvalidInput => {
             ProviderFailure::IdentityChanged
         }
-        taskmanager_windows_api::WindowsApiError::InvalidText
-        | taskmanager_windows_api::WindowsApiError::ResourceLimit
-        | taskmanager_windows_api::WindowsApiError::QueryFailed => {
-            ProviderFailure::TemporarilyUnavailable
-        }
+        WindowsApiError::InvalidText
+        | WindowsApiError::ResourceLimit
+        | WindowsApiError::QueryFailed => ProviderFailure::TemporarilyUnavailable,
     }
 }
 

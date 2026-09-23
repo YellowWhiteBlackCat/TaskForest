@@ -31,6 +31,34 @@ use taskmanager_windows_api::{InstanceMutex, signal_named_event};
 /// The kernel-object name for a single-instance mutex/event derives from the
 /// stable instance name (e.g. the app identifier). Mutex and event must use
 /// distinct names — two kernel objects cannot share one name.
+/// A shared handle to the primary's named auto-reset event.
+///
+/// The wrapper keeps the audited Windows API's `InstanceEvent` out of this
+/// module's scope, where the platform contract's distinct `InstanceEvent` (the
+/// activation-request message) is imported: the two same-named types never
+/// share a scope.
+#[cfg(windows)]
+mod named_event {
+    use std::sync::Arc;
+
+    use taskmanager_windows_api::InstanceEvent;
+
+    #[derive(Clone)]
+    pub(super) struct NamedEvent(Arc<InstanceEvent>);
+
+    impl NamedEvent {
+        pub(super) fn create(name: &str) -> Option<Self> {
+            InstanceEvent::create(name)
+                .ok()
+                .map(|event| Self(Arc::new(event)))
+        }
+
+        pub(super) fn wait(&self) -> bool {
+            self.0.wait().is_ok()
+        }
+    }
+}
+
 #[cfg(windows)]
 fn native_mutex_name(instance_name: &str) -> String {
     format!("single-instance.{instance_name}.mutex")
@@ -78,10 +106,7 @@ fn acquire_windows(
         return Ok(InstanceRole::Secondary);
     }
 
-    let event = Arc::new(
-        taskmanager_windows_api::InstanceEvent::create(&event_name)
-            .map_err(|_| InstanceFailure::Rejected)?,
-    );
+    let event = named_event::NamedEvent::create(&event_name).ok_or(InstanceFailure::Rejected)?;
     let stop = Arc::new(AtomicBool::new(false));
     let join = spawn_activation_thread(event.clone(), events, stop.clone())?;
 
@@ -96,7 +121,7 @@ fn acquire_windows(
 
 #[cfg(windows)]
 fn spawn_activation_thread(
-    event: Arc<taskmanager_windows_api::InstanceEvent>,
+    event: named_event::NamedEvent,
     events: Sender<InstanceEvent>,
     stop: Arc<AtomicBool>,
 ) -> Result<JoinHandle<()>, InstanceFailure> {
@@ -104,7 +129,7 @@ fn spawn_activation_thread(
         .name("taskmanager:single-instance".into())
         .spawn(move || {
             while !stop.load(Ordering::Relaxed) {
-                if event.wait().is_ok() {
+                if event.wait() {
                     let _ = events.send(InstanceEvent::Activate);
                 }
             }
@@ -118,7 +143,7 @@ fn spawn_activation_thread(
 #[cfg(windows)]
 struct WindowsInstanceGuard {
     _mutex: InstanceMutex,
-    _event: Arc<taskmanager_windows_api::InstanceEvent>,
+    _event: named_event::NamedEvent,
     stop: Arc<AtomicBool>,
     join: Mutex<Option<JoinHandle<()>>>,
     event_name: String,

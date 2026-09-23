@@ -20,6 +20,7 @@ use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::query::With;
 use bevy::input::keyboard::KeyCode;
 use bevy::ui_widgets::Activate;
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SystemFacets,
@@ -117,6 +118,8 @@ fn headless_shell_app() -> App {
 use bevy::ecs::entity::Entity;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
+use taskmanager_application::i18n::t;
+use taskmanager_shell::page_help;
 
 /// Inject key presses the way a real window does: as `KeyboardInput`
 /// messages, which the input plugin's `PreUpdate` system folds into
@@ -235,7 +238,7 @@ fn route_transitions_are_idempotent_and_explicit() {
 
 #[test]
 fn unshared_actions_never_invent_pages() {
-    use taskmanager_application::{AppAction, AppPage, RefreshRequest};
+    use taskmanager_application::RefreshRequest;
 
     // The shared page set maps one-to-one; every shared SelectPage action
     // must route, and non-page actions must never invent a route.
@@ -267,8 +270,8 @@ fn unshared_actions_never_invent_pages() {
 /// here.
 #[test]
 fn nav_labels_consume_the_shared_page_descriptor() {
-    for help in taskmanager_shell::page_help() {
-        let page = page_for_action(taskmanager_application::AppAction::SelectPage(help.page))
+    for help in page_help() {
+        let page = page_for_action(AppAction::SelectPage(help.page))
             .expect("every shared page routes in this frontend");
         assert_eq!(
             page.nav_label(),
@@ -278,13 +281,10 @@ fn nav_labels_consume_the_shared_page_descriptor() {
     }
     // The exact deviation this pins: AppHistory renders the shared short tab
     // word, never the longer command word a local `tab.apphistory` key gave.
-    assert_eq!(
-        Page::AppHistory.nav_label(),
-        taskmanager_application::i18n::t("tab.apphistory_short")
-    );
+    assert_eq!(Page::AppHistory.nav_label(), t("tab.apphistory_short"));
     assert_ne!(
         Page::AppHistory.nav_label(),
-        taskmanager_application::i18n::t("tab.apphistory"),
+        t("tab.apphistory"),
         "a locally chosen full-word key must not leak into the tab"
     );
 }
@@ -479,7 +479,7 @@ fn nav_button_activation_applies_the_page_action_to_the_shell() {
     let shell = &app.world().non_send::<crate::app::FrontendTrack>().shell;
     assert_eq!(
         shell.page(),
-        taskmanager_application::AppPage::Services,
+        AppPage::Services,
         "the pointer route wrote the shell page, not only the bevy route"
     );
     assert!(
