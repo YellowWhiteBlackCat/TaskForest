@@ -387,20 +387,23 @@ source.
 | `contract_tag` | the row's primary contract tag: it must equal the first `paths` token. Opaque to the resolver, whose only check is that matrix-internal equality; the vocabulary authority stays the Rust `ContractTag` enum. |
 | `platform` | **reserved P5 axis**, same discipline as the manifest: empty in every committed row and opaque to the resolver. |
 
-The TUI block (47 rows: 45 anchored + 2 `pending`) is the D2 deliverable. TUI
-has no stable case-prefix convention and no per-frontend matrix, so every row
-names its test explicitly; the `pending` rows record honest gaps that could not
-be anchored to a discoverable test (`mc03-tui-column-drag`,
-`mc05-tui-chart-hover`). Both are pointer-modality cases the terminal shape does
-not port: the TUI capability registry declares `ColumnDragResize` and `Tooltip`
-unsupported ("no pointer-driven column-edge drag surface", "no hover surface"),
-and the runtime deliberately drops drag/move events as unmodeled. The other two
-D2 gaps were closed by real tests, not relabelled: `mc02-tui-hotplug` anchors
-the storage-family fail-closed fallback and `mc07-tui-capture-visual` anchors
-the supervised capture frame's typed marker (see "Known S4/S5 residuals"). All
-47 rows declare a `P0-MC-*` id; together with GPUI/Iced they cover all eight
-requirements on three frontends. Bevy still carries `-` (see "Bevy `p0_id`"
-below).
+The TUI block (47 rows, all anchored) is the D2 deliverable. TUI has no stable
+case-prefix convention and no per-frontend matrix, so every row names its test
+explicitly. The last two D2 gaps were closed by real keyboard ports rather than
+by relabelling: the terminal shape has no pointer drag or hover surface (its
+capability registry declares `ColumnDragResize` and `Tooltip` unsupported — "no
+pointer-driven column-edge drag surface", "no hover surface" — and the runtime
+deliberately drops drag/move events as unmodeled), so a UI-parity line ported
+the two gestures and gave each its own case id (`mc03-tui-column-reorder` = the
+column menu's `←`/`→` reorder, `mc05-tui-chart-cursor` = the Performance·CPU
+chart's `←`/`→` sample cursor). Both carry `success|keyboard`, not the source
+case's stale `pointer`: a keyboard reorder is not a drag and a keyboard sample
+cursor is not a hover. The other two D2 gaps were closed earlier by real tests,
+not relabelled: `mc02-tui-hotplug` anchors the storage-family fail-closed
+fallback and `mc07-tui-capture-visual` anchors the supervised capture frame's
+typed marker (see "Known S4/S5 residuals"). All 47 rows declare a `P0-MC-*` id;
+together with GPUI/Iced they cover all eight requirements on three frontends.
+Bevy still carries `-` (see "Bevy `p0_id`" below).
 
 Anchor-source recognition in the resolver (`--interaction-matrix PATH`):
 
@@ -517,13 +520,15 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   columns. No vocabulary is copied into TSV, Python, or bash.
 - **Resolved in W12-A (D2):** `mc02-tui-hotplug` is anchored to a real
   storage-family hot-unplug reconcile test and `mc07-tui-capture-visual` to the
-  supervised capture frame's typed marker test. The two remaining TUI `pending`
-  cases are the pointer-modality gaps the terminal shape does not port
-  (`mc03-tui-column-drag`, `mc05-tui-chart-hover`); the capability registry owns
-  the absence reasons and neither case can be promoted without a real ported
-  surface. Owner decision (D2): accept the two gaps, or open a UI-parity line
-  that ports a keyboard equivalent and gets its own case id (a keyboard sample
-  cursor is not "hover").
+  supervised capture frame's typed marker test.
+- **Resolved by the W28 UI-parity line (D2):** the last two TUI `pending` cases
+  were pointer-modality gaps the terminal shape does not port. Instead of
+  accepting them, the parity line ported keyboard equivalents under their own
+  case ids — `mc03-tui-column-reorder` (the column menu's `←`/`→` reorder) and
+  `mc05-tui-chart-cursor` (the Performance·CPU chart's `←`/`→` sample cursor) —
+  so the unified matrix is now 193 cases / 193 anchored / 0 pending / 0
+  dangling. Both rows carry `success|keyboard`: the source case's `pointer` is
+  not what a terminal keyboard port drives.
 - TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
   scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
   marker test proves the frame-marker contract, not a per-scenario matrix.
@@ -704,7 +709,10 @@ order, each requiring its own decision:
   never toggles, hovers or drags) must not claim `pointer` on a toggle or
   projection case: TUI's pointer path is anchored by its own case
   (`mc00-tui-nav-click`), and the toggle/aggregate rows carry `success`/
-  `success|toggle` only.
+  `success|toggle` only. The same rule names the keyboard ports for what they
+  are: `mc03-tui-column-reorder` and `mc05-tui-chart-cursor` carry
+  `success|keyboard`, because a keyboard column reorder is not a pointer drag
+  and a keyboard sample cursor is not a hover.
 - Two interaction anchors record a deliberate evidence form rather than a
   missing one: `bev-tofu-law` anchors the spawned-icon scene (a bitmap
   `ImageNode` with no text glyph — the behavior the tofu law protects), while

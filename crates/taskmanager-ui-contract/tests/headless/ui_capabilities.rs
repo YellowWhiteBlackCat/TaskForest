@@ -23,6 +23,18 @@ fn full_declaration(
     }
 }
 
+/// The reference shape's honest declaration: `Reference` (a mounted
+/// `taskmanager-ui` component) for ordinary capabilities, `Ported`
+/// (frontend-local composition) for the registered semantic contracts that no
+/// shape mounts.
+fn honest_reference_support(capability: ComponentCapability) -> CapabilitySupport {
+    if capability.is_semantic_contract() {
+        CapabilitySupport::Ported
+    } else {
+        CapabilitySupport::Reference
+    }
+}
+
 /// The registry is total and duplicate-free: every variant appears exactly
 /// once in `ALL`, ids are unique, and every entry names a reference path.
 /// The count is pinned so adding a capability is a conscious registry
@@ -48,7 +60,7 @@ fn all_covers_every_capability_exactly_once() {
 /// explicit decisions with reasons).
 #[test]
 fn total_declarations_produce_no_drift_or_findings() {
-    let reference = full_declaration(FrontendShape::Gpui, |_| CapabilitySupport::Reference);
+    let reference = full_declaration(FrontendShape::Gpui, honest_reference_support);
     assert!(capability_drift(&capability_report(&reference)).is_empty());
     assert!(capability_findings(&reference).is_empty());
 
@@ -145,8 +157,7 @@ fn the_reference_shape_cannot_port_diverge_or_defer() {
         CapabilitySupport::Divergent { reason: "why" },
         CapabilitySupport::Unsupported { reason: "why" },
     ] {
-        let mut declaration =
-            full_declaration(FrontendShape::Gpui, |_| CapabilitySupport::Reference);
+        let mut declaration = full_declaration(FrontendShape::Gpui, honest_reference_support);
         declaration.entries[0].support = deferred;
         assert_eq!(
             capability_findings(&declaration),
@@ -158,6 +169,61 @@ fn the_reference_shape_cannot_port_diverge_or_defer() {
             "support {deferred:?} is not a reference-shape decision"
         );
     }
+}
+
+/// The semantic-contract registration is explicit and minimal: only the
+/// audited `SearchInput` capability is classified that way, so the reference
+/// component path stays the mounted-component claim for every other cell.
+#[test]
+fn only_the_audited_capability_is_a_semantic_contract() {
+    assert!(ComponentCapability::SearchInput.is_semantic_contract());
+    assert!(!ComponentCapability::TextInput.is_semantic_contract());
+    assert!(!ComponentCapability::Table.is_semantic_contract());
+    assert_eq!(
+        ComponentCapability::ALL
+            .iter()
+            .filter(|capability| capability.is_semantic_contract())
+            .count(),
+        1,
+        "a capability joins the semantic-contract set only with audit evidence"
+    );
+}
+
+/// A registered semantic contract cannot be claimed as a mounted reference
+/// component: the reference shape asserting `Reference` overclaims, and the
+/// gate names the exact capability. `Ported` (frontend-local composition) is
+/// the honest declaration, but diverging from or refusing the semantics stays
+/// forbidden.
+#[test]
+fn semantic_contract_capability_cannot_claim_a_mounted_reference_component() {
+    let overclaim = full_declaration(FrontendShape::Gpui, |_| CapabilitySupport::Reference);
+    assert_eq!(
+        capability_findings(&overclaim),
+        vec![CapabilityFinding {
+            frontend: FrontendShape::Gpui,
+            capability: ComponentCapability::SearchInput,
+            kind: CapabilityFindingKind::ReferenceComponentNotMounted,
+        }]
+    );
+
+    let honest = full_declaration(FrontendShape::Gpui, honest_reference_support);
+    assert!(capability_findings(&honest).is_empty());
+
+    let mut refusing = full_declaration(FrontendShape::Gpui, honest_reference_support);
+    refusing
+        .entries
+        .iter_mut()
+        .find(|entry| entry.capability == ComponentCapability::SearchInput)
+        .expect("SearchInput is registered")
+        .support = CapabilitySupport::Unsupported { reason: "why" };
+    assert_eq!(
+        capability_findings(&refusing),
+        vec![CapabilityFinding {
+            frontend: FrontendShape::Gpui,
+            capability: ComponentCapability::SearchInput,
+            kind: CapabilityFindingKind::ReferenceShapeCannotDefer,
+        }]
+    );
 }
 
 /// Deliberate differences must say why: empty `via`/`reason` text is a
@@ -192,6 +258,12 @@ fn every_capability_has_explicit_toolkit_neutral_semantic_specification() {
     for capability in ComponentCapability::ALL {
         let spec = capability.semantic_spec();
         assert_eq!(spec.capability, *capability);
+        assert_eq!(
+            spec.is_semantic_contract(),
+            capability.is_semantic_contract(),
+            "capability {} must carry its reference delivery into the spec",
+            capability.id()
+        );
         assert!(
             !spec.user_facing_behavior.is_empty(),
             "capability {} must define user-facing behavior",

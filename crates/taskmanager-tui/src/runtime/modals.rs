@@ -131,6 +131,8 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 match key.code {
                     ratatui::crossterm::event::KeyCode::Up => app.column_menu_move(-1),
                     ratatui::crossterm::event::KeyCode::Down => app.column_menu_move(1),
+                    ratatui::crossterm::event::KeyCode::Left => app.column_menu_move_column(-1),
+                    ratatui::crossterm::event::KeyCode::Right => app.column_menu_move_column(1),
                     ratatui::crossterm::event::KeyCode::Enter
                     | ratatui::crossterm::event::KeyCode::Char(' ') => app.column_menu_toggle(),
                     ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),

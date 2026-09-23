@@ -81,6 +81,31 @@ impl TuiApp {
         ]
     }
 
+    /// The columns the keyboard reorder gesture can move, in their default
+    /// left-to-right order. PID/Name are always-visible identity columns and
+    /// CPU owns the fixed leading readout (the per-row trend splices after it),
+    /// so only the remaining toggleable columns can change position. This is
+    /// the single source the renderer iterates and the column menu moves
+    /// within, so the header, rows, and widths can never disagree.
+    #[must_use]
+    pub const fn reorderable_columns() -> [SortCol; 13] {
+        [
+            SortCol::Memory,
+            SortCol::Pss,
+            SortCol::Swap,
+            SortCol::User,
+            SortCol::State,
+            SortCol::Threads,
+            SortCol::Fds,
+            SortCol::Nice,
+            SortCol::StartTime,
+            SortCol::CpuTime,
+            SortCol::DiskRead,
+            SortCol::DiskWrite,
+            SortCol::Network,
+        ]
+    }
+
     /// Toggle the column-visibility menu on the Applications page (mutually
     /// exclusive with every other overlay; the modal trap owns its keys).
     pub fn toggle_column_menu(&mut self) {
@@ -100,6 +125,40 @@ impl TuiApp {
         if let Some(selection) = self.column_menu_selection_mut() {
             *selection = selection.saturating_add_signed(delta).min(count - 1);
         }
+    }
+
+    /// Move the column under the column-menu cursor one slot left (`delta < 0`)
+    /// or right (`delta > 0`) by swapping it with its neighbour. This is the
+    /// keyboard equivalent of dragging a column to a new position: it mutates
+    /// the one display-order source the header, rows, and widths all paint, so
+    /// the whole table reorders. The identity/CPU prefix is fixed — a selection
+    /// outside the reorderable tail is a no-op — and the move clamps at both
+    /// ends. Session-local presentation state (ADR-027): the shell owns the
+    /// sort value, the TUI owns column display.
+    pub fn column_menu_move_column(&mut self, delta: isize) {
+        let Some(column) = self
+            .column_menu_selection()
+            .and_then(|selection| Self::toggleable_columns().get(selection).copied())
+        else {
+            return;
+        };
+        let Some(index) = self
+            .column_order
+            .iter()
+            .position(|candidate| *candidate == column)
+        else {
+            return;
+        };
+        let target = if delta < 0 {
+            index.checked_sub(1)
+        } else {
+            (index + 1 < self.column_order.len()).then_some(index + 1)
+        };
+        let Some(target) = target else {
+            return;
+        };
+        self.column_order.swap(index, target);
+        self.detail_scroll_reset();
     }
 
     /// Toggle the hidden flag of the column under the menu cursor.

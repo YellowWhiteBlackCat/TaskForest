@@ -37,6 +37,22 @@ pub(super) const SPARKLINE_MIN_AREA_WIDTH: u16 = 160;
 /// would be truncated — the gutter yields to content below the threshold.
 pub(super) const COLUMN_GUTTER_WIDE_WIDTH: u16 = 190;
 
+/// The fixed cell width of one reorderable tail column. The default order and
+/// these widths reproduce the historical layout byte for byte; a reorder only
+/// permutes the same widths. The identity/CPU prefix never appears in the
+/// order, so its arms are inert placeholders that are never painted.
+const fn reorderable_column_width(column: SortCol) -> u16 {
+    match column {
+        SortCol::Memory | SortCol::Pss | SortCol::Swap => 10,
+        SortCol::User => 12,
+        SortCol::State | SortCol::Threads => 7,
+        SortCol::Fds | SortCol::Nice => 5,
+        SortCol::StartTime => 11,
+        SortCol::CpuTime | SortCol::DiskRead | SortCol::DiskWrite | SortCol::Network => 9,
+        SortCol::Pid | SortCol::Name | SortCol::Cpu => 0,
+    }
+}
+
 /// The Applications page's three vertical bands. This is shared by the
 /// renderer and `table_hit`, so pointer coordinates always address the same
 /// table area that was painted.
@@ -160,6 +176,7 @@ pub(super) fn render_processes(
             swap_visible,
             sparkline_visible,
             hidden: &app.hidden_columns,
+            order: &app.column_order,
         };
         let column_visible = |column: SortCol| columns.visible(column);
         let mut widths = vec![
@@ -170,31 +187,14 @@ pub(super) fn render_processes(
         if sparkline_visible {
             widths.push(Constraint::Length(sparkline::SPARKLINE_MAX_SAMPLES as u16));
         }
+        // The tail widths follow the same display order and visibility gate the
+        // header and rows paint, so a reordered or hidden column can never
+        // desynchronize the layout.
         widths.extend(
-            [SortCol::Memory, SortCol::Pss]
-                .into_iter()
-                .filter(|candidate| column_visible(*candidate))
-                .map(|_| Constraint::Length(10)),
-        );
-        if column_visible(SortCol::Swap) {
-            widths.push(Constraint::Length(10));
-        }
-        widths.extend(
-            [
-                (SortCol::User, 12),
-                (SortCol::State, 7),
-                (SortCol::Threads, 7),
-                (SortCol::Fds, 5),
-                (SortCol::Nice, 5),
-                (SortCol::StartTime, 11),
-                (SortCol::CpuTime, 9),
-                (SortCol::DiskRead, 9),
-                (SortCol::DiskWrite, 9),
-                (SortCol::Network, 9),
-            ]
-            .into_iter()
-            .filter(|(candidate, _)| column_visible(*candidate))
-            .map(|(_, width)| Constraint::Length(width)),
+            app.column_order
+                .iter()
+                .filter(|column| column_visible(**column))
+                .map(|column| Constraint::Length(reorderable_column_width(*column))),
         );
         // Fail-closed re-bound of the plan's committed window against the
         // cached id slice (the same math the render boundary has always
@@ -377,12 +377,14 @@ fn process_header(
         swap_visible,
         sparkline_visible,
         hidden,
+        order,
     } = columns;
     let visible = |column: SortCol| {
         process_details::ColumnVisibility {
             swap_visible,
             sparkline_visible,
             hidden,
+            order,
         }
         .visible(column)
     };
@@ -397,29 +399,13 @@ fn process_header(
     // `process_cells`. Built outside the `columns` vec because it has no
     // SortCol — the active-sort arrow never lands on it.
     let splice_trend_at = columns.len();
+    // The tail headers follow the user's display order (the column menu's
+    // reorder gesture), gated by the same visibility as the widths and cells.
     columns.extend(
-        [SortCol::Memory, SortCol::Pss]
-            .into_iter()
+        order
+            .iter()
+            .copied()
             .filter(|candidate| visible(*candidate)),
-    );
-    if visible(SortCol::Swap) {
-        columns.push(SortCol::Swap);
-    }
-    columns.extend(
-        [
-            SortCol::User,
-            SortCol::State,
-            SortCol::Threads,
-            SortCol::Fds,
-            SortCol::Nice,
-            SortCol::StartTime,
-            SortCol::CpuTime,
-            SortCol::DiskRead,
-            SortCol::DiskWrite,
-            SortCol::Network,
-        ]
-        .into_iter()
-        .filter(|candidate| visible(*candidate)),
     );
     let mut cells: Vec<Cell> = columns
         .iter()

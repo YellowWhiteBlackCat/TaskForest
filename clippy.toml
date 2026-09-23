@@ -4,8 +4,8 @@
 #
 # Lowered from 48/650 after the W27 refactors (windows/macos facet-surface
 # assertion batteries, gpui `run_production`) removed every function above 44.
-# The next target is 44/500: `platform-runtime::channel::construction::build`
-# (591) and `gpui::render_page_body` (563) must be split into named helpers
-# first, and the threshold may only move in the same change as that refactor.
+# The 44/500 target is now met: `platform-runtime::channel::construction::build`
+# was split into per-facet-domain lane/facet helpers, and
+# `gpui::render_page_body` was split into per-page body helpers.
 cognitive-complexity-threshold = 44
-too-many-lines-threshold = 600
+too-many-lines-threshold = 500

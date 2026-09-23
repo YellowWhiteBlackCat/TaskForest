@@ -167,6 +167,13 @@ pub struct TuiApp {
     /// utilization chart and fact strip never scroll; compact layout removes
     /// this optional region entirely.
     pub gpu_engine_scroll: usize,
+    /// Selected sample index of the Performance·CPU history chart, moved by
+    /// the `←`/`→` keyboard cursor (the terminal port of a pointer hover). The
+    /// renderer clamps it against the live window and paints the per-sample
+    /// readout; `None` means no cursor. Reset when the Performance device
+    /// changes or the page leaves, so a stale index never points at another
+    /// series.
+    pub chart_cursor: Option<usize>,
     /// Vertical fact offset for the System page's typed section viewport.
     /// Stored as navigation intent and clamped by the current projection and
     /// terminal height during paint.
@@ -197,6 +204,14 @@ pub struct TuiApp {
     /// columns. TUI-local (ADR-027): the shell owns the sort value; the
     /// *selection* of visible columns is presentation state.
     pub hidden_columns: std::collections::HashSet<SortCol>,
+    /// The Applications table's tail-column display order (the toggleable
+    /// columns after the always-visible PID/Name/CPU prefix and the trend
+    /// splice). The column menu's keyboard reorder gesture moves one column
+    /// left/right by swapping neighbours in this one vector, so the header,
+    /// rows, and widths all follow. Initialised to
+    /// [`Self::reorderable_columns`]'s default order. TUI-local (ADR-027):
+    /// session-local presentation state; the shell owns the sort value.
+    pub column_order: Vec<SortCol>,
     /// Which Applications-page panel owns the keyboard (Tab cycles the
     /// focus; the details panel consumes Up/Down as panel scroll).
     pub focus_panel: FocusPanel,
@@ -295,12 +310,14 @@ impl TuiApp {
             cpu_core_scroll: 0,
             cpu_detail_scroll: 0,
             gpu_engine_scroll: 0,
+            chart_cursor: None,
             system_scroll: 0,
             health_rule_selection: 0,
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
             hidden_columns: std::collections::HashSet::new(),
+            column_order: Self::reorderable_columns().to_vec(),
             focus_panel: FocusPanel::Table,
             help_scroll: 0,
             last_insights_target: None,
@@ -431,6 +448,7 @@ impl TuiApp {
             self.last_insights_target = None;
             self.focus_panel = FocusPanel::Table;
             self.system_scroll = 0;
+            self.chart_cursor = None;
             self.persist_last_page();
         }
         if self.shell.interaction_surface().is_some()
@@ -471,6 +489,7 @@ impl TuiApp {
             self.last_insights_target = None;
             self.focus_panel = FocusPanel::Table;
             self.system_scroll = 0;
+            self.chart_cursor = None;
         }
         if self.page() == AppPage::Applications && self.query != query_before {
             // Drop the stale detail identity before the cursor re-derives its

@@ -146,17 +146,19 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
         gray_zero,
         local_time_rules,
     } = input;
-    let data = super::process_data::process_cell_data(process, local_time_rules);
+    let mut data = super::process_data::process_cell_data(process, local_time_rules);
     let ColumnVisibility {
         swap_visible,
         sparkline_visible,
         hidden,
+        order,
     } = columns;
     let visible = |column: SortCol| {
         ColumnVisibility {
             swap_visible,
             sparkline_visible,
             hidden,
+            order,
         }
         .visible(column)
     };
@@ -243,52 +245,33 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
         };
         cells.push(trend);
     }
-    if visible(SortCol::Memory) {
-        cells.push(zero_tinted_cell(data.memory, gray_zero, theme));
-    }
-    if visible(SortCol::Pss) {
-        cells.push(zero_tinted_cell(data.pss, gray_zero, theme));
-    }
-    if visible(SortCol::Swap) {
-        cells.push(zero_tinted_cell(data.swap, gray_zero, theme));
-    }
-    // The tail columns (User / State / Threads / Fds / Nice / StartTime /
-    // CpuTime / Disk r/w) push only when the user has not hidden them; the
-    // header and widths apply the same gate so every row stays aligned.
-    if visible(SortCol::User) {
-        cells.push(search_highlight_cell(
-            &data.user,
-            query,
-            search_active,
-            theme,
-        ));
-    }
-    if visible(SortCol::State) {
-        cells.push(Cell::from(process.status.as_str()));
-    }
-    if visible(SortCol::Threads) {
-        cells.push(Cell::from(data.threads));
-    }
-    if visible(SortCol::Fds) {
-        cells.push(Cell::from(data.fds));
-    }
-    if visible(SortCol::Nice) {
-        cells.push(Cell::from(data.nice));
-    }
-    if visible(SortCol::StartTime) {
-        cells.push(Cell::from(data.start_time));
-    }
-    if visible(SortCol::CpuTime) {
-        cells.push(Cell::from(data.cpu_time));
-    }
-    if visible(SortCol::DiskRead) {
-        cells.push(zero_tinted_cell(data.disk_read, gray_zero, theme));
-    }
-    if visible(SortCol::DiskWrite) {
-        cells.push(zero_tinted_cell(data.disk_write, gray_zero, theme));
-    }
-    if visible(SortCol::Network) {
-        cells.push(zero_tinted_cell(data.network, gray_zero, theme));
+    // The tail columns paint in the user's display order (the column menu's
+    // reorder gesture mutates the single `column_order` source), gated by the
+    // same visibility the header and widths use so every row stays aligned.
+    for &column in order {
+        if !visible(column) {
+            continue;
+        }
+        let cell: Cell<'a> = match column {
+            SortCol::Memory => zero_tinted_cell(data.memory, gray_zero, theme),
+            SortCol::Pss => zero_tinted_cell(data.pss, gray_zero, theme),
+            SortCol::Swap => zero_tinted_cell(data.swap, gray_zero, theme),
+            SortCol::User => search_highlight_cell(&data.user, query, search_active, theme),
+            SortCol::State => Cell::from(process.status.as_str()),
+            // The reorderable order holds each column once, so moving its
+            // pre-formatted string out of `data` is allocation-free.
+            SortCol::Threads => Cell::from(std::mem::take(&mut data.threads)),
+            SortCol::Fds => Cell::from(std::mem::take(&mut data.fds)),
+            SortCol::Nice => Cell::from(std::mem::take(&mut data.nice)),
+            SortCol::StartTime => Cell::from(std::mem::take(&mut data.start_time)),
+            SortCol::CpuTime => Cell::from(std::mem::take(&mut data.cpu_time)),
+            SortCol::DiskRead => zero_tinted_cell(data.disk_read, gray_zero, theme),
+            SortCol::DiskWrite => zero_tinted_cell(data.disk_write, gray_zero, theme),
+            SortCol::Network => zero_tinted_cell(data.network, gray_zero, theme),
+            // The identity/CPU prefix never appears in the reorderable order.
+            SortCol::Pid | SortCol::Name | SortCol::Cpu => continue,
+        };
+        cells.push(cell);
     }
     cells
 }
@@ -306,6 +289,12 @@ pub(super) struct ColumnVisibility<'a> {
     pub(super) swap_visible: bool,
     pub(super) sparkline_visible: bool,
     pub(super) hidden: &'a std::collections::HashSet<SortCol>,
+    /// The tail columns' left-to-right display order. The column menu's
+    /// reorder gesture mutates the single `TuiApp::column_order` source this
+    /// borrows, so the header, rows, and widths can never disagree. Never
+    /// contains the always-visible PID/Name identity columns or CPU (whose
+    /// readout leads the table and owns the trend splice).
+    pub(super) order: &'a [SortCol],
 }
 
 impl ColumnVisibility<'_> {
@@ -350,12 +339,14 @@ pub(super) fn group_header_cells(
         swap_visible,
         sparkline_visible,
         hidden,
+        order,
     } = columns;
     let visible = |column: SortCol| {
         ColumnVisibility {
             swap_visible,
             sparkline_visible,
             hidden,
+            order,
         }
         .visible(column)
     };
@@ -378,32 +369,17 @@ pub(super) fn group_header_cells(
         // widened table (and matches the gpui `show_spark=false` blank cell).
         cells.push(Cell::from(MISSING_VALUE));
     }
-    if visible(SortCol::Memory) {
-        cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
-    }
-    if visible(SortCol::Pss) {
-        cells.push(Cell::from(MISSING_VALUE));
-    }
-    if visible(SortCol::Swap) {
-        cells.push(Cell::from(MISSING_VALUE));
-    }
-    // The per-process-only columns (User / State / Threads / Fds / Nice /
-    // StartTime / CpuTime / Disk r/w) have no aggregate meaning: honest
-    // dashes keep the row aligned with the widened table. Each pushes only
-    // when the column is visible (same gate as the process rows).
-    for column in [
-        SortCol::User,
-        SortCol::State,
-        SortCol::Threads,
-        SortCol::Fds,
-        SortCol::Nice,
-        SortCol::StartTime,
-        SortCol::CpuTime,
-        SortCol::DiskRead,
-        SortCol::DiskWrite,
-        SortCol::Network,
-    ] {
-        if visible(column) {
+    // The tail columns follow the user's display order (the reorder gesture),
+    // gated by the same visibility as the process rows. Memory keeps the
+    // aggregate memory value; every per-process-only column has no aggregate
+    // meaning, so it paints the honest dash and stays aligned.
+    for &column in order {
+        if !visible(column) {
+            continue;
+        }
+        if column == SortCol::Memory {
+            cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
+        } else {
             cells.push(Cell::from(MISSING_VALUE));
         }
     }

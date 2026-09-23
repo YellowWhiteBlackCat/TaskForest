@@ -205,7 +205,8 @@ timeout, delivery ownership and live drain without host UI.
 src/assembly.rs  composition.rs        channel assembly and composition
 src/registration.rs                    provider catalog wiring
 src/channel/                           one bounded channel per capability
-│   └── construction/  lanes.rs  port.rs
+│   ├── lanes.rs  port.rs  facet_attach.rs
+│   └── construction/  budget.rs  context.rs  system.rs  process.rs  facets.rs
 src/delivery/                          FairEventPort + EventClass fair delivery
 │   └── event_port.rs  event_queue.rs  publisher.rs  worker/  catalog.rs
 src/ecs/                               Bevy ECS scheduling kernel (ADR-033)

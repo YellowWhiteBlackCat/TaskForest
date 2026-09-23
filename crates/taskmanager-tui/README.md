@@ -122,7 +122,7 @@ src/ui.rs                                     page rendering root
 │   ├── service_dependencies_modal.rs  service_menu.rs  session_menu.rs
 │   ├── startup_menu.rs  batch_menu.rs  column_menu.rs  affinity_modal.rs
 │   ├── confirmations.rs  header.rs  footer.rs  frame_plan.rs
-│   ├── sparkline.rs  highlight.rs  table_hit.rs  text.rs  units.rs
+│   ├── sparkline.rs  chart_cursor.rs  highlight.rs  table_hit.rs  text.rs  units.rs
 src/command_palette/  (+ surface_protocol.rs) command palette
 src/bindings.rs  capabilities.rs  functional.rs  keys, capabilities, CORE-04
 src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs

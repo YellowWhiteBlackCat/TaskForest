@@ -13,7 +13,7 @@ commands).
 This guard pins the audited ceiling and fails when ``clippy.toml`` exceeds it:
 
 ``cognitive-complexity-threshold <= 44``
-``too-many-lines-threshold <= 600``
+``too-many-lines-threshold <= 500``
 
 Lowering a threshold needs no change here. Raising one is a conscious act: it
 must edit this pin in the same change, so the regression is visible in review
@@ -46,7 +46,7 @@ CLIPPY_TOML = "clippy.toml"
 # one must edit this table in the same change, which is the whole point.
 CEILINGS: dict[str, int] = {
     "cognitive-complexity-threshold": 44,
-    "too-many-lines-threshold": 600,
+    "too-many-lines-threshold": 500,
 }
 
 # `key = 44` / `key = 44  # comment`. clippy.toml is a flat key/value file.
@@ -164,15 +164,15 @@ def self_test() -> int:
     """Prove the guard is not a rubber stamp: it must go red on a raise and
     fail closed on an unreadable shape."""
     cases: list[tuple[str, str, int]] = [
-        ("at the ceiling", "cognitive-complexity-threshold = 44\ntoo-many-lines-threshold = 600\n", EXIT_OK),
-        ("below the ceiling", "cognitive-complexity-threshold = 40\ntoo-many-lines-threshold = 500\n", EXIT_OK),
-        ("comments and blank lines", "# note\n\ncognitive-complexity-threshold = 44  # inline\ntoo-many-lines-threshold = 600\n", EXIT_OK),
-        ("raised complexity", "cognitive-complexity-threshold = 45\ntoo-many-lines-threshold = 600\n", EXIT_ABOVE_CEILING),
+        ("at the ceiling", "cognitive-complexity-threshold = 44\ntoo-many-lines-threshold = 500\n", EXIT_OK),
+        ("below the ceiling", "cognitive-complexity-threshold = 40\ntoo-many-lines-threshold = 420\n", EXIT_OK),
+        ("comments and blank lines", "# note\n\ncognitive-complexity-threshold = 44  # inline\ntoo-many-lines-threshold = 500\n", EXIT_OK),
+        ("raised complexity", "cognitive-complexity-threshold = 45\ntoo-many-lines-threshold = 500\n", EXIT_ABOVE_CEILING),
         ("raised lines", "cognitive-complexity-threshold = 44\ntoo-many-lines-threshold = 650\n", EXIT_ABOVE_CEILING),
         ("legacy ceiling", "cognitive-complexity-threshold = 48\ntoo-many-lines-threshold = 650\n", EXIT_ABOVE_CEILING),
         ("missing key", "cognitive-complexity-threshold = 44\n", EXIT_PARSE_FAILURE),
-        ("non-integer", "cognitive-complexity-threshold = many\ntoo-many-lines-threshold = 600\n", EXIT_PARSE_FAILURE),
-        ("duplicate key", "cognitive-complexity-threshold = 44\ncognitive-complexity-threshold = 40\ntoo-many-lines-threshold = 600\n", EXIT_PARSE_FAILURE),
+        ("non-integer", "cognitive-complexity-threshold = many\ntoo-many-lines-threshold = 500\n", EXIT_PARSE_FAILURE),
+        ("duplicate key", "cognitive-complexity-threshold = 44\ncognitive-complexity-threshold = 40\ntoo-many-lines-threshold = 500\n", EXIT_PARSE_FAILURE),
         ("empty file", "", EXIT_PARSE_FAILURE),
     ]
     failures = 0
