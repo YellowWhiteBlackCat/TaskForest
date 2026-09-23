@@ -1,7 +1,10 @@
 use super::{MenuEntry, ServiceFilter, build_service_menu};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::TopPage;
-use gpui::{AppContext, TestAppContext, VisualTestContext, px};
+use gpui::{
+    AppContext, Context, InteractiveElement, IntoElement, ParentElement, Render, Styled,
+    TestAppContext, VisualTestContext, Window, div, px,
+};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
@@ -111,7 +114,10 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
 /// painted membership authority (a filter with no member paints an empty
 /// inventory, never a placeholder row). The filtered phases use fresh windows
 /// because `debug_bounds` keeps the last frame that painted a selector, so a
-/// dropped row is only observable as "never painted in this window".
+/// dropped row is only observable as "never painted in this window" — the
+/// vendored cache semantics this relies on are pinned by
+/// `debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_fact`
+/// below.
 #[gpui::test]
 async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppContext) {
     let services = || {
@@ -209,5 +215,108 @@ async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppCont
     assert!(
         vcx.debug_bounds("tm-svc-row:0").is_none(),
         "a typed-status filter with no member must paint no inventory row"
+    );
+}
+
+/// Pit pin for the vendored `debug_bounds` cache: the map lives on the reused
+/// `Frame`, `Frame::clear` does not clear it, and `Frame::finish` only migrates
+/// element states — so a selector painted by ANY earlier frame of a window
+/// stays queryable. It is a cross-frame cache, never a current-frame
+/// observation; a same-window absence assertion proves nothing (it can only say
+/// "this window never painted it").
+///
+/// The filtered-row tests above depend on this fact. If this test goes red
+/// after a vendored gpui update, the map began clearing per frame: the
+/// fresh-window discipline can then be RELAXED (same-window absence becomes
+/// observable) — revise the dependent tests instead of deleting this pin.
+struct DebugBoundsPinView {
+    paint: bool,
+}
+
+impl Render for DebugBoundsPinView {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let root = div().w(px(64.0)).h(px(64.0));
+        // Each branch paints exactly one branch-marker selector, so the frame
+        // proves which state it rendered instead of only leaking history.
+        if self.paint {
+            root.child(
+                div()
+                    .debug_selector(|| "tm-debug-bounds-pin".to_owned())
+                    .w(px(24.0))
+                    .h(px(24.0)),
+            )
+        } else {
+            root.child(
+                div()
+                    .debug_selector(|| "tm-debug-bounds-unpinned".to_owned())
+                    .w(px(24.0))
+                    .h(px(24.0)),
+            )
+        }
+    }
+}
+
+#[gpui::test]
+async fn debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_fact(
+    cx: &mut TestAppContext,
+) {
+    let win = cx.add_window(|_window, _cx| DebugBoundsPinView { paint: true });
+    let view = win
+        .entity(cx)
+        .expect("window root DebugBoundsPinView entity");
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+
+    let painted = vcx
+        .debug_bounds("tm-debug-bounds-pin")
+        .expect("the pinned branch of the first frame must paint");
+    assert!(
+        painted.size.width > px(0.0) && painted.size.height > px(0.0),
+        "the pin must come from a real painted element: {painted:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-debug-bounds-unpinned").is_none(),
+        "the unpinned branch must not paint while the pinned branch is active"
+    );
+    assert!(
+        vcx.debug_bounds("tm-debug-bounds-never-painted").is_none(),
+        "a selector no frame ever painted must be absent, so the retention assertion below is discriminating"
+    );
+
+    // The next frame renders the OTHER branch. The unpinned marker proves the
+    // new frame really ran; the pinned selector must still answer with the
+    // earlier frame's own bounds.
+    view.update(cx, |view, cx| {
+        view.paint = false;
+        cx.notify();
+    });
+    vcx.update(|window, cx| window.draw(cx).clear());
+    assert!(
+        vcx.debug_bounds("tm-debug-bounds-unpinned").is_some(),
+        "the second frame must render the updated view state (marker for the new branch)"
+    );
+    let retained = vcx.debug_bounds("tm-debug-bounds-pin").expect(
+        "Frame::clear must keep debug_bounds: if this is empty, the vendored cache now clears per \
+         frame and the fresh-window discipline in the filtered-row tests can be relaxed",
+    );
+    assert_eq!(
+        retained, painted,
+        "the retained entry must be the earlier painted frame's own bounds, not a re-derived value"
+    );
+
+    // The complement: absence is only a fact about a window that NEVER painted
+    // the selector.
+    let fresh = cx.add_window(|_window, _cx| DebugBoundsPinView { paint: false });
+    cx.update_window(fresh.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    let mut fresh_vcx = VisualTestContext::from_window(fresh.into(), cx);
+    assert!(
+        fresh_vcx.debug_bounds("tm-debug-bounds-unpinned").is_some(),
+        "the fresh window must paint its own (unpinned) branch"
+    );
+    assert!(
+        fresh_vcx.debug_bounds("tm-debug-bounds-pin").is_none(),
+        "a fresh window that never painted the pin reports absence; same-window absence is not observable"
     );
 }

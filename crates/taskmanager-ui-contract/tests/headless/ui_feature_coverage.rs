@@ -509,11 +509,13 @@ fn capability_and_feature_registries_are_deliberately_asymmetric() {
     );
 }
 
-/// The three delivery definitions most easily blurred are pinned at their
+/// The five delivery definitions most easily blurred are pinned at their
 /// boundary: CPU cache stays capacity-only, thrashing health keeps the
-/// full-stall deduction requirement, and NUMA keeps the per-node requirement.
-/// Weakening one must fail here and be a conscious specification change, never
-/// an accidental overclaim.
+/// full-stall deduction requirement, NUMA keeps the per-node requirement, the
+/// memory breakdown keeps the virtual address-space size (VmSize) OUTSIDE, and
+/// the thermal-throttle feature keeps the real-time PROCHOT state
+/// (`is_throttled`) OUTSIDE. Weakening one must fail here and be a conscious
+/// specification change, never an accidental overclaim.
 #[test]
 fn authoritative_delivery_definitions_pin_their_boundaries() {
     let cache = FeatureId::CpuCacheTopology
@@ -534,4 +536,18 @@ fn authoritative_delivery_definitions_pin_their_boundaries() {
         .delivery_definition;
     assert!(numa.contains("per-NUMA-node"), "{numa}");
     assert!(numa.contains("does NOT satisfy"), "{numa}");
+
+    let memory = FeatureId::MemoryBreakdownRssPss
+        .semantic_spec()
+        .delivery_definition;
+    assert!(memory.contains("shared_bytes"), "{memory}");
+    assert!(memory.contains("VmSize"), "{memory}");
+    assert!(memory.contains("OUTSIDE"), "{memory}");
+
+    let thermal = FeatureId::ThermalThrottleEvents
+        .semantic_spec()
+        .delivery_definition;
+    assert!(thermal.contains("package_throttle_count"), "{thermal}");
+    assert!(thermal.contains("is_throttled"), "{thermal}");
+    assert!(thermal.contains("OUTSIDE"), "{thermal}");
 }

@@ -164,11 +164,12 @@ fn missing_policy_rows_are_omitted_instead_of_dashed() {
 }
 
 /// The `power.thermal-throttle-events` delivery: the spec list renders the
-/// cumulative package and per-core thermal-throttle trigger counters of every
-/// package from the shared CPU projection. A package whose projection carries
-/// no counter contributes no segment, a projection with no observed counter
-/// keeps the whole row absent, and an observed package with an unobserved
-/// sibling counter renders the labeled dash — never a fabricated `0`.
+/// shared [`taskmanager_shell::presentation::cpu_thermal_throttle_summary`]
+/// fold, whose exact value form — one `S{package_id}` segment per observed
+/// package, the labeled dash for an unobserved sibling counter, never a
+/// fabricated `0` — is pinned once by the shell rule test. This anchor proves
+/// the panel paints that shared fold and keeps the whole row absent when no
+/// package observed a counter.
 #[test]
 fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
     taskmanager_test_support::pin_english();
@@ -195,7 +196,16 @@ fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
     cpu.packages = vec![observed, package_only];
     let rows = cpu_spec_rows(&cpu, &hardware, units);
     let value = value_of(&rows, "cpu.thermal_throttle");
-    assert_eq!(value, "S0 Package 7 · Core 3 | S1 Package 12 · Core —");
+    let expected = taskmanager_shell::presentation::cpu_thermal_throttle_summary(&cpu)
+        .expect("observed counters must produce the shared fold");
+    assert_eq!(
+        value, expected,
+        "the spec row must paint the shared thermal-throttle fold"
+    );
+    assert!(
+        value.contains(taskmanager_shell::presentation::MISSING_VALUE),
+        "the unobserved sibling counter must keep the labeled dash: {value}"
+    );
     assert!(
         !value.contains("Core 0"),
         "an unobserved core counter must stay a labeled dash: {value}"

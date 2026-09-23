@@ -399,10 +399,11 @@ mod cpu_throttle_tests {
     }
 
     /// The `power.thermal-throttle-events` delivery: the Performance CPU stat
-    /// column renders the cumulative package/per-core trigger counters per
-    /// package from the shared projection, keeps an unobserved sibling counter
-    /// a labeled dash, and omits the row entirely when no package observed a
-    /// counter — never a fabricated zero.
+    /// column renders the shared
+    /// [`taskmanager_shell::presentation::cpu_thermal_throttle_summary`] fold
+    /// (whose exact value form is pinned once by the shell rule test) and omits
+    /// the row entirely when no package observed a counter — never a fabricated
+    /// zero.
     #[test]
     fn cpu_stats_render_the_thermal_throttle_counters_with_honest_absence() {
         taskmanager_test_support::pin_english();
@@ -411,10 +412,20 @@ mod cpu_throttle_tests {
         set_package_counters(&mut app, &[(0, Some(7), Some(3)), (1, Some(12), None)]);
         let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
         let row = throttle_row(&stats).expect("observed counters must grow a stat row");
+        let expected = {
+            let snapshot = app
+                .shell
+                .projection()
+                .snapshot
+                .as_ref()
+                .expect("demo snapshot");
+            taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+                .expect("observed counters must produce the shared fold")
+        };
         assert_eq!(
             row.value(),
-            Some("S0 Package 7 · Core 3 | S1 Package 12 · Core —"),
-            "an unobserved core counter must stay a labeled dash, never a 0"
+            Some(expected.as_str()),
+            "the stat row must render the shared thermal-throttle fold"
         );
 
         set_package_counters(&mut app, &[(0, None, None)]);

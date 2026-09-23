@@ -8,7 +8,8 @@
 #   quick      seconds-minutes: toolchain/platform preflight, fmt, dependency-floor,
 #              python policy gates, test-runner policy, install-manager
 #              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
-#              side-effect guards, per-crate coverage gate self-test, and the
+#              side-effect guards, per-crate coverage gate self-test, the
+#              CI/local command-parity and gate-wiring guards, and the
 #              private A/B capture-isolation check when a host Wayland/KWin
 #              session and writable user cgroup are available (or
 #              TM_CAPTURE_ISOLATION_GATE=1 forces it).
@@ -557,6 +558,19 @@ if maybe clippy-parity-self; then
 fi
 if maybe clippy-parity; then
     run_stage clippy-parity quick run_py scripts/quality/clippy_command_parity_guard.py
+fi
+if maybe production-config-wiring-self; then
+    # clippy-parity proves the clippy *command* is the same on both hosts; this
+    # guard proves the production-config helper is still *wired into* both hosts
+    # (CI's lint job and this script's standard production-config stage), so a
+    # later refactor cannot delete or neutralise it in silence. The self-test
+    # proves it goes red on a deleted/commented-out step and on a
+    # `continue-on-error: true` step, and that it fails closed (exit 2) on a
+    # file or job it cannot parse.
+    run_stage production-config-wiring-self quick run_py scripts/quality/production_config_wiring_guard.py --self-test
+fi
+if maybe production-config-wiring; then
+    run_stage production-config-wiring quick run_py scripts/quality/production_config_wiring_guard.py
 fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"

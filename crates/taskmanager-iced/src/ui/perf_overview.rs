@@ -396,9 +396,10 @@ pub(crate) fn cpu_memory_header_and_stats(
             stats.push(StatRow::text(t("cpu.interrupts"), Some(interrupts)));
         }
         // Cumulative thermal-throttle trigger counters (`power.thermal-throttle-events`).
-        // The whole row is omitted when no package observed a counter; the fold
-        // keeps an unobserved sibling counter a labeled dash, never a zero.
-        if let Some(throttle) = cpu_throttle_summary(cpu) {
+        // The whole row is omitted when no package observed a counter; the
+        // shared shell fold keeps an unobserved sibling counter a labeled dash,
+        // never a zero.
+        if let Some(throttle) = taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu) {
             stats.push(StatRow::text(t("cpu.thermal_throttle"), Some(throttle)));
         }
         if let Some(load) = snapshot.load_average.as_ref() {

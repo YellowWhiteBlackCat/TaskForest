@@ -236,27 +236,39 @@ fn dense_right_rail_scroll_exposes_the_tail_without_an_omitted_rows_placeholder(
 }
 
 /// The `power.thermal-throttle-events` delivery: the CPU rail paints the
-/// cumulative package/per-core thermal-throttle trigger counters from the
-/// shared CPU projection, keeps an unobserved sibling counter as the labeled
-/// shared dash in the projection, and paints no row at all when no package
-/// observed a counter — never a fabricated zero.
+/// shared [`taskmanager_shell::presentation::cpu_thermal_throttle_summary`]
+/// fold (whose exact value form — per-package segments including the labeled
+/// dash for an unobserved sibling counter, never a fabricated zero — is pinned
+/// once by the shell rule test) and paints no row at all when no package
+/// observed a counter.
 #[test]
 fn thermal_throttle_counters_paint_with_honest_absence() {
     let mut app = cpu_app();
 
     // Observed counters: the single package segment reaches the painted rail
-    // (the bounded value slot fits "S0 Package 7 · Core 3" exactly).
+    // (the bounded value slot fits one package segment exactly).
     set_package_counters(&mut app, &[(0, Some(7), Some(3))]);
     app.scroll_cpu_details(isize::MAX);
     let observed = frame_text(&app, 120, 48);
+    let expected = {
+        let snapshot = app
+            .shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .expect("demo snapshot");
+        taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+            .expect("observed counters must produce the shared fold")
+    };
     assert!(
-        row_paints(&observed, "Thermal throttle", "S0 Package 7 · Core 3"),
-        "the observed package counters must paint:\n{observed}"
+        row_paints(&observed, "Thermal throttle", &expected),
+        "the observed package counters must paint the shared fold:\n{observed}"
     );
 
-    // The projection keeps an unobserved core counter a labeled dash and a
-    // second package its own S-id (the rail's bounded value slot may elide the
-    // tail, so the fold is asserted at the data layer it paints from).
+    // A second package with an unobserved core counter keeps its own S-id and
+    // the labeled dash in the same fold (the rail's bounded value slot may
+    // elide the tail on screen, so the multi-package fold is asserted at the
+    // data layer it paints from).
     set_package_counters(&mut app, &[(0, Some(7), Some(3)), (1, Some(12), None)]);
     let snapshot = app
         .shell
@@ -264,14 +276,16 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
         .snapshot
         .clone()
         .expect("demo snapshot");
+    let expected = taskmanager_shell::presentation::cpu_thermal_throttle_summary(&snapshot.cpu)
+        .expect("observed counters must produce the shared fold");
     let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(&snapshot.cpu, None);
     let throttle = rows
         .iter()
         .find(|row| row.label == taskmanager_application::i18n::t("cpu.thermal_throttle"))
         .expect("the observed counters must grow a rail row");
     assert_eq!(
-        throttle.value, "S0 Package 7 · Core 3 | S1 Package 12 · Core —",
-        "an unobserved counter must stay a labeled dash, never a fabricated 0"
+        throttle.value, expected,
+        "the rail row must paint the shared thermal-throttle fold"
     );
 
     // No package observed any counter: the whole row is absent (the honest
