@@ -27,6 +27,12 @@ use crate::health::CapabilityHealth;
 #[path = "delivery/worker_lifecycle.rs"]
 mod worker_lifecycle;
 
+// One definition of the deterministic cross-thread wait macro; every runtime
+// test module invokes it as `crate::wait_for!`. A file may not be mounted as a
+// module more than once (`clippy::duplicate_mod`).
+#[path = "wait.rs"]
+mod wait;
+
 fn fixed_clock() -> u64 {
     42
 }
@@ -870,22 +876,16 @@ fn lane_panic_is_isolated_and_publishes_a_typed_failure() {
 
     // The panicked request's owner retires only when its terminal health
     // record lands (claim -> enqueue -> record), while the event above is
-    // already observable after the enqueue; retry admission across that
-    // documented microsecond window instead of assuming one interleaving.
-    let mut ok_admitted = false;
-    for _ in 0..10_000 {
-        if catalog
+    // already observable after the enqueue; wait on a wall-clock deadline for
+    // that documented window instead of assuming one interleaving.
+    crate::wait_for!("panicked terminal to retire its owner", || {
+        catalog
             .ecs_scheduler_handle()
             .lock()
             .expect("scheduler lock")
             .reserve_submission(&CapabilityId::TELEMETRY_CPU, ok_id, 0)
-        {
-            ok_admitted = true;
-            break;
-        }
-        std::thread::yield_now();
-    }
-    assert!(ok_admitted, "panicked terminal must retire its owner");
+            .then_some(())
+    });
     request_tx
         .send(Queued {
             request_id: ok_id,
@@ -912,6 +912,7 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
     let workers = crate::WorkerRuntime::default();
     let served = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let marker = served.clone();
+    let (served_tx, served_rx) = bounded(2);
     let cpu_event = |payload: u8| {
         PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Cpu {
             revision: SystemTelemetryRevision::new(u64::from(payload) + 1),
@@ -924,6 +925,7 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
     };
     super::spawn_lane(&workers, request_rx, publisher, move |payload: u8| {
         marker.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let _ = served_tx.send(());
         Ok(cpu_event(payload))
     })
     .expect("provider worker starts");
@@ -941,10 +943,12 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
             .expect("request queued");
     }
     drop(request_tx);
-    let mut waited = 0;
-    while served.load(std::sync::atomic::Ordering::SeqCst) < 2 && waited < 500 {
-        thread::sleep(Duration::from_millis(10));
-        waited += 1;
+    // The provider runs on the lane thread; block on its own completion
+    // signal rather than counting scheduler yields.
+    for _ in 0..2 {
+        served_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the lane must keep serving requests after stale publications");
     }
     assert_eq!(
         served.load(std::sync::atomic::Ordering::SeqCst),

@@ -1,6 +1,4 @@
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
 use taskmanager_application::{
     PlatformEvent, ProcessAffinityEvent, ProcessAffinityRequest, ProcessControlRequest,
@@ -388,13 +386,9 @@ fn frozen_process() -> FrozenProcessIdentity {
 fn wait_event(
     handle: &taskmanager_application::PlatformHandle,
 ) -> taskmanager_platform_contract::EventEnvelope<PlatformEvent> {
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            return event;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("process runtime event did not arrive");
+    crate::wait_for!("process runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    })
 }
 
 #[test]

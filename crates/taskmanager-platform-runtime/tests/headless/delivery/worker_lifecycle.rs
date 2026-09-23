@@ -91,19 +91,19 @@ fn worker_limits_fail_closed_across_runtime_owners_and_release_after_exit() {
         .expect("idle worker observes cooperative shutdown");
 
     let mut replacement = None;
-    for _ in 0..1_024 {
+    crate::wait_for!("exited worker to return its process quota", || {
         let (_replacement_tx, replacement_rx) = bounded::<Queued<u64>>(1);
         match crate::spawn_lane(&second, replacement_rx, publisher.clone(), |_| {
             Err(ProviderFailure::Unsupported)
         }) {
             Ok(()) => {
                 replacement = Some(());
-                break;
+                Some(())
             }
-            Err(WorkerSpawnError::ProcessCapacity { .. }) => thread::yield_now(),
+            Err(WorkerSpawnError::ProcessCapacity { .. }) => None,
             Err(error) => panic!("unexpected replacement startup error: {error}"),
         }
-    }
+    });
     assert_eq!(replacement, Some(()), "exited worker returns its quota");
 
     drop(request_tx);
@@ -172,19 +172,22 @@ fn dropping_runtime_never_waits_for_a_blocked_provider_and_keeps_its_quota() {
     dropper.join().expect("drop observer exits");
 
     let mut restarted = false;
-    for _ in 0..1_024 {
-        let (_tx, rx) = bounded::<Queued<u32>>(1);
-        match crate::spawn_lane(&replacement, rx, publisher.clone(), |_| {
-            Err(ProviderFailure::Unsupported)
-        }) {
-            Ok(()) => {
-                restarted = true;
-                break;
+    crate::wait_for!(
+        "provider exit to return the retained process permit",
+        || {
+            let (_tx, rx) = bounded::<Queued<u32>>(1);
+            match crate::spawn_lane(&replacement, rx, publisher.clone(), |_| {
+                Err(ProviderFailure::Unsupported)
+            }) {
+                Ok(()) => {
+                    restarted = true;
+                    Some(())
+                }
+                Err(WorkerSpawnError::ProcessCapacity { .. }) => None,
+                Err(error) => panic!("unexpected restart error: {error}"),
             }
-            Err(WorkerSpawnError::ProcessCapacity { .. }) => thread::yield_now(),
-            Err(error) => panic!("unexpected restart error: {error}"),
-        }
-    }
+        },
+    );
     assert!(
         restarted,
         "provider exit returns the retained process permit"
@@ -224,16 +227,17 @@ fn spawn_reclaims_a_dead_lane_before_the_capacity_check() {
     // next spawn reclaims it. Before reclaim-on-spawn this loop could only
     // end in `Capacity`, so a dead lane permanently pinned the ceiling.
     let mut replacement = None;
-    for _ in 0..10_000 {
-        match workers.spawn("replacement".into(), |_| {}) {
+    crate::wait_for!(
+        "a dead lane handle must not pin the runtime worker ceiling",
+        || match workers.spawn("replacement".into(), |_| {}) {
             Ok(()) => {
                 replacement = Some(());
-                break;
+                Some(())
             }
-            Err(WorkerSpawnError::Capacity { .. }) => thread::yield_now(),
+            Err(WorkerSpawnError::Capacity { .. }) => None,
             Err(error) => panic!("unexpected replacement startup error: {error}"),
-        }
-    }
+        },
+    );
     assert!(
         replacement.is_some(),
         "a dead lane handle must not pin the runtime worker ceiling"
@@ -269,17 +273,16 @@ fn panicking_provider_degrades_to_typed_fault_with_bounded_panic_notes() {
         let request = RequestId::new(90 + nth).expect("fixture id");
         // The previous request's owner retires only when its terminal health
         // record lands (claim -> enqueue -> record), so admission may briefly
-        // still see `CapabilityInFlight`; retry until the owner is released
-        // instead of assuming a fixed interleaving.
-        let mut admitted = false;
-        for _ in 0..10_000 {
-            if reserve(&catalog, &capability, request).is_ok() {
-                admitted = true;
-                break;
-            }
-            thread::yield_now();
-        }
-        assert!(admitted, "panicked terminal {nth} must retire its owner");
+        // still see `CapabilityInFlight`; wait on a wall-clock deadline for the
+        // owner to be released instead of assuming a fixed interleaving.
+        crate::wait_for!(
+            &format!("panicked terminal {nth} to retire its owner"),
+            || {
+                reserve(&catalog, &capability, request)
+                    .is_ok()
+                    .then_some(())
+            },
+        );
         request_tx
             .send(Queued {
                 request_id: request,
@@ -291,20 +294,14 @@ fn panicking_provider_degrades_to_typed_fault_with_bounded_panic_notes() {
         // The panic note is recorded before publication, so also wait for the
         // terminal delivery before reserving the next request: one capability
         // owns at most one in-flight request at a time.
-        let mut published = false;
-        for _ in 0..10_000 {
-            let snapshot = CapabilityScheduler::scheduling_snapshot(catalog.as_ref());
-            let delivered = snapshot.event_queues.observation_pending
-                + snapshot.event_queues.terminal_mailbox_pending;
-            if snapshot.provider_panics == nth && delivered >= nth {
-                published = true;
-                break;
-            }
-            thread::yield_now();
-        }
-        assert!(
-            published,
-            "panicking request {nth} still degrades to one terminal"
+        crate::wait_for!(
+            &format!("panicking request {nth} to degrade to one terminal"),
+            || {
+                let snapshot = CapabilityScheduler::scheduling_snapshot(catalog.as_ref());
+                let delivered = snapshot.event_queues.observation_pending
+                    + snapshot.event_queues.terminal_mailbox_pending;
+                (snapshot.provider_panics == nth && delivered >= nth).then_some(())
+            },
         );
 
         if nth == 1 {

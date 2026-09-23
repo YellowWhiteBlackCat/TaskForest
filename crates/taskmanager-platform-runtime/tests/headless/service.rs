@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::{
     LatestControlRequest, PlatformHandle, ServiceControlRequest, ServiceDependenciesRequest,
     ServiceEvent, ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
@@ -39,13 +36,9 @@ fn service_bindings() -> RuntimeProviderBindings {
 }
 
 fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            return event;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("service runtime event did not arrive");
+    crate::wait_for!("service runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    })
 }
 
 fn registered_service_provider(capability: &CapabilityId) -> ProviderId {

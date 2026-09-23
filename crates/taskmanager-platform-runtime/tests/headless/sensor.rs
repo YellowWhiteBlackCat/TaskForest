@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::{
@@ -71,33 +68,29 @@ fn shared_sensor_runtime_injects_clock_and_derives_source_health() {
         })
         .expect("sensor request accepted");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("connected event port") {
-            assert_eq!(event.provider, Some(ProviderId::borrowed("fixture.sensor")));
-            assert!(matches!(
-                event.outcome,
-                Ok(PlatformEvent::Sensors(SensorEvent::Snapshot(ref snapshot)))
-                    if snapshot.value.timestamp_ms == CLOCK_MS
-            ));
-            assert_eq!(
-                handle
-                    .capabilities()
-                    .snapshot()
-                    .get(&CapabilityId::SENSORS)
-                    .map(|descriptor| descriptor.status),
-                Some(CapabilityStatus::Available)
-            );
-            assert_eq!(
-                handle
-                    .capabilities()
-                    .snapshot()
-                    .get(&CapabilityId::SENSORS)
-                    .map(|descriptor| descriptor.providers.clone()),
-                Some(vec![ProviderId::borrowed("fixture.sensor")])
-            );
-            return;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("sensor runtime event did not arrive");
+    let event = crate::wait_for!("sensor runtime event", || {
+        handle.events().try_recv().expect("connected event port")
+    });
+    assert_eq!(event.provider, Some(ProviderId::borrowed("fixture.sensor")));
+    assert!(matches!(
+        event.outcome,
+        Ok(PlatformEvent::Sensors(SensorEvent::Snapshot(ref snapshot)))
+            if snapshot.value.timestamp_ms == CLOCK_MS
+    ));
+    assert_eq!(
+        handle
+            .capabilities()
+            .snapshot()
+            .get(&CapabilityId::SENSORS)
+            .map(|descriptor| descriptor.status),
+        Some(CapabilityStatus::Available)
+    );
+    assert_eq!(
+        handle
+            .capabilities()
+            .snapshot()
+            .get(&CapabilityId::SENSORS)
+            .map(|descriptor| descriptor.providers.clone()),
+        Some(vec![ProviderId::borrowed("fixture.sensor")])
+    );
 }

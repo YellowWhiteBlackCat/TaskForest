@@ -188,28 +188,27 @@ fn slow_storage_lane_does_not_block_cpu_completion() {
 
     let mut saw_cpu = false;
     let mut saw_memory = false;
-    for _ in 0..50 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            assert_eq!(
-                event.provider,
-                Some(registered_system_provider(&event.capability))
-            );
-            match event.outcome {
-                Ok(PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Cpu { .. })) => {
-                    saw_cpu = true
+    crate::wait_for!(
+        "CPU and memory completion ahead of the slow storage provider",
+        || {
+            if let Some(event) = handle.events().try_recv().expect("event port") {
+                assert_eq!(
+                    event.provider,
+                    Some(registered_system_provider(&event.capability))
+                );
+                match event.outcome {
+                    Ok(PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Cpu {
+                        ..
+                    })) => saw_cpu = true,
+                    Ok(PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Memory {
+                        ..
+                    })) => saw_memory = true,
+                    other => panic!("slow storage completed before CPU/memory: {other:?}"),
                 }
-                Ok(PlatformEvent::SystemTelemetry(SystemTelemetryDomainEvent::Memory {
-                    ..
-                })) => saw_memory = true,
-                other => panic!("slow storage completed before CPU/memory: {other:?}"),
             }
-            if saw_cpu && saw_memory {
-                return;
-            }
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    panic!("CPU or memory completion was blocked behind the slow storage provider");
+            (saw_cpu && saw_memory).then_some(())
+        },
+    );
 }
 
 /// The container observation lane must drive a real `ContainerRollupProvider`
@@ -283,28 +282,25 @@ fn container_lane_emits_snapshot_event_carrying_the_provider_rollup() {
         })
         .expect("containers refresh accepted by the lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            assert_eq!(
-                event.provider,
-                Some(registered_system_provider(&CapabilityId::CONTAINERS))
-            );
-            match event.outcome {
-                Ok(PlatformEvent::Containers(ContainerRollupEvent::Snapshot(boxed))) => {
-                    // The stub rollup must arrive unchanged — proving the
-                    // executor closure fed the event mapper.
-                    assert_eq!(*boxed, expected);
-                    assert_eq!(boxed.containers.len(), 1);
-                    assert_eq!(boxed.containers[0].id, "/docker/stub-abc");
-                    return;
-                }
-                Ok(other) => panic!("expected a Containers event, got {other:?}"),
-                Err(failure) => panic!("container lane reported a failure: {failure:?}"),
-            }
+    let event = crate::wait_for!(
+        "ContainerRollup snapshot event from the live observation lane",
+        || handle.events().try_recv().expect("event port"),
+    );
+    assert_eq!(
+        event.provider,
+        Some(registered_system_provider(&CapabilityId::CONTAINERS))
+    );
+    match event.outcome {
+        Ok(PlatformEvent::Containers(ContainerRollupEvent::Snapshot(boxed))) => {
+            // The stub rollup must arrive unchanged — proving the
+            // executor closure fed the event mapper.
+            assert_eq!(*boxed, expected);
+            assert_eq!(boxed.containers.len(), 1);
+            assert_eq!(boxed.containers[0].id, "/docker/stub-abc");
         }
-        thread::sleep(Duration::from_millis(2));
+        Ok(other) => panic!("expected a Containers event, got {other:?}"),
+        Err(failure) => panic!("container lane reported a failure: {failure:?}"),
     }
-    panic!("no ContainerRollup snapshot event arrived from the live observation lane");
 }
 
 /// Drive one real `SmbiosMemoryRequest::Refresh` through the typed port: the
@@ -370,23 +366,19 @@ fn smbios_memory_lane_emits_update_event_for_a_refresh_request() {
         })
         .expect("smbios refresh accepted by the lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            match event.outcome {
-                Ok(PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(snapshot))) => {
-                    assert!(snapshot.is_success());
-                    assert_eq!(snapshot.slots_total, 4);
-                    assert_eq!(snapshot.slots_used, 2);
-                    assert_eq!(snapshot.modules.len(), 1);
-                    return;
-                }
-                Ok(other) => panic!("expected a SmbiosMemory event, got {other:?}"),
-                Err(failure) => panic!("smbios lane reported a failure: {failure:?}"),
-            }
+    let event = crate::wait_for!("SmbiosMemory update event from the live lane", || {
+        handle.events().try_recv().expect("event port")
+    });
+    match event.outcome {
+        Ok(PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(snapshot))) => {
+            assert!(snapshot.is_success());
+            assert_eq!(snapshot.slots_total, 4);
+            assert_eq!(snapshot.slots_used, 2);
+            assert_eq!(snapshot.modules.len(), 1);
         }
-        thread::sleep(Duration::from_millis(2));
+        Ok(other) => panic!("expected a SmbiosMemory event, got {other:?}"),
+        Err(failure) => panic!("smbios lane reported a failure: {failure:?}"),
     }
-    panic!("no SmbiosMemory update event arrived from the live lane");
 }
 
 /// Drive one real `RaplPowerRequest::Refresh` through the typed port: the
@@ -449,23 +441,19 @@ fn rapl_power_lane_emits_update_event_for_a_refresh_request() {
         })
         .expect("rapl refresh accepted by the lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            match event.outcome {
-                Ok(PlatformEvent::RaplPower(RaplPowerEvent::Update(snapshot))) => {
-                    assert!(snapshot.is_success());
-                    assert_eq!(snapshot.sample_ms, 250);
-                    assert_eq!(snapshot.packages.len(), 1);
-                    assert_eq!(snapshot.packages[0].power_w, 9.5);
-                    return;
-                }
-                Ok(other) => panic!("expected a RaplPower event, got {other:?}"),
-                Err(failure) => panic!("rapl lane reported a failure: {failure:?}"),
-            }
+    let event = crate::wait_for!("RaplPower update event from the live lane", || {
+        handle.events().try_recv().expect("event port")
+    });
+    match event.outcome {
+        Ok(PlatformEvent::RaplPower(RaplPowerEvent::Update(snapshot))) => {
+            assert!(snapshot.is_success());
+            assert_eq!(snapshot.sample_ms, 250);
+            assert_eq!(snapshot.packages.len(), 1);
+            assert_eq!(snapshot.packages[0].power_w, 9.5);
         }
-        thread::sleep(Duration::from_millis(2));
+        Ok(other) => panic!("expected a RaplPower event, got {other:?}"),
+        Err(failure) => panic!("rapl lane reported a failure: {failure:?}"),
     }
-    panic!("no RaplPower update event arrived from the live lane");
 }
 
 /// Drive one real `MsrReadoutRequest::Refresh` through the typed port: the
@@ -531,24 +519,20 @@ fn msr_readout_lane_emits_update_event_for_a_refresh_request() {
         })
         .expect("msr refresh accepted by the lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            match event.outcome {
-                Ok(PlatformEvent::MsrReadout(MsrReadoutEvent::Update(snapshot))) => {
-                    assert!(snapshot.is_success());
-                    assert_eq!(snapshot.packages.len(), 1);
-                    assert_eq!(snapshot.packages[0].cpu, 1);
-                    assert_eq!(snapshot.packages[0].temperature_c, Some(54.5));
-                    assert_eq!(snapshot.packages[0].vcore_v, Some(1.219));
-                    return;
-                }
-                Ok(other) => panic!("expected a MsrReadout event, got {other:?}"),
-                Err(failure) => panic!("msr lane reported a failure: {failure:?}"),
-            }
+    let event = crate::wait_for!("MsrReadout update event from the live lane", || {
+        handle.events().try_recv().expect("event port")
+    });
+    match event.outcome {
+        Ok(PlatformEvent::MsrReadout(MsrReadoutEvent::Update(snapshot))) => {
+            assert!(snapshot.is_success());
+            assert_eq!(snapshot.packages.len(), 1);
+            assert_eq!(snapshot.packages[0].cpu, 1);
+            assert_eq!(snapshot.packages[0].temperature_c, Some(54.5));
+            assert_eq!(snapshot.packages[0].vcore_v, Some(1.219));
         }
-        thread::sleep(Duration::from_millis(2));
+        Ok(other) => panic!("expected a MsrReadout event, got {other:?}"),
+        Err(failure) => panic!("msr lane reported a failure: {failure:?}"),
     }
-    panic!("no MsrReadout update event arrived from the live lane");
 }
 
 /// Drive one real `CpuThrottleRequest::Refresh` through the typed port: the
@@ -612,22 +596,18 @@ fn cpu_throttle_lane_emits_update_event_for_a_refresh_request() {
         })
         .expect("cpu-throttle refresh accepted by the lane");
 
-    for _ in 0..100 {
-        if let Some(event) = handle.events().try_recv().expect("event port") {
-            match event.outcome {
-                Ok(PlatformEvent::CpuThrottle(CpuThrottleEvent::Update(snapshot))) => {
-                    assert!(snapshot.is_success());
-                    assert_eq!(snapshot.packages.len(), 1);
-                    assert_eq!(snapshot.packages[0].package_id, 1);
-                    assert_eq!(snapshot.packages[0].package_throttle_count, Some(7));
-                    assert_eq!(snapshot.packages[0].core_throttle_count, None);
-                    return;
-                }
-                Ok(other) => panic!("expected a CpuThrottle event, got {other:?}"),
-                Err(failure) => panic!("cpu-throttle lane reported a failure: {failure:?}"),
-            }
+    let event = crate::wait_for!("CpuThrottle update event from the live lane", || {
+        handle.events().try_recv().expect("event port")
+    });
+    match event.outcome {
+        Ok(PlatformEvent::CpuThrottle(CpuThrottleEvent::Update(snapshot))) => {
+            assert!(snapshot.is_success());
+            assert_eq!(snapshot.packages.len(), 1);
+            assert_eq!(snapshot.packages[0].package_id, 1);
+            assert_eq!(snapshot.packages[0].package_throttle_count, Some(7));
+            assert_eq!(snapshot.packages[0].core_throttle_count, None);
         }
-        thread::sleep(Duration::from_millis(2));
+        Ok(other) => panic!("expected a CpuThrottle event, got {other:?}"),
+        Err(failure) => panic!("cpu-throttle lane reported a failure: {failure:?}"),
     }
-    panic!("no CpuThrottle update event arrived from the live lane");
 }
