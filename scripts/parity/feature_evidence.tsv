@@ -290,3 +290,27 @@ power.thermal-throttle-events	gpui	gpui_app::cpu_view::details_panel::tests::cpu
 power.thermal-throttle-events	iced	ui::perf_overview::tests::cpu_throttle_tests::cpu_stats_render_the_thermal_throttle_counters_with_honest_absence	anchored	-
 power.thermal-throttle-events	tui	ui::tests::cpu_right_rail::thermal_throttle_counters_paint_with_honest_absence	anchored	-
 power.thermal-throttle-events	bevy	pages::performance::tests::cpu_thermal_throttle_counters_render_with_honest_absence	anchored	-
+# W28-A batch (2026-09-23): the per-process swap ownership addition.  The
+# `memory.process-swap-charge` feature was registered as the single authority
+# for the swap charged to one process - a fact the four shapes already render
+# in their Apps-table Swap column and that `memory.breakdown-rss-pss`
+# explicitly excludes from its narrowed definition, while
+# `storage.swap-throughput` stays system-level.  The Iced and TUI cells are
+# anchored on the tests that really prove the observed charge and the honest
+# absence: Iced's
+# `apps_resource_projection_preserves_typed_pss_swap_and_measured_zero` (a
+# measured `0 B` renders and an unknown observation renders the shared dash,
+# never a fallback) and TUI's painted-frame
+# `apps_table_projects_typed_pss_and_swap_without_zero_fallbacks` (the Swap
+# column keeps a measured `0 B` visible).  GPUI and Bevy render the Swap cell
+# but have no discoverable test proving the observed charge: GPUI's only
+# swap-column test pins the auto-hide rule (a system swap-total fact) and its
+# swap fixture test never renders the cell, while Bevy's
+# `row_view_formats_contract_columns_from_typed_observations` only proves the
+# honest-dash branch, so both are recorded as explicit `pending` gaps.  This
+# takes the table to 73 anchored rows (gpui 16, iced 19, tui 21, bevy 17) plus
+# two surveyed `pending` gaps.
+memory.process-swap-charge	iced	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	anchored	-
+memory.process-swap-charge	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-
+memory.process-swap-charge	gpui	-	pending	no discoverable test proves the Apps-table Swap cell renders the observed per-process charge (the swap-column test pins auto-hide, the capture test asserts the fixture only)
+memory.process-swap-charge	bevy	-	pending	the contract-column test proves only the honest dash for an unobserved Swap cell, never an observed charge

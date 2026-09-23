@@ -29,7 +29,7 @@ fn full_declaration(
 /// a conscious registry change.
 #[test]
 fn all_covers_features_exactly_once() {
-    assert_eq!(FeatureId::ALL.len(), 75);
+    assert_eq!(FeatureId::ALL.len(), 76);
     let mut ids: Vec<_> = FeatureId::ALL.iter().map(|feature| feature.id()).collect();
     let count = ids.len();
     ids.sort_unstable();
@@ -41,7 +41,21 @@ fn all_covers_features_exactly_once() {
             .all(|feature| !feature.id().is_empty()),
         "every feature names a stable machine id"
     );
-    assert_eq!(FeatureId::ALL.len(), FeatureArea::ALL.len() * 5);
+    // The registry is the uniform 15 x 5 grid plus one deliberate addition:
+    // the memory-forensics area carries a sixth representative
+    // (`memory.process-swap-charge`) so the already-rendered per-process swap
+    // projection has a feature authority. The census stays explicit so a
+    // silent addition or drop still fails.
+    let memory_forensics = FeatureId::ALL
+        .iter()
+        .filter(|feature| feature.area() == FeatureArea::MemoryForensics)
+        .count();
+    assert_eq!(memory_forensics, 6, "the memory-forensics census moved");
+    assert_eq!(
+        FeatureId::ALL.len(),
+        FeatureArea::ALL.len() * 5 + 1,
+        "the uniform 15 x 5 registry plus the one memory-forensics addition"
+    );
 }
 
 /// Every feature carries one explicit, non-empty, toolkit-neutral semantic
@@ -60,11 +74,12 @@ fn every_feature_has_explicit_toolkit_neutral_semantic_specification() {
     }
 }
 
-/// Every feature files under a known blueprint area, every area carries
-/// exactly five registered representatives, and the areas themselves are total
-/// and unique. (The 225-item completeness TODO grows the per-area feature
-/// count toward the blueprint's 15; it never empties an area or lets one area
-/// run ahead of the pinned registry shape.)
+/// Every feature files under a known blueprint area, the per-area census is
+/// pinned (five per area, with the one deliberate sixth memory-forensics
+/// representative), and the areas themselves are total and unique. (The
+/// 225-item completeness TODO grows the per-area feature count toward the
+/// blueprint's 15; it never empties an area, and a single-area addition is a
+/// conscious census change like `memory.process-swap-charge`.)
 #[test]
 fn feature_areas_are_well_formed_and_total() {
     assert_eq!(FeatureArea::ALL.len(), 15);
@@ -90,12 +105,12 @@ fn feature_areas_are_well_formed_and_total() {
             .iter()
             .filter(|feature| feature.area() == *area)
             .count();
-        assert_eq!(
-            representatives,
-            5,
-            "area {} must register exactly five representatives",
-            area.id()
-        );
+        let expected = if *area == FeatureArea::MemoryForensics {
+            6
+        } else {
+            5
+        };
+        assert_eq!(representatives, expected, "area {} census moved", area.id());
     }
 }
 
@@ -127,6 +142,10 @@ fn feature_area_classification_is_correct() {
     assert_eq!(
         FeatureId::PmuCounterAbstraction.area(),
         FeatureArea::DynamicTracing
+    );
+    assert_eq!(
+        FeatureId::MemoryProcessSwapCharge.area(),
+        FeatureArea::MemoryForensics
     );
     assert_eq!(
         FeatureId::CpuCacheTopology.area(),
@@ -550,4 +569,14 @@ fn authoritative_delivery_definitions_pin_their_boundaries() {
     assert!(thermal.contains("package_throttle_count"), "{thermal}");
     assert!(thermal.contains("is_throttled"), "{thermal}");
     assert!(thermal.contains("OUTSIDE"), "{thermal}");
+
+    // The per-process swap charge keeps its own authority: it names the
+    // process-row `swap_bytes` scalar, stays distinct from RSS/PSS and the
+    // system swap-throughput rates, and never fabricates a zero.
+    let swap = FeatureId::MemoryProcessSwapCharge
+        .semantic_spec()
+        .delivery_definition;
+    assert!(swap.contains("swap_bytes"), "{swap}");
+    assert!(swap.contains("distinct from RSS/PSS"), "{swap}");
+    assert!(swap.contains("never a fabricated zero"), "{swap}");
 }

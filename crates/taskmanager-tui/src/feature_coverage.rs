@@ -51,6 +51,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::ProcessAffinityMask
         | FeatureId::ProcessTreeKill
         | FeatureId::MemoryBreakdownRssPss
+        | FeatureId::MemoryProcessSwapCharge
         | FeatureId::MemoryPageFaults
         | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration

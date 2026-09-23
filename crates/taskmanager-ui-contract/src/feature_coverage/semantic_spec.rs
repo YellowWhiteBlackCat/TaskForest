@@ -81,6 +81,14 @@ impl FeatureId {
                                       fact; an unobserved facet stays an honest absence, \
                                       never a fabricated zero.",
             },
+            Self::MemoryProcessSwapCharge => FeatureSemanticSpec {
+                feature: self,
+                delivery_definition: "A per-process surface renders the swap charged to the \
+                                      process from the shared process-row projection \
+                                      (`swap_bytes`), kept distinct from RSS/PSS and from the \
+                                      system swap-in/out throughput rates; an unobserved charge \
+                                      renders the shared dash, never a fabricated zero.",
+            },
             Self::MemoryVmaMap => FeatureSemanticSpec {
                 feature: self,
                 delivery_definition: "A memory surface renders the per-process virtual memory \

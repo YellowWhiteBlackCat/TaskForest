@@ -92,11 +92,12 @@
 //! ## Coverage status / TODO
 //!
 //! This is the extensible skeleton, not the finished 225-item mapping. `ALL`
-//! registers 75 representative items - five per blueprint area - of which ten
-//! are Wave 3 / Wave 4 deliverables. The remaining blueprint items are a
-//! deliberate TODO: they must be added to [`FeatureId`] (with a per-frontend
-//! decision and a semantic specification) rather than claimed as covered. A
-//! gate that never sees a feature cannot protect it.
+//! registers 76 representative items - five per blueprint area, plus the
+//! per-process swap charge the memory-forensics area needed as its own
+//! authority - of which ten are Wave 3 / Wave 4 deliverables. The remaining
+//! blueprint items are a deliberate TODO: they must be added to [`FeatureId`]
+//! (with a per-frontend decision and a semantic specification) rather than
+//! claimed as covered. A gate that never sees a feature cannot protect it.
 //!
 //! ## Platform axis fold (P5)
 //!
@@ -296,6 +297,13 @@ pub enum FeatureId {
     // -- Area 2: memory forensics ------------------------------------------
     /// Blueprint item 16: RSS/PSS/USS and virtual memory breakdown.
     MemoryBreakdownRssPss,
+    /// Per-process swap charge (`VmSwap`): the swap currently charged to one
+    /// process. It is deliberately separate from the resident physical-memory
+    /// facets of [`Self::MemoryBreakdownRssPss`] (whose delivery definition
+    /// explicitly excludes the swap charge) and from the system-level
+    /// swap-in/out rates of [`Self::SwapThroughputRate`]; the process-row
+    /// scalar `swap_bytes` is its single authority.
+    MemoryProcessSwapCharge,
     /// Blueprint item 18: full virtual memory area (VMA) map.
     MemoryVmaMap,
     /// Blueprint item 27: long-term memory leak trend prediction.
@@ -460,6 +468,7 @@ impl FeatureId {
         Self::ProcessTreeKill,
         Self::ProcessAncestorLineage,
         Self::MemoryBreakdownRssPss,
+        Self::MemoryProcessSwapCharge,
         Self::MemoryVmaMap,
         Self::MemoryLeakTrend,
         Self::MemoryPageFaults,
@@ -541,6 +550,7 @@ impl FeatureId {
             Self::ProcessTreeKill => "process.tree-kill",
             Self::ProcessAncestorLineage => "process.ancestor-lineage",
             Self::MemoryBreakdownRssPss => "memory.breakdown-rss-pss",
+            Self::MemoryProcessSwapCharge => "memory.process-swap-charge",
             Self::MemoryVmaMap => "memory.vma-map",
             Self::MemoryLeakTrend => "memory.leak-trend",
             Self::MemoryPageFaults => "memory.page-faults",
@@ -623,6 +633,7 @@ impl FeatureId {
             | Self::ProcessTreeKill
             | Self::ProcessAncestorLineage => FeatureArea::ProcessLifecycle,
             Self::MemoryBreakdownRssPss
+            | Self::MemoryProcessSwapCharge
             | Self::MemoryVmaMap
             | Self::MemoryLeakTrend
             | Self::MemoryPageFaults
