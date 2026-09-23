@@ -10,7 +10,7 @@
 
 use bevy::app::AppExit;
 use bevy::ecs::message::{MessageReader, MessageWriter};
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
@@ -627,73 +627,106 @@ fn edit_search_line(
     true
 }
 
+/// Read-only sources the keyboard adapter consults to resolve one press: the
+/// just-pressed events, the live key state, and the optional page-local
+/// surfaces.
+///
+/// Bundled as a `SystemParam` so the adapter's parameter list stays a
+/// dependency list rather than design sprawl (the same policy as
+/// [`InventoryActionModals`]).
+#[derive(SystemParam)]
+pub(crate) struct KeyboardDispatchInputs<'w, 's> {
+    /// The just-pressed key events for this frame.
+    presses: MessageReader<'w, 's, KeyboardInput>,
+    /// Live modifier/key state the chord arms read.
+    keys: Res<'w, ButtonInput<KeyCode>>,
+    /// Performance page device focus (absent when the page is unmounted).
+    perf_device_focus: Option<Res<'w, PerformanceDeviceFocus>>,
+    /// Service-log export directory (absent outside the window shell).
+    export_dir: Option<Res<'w, ServiceLogExportDir>>,
+}
+
+/// Mutable sinks the keyboard adapter drives: the frame-tail effect queue, the
+/// route authority, the one-quit latch, the app-exit writer, the shared
+/// feedback cache, the search text state, and the deferred-command seam.
+#[derive(SystemParam)]
+pub(crate) struct KeyboardDispatchOutputs<'w, 's> {
+    /// Effects collected for the frame-tail drain.
+    pending: ResMut<'w, PendingEffects>,
+    /// This frontend's visible route.
+    route: ResMut<'w, Route>,
+    /// The one-quit latch (frame-level, not key-level).
+    quit: ResMut<'w, QuitForwarded>,
+    /// The app-exit writer.
+    exits: MessageWriter<'w, AppExit>,
+    /// Shared feedback cache, absent in minimal compositions.
+    feedback_cache: Option<ResMut<'w, FeedbackCache>>,
+    /// Search text-editing state, absent before the page resources mount.
+    text_state: Option<ResMut<'w, TextInputState>>,
+    /// Deferred commands (observer triggers).
+    commands: Commands<'w, 's>,
+}
+
 /// The `Update` keyboard adapter: normalize every just-pressed Bevy key and
 /// forward it through the shell's routers. One pass, in modal-precedence
 /// order; effects and re-render signals collect for the frame tail.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn keyboard_dispatch_system(
-    mut presses: MessageReader<KeyboardInput>,
-    keys: Res<ButtonInput<KeyCode>>,
+    mut inputs: KeyboardDispatchInputs,
+    mut outputs: KeyboardDispatchOutputs,
     mut track: NonSendMut<FrontendTrack>,
     mut modals: InventoryActionModals,
     selections: InventorySelections,
-    mut pending: ResMut<PendingEffects>,
-    mut route: ResMut<Route>,
-    mut quit: ResMut<QuitForwarded>,
-    mut exits: MessageWriter<AppExit>,
-    perf_device_focus: Option<Res<PerformanceDeviceFocus>>,
-    export_dir: Option<Res<ServiceLogExportDir>>,
-    feedback_cache: Option<ResMut<FeedbackCache>>,
-    mut text_state: Option<ResMut<TextInputState>>,
-    mut commands: Commands,
 ) {
-    let events: Vec<KeyboardInput> = presses
+    let events: Vec<KeyboardInput> = inputs
+        .presses
         .read()
         .filter(|event| event.state == ButtonState::Pressed)
         .cloned()
         .collect();
-    let modifiers = modifiers_from(&keys);
+    let modifiers = modifiers_from(&inputs.keys);
     let shell = &mut track.shell;
     let armed_before = shell.confirmation_kind();
     let applied = {
         let mut frame = DispatchFrame {
-            keys: &keys,
+            keys: &inputs.keys,
             shell,
-            route: &mut route,
-            pending: &mut pending.0,
-            commands: &mut commands,
+            route: &mut outputs.route,
+            pending: &mut outputs.pending.0,
+            commands: &mut outputs.commands,
             modals: &mut modals,
             selections: &selections,
-            text_state: &mut text_state,
-            export_dir: export_dir.as_deref(),
-            perf_device_focus: perf_device_focus.as_deref(),
+            text_state: &mut outputs.text_state,
+            export_dir: inputs.export_dir.as_deref(),
+            perf_device_focus: inputs.perf_device_focus.as_deref(),
             applied: false,
         };
         frame.run(&events, modifiers);
         frame.applied
     };
     if applied {
-        commands.trigger(ShellInteractionApplied);
+        outputs.commands.trigger(ShellInteractionApplied);
     }
     if armed_before != shell.confirmation_kind() {
         let view = shell
             .pending_confirmation()
             .and_then(PendingConfirmationView::from_pending);
-        commands.trigger(ConfirmationChanged(view));
+        outputs.commands.trigger(ConfirmationChanged(view));
     }
-    if let Some(mut cache) = feedback_cache {
+    if let Some(cache) = outputs.feedback_cache.as_mut() {
         let feedback = shell.feedback_text().to_owned();
         if cache.0.as_deref() != Some(feedback.as_str()) {
             cache.0 = Some(feedback.clone());
-            commands.trigger(crate::drain::FeedbackChanged(feedback));
+            outputs
+                .commands
+                .trigger(crate::drain::FeedbackChanged(feedback));
         }
     }
     // Quit forwarding is frame-level, not key-level: a quit requested
     // outside the keyboard (tray, platform lifecycle) still exits exactly
     // once. The TUI checks the same state every loop iteration.
-    if !quit.0 && shell.quit_reason().is_some() {
-        exits.write(AppExit::Success);
-        quit.0 = true;
+    if !outputs.quit.0 && shell.quit_reason().is_some() {
+        outputs.exits.write(AppExit::Success);
+        outputs.quit.0 = true;
     }
 }
 

@@ -6,7 +6,9 @@
 
 use taskmanager_application::SystemFacets;
 
-use super::super::facet_attach::{attach_optional, attach_system_auxiliary_facets};
+use super::super::facet_attach::{
+    SystemAuxiliaryPorts, attach_optional, attach_system_auxiliary_facets,
+};
 use super::super::port::request_lane;
 use super::context::LaneContext;
 use crate::config::SystemProviderBindings;
@@ -130,12 +132,14 @@ pub(super) fn system_runtime(
     });
     let system = attach_system_auxiliary_facets(
         system,
-        gpu_engine_rows_port,
-        npu_inventory_port,
-        smbios_memory_port,
-        rapl_power_port,
-        msr_readout_port,
-        cpu_throttle_port,
+        SystemAuxiliaryPorts {
+            gpu_engine_rows: gpu_engine_rows_port,
+            npu_inventory: npu_inventory_port,
+            smbios_memory: smbios_memory_port,
+            rapl_power: rapl_power_port,
+            msr_readout: msr_readout_port,
+            cpu_throttle: cpu_throttle_port,
+        },
     );
 
     let lanes = PendingSystemRuntimeLanes::new(

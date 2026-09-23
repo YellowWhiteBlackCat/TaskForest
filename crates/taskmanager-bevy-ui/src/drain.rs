@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use taskmanager_application::{PlatformClient, PlatformEffect, RefreshRequest};
 use taskmanager_platform_contract::CapabilitySnapshot;
 
@@ -194,6 +194,22 @@ pub(crate) fn unix_now_ms() -> u64 {
         .unwrap_or(u64::MAX)
 }
 
+/// The optional appearance authorities a folded platform appearance event is
+/// written through: the operator's theme preferences, the resolved window
+/// palette, and the camera clear color.
+///
+/// All three are absent in the headless composition, so each stays optional
+/// and the drain skips the appearance write it cannot complete.
+#[derive(SystemParam)]
+pub(crate) struct AppearanceTargets<'w> {
+    /// Persisted theme preferences, when the settings page installed them.
+    prefs: Option<ResMut<'w, crate::pages::settings::ThemePreferences>>,
+    /// The resolved window palette every renderer reads.
+    palette: Option<ResMut<'w, WindowPalette>>,
+    /// The camera clear color (absent headless).
+    clear: Option<ResMut<'w, bevy::camera::ClearColor>>,
+}
+
 /// The `PreUpdate` system: one drain cycle against the shared runtime.
 ///
 /// The very first frame also submits the initial full refresh through the
@@ -201,40 +217,33 @@ pub(crate) fn unix_now_ms() -> u64 {
 /// so the summary line reflects live platform state instead of staying on its
 /// cold-start text. Batches folded this frame trigger
 /// [`ShellProjectionFolded`] for the page observers.
-#[allow(
-    clippy::too_many_arguments,
-    clippy::collapsible_if,
-    clippy::explicit_auto_deref
-)]
 pub(crate) fn drain_system(
     runtime: Res<SharedRuntimeHandle>,
     mut track: NonSendMut<FrontendTrack>,
     mut pending: ResMut<crate::input::PendingEffects>,
     mut feedback_cache: ResMut<FeedbackCache>,
-    prefs: Option<ResMut<crate::pages::settings::ThemePreferences>>,
-    palette: Option<ResMut<WindowPalette>>,
-    mut clear: Option<ResMut<bevy::camera::ClearColor>>,
     mut tray: Option<ResMut<crate::tray::TrayResource>>,
+    mut appearance_targets: AppearanceTargets,
     mut commands: Commands,
 ) {
     if let Some(tray_res) = tray.as_mut() {
         tray_res.sync_pause_checkmark(track.shell.paused());
         for event in tray_res.drain_events() {
-            if let taskmanager_core::core::tray::TrayEvent::MenuActivated { id } = event {
-                if let Some(intent) = crate::tray::resolve_tray_action(id) {
-                    match intent {
-                        crate::tray::TrayIntent::Show => {}
-                        crate::tray::TrayIntent::TogglePause => {
-                            let _ = track
-                                .shell
-                                .apply_action(taskmanager_application::AppAction::TogglePause);
-                            tray_res.sync_pause_checkmark(track.shell.paused());
-                        }
-                        crate::tray::TrayIntent::Quit => {
-                            track
-                                .shell
-                                .request_quit(taskmanager_shell::QuitReason::Tray);
-                        }
+            if let taskmanager_core::core::tray::TrayEvent::MenuActivated { id } = event
+                && let Some(intent) = crate::tray::resolve_tray_action(id)
+            {
+                match intent {
+                    crate::tray::TrayIntent::Show => {}
+                    crate::tray::TrayIntent::TogglePause => {
+                        let _ = track
+                            .shell
+                            .apply_action(taskmanager_application::AppAction::TogglePause);
+                        tray_res.sync_pause_checkmark(track.shell.paused());
+                    }
+                    crate::tray::TrayIntent::Quit => {
+                        track
+                            .shell
+                            .request_quit(taskmanager_shell::QuitReason::Tray);
                     }
                 }
             }
@@ -263,20 +272,19 @@ pub(crate) fn drain_system(
     if let Some(summary) = cycle.capability_summary {
         commands.trigger(CapabilitySummaryChanged(summary));
     }
-    if let Some(appearance) = cycle.appearance {
-        if let Some(mut prefs) = prefs {
-            if prefs.observed_appearance != Some(appearance) {
-                prefs.observed_appearance = Some(appearance);
-                if prefs.mode.is_none() {
-                    if let Some(mut pal) = palette {
-                        crate::pages::settings::apply_preferences(
-                            &*prefs,
-                            &mut pal,
-                            clear.as_deref_mut(),
-                        );
-                    }
-                }
-            }
+    if let Some(appearance) = cycle.appearance
+        && let Some(mut prefs) = appearance_targets.prefs
+        && prefs.observed_appearance != Some(appearance)
+    {
+        prefs.observed_appearance = Some(appearance);
+        if prefs.mode.is_none()
+            && let Some(pal) = appearance_targets.palette.as_deref_mut()
+        {
+            crate::pages::settings::apply_preferences(
+                &prefs,
+                pal,
+                appearance_targets.clear.as_deref_mut(),
+            );
         }
     }
     let feedback = track.shell.feedback_text().to_owned();
