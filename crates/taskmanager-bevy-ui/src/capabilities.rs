@@ -1,17 +1,14 @@
 //! Bevy's explicit CORE-08 component/surface capability declaration.
 //!
 //! The declaration describes the DELIVERED Bevy surface, not a promise that
-//! every authored widget scene is mounted. Several widget families
-//! (`dropdown_menu_scene`, `tooltip_scene`, `slider_scene`,
-//! `scrollbar_scene`) are ports that await a host surface, so their cells
-//! declare the shape's actual delivered mechanism instead of `Ported`:
-//! `Unsupported` where nothing equivalent is offered, `Divergent` where a
-//! different mounted mechanism carries the same user goal. Each cell is
-//! pinned against the mounted page trees in
-//! `tests/headless/capabilities.rs`, so mounting one of those scenes later
-//! fails the test until the declaration is updated in the same change.
-//! Unsupported and deliberate differences carry reasons so the four-frontend
-//! registry stays fail-closed while Bevy grows.
+//! every reference component exists. A cell declares the shape's actual
+//! delivered mechanism: `Unsupported` where nothing equivalent is offered,
+//! `Divergent` where a different mounted mechanism carries the same user goal.
+//! Each delivered-surface cell is pinned against the mounted page trees in
+//! `tests/headless/capabilities.rs`, so mounting a new mechanism later fails
+//! the test until the declaration is updated in the same change. Unsupported
+//! and deliberate differences carry reasons so the four-frontend registry
+//! stays fail-closed while Bevy grows.
 
 use taskmanager_ui_contract::{
     CapabilityEntry, CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration,
@@ -31,14 +28,13 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        // No control-anchored popover is mounted anywhere: the authored
-        // `dropdown_menu_scene` is a port awaiting a host surface (column
-        // visibility / preset picker) and this shape ships no such surface.
+        // No control-anchored popover is mounted anywhere: this shape ships
+        // no column-visibility or preset-picker surface to anchor one to.
         (
             DropdownMenu,
             Unsupported {
-                reason: "no control-anchored popover is offered; the authored dropdown \
-                         scene is not mounted and no column-visibility surface exists",
+                reason: "no control-anchored popover is offered; no column-visibility \
+                         or preset-picker surface exists",
             },
         ),
         // No pointer-hover explanation surface is mounted; hint copy is
@@ -82,12 +78,11 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 reason: "boolean rows use the official bevy_ui_widgets Checkbox; no switch-specific control is authored",
             },
         ),
-        // Bounded settings are discrete radio choices; the authored slider
-        // scene is not mounted on any page.
+        // Bounded settings are discrete radio choices.
         (
             Slider,
             Divergent {
-                reason: "bounded settings render as discrete radio choices; the authored slider scene is not mounted",
+                reason: "bounded settings render as discrete radio choices",
             },
         ),
         (Checkbox, Ported),
@@ -103,12 +98,11 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (VirtualList, Ported),
         (Tree, Ported),
         // Scrolling rides the official `bevy_ui_widgets::ScrollArea`
-        // (wheel/trackpad + ScrollIntoView); the authored rail scene is not
-        // mounted on any page.
+        // (wheel/trackpad + ScrollIntoView).
         (
             Scrollbar,
             Divergent {
-                reason: "page scrolling rides the official bevy_ui_widgets ScrollArea; the authored rail scene is not mounted",
+                reason: "page scrolling rides the official bevy_ui_widgets ScrollArea",
             },
         ),
         (

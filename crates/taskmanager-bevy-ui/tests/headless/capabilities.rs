@@ -9,24 +9,20 @@
 //!   pinned, so a support change is a conscious edit here;
 //! - delivered surface: the census mounts every route on the real
 //!   `FrontendWindowPlugin` composition, walks the mounted page subtree, and
-//!   counts both the authored widget surfaces (`TooltipSurface`,
-//!   `SliderSurface`, `ScrollbarSurface`, `DropdownMenuSurface`) and the
-//!   official `bevy_ui_widgets` mechanisms the Divergent cells name.
-//!   Mounting an authored scene, or an official slider/scrollbar/popover,
-//!   fails here until the declaration is updated in the same change.
+//!   counts the official `bevy_ui_widgets` mechanisms the Divergent cells
+//!   name. Mounting an official slider/scrollbar/popover fails here until the
+//!   declaration is updated in the same change.
 
 use std::sync::Arc;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
-use bevy::asset::{AssetPlugin, Assets};
+use bevy::asset::Assets;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::query::With;
 use bevy::ecs::world::World;
-use bevy::image::Image;
-use bevy::scene::{Scene, ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui_widgets::popover::Popover;
 use bevy::ui_widgets::{
@@ -48,29 +44,8 @@ use taskmanager_ui_contract::{
 use crate::app::{Page, PageContent, Route, RouteChanged};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
-use crate::widgets::controls::{
-    MIN_SCROLLBAR_THUMB_PX, ScrollbarOrientation, ScrollbarSurface, SliderState, SliderSurface,
-    TooltipSpec, TooltipSurface, compute_scrollbar_geometry, scrollbar_scene, slider_scene,
-    tooltip_scene,
-};
-use crate::widgets::menu::{
-    DropdownMenuState, DropdownMenuSurface, MenuItem, MenuSpec, dropdown_menu_scene,
-};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
-
-// ---- fixtures -----------------------------------------------------------
-
-/// Bare scene app for the authored widget scenes (pure nodes, no page
-/// resources): the asset stores are the only infrastructure they resolve.
-fn headless_scene_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_plugins((AssetPlugin::default(), ScenePlugin));
-    app.init_resource::<Assets<Font>>();
-    app.init_resource::<Assets<Image>>();
-    app
-}
 
 // ---- scripted platform client (the headless window composition) ----
 
@@ -147,14 +122,10 @@ fn headless_window_app() -> App {
     app
 }
 
-/// The delivered-surface census of one mounted page subtree: the authored
-/// widget families plus the official mechanisms the declaration names.
+/// The delivered-surface census of one mounted page subtree: the official
+/// mechanisms the declaration names.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct SurfaceCensus {
-    authored_tooltip: usize,
-    authored_slider: usize,
-    authored_scrollbar: usize,
-    authored_dropdown: usize,
     official_slider: usize,
     official_scrollbar: usize,
     official_popover: usize,
@@ -167,10 +138,6 @@ struct SurfaceCensus {
 
 impl SurfaceCensus {
     fn add(&mut self, other: Self) {
-        self.authored_tooltip += other.authored_tooltip;
-        self.authored_slider += other.authored_slider;
-        self.authored_scrollbar += other.authored_scrollbar;
-        self.authored_dropdown += other.authored_dropdown;
         self.official_slider += other.official_slider;
         self.official_scrollbar += other.official_scrollbar;
         self.official_popover += other.official_popover;
@@ -208,10 +175,6 @@ fn count_in_subtree<T: Component>(world: &mut World, root: Entity) -> usize {
 
 fn census_subtree(world: &mut World, root: Entity) -> SurfaceCensus {
     SurfaceCensus {
-        authored_tooltip: count_in_subtree::<TooltipSurface>(world, root),
-        authored_slider: count_in_subtree::<SliderSurface>(world, root),
-        authored_scrollbar: count_in_subtree::<ScrollbarSurface>(world, root),
-        authored_dropdown: count_in_subtree::<DropdownMenuSurface>(world, root),
         official_slider: count_in_subtree::<Slider>(world, root),
         official_scrollbar: count_in_subtree::<Scrollbar>(world, root),
         official_popover: count_in_subtree::<Popover>(world, root),
@@ -288,7 +251,7 @@ fn capability_declaration_is_complete_and_pinned() {
     let expected: [(ComponentCapability, Kind); 19] = [
         (ModalOverlay, Kind::Ported),
         (ContextMenu, Kind::Ported),
-        // Authored scene, zero mounts: no control-anchored popover is offered.
+        // No control-anchored popover mechanism is offered.
         (DropdownMenu, Kind::Unsupported),
         // No hover/focus explanation surface; hints render as inline captions.
         (Tooltip, Kind::Unsupported),
@@ -309,7 +272,7 @@ fn capability_declaration_is_complete_and_pinned() {
         (ColumnDragResize, Kind::Divergent),
         (VirtualList, Kind::Ported),
         (Tree, Kind::Ported),
-        // Scrolling rides the official ScrollArea; no rail is mounted.
+        // Scrolling rides the official ScrollArea.
         (Scrollbar, Kind::Divergent),
         (FocusVisible, Kind::Divergent),
     ];
@@ -337,92 +300,9 @@ fn capability_declaration_is_complete_and_pinned() {
     }
 }
 
-/// The authored widget scenes behind the `Unsupported`/`Divergent` cells
-/// still assemble, carry their surface marker, and spawn: "authored but not
-/// mounted" is the declared state, not a missing implementation.
-#[test]
-fn authored_widget_scenes_assemble_and_carry_their_surface_marker() {
-    let palette = ui_palette(&Theme::dark());
-    let mut app = headless_scene_app();
-
-    let tooltip_spec = TooltipSpec::new("Search").with_key_hint("Ctrl+F");
-    assert_eq!(
-        census_authored(&mut app, tooltip_scene(&tooltip_spec, &palette)).authored_tooltip,
-        1,
-        "the tooltip bubble carries TooltipSurface"
-    );
-
-    let slider_state = SliderState::new(0.0, 100.0, 10.0, 50.0);
-    assert_eq!(
-        census_authored(&mut app, slider_scene(&slider_state, &palette)).authored_slider,
-        1,
-        "the slider carries SliderSurface"
-    );
-
-    let menu_spec = MenuSpec {
-        title: "Actions".to_owned(),
-        items: vec![MenuItem {
-            label: "Run".to_owned(),
-            enabled: true,
-        }],
-    };
-    let mut dropdown_state = DropdownMenuState::default();
-    assert_eq!(
-        census_authored(
-            &mut app,
-            dropdown_menu_scene("Action".to_owned(), &menu_spec, &dropdown_state, &palette),
-        )
-        .authored_dropdown,
-        1,
-        "the closed dropdown carries DropdownMenuSurface"
-    );
-    dropdown_state.open();
-    assert_eq!(
-        census_authored(
-            &mut app,
-            dropdown_menu_scene("Action".to_owned(), &menu_spec, &dropdown_state, &palette),
-        )
-        .authored_dropdown,
-        1,
-        "the open dropdown carries DropdownMenuSurface"
-    );
-
-    let geo = compute_scrollbar_geometry(100.0, 300.0, 50.0, 200.0, MIN_SCROLLBAR_THUMB_PX);
-    assert_eq!(
-        census_authored(
-            &mut app,
-            scrollbar_scene(&geo, ScrollbarOrientation::Vertical, &palette),
-        )
-        .authored_scrollbar,
-        1,
-        "the vertical rail carries ScrollbarSurface"
-    );
-    assert_eq!(
-        census_authored(
-            &mut app,
-            scrollbar_scene(&geo, ScrollbarOrientation::Horizontal, &palette),
-        )
-        .authored_scrollbar,
-        1,
-        "the horizontal rail carries ScrollbarSurface"
-    );
-}
-
-/// One bare authoring scene's census (the scene root is the subtree).
-fn census_authored(app: &mut App, scene: impl Scene) -> SurfaceCensus {
-    let world = app.world_mut();
-    let root = world
-        .spawn_scene(scene)
-        .expect("the authored scene resolves with no app resources")
-        .id();
-    let census = census_subtree(world, root);
-    assert!(world.despawn(root), "the authored scene despawns cleanly");
-    census
-}
-
 /// Every declared delivered-surface cell matches the mounted page trees: the
-/// "not mounted" reasons are true today, and the mechanisms those reasons
-/// name are really there.
+/// official mechanisms the `Divergent` cells name are really mounted, and the
+/// mechanisms that would replace an `Unsupported` cell are absent.
 #[test]
 fn declared_cells_match_the_mounted_page_surface() {
     let mut app = headless_window_app();
@@ -441,24 +321,6 @@ fn declared_cells_match_the_mounted_page_surface() {
             .map(|(_, census)| *census)
             .expect("every route has a census")
     };
-
-    // Authored surfaces: no page mounts one (the declaration's reasons say so).
-    assert_eq!(
-        totals.authored_tooltip, 0,
-        "no page may mount a tooltip bubble while Tooltip is Unsupported"
-    );
-    assert_eq!(
-        totals.authored_slider, 0,
-        "no page may mount a slider while Slider is Divergent to radio choices"
-    );
-    assert_eq!(
-        totals.authored_scrollbar, 0,
-        "no page may mount a rail while Scrollbar is Divergent to ScrollArea"
-    );
-    assert_eq!(
-        totals.authored_dropdown, 0,
-        "no page may mount a dropdown while DropdownMenu is Unsupported"
-    );
 
     // Official mechanisms that would replace a declared cell: absent too.
     assert_eq!(
