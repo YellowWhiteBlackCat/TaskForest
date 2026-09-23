@@ -580,7 +580,6 @@ impl std::fmt::Display for ResourceHistoryWindow {
     }
 }
 
-#[allow(dead_code)]
-pub type HistoryWindow = ResourceHistoryWindow;
-#[allow(unused_imports)]
-pub(crate) use super::system_dashboard::history_window_label;
+// (the `history_window_label` re-export was a dead forwarding shim: the
+// `system_dashboard_tests` module reaches the function through its own
+// `#[cfg(test)]` include, so nothing consumed this path.)

@@ -39,10 +39,6 @@ pub(crate) fn containers_fold_observer(
     }
 }
 
-/// Alias for [`ContainerSummary`] for caller parity.
-#[allow(dead_code)]
-pub(crate) type ContainerItem = ContainerSummary;
-
 /// Which branch the page body takes for one rollup projection.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Component)]
 pub(crate) enum ContainersPageBranch {
@@ -163,12 +159,6 @@ pub(crate) fn scene(ctx: &PageContext<'_>) -> impl Scene + use<> {
             { body },
         ]
     }
-}
-
-/// Content alias for page-agent contract compatibility.
-#[allow(dead_code)]
-pub(crate) fn content(ctx: &PageContext<'_>) -> impl Scene + use<> {
-    scene(ctx)
 }
 
 fn message_scene(text: &'static str) -> Box<dyn Scene> {

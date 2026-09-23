@@ -351,7 +351,7 @@ fn elastic_layout_playbook_table_columns_under_narrow_and_wide_short_viewports()
     for (width, height, is_compact) in viewports {
         let size = frame(width, height);
         assert_eq!(
-            crate::app::viewport_compact(size),
+            crate::app::motion::viewport_compact(size),
             is_compact,
             "viewport_compact must match expected compact contract for {width}x{height}"
         );
@@ -483,7 +483,7 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
 
     // 1. Root chrome single-row convergence at wide viewports (>= 1320px width and non-compact height)
     let wide_viewport = frame(1440.0, 900.0);
-    assert!(!crate::app::viewport_compact(wide_viewport));
+    assert!(!crate::app::motion::viewport_compact(wide_viewport));
     let wide_budget = PageLayoutBudget::for_viewport(wide_viewport);
     assert_eq!(wide_budget.chrome, ChromePresentation::SingleRow);
     assert!(!wide_budget.chrome.is_wrapped());
@@ -491,13 +491,13 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
     // At narrow viewports (e.g. 720x480) and wide-short viewports (e.g. 2048x540):
     // Root chrome presentation must wrap onto dedicated bounded strips so actions don't push off-screen.
     let narrow_viewport = frame(720.0, 480.0);
-    assert!(crate::app::viewport_compact(narrow_viewport));
+    assert!(crate::app::motion::viewport_compact(narrow_viewport));
     let narrow_budget = PageLayoutBudget::for_viewport(narrow_viewport);
     assert_eq!(narrow_budget.chrome, ChromePresentation::Wrapped);
     assert!(narrow_budget.chrome.is_wrapped());
 
     let wide_short_viewport = frame(2048.0, 540.0);
-    assert!(crate::app::viewport_compact(wide_short_viewport));
+    assert!(crate::app::motion::viewport_compact(wide_short_viewport));
     let ws_budget = PageLayoutBudget::for_viewport(wide_short_viewport);
     assert_eq!(ws_budget.vertical_space, VerticalSpace::Constrained);
 

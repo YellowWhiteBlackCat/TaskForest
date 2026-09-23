@@ -1,9 +1,6 @@
+use super::formatting::format_open_file_row;
 use super::formatting::{
-    environment_preview_lines, format_open_file_row, open_files_preview_lines,
-};
-use super::formatting::{
-    format_capability_line, format_capability_row, format_engine_cycles, format_engine_time,
-    is_dangerous_capability,
+    format_capability_line, format_engine_cycles, format_engine_time, is_dangerous_capability,
 };
 use super::*;
 use ratatui::Terminal;
@@ -26,6 +23,36 @@ use taskmanager_core::core::process_telemetry::{
     ThreadState,
 };
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+
+/// Compact preview row bounds asserted by the headless preview tests. The
+/// production renderer always passes its own limit, so these bounded wrappers
+/// live with the tests that exercise them.
+const OPEN_FILES_PREVIEW: usize = 3;
+const ENVIRONMENT_PREVIEW: usize = 3;
+
+fn open_files_preview_lines(
+    open_files: &ProcessOpenFiles,
+    theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    open_files_preview_lines_with_limit(open_files, theme, OPEN_FILES_PREVIEW)
+}
+
+fn environment_preview_lines(
+    env: &ProcessEnvironment,
+    theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    environment_preview_lines_with_limit(env, theme, ENVIRONMENT_PREVIEW)
+}
+
+/// String projection of one capability row for the warning-marker assertions;
+/// the styled production path is `format_capability_line`.
+fn format_capability_row(cap: &str) -> String {
+    if is_dangerous_capability(cap) {
+        format!("[!] \u{26a0} {cap}")
+    } else {
+        cap.to_string()
+    }
+}
 
 /// Pin English and serialize against the language-flipping i18n test, so
 /// the chrome assertions below stay deterministic.

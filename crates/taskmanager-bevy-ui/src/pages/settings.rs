@@ -187,8 +187,6 @@ pub(crate) struct SettingsChoice(pub(crate) SettingsField);
 pub(crate) enum SettingsField {
     Theme(LightDark),
     SystemMode,
-    #[allow(dead_code)]
-    Skin(Skin),
     HighContrast(bool),
     Language(Language),
     Refresh(TelemetryInterval),
@@ -230,86 +228,6 @@ where
     Some(client.try_submit(updated))
 }
 
-/// Apply a persisted [`Config`] snapshot to the live theme preferences and shell.
-#[allow(dead_code)]
-pub(crate) fn apply_persisted_config(
-    config: &Config,
-    prefs: Option<&mut ThemePreferences>,
-    palette: &mut WindowPalette,
-    clear: Option<&mut ClearColor>,
-    track: &mut FrontendTrack,
-) {
-    if let Some(prefs) = prefs {
-        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
-            prefs.mode = None;
-        } else if config.mode.eq_ignore_ascii_case("Light") {
-            prefs.mode = Some(LightDark::Light);
-        } else if config.mode.eq_ignore_ascii_case("Dark") {
-            prefs.mode = Some(LightDark::Dark);
-        } else if config.mode.eq_ignore_ascii_case("EyeForest") {
-            prefs.mode = Some(LightDark::EyeForest);
-        }
-
-        if !config.skin.is_empty() {
-            prefs.skin = match config.skin.to_ascii_lowercase().as_str() {
-                "kde" => Some(Skin::Kde),
-                "windows" => Some(Skin::Windows),
-                "macos" => Some(Skin::Macos),
-                _ => Some(Skin::Gnome),
-            };
-        }
-
-        prefs.hc = config.hc;
-        apply_preferences(prefs, palette, clear);
-    }
-
-    if let Some(lang) = config.language.as_deref().and_then(Language::from_code) {
-        set_language(lang);
-    }
-
-    if config.refresh_ms > 0 {
-        track
-            .shell
-            .set_telemetry_interval(TelemetryInterval::clamped(Duration::from_millis(
-                config.refresh_ms,
-            )));
-    }
-
-    if config.graph_data_points > 0 {
-        track
-            .shell
-            .set_history_capacity(usize::try_from(config.graph_data_points).unwrap_or(60));
-    }
-}
-
-/// Sync preferences from the coordinator via [`SharedRuntimeHandle`].
-#[allow(dead_code)]
-pub(crate) fn sync_preferences_from_config(
-    runtime: Option<&SharedRuntimeHandle>,
-    prefs: Option<&mut ThemePreferences>,
-    palette: &mut WindowPalette,
-    clear: Option<&mut ClearColor>,
-    track: &mut FrontendTrack,
-) {
-    let Some(runtime) = runtime else {
-        return;
-    };
-    let mut config_guard = runtime.shared.lock_config();
-    let Some(client) = config_guard.as_mut() else {
-        return;
-    };
-
-    if client.snapshot().is_none() {
-        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
-    } else {
-        let _ = client.drain();
-    }
-
-    if let Some(snapshot) = client.snapshot().cloned() {
-        apply_persisted_config(&snapshot, prefs, palette, clear, track);
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn settings_choice_observer(
     change: On<ValueChange<bool>>,
@@ -347,15 +265,6 @@ fn settings_choice_observer(
             }
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
                 cfg.mode = "System".to_string();
-            });
-        }
-        SettingsField::Skin(skin) => {
-            if let Some(prefs) = prefs.as_deref_mut() {
-                prefs.skin = Some(skin);
-                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
-            }
-            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
-                cfg.skin = skin.label().to_string();
             });
         }
         SettingsField::HighContrast(on) => {

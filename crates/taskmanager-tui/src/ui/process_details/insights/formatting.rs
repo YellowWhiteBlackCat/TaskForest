@@ -6,7 +6,6 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::process_telemetry::{ProcessGpuDevice, ProcessGpuEngineUsage};
 use taskmanager_shell::presentation::{bytes, missing_value};
 
-use super::CAPABILITIES_PREVIEW;
 use crate::TuiTheme;
 
 /// Compact GPU device line: `GPU #<id> <util> · VRAM in use <bytes>`.
@@ -93,16 +92,6 @@ pub(crate) fn is_dangerous_capability(cap: &str) -> bool {
         || stripped.contains("SYS_PTRACE")
 }
 
-/// Format one capability entry as a string. Dangerous capabilities include a visible warning marker `[!] ⚠`.
-#[allow(dead_code)]
-pub(crate) fn format_capability_row(cap: &str) -> String {
-    if is_dangerous_capability(cap) {
-        format!("[!] \u{26a0} {cap}")
-    } else {
-        cap.to_string()
-    }
-}
-
 /// Format one capability entry as a styled terminal line. Dangerous capabilities are highlighted
 /// with a visible warning marker `[!] ⚠` in the theme's warning color with bold styling.
 pub(crate) fn format_capability_line(cap: &str, theme: TuiTheme) -> ratatui::text::Line<'static> {
@@ -121,14 +110,6 @@ pub(crate) fn format_capability_line(cap: &str, theme: TuiTheme) -> ratatui::tex
     } else {
         ratatui::text::Line::from(format!("    {cap}"))
     }
-}
-
-#[allow(dead_code)]
-pub(crate) fn capabilities_preview_lines(
-    capabilities: &[String],
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    capabilities_preview_lines_with_limit(capabilities, theme, CAPABILITIES_PREVIEW)
 }
 
 /// Bounded Capabilities preview: the count title, then up to `limit` capability rows
@@ -159,7 +140,6 @@ pub(crate) fn capabilities_preview_lines_with_limit(
     out
 }
 
-use super::{ENVIRONMENT_PREVIEW, OPEN_FILES_PREVIEW};
 use taskmanager_core::core::process_telemetry::{
     OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
 };
@@ -181,14 +161,6 @@ pub(crate) fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> S
     } else {
         format!("{} [{}] → {}", entry.fd, entry.resolved_kind(), target)
     }
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn open_files_preview_lines(
-    open_files: &ProcessOpenFiles,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    open_files_preview_lines_with_limit(open_files, theme, OPEN_FILES_PREVIEW)
 }
 
 /// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
@@ -243,14 +215,6 @@ pub(crate) fn open_files_preview_lines_with_limit(
 /// are escaped to keep each entry on a single terminal row.
 pub(crate) fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
     taskmanager_application::process_details_vm::format_env_entry(entry)
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn environment_preview_lines(
-    env: &ProcessEnvironment,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    environment_preview_lines_with_limit(env, theme, ENVIRONMENT_PREVIEW)
 }
 
 /// Bounded Environment-facet preview: the entry count, then the first

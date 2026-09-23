@@ -1355,7 +1355,7 @@
   "tui.surface.hint_time": "时间",
   "tui.settings_move": "Tab / ↑↓ 移动 · ←→ 修改",
   "tui.settings_save": "Enter 保存 · Esc 取消",
-  "tui.settings_save_failed": "保存失败：{}",
+  "tui.settings_save_failed": "设置保存失败：{}",
   "menu.word_move": "移动",
   "menu.word_select": "选择",
   "menu.word_cancel": "取消",

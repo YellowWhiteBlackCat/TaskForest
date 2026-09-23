@@ -111,16 +111,14 @@ fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessLiveKey {
         .and_then(ProcessLiveKey::from_process)
         .expect("demo process carries a current start token")
 }
-#[path = "app/row_summary.rs"]
-mod row_summary;
-#[path = "app/search_paste.rs"]
-mod search_paste;
-#[allow(unused_imports)]
-use super::search_input::SEARCH_QUERY_MAX;
 #[path = "app/frame_state.rs"]
 mod frame_state;
 #[path = "app/gpu_engine_rows.rs"]
 mod gpu_engine_rows;
+#[path = "app/row_summary.rs"]
+mod row_summary;
+#[path = "app/search_paste.rs"]
+mod search_paste;
 #[path = "app/service_control.rs"]
 mod service_control;
 #[path = "app/service_log.rs"]
@@ -382,13 +380,22 @@ fn session_control_completion_accepts_only_the_latest_intent() {
         panic!("second action must be session control");
     };
 
+    // The superseded intent's outcome must change nothing. Assert the feedback
+    // is byte-identical rather than matching a localized sentence: the
+    // invariant is "a stale outcome is a no-op", and it must hold under any
+    // host language (matching `"Demo snapshot"` only held in English).
+    let banner = app.feedback_text().to_string();
     app.apply_session_control_outcome(SessionControlOutcome {
         request_id: first.request_id,
         session_id: first.session_id,
         action: first.action,
         result: Ok(()),
     });
-    assert!(app.feedback_text().contains("Demo snapshot"));
+    assert_eq!(
+        app.feedback_text(),
+        banner,
+        "a superseded session outcome must leave the current feedback untouched"
+    );
 
     app.apply_session_control_outcome(SessionControlOutcome {
         request_id: second.request_id,
@@ -396,8 +403,15 @@ fn session_control_completion_accepts_only_the_latest_intent() {
         action: second.action,
         result: Err(FailureKind::PermissionDenied),
     });
-    assert!(app.feedback_text().contains("failed"));
-    assert!(app.feedback_text().contains("PermissionDenied"));
+    let feedback = app.feedback_text();
+    assert_ne!(
+        feedback, banner,
+        "the latest intent's outcome must replace the feedback"
+    );
+    assert!(
+        feedback.contains("PermissionDenied"),
+        "the typed failure kind is the stable, locale-independent signal: {feedback}"
+    );
 }
 
 #[test]

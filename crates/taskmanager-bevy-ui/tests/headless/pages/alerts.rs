@@ -30,10 +30,10 @@ use bevy::text::Font;
 use bevy::ui::Checked;
 use bevy::ui::widget::Text;
 use taskmanager_application::{
-    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
-    SystemFacets,
+    HostTelemetryRequest, ManagedAlertRule, ManagedAlertRuleEdit, PlatformClient, PlatformEvent,
+    PlatformFacets, PlatformHandle, SystemFacets,
 };
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertRule, AlertSeverity};
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
@@ -48,6 +48,90 @@ use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+
+/// Create a new managed alert rule.
+fn create_alert_rule(
+    shell: &mut ShellApp,
+    id: impl Into<String>,
+    metric: AlertMetric,
+    severity: AlertSeverity,
+    threshold: f32,
+    hysteresis: f32,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let rule = AlertRule::new(
+        id,
+        metric,
+        severity,
+        threshold,
+        std::time::Duration::from_secs(5),
+        hysteresis,
+    );
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
+}
+
+/// Edit an existing managed alert rule.
+fn edit_alert_rule(
+    shell: &mut ShellApp,
+    target_id: String,
+    metric: AlertMetric,
+    severity: AlertSeverity,
+    threshold: f32,
+    hysteresis: f32,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let enabled = shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .iter()
+        .find(|m| m.rule.id == target_id)
+        .is_none_or(|m| m.enabled);
+    let rule = AlertRule::new(
+        target_id.clone(),
+        metric,
+        severity,
+        threshold,
+        std::time::Duration::from_secs(5),
+        hysteresis,
+    );
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Update {
+        target_id,
+        managed: ManagedAlertRule::new(rule, enabled),
+    })
+}
+
+/// Export the managed alert rules through the canonical core transfer codec.
+fn export_alert_rules(
+    shell: &ShellApp,
+) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
+    let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .iter()
+        .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
+        .collect();
+    taskmanager_core::core::alerts::export_alert_rules_json(&entries)
+}
+
+/// Import managed alert rules through the canonical core transfer codec.
+fn import_alert_rules(
+    shell: &mut ShellApp,
+    json: &str,
+    mode: taskmanager_application::AlertRuleImportMode,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
+    let rules: Vec<ManagedAlertRule> = entries.into_iter().map(ManagedAlertRule::from).collect();
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
+}
 
 // ---- scripted platform client (the headless shell-app composition) ----
 
@@ -497,10 +581,9 @@ fn event_history_renders_recent_events() {
 #[test]
 fn alert_rule_export_and_import_round_trip() {
     use taskmanager_application::AlertRuleImportMode;
-    use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut shell = ShellApp::new();
-    let json = super::export_alert_rules(&shell).expect("export rules");
+    let json = export_alert_rules(&shell).expect("export rules");
     assert!(json.contains("cpu"));
 
     let custom = AlertRule::new(
@@ -516,8 +599,8 @@ fn alert_rule_export_and_import_round_trip() {
     )];
     let custom_json = taskmanager_core::core::alerts::export_alert_rules_json(&entries).unwrap();
 
-    let outcome = super::import_alert_rules(&mut shell, &custom_json, AlertRuleImportMode::Replace)
-        .expect("import");
+    let outcome =
+        import_alert_rules(&mut shell, &custom_json, AlertRuleImportMode::Replace).expect("import");
     assert_eq!(
         outcome,
         taskmanager_application::ManagedAlertRuleEditOutcome::Applied
@@ -531,7 +614,7 @@ fn alert_rule_authoring_creates_and_edits_rules() {
     let initial_count = shell.projection().alert_center.managed_rules().len();
 
     // 1. Create rule
-    let outcome = super::create_alert_rule(
+    let outcome = create_alert_rule(
         &mut shell,
         "custom-cpu-rule",
         AlertMetric::CpuUsagePercent,
@@ -554,7 +637,7 @@ fn alert_rule_authoring_creates_and_edits_rules() {
     assert_eq!(created.rule.severity, AlertSeverity::Critical);
 
     // 2. Edit rule
-    let edit_outcome = super::edit_alert_rule(
+    let edit_outcome = edit_alert_rule(
         &mut shell,
         "custom-cpu-rule".to_string(),
         AlertMetric::CpuUsagePercent,

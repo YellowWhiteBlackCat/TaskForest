@@ -34,9 +34,11 @@ whichever package owns it in its transaction.
 
 The shared hicolor icon set is the current cross-package case. The
 `taskforest-common` data package is its single DEB and RPM owner: the frontend
-packages depend on it, the Iced and Bevy recipes no longer install icons, and
-the GPUI `.deb`/`.rpm` builders remove the manifest-declared common
-destinations from the PKGBUILD-derived tree. The monolithic Arch package
+packages depend on it, the frontend recipes no longer install icons, and every
+frontend `.deb` builder removes the manifest-declared common destinations from
+a caller-supplied staged tree (the GPUI builder always, the Iced/TUI/Bevy
+builders whenever a staged tree is passed; `build-rpm.sh` filters every
+frontend target). The monolithic Arch package
 (`packaging/arch/PKGBUILD`) still ships the icons for its own single-package
 install and is credited as a provider. The manifest guard rejects any
 destination installed by both the common package and another DEB or RPM

@@ -801,7 +801,7 @@ fn settings_save_failure_message_is_localized() {
     let (mut app, root) = app_with_unwritable_config("en");
     assert_eq!(
         submit_save_and_wait_for_error(&mut app, 0),
-        "save failed: create_directory",
+        "Settings save failed: create_directory",
         "the en failure message must be the catalog value"
     );
     drop(app);
@@ -811,7 +811,7 @@ fn settings_save_failure_message_is_localized() {
     let (mut app, root) = app_with_unwritable_config("zh");
     assert_eq!(
         submit_save_and_wait_for_error(&mut app, 1),
-        "保存失败：create_directory",
+        "设置保存失败：create_directory",
         "the zh failure message must be the catalog value"
     );
     drop(app);

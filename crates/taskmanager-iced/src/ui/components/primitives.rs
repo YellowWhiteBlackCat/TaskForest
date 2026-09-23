@@ -28,14 +28,6 @@ use crate::theme;
 /// VRAM meters' fill tone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BadgeTone {
-    /// Quiet neutral chip: `palette.surface` fill, `palette.fg_muted` text.
-    /// Grammar-complete: no page constructs it yet (no neutral-chip call site).
-    #[allow(dead_code)]
-    Neutral,
-    /// `palette.success`. Grammar-complete: no page constructs it yet (the
-    /// success-look call site lands with a success-state surface).
-    #[allow(dead_code)]
-    Success,
     /// `palette.warning`
     Warning,
     /// `palette.danger`
@@ -50,24 +42,18 @@ impl BadgeTone {
     pub(crate) fn fill(self, theme: &Theme) -> Color {
         let palette = theme.palette();
         match self {
-            Self::Neutral => palette.surface,
-            Self::Success => palette.success,
             Self::Warning => palette.warning,
             Self::Danger => palette.danger,
             Self::Accent => palette.accent,
         }
     }
 
-    /// The tone's foreground on its own fill: tinted tones pick the
-    /// higher-contrast black/white via [`on_accent`] (WCAG contrast over
-    /// the fill's luminance, so light and dark skins both stay legible);
-    /// the neutral chip keeps the muted foreground so it stays quiet.
+    /// The tone's foreground on its own fill: pick the higher-contrast
+    /// black/white via [`on_accent`] (WCAG contrast over the fill's
+    /// luminance, so light and dark skins both stay legible).
     #[must_use]
     pub(crate) fn foreground(self, theme: &Theme) -> Color {
-        match self {
-            Self::Neutral => theme.palette().fg_muted,
-            tinted => on_accent(tinted.fill(theme)),
-        }
+        on_accent(self.fill(theme))
     }
 }
 
@@ -226,10 +212,6 @@ pub(crate) enum PanelState {
     Unavailable,
     /// Degraded/partial: some rows are still usable, so caution, not alarm.
     Partial,
-    /// Recovering after a failure (e.g. the first post-retry frames).
-    /// Grammar-complete today; source panels adopt it with the retry lane.
-    #[allow(dead_code)]
-    Recovery,
 }
 
 impl PanelState {
@@ -241,7 +223,6 @@ impl PanelState {
             Self::Empty => palette.fg_muted,
             Self::Unavailable => palette.danger,
             Self::Partial => palette.warning,
-            Self::Recovery => palette.success,
         }
     }
 }

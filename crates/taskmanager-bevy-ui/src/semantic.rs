@@ -155,47 +155,6 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
     builder.build()
 }
 
-/// Validate and execute one assistive-technology action against the frozen
-/// semantic snapshot for Bevy.
-#[allow(dead_code)]
-pub(crate) fn apply_accessibility_action(
-    track: &mut FrontendTrack,
-    request: &taskmanager_ui_contract::AccessibilityActionRequest,
-    snapshot: &SemanticSnapshot,
-) -> Result<(), taskmanager_ui_contract::AccessibilityActionRejection> {
-    request.validate_against(snapshot)?;
-
-    if let Some(identity) = track.shell.visible_processes().iter().find_map(|process| {
-        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
-            == request.node.as_str())
-        .then(|| taskmanager_core::core::process::ProcessLiveKey::from_process(process))
-        .flatten()
-    }) {
-        match request.action {
-            taskmanager_ui_contract::SemanticAction::Focus
-            | taskmanager_ui_contract::SemanticAction::Select => {
-                let _ = track
-                    .shell
-                    .apply_action(taskmanager_application::AppAction::SelectPage(
-                        taskmanager_application::AppPage::Applications,
-                    ));
-                let _ = track
-                    .shell
-                    .select_row_id(taskmanager_shell::ProcessRowId::Process(identity));
-            }
-            _ => {}
-        }
-        return Ok(());
-    }
-
-    if request.action == taskmanager_ui_contract::SemanticAction::Dismiss
-        && request.node.as_str().starts_with("modal:")
-    {
-        track.shell.dismiss_overlay();
-    }
-    Ok(())
-}
-
 /// The `PostUpdate` projection: rebuild only when the revision key moved.
 fn sync_semantic_snapshot(
     track: NonSend<FrontendTrack>,

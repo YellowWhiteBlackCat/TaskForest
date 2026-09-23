@@ -378,8 +378,6 @@ pub(crate) struct ProcessSearchInput;
 #[derive(Resource, Clone, Debug, Default)]
 pub(crate) struct ProcessColumnWidthConfig {
     pub(crate) overrides: std::collections::HashMap<String, f32>,
-    #[allow(dead_code)]
-    pub(crate) available_width: Option<f32>,
 }
 
 /// Event to resize a table column by ID.
@@ -856,14 +854,3 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/process_affinity.rs"]
 mod process_affinity_tests;
-
-/// Request a batch process-control action (suspend/resume/kill) over current selection,
-/// arming the shared confirmation gate with `ProcessBatch` when multiple rows are targeted
-/// or when the verb is destructive.
-#[allow(dead_code)]
-pub(crate) fn request_process_batch(
-    shell: &mut ShellApp,
-    action: taskmanager_core::core::process::ProcessBatchAction,
-) -> Option<taskmanager_application::PlatformEffect> {
-    shell.request_process_batch(action)
-}

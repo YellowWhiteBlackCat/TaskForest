@@ -1,7 +1,5 @@
 use super::*;
-use crate::engine_names::{
-    CLASS_COMPUTE, CLASS_COPY, CLASS_RENDER, CLASS_VIDEO, CLASS_VIDEO_ENHANCE,
-};
+use crate::engine_names::{CLASS_COPY, CLASS_VIDEO};
 
 /// Build a fake `/sys` tree and assert the xe PMU + engines are discovered
 /// with the kernel-default config packing. Mirrors the on-box Core Ultra
@@ -52,23 +50,21 @@ fn discover_xe_layout_from_fixture_matches_on_box_shape() {
     };
     assert_eq!(pmu_type, 42);
     assert_eq!(engines.len(), 5, "five classes across gt0+gt1: {engines:?}");
-    let by_class: std::collections::HashMap<u32, &XeEngineCfg> = engines
+    let by_name: std::collections::HashMap<&str, &XeEngineCfg> = engines
         .iter()
-        .map(|engine| (engine.class, engine))
+        .map(|engine| (engine.class_name.as_str(), engine))
         .collect();
-    // Render: active 0x2, total 0x3 (class 0, instance 0).
-    assert_eq!(by_class[&CLASS_RENDER].label, "Render/3D");
-    assert_eq!(by_class[&CLASS_RENDER].class_name, "render");
-    assert_eq!(by_class[&CLASS_RENDER].instance, 0);
-    assert_eq!(by_class[&CLASS_RENDER].active_config, 0x2);
-    assert_eq!(by_class[&CLASS_RENDER].total_config, 0x3);
+    // Render: class 0 -> active 0x2, total 0x3.
+    assert_eq!(by_name["render"].label, "Render/3D");
+    assert_eq!(by_name["render"].active_config, 0x2);
+    assert_eq!(by_name["render"].total_config, 0x3);
     // Copy: class 1 << 20 → active 0x100002 / total 0x100003.
-    assert_eq!(by_class[&CLASS_COPY].active_config, 0x10_0002);
-    assert_eq!(by_class[&CLASS_COPY].total_config, 0x10_0003);
-    assert_eq!(by_class[&CLASS_COMPUTE].active_config, 0x40_0002);
-    assert_eq!(by_class[&CLASS_COMPUTE].total_config, 0x40_0003);
-    assert_eq!(by_class[&CLASS_VIDEO].active_config, 0x20_0002);
-    assert_eq!(by_class[&CLASS_VIDEO_ENHANCE].active_config, 0x30_0002);
+    assert_eq!(by_name["copy"].active_config, 0x10_0002);
+    assert_eq!(by_name["copy"].total_config, 0x10_0003);
+    assert_eq!(by_name["compute"].active_config, 0x40_0002);
+    assert_eq!(by_name["compute"].total_config, 0x40_0003);
+    assert_eq!(by_name["video"].active_config, 0x20_0002);
+    assert_eq!(by_name["video-enhance"].active_config, 0x30_0002);
 
     std::fs::remove_dir_all(root).ok();
 }
@@ -102,7 +98,7 @@ fn xe_engine_configs_dedupes_one_class_across_gts() {
     assert_eq!(
         configs
             .iter()
-            .filter(|engine| engine.class == CLASS_RENDER)
+            .filter(|engine| engine.class_name == "render")
             .count(),
         1
     );
@@ -146,13 +142,11 @@ fn discover_i915_layout_encodes_class_and_instance() {
         .map(|engine| (engine.label.as_str(), engine))
         .collect();
     // Render class 0, instance 0 → 0x0000.
-    assert_eq!(by_label["Render/3D"].class, CLASS_RENDER);
     assert_eq!(by_label["Render/3D"].class_name, "render");
     assert_eq!(by_label["Render/3D"].config, 0x0000);
     // Copy class 1 << 12 | instance 1 << 4 → 0x1010.
     assert_eq!(by_label["Copy"].config, 0x1010);
     // Video Encode class 3 << 12 → 0x3000.
-    assert_eq!(by_label["Video Encode"].class, CLASS_VIDEO_ENHANCE);
     assert_eq!(by_label["Video Encode"].class_name, "video-enhance");
     assert_eq!(by_label["Video Encode"].config, 0x3000);
 

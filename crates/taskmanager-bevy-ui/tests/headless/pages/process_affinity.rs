@@ -15,11 +15,11 @@ fn dummy_identity(pid: u32, name: &str) -> FrozenProcessIdentity {
 #[test]
 fn affinity_modal_state_open_toggle_and_apply() {
     let mut state = ProcessAffinityModalState::default();
-    assert!(!state.is_open());
+    assert!(state.session.is_none());
 
     let target = dummy_identity(1234, "test_proc");
     state.open(target.clone(), 4);
-    assert!(state.is_open());
+    assert!(state.session.is_some());
 
     let session = state.session.as_ref().unwrap();
     assert_eq!(session.target, target);

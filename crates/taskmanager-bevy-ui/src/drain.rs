@@ -223,7 +223,7 @@ pub(crate) fn drain_system(
             if let taskmanager_core::core::tray::TrayEvent::MenuActivated { id } = event {
                 if let Some(intent) = crate::tray::resolve_tray_action(id) {
                     match intent {
-                        crate::tray::TrayIntent::ShowWindow => {}
+                        crate::tray::TrayIntent::Show => {}
                         crate::tray::TrayIntent::TogglePause => {
                             let _ = track
                                 .shell

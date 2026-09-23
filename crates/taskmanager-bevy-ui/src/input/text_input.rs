@@ -20,26 +20,6 @@ impl TextInputState {
         self.cursor.min(text.chars().count())
     }
 
-    /// Set clipboard text.
-    #[allow(dead_code)]
-    pub(crate) fn set_clipboard(&mut self, text: &str) {
-        self.clipboard = text.to_owned();
-    }
-
-    /// Get clipboard text.
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn get_clipboard(&self) -> &str {
-        &self.clipboard
-    }
-
-    /// Set the cursor position, clamped to [0, text.chars().count()].
-    #[allow(dead_code)]
-    pub(crate) fn set_cursor(&mut self, text: &str, pos: usize) {
-        self.cursor = pos.min(text.chars().count());
-        self.selection_anchor = None;
-    }
-
     /// Move the cursor left by one character.
     pub(crate) fn move_left(&mut self, text: &str) {
         self.cursor = self.cursor_pos(text).saturating_sub(1);

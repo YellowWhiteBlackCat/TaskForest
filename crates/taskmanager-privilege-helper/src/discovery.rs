@@ -90,14 +90,7 @@ impl Driver {
 #[derive(Debug, Clone)]
 pub struct XeEngineCfg {
     pub label: String,
-    /// Numeric class id (UAPI). Read by the unit tests and useful for on-box
-    /// diagnostics; not consumed by the emit path, which uses `class_name`.
-    #[allow(dead_code)]
-    pub class: u32,
     pub class_name: String,
-    /// Instance digit (0 for xe system-wide per-class counters). Diagnostic.
-    #[allow(dead_code)]
-    pub instance: u32,
     pub active_config: u64,
     pub total_config: u64,
 }
@@ -106,13 +99,7 @@ pub struct XeEngineCfg {
 #[derive(Debug, Clone)]
 pub struct I915EngineCfg {
     pub label: String,
-    /// Numeric class id (UAPI). Read by the unit tests; not consumed by emit.
-    #[allow(dead_code)]
-    pub class: u32,
     pub class_name: String,
-    /// Instance digit (i915 addresses counters per class+instance). Diagnostic.
-    #[allow(dead_code)]
-    pub instance: u32,
     pub config: u64,
 }
 
@@ -383,9 +370,7 @@ fn discover_xe_engine_configs(device: &Path, layout: &XeConfigLayout) -> Vec<XeE
             };
             by_class.entry(parsed.class).or_insert(XeEngineCfg {
                 label: engine_names::engine_label(&name),
-                class: parsed.class,
                 class_name: engine_names::class_keyword(parsed.class).to_string(),
-                instance: parsed.instance,
                 active_config: layout.pack_engine_busy(
                     XE_EVENT_ACTIVE_TICKS,
                     parsed.class,
@@ -423,9 +408,7 @@ fn discover_i915_engine_configs(device: &Path) -> Vec<I915EngineCfg> {
                 | I915_SAMPLE_BUSY;
             engines.push(I915EngineCfg {
                 label: engine_names::engine_label(&name),
-                class: parsed.class,
                 class_name: engine_names::class_keyword(parsed.class).to_string(),
-                instance: parsed.instance,
                 config,
             });
         }

@@ -45,9 +45,7 @@ pub(crate) mod history_replay;
 mod history_series;
 mod input_state;
 mod menus;
-mod motion;
-#[allow(unused_imports)]
-pub(crate) use motion::viewport_compact;
+pub(crate) mod motion;
 mod navigation;
 mod performance_state;
 mod pointer_capture;

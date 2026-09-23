@@ -581,9 +581,6 @@ fn compact_performance_sidebar_label(app: &crate::IcedApp, device: PerfDevice) -
     perf_rail::compact_device_label(app, device)
 }
 
-#[allow(unused_imports)]
-pub(crate) use super::perf_rail::bounded_sidebar_label;
-
 /// The localized label for one selector tab. Reuses the existing common/sidebar
 /// catalog keys verbatim — no new locale entries (CPU/Memory/Gpu/Disk via
 /// `common.*`, Network via `sidebar.network`).

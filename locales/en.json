@@ -1355,7 +1355,7 @@
   "tui.surface.hint_time": "time",
   "tui.settings_move": "Tab / ↑↓ move · ←→ change",
   "tui.settings_save": "Enter save · Esc cancel",
-  "tui.settings_save_failed": "save failed: {}",
+  "tui.settings_save_failed": "Settings save failed: {}",
   "menu.word_move": "move",
   "menu.word_select": "select",
   "menu.word_cancel": "cancel",

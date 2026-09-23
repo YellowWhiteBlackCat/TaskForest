@@ -109,6 +109,22 @@ trap 'rm -rf "$work"' EXIT
 
 if [[ -n "$target_src" && -d "$target_src/usr" ]]; then
     cp -a "$target_src/usr" "$work/usr"
+
+    # taskforest-common is the single DEB owner of the shared hicolor icon
+    # set. A caller-supplied staged tree may carry the PKGBUILD-derived assets
+    # for the monolithic Arch package, so remove exactly the destinations the
+    # manifest attributes to the common data package before packaging the Bevy
+    # product. The manifest is the authority; no hand-maintained path list
+    # lives here.
+    manifest="$repo/docs/system-install-manifest.tsv"
+    [[ -f "$manifest" ]] || { echo "build-deb-bevy: missing $manifest" >&2; exit 1; }
+    while IFS= read -r destination; do
+        [[ "$destination" == /usr/* ]] || continue
+        rm -f "$work$destination"
+        rmdir -p --ignore-fail-on-non-empty "$(dirname "$work$destination")" \
+            2>/dev/null || true
+    done < <(awk -F'\t' -v provider="packaging/debian/build-deb-common.sh" \
+        'NR > 1 && index($7, provider) { print $4 }' "$manifest")
 else
     bin=""
     if [[ -n "$target_src" && -f "$target_src" ]]; then

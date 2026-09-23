@@ -3,17 +3,10 @@
 //! query cap, and the cursor/multi-set reset mirroring `push_search_char`.
 
 use super::*;
-use taskmanager_core::core::process::ProcessLiveKey;
-
-#[allow(dead_code)]
-fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessLiveKey {
-    app.projection()
-        .processes_slice()
-        .iter()
-        .find(|process| process.pid == pid)
-        .and_then(ProcessLiveKey::from_process)
-        .expect("demo process carries a current start token")
-}
+// The bounded-query cap is used by this module only; import it here rather
+// than re-exporting it through the parent test module with an `unused_imports`
+// allow.
+use super::search_input::SEARCH_QUERY_MAX;
 
 #[test]
 fn paste_appends_printable_text_and_resets_the_cursor() {

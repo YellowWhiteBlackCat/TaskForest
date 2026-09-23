@@ -10,6 +10,32 @@ use taskmanager_platform_contract::{TrayController, TrayFailure};
 
 use super::*;
 
+// The polymorphic `TrayControllerTarget` impls the tray tests exercise live
+// here, in the test tree: production only ever syncs through `TrayResource`.
+impl TrayControllerTarget for Option<Box<dyn TrayController>> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        self.as_deref()
+    }
+}
+
+impl TrayControllerTarget for Option<&dyn TrayController> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        *self
+    }
+}
+
+impl TrayControllerTarget for Box<dyn TrayController> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        Some(&**self)
+    }
+}
+
+impl TrayControllerTarget for dyn TrayController {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        Some(self)
+    }
+}
+
 #[derive(Default)]
 struct MockTrayController {
     last_checked: Arc<AtomicBool>,
@@ -41,10 +67,6 @@ fn action_mapping_is_complete_and_rejects_unknown_ids() {
     assert_eq!(
         resolve_tray_action(TRAY_ACTION_SHOW),
         Some(TrayIntent::Show)
-    );
-    assert_eq!(
-        resolve_tray_action(TRAY_ACTION_SHOW),
-        Some(TrayIntent::ShowWindow)
     );
     assert_eq!(
         resolve_tray_action(TRAY_ACTION_PAUSE),
@@ -159,7 +181,7 @@ fn bevy_tray_spec_reflects_paused_state() {
 #[test]
 fn tray_resource_lifecycle_and_defaults() {
     let mut tray = TrayResource::default();
-    assert!(!tray.is_active());
+    assert!(tray.controller.is_none());
     assert!(tray.drain_events().is_empty());
     tray.sync_pause_checkmark(true);
     sync_tray_pause_checkmark(&tray, true);
@@ -226,7 +248,7 @@ fn sync_tray_pause_checkmark_drives_controller() {
     assert!(last_checked.load(Ordering::Relaxed));
 
     let tray = TrayResource::new(Some(mock), None);
-    assert!(tray.is_active());
+    assert!(tray.controller.is_some());
     tray.sync_pause_checkmark(false);
     assert_eq!(last_action_id.load(Ordering::Relaxed), TRAY_ACTION_PAUSE);
     assert!(!last_checked.load(Ordering::Relaxed));
@@ -240,15 +262,8 @@ fn sync_tray_pause_checkmark_drives_controller() {
 #[test]
 fn tray_resource_empty_and_active_states() {
     let empty = TrayResource::empty();
-    assert!(!empty.is_active());
     assert!(empty.controller.is_none());
     assert!(empty.events_rx.is_none());
-}
-
-#[test]
-fn tray_intent_constants_and_aliases() {
-    assert_eq!(TrayIntent::SHOW_WINDOW, TrayIntent::Show);
-    assert_eq!(TrayIntent::ShowWindow, TrayIntent::Show);
 }
 
 #[test]
