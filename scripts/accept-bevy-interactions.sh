@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # Fourth frontend's fail-closed headless interaction gate.
 #
-# The matrix names behavior tests, not source symbols. Discovery must find
-# every named test in the actual Bevy lib target, then the complete lib target
-# runs under the locked workspace. Wayland pixels are a separate gate owned by
-# capture-bevy.sh and never inferred from this pass.
+# The unified matrix names behavior tests, not source symbols. Discovery must
+# find every named test in the actual Bevy lib target, then the complete lib
+# target runs under the locked workspace. Wayland pixels are a separate gate
+# owned by capture-bevy.sh and never inferred from this pass.
+#
+# D6: the retired per-frontend compatibility view is gone; the unified matrix is
+# the single declaration authority and this gate projects its `bevy` rows into
+# the run's evidence directory.
 set -euo pipefail
 export LC_ALL=C
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
-MATRIX="$REPO/scripts/bevy_interaction_matrix.tsv"
+UNIFIED_MATRIX="$REPO/scripts/parity/cross_frontend_matrix.tsv"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 OUT="$REPO/target/bevy-interaction-evidence/$RUN_ID"
 mkdir -p "$OUT"
@@ -20,21 +24,45 @@ die() {
     exit 1
 }
 
+# Project the unified matrix's `bevy` rows to the columns this gate consumes.
+# The projection is generated per run, never committed; `paths` tokens are
+# copied verbatim (their vocabulary authority is the Rust `ContractTag`).
+project_matrix() {
+    local output="$1"
+    [ -s "$UNIFIED_MATRIX" ] \
+        || die "unified interaction matrix is empty or missing: $UNIFIED_MATRIX"
+    {
+        printf 'case_id\ttarget\ttest_name\tpaths\n'
+        awk -F'\t' -v OFS='\t' '
+            $0 ~ /^[[:space:]]*#/ { next }
+            $1 == "subject_kind" { next }
+            $3 == "bevy" { print $2, $5, $6, $7 }
+        ' "$UNIFIED_MATRIX"
+    } >"$output"
+}
+
+MATRIX="$OUT/matrix.tsv"
+project_matrix "$MATRIX"
+
 validate_matrix() {
     [ -s "$MATRIX" ] || die "missing or empty matrix: $MATRIX"
     [ "$(head -n 1 "$MATRIX")" = $'case_id\ttarget\ttest_name\tpaths' ] \
         || die "unexpected matrix header"
+    # The resolver owns the authoritative row schema, the `(frontend, case_id)`
+    # key and the target vocabulary; this gate keeps a local shape check.  The
+    # unified matrix also lets two cases share one anchor test (for example the
+    # icon-stamp and tofu-law cases both drive the spawned-icon scene), so the
+    # retired per-frontend view's duplicate test-name rule is deliberately not
+    # carried over.
     local case_id target test_name paths count=0
-    local -A cases=() tests=()
+    local -A cases=()
     while IFS=$'\t' read -r case_id target test_name paths; do
         [ -n "${case_id:-}" ] || die "empty case id"
         [ -z "${cases[$case_id]+set}" ] || die "duplicate case id: $case_id"
         [ "$target" = lib ] || die "$case_id: target must be lib"
         [ -n "$test_name" ] || die "$case_id: empty test name"
-        [ -z "${tests[$test_name]+set}" ] || die "duplicate test name: $test_name"
         [ -n "$paths" ] || die "$case_id: empty behavior path"
         cases[$case_id]=1
-        tests[$test_name]=1
         count=$((count + 1))
     done < <(tail -n +2 "$MATRIX")
     [ "$count" -gt 0 ] || die "matrix has no behavior cases"
@@ -73,13 +101,13 @@ timeout --kill-after=10s 20m cargo nextest run "$LOCK_FLAG" -p taskmanager-bevy-
     --no-fail-fast >"$OUT/nextest.log" 2>&1
 status=$?
 set -e
-cp "$MATRIX" "$OUT/matrix.tsv"
 {
     printf 'run_id=%s\n' "$RUN_ID"
     printf 'git_head=%s\n' "$(cat "$OUT/git-head.txt")"
     printf 'worktree_sha256=%s\n' "$(sha256sum "$OUT/git-status.txt" | cut -d' ' -f1)"
     printf 'rust=%s\n' "$(cat "$OUT/rust.txt")"
-    printf 'matrix=scripts/bevy_interaction_matrix.tsv\n'
+    printf 'matrix=scripts/parity/cross_frontend_matrix.tsv\n'
+    printf 'matrix_projection=%s\n' "target/bevy-interaction-evidence/$RUN_ID/matrix.tsv"
     printf 'matrix_count=%s\n' "$MATRIX_COUNT"
     printf 'command=cargo nextest run %s -p taskmanager-bevy-ui --lib -j 4 --no-fail-fast\n' "$LOCK_FLAG"
     printf 'status=%s\n' "$status"
@@ -90,7 +118,7 @@ cp "$MATRIX" "$OUT/matrix.tsv"
     printf '  "git_head": "%s",\n' "$(cat "$OUT/git-head.txt")"
     printf '  "worktree_sha256": "%s",\n' "$(sha256sum "$OUT/git-status.txt" | cut -d' ' -f1)"
     printf '  "rust": "%s",\n' "$(cat "$OUT/rust.txt")"
-    printf '  "matrix": "scripts/bevy_interaction_matrix.tsv",\n'
+    printf '  "matrix": "scripts/parity/cross_frontend_matrix.tsv",\n'
     printf '  "matrix_count": %s,\n' "$MATRIX_COUNT"
     printf '  "command": "cargo nextest run %s -p taskmanager-bevy-ui --lib -j 4 --no-fail-fast",\n' "$LOCK_FLAG"
     printf '  "status": "%s",\n' "$([ "$status" -eq 0 ] && printf 'pass' || printf 'fail')"

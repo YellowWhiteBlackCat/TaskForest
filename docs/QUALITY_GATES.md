@@ -155,7 +155,7 @@ binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 
 standard` 重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形
 runner 只能报告环境性 SKIP，不能把它记为隔离 PASS。
 
-Bevy 交互矩阵（`scripts/bevy_interaction_matrix.tsv`）由机械发现驱动：脚本先对 lib 目标做
+Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 bevy 投影）由机械发现驱动：脚本先对 lib 目标做
 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
 存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。

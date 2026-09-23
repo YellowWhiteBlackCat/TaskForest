@@ -67,7 +67,6 @@ FRONTEND_SCRIPTS = {
         "scripts/capture_bevy_scenarios.tsv",
         "scripts/validate_bevy_matrix.py",
         "scripts/accept-bevy-interactions.sh",
-        "scripts/bevy_interaction_matrix.tsv",
     ),
 }
 ROOT_FILES = (

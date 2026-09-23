@@ -9,6 +9,11 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
+# D6: the unified matrix is the single interaction declaration authority.  The
+# retired per-frontend compatibility view is gone; the receipt validator
+# projects this file's `gpui` rows.
+UNIFIED_MATRIX="$REPO/scripts/parity/cross_frontend_matrix.tsv"
+
 scope="${GPUI_INTERACTION_SCOPE:-linux}"
 evidence_root="${GPUI_INTERACTION_EVIDENCE_ROOT:-$REPO/target/gpui-interaction-evidence}"
 workdir_task="${GPUI_INTERACTION_WORKDIR_TASK:-gpui-interactions}"
@@ -65,6 +70,7 @@ printf 'scope=%s\n' "$scope" >>"$RUN_DIR/metadata.txt"
 printf 'git_head=%s\n' "$GIT_HEAD" >>"$RUN_DIR/metadata.txt"
 printf 'worktree=%s\n' "$WORKTREE_STATE" >>"$RUN_DIR/metadata.txt"
 printf 'rust=%s\n' "$(rustc -V)" >>"$RUN_DIR/metadata.txt"
+printf 'matrix=scripts/parity/cross_frontend_matrix.tsv\n' >>"$RUN_DIR/metadata.txt"
 printf 'evidence_root=%s\n' "$evidence_root" >>"$RUN_DIR/metadata.txt"
 printf 'command=%s\n' "${GPUI_INTERACTION_COMMAND:-bash scripts/accept-gpui-interactions.sh}" \
     >>"$RUN_DIR/metadata.txt"
@@ -85,9 +91,10 @@ timeout --kill-after=10s 20m cargo nextest list --locked --profile ci \
 
 # Structural authority lives in the unified matrix, the Rust `ContractTag`
 # conformance and the Rust GPUI projection gate; this validator keeps only the
-# per-target (`gui`/`lib`) `ok`-event receipt.
+# per-target (`gui`/`lib`) `ok`-event receipt and projects the unified matrix's
+# `gpui` rows itself.
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
-    --matrix scripts/gpui_interaction_matrix.tsv \
+    --matrix "$UNIFIED_MATRIX" \
     --gui-list "$RUN_DIR/gui-list.json" \
     --lib-list "$RUN_DIR/lib-list.json" \
     --receipt "$RUN_DIR/matrix-validation.json"
@@ -105,7 +112,7 @@ run_nextest "$RUN_DIR/gui-run.log" -p taskmanager-gpui --test gui --features tes
 run_nextest "$RUN_DIR/lib-run.log" -p taskmanager-gpui --lib
 
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
-    --matrix scripts/gpui_interaction_matrix.tsv \
+    --matrix "$UNIFIED_MATRIX" \
     --gui-list "$RUN_DIR/gui-list.json" \
     --lib-list "$RUN_DIR/lib-list.json" \
     --run-log "$RUN_DIR/gui-run.log" \
