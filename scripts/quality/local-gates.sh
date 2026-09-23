@@ -559,6 +559,16 @@ fi
 if maybe clippy-parity; then
     run_stage clippy-parity quick run_py scripts/quality/clippy_command_parity_guard.py
 fi
+if maybe clippy-ratchet-self; then
+    # clippy-parity proves both hosts still *carry* the ratchet flags; this guard
+    # proves the `clippy.toml` ceiling they enforce has not been raised back. The
+    # self-test proves it goes red on a raise and fails closed (exit 2) on a
+    # missing key, a duplicate key or a non-integer value.
+    run_stage clippy-ratchet-self quick run_py scripts/quality/clippy_ratchet_guard.py --self-test
+fi
+if maybe clippy-ratchet; then
+    run_stage clippy-ratchet quick run_py scripts/quality/clippy_ratchet_guard.py
+fi
 if maybe production-config-wiring-self; then
     # clippy-parity proves the clippy *command* is the same on both hosts; this
     # guard proves the production-config helper is still *wired into* both hosts

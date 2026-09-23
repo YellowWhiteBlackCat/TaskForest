@@ -44,7 +44,7 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
 - `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build 和
   平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
