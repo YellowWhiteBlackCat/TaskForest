@@ -1,23 +1,24 @@
-name	page	window_size
-applications	applications	1180x780
-performance	performance	1180x780
-services	services	1180x780
-service-logs	service-logs	1180x780
-system	system	1180x780
-startup	startup	1180x780
-users	users	1180x780
-alerts	alerts	1180x780
-settings	settings	1180x780
-app-history	app-history	1180x780
-containers	containers	1180x780
-applications-compact	applications	720x480
-performance-compact	performance	720x480
-services-compact	services	720x480
-service-logs-compact	services	720x480
-system-compact	system	720x480
-startup-compact	startup	720x480
-users-compact	users	720x480
-alerts-compact	alerts	720x480
-settings-compact	settings	720x480
-app-history-compact	app-history	720x480
-containers-compact	containers	720x480
+name	page	window_size	skin
+applications	applications	1180x780	gnome-light
+performance	performance	1180x780	gnome-light
+services	services	1180x780	gnome-light
+service-logs	service-logs	1180x780	gnome-light
+system	system	1180x780	gnome-light
+startup	startup	1180x780	gnome-light
+users	users	1180x780	gnome-light
+alerts	alerts	1180x780	gnome-light
+settings	settings	1180x780	gnome-light
+app-history	app-history	1180x780	gnome-light
+containers	containers	1180x780	gnome-light
+applications-compact	applications	720x480	gnome-light
+performance-compact	performance	720x480	gnome-light
+services-compact	services	720x480	gnome-light
+service-logs-compact	services	720x480	gnome-light
+system-compact	system	720x480	gnome-light
+startup-compact	startup	720x480	gnome-light
+users-compact	users	720x480	gnome-light
+alerts-compact	alerts	720x480	gnome-light
+settings-compact	settings	720x480	gnome-light
+app-history-compact	app-history	720x480	gnome-light
+containers-compact	containers	720x480	gnome-light
+performance-dark	performance	1180x780	gnome-dark

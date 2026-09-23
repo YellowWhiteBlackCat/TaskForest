@@ -63,6 +63,9 @@ SOURCE_MANIFEST="$RUN_DIR/iced-source-manifest.sha256"
 NIRI_OUTPUTS="$RUN_DIR/niri-outputs.json"
 MANIFEST="$RUN_DIR/iced-capture-manifest.tsv"
 MATRIX_RECEIPT="$RUN_DIR/iced-capture-validation.json"
+VALIDATOR_MATRIX="$RUN_DIR/iced-capture-matrix-validator.tsv"
+VALIDATOR_MANIFEST="$RUN_DIR/iced-capture-manifest-validator.tsv"
+APPEARANCE_RECEIPT="$RUN_DIR/appearance.tsv"
 HOST_XDG="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
 APP_ID="io.github.YellowWhiteBlackCat.TaskForestI"
@@ -225,8 +228,8 @@ elif [ -n "${TM_ICED_CAPTURE_SOURCE_FAILURE:-}" ]; then
   esac
   MATRIX="$RUN_DIR/capture-source-failure.tsv"
   {
-    printf 'name\tdevice\twindow_size\n'
-    printf 'source-%s\t%s\t1180x780\n' \
+    printf 'name\tdevice\twindow_size\tskin\n'
+    printf 'source-%s\t%s\t1180x780\tgnome-dark\n' \
       "$TM_ICED_CAPTURE_SOURCE_FAILURE" "$TM_ICED_CAPTURE_SOURCE_FAILURE"
   } >"$MATRIX"
   CAPTURE_SCOPE=targeted-source-failure
@@ -288,7 +291,58 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'dbus_address_sha256=%s\n' "$DBUS_ADDRESS_SHA256"
   printf 'command=bash scripts/capture-iced.sh\n'
 } >"$METADATA"
-printf 'scenario\tdevice\trequested_window\timage\tmarkers\twindows\taction\tapp_pid\twindow_id\twidth\theight\tbytes\tsha256\tstatus\n' >"$MANIFEST"
+printf 'scenario\tdevice\trequested_window\timage\tmarkers\twindows\taction\tapp_pid\twindow_id\twidth\theight\tbytes\tsha256\tstatus\tappearance\n' >"$MANIFEST"
+printf 'scenario\tskin\tappearance\tcontrol\n' >"$APPEARANCE_RECEIPT"
+
+# The explicit appearance dimension. The scenario table's trailing `skin`
+# column uses the product's existing `TM_SKIN` token vocabulary
+# (`<skin>-<light|dark>`), which this harness passes to the app; the rendered
+# frame is read back through its mean luminance so the receipt records what was
+# actually painted, not only what was requested, and the requested/rendered
+# comparison is the measured `appearance_control` verdict. The matrix validator
+# knows only the identity columns, so the harness projects them out for it
+# below.
+appearance_of() {
+  local image="$1" luminance=""
+  if command -v identify >/dev/null 2>&1; then
+    luminance="$(identify -format \
+      '%[fx:0.2126*mean.r+0.7152*mean.g+0.0722*mean.b]' \
+      "$image" 2>/dev/null || true)"
+  fi
+  case "$luminance" in
+  '') printf 'unknown' ;;
+  *) awk -v value="$luminance" \
+    'BEGIN { print (value + 0 >= 0.5) ? "light" : "dark" }' ;;
+  esac
+}
+
+# The requested mode is the `TM_SKIN` token suffix. A mode the mean-luminance
+# readback cannot distinguish (eye-forest) stays inconclusive rather than being
+# forced into light/dark.
+appearance_mode_of() {
+  case "$1" in
+  *-light) printf 'light' ;;
+  *-dark) printf 'dark' ;;
+  *) printf 'unknown' ;;
+  esac
+}
+
+# The measured verdict for one frame: `honored` when the readback agrees with
+# the requested mode, `ignored` when it disagrees, and `unknown` when either
+# side is inconclusive. This claims only what the pixels support; the old
+# hard-coded `ignored` is gone.
+appearance_control_of() {
+  local requested rendered
+  requested="$(appearance_mode_of "$1")"
+  rendered="$2"
+  if [ "$rendered" = unknown ] || [ "$requested" = unknown ]; then
+    printf 'unknown'
+  elif [ "$requested" = "$rendered" ]; then
+    printf 'honored'
+  else
+    printf 'ignored'
+  fi
+}
 
 cat >"$CONF" <<KDL
 screenshot-path "$RUNTIME_DIR/shot-%Y-%m-%d-%H-%M-%S.png"
@@ -418,7 +472,7 @@ NIRI_OUTPUT_LOGICAL="$(jq -r 'if type == "object" then .winit.logical else .[0].
 sed -i "s/^nested_output_logical=.*/nested_output_logical=$NIRI_OUTPUT_LOGICAL/" "$METADATA"
 
 capture_one() {
-  local name="$1" device="$2" window_size="$3"
+  local name="$1" device="$2" window_size="$3" skin="$4"
   # A "-zh" scenario-name suffix renders the localized surface (ICED-002
   # geometry evidence): the launch reads XDG_CONFIG_HOME/taskmanager/config.json
   # (JSON, serde), whose shared language token is "en"/"zh".
@@ -439,7 +493,7 @@ capture_one() {
   local cache_home="$RUNTIME_DIR/cache-$name"
   local state_home="$RUNTIME_DIR/state-$name"
   local window_id="" window_ready=0 marker_ready=0 action_status=failed
-  local width=0 height=0 bytes=0 hash=-
+  local width=0 height=0 bytes=0 hash=- rendered=unknown control=unknown
   local page=performance
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
@@ -470,6 +524,7 @@ capture_one() {
     height=0
     bytes=0
     hash="-"
+    rendered=unknown
 
     printf '  start %-13s device=%-7s window=%s\n' "$name" "$device" "$window_size"
     XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$config_home" \
@@ -477,7 +532,7 @@ capture_one() {
     XDG_STATE_HOME="$state_home" \
       WAYLAND_DISPLAY="$SOCK" TM_ICED_CAPTURE_MARKER_FILE="$markers" \
       TM_ICED_CAPTURE_DEVICE="$device" TM_ICED_WINDOW_SIZE="$window_size" \
-      TM_ICED_CAPTURE_LOCALE="$locale" \
+      TM_ICED_CAPTURE_LOCALE="$locale" TM_SKIN="$skin" \
       LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
     APP_PID=$!
     APP_PGID=""
@@ -556,6 +611,7 @@ capture_one() {
         read -r width height <<<"$dimensions"
         if [ -n "$width" ] && [ -n "$height" ]; then
           hash="$(sha256sum "$image" | cut -d' ' -f1)"
+          rendered="$(appearance_of "$image")"
         else
           action_status=failed
         fi
@@ -575,11 +631,14 @@ capture_one() {
   fi
   grep 'ICED_CAPTURE_MARKER' "$markers" 2>/dev/null | sed "s/^/$name\t/" \
     >>"$RUN_DIR/iced-capture-markers.log" || true
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$name" "$device" "$window_size" \
     "$name/image.png" "$name/markers.log" "$name/window.json" "$name/action.log" \
     "$APP_PID" "$window_id" "$width" "$height" "$bytes" "$hash" "$action_status" \
-    >>"$MANIFEST"
+    "$rendered" >>"$MANIFEST"
+  control="$(appearance_control_of "$skin" "$rendered")"
+  printf '%s\t%s\t%s\t%s\n' "$name" "$skin" "$rendered" "$control" \
+    >>"$APPEARANCE_RECEIPT"
 
   terminate_owned "$APP_PID" "$APP_PGID"
   APP_PID=""
@@ -589,10 +648,10 @@ capture_one() {
 
 : >"$RUN_DIR/iced-capture-markers.log"
 FAILURES=0
-while IFS=$'\t' read -r name device window_size; do
+while IFS=$'\t' read -r name device window_size skin; do
   [ "$name" = name ] && continue
   [ -n "$name" ] || continue
-  if ! capture_one "$name" "$device" "$window_size"; then
+  if ! capture_one "$name" "$device" "$window_size" "$skin"; then
     FAILURES=$((FAILURES + 1))
   fi
 done <"$MATRIX"
@@ -603,12 +662,47 @@ if [ "$FAILURES" -ne 0 ]; then
   exit 1
 fi
 
+# The validator owns the identity-column contract; the explicit appearance
+# dimension stays in the reader-facing manifest.tsv/appearance.tsv and the
+# projected copies keep the validator's exact field sets.
+cut -f1-3 "$MATRIX" >"$VALIDATOR_MATRIX"
+cut -f1-14 "$MANIFEST" >"$VALIDATOR_MANIFEST"
+APPEARANCE_REQUESTED="$(cut -f2 "$APPEARANCE_RECEIPT" | tail -n +2 | sort -u | paste -sd, -)"
+APPEARANCE_RENDERED="$(cut -f3 "$APPEARANCE_RECEIPT" | tail -n +2 | sort -u | paste -sd, -)"
+# Fold the per-frame verdicts into one measured control value. `honored` only
+# when every measured frame agrees; `ignored` when at least one disagrees (the
+# request was demonstrably not honoured); `unknown` when nothing disagrees but
+# at least one frame is inconclusive. Never stronger than the rows support.
+APPEARANCE_CONTROL="$(awk -F '\t' '
+  NR > 1 {
+    if ($4 == "honored") honored += 1
+    else if ($4 == "ignored") ignored += 1
+    else unknown += 1
+  }
+  END {
+    if (honored + ignored + unknown == 0) print "unknown"
+    else if (ignored > 0) print "ignored"
+    else if (unknown > 0) print "unknown"
+    else print "honored"
+  }
+' "$APPEARANCE_RECEIPT")"
+# The metadata block is written before the scenarios launch (the run identity is
+# fixed up front); append the appearance dimension once the frames exist. Keys
+# are unique, so the validator's duplicate-key rejection still holds.
+{
+  printf 'appearance_requested=%s\n' "$APPEARANCE_REQUESTED"
+  printf 'appearance_rendered=%s\n' "$APPEARANCE_RENDERED"
+  printf 'appearance_control=%s\n' "$APPEARANCE_CONTROL"
+  printf 'appearance_mechanism=iced-demo-config-snapshot-honors-tm-skin\n'
+  printf 'appearance_receipt=%s\n' "${APPEARANCE_RECEIPT#"$REPO/"}"
+} >>"$METADATA"
+
 # Hashing and inspecting the complete 31-image matrix is bounded work, but can
 # exceed thirty seconds on a loaded developer host. Keep the validator finite
 # while giving the full receipt a stable local budget.
 PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 scripts/validate_iced_matrix.py \
-  --matrix "$MATRIX" \
-  --manifest "$MANIFEST" \
+  --matrix "$VALIDATOR_MATRIX" \
+  --manifest "$VALIDATOR_MANIFEST" \
   --run-dir "$RUN_DIR" \
   --metadata "$METADATA" \
   --source-manifest "$SOURCE_MANIFEST" \

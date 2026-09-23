@@ -638,7 +638,11 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   not what a terminal keyboard port drives.
 - TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
   scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
-  marker test proves the frame-marker contract, not a per-scenario matrix.
+  marker test proves the frame-marker contract, not a per-scenario matrix. The
+  appearance dimension still holds a like-for-like pair: the same
+  `TM_TUI_CAPTURE_PAGE=performance` frame is captured with
+  `TM_TUI_CAPTURE_SKIN=gnome-dark` (default) and `gnome-light`, and each run
+  records its measured `appearance_control` verdict.
 - **Iced capture now includes the health modal (W19-B).** Iced capture reaches
   the six shared pages, the eight Performance devices and two renderer-local
   surfaces - `service-details` on Services and the health modal on Performance.

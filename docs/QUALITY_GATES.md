@@ -143,6 +143,7 @@ SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 Niri `screenshot-window` 写出 PNG；验收脚本拒绝 `TM_CAPTURE_NIRI_BACKGROUND=0`，避免调试
 参数意外触碰宿主桌面。需要研究可见 compositor 行为时，必须使用独立的手工调试环境，
 不得把结果写入验收 receipt。
+画面外观是可记录维度：scenario 表新增 `skin` 列（复用 `TM_SKIN` 词表），capture 把请求值传给应用并从 PNG 均值亮度回读 `appearance_rendered`，再按请求模式与回读结果比对得出 `appearance_control`：全部场景一致记 `honored`，任一场景不一致记 `ignored`，其余（含无法量测或不可判定项）记 `unknown`，不伪装成可控；Bevy/Iced/TUI 在 Performance/CPU 页各有 light/dark 成对场景（Bevy `performance`/`performance-dark`、Iced `cpu`/`cpu-light`、TUI 同页切换 `TM_TUI_CAPTURE_SKIN=gnome-light|gnome-dark`），保证同页可比。
 
 每个后台 capture 必须经 `scripts/capture_supervisor.py` 获得随机 Run UUID，并将应用
 binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 与 receipt

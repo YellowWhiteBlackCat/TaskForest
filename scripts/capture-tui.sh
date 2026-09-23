@@ -49,6 +49,7 @@ CAPTURE_SCENE="${TM_TUI_CAPTURE_SCENE:-}"
 CAPTURE_COLUMNS="${TM_TUI_CAPTURE_COLUMNS:-120}"
 CAPTURE_LINES="${TM_TUI_CAPTURE_LINES:-36}"
 CAPTURE_FONT_SIZE="${TM_TUI_CAPTURE_FONT_SIZE:-13}"
+CAPTURE_SKIN="${TM_TUI_CAPTURE_SKIN:-gnome-dark}"
 CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
 if ! [[ "$CAPTURE_COLUMNS" =~ ^[0-9]+$ ]] || [ "$CAPTURE_COLUMNS" -lt 54 ]; then
   printf 'TM_TUI_CAPTURE_COLUMNS must be an integer >= 54\n' >&2
@@ -62,6 +63,24 @@ if ! [[ "$CAPTURE_FONT_SIZE" =~ ^[0-9]+$ ]] || [ "$CAPTURE_FONT_SIZE" -lt 8 ] ||
   printf 'TM_TUI_CAPTURE_FONT_SIZE must be an integer from 8 to 30\n' >&2
   exit 2
 fi
+# The appearance dimension reuses the product's existing `TM_SKIN` token
+# vocabulary (`<skin>-<light|dark>`). The TUI demo boot resolves it through the
+# shared `TM_SKIN` override (dark GNOME default when unset), and the rendered
+# frame is read back to record what was actually painted. The canonical
+# like-for-like pair, matching the Bevy/Iced performance pairs, is the same
+# `TM_TUI_CAPTURE_PAGE=performance` frame captured with
+# `TM_TUI_CAPTURE_SKIN=gnome-dark` (default) and `gnome-light`.
+case "$CAPTURE_SKIN" in
+  gnome-light|gnome-dark|gnome-eyeforest|gnome-eye-forest|\
+  kde-light|kde-dark|kde-eyeforest|kde-eye-forest|\
+  windows-light|windows-dark|windows-eyeforest|windows-eye-forest|\
+  macos-light|macos-dark|macos-eyeforest|macos-eye-forest) ;;
+  *)
+    printf 'unsupported TM_TUI_CAPTURE_SKIN=%s (expected a TM_SKIN token like gnome-dark)\n' \
+      "$CAPTURE_SKIN" >&2
+    exit 2
+    ;;
+esac
 case "$CAPTURE_DEVICE" in
   ""|cpu|memory|disk|network|gpu|battery|fan) ;;
   *)
@@ -123,6 +142,52 @@ for command in cargo file git jq niri ps rustc sha256sum setsid stat timeout; do
     exit 2
   fi
 done
+
+# Read the rendered frame's mean luminance so the receipt records what was
+# actually painted, not only the requested `TM_SKIN` token. `identify` is the
+# same optional ImageMagick tool the GPUI contact sheet already uses; when it
+# is absent the appearance is reported as `unknown` rather than guessed.
+appearance_of() {
+  local image="$1" luminance=""
+  if command -v identify >/dev/null 2>&1; then
+    luminance="$(identify -format \
+      '%[fx:0.2126*mean.r+0.7152*mean.g+0.0722*mean.b]' \
+      "$image" 2>/dev/null || true)"
+  fi
+  case "$luminance" in
+  '') printf 'unknown' ;;
+  *) awk -v value="$luminance" \
+    'BEGIN { print (value + 0 >= 0.5) ? "light" : "dark" }' ;;
+  esac
+}
+
+# The requested mode is the `TM_SKIN` token suffix. A mode the mean-luminance
+# readback cannot distinguish (eye-forest) stays inconclusive rather than being
+# forced into light/dark.
+appearance_mode_of() {
+  case "$1" in
+  *-light) printf 'light' ;;
+  *-dark) printf 'dark' ;;
+  *) printf 'unknown' ;;
+  esac
+}
+
+# The measured verdict for the frame: `honored` when the readback agrees with
+# the requested mode, `ignored` when it disagrees, and `unknown` when either
+# side is inconclusive. This claims only what the pixels support; the old
+# hard-coded `ignored` is gone.
+appearance_control_of() {
+  local requested rendered
+  requested="$(appearance_mode_of "$1")"
+  rendered="$2"
+  if [ "$rendered" = unknown ] || [ "$requested" = unknown ]; then
+    printf 'unknown'
+  elif [ "$requested" = "$rendered" ]; then
+    printf 'honored'
+  else
+    printf 'ignored'
+  fi
+}
 case "$CAPTURE_NIRI_BACKGROUND" in
   1) ;;
   0) printf 'visible TUI capture is disabled; use the private background route\n' >&2; exit 2 ;;
@@ -335,6 +400,7 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   TM_TUI_CAPTURE_DEVICE="$CAPTURE_DEVICE" \
   TM_TUI_CAPTURE_SCENE="$CAPTURE_SCENE" \
   TM_TUI_CAPTURE_SOURCE_FAILURE="${TM_TUI_CAPTURE_SOURCE_FAILURE:-}" \
+  TM_SKIN="$CAPTURE_SKIN" \
   LIBGL_ALWAYS_SOFTWARE=1 \
   setsid alacritty --class "$APP_ID" --title "TaskForest TUI Evidence" \
     -o "window.dimensions.columns=$CAPTURE_COLUMNS" \
@@ -401,6 +467,8 @@ if [ ! -s "$IMAGE" ] || ! file "$IMAGE" | grep -q 'PNG image data' \
   printf 'TUI screenshot missing or too small\n' >&2
   exit 1
 fi
+RENDERED_APPEARANCE="$(appearance_of "$IMAGE")"
+APPEARANCE_CONTROL="$(appearance_control_of "$CAPTURE_SKIN" "$RENDERED_APPEARANCE")"
 
 RUST_VERSION="$(rustc -V)"
 NIRI_VERSION="$(niri --version)"
@@ -445,6 +513,11 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'terminal_lines=%s\n' "$CAPTURE_LINES"
   printf 'terminal_font_size=%s\n' "$CAPTURE_FONT_SIZE"
   printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
+  printf 'appearance_requested=%s\n' "$CAPTURE_SKIN"
+  printf 'appearance_rendered=%s\n' "$RENDERED_APPEARANCE"
+  printf 'appearance_control=%s\n' "$APPEARANCE_CONTROL"
+  printf 'appearance_mechanism=tui-demo-theme-honors-tm-skin-dark-default\n'
+  printf 'appearance_receipt=%s\n' "${IMAGE#"$REPO/"}"
   printf 'command=bash scripts/capture-tui.sh\n'
 } >"$METADATA"
 printf 'image\twidth\theight\tbytes\tsha256\tmarkers\n' >"$MANIFEST"
