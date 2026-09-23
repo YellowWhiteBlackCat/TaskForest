@@ -18,8 +18,8 @@
 //!   first observation.
 //!
 //! Action-menu seam: the enable/disable verbs read the current target
-//! from [`StartupSelection`]; the pointer and key adapters fire
-//! [`StartupSortClicked`], [`StartupRowClicked`] and [`StartupSelectionMoved`].
+//! from `StartupSelection`; the pointer and key adapters fire
+//! `StartupSortClicked`, `StartupRowClicked` and `StartupSelectionMoved`.
 //! Colors are palette roles only — the chip seam note in
 //! [`crate::pages::services`] applies here too.
 

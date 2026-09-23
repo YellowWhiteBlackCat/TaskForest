@@ -3,7 +3,7 @@
 //!
 //! **Composition model** (the page-proxy contract in [`crate::pages`]): the
 //! static tree is the title + status line + the EMPTY body container; the
-//! body's only author is [`paint_system`], bound by the root's on-insert
+//! body's only author is `paint_system`, bound by the root's on-insert
 //! hook (the same single-authority shape the History page uses — a static
 //! body here would race the paint pass into a doubled surface).
 //!

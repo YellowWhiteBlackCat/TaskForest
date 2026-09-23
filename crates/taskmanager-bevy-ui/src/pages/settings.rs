@@ -5,7 +5,7 @@
 //!
 //! **Authorities and their write entries** (all pre-existing, none invented):
 //! - theme light/dark — this frontend's render authority is the
-//!   [`WindowPalette`] resource (+ the camera clear color); a choice
+//!   `WindowPalette` resource (+ the camera clear color); a choice
 //!   re-resolves it from the theme tokens and the remount restyles the page
 //!   through the `TextRole` observer and the nav rail through the route
 //!   observer. Full-chrome text retheming (header/summary ink stamped once
@@ -24,7 +24,7 @@
 //! `RadioButton` for the discrete selects (theme/language/cadence/capacity)
 //! and `Checkbox` for the pause boolean — with `Checked` as the state
 //! marker. The widget package's pointer/focus observers ride the windowed
-//! composition; the page's activation observer ([`settings_choice_observer`])
+//! composition; the page's activation observer (`settings_choice_observer`)
 //! resolves the `ValueChange` activations back to their typed choices and
 //! applies them, which is the same seam headless tests exercise.
 //!

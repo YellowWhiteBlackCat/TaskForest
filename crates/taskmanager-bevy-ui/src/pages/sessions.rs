@@ -17,8 +17,8 @@
 //!   Lock verbs are routed by the action buttons and the action menu).
 //!
 //! Action-menu seam: the disconnect/lock verbs read the current target
-//! from [`SessionSelection`]; the pointer and key adapters fire
-//! [`SessionSortClicked`], [`SessionRowClicked`] and [`SessionSelectionMoved`].
+//! from `SessionSelection`; the pointer and key adapters fire
+//! `SessionSortClicked`, `SessionRowClicked` and `SessionSelectionMoved`.
 //! Colors are palette roles only.
 
 use bevy::color::Color;

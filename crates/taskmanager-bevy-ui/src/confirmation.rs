@@ -15,7 +15,7 @@
 //!
 //! Open/dismiss paths (keyboard y/n/Enter/Escape live in [`crate::input`];
 //! the two buttons here) all converge on the same shell methods, and every
-//! transition republishes [`ConfirmationChanged`] so the overlay mounts and
+//! transition republishes `ConfirmationChanged` so the overlay mounts and
 //! despawns from one authority.
 
 use bevy::ecs::component::Component;

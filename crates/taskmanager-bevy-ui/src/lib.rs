@@ -16,7 +16,7 @@
 //!   type metrics (boundary 2 — the adapter lives in this crate, never behind
 //!   a `theme` feature).
 //! - [`app`]: the frontend-owned route model (nine pages), keyboard routing
-//!   through the shared command router, and the [`app::ShellTrack`] seam
+//!   through the shared command router, and the `app::ShellTrack` seam
 //!   pages read the folded projection through.
 //! - [`input`]: the real-input seam — Bevy keyboard events forwarded
 //!   through the shell's own routers, with the effect bridge to the drain.
@@ -30,7 +30,7 @@
 //!   projection; each page owns its scene and refresh seams.
 //! - [`widgets`]: the owned component layer (table/chart cores + bsn! render
 //!   adapters and the keyboard-first action menu).
-//! - [`window`]: the bsn! app shell (nav strip + status band + content slot)
+//! - `window`: the bsn! app shell (nav strip + status band + content slot)
 //!   and the observers that keep it live.
 //!
 //! Bevy types never cross this crate's public API: [`run_window`]
@@ -38,12 +38,11 @@
 //! stays crate-private.
 
 #![forbid(unsafe_code)]
-// This crate's docs deliberately navigate to its internal seams — the
-// [`app`] route model, the drain events, the page observers — while the
-// public API stays minimal (bevy types and internals never cross it).
-// Every module-level doc that bracket-links one of those private items
-// would otherwise trip rustdoc's private-link lint under `-D warnings`.
-#![allow(rustdoc::private_intra_doc_links)]
+// This crate's docs navigate its internal seams — the route model, the drain
+// events, the page observers — while the public API stays minimal (bevy types
+// and internals never cross it). Internal seams are named as plain code spans
+// rather than intra-doc links, so `RUSTDOCFLAGS="-D warnings" cargo doc` stays
+// clean without a crate-wide lint opt-out.
 
 // A release artifact is a platform variant, never a hardware-vendor variant
 // (ADR-006/051). Developers may use reduced debug builds to exercise fallback

@@ -15,14 +15,14 @@
 //! - `context.palette` (`&UiPalette`) is the only color/type source — never
 //!   a literal, never Feathers.
 //! - `context.body` / `context.heading` are ready type metrics; the font
-//!   handle is stamped by the text-role observers in [`crate::window`], so
+//!   handle is stamped by the text-role observers in `crate::window`, so
 //!   pages spawn `Text` + a role marker and never touch font assets.
 //! - `context.history` is the immutable application-history projection from
 //!   the app-host connector; it is not a second live-process join authority.
 //! - Dynamic refresh: pages register their own observers on
 //!   `crate::drain::ShellProjectionFolded` (fired whenever the drain folded
 //!   platform batches this frame) and re-read the shell through the
-//!   [`crate::app::ShellTrack`] system param.
+//!   `crate::app::ShellTrack` system param.
 //! - Shared widgets live in [`crate::widgets`] (table, chart, menu);
 //!   shared files (app.rs, window.rs, palette.rs, drain.rs) are
 //!   NOT touched by page work — this reservation is the whole point of the

@@ -8,9 +8,9 @@
 //! `packaging/regenerate-ui-icons.sh`, tinted at draw time with the theme ink
 //! a text sibling would inherit.
 //!
-//! The runtime shape mirrors the text contract in [`crate::window`]: scene
+//! The runtime shape mirrors the text contract in `crate::window`: scene
 //! builders stay pure and emit `IconPlate` + `IconInk`; one insert-observer
-//! joins them with the [`IconPlates`] handle store and stamps the bitmap.
+//! joins them with the `IconPlates` handle store and stamps the bitmap.
 //! A semantic id whose bitmap is missing degrades to an invisible node —
 //! an honest absence, never a placeholder glyph.
 

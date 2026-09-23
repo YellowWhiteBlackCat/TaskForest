@@ -1,11 +1,11 @@
 //! The generic frontend-local action-menu modal, shared by every inventory
 //! page that offers control verbs (Services, Startup, Sessions).
 //!
-//! **Architecture**: a page instantiates [`MenuModal<Ctx>`] with its own
-//! frozen-target type ([`ActionMenuContext`]). The engine owns the open
+//! **Architecture**: a page instantiates `MenuModal<Ctx>` with its own
+//! frozen-target type (`ActionMenuContext`). The engine owns the open
 //! session, the clamped keyboard state machine, and the overlay mount/
 //! despawn; the page owns only the menu spec, how a verb freezes into the
-//! shell's shared confirmation gate ([`ActionMenuContext::commit`]), and how
+//! shell's shared confirmation gate (`ActionMenuContext::commit`), and how
 //! a closed menu's open-attempt resolves a page selection into a frozen
 //! target.
 //!
@@ -15,7 +15,7 @@
 //! closed, the page's open-attempt (bare Enter over a selected row) runs
 //! before the shell's free bindings.
 //!
-//! Mount/despawn flows through [`MenuModalChanged`], fired by the caller on
+//! Mount/despawn flows through `MenuModalChanged`, fired by the caller on
 //! session transitions.
 
 use bevy::ecs::component::Component;
