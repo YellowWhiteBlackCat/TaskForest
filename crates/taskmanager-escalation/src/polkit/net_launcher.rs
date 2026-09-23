@@ -350,6 +350,9 @@ mod launcher_internals {
 
 #[cfg(target_os = "linux")]
 use launcher_internals::{HandoffName, PkexecChild, accept_privileged_peer, bind_handoff_listener};
+// `taskmanager_fd_bridge` is a Linux-only dependency (fd passing over a Unix
+// socket), and `recv_fd` is called only from the Linux-gated launcher above.
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::recv_fd;
 
 /// Drive one net-launcher invocation through `process` and map the raw result to

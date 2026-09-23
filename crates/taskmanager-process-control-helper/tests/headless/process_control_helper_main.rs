@@ -1,5 +1,9 @@
 use super::*;
+// Linux-only dependency (declared under the target gate in Cargo.toml); the
+// pidfd assertions below ride that gate.
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::is_pidfd_unsupported;
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::pidfd_open;
 
 #[test]

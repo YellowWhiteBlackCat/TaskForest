@@ -41,8 +41,13 @@ use serde::Serialize;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+// Consumed only by the Linux-gated pidfd path below (the dependency itself is
+// declared under `[target.'cfg(target_os = "linux")'.dependencies]`).
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::is_pidfd_unsupported;
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::pidfd_open;
+#[cfg(target_os = "linux")]
 use taskmanager_fd_bridge::pidfd_send_signal;
 #[cfg(windows)]
 use taskmanager_windows_api::ProcessPriorityClass;

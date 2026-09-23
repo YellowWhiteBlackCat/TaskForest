@@ -10,6 +10,9 @@
 //! hover/focus repaint.
 
 use std::cmp::Ordering;
+// Linux-only dependency: the bridge exists only on Linux, and the type alias
+// below is the only consumer.
+#[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;

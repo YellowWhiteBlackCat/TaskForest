@@ -4,12 +4,15 @@
 use super::suggest::{shape_suggestion, suggest_thresholds_json};
 use super::*;
 use std::path::PathBuf;
+// Both are consumed only by the Linux-gated live export test below.
+#[cfg(target_os = "linux")]
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::alerts::{
     AlertMetric, SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
 use taskmanager_core::core::export::snapshot_to_json;
 use taskmanager_core::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+#[cfg(target_os = "linux")]
 use taskmanager_platform_native::NativePlatformRuntime;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 

@@ -1,7 +1,10 @@
 use super::{apply_accessibility_action, build_snapshot};
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
+// Linux-only dependency: these snapshots exist only on Linux.
+#[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::snapshot_to_tree_update;
+#[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::stable_node_id;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;

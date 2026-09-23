@@ -1,6 +1,9 @@
 //! Host smoke tests for hardware-data correctness (cache totals, etc.). These read
 //! live /sys + DMI, so they assert aggregate sanity rather than exact host values.
 
+// Linux-only provider: `detect_cpu_cache` is a real /sys reader on Linux and a
+// None stub elsewhere, so the import rides the Linux gate with its consumer.
+#[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{detect_cpu_cache, parse_size_to_kb};
 // Reads live /sys + detect_cpu_cache (a Linux-only provider that returns a
 // None stub on macOS/Windows) — compile/run on Linux only, else the stub makes

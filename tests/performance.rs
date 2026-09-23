@@ -42,6 +42,7 @@ use taskmanager_core::core::HostRuntimeFacts;
 #[cfg(target_os = "linux")]
 use taskmanager_core::core::HostRuntimeObservation;
 use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+#[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{parse_proc_io, parse_proc_stat, parse_proc_status_memory};
 use taskmanager_shell::matches_process_query;
 #[cfg(target_os = "linux")]

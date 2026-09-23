@@ -9,6 +9,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+// Linux-only dependency: the bridge exists only on Linux, and the type alias
+// below is the only consumer.
+#[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
 use taskmanager_application::AlertSuggestionWindow;
 use taskmanager_core::core::config::MOTION_NORMAL;

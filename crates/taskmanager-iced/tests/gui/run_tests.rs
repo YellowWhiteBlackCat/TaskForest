@@ -1,4 +1,6 @@
 use super::*;
+// The desktop application id is asserted only under the Linux gate below.
+#[cfg(target_os = "linux")]
 use taskmanager_assets::product::ICED_APP_ID;
 use taskmanager_assets::product::ICED_NAME;
 
