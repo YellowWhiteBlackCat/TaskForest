@@ -191,7 +191,7 @@ interaction	mc03-tui-app-aggregate	tui	P0-MC-03	lib	process_view::tests::applica
 interaction	mc03-tui-search-focus	tui	P0-MC-03	lib	runtime::tests::search_match::enter_with_an_active_search_jumps_to_the_next_matching_row	success|keyboard|focus	-	success	
 interaction	mc03-tui-search-clear	tui	P0-MC-03	lib	runtime::tests::search_match::esc_clears_the_query_first_then_closes_the_field	cancel|keyboard	-	cancel	
 interaction	mc03-tui-swap-truth	tui	P0-MC-03	lib	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	success|failure	-	success	
-interaction	mc03-tui-column-drag	tui	P0-MC-03	lib	pending	pointer|toggle	-	pointer	
+interaction	mc03-tui-column-reorder	tui	P0-MC-03	lib	runtime::tests::column_menu::moving_the_selected_column_left_reorders_the_painted_table	success|keyboard	-	success	
 interaction	mc04-tui-gpu-detail	tui	P0-MC-04	lib	ui::tests::device_render::gpu_detail_section_renders_utilization_vram_clocks_and_engines	success|failure	-	success	
 interaction	mc04-tui-gpu-metric-cycle	tui	P0-MC-04	lib	runtime::tests::keys_gpu::gpu_page_g_cycles_the_shared_chart_metric_selection	success|toggle	-	success	
 interaction	mc04-tui-gpu-metric-generation	tui	P0-MC-04	lib	runtime::tests::keys_gpu::gpu_chart_metric_selection_resets_when_the_generation_advances	lifecycle	-	lifecycle	
@@ -204,7 +204,7 @@ interaction	mc05-tui-settings-persist	tui	P0-MC-05	lib	runtime::tests::settings_
 interaction	mc05-tui-settings-cancel	tui	P0-MC-05	lib	runtime::tests::settings_export::settings_esc_cancels_without_applying_changes	cancel	-	cancel	
 interaction	mc05-tui-visibility-filter	tui	P0-MC-05	lib	runtime::tests::settings_export::device_visibility_preferences_filter_the_digit_selector	success|toggle	-	success	
 interaction	mc05-tui-density	tui	P0-MC-05	lib	ui::tests::visibility::every_page_paints_visible_body_rows_at_reference_and_minimum_sizes	success|responsive	-	success	
-interaction	mc05-tui-chart-hover	tui	P0-MC-05	lib	pending	pointer	-	pointer	
+interaction	mc05-tui-chart-cursor	tui	P0-MC-05	lib	runtime::tests::chart_cursor::arrows_move_the_chart_cursor_and_paint_the_hover_readout	success|keyboard	-	success	
 interaction	mc06-tui-ctrl-pause	tui	P0-MC-06	lib	runtime::tests::keys_navigation::control_hold_pauses_telemetry_through_the_shared_policy	success|keyboard|lifecycle	-	success	
 interaction	mc06-tui-about	tui	P0-MC-06	lib	ui::about::tests::about_overlay_renders_hardware_facts_and_version	success|cancel	-	success	
 interaction	mc06-tui-modal-cancel	tui	P0-MC-06	lib	runtime::tests::control_feedback::esc_key_dismisses_open_modal_before_feedback_notice	cancel|failure	-	cancel	

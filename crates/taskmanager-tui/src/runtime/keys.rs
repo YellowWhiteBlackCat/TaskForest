@@ -26,6 +26,7 @@ use taskmanager_shell::{
 };
 
 use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectAction, TuiDirectArm, TuiDirectScope};
+use crate::ui::chart_cursor::chart_cursor_system;
 use crate::{FocusPanel, PerfDevice, TuiApp, TuiInputScope};
 
 use super::{HELP_PAGE_STEP, inline_network_escalation_ready, key_to_terminal, modals, navigation};
@@ -34,7 +35,7 @@ type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 12] = [
+const KEY_SYSTEMS: [KeySystem; 13] = [
     open_modal_system,
     owned_input_system,
     character_system,
@@ -43,6 +44,7 @@ const KEY_SYSTEMS: [KeySystem; 12] = [
     detail_scroll_system,
     cpu_detail_scroll_system,
     performance_scroll_system,
+    chart_cursor_system,
     table_navigation_system,
     nonflat_navigation_system,
     feedback_notice_dismiss_system,

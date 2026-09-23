@@ -7,6 +7,7 @@ mod alerts;
 mod app_history;
 pub(crate) mod batch_menu;
 mod boot_timeline;
+pub(crate) mod chart_cursor;
 mod column_menu;
 mod confirmations;
 mod containers;

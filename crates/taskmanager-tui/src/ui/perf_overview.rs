@@ -481,7 +481,16 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
     // x domain spans the sample count, clamped to two so a short window cannot
     // collapse it to zero width.
     let x_max = data.len().max(2) as f64;
-    let datasets = vec![
+    // The keyboard chart cursor (the terminal port of a pointer hover): a
+    // selected sample index painted as one marker point plus the per-sample
+    // readout below. A stale index (a shrunken window) or a gap sample paints
+    // no marker; the readout keeps the shared dash for a gap.
+    let cursor_index = app.chart_cursor.filter(|index| *index < samples.len());
+    let cursor_marker: Vec<(f64, f64)> = cursor_index
+        .filter(|index| samples[*index].is_finite())
+        .map(|index| vec![(index as f64, f64::from(samples[index]))])
+        .unwrap_or_default();
+    let mut datasets = vec![
         Dataset::default()
             .name(Span::styled(t("common.cpu"), Style::new().fg(theme.accent)))
             .data(&data)
@@ -489,6 +498,15 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
             .graph_type(GraphType::Line)
             .style(Style::new().fg(theme.accent)),
     ];
+    if !cursor_marker.is_empty() {
+        datasets.push(
+            Dataset::default()
+                .data(&cursor_marker)
+                .marker(Marker::Block)
+                .graph_type(GraphType::Scatter)
+                .style(Style::new().fg(theme.danger)),
+        );
+    }
     let x_axis = Axis::default()
         .bounds([0.0, x_max])
         .labels([Line::from(t("perf.older")), Line::raw(t("perf.now"))]);
@@ -497,13 +515,18 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
         Line::raw("50%"),
         Line::raw("100%"),
     ]);
-    let summary = summary_line(t("common.cpu"), &samples, |value| format!("{value:.0}%"));
+    // An active cursor shows its per-sample readout in the block footer; with
+    // no cursor the footer keeps the shared latest/avg/peak summary.
+    let footer = cursor_index
+        .and_then(|index| {
+            super::chart_cursor::readout_line(t("common.cpu"), &samples, index, |value| {
+                format!("{value:.0}%")
+            })
+        })
+        .or_else(|| summary_line(t("common.cpu"), &samples, |value| format!("{value:.0}%")));
     let mut block = panel(title, theme);
-    if let Some(summary) = summary {
-        block = block.title_bottom(Line::from(Span::styled(
-            summary,
-            Style::new().fg(theme.dim),
-        )));
+    if let Some(footer) = footer {
+        block = block.title_bottom(Line::from(Span::styled(footer, Style::new().fg(theme.dim))));
     }
     frame.render_widget(
         Chart::new(datasets)

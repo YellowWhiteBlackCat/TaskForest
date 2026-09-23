@@ -84,6 +84,7 @@ impl TuiApp {
         self.cpu_core_scroll = 0;
         self.cpu_detail_scroll = 0;
         self.gpu_engine_scroll = 0;
+        self.chart_cursor = None;
     }
 
     /// Move the CPU per-core viewport by logical grid rows. Paint clamps this
