@@ -26,6 +26,7 @@ use crate::i18n::{self, Key, Language};
 use super::components::IcedElement;
 use super::components::{segmented, select, slider, switch};
 use super::overlays::modal_overlay;
+use taskmanager_application::i18n::t;
 
 mod controls;
 mod shortcuts;
@@ -77,7 +78,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     modal_overlay(
         theme_snapshot,
         i18n::t(language, Key::Settings),
-        taskmanager_application::i18n::t("settings.persist_hint"),
+        t("settings.persist_hint"),
         scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
             .height(Length::Fixed(SETTINGS_SCROLL_HEIGHT))
             .width(Length::Fill)
@@ -93,7 +94,7 @@ fn group<'a>(
     rows: Vec<IcedElement<'a>>,
 ) -> IcedElement<'a> {
     column(vec![
-        group_header(theme_snapshot, taskmanager_application::i18n::t(key)),
+        group_header(theme_snapshot, t(key)),
         column(rows).spacing(f32::from(tokens::SPACE_2)).into(),
     ])
     .spacing(f32::from(tokens::SPACE_6))
@@ -113,7 +114,7 @@ fn general_group<'a>(
         "settings.group_general",
         vec![
             setting_row(
-                taskmanager_application::i18n::t("settings.language"),
+                t("settings.language"),
                 boxed(
                     220.0,
                     select(
@@ -129,7 +130,7 @@ fn general_group<'a>(
                 ),
             ),
             setting_row(
-                taskmanager_application::i18n::t("settings.startup_page"),
+                t("settings.startup_page"),
                 boxed(
                     260.0,
                     select(
@@ -137,17 +138,14 @@ fn general_group<'a>(
                         target("startup-page"),
                         startup_choices,
                         startup_selected(startup_choices, &prefs.startup_page),
-                        taskmanager_application::i18n::t("settings.startup_page"),
+                        t("settings.startup_page"),
                         |choice: &StartupChoice| {
                             Message::SettingsChanged(SettingsChange::StartupPage(choice.token))
                         },
                     ),
                 ),
             ),
-            section_caption(
-                theme_snapshot,
-                taskmanager_application::i18n::t("settings.keyboard"),
-            ),
+            section_caption(theme_snapshot, t("settings.keyboard")),
             shortcut_section(theme_snapshot),
         ],
     )
@@ -166,7 +164,7 @@ fn appearance_group<'a>(
         "settings.group_appearance",
         vec![
             setting_row(
-                taskmanager_application::i18n::t("settings.ui_size"),
+                t("settings.ui_size"),
                 segmented(
                     theme_snapshot,
                     target("ui-size"),
@@ -214,7 +212,7 @@ fn appearance_group<'a>(
                 }),
             ),
             setting_row(
-                taskmanager_application::i18n::t("settings.motion"),
+                t("settings.motion"),
                 segmented(
                     theme_snapshot,
                     target("motion"),
@@ -245,7 +243,7 @@ fn fonts_group<'a>(
         "settings.group_fonts",
         vec![
             setting_row(
-                taskmanager_application::i18n::t("settings.ui_font"),
+                t("settings.ui_font"),
                 segmented(
                     theme_snapshot,
                     target("ui-font"),
@@ -276,7 +274,7 @@ fn fonts_group<'a>(
                 ),
             ),
             setting_row(
-                taskmanager_application::i18n::t("settings.mono_font"),
+                t("settings.mono_font"),
                 segmented(
                     theme_snapshot,
                     target("mono-font"),
@@ -307,17 +305,14 @@ fn fonts_group<'a>(
                 ),
             ),
             setting_row(
-                taskmanager_application::i18n::t("settings.text_rendering"),
-                static_value(
-                    theme_snapshot,
-                    taskmanager_application::i18n::t("settings.text_default"),
-                ),
+                t("settings.text_rendering"),
+                static_value(theme_snapshot, t("settings.text_default")),
             ),
             hint_line(
                 theme_snapshot,
                 // Frontend-neutral wording: the GPUI-specific key belongs to the
                 // GPUI settings page; Iced has no text-raster variant at all.
-                taskmanager_application::i18n::t("settings.text_rendering_unavailable_generic"),
+                t("settings.text_rendering_unavailable_generic"),
             ),
         ],
     )
@@ -395,13 +390,10 @@ fn system_group<'a>(
     prefs: &PresentationPreferences,
 ) -> IcedElement<'a> {
     let mut rows: Vec<IcedElement<'a>> = Vec::new();
-    rows.push(section_caption(
-        theme_snapshot,
-        taskmanager_application::i18n::t("settings.devices"),
-    ));
+    rows.push(section_caption(theme_snapshot, t("settings.devices")));
     for kind in DeviceKind::ALL {
         rows.push(setting_row(
-            taskmanager_application::i18n::t(device_label_key(kind)),
+            t(device_label_key(kind)),
             switch(
                 theme_snapshot,
                 target(kind.key()),
@@ -412,7 +404,7 @@ fn system_group<'a>(
         ));
     }
     rows.push(setting_row(
-        taskmanager_application::i18n::t("settings.refresh_interval"),
+        t("settings.refresh_interval"),
         slider(
             theme_snapshot,
             target("refresh"),
@@ -429,10 +421,10 @@ fn system_group<'a>(
     ));
     rows.push(section_caption(
         theme_snapshot,
-        taskmanager_application::i18n::t("settings.graph_settings"),
+        t("settings.graph_settings"),
     ));
     rows.push(setting_row(
-        taskmanager_application::i18n::t("settings.graph_data_points"),
+        t("settings.graph_data_points"),
         slider(
             theme_snapshot,
             target("data-points"),
@@ -448,7 +440,7 @@ fn system_group<'a>(
         ),
     ));
     rows.push(setting_row(
-        taskmanager_application::i18n::t("settings.network_dynamic_scaling"),
+        t("settings.network_dynamic_scaling"),
         switch(
             theme_snapshot,
             target("net-scaling"),
@@ -458,7 +450,7 @@ fn system_group<'a>(
         ),
     ));
     rows.push(setting_row(
-        taskmanager_application::i18n::t("settings.zero_values"),
+        t("settings.zero_values"),
         switch(
             theme_snapshot,
             target("zero-values"),
@@ -469,10 +461,10 @@ fn system_group<'a>(
     ));
     rows.push(hint_line(
         theme_snapshot,
-        taskmanager_application::i18n::t("settings.gray_zero_values_hint"),
+        t("settings.gray_zero_values_hint"),
     ));
     rows.push(setting_row(
-        taskmanager_application::i18n::t("settings.history_persistence"),
+        t("settings.history_persistence"),
         switch(
             theme_snapshot,
             target("continuous-history"),
@@ -483,7 +475,7 @@ fn system_group<'a>(
     ));
     rows.push(hint_line(
         theme_snapshot,
-        taskmanager_application::i18n::t("settings.history_persistence_detail"),
+        t("settings.history_persistence_detail"),
     ));
     group(theme_snapshot, "settings.group_system", rows)
 }
@@ -499,7 +491,7 @@ fn notifications_group<'a>(
         "settings.group_notifications",
         vec![
             setting_row(
-                taskmanager_application::i18n::t("settings.desktop_notifications"),
+                t("settings.desktop_notifications"),
                 switch(
                     theme_snapshot,
                     target("desktop-notifications"),
@@ -508,12 +500,9 @@ fn notifications_group<'a>(
                     |on| Message::SettingsChanged(SettingsChange::DesktopNotifications(on)),
                 ),
             ),
-            hint_line(
-                theme_snapshot,
-                taskmanager_application::i18n::t("settings.desktop_notifications_hint"),
-            ),
+            hint_line(theme_snapshot, t("settings.desktop_notifications_hint")),
             setting_row(
-                taskmanager_application::i18n::t("settings.quiet_hours_start"),
+                t("settings.quiet_hours_start"),
                 boxed(
                     200.0,
                     select(
@@ -521,7 +510,7 @@ fn notifications_group<'a>(
                         target("quiet-hours-start"),
                         hours,
                         hours.get(usize::from(prefs.quiet_start)),
-                        taskmanager_application::i18n::t("settings.quiet_hours_start"),
+                        t("settings.quiet_hours_start"),
                         |hour: &QuietHour| {
                             Message::SettingsChanged(SettingsChange::QuietHoursStart(hour.0))
                         },
@@ -529,7 +518,7 @@ fn notifications_group<'a>(
                 ),
             ),
             setting_row(
-                taskmanager_application::i18n::t("settings.quiet_hours_end"),
+                t("settings.quiet_hours_end"),
                 boxed(
                     200.0,
                     select(
@@ -537,7 +526,7 @@ fn notifications_group<'a>(
                         target("quiet-hours-end"),
                         hours,
                         hours.get(usize::from(prefs.quiet_end)),
-                        taskmanager_application::i18n::t("settings.quiet_hours_end"),
+                        t("settings.quiet_hours_end"),
                         |hour: &QuietHour| {
                             Message::SettingsChanged(SettingsChange::QuietHoursEnd(hour.0))
                         },
@@ -612,12 +601,9 @@ fn units_group<'a>(
         base2_change,
     ) in surfaces
     {
-        rows.push(section_caption(
-            theme_snapshot,
-            taskmanager_application::i18n::t(unit_key),
-        ));
+        rows.push(section_caption(theme_snapshot, t(unit_key)));
         rows.push(setting_row(
-            taskmanager_application::i18n::t(unit_key),
+            t(unit_key),
             segmented(
                 theme_snapshot,
                 target(unit_section),
@@ -627,7 +613,7 @@ fn units_group<'a>(
             ),
         ));
         rows.push(setting_row(
-            taskmanager_application::i18n::t(base_key),
+            t(base_key),
             segmented(
                 theme_snapshot,
                 target(base_section),

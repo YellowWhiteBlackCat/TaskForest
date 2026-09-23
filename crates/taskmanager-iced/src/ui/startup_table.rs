@@ -30,6 +30,8 @@ use super::{
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
+use taskmanager_application::StartupControlRequest;
+use taskmanager_theme::Theme;
 
 mod timeline;
 pub(super) use timeline::*;
@@ -286,8 +288,8 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
 /// carrying the target entry name, plus Confirm / Cancel. Mirrors GPUI's
 /// `request_startup_control_confirmation` dialog and the F12 Kill confirm bar.
 fn startup_confirm_bar<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    request: &taskmanager_application::StartupControlRequest,
+    theme_snapshot: &'a Theme,
+    request: &StartupControlRequest,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let confirm = focus::button(
         theme_snapshot,
@@ -326,7 +328,7 @@ fn startup_confirm_bar<'a>(
 /// toggle submits through the shell's shared startup-control request
 /// (latest-wins). Mirrors the Users session action bar.
 fn startup_action_bar<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     shell: &ShellApp,
     rows: &[StartupRow],
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -569,7 +571,7 @@ fn boot_evidence_strip_data(
 /// The non-interactive boot-evidence pill strip above the waterfall; `None`
 /// when silent. Failed units wear the danger color only when populated.
 fn boot_evidence_strip<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let data = boot_evidence_strip_data(evidence)?;

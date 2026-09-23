@@ -23,7 +23,7 @@ use std::ops::RangeInclusive;
 
 use iced::widget::{Space, button, container, row, text};
 use iced::{Background, Border, Color, Length, Vector};
-use taskmanager_theme::color::mix;
+use taskmanager_theme::color::{self, mix};
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 
@@ -113,7 +113,7 @@ fn switch_track_fill(theme_snapshot: &Theme, on: bool, status: button::Status) -
         }
         button::Status::Hovered => crate::theme_binding::color(mix(base, palette.hover, 0.28)),
         button::Status::Pressed => {
-            crate::theme_binding::color(mix(base, taskmanager_theme::Color::BLACK, 0.22))
+            crate::theme_binding::color(mix(base, color::Color::BLACK, 0.22))
         }
         _ => crate::theme_binding::color(base),
     }

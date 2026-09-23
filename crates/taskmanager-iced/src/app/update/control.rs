@@ -6,6 +6,9 @@ use taskmanager_shell::ShellApp;
 
 use super::super::{ContextMenuKind, IcedApp, Message};
 use super::dispatch::UpdateDispatch;
+use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 impl IcedApp {
     /// Handle a typed control message, returning any emitted platform effect.
@@ -66,14 +69,10 @@ impl IcedApp {
                     .as_ref()
                     .and_then(|snapshot| snapshot.disks.get(index))
                 {
-                    let intent = taskmanager_core::core::system_health::SmartSelfTestIntent {
-                        device_id: taskmanager_core::core::identity::DeviceId::new(
-                            disk.device_id.clone(),
-                        ),
+                    let intent = SmartSelfTestIntent {
+                        device_id: DeviceId::new(disk.device_id.clone()),
                         device_generation: disk.device_generation,
-                        device_key: taskmanager_core::core::StorageDeviceKey::new(
-                            disk.name.clone(),
-                        ),
+                        device_key: StorageDeviceKey::new(disk.name.clone()),
                         display_name: if disk.model.is_empty() {
                             disk.name.clone()
                         } else {

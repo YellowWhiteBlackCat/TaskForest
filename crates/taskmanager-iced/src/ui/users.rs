@@ -31,6 +31,9 @@ use super::{
     VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
     virtual_table_key, virtual_table_row,
 };
+use taskmanager_application::AppPage;
+use taskmanager_shell::InfoSortCol;
+use taskmanager_shell::InfoTable;
 
 /// Typed column specs for the Users table — the same vocabulary as the
 /// process-column contract (id/label/width/alignment), page-owned because
@@ -52,19 +55,11 @@ pub(super) fn users_columns() -> UsersColumns {
     UsersColumns {
         session: TableColumn::text(
             "Session",
-            taskmanager_shell::InfoSortCol::Session.label(),
+            InfoSortCol::Session.label(),
             ColumnWidth::Fixed(120.0),
         ),
-        name: TableColumn::text(
-            "Name",
-            taskmanager_shell::InfoSortCol::Name.label(),
-            ColumnWidth::Fixed(170.0),
-        ),
-        seat: TableColumn::text(
-            "Seat",
-            taskmanager_shell::InfoSortCol::Seat.label(),
-            ColumnWidth::Fixed(100.0),
-        ),
+        name: TableColumn::text("Name", InfoSortCol::Name.label(), ColumnWidth::Fixed(170.0)),
+        seat: TableColumn::text("Seat", InfoSortCol::Seat.label(), ColumnWidth::Fixed(100.0)),
         tty: TableColumn::text("Tty", "users.tty", ColumnWidth::Fixed(100.0)),
         remote: TableColumn::text("Remote", "users.remote", ColumnWidth::Fixed(90.0)),
         logon: TableColumn::text("Logon", "users.logon", ColumnWidth::Fill),
@@ -98,22 +93,22 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                 row![
                     info_header_cell(
                         theme_snapshot,
-                        taskmanager_shell::InfoTable::Users,
-                        taskmanager_shell::InfoSortCol::Session,
+                        InfoTable::Users,
+                        InfoSortCol::Session,
                         shell.sessions_sort,
                         columns.session.length(),
                     ),
                     info_header_cell(
                         theme_snapshot,
-                        taskmanager_shell::InfoTable::Users,
-                        taskmanager_shell::InfoSortCol::Name,
+                        InfoTable::Users,
+                        InfoSortCol::Name,
                         shell.sessions_sort,
                         columns.name.length(),
                     ),
                     info_header_cell(
                         theme_snapshot,
-                        taskmanager_shell::InfoTable::Users,
-                        taskmanager_shell::InfoSortCol::Seat,
+                        InfoTable::Users,
+                        InfoSortCol::Seat,
                         shell.sessions_sort,
                         columns.seat.length(),
                     ),
@@ -147,7 +142,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
                 generation: projection_generation,
-                table: taskmanager_shell::InfoTable::Users,
+                table: InfoTable::Users,
                 sort: shell.sessions_sort,
                 query: "",
                 search_active: false,
@@ -202,7 +197,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                             .width(Length::Fill);
                             let row = focus::selectable_row_with_menu(
                                 &table_theme,
-                                taskmanager_application::AppPage::Users,
+                                AppPage::Users,
                                 index,
                                 container(row)
                                     .style(move |_| {

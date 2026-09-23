@@ -5,6 +5,7 @@ use taskmanager_core::core::alerts::{
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
 fn empty_window_is_typed_insufficient() {
@@ -55,10 +56,10 @@ fn smart_temperature_is_retained_only_as_suggestion_evidence() {
     let mut window = AlertSuggestionWindow::new();
     window.record_snapshot(&SystemSnapshot {
         disks: vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .smart_temperature_c(Some(40.0))
                 .build(),
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .smart_temperature_c(Some(45.0))
                 .build(),
         ],

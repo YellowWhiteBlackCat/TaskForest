@@ -1,14 +1,19 @@
 use super::*;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::directory_usage::{DirectoryScanId, DirectoryScanTotals};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 /// A disk whose partition children carry `mount_points`, in order. The
 /// partition type is not re-exported to frontends, so the children are
 /// built through `Default` with the element type inferred from the
 /// field itself.
 fn disk_with_mounts(mount_points: &[&str]) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .partitions({
             let mut children = DiskMetrics::default().partitions;
             children.resize(mount_points.len(), Default::default());
@@ -81,7 +86,7 @@ fn disk_without_reported_mounts_falls_back_to_the_root_path() {
 /// matches snapshots rooted at or below it.
 #[test]
 fn a_disk_level_mount_without_partition_children_owns_its_tree() {
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .mount_point("/".into())
         .build();
     assert!(disk.partitions.is_empty());
@@ -162,7 +167,7 @@ fn snapshot_targeting_matches_own_partition_and_drilldown_paths_only() {
 /// state — and the panel seams never fabricate values.
 #[test]
 fn every_typed_scan_status_renders_its_own_label() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     assert_eq!(
         status_text(DirectoryScanStatus::Scanning),
         "Scanning…",
@@ -181,7 +186,7 @@ fn every_typed_scan_status_renders_its_own_label() {
 
 #[test]
 fn unreadable_entries_render_the_danger_label_not_a_fabricated_zero() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let unreadable = entry("secret", 1, None, true);
     assert!(entry_is_unreadable(&unreadable));
     assert_eq!(entry_size_text(&unreadable), "unreadable");
@@ -201,7 +206,7 @@ fn unreadable_entries_render_the_danger_label_not_a_fabricated_zero() {
 
 #[test]
 fn totals_line_carries_each_failure_dimension_as_its_own_fact() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut snap = snapshot("/", DirectoryScanStatus::Completed);
     snap.totals.files_counted = 12;
     snap.totals.directories_visited = 3;
@@ -254,9 +259,9 @@ fn panel_renders_each_typed_state_from_a_fixture_shell() {
             entry("big", 1, Some(400), false),
             entry("secret", 1, None, true),
         ];
-        taskmanager_shell::fixture::seed_projection_fact(
+        seed_projection_fact(
             &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(Some(snap)),
+            ProjectionSeedFact::DirectoryUsage(Some(snap)),
         );
         {
             let _panel = usage_panel(&app, &disk);

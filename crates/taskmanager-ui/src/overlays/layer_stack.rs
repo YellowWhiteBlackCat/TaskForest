@@ -25,6 +25,7 @@ use taskmanager_theme::Palette;
 use crate::focus::{ModalEscTarget, begin_modal, esc_chain_target, restore_modal};
 use crate::styled::scrim;
 use crate::{BackfillBuilder, Callback};
+use taskmanager_theme::Color;
 
 /// Typed layer identifier. Mints from a counter with wrap-around guard.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -61,7 +62,7 @@ impl PaletteScrim {
     }
 
     /// Resolve the scrim color.
-    pub fn color(&self) -> taskmanager_theme::Color {
+    pub fn color(&self) -> Color {
         scrim(&self.palette, self.alpha)
     }
 }

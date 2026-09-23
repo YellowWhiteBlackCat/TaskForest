@@ -31,6 +31,7 @@ use crate::focus;
 use crate::theme;
 
 use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_theme::Theme;
 
 /// Maximum entry rows rendered before collapsing into a "+N more" line. The
 /// snapshot itself is already bounded (`max_reported`); this is the panel's
@@ -345,7 +346,7 @@ pub(super) fn usage_panel<'a>(
 
 /// Wrap the panel body in the shared panel chrome.
 fn panel_container<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     body: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     container(column(body).spacing(6).width(Length::Fill))

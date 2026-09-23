@@ -1,14 +1,18 @@
 use super::*;
+use taskmanager_application::i18n::Language::En;
+use taskmanager_application::i18n::set_language;
+use taskmanager_core::core::metrics::CpuFrequencySource;
 use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(En);
     let shell = demo_app();
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
     let mut bogomips_only = snapshot.clone();
-    bogomips_only.cpu.frequency_source =
-        taskmanager_core::core::metrics::CpuFrequencySource::BogoMips;
+    bogomips_only.cpu.frequency_source = CpuFrequencySource::BogoMips;
 
     let rows = health_rows(&bogomips_only, Language::En);
     // A BogoMIPS-only host must read the BogoMIPS readout, never "MHz".
@@ -27,7 +31,7 @@ fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
 
 #[test]
 fn health_rows_cover_every_domain_with_fixture_values() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(En);
     let shell = demo_app();
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
     let rows = health_rows(snapshot, Language::En);
@@ -65,10 +69,7 @@ fn health_modal_renders_with_and_without_telemetry() {
     drop(_view);
 
     let mut app = crate::IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     let _view = render(&app);
 }
 
@@ -164,39 +165,61 @@ fn health_modal_chrome_resolves_in_both_locales() {
     }
 }
 
-/// Every shared product term the iced summary now renders points at the
-/// existing catalog key and resolves to the same string the shared catalog
-/// resolves (so the two dictionaries cannot drift), in both locales.
+/// One expectation per shared product term the iced summary renders: the iced
+/// key, the shared catalog code it mirrors, and the string both dictionaries
+/// must resolve in each locale. `health_dictionary_resolves_the_shared_terms`
+/// checks the iced side and `health_shared_catalog_carries_the_same_terms`
+/// checks the shared side against the same table, so either dictionary
+/// drifting fails one of the two.
+const HEALTH_SHARED_TERMS: [(Key, &str, &str, &str); 10] = [
+    (Key::Cpu, "common.cpu", "CPU", "CPU"),
+    (Key::Memory, "common.memory", "Memory", "内存"),
+    (Key::Swap, "mem.swap", "Swap", "交换空间"),
+    (Key::Disk, "common.disk", "Disk", "磁盘"),
+    (Key::Network, "common.network", "Network", "网络"),
+    (Key::Gpu, "common.gpu", "GPU", "GPU"),
+    (Key::SystemDomain, "system.title", "System", "系统"),
+    (Key::HealthScore, "system.health_score", "Health", "健康度"),
+    (
+        Key::HealthUnavailable,
+        "health.unavailable",
+        "Unavailable",
+        "不可用",
+    ),
+    (Key::HealthVerdictOk, "health.verdict_ok", "ok", "正常"),
+];
+
+/// The iced side of [`HEALTH_SHARED_TERMS`]: every shared product term this
+/// frontend renders names the catalog key it mirrors and resolves to the term
+/// both dictionaries agree on.
 #[test]
-fn health_shared_terms_match_the_shared_catalog_in_both_locales() {
-    let prior = taskmanager_application::i18n::current_language();
-    for (key, code) in [
-        (Key::Cpu, "common.cpu"),
-        (Key::Memory, "common.memory"),
-        (Key::Swap, "mem.swap"),
-        (Key::Disk, "common.disk"),
-        (Key::Network, "common.network"),
-        (Key::Gpu, "common.gpu"),
-        (Key::SystemDomain, "system.title"),
-        (Key::HealthScore, "system.health_score"),
-        (Key::HealthUnavailable, "health.unavailable"),
-        (Key::HealthVerdictOk, "health.verdict_ok"),
-    ] {
+fn health_dictionary_resolves_the_shared_terms() {
+    for (key, code, en, zh) in HEALTH_SHARED_TERMS {
         assert_eq!(key.code(), code, "{key:?} must name the shared catalog key");
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
-        assert_eq!(
-            i18n::t(Language::En, key),
-            taskmanager_application::i18n::t(code),
-            "{key:?} en"
-        );
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
-        assert_eq!(
-            i18n::t(Language::Zh, key),
-            taskmanager_application::i18n::t(code),
-            "{key:?} zh"
-        );
+        assert_eq!(i18n::t(Language::En, key), en, "{key:?} en");
+        assert_eq!(i18n::t(Language::Zh, key), zh, "{key:?} zh");
     }
-    taskmanager_application::i18n::set_language(prior);
+}
+
+/// The shared-catalog side of [`HEALTH_SHARED_TERMS`]. The explicit imports
+/// shadow this test tree's glob-imported iced `Language`/`t` for the body of
+/// this function only, so the two dictionaries never share one scope — which
+/// is what would otherwise force an alias (forbidden) or a qualified path
+/// (also forbidden).
+#[test]
+fn health_shared_catalog_carries_the_same_terms() {
+    use taskmanager_application::i18n::{Language, current_language, set_language, t};
+
+    let prior = current_language();
+    set_language(Language::En);
+    for (_, code, en, _) in HEALTH_SHARED_TERMS {
+        assert_eq!(t(code), en, "{code} en");
+    }
+    set_language(Language::Zh);
+    for (_, code, _, zh) in HEALTH_SHARED_TERMS {
+        assert_eq!(t(code), zh, "{code} zh");
+    }
+    set_language(prior);
 }
 
 /// The synthesized CPU/GPU thermal-pill labels resolve through the active
@@ -362,10 +385,7 @@ mod thermal_zone_tests {
             ],
             ..Default::default()
         };
-        taskmanager_shell::fixture::seed_projection_fact(
-            &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(sensors)),
-        );
+        seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sensors(Some(sensors)));
         let projected = app
             .shell
             .projection()
@@ -445,38 +465,47 @@ mod thermal_zone_tests {
     }
 
     /// The zone heading is a localized system surface label, not the shared
-    /// device-temperature quantity word. Both locales must resolve the iced
-    /// dictionary's `common.thermal_zones` key (the same catalog spelling the
-    /// other frontends use) and differ from the shared catalog's
-    /// `common.temperature`, which stays the device channel label.
+    /// device-temperature quantity word: the iced dictionary resolves the
+    /// `common.thermal_zones` key, and the shared catalog side of the same
+    /// expectation is asserted in
+    /// [`thermal_zone_surface_key_differs_from_the_quantity`].
     #[test]
-    fn thermal_zone_heading_resolves_the_shared_zone_key_in_both_locales() {
-        let prior = taskmanager_application::i18n::current_language();
-
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
-        let en_heading = crate::i18n::t(crate::i18n::Language::En, crate::i18n::Key::ThermalZones);
-        let en_temperature = taskmanager_application::i18n::t("common.temperature");
-
-        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
-        let zh_heading = crate::i18n::t(crate::i18n::Language::Zh, crate::i18n::Key::ThermalZones);
-        let zh_temperature = taskmanager_application::i18n::t("common.temperature");
-
-        taskmanager_application::i18n::set_language(prior);
-
+    fn thermal_zone_heading_resolves_the_shared_zone_key() {
         assert_eq!(
-            crate::i18n::Key::ThermalZones.code(),
+            Key::ThermalZones.code(),
             "common.thermal_zones",
             "the iced key must spell the shared catalog key"
         );
-        assert_eq!(en_heading, "Thermal zones");
-        assert_eq!(zh_heading, "温度区");
-        assert_ne!(
-            en_heading, en_temperature,
-            "the zone heading must not reuse the device temperature quantity word"
-        );
-        assert_ne!(
-            zh_heading, zh_temperature,
-            "the zone heading must not reuse the device temperature quantity word"
-        );
+        assert_eq!(i18n::t(Language::En, Key::ThermalZones), "Thermal zones");
+        assert_eq!(i18n::t(Language::Zh, Key::ThermalZones), "温度区");
     }
+}
+
+/// The shared-catalog side of the zone-heading expectation: the surface key and
+/// the device-temperature quantity word are distinct terms in both locales.
+/// The explicit import shadows this tree's glob-imported iced `t` for the body
+/// of this function only (see `health_shared_catalog_carries_the_same_terms`).
+#[test]
+fn thermal_zone_surface_key_differs_from_the_quantity() {
+    use taskmanager_application::i18n::{Language, current_language, set_language, t};
+
+    let prior = current_language();
+    set_language(Language::En);
+    let en_surface = t("common.thermal_zones");
+    let en_quantity = t("common.temperature");
+    set_language(Language::Zh);
+    let zh_surface = t("common.thermal_zones");
+    let zh_quantity = t("common.temperature");
+    set_language(prior);
+
+    assert_eq!(en_surface, "Thermal zones");
+    assert_eq!(zh_surface, "温度区");
+    assert_ne!(
+        en_surface, en_quantity,
+        "the zone heading must not reuse the device temperature quantity word"
+    );
+    assert_ne!(
+        zh_surface, zh_quantity,
+        "the zone heading must not reuse the device temperature quantity word"
+    );
 }

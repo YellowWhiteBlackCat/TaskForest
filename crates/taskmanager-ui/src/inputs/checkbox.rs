@@ -12,6 +12,7 @@ use gpui::{
     Window, div, px,
 };
 use taskmanager_theme::Palette;
+use taskmanager_theme::color::on_accent;
 use taskmanager_theme::tokens;
 
 /// Typed checkbox event payload.
@@ -143,7 +144,7 @@ impl RenderOnce for Checkbox {
             .size(px(10.0))
             .rounded(crate::theme_binding::absolute(palette.xsmall_radius))
             .bg(crate::theme_binding::fill(if checked {
-                taskmanager_theme::color::on_accent(palette.accent)
+                on_accent(palette.accent)
             } else {
                 palette.surface
             }));

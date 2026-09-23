@@ -19,6 +19,10 @@ use taskmanager_ui_contract::ProcessColumnSpec;
 
 use super::process_projection::ProcessProjection;
 use super::process_sparkline::{PROCESS_SPARK_HEIGHT, PROCESS_SPARK_WIDTH, ProcessCpuSparkline};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::FONT_CAPTION;
+use taskmanager_theme::tokens::SPACE_8;
+use taskmanager_ui_contract::find;
 
 mod priority_choice;
 use priority_choice::{PriorityChoice, selection_hint};
@@ -89,11 +93,11 @@ pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64
 /// is descriptive, not a selector: the category tree is the only runtime
 /// projection.
 pub(crate) fn process_view_selector(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let mut tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = vec![
         text(t("proc.mode_category_tree"))
-            .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+            .size(f32::from(FONT_CAPTION))
             .color(theme::muted_text_color(theme_snapshot))
             .into(),
     ];
@@ -117,7 +121,7 @@ pub(crate) fn process_view_selector(
 /// owns the actual filtered row projection consumed by the table and keyboard
 /// paths.
 pub(crate) fn process_status_filter_selector(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     selected: ProcessStatusFilter,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = ProcessStatusFilter::ALL
@@ -134,7 +138,7 @@ pub(crate) fn process_status_filter_selector(
         .collect();
     row![
         text(t("proc.status_filter"))
-            .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+            .size(f32::from(FONT_CAPTION))
             .color(theme::muted_text_color(theme_snapshot)),
         row(tabs).spacing(4),
     ]
@@ -264,7 +268,7 @@ pub(crate) fn sort_col_from_contract_id(token: &str) -> Option<SortCol> {
 /// contract gate test both catch, while the accessors below keep panic-free
 /// page-local fallbacks so rendering survives a release build.
 fn contract_spec(column: SortCol) -> Option<&'static ProcessColumnSpec> {
-    let spec = taskmanager_ui_contract::find(sort_col_contract_id(column));
+    let spec = find(sort_col_contract_id(column));
     debug_assert!(
         column == SortCol::Pss || spec.is_some(),
         "SortCol {column:?} ({}) is missing from PROCESS_COLUMNS",
@@ -430,7 +434,7 @@ const PROCESS_HEADER_RESIZE_EDGE_PX: f32 = 6.0;
 /// column. Resizable columns additionally carry a trailing-edge drag handle
 /// ([`column_resizable`]); the identity column keeps a plain sort button.
 fn header_cell(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     column: SortCol,
     width: f32,
     active_sort: (SortCol, SortDir),
@@ -442,7 +446,7 @@ fn header_cell(
                 text(localized_sort_column_label(column))
                     .wrapping(iced::widget::text::Wrapping::None),
                 text(marker)
-                    .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+                    .size(f32::from(FONT_CAPTION))
                     .wrapping(iced::widget::text::Wrapping::None),
             ]
             .spacing(4)
@@ -551,18 +555,16 @@ pub(crate) fn apps_table_width_with(
     columns_width
         + PROCESS_SPARK_WIDTH
         + theme::table_column_spacing() * (cell_count.saturating_sub(1) as f32)
-        + 2.0 * f32::from(taskmanager_theme::tokens::SPACE_8)
+        + 2.0 * f32::from(SPACE_8)
 }
 
 /// The non-sortable Trend header cell: a plain (non-button) left-aligned muted
 /// text cell of the sparkline column width. NOT a `header_cell` (no `SortCol`,
 /// no click target, no sort arrow) — mirrors the gpui processes_view chrome
 /// where the Trend header is a plain `div`, not a `sort_cell`.
-fn trend_header_cell(
-    theme_snapshot: &taskmanager_theme::Theme,
-) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+fn trend_header_cell(theme_snapshot: &Theme) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     text(t("proc.trend"))
-        .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+        .size(f32::from(FONT_CAPTION))
         .color(theme::muted_text_color(theme_snapshot))
         .width(Length::Fixed(PROCESS_SPARK_WIDTH))
         .into()

@@ -14,6 +14,12 @@ use super::components::{key_value_rows, message_panel, titled_card};
 use super::tables::ListState;
 use crate::IcedApp;
 use crate::app::Message;
+use taskmanager_application::SmbiosMemoryState;
+use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
+use taskmanager_shell::presentation::kernel_error_summary;
+use taskmanager_shell::presentation::smbios_memory_inventory_rows;
+use taskmanager_theme::Theme;
 
 mod npu;
 pub(crate) use npu::{NpuDeviceViewModel, npu_device_view_models};
@@ -46,11 +52,11 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         .iter()
         .map(|model| npu_info_panel(theme_snapshot, model));
     let smbios_snapshot = match shell.smbios_memory_state() {
-        taskmanager_application::SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
+        SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
         _ => None,
     };
     let memory_slots_panel = smbios_snapshot.map(|snapshot| {
-        let rows = taskmanager_shell::presentation::smbios_memory_inventory_rows(snapshot)
+        let rows = smbios_memory_inventory_rows(snapshot)
             .into_iter()
             .map(|(label, value)| SystemInfoRow { label, value })
             .collect::<Vec<_>>();
@@ -102,7 +108,7 @@ pub(crate) fn format_system_spec_export(
     hardware: Option<&HardwareInfo>,
     snapshot: Option<&SystemSnapshot>,
     npu_inventory: Option<&NpuInventorySnapshot>,
-    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
+    smbios_memory: Option<&SmbiosMemorySnapshot>,
 ) -> String {
     let mut lines = Vec::new();
     lines.push("# System Specifications".to_string());
@@ -114,8 +120,7 @@ pub(crate) fn format_system_spec_export(
     }
     if let Some(smbios) = smbios_memory {
         lines.push(format!("## {}", t("system.memory_slots")));
-        for (label, value) in taskmanager_shell::presentation::smbios_memory_inventory_rows(smbios)
-        {
+        for (label, value) in smbios_memory_inventory_rows(smbios) {
             lines.push(format!("- {}: {}", label, value));
         }
     }
@@ -134,7 +139,7 @@ pub(crate) fn format_system_spec_export(
 }
 
 fn npu_info_panel<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     model: &NpuDeviceViewModel,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     iced::widget::container(
@@ -157,7 +162,7 @@ fn npu_info_panel<'a>(
 }
 
 fn info_panel<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     title: &'static str,
     rows: &[SystemInfoRow],
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -191,7 +196,7 @@ pub(super) fn hardware_list_state(
 
 pub(crate) fn hardware_info_rows(
     hardware: &HardwareInfo,
-    cpu: Option<&taskmanager_core::core::metrics::CpuMetrics>,
+    cpu: Option<&CpuMetrics>,
 ) -> Vec<SystemInfoRow> {
     let mut rows = Vec::new();
     push_text(
@@ -219,7 +224,7 @@ pub(crate) fn hardware_info_rows(
         t("system.field.kernel_compiler"),
         hardware.kernel_compiler.as_deref(),
     );
-    if let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hardware) {
+    if let Some(errors) = kernel_error_summary(hardware) {
         push_value(&mut rows, t("system.kernel_errors"), Some(errors));
     }
     push_text(

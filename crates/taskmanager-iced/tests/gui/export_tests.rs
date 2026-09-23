@@ -1,19 +1,20 @@
 use super::*;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn test_process_to_tsv() {
-    let proc = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let proc = ProcessItemFixtureBuilder::new()
         .pid(1234)
         .name("rustc".to_string())
         .current_cpu_percentage(45.2)
         .current_memory_bytes(1024 * 1024 * 50)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("testuser".to_string()),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("testuser".to_string()),
+            None,
+            1,
+        ))
         .status("Running".to_string())
         .build();
     let tsv = process_to_tsv(&proc);
@@ -22,18 +23,16 @@ fn test_process_to_tsv() {
 
 #[test]
 fn test_process_to_json() {
-    let proc = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let proc = ProcessItemFixtureBuilder::new()
         .pid(5678)
         .name("cargo \"builder\"".to_string())
         .current_cpu_percentage(12.0)
         .current_memory_bytes(1024 * 1024 * 10)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("admin".to_string()),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("admin".to_string()),
+            None,
+            1,
+        ))
         .status("Sleeping".to_string())
         .cmdline("cargo build --release".to_string())
         .build();
@@ -47,7 +46,7 @@ fn test_process_to_json() {
 /// produce parseable JSON: serde owns the escaping, not a hand-rolled rule.
 #[test]
 fn process_json_escapes_control_characters() {
-    let proc = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let proc = ProcessItemFixtureBuilder::new()
         .pid(9)
         .name("tricky".to_string())
         .cmdline("a\nb\tc\rd\\e \"f\"\u{7}g".to_string())

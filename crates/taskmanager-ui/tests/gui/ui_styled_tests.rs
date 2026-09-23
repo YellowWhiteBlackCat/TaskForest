@@ -1,8 +1,9 @@
 use super::{active_fill, blend, disabled_fg, hover_fill, scrim};
+use taskmanager_theme::Palette;
 use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{Color, Theme};
 
-fn palette() -> taskmanager_theme::Palette {
+fn palette() -> Palette {
     Theme::dark().palette()
 }
 

@@ -11,15 +11,14 @@ use taskmanager_platform_contract::{
 
 use super::super::super::{PlatformEvent, PowerSupplyEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};
+use taskmanager_core::DeviceId;
+use taskmanager_core::DeviceState;
 
 #[test]
 fn power_supply_event_preserves_devices_and_source_status() {
     let mut batch = PlatformEventBatch::default();
     let request_id = RequestId::new(4).expect("non-zero fixture request");
-    let mut battery = BatteryInfo::new(
-        "power-supply:serial-a",
-        taskmanager_core::DeviceState::default(),
-    );
+    let mut battery = BatteryInfo::new("power-supply:serial-a", DeviceState::default());
     battery.kind = PowerSupplyKind::UninterruptiblePowerSupply;
     battery.device_generation = DeviceGeneration::new(3);
     battery.apply_scalar_observations(BatteryScalarObservations {
@@ -44,9 +43,7 @@ fn power_supply_event_preserves_devices_and_source_status() {
                     ..Default::default()
                 },
                 ProviderId::borrowed("fixture.power-supply"),
-                DeviceDiscovery::Available(vec![taskmanager_core::DeviceId::new(
-                    "power-supply:serial-a",
-                )]),
+                DeviceDiscovery::Available(vec![DeviceId::new("power-supply:serial-a")]),
                 Vec::new(),
             ),
         )),

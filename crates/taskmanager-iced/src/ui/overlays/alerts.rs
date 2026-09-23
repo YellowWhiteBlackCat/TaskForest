@@ -13,9 +13,10 @@ use taskmanager_theme::tokens;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use taskmanager_theme::Theme;
 
 pub fn alert_center_overlay<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     events: &'a [AlertEvent],
     policy: &NotificationPolicy,
     appear: f32,

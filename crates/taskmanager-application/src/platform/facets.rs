@@ -1,6 +1,9 @@
 //! Request and event contracts grouped by independent capability change axis.
 
 use taskmanager_core::core::setup::SetupScriptEvent;
+use taskmanager_platform_contract::RequestScope;
+use taskmanager_platform_contract::RequestTracking;
+use taskmanager_platform_contract::RequestTrackingError;
 use taskmanager_platform_contract::{CapabilityId, EventPort};
 
 /// Bind one application request DTO to exactly one platform-neutral
@@ -8,20 +11,14 @@ use taskmanager_platform_contract::{CapabilityId, EventPort};
 /// boundary, so native adapters never repeat it.
 macro_rules! bind_request_capability {
     ($request:ty, $capability:expr) => {
-        impl taskmanager_platform_contract::CapabilityRequest for $request {
-            const CAPABILITY: taskmanager_platform_contract::CapabilityId = $capability;
+        impl CapabilityRequest for $request {
+            const CAPABILITY: CapabilityId = $capability;
         }
     };
 }
 
-fn opaque_target_tracking(
-    target: &str,
-) -> Result<
-    taskmanager_platform_contract::RequestTracking,
-    taskmanager_platform_contract::RequestTrackingError,
-> {
-    taskmanager_platform_contract::RequestScope::try_from_str(target)
-        .map(taskmanager_platform_contract::RequestTracking::Target)
+fn opaque_target_tracking(target: &str) -> Result<RequestTracking, RequestTrackingError> {
+    RequestScope::try_from_str(target).map(RequestTracking::Target)
 }
 
 mod cpu_throttle;

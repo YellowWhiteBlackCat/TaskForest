@@ -20,6 +20,10 @@ use crate::app::{FocusTarget, Message, history_replay::IcedHistoryReplay};
 use crate::focus;
 use crate::theme;
 use crate::ui::device_chart;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::presentation::local_timestamp;
+use taskmanager_shell::presentation::missing_value;
+use taskmanager_theme::Theme;
 
 fn history_window_label(window: HistoryWindow) -> &'static str {
     t(match window {
@@ -61,7 +65,7 @@ pub(crate) fn format_peak(peak: f64) -> String {
 
 /// Curve color follows the series' device family, mirroring the live
 /// Performance pages' palette (GPUI `series_color` parity).
-fn series_color(theme_snapshot: &taskmanager_theme::Theme, metric: HistoryMetric) -> iced::Color {
+fn series_color(theme_snapshot: &Theme, metric: HistoryMetric) -> iced::Color {
     match metric {
         HistoryMetric::CpuUsagePct
         | HistoryMetric::CpuCoreUsagePct
@@ -99,9 +103,9 @@ fn series_color(theme_snapshot: &taskmanager_theme::Theme, metric: HistoryMetric
 /// open. Window pills and refresh mutate state through messages; the view
 /// itself renders rows read-only.
 pub fn render_history_replay<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     state: &'a IcedHistoryReplay,
-    local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &'a LocalTimeRulesObservation,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     let window = state.window();
@@ -159,7 +163,7 @@ pub fn render_history_replay<'a>(
             text(format!(
                 "{} {}",
                 t("perf.replay.loaded_at"),
-                taskmanager_shell::presentation::local_timestamp(loaded_at_ms, local_time_rules)
+                local_timestamp(loaded_at_ms, local_time_rules)
             ))
             .size(f32::from(tokens::FONT_11))
             .color(muted),
@@ -176,7 +180,7 @@ pub fn render_history_replay<'a>(
             let peak_str = row_item
                 .peak_value
                 .map(|value| format!("{}: {}", t("perf.replay.peak"), format_peak(value)))
-                .unwrap_or_else(taskmanager_shell::presentation::missing_value);
+                .unwrap_or_else(missing_value);
             let gaps_str = format!(
                 "{}: {}, {}: {}",
                 t("perf.replay.observed"),

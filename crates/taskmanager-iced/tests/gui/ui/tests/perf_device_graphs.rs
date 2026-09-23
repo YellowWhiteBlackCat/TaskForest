@@ -8,6 +8,14 @@
 use super::super::perf_devices::battery::battery_section_state;
 use super::super::tables::ListState;
 use super::super::*;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_core::core::sensors::SensorReading;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn per_device_windows_resolve_for_the_exact_keys_the_renderer_uses() {
@@ -17,26 +25,21 @@ fn per_device_windows_resolve_for_the_exact_keys_the_renderer_uses() {
     // window is exactly the N recorded samples — proving the per-device graph on
     // that row lines up with that device's own history (never a sibling's, never
     // the system aggregate).
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let snapshot = shell
         .projection()
         .snapshot
         .clone()
         .expect("demo snapshot fixture");
     let mut app = crate::IcedApp::default();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
     );
     // The default frontend has no recorded history; record three fresh samples
     // so every per-device window crosses the 2-sample floor the graph needs.
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
 
     // GPU: demo xe reports 18% utilization → window of three 18.0 samples.
@@ -103,7 +106,7 @@ fn device_sections_render_per_device_graphs_with_and_without_history() {
     // and (b) a session that has accrued samples (>=2 → the per-device graph
     // actually plots). Both paths must render without panicking.
     let mut app = crate::IcedApp::default();
-    let demo = taskmanager_shell::demo_app();
+    let demo = demo_app();
     let snapshot = demo
         .projection()
         .snapshot
@@ -111,9 +114,9 @@ fn device_sections_render_per_device_graphs_with_and_without_history() {
         .expect("demo snapshot fixture");
 
     // (a) Snapshot present, history empty: each device's window has 0 samples.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
     );
     assert_eq!(gpu_section_state(Some(&snapshot)), ListState::Ready);
     assert!(
@@ -139,12 +142,7 @@ fn device_sections_render_per_device_graphs_with_and_without_history() {
     // (b) Record enough snapshots that every per-device window crosses the
     // 2-sample floor; the per-device graph now has data to plot.
     for _ in 0..4 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
     assert!(
         app.shell
@@ -175,23 +173,18 @@ fn device_sections_render_per_device_graphs_with_and_without_history() {
 #[test]
 fn device_main_graphs_read_out_the_hovered_sample_and_render() {
     let mut app = crate::IcedApp::default();
-    let demo = taskmanager_shell::demo_app();
+    let demo = demo_app();
     let snapshot = demo
         .projection()
         .snapshot
         .clone()
         .expect("demo snapshot fixture");
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot.clone()))),
     );
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     }
 
     // The GPU main graph plots the per-GPU window; an in-frame cursor at the
@@ -243,8 +236,8 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
 
     // Battery: record BAT0 at 72% three times.
     let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(10));
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
-        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(72, 10),
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(72, 10),
         ..Default::default()
     });
     let power = PowerSupplySnapshot {
@@ -253,21 +246,16 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
         batteries: vec![battery],
         ..PowerSupplySnapshot::default()
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(power.clone())),
+        ProjectionSeedFact::PowerSupplies(Some(power.clone())),
     );
-    let dynamic_system = taskmanager_core::core::metrics::SystemSnapshot {
+    let dynamic_system = SystemSnapshot {
         timestamp_ms: 1_000,
         ..Default::default()
     };
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &dynamic_system,
-            Some(&power),
-            None,
-        );
+        record_demo_history_frame(&mut app.shell, &dynamic_system, Some(&power), None);
     }
     assert_eq!(
         app.shell.history.battery_capacity_pct_for("BAT0"),
@@ -289,17 +277,12 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
         readings: vec![sample_fan_reading("cpu_fan", "hwmon:cpu", 1_500)],
         ..SensorCenterSnapshot::default()
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(sensors.clone())),
+        ProjectionSeedFact::Sensors(Some(sensors.clone())),
     );
     for _ in 0..3 {
-        taskmanager_shell::fixture::record_demo_history_frame(
-            &mut app.shell,
-            &dynamic_system,
-            None,
-            Some(&sensors),
-        );
+        record_demo_history_frame(&mut app.shell, &dynamic_system, None, Some(&sensors));
     }
     assert_eq!(
         app.shell.history.fan_rpm_for("fan1"),
@@ -331,11 +314,7 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
 /// `fan_summary_lines` / `record_sensors` read). Used by the battery/fan
 /// per-device test to seed the per-fan RPM window without re-deriving the full
 /// observation builder inline.
-fn sample_fan_reading(
-    label: &str,
-    device_id: &str,
-    rpm: u32,
-) -> taskmanager_core::core::sensors::SensorReading {
+fn sample_fan_reading(label: &str, device_id: &str, rpm: u32) -> SensorReading {
     use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,

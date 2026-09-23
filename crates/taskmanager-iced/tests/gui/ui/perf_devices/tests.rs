@@ -3,7 +3,25 @@ use super::disk::partition_usage_text;
 use super::gpu::gpu_headline_label_value;
 use super::network::network_summary_lines;
 use super::*;
+use taskmanager_application::GpuEngineRowsState;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::DiskPartitionScalarObservations;
+use taskmanager_core::core::metrics::GpuScalarObservations;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::power::BatteryScalarObservations;
+use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::gpu_chart_metric_gate;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricProjection;
+use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
+use taskmanager_test_support::pin_english;
 
 /// Iced consumes the shared typed presentation keys; it does not maintain a
 /// second failure-kind mapping.
@@ -15,9 +33,7 @@ fn engine_rows_failure_keys_cover_every_typed_kind() {
     };
     for (status, expected_key) in [
         (
-            CapabilityStatus::Degraded(
-                taskmanager_core::core::failure::FailureKind::PermissionDenied,
-            ),
+            CapabilityStatus::Degraded(FailureKind::PermissionDenied),
             "gpu.engines_permission_denied",
         ),
         (
@@ -31,8 +47,8 @@ fn engine_rows_failure_keys_cover_every_typed_kind() {
         ),
     ] {
         let presentation = present_gpu_engine_rows(
-            &taskmanager_application::GpuEngineRowsState::Closed,
-            &taskmanager_core::core::identity::DeviceId::new("gpu:0"),
+            &GpuEngineRowsState::Closed,
+            &DeviceId::new("gpu:0"),
             Some(status),
         );
         assert_eq!(presentation.message_key(), Some(expected_key));
@@ -91,16 +107,14 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
 fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
     use taskmanager_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
 
-    taskmanager_test_support::pin_english();
+    pin_english();
 
     let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(42.4, 1),
         temperature_c: ScalarObservation::available(57.6, 1),
         frequency_mhz: ScalarObservation::available(1_850, 1),
-        power_w: ScalarObservation::unavailable(
-            taskmanager_core::core::failure::FailureKind::Unsupported,
-        ),
+        power_w: ScalarObservation::unavailable(FailureKind::Unsupported),
         ..GpuScalarObservations::default()
     });
     let metrics = projection::gpu_headline_metrics(&gpu);
@@ -130,15 +144,12 @@ fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
 /// Look one summary row's value up by its localized label so the tests
 /// assert the VALUE (the unit-pair formatting), not the surrounding row
 /// order. A present-but-uncollected row reads as the shared dash.
-fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> String {
-    rows.iter().find(|row| row.label() == label).map_or(
-        "\u{ab}row absent\u{bb}".to_string(),
-        |row| {
-            row.value()
-                .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE)
-                .to_string()
-        },
-    )
+fn row_value(rows: &[StatRow], label: &str) -> String {
+    rows.iter()
+        .find(|row| row.label() == label)
+        .map_or("\u{ab}row absent\u{bb}".to_string(), |row| {
+            row.value().unwrap_or(MISSING_VALUE).to_string()
+        })
 }
 
 /// Battery health and runtime estimates are typed facts, not decorations:
@@ -147,13 +158,13 @@ fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> Str
 /// its row entirely absent — never "0%" or "00h 00m".
 #[test]
 fn battery_health_and_estimate_rows_follow_typed_availability() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::metrics::ScalarObservation;
     use taskmanager_core::core::power::BatteryInfo;
 
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(1));
-    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+    battery.apply_scalar_observations(BatteryScalarObservations {
         energy_full_uwh: ScalarObservation::available(49_000_000.0, 1),
         energy_full_design_uwh: ScalarObservation::available(56_000_000.0, 1),
         time_to_empty_secs: ScalarObservation::available(3_780.0, 1),
@@ -193,31 +204,22 @@ fn battery_health_and_estimate_rows_follow_typed_availability() {
 /// `network_stats` parity). Before this they hardcoded base-2 bytes.
 #[test]
 fn static_quantities_follow_the_resolved_unit_pairs() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     const GIB: u64 = 1024 * 1024 * 1024;
-    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let mut disk = DiskMetricsFixtureBuilder::new()
         .mount_point("/".into())
         .current_capacity_bytes(2 * GIB)
         .current_available_bytes(GIB)
         .build();
     disk.partitions = vec![
-        taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+        DiskPartitionFixtureBuilder::new()
             .mount_point("/".into())
             .name("nvme0n1p2".into())
-            .scalar_observations(
-                taskmanager_core::core::metrics::DiskPartitionScalarObservations {
-                    capacity_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
-                        2 * GIB,
-                        1,
-                    ),
-                    used_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
-                        GIB, 1,
-                    ),
-                    free_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
-                        GIB, 1,
-                    ),
-                },
-            )
+            .scalar_observations(DiskPartitionScalarObservations {
+                capacity_bytes: ScalarObservation::available(2 * GIB, 1),
+                used_bytes: ScalarObservation::available(GIB, 1),
+                free_bytes: ScalarObservation::available(GIB, 1),
+            })
             .build(),
     ];
     // The partition census lives ONCE in the vital line (GPUI parity): the
@@ -244,7 +246,7 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
     );
     assert!(vital.starts_with("8.6 Gb / 17.2 Gb"), "vital: {vital}");
 
-    let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let nic = NetworkMetricsFixtureBuilder::new()
         .interface_name("enp3s0".into())
         .current_total_rx_bytes(1_500_000)
         .current_total_tx_bytes(750_000)
@@ -262,7 +264,7 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
 fn partition_usage_does_not_turn_missing_free_space_into_zero() {
     // The label resolves through the shared catalog: pin the language so the
     // assertion is identical on any host locale (portability red line).
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (text, ratio) = partition_usage_text(
         Some(70),
         Some(100),
@@ -325,7 +327,7 @@ fn gpu_selected_demo() -> crate::IcedApp {
 }
 
 fn choice_state(
-    projection: &taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricProjection,
+    projection: &GpuChartMetricProjection,
     metric: GpuChartMetric,
 ) -> GpuChartMetricChoiceState {
     projection
@@ -344,7 +346,7 @@ fn choice_state(
 fn gpu_chart_metric_projection_defaults_to_utilization_and_gates_families() {
     let app = gpu_selected_demo();
     let gpu = app.viewed_gpu().expect("demo views its GPU");
-    let gate = taskmanager_shell::gpu_chart_metric_gate(Some(gpu));
+    let gate = gpu_chart_metric_gate(Some(gpu));
     let projection = app.shell.gpu_chart_metric_projection(&gate);
 
     assert_eq!(projection.selected, GpuChartMetric::Utilization);
@@ -376,7 +378,7 @@ fn gpu_chart_metric_selects_through_the_shared_gate() {
     let viewed = app.viewed_gpu().expect("demo views its GPU").clone();
     let device_id = viewed.device_id.clone();
     let device_generation = viewed.device_generation.get();
-    let gate = taskmanager_shell::gpu_chart_metric_gate(Some(&viewed));
+    let gate = gpu_chart_metric_gate(Some(&viewed));
 
     app.shell
         .select_gpu_chart_metric(GpuChartMetric::Power, &gate);
@@ -417,20 +419,18 @@ fn gpu_chart_metric_selects_through_the_shared_gate() {
 #[test]
 fn gpu_chart_metric_selected_unavailable_stays_explicit() {
     let mut app = gpu_selected_demo();
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         if let Some(snapshot) = snapshot.as_mut()
             && let Some(gpu) = snapshot.gpu.first_mut()
         {
-            gpu.apply_scalar_observations(taskmanager_core::core::metrics::GpuScalarObservations {
-                utilization_pct: taskmanager_core::core::metrics::ScalarObservation::unavailable(
-                    taskmanager_core::core::failure::FailureKind::Unsupported,
-                ),
-                ..taskmanager_core::core::metrics::GpuScalarObservations::default()
+            gpu.apply_scalar_observations(GpuScalarObservations {
+                utilization_pct: ScalarObservation::unavailable(FailureKind::Unsupported),
+                ..GpuScalarObservations::default()
             });
         }
     });
     let gpu = app.viewed_gpu().expect("demo still views its GPU");
-    let gate = taskmanager_shell::gpu_chart_metric_gate(Some(gpu));
+    let gate = gpu_chart_metric_gate(Some(gpu));
     app.shell.reconcile_gpu_chart_metric(&gate);
     let projection = app.shell.gpu_chart_metric_projection(&gate);
 
@@ -454,7 +454,7 @@ fn gpu_chart_metric_generation_change_resets_to_the_default() {
     use taskmanager_core::core::identity::DeviceGeneration;
 
     let mut app = gpu_selected_demo();
-    let gate = taskmanager_shell::gpu_chart_metric_gate(app.viewed_gpu());
+    let gate = gpu_chart_metric_gate(app.viewed_gpu());
     app.shell
         .select_gpu_chart_metric(GpuChartMetric::Temperature, &gate);
     let _ = app.update(Message::Tick);
@@ -464,7 +464,7 @@ fn gpu_chart_metric_generation_change_resets_to_the_default() {
         "a stable generation keeps the user's selection"
     );
 
-    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+    edit_snapshot(&mut app.shell, |snapshot| {
         if let Some(snapshot) = snapshot.as_mut()
             && let Some(gpu) = snapshot.gpu.first_mut()
         {

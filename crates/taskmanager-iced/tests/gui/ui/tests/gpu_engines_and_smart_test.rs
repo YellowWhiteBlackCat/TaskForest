@@ -1,6 +1,7 @@
 //! Behavior tests for GPU engines breakdown panel and SMART self-test control in Iced.
 
 use crate::app::Message;
+use taskmanager_application::ConfirmationKind;
 use taskmanager_core::core::SmartSelfTestKind;
 
 #[test]
@@ -62,7 +63,7 @@ fn smart_self_test_control_request_and_confirm_flow() {
     assert_eq!(pending.kind, SmartSelfTestKind::Short);
     assert_eq!(
         app.shell.confirmation_kind(),
-        Some(taskmanager_application::ConfirmationKind::SmartSelfTest)
+        Some(ConfirmationKind::SmartSelfTest)
     );
 
     // Confirm the self-test

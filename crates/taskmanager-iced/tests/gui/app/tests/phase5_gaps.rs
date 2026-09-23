@@ -6,7 +6,13 @@ use std::collections::HashSet;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::matches_process_query;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn test_affinity_presets_select_all_clear_all_invert_and_hetero() {
@@ -46,9 +52,9 @@ fn test_affinity_presets_select_all_clear_all_invert_and_hetero() {
     );
 
     // 4. Hetero P-Cores / E-Cores
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Hardware(Some(Box::new(HardwareInfo {
+        ProjectionSeedFact::Hardware(Some(Box::new(HardwareInfo {
             core_breakdown: CoreBreakdown {
                 p_cores: 2,
                 e_cores: 2,
@@ -91,20 +97,20 @@ fn test_cpu_cache_and_policy_rows_formatting() {
 #[test]
 fn test_process_tree_bulk_expand_all_and_collapse_all() {
     let mut app = IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProjectionSeedFact::Processes(Some(vec![
+            ProcessItemFixtureBuilder::new()
                 .pid(1)
                 .parent_pid(None)
                 .name("systemd".into())
                 .build(),
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(100)
                 .parent_pid(Some(1))
                 .name("dbus".into())
                 .build(),
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(200)
                 .parent_pid(Some(100))
                 .name("app".into())
@@ -133,28 +139,26 @@ fn test_process_tree_bulk_expand_all_and_collapse_all() {
 #[test]
 fn test_service_details_matching_pid_and_jump_to_process() {
     let mut app = IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProjectionSeedFact::Processes(Some(vec![
+            ProcessItemFixtureBuilder::new()
                 .pid(456)
                 .name("NetworkManager".into())
                 .build(),
         ])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            ServiceItem::from_inventory(
-                "nm.service",
-                "NetworkManager.service",
-                ServiceStatus::Active,
-                "",
-                "",
-                "",
-                "",
-            ),
-        ])),
+        ProjectionSeedFact::Services(Some(vec![ServiceItem::from_inventory(
+            "nm.service",
+            "NetworkManager.service",
+            ServiceStatus::Active,
+            "",
+            "",
+            "",
+            "",
+        )])),
     );
 
     let _ = app
@@ -208,53 +212,33 @@ fn test_performance_graph_resolution_selection() {
 
 #[test]
 fn test_matches_process_query_structured_syntax() {
-    let proc = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let proc = ProcessItemFixtureBuilder::new()
         .pid(1234)
-        .metadata_observations(
-            taskmanager_core::core::process::ProcessMetadataObservations::current(
-                taskmanager_core::core::process::ProcessOwner::opaque("root"),
-                None,
-                1,
-            ),
-        )
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            None,
+            1,
+        ))
         .status("Running".into())
         .cmdline("/usr/bin/python3 -m server".into())
         .name("python3".into())
         .build();
 
     // Prefix matches
-    assert!(taskmanager_shell::matches_process_query(&proc, "pid:1234"));
-    assert!(!taskmanager_shell::matches_process_query(&proc, "pid:5678"));
-    assert!(taskmanager_shell::matches_process_query(&proc, "user:root"));
-    assert!(!taskmanager_shell::matches_process_query(
-        &proc,
-        "user:alice"
-    ));
-    assert!(taskmanager_shell::matches_process_query(
-        &proc,
-        "status:running"
-    ));
-    assert!(taskmanager_shell::matches_process_query(
-        &proc,
-        "cmd:server"
-    ));
-    assert!(taskmanager_shell::matches_process_query(
-        &proc,
-        "name:python"
-    ));
+    assert!(matches_process_query(&proc, "pid:1234"));
+    assert!(!matches_process_query(&proc, "pid:5678"));
+    assert!(matches_process_query(&proc, "user:root"));
+    assert!(!matches_process_query(&proc, "user:alice"));
+    assert!(matches_process_query(&proc, "status:running"));
+    assert!(matches_process_query(&proc, "cmd:server"));
+    assert!(matches_process_query(&proc, "name:python"));
 
     // Multi-prefix matches
-    assert!(taskmanager_shell::matches_process_query(
-        &proc,
-        "user:root pid:1234"
-    ));
-    assert!(!taskmanager_shell::matches_process_query(
-        &proc,
-        "user:root pid:9999"
-    ));
+    assert!(matches_process_query(&proc, "user:root pid:1234"));
+    assert!(!matches_process_query(&proc, "user:root pid:9999"));
 
     // Standard substring matches
-    assert!(taskmanager_shell::matches_process_query(&proc, "python"));
-    assert!(taskmanager_shell::matches_process_query(&proc, "1234"));
-    assert!(!taskmanager_shell::matches_process_query(&proc, "nginx"));
+    assert!(matches_process_query(&proc, "python"));
+    assert!(matches_process_query(&proc, "1234"));
+    assert!(!matches_process_query(&proc, "nginx"));
 }

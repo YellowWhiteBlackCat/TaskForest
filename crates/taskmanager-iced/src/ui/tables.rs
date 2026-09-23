@@ -25,7 +25,11 @@ use super::{
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
+use taskmanager_core::core::process::ProcessBatchIntent;
 use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::process_batch_action_label;
+use taskmanager_shell::service_cycle_members;
+use taskmanager_theme::Theme;
 
 mod headings;
 pub(super) use headings::service_heading;
@@ -36,7 +40,7 @@ pub(super) use headings::service_heading;
 /// sort slot. The caption comes from [`InfoSortCol::label`] (the shell's
 /// single source of truth) — never duplicated here.
 pub(super) fn info_header_cell<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     table: InfoTable,
     column: InfoSortCol,
     active: Option<(InfoSortCol, SortDir)>,
@@ -51,7 +55,7 @@ pub(super) fn info_header_cell<'a>(
             };
             row![
                 text(t(column.label())),
-                text(marker).size(f32::from(taskmanager_theme::tokens::FONT_CAPTION)),
+                text(marker).size(f32::from(tokens::FONT_CAPTION)),
             ]
             .spacing(4)
             .width(Length::Fill)
@@ -424,7 +428,7 @@ pub(super) fn service_action_label(action: ServiceAction) -> &'static str {
 /// against `shell.projection().services`, so a visual index would target the wrong
 /// service whenever a sort or the page filter reorders the rows.
 fn service_action_buttons(
-    theme_snapshot: taskmanager_theme::Theme,
+    theme_snapshot: Theme,
     source_index: usize,
     compact: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
@@ -568,7 +572,7 @@ pub(crate) fn service_row_height(compact: bool) -> f32 {
 /// inputs that can change the materialized widget tree; the virtual range is
 /// added by [`virtual_table_key`].
 pub(super) struct InventoryTableKey<'a> {
-    pub(super) theme_snapshot: &'a taskmanager_theme::Theme,
+    pub(super) theme_snapshot: &'a Theme,
     pub(super) generation: u64,
     pub(super) table: InfoTable,
     pub(super) sort: Option<(InfoSortCol, SortDir)>,
@@ -621,7 +625,7 @@ pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRow> {
     // the way into action messages; no pointer scan can turn this into an
     // O(N²) projection when a large service inventory is sorted.
     let provider = shell.projection().services.as_deref().unwrap_or(&[]);
-    let cycle_members = taskmanager_shell::service_cycle_members(provider);
+    let cycle_members = service_cycle_members(provider);
     shell
         .sorted_service_indices()
         .into_iter()
@@ -648,7 +652,7 @@ pub(super) fn service_description(description: &str) -> &str {
 
 /// Confirm the pending process termination through the shared shell intent.
 pub(super) fn confirm_bar<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: &FrozenProcessIdentity,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
@@ -678,8 +682,8 @@ pub(super) fn confirm_bar<'a>(
 /// the intent's single frozen identity (single-select today); if the target
 /// vanished before confirmation, only the cancel affordance renders.
 pub(super) fn confirm_batch_bar<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    intent: &taskmanager_core::core::process::ProcessBatchIntent,
+    theme_snapshot: &'a Theme,
+    intent: &ProcessBatchIntent,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let confirm = focus::button(
         theme_snapshot,
@@ -695,7 +699,7 @@ pub(super) fn confirm_batch_bar<'a>(
         Message::DismissOverlay,
         false,
     );
-    let action_label = taskmanager_shell::presentation::process_batch_action_label(intent.action);
+    let action_label = process_batch_action_label(intent.action);
     // Surface the full target scope so a multi-target destructive action reads
     // as a frozen identity set rather than the single first row (mirrors the
     // GPUI confirmation scope).

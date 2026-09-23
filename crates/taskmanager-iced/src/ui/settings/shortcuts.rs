@@ -13,6 +13,7 @@ use taskmanager_ui_contract::FrontendBindingDeclaration;
 
 use super::*;
 use crate::ui::overlays::binding_declaration;
+use taskmanager_application::i18n::t;
 
 /// One rendered shortcut row: the shared command label plus the declared
 /// key token, or `None` when the declaration marks the command deliberately
@@ -58,7 +59,7 @@ fn shortcut_row<'a>(theme_snapshot: &'a Theme, row: &ShortcutRow) -> IcedElement
             .style(move |_| crate::theme::panel_style(theme_snapshot))
             .padding([2, 6])
             .into(),
-        None => text(taskmanager_application::i18n::t("common.none"))
+        None => text(t("common.none"))
             .size(f32::from(tokens::FONT_11))
             .color(crate::theme::muted_text_color(theme_snapshot))
             .into(),

@@ -31,6 +31,8 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 
+use taskmanager_core::core::time::LocalTimeRulesCacheKey;
+use taskmanager_shell::presentation::start_clock_local;
 use taskmanager_shell::presentation::{
     bytes, missing_value, optional_bytes, optional_count, optional_duration, optional_nice,
 };
@@ -311,10 +313,7 @@ fn group_header_from_shared(
         status: root.status.clone(),
         nice: root.current_nice(),
         start_time_secs: root.current_start_time_secs(),
-        start_clock: taskmanager_shell::presentation::start_clock_local(
-            root.current_start_time_secs(),
-            local_time_rules,
-        ),
+        start_clock: start_clock_local(root.current_start_time_secs(), local_time_rules),
     })
 }
 
@@ -348,10 +347,7 @@ pub(crate) fn build_row_cells_with_rules(
         status: process.status.clone(),
         fds: optional_count(process.current_fds()),
         nice: optional_nice(process.current_nice()),
-        start_clock: taskmanager_shell::presentation::start_clock_local(
-            process.current_start_time_secs(),
-            local_time_rules,
-        ),
+        start_clock: start_clock_local(process.current_start_time_secs(), local_time_rules),
     }
 }
 
@@ -403,10 +399,7 @@ impl ProcessProjection {
                     start_clock,
                     ..
                 } => {
-                    *start_clock = taskmanager_shell::presentation::start_clock_local(
-                        *start_time_secs,
-                        local_time_rules,
-                    );
+                    *start_clock = start_clock_local(*start_time_secs, local_time_rules);
                 }
             }
         }
@@ -499,7 +492,7 @@ pub(crate) struct ProcessProjectionFingerprint {
     query: String,
     expanded_groups: HashSet<String>,
     expanded_tree: HashSet<ProcessLiveKey>,
-    local_time_rules: Option<taskmanager_core::core::time::LocalTimeRulesCacheKey>,
+    local_time_rules: Option<LocalTimeRulesCacheKey>,
 }
 
 impl ProcessProjectionFingerprint {

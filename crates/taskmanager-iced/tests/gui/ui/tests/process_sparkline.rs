@@ -6,7 +6,9 @@ use iced::Size;
 use std::collections::HashSet;
 use std::rc::Rc;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::{SortCol, SortDir};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 const SPARK_SIZE: Size = Size::new(48.0, 16.0);
 
@@ -54,11 +56,11 @@ fn fingerprint_changes_only_when_process_history_identity_changes() {
 #[test]
 fn canonical_process_nodes_carry_hierarchy_depth() {
     let items = [
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1)
             .name("root".into())
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(2)
             .name("child".into())
             .parent_pid(Some(1))
@@ -70,7 +72,7 @@ fn canonical_process_nodes_carry_hierarchy_depth() {
         (SortCol::Cpu, SortDir::Desc),
         &HashSet::from(["category:uncategorized".to_string()]),
         &HashSet::new(),
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
         0,
     );
     let depths: Vec<_> = projection

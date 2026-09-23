@@ -14,12 +14,13 @@ use crate::platform::{
 use super::PlatformClient;
 use super::startup_projection::append_startup_evidence_projection;
 use super::system_projection::{append_system_projection, system_telemetry_domain};
+use taskmanager_core::FailureKind;
 
 const MAX_EVENTS_PER_DRAIN: usize = 64;
 
 struct ProcessInsightDrainOutcome {
     projection: Option<ProcessInsightsProjectionApplyResult>,
-    diagnostic: Option<taskmanager_core::FailureKind>,
+    diagnostic: Option<FailureKind>,
 }
 
 impl PlatformClient {
@@ -31,10 +32,9 @@ impl PlatformClient {
             };
             let context = PlatformEventContext::from_envelope(&event);
             if !event.has_consistent_failure_metadata() {
-                batch.failures.push(operation_failure(
-                    &context,
-                    taskmanager_core::FailureKind::ProviderFault,
-                ));
+                batch
+                    .failures
+                    .push(operation_failure(&context, FailureKind::ProviderFault));
                 continue;
             }
             match event.outcome {
@@ -46,10 +46,9 @@ impl PlatformClient {
                             | PlatformEvent::StartupEvidence(_)
                     );
                     if !application_reduced && !payload.accepts_capability(&context.capability) {
-                        batch.failures.push(operation_failure(
-                            &context,
-                            taskmanager_core::FailureKind::ProviderFault,
-                        ));
+                        batch
+                            .failures
+                            .push(operation_failure(&context, FailureKind::ProviderFault));
                         continue;
                     }
                     let process_outcome = match &payload {
@@ -151,7 +150,7 @@ impl PlatformClient {
                         {
                             failure.kind
                         } else {
-                            taskmanager_core::FailureKind::ProviderFault
+                            FailureKind::ProviderFault
                         };
                         let applied = self.process_insights_projection.apply_failure(
                             &pending.target,
@@ -178,7 +177,7 @@ impl PlatformClient {
                         {
                             failure.kind
                         } else {
-                            taskmanager_core::FailureKind::ProviderFault
+                            FailureKind::ProviderFault
                         };
                         let applied = self.system_telemetry_projection.apply_failure(
                             pending.revision,
@@ -204,7 +203,7 @@ impl PlatformClient {
                         {
                             failure.kind
                         } else {
-                            taskmanager_core::FailureKind::ProviderFault
+                            FailureKind::ProviderFault
                         };
                         let applied = self.startup_evidence_projection.apply_failure(
                             revision,
@@ -229,7 +228,7 @@ impl PlatformClient {
         let Some(pending) = self.process_insight_requests.remove(&request_id) else {
             return ProcessInsightDrainOutcome {
                 projection: None,
-                diagnostic: Some(taskmanager_core::FailureKind::Rejected),
+                diagnostic: Some(FailureKind::Rejected),
             };
         };
         if process_insight_facet(capability) != Some(pending.facet)
@@ -240,11 +239,9 @@ impl PlatformClient {
                     &pending.target,
                     pending.revision,
                     pending.facet,
-                    ProcessInsightUnavailable::Provider(
-                        taskmanager_core::FailureKind::ProviderFault,
-                    ),
+                    ProcessInsightUnavailable::Provider(FailureKind::ProviderFault),
                 )),
-                diagnostic: Some(taskmanager_core::FailureKind::ProviderFault),
+                diagnostic: Some(FailureKind::ProviderFault),
             };
         }
         let applied = self.process_insights_projection.apply(event);
@@ -258,12 +255,10 @@ impl PlatformClient {
             ProcessInsightsProjectionRejection::DifferentFrozenTarget
             | ProcessInsightsProjectionRejection::StaleOrUnexpectedRevision
             | ProcessInsightsProjectionRejection::ConflictingRawIdentity => {
-                taskmanager_core::FailureKind::IdentityChanged
+                FailureKind::IdentityChanged
             }
             ProcessInsightsProjectionRejection::NoActiveRequest
-            | ProcessInsightsProjectionRejection::DuplicateFacet => {
-                taskmanager_core::FailureKind::Rejected
-            }
+            | ProcessInsightsProjectionRejection::DuplicateFacet => FailureKind::Rejected,
         };
         ProcessInsightDrainOutcome {
             projection: Some(self.process_insights_projection.apply_failure(
@@ -277,10 +272,7 @@ impl PlatformClient {
     }
 }
 
-fn operation_failure(
-    context: &PlatformEventContext,
-    kind: taskmanager_core::FailureKind,
-) -> OperationFailure {
+fn operation_failure(context: &PlatformEventContext, kind: FailureKind) -> OperationFailure {
     OperationFailure {
         request_id: context.request_id,
         capability: context.capability.clone(),

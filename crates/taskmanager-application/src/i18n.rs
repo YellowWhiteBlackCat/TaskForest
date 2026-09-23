@@ -27,6 +27,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
+use taskmanager_core::alerts::AlertSeverity;
 
 /// The two locales this app ships. Add a variant + a matching `locales/<code>.json`
 /// (and a wire value below) to extend.
@@ -192,11 +193,11 @@ fn leak_str(s: String) -> &'static str {
 /// surfaces alert severities through this so the three copy sites cannot
 /// drift (they once duplicated this match in three files).
 #[must_use]
-pub fn alert_severity_label(severity: taskmanager_core::alerts::AlertSeverity) -> &'static str {
+pub fn alert_severity_label(severity: AlertSeverity) -> &'static str {
     match severity {
-        taskmanager_core::alerts::AlertSeverity::Info => t("alert.info"),
-        taskmanager_core::alerts::AlertSeverity::Warning => t("alert.warning"),
-        taskmanager_core::alerts::AlertSeverity::Critical => t("alert.critical"),
+        AlertSeverity::Info => t("alert.info"),
+        AlertSeverity::Warning => t("alert.warning"),
+        AlertSeverity::Critical => t("alert.critical"),
     }
 }
 

@@ -1,7 +1,15 @@
 use super::{IcedApp, apply_capture_target, capture_device_from_name, capture_page_from_name};
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
+use taskmanager_application::AppPage;
+use taskmanager_application::ConfigClient;
+use taskmanager_application::ConfigCoordinator;
+use taskmanager_application::ConfigDrain;
 use taskmanager_application::{ConfigStore, PlatformClient};
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarAvailability;
+use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
 
 /// The shared `TM_SKIN` testing override selects the demo/capture appearance.
@@ -73,27 +81,15 @@ fn capture_device_selector_accepts_only_the_complete_performance_vocabulary() {
     assert_eq!(capture_device_from_name("GPU"), None);
     assert_eq!(
         capture_page_from_name("applications"),
-        Some(taskmanager_application::AppPage::Applications)
+        Some(AppPage::Applications)
     );
-    assert_eq!(
-        capture_page_from_name("services"),
-        Some(taskmanager_application::AppPage::Services)
-    );
-    assert_eq!(
-        capture_page_from_name("startup"),
-        Some(taskmanager_application::AppPage::Startup)
-    );
-    assert_eq!(
-        capture_page_from_name("users"),
-        Some(taskmanager_application::AppPage::Users)
-    );
-    assert_eq!(
-        capture_page_from_name("system"),
-        Some(taskmanager_application::AppPage::System)
-    );
+    assert_eq!(capture_page_from_name("services"), Some(AppPage::Services));
+    assert_eq!(capture_page_from_name("startup"), Some(AppPage::Startup));
+    assert_eq!(capture_page_from_name("users"), Some(AppPage::Users));
+    assert_eq!(capture_page_from_name("system"), Some(AppPage::System));
     assert_eq!(
         capture_page_from_name("app-history"),
-        Some(taskmanager_application::AppPage::AppHistory)
+        Some(AppPage::AppHistory)
     );
     assert_eq!(capture_page_from_name("performance"), None);
 }
@@ -182,9 +178,7 @@ fn system_and_npu_capture_targets_seed_complete_typed_npu_facts() {
     assert!(device.memory.shared_total_bytes.current_value().is_none());
     assert_eq!(
         device.memory.shared_total_bytes.availability(),
-        taskmanager_core::core::metrics::ScalarAvailability::Unavailable(
-            taskmanager_core::core::failure::FailureKind::Unsupported
-        )
+        ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
 
     let mut npu = IcedApp::demo();
@@ -213,10 +207,7 @@ fn health_capture_target_opens_the_local_surface_through_the_message_reducer() {
     assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Health));
     // The modal rides Performance with the default device selected; the
     // surface is the target, not a page or a device.
-    assert_eq!(
-        app.shell.page(),
-        taskmanager_application::AppPage::Performance
-    );
+    assert_eq!(app.shell.page(), AppPage::Performance);
     assert_eq!(app.performance.selected_device, PerfDevice::Cpu);
 
     // The toolbar trigger's own reducer path owns the same surface state.
@@ -241,10 +232,9 @@ impl IcedApp {
     pub(crate) fn with_config_store_and_font_availability(
         platform: Option<PlatformClient>,
         store: ConfigStore,
-        font_availability: taskmanager_theme::FontAvailability,
+        font_availability: FontAvailability,
     ) -> Self {
-        let coordinator = taskmanager_application::ConfigCoordinator::start(store)
-            .expect("start injected config runtime");
+        let coordinator = ConfigCoordinator::start(store).expect("start injected config runtime");
         let mut app = Self::new(platform);
         app.configuration = crate::app::configuration_state::IcedConfiguration::new(
             Some(coordinator.client()),
@@ -254,14 +244,11 @@ impl IcedApp {
         app
     }
 
-    pub(crate) fn wait_for_config_where(
-        &mut self,
-        predicate: impl Fn(&taskmanager_core::core::config::Config) -> bool,
-    ) {
+    pub(crate) fn wait_for_config_where(&mut self, predicate: impl Fn(&Config) -> bool) {
         if self
             .configuration
             .client()
-            .and_then(taskmanager_application::ConfigClient::snapshot)
+            .and_then(ConfigClient::snapshot)
             .is_some_and(|snapshot| predicate(snapshot))
         {
             return;
@@ -273,22 +260,22 @@ impl IcedApp {
                 .expect("injected config client")
                 .wait_for_drain(std::time::Duration::from_secs(2));
             match drain {
-                taskmanager_application::ConfigDrain::Empty => {
+                ConfigDrain::Empty => {
                     panic!("expected configuration publication")
                 }
-                taskmanager_application::ConfigDrain::Publications(publications) => {
+                ConfigDrain::Publications(publications) => {
                     for publication in publications {
                         self.apply_config_publication(&publication);
                     }
                 }
-                taskmanager_application::ConfigDrain::ResyncRequired { latest, .. } => {
+                ConfigDrain::ResyncRequired { latest, .. } => {
                     self.apply_config_publication(&latest);
                 }
             }
             if self
                 .configuration
                 .client()
-                .and_then(taskmanager_application::ConfigClient::snapshot)
+                .and_then(ConfigClient::snapshot)
                 .is_some_and(|snapshot| predicate(snapshot))
             {
                 return;

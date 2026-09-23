@@ -8,7 +8,23 @@ use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore};
 use taskmanager_core::core::process::ProcessLiveKey;
 
+use taskmanager_application::ConfigClient;
+use taskmanager_application::ConfigCoordinator;
+use taskmanager_application::ConfigRuntimeOptions;
+use taskmanager_application::ConfigSubmissionStatus;
+use taskmanager_application::ConfigSubmitError;
+use taskmanager_application::KeyCode;
+use taskmanager_application::Modifiers;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::current_language;
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_shell::ShellKeyEvent;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::MotionPolicy;
 
 #[test]
@@ -17,10 +33,7 @@ fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
     let path = dir.join("config.json");
     let app = IcedApp::with_config_store(None, ConfigStore::new(&path));
 
-    assert_eq!(
-        app.config_draft(),
-        taskmanager_core::core::config::Config::default()
-    );
+    assert_eq!(app.config_draft(), Config::default());
     assert!(app.shell.feedback_notice().is_none());
 
     drop(app);
@@ -40,10 +53,7 @@ fn details_section_resets_to_overview_when_properties_open() {
     // visit ended on another tab.
     app.shell.application.active_page = AppPage::Applications;
     assert!(app.shell.select_row(0));
-    let enter = IcedKey::Fixed(ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Enter,
-        taskmanager_application::Modifiers::NONE,
-    ));
+    let enter = IcedKey::Fixed(ShellKeyEvent::new(KeyCode::Enter, Modifiers::NONE));
     let _ = app.update(Message::Key(enter));
     assert!(app.process_properties_open());
     assert_eq!(app.details_section(), DetailsSection::Overview);
@@ -89,8 +99,7 @@ fn graph_data_points_preference_propagates_to_the_shared_history_capacity() {
     // authoritative here.
     assert_eq!(
         app.shell.history.capacity(),
-        usize::try_from(taskmanager_core::core::config::Config::default().graph_data_points)
-            .unwrap()
+        usize::try_from(Config::default().graph_data_points).unwrap()
     );
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::GraphDataPoints(
@@ -116,7 +125,7 @@ fn graph_data_points_preference_propagates_to_the_shared_history_capacity() {
     hostile.load_config();
     assert_eq!(
         hostile.shell.history.capacity(),
-        taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
+        MAX_HISTORY_CAPACITY,
         "a hostile preference clamps to the product ceiling"
     );
 
@@ -153,8 +162,8 @@ fn language_preference_persists_and_applies_at_startup() {
     reloaded.load_config();
     assert_eq!(reloaded.language(), crate::i18n::Language::Zh);
     assert_eq!(
-        taskmanager_application::i18n::current_language(),
-        taskmanager_application::i18n::Language::Zh,
+        current_language(),
+        Language::Zh,
         "the shared catalog follows the applied preference"
     );
 
@@ -294,9 +303,9 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     let dir = temp_dir("settings-backpressure-rollback");
     let path = dir.join("config.json");
     std::fs::create_dir_all(&dir).unwrap();
-    let coordinator = taskmanager_application::ConfigCoordinator::start_with_options(
+    let coordinator = ConfigCoordinator::start_with_options(
         ConfigStore::new(&path),
-        taskmanager_application::ConfigRuntimeOptions {
+        ConfigRuntimeOptions {
             command_capacity: 1,
             publication_capacity: 4,
             refresh_interval: std::time::Duration::from_secs(60),
@@ -305,10 +314,8 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     .unwrap();
     let mut app = IcedApp::new_with_runtime_clients(None, Some(coordinator.client()), None);
     app.load_config();
-    app.shell.application.active_page = taskmanager_application::AppPage::Applications;
-    app.input.focused_control = Some(FocusTarget::PageTab(
-        taskmanager_application::AppPage::Applications,
-    ));
+    app.shell.application.active_page = AppPage::Applications;
+    app.input.focused_control = Some(FocusTarget::PageTab(AppPage::Applications));
     let lock = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -321,7 +328,7 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     let base = app
         .configuration
         .client()
-        .and_then(taskmanager_application::ConfigClient::snapshot)
+        .and_then(ConfigClient::snapshot)
         .unwrap()
         .as_ref()
         .clone();
@@ -329,7 +336,7 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     blocked.ui_size = "Small".into();
     assert_eq!(
         app.configuration.client().unwrap().try_submit(blocked),
-        Ok(taskmanager_application::ConfigSubmissionStatus::Queued)
+        Ok(ConfigSubmissionStatus::Queued)
     );
     // Once the worker has taken the first command it blocks on the fixture's
     // OS lock. Queue a second command into the now-free one-slot lane; from
@@ -340,11 +347,11 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
         let mut queued = base.clone();
         queued.ui_size = "Large".into();
         match app.configuration.client().unwrap().try_submit(queued) {
-            Ok(taskmanager_application::ConfigSubmissionStatus::Queued) => {
+            Ok(ConfigSubmissionStatus::Queued) => {
                 queued_behind_blocked = true;
                 break;
             }
-            Err(taskmanager_application::ConfigSubmitError::Backpressure) => {
+            Err(ConfigSubmitError::Backpressure) => {
                 std::thread::yield_now();
             }
             outcome => panic!("unexpected queue outcome: {outcome:?}"),
@@ -355,15 +362,10 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     let _ = app.update(Message::SettingsChanged(SettingsChange::Skin(Skin::Kde)));
     assert_eq!(app.theme().skin, Skin::Gnome);
     assert!(app.preferences().skin.is_empty());
-    assert_eq!(
-        app.shell.page(),
-        taskmanager_application::AppPage::Applications
-    );
+    assert_eq!(app.shell.page(), AppPage::Applications);
     assert_eq!(
         app.input.focused_control,
-        Some(FocusTarget::PageTab(
-            taskmanager_application::AppPage::Applications
-        ))
+        Some(FocusTarget::PageTab(AppPage::Applications))
     );
     assert!(app.shell.feedback_text().contains("not queued"));
 
@@ -382,7 +384,7 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
 fn overlay_open_seeds_the_process_ring_from_provider_history() {
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    let mut seeded = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut seeded = ProcessItemFixtureBuilder::new()
         .pid(3_100)
         .name("provider-fed".into())
         .current_cpu_percentage(44.0)
@@ -396,10 +398,9 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
     // The overlay path freezes a trustworthy identity (mirrors the shared
     // demo shell's process shape).
     let mut seeded_observations = *seeded.scalar_observations();
-    seeded_observations.start_token =
-        taskmanager_core::core::metrics::ScalarObservation::available(310_001, 1);
+    seeded_observations.start_token = ScalarObservation::available(310_001, 1);
     seeded.apply_scalar_observations(seeded_observations);
-    let mut cold = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut cold = ProcessItemFixtureBuilder::new()
         .pid(3_101)
         .name("mac-win-shape".into())
         .current_cpu_percentage(1.0)
@@ -407,12 +408,11 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
         .current_start_time_secs(1_785_290_001)
         .build();
     let mut cold_observations = *cold.scalar_observations();
-    cold_observations.start_token =
-        taskmanager_core::core::metrics::ScalarObservation::available(310_002, 1);
+    cold_observations.start_token = ScalarObservation::available(310_002, 1);
     cold.apply_scalar_observations(cold_observations);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![seeded, cold])),
+        ProjectionSeedFact::Processes(Some(vec![seeded, cold])),
     );
 
     // Select the provider-fed process and open the properties overlay through
@@ -432,8 +432,8 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
     let _ = app.shell.select_row(index);
     let enter = || {
         Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
-            taskmanager_application::KeyCode::Enter,
-            taskmanager_application::Modifiers::NONE,
+            KeyCode::Enter,
+            Modifiers::NONE,
         )))
     };
     let _ = app.update(enter());
@@ -586,10 +586,7 @@ fn warmup_spin_and_frame_pump_lifecycle() {
     );
 
     let committed = app.shell.projection().snapshot.clone();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     assert!(committed.is_some(), "fixture snapshot present");
     assert!(
         app.shell.telemetry_frame_state().is_collecting(),
@@ -609,9 +606,9 @@ fn warmup_spin_and_frame_pump_lifecycle() {
         "phase advanced by the 800 ms period fraction"
     );
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(committed)),
+        ProjectionSeedFact::Snapshot(Box::new(committed)),
     );
     app.advance_motion(now + Duration::from_millis(200));
     assert_eq!(
@@ -630,7 +627,7 @@ fn warmup_spin_and_frame_pump_lifecycle() {
 /// panel background fades in.
 #[test]
 fn modal_styles_scale_with_the_entrance_progress() {
-    let theme = taskmanager_theme::Theme::dark();
+    let theme = Theme::dark();
     let dim = crate::theme::scrim_style_with(&theme, 0.0);
     let full = crate::theme::scrim_style_with(&theme, 1.0);
     let brightness = |style: &iced::widget::container::Style| match style.background.unwrap() {

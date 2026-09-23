@@ -6,6 +6,7 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::super::responsive::PerformancePageBudget;
+use taskmanager_theme::Theme;
 
 pub(crate) fn npu_section(
     app: &crate::IcedApp,
@@ -38,7 +39,7 @@ pub(crate) fn npu_section(
 fn npu_block<'a>(
     _app: &'a crate::IcedApp,
     device: &'a NpuDevice,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let title = format!("{} {}", t("npu.title"), device.device_id.as_str());

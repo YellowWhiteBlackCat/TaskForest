@@ -12,6 +12,9 @@ use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::{FocusTarget, Message};
+use taskmanager_application::AppPage;
+use taskmanager_application::RefreshRequest;
+use taskmanager_theme::Theme;
 
 mod widget;
 pub(crate) use widget::*;
@@ -198,30 +201,30 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
     }
 }
 
-fn refresh_request_key(request: taskmanager_application::RefreshRequest) -> &'static str {
+fn refresh_request_key(request: RefreshRequest) -> &'static str {
     match request {
-        taskmanager_application::RefreshRequest::Services => "services",
-        taskmanager_application::RefreshRequest::Startup => "startup",
-        taskmanager_application::RefreshRequest::Sessions => "sessions",
+        RefreshRequest::Services => "services",
+        RefreshRequest::Startup => "startup",
+        RefreshRequest::Sessions => "sessions",
         _ => "other",
     }
 }
 
-fn page_key(page: taskmanager_application::AppPage) -> &'static str {
+fn page_key(page: AppPage) -> &'static str {
     match page {
-        taskmanager_application::AppPage::Performance => "performance",
-        taskmanager_application::AppPage::Applications => "applications",
-        taskmanager_application::AppPage::Services => "services",
-        taskmanager_application::AppPage::System => "system",
-        taskmanager_application::AppPage::Startup => "startup",
-        taskmanager_application::AppPage::Users => "users",
-        taskmanager_application::AppPage::AppHistory => "app-history",
+        AppPage::Performance => "performance",
+        AppPage::Applications => "applications",
+        AppPage::Services => "services",
+        AppPage::System => "system",
+        AppPage::Startup => "startup",
+        AppPage::Users => "users",
+        AppPage::AppHistory => "app-history",
     }
 }
 
 /// Build one renderer-local button that participates in Iced focus traversal.
 pub(crate) fn button<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     label: &'static str,
     on_press: Message,
@@ -234,7 +237,7 @@ pub(crate) fn button<'a>(
 /// runtime availability bit. Disabled controls remain visible for layout and
 /// discoverability, but cannot publish a request through either input path.
 pub(crate) fn button_enabled<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     label: &'static str,
     on_press: Message,
@@ -266,7 +269,7 @@ pub(crate) fn button_enabled<'a>(
 
 /// A focusable button with a runtime label (settings pills, row actions).
 pub(crate) fn dynamic_button<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     label: String,
     on_press: Message,
@@ -296,7 +299,7 @@ pub(crate) fn dynamic_button<'a>(
 /// for regular view trees; a lazy body must own every captured style input for
 /// its `'static` widget tree.
 pub(crate) fn dynamic_button_owned(
-    theme_snapshot: taskmanager_theme::Theme,
+    theme_snapshot: Theme,
     target: FocusTarget,
     label: String,
     on_press: Message,
@@ -322,7 +325,7 @@ pub(crate) fn dynamic_button_owned(
 
 /// A quiet focusable toolbar/secondary button (ghost surface style).
 pub(crate) fn ghost_button<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     label: &'static str,
     on_press: Message,
@@ -348,7 +351,7 @@ pub(crate) fn ghost_button<'a>(
 /// the Iced adapter; the focus and activation path remains the same as the
 /// text-only ghost button.
 pub(crate) fn ghost_button_with_icon<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     icon_id: IconId,
     label: &'static str,
@@ -378,7 +381,7 @@ pub(crate) fn ghost_button_with_icon<'a>(
 /// Owned-theme variant used by viewport-lazy Performance rail cards. The
 /// lazy body must retain its style snapshot without borrowing the parent view.
 pub(crate) fn device_rail_card_owned(
-    theme_snapshot: taskmanager_theme::Theme,
+    theme_snapshot: Theme,
     target: FocusTarget,
     content: Element<'static, Message, iced::Theme, iced::Renderer>,
     selected: bool,
@@ -405,7 +408,7 @@ pub(crate) fn device_rail_card_owned(
 /// A focusable selection pill: accent-filled when selected, ghost otherwise.
 /// Used by the settings choosers so the active choice reads immediately.
 pub(crate) fn choice_pill<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     label: String,
     selected: bool,
@@ -438,7 +441,7 @@ pub(crate) fn choice_pill<'a>(
 /// strip. Settings selectors keep the text-only variant because their values
 /// are not semantic icon identities.
 pub(crate) fn choice_pill_with_icon<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     target: FocusTarget,
     icon_id: IconId,
     label: String,
@@ -476,8 +479,8 @@ pub(crate) fn choice_pill_with_icon<'a>(
 /// menu on right-click (the Users row menu, GPUI parity). `on_right_press`
 /// fires only for a right-button press over the row bounds.
 pub(crate) fn selectable_row_with_menu<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
-    page: taskmanager_application::AppPage,
+    theme_snapshot: &Theme,
+    page: AppPage,
     index: usize,
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
     on_right_press: Message,
@@ -489,8 +492,8 @@ pub(crate) fn selectable_row_with_menu<'a>(
 /// identity. It remains selectable, but deliberately has no context menu:
 /// unavailable identity authority must not be replaced with a PID hint.
 pub(crate) fn selectable_row<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
-    page: taskmanager_application::AppPage,
+    theme_snapshot: &Theme,
+    page: AppPage,
     index: usize,
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -503,7 +506,7 @@ pub(crate) fn selectable_row<'a>(
 /// widget handles it); the wrapper owns the keyboard Enter/Space path and
 /// publishes `on_press` when focused.
 pub(crate) fn focusable_control<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     target: FocusTarget,
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
     on_press: Message,
@@ -521,8 +524,8 @@ pub(crate) fn focusable_control<'a>(
 }
 
 fn selectable_row_base<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
-    page: taskmanager_application::AppPage,
+    theme_snapshot: &Theme,
+    page: AppPage,
     index: usize,
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
     on_right_press: Option<Message>,
@@ -547,7 +550,7 @@ fn selectable_row_base<'a>(
 /// resolves through the shared catalog (`common.close`, the same key the
 /// applications page's search-close button uses).
 pub(crate) fn modal_close<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     FocusableButton::new(
         MODAL_CLOSE_ID,

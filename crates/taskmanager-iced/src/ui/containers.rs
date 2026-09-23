@@ -29,7 +29,9 @@ use crate::theme;
 use taskmanager_theme::tokens;
 
 use super::components::message_panel;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_theme::Theme;
 
 /// Which branch the page body takes for one rollup projection. Pure seam the
 /// headless tests pin: a typed non-healthy source and a genuinely
@@ -97,7 +99,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 /// The page header: title, the honest scope subtitle, and the close action
 /// (the local-surface dismissal — same semantics as Escape).
 fn page_header<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     language: crate::i18n::Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
@@ -118,7 +120,7 @@ fn page_header<'a>(
 }
 
 fn page_body<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     rollup: Option<&'a ContainerRollup>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     match page_branch(rollup) {
@@ -152,7 +154,7 @@ fn page_body<'a>(
 /// The rollup source seam. The shared `SystemProjectionStore::containers` field lands
 /// with the container-rollup lane (parallel shared-layer work); until then
 /// the page honestly renders the waiting state.
-fn containers_rollup(shell: &taskmanager_shell::ShellApp) -> Option<&ContainerRollup> {
+fn containers_rollup(shell: &ShellApp) -> Option<&ContainerRollup> {
     // Shared shell data (ADR-027): the rollup arrives via the platform batch.
     shell.projection().containers.as_ref()
 }
@@ -201,7 +203,7 @@ pub(crate) fn container_row_vm(summary: &ContainerSummary) -> ContainerRowVm {
 }
 
 fn container_table<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     rollup: &'a ContainerRollup,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);

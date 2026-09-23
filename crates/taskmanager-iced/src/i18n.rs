@@ -9,6 +9,10 @@
 //! English labels. Key names mirror the `locales/*.json` vocabulary where one
 //! exists.
 
+use taskmanager_application::i18n::Language::En;
+use taskmanager_application::i18n::Language::Zh;
+use taskmanager_application::i18n::set_language;
+
 /// The two supported UI languages.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Language {
@@ -422,10 +426,10 @@ pub fn t(language: Language, key: Key) -> &'static str {
 /// body in Chinese while the iced-owned modal chrome stays English.
 pub fn sync_shared_language(language: Language) {
     let shared = match language {
-        Language::En => taskmanager_application::i18n::Language::En,
-        Language::Zh => taskmanager_application::i18n::Language::Zh,
+        Language::En => En,
+        Language::Zh => Zh,
     };
-    taskmanager_application::i18n::set_language(shared);
+    set_language(shared);
 }
 
 #[cfg(test)]

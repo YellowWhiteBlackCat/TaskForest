@@ -15,6 +15,7 @@ use taskmanager_platform_contract::{
 use crate::platform::{
     ProjectedSystemTelemetry, SystemTelemetryDomainState, SystemTelemetryUnavailable,
 };
+use taskmanager_core::detect_process_anomalies;
 
 /// Structured system overview projection facts for the diagnostic bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -282,7 +283,7 @@ impl DiagnosticProcessSummary {
             })
             .collect();
 
-        let anomalies_count = taskmanager_core::detect_process_anomalies(processes).len();
+        let anomalies_count = detect_process_anomalies(processes).len();
 
         Self {
             total_processes,

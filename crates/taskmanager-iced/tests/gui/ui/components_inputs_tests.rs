@@ -7,6 +7,7 @@
 // broken token read would otherwise panic in a real frame.
 
 use super::*;
+use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::{HighContrast, LightDark, Skin};
 
 fn theme_for(skin: Skin, mode: LightDark) -> Theme {
@@ -14,7 +15,7 @@ fn theme_for(skin: Skin, mode: LightDark) -> Theme {
         skin,
         mode,
         HighContrast::Off,
-        taskmanager_theme::ResolvedFonts::system_for(skin),
+        ResolvedFonts::system_for(skin),
     )
 }
 

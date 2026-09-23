@@ -19,6 +19,9 @@ use super::overlays::modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::{key_value_rows, titled_card};
 use crate::{IcedApp, focus, theme};
+use taskmanager_application::ServiceDependenciesLifecycle;
+use taskmanager_shell::presentation::service_diagnostics_rows;
+use taskmanager_ui_contract::IconId;
 
 pub(super) fn open_button_owned(
     theme_snapshot: Theme,
@@ -168,9 +171,7 @@ fn service_rows(item: &ServiceItem, matching_pid: Option<u32>) -> Vec<(String, S
             value_or_dash(&item.sub_state),
         ),
     ];
-    rows.extend(taskmanager_shell::presentation::service_diagnostics_rows(
-        item.diagnostics(),
-    ));
+    rows.extend(service_diagnostics_rows(item.diagnostics()));
     if let Some(pid) = matching_pid {
         rows.push((t("proc.pid").to_owned(), pid.to_string()));
     }
@@ -179,7 +180,7 @@ fn service_rows(item: &ServiceItem, matching_pid: Option<u32>) -> Vec<(String, S
 
 pub(crate) fn dependency_panel<'a>(
     app: &'a IcedApp,
-    lifecycle: &taskmanager_application::ServiceDependenciesLifecycle,
+    lifecycle: &ServiceDependenciesLifecycle,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     if let Some(failure) = lifecycle.failure() {
         return container(
@@ -188,7 +189,7 @@ pub(crate) fn dependency_panel<'a>(
                 focus::ghost_button_with_icon(
                     app.theme(),
                     FocusTarget::ServiceDetailsRetry,
-                    taskmanager_ui_contract::IconId::Refresh,
+                    IconId::Refresh,
                     t("common.refresh"),
                     Message::RefreshServiceDetails,
                 ),
@@ -343,7 +344,7 @@ fn logs_panel<'a>(
         focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::ServiceDetailsLogRefresh,
-            taskmanager_ui_contract::IconId::Refresh,
+            IconId::Refresh,
             t("common.refresh"),
             Message::RefreshServiceDetailsLogs,
         ),

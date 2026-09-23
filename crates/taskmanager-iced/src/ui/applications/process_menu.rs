@@ -16,6 +16,8 @@ use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message, ProcessMenuAction};
 use crate::{focus, theme};
+use taskmanager_core::core::process::PriorityTier;
+use taskmanager_shell::presentation::priority_tier_label;
 
 /// The floating action panel for one open process menu. Self-owned (the
 /// panel must outlive the frame that built it inside the row's lazy body),
@@ -147,28 +149,22 @@ pub(super) fn panel(
         action_button(
             theme_snapshot,
             FocusTarget::ProcessMenuPriorityHigh,
-            taskmanager_shell::presentation::priority_tier_label(
-                taskmanager_core::core::process::PriorityTier::High
-            ),
-            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::High),
+            priority_tier_label(PriorityTier::High),
+            ProcessMenuAction::Priority(PriorityTier::High),
             false,
         ),
         action_button(
             theme_snapshot,
             FocusTarget::ProcessMenuPriorityNormal,
-            taskmanager_shell::presentation::priority_tier_label(
-                taskmanager_core::core::process::PriorityTier::Normal
-            ),
-            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::Normal),
+            priority_tier_label(PriorityTier::Normal),
+            ProcessMenuAction::Priority(PriorityTier::Normal),
             false,
         ),
         action_button(
             theme_snapshot,
             FocusTarget::ProcessMenuPriorityLow,
-            taskmanager_shell::presentation::priority_tier_label(
-                taskmanager_core::core::process::PriorityTier::Low
-            ),
-            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::Low),
+            priority_tier_label(PriorityTier::Low),
+            ProcessMenuAction::Priority(PriorityTier::Low),
             false,
         ),
         action_button(

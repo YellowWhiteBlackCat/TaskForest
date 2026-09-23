@@ -13,11 +13,26 @@ use super::{
     CompactDetailViewport, PerfDetail, available_perf_devices, bounded_sidebar_label, chunk_count,
     compact_detail_viewport, perf_detail_kind, performance_sidebar_label,
 };
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::DiskPartitionScalarObservations;
+use taskmanager_core::core::metrics::DiskScalarObservations;
+use taskmanager_core::core::metrics::NetworkAdapterType;
+use taskmanager_core::core::metrics::OptionalObservation;
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::metrics::{
     DiskMetrics, GpuScalarObservations, GpuThrottleReason, NetworkMetrics, ScalarObservation,
     SystemSnapshot,
 };
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::bytes;
+use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 #[path = "devices/fan.rs"]
 mod fan;
@@ -31,15 +46,9 @@ pub(crate) fn rate_text(value: Option<u64>) -> String {
 /// Flatten pre-folded shell [`StatRow`]s into `(label, value-or-dash)` pairs
 /// the table assertions read; `None` renders the shared dash exactly like
 /// the statistics panel does.
-pub(crate) fn flat(rows: &[taskmanager_shell::viewmodel::StatRow]) -> Vec<(&str, &str)> {
+pub(crate) fn flat(rows: &[StatRow]) -> Vec<(&str, &str)> {
     rows.iter()
-        .map(|row| {
-            (
-                row.label(),
-                row.value()
-                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
-            )
-        })
+        .map(|row| (row.label(), row.value().unwrap_or(MISSING_VALUE)))
         .collect()
 }
 
@@ -53,8 +62,8 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
     set_language(Language::En);
 
     let mut gpu = GpuMetrics::new("gpu:pci:0000:03:00.0", "NVIDIA GeForce");
-    gpu.device_state = taskmanager_core::core::device_state::DeviceState {
-        status: taskmanager_core::core::device_state::DeviceStatus::Healthy,
+    gpu.device_state = DeviceState {
+        status: DeviceStatus::Healthy,
         ..Default::default()
     };
     gpu.driver = Some("nvidia".into());
@@ -155,9 +164,9 @@ fn gpu_selector_enumerates_every_projected_adapter() {
         ],
         ..SystemSnapshot::default()
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let devices = available_perf_devices(&app);
@@ -289,7 +298,7 @@ fn gpu_section_state_distinguishes_loading_empty_and_ready() {
     assert_eq!(gpu_section_state(Some(&empty)), ListState::Empty);
 
     // The demo fixture carries a GPU → Ready.
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let snapshot = shell
         .projection()
         .snapshot
@@ -438,9 +447,9 @@ fn performance_rail_keeps_dynamic_device_indices_like_gpui() {
     let mut second_network = snapshot.networks[0].clone();
     second_network.interface_name = "eth1".into();
     snapshot.networks.push(second_network);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let devices = available_perf_devices(&app);
@@ -619,13 +628,13 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
     const GIB: u64 = 1024 * 1024 * 1024;
     const MIB: u64 = 1024 * 1024;
 
-    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let mut disk = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:nvme1".into())
         .name("nvme1n1".into())
         .disk_type("SATA SSD".into())
         .mount_point("/".into())
-        .device_state(taskmanager_core::core::device_state::DeviceState {
-            status: taskmanager_core::core::device_state::DeviceStatus::Healthy,
+        .device_state(DeviceState {
+            status: DeviceStatus::Healthy,
             ..Default::default()
         })
         .current_capacity_bytes(500 * GIB)
@@ -638,16 +647,14 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
         .smart_power_on_hours(Some(7200))
         .build();
     disk.partitions = vec![
-        taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+        DiskPartitionFixtureBuilder::new()
             .mount_point("/home".into())
             .name("nvme1n1p2".into())
-            .scalar_observations(
-                taskmanager_core::core::metrics::DiskPartitionScalarObservations {
-                    capacity_bytes: ScalarObservation::available(100 * GIB, 1),
-                    used_bytes: ScalarObservation::available(70 * GIB, 1),
-                    free_bytes: ScalarObservation::available(30 * GIB, 1),
-                },
-            )
+            .scalar_observations(DiskPartitionScalarObservations {
+                capacity_bytes: ScalarObservation::available(100 * GIB, 1),
+                used_bytes: ScalarObservation::available(70 * GIB, 1),
+                free_bytes: ScalarObservation::available(30 * GIB, 1),
+            })
             .build(),
     ];
     // The remaining SMART evidence families the definition names: available
@@ -719,8 +726,8 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
 
     // Reported availability without any concrete readout still speaks through
     // the shared SMART status row, and grows no fabricated readout.
-    let availability_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
-        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+    let availability_only = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
         .build();
     let availability_source = disk_summary_lines(&availability_only, true, true, &[]);
     let availability_rows = flat(&availability_source);
@@ -745,16 +752,16 @@ fn disk_summary_renders_observed_iops_latency_and_queue_depth() {
 
     // Every throughput-depth fact comes from its own typed observation: the
     // disk summary must paint the observed values, not the shared dash.
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:nvme0".into())
         .name("nvme0n1".into())
-        .scalar_observations(taskmanager_core::core::metrics::DiskScalarObservations {
+        .scalar_observations(DiskScalarObservations {
             capacity_bytes: ScalarObservation::available(500 * 1024 * 1024 * 1024, 1),
             iops: ScalarObservation::available(137, 1),
             response_time_ms: ScalarObservation::available(1.54, 1),
             average_queue_depth: ScalarObservation::available(2.25, 1),
             service_time_ms: ScalarObservation::available(0.42, 1),
-            ..taskmanager_core::core::metrics::DiskScalarObservations::default()
+            ..DiskScalarObservations::default()
         })
         .build();
     // The builder's scalar-group stage applies the full group; keep the
@@ -848,7 +855,7 @@ fn disk_summary_surfaces_critical_warning_prefix_and_removable_flag() {
 
     // A disk whose hwmon layer raised the critical-warning bit prefixes the
     // temperature label with ⚠ (the most actionable SMART fact), mirroring GPUI.
-    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let mut disk = DiskMetricsFixtureBuilder::new()
         .smart_temperature_c(Some(81.0))
         .smart_critical_warning(Some(true))
         .smart_temp_critical_c(Some(70.0))
@@ -898,7 +905,7 @@ fn disk_section_state_distinguishes_loading_empty_and_ready() {
     assert_eq!(disk_section_state(Some(&empty)), ListState::Empty);
 
     // The demo fixture carries one disk → Ready.
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let snapshot = shell
         .projection()
         .snapshot
@@ -914,7 +921,7 @@ fn network_summary_projects_wireless_ssid_signal_and_utilization() {
     set_language(Language::En);
 
     const MIB: u64 = 1024 * 1024;
-    let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let nic = NetworkMetricsFixtureBuilder::new()
         .device_id("network:test:wlp3s0".into())
         .interface_name("wlp3s0".into())
         .current_rx_bytes_per_sec(5 * MIB)
@@ -922,17 +929,17 @@ fn network_summary_projects_wireless_ssid_signal_and_utilization() {
         .current_utilization_pct(22.0)
         .link_up_observation(ScalarObservation::available(true, 1))
         .link_speed_observation(match Some(866) {
-            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
-            None => taskmanager_core::core::metrics::ScalarObservation::default(),
+            Some(value) => ScalarObservation::available(value, 1),
+            None => ScalarObservation::default(),
         })
         .ssid_observation(match Some("TaskForest-5G".into()) {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
-        .adapter_type(taskmanager_core::core::metrics::NetworkAdapterType::WiFi)
+        .adapter_type(NetworkAdapterType::WiFi)
         .signal_observation(match Some(-47) {
-            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
-            None => taskmanager_core::core::metrics::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .ipv4_addr(Some("192.168.1.10".into()))
         .ipv6_addr(Some("fe80::2".into()))
@@ -1034,7 +1041,7 @@ fn network_section_state_distinguishes_loading_empty_and_ready() {
     assert!(empty.networks.is_empty());
     assert_eq!(network_section_state(Some(&empty)), ListState::Empty);
 
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let snapshot = shell
         .projection()
         .snapshot

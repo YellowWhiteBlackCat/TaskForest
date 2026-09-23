@@ -18,6 +18,7 @@ use iced::widget::{column, container, row, scrollable, text};
 // body strings (Performance / Applications) that were previously hard-coded.
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{alert_severity_label, t};
+use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_shell::{PageHelp, ShellApp};
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
@@ -27,6 +28,9 @@ use crate::focus;
 use crate::i18n::{self, Key};
 use crate::theme;
 use responsive::ChromePresentation;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::page_help;
+use taskmanager_theme::Theme;
 
 mod about;
 mod affinity;
@@ -95,7 +99,7 @@ pub(crate) use about::about_copy_payload;
 
 /// The current-window capture trigger button in the top navigation strip.
 pub(crate) fn current_window_capture_btn<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     language: crate::i18n::Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     focus::ghost_button_with_icon(
@@ -132,20 +136,19 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     // The frontend-local alerts route suppresses the shared-tab highlight so
     // only one route reads as active at a time.
     let alerts_open = app.alerts_page_open();
-    let mut page_tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> =
-        taskmanager_shell::page_help()
-            .into_iter()
-            .map(|PageHelp { page, label, .. }| {
-                focus::choice_pill_with_icon(
-                    theme_snapshot,
-                    FocusTarget::PageTab(page),
-                    page_icon(page),
-                    label.to_string(),
-                    page == current_page && !alerts_open,
-                    Message::SelectPage(page),
-                )
-            })
-            .collect();
+    let mut page_tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = page_help()
+        .into_iter()
+        .map(|PageHelp { page, label, .. }| {
+            focus::choice_pill_with_icon(
+                theme_snapshot,
+                FocusTarget::PageTab(page),
+                page_icon(page),
+                label.to_string(),
+                page == current_page && !alerts_open,
+                Message::SelectPage(page),
+            )
+        })
+        .collect();
     // The alerts page rides the same tab strip as the shared pages (an
     // Iced-local route outside the `AppPage` set).
     page_tabs.push(alerts::page_tab_pill(app));
@@ -223,10 +226,11 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     // one horizontal scroller made the first screenshot look like controls
     // had disappeared behind the right edge even though they were reachable.
     let nav: Element<'_, Message, iced::Theme, iced::Renderer> = if wrapped_chrome {
-        let page_nav = scrollable(row(page_tabs).spacing(4).padding([
-            f32::from(taskmanager_theme::tokens::SPACE_2),
-            f32::from(taskmanager_theme::tokens::SPACE_4),
-        ]))
+        let page_nav = scrollable(
+            row(page_tabs)
+                .spacing(4)
+                .padding([f32::from(tokens::SPACE_2), f32::from(tokens::SPACE_4)]),
+        )
         .direction(iced::widget::scrollable::Direction::Horizontal(
             iced::widget::scrollable::Scrollbar::default(),
         ))
@@ -241,10 +245,7 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
             .spacing(4)
             .push(iced::widget::Space::new().width(iced::Length::Fill))
             .push(toolbar)
-            .padding([
-                f32::from(taskmanager_theme::tokens::SPACE_2),
-                f32::from(taskmanager_theme::tokens::SPACE_4),
-            ])
+            .padding([f32::from(tokens::SPACE_2), f32::from(tokens::SPACE_4)])
             .into()
     };
 
@@ -270,18 +271,14 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
         crate::theme_binding::color(theme_snapshot.palette().warning)
     } else if let Some(notice) = shell.feedback_notice() {
         match notice.severity() {
-            taskmanager_shell::FeedbackSeverity::Info => {
-                crate::theme_binding::color(theme_snapshot.palette().fg)
-            }
-            taskmanager_shell::FeedbackSeverity::Success => {
+            FeedbackSeverity::Info => crate::theme_binding::color(theme_snapshot.palette().fg),
+            FeedbackSeverity::Success => {
                 crate::theme_binding::color(theme_snapshot.palette().success)
             }
-            taskmanager_shell::FeedbackSeverity::Warning => {
+            FeedbackSeverity::Warning => {
                 crate::theme_binding::color(theme_snapshot.palette().warning)
             }
-            taskmanager_shell::FeedbackSeverity::Error => {
-                crate::theme_binding::color(theme_snapshot.palette().danger)
-            }
+            FeedbackSeverity::Error => crate::theme_binding::color(theme_snapshot.palette().danger),
         }
     } else {
         crate::theme_binding::color(theme_snapshot.palette().fg)
@@ -293,11 +290,7 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     // hint; absent when no alert is active. The hover tooltip surfaces the
     // worst severity's label so the tone is never color-only information.
     let alert_text: Option<String> = (!shell.projection().alert_active.is_empty()).then(|| {
-        taskmanager_application::i18n::t("alerts.active").replacen(
-            "{}",
-            &shell.projection().alert_active.len().to_string(),
-            1,
-        )
+        t("alerts.active").replacen("{}", &shell.projection().alert_active.len().to_string(), 1)
     });
     let worst_severity = shell
         .projection()
@@ -367,7 +360,7 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
 }
 
 fn telemetry_warmup_body<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     spin: Option<f32>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
@@ -456,10 +449,7 @@ pub(crate) fn footer_status(shell: &ShellApp) -> String {
 /// the shared badge grammar — Critical → danger, Warning → caution, Info →
 /// accent. The same palette semantic colors the old inline severity-colored
 /// text pill used; only the presentation moved to the tone-filled capsule.
-fn alert_badge_tone(
-    severity: taskmanager_core::core::alerts::AlertSeverity,
-) -> components::BadgeTone {
-    use taskmanager_core::core::alerts::AlertSeverity;
+fn alert_badge_tone(severity: AlertSeverity) -> components::BadgeTone {
     match severity {
         AlertSeverity::Critical => components::BadgeTone::Danger,
         AlertSeverity::Warning => components::BadgeTone::Warning,

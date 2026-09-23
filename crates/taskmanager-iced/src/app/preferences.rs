@@ -4,12 +4,13 @@
 //! authority.
 
 use super::DeviceKind;
+use taskmanager_theme::FontAvailability;
 
 /// Renderer-ready values resolved from one persisted `Config` snapshot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PresentationPreferences {
     /// Cached installed-font catalog for the Settings family pickers.
-    pub(crate) font_availability: taskmanager_theme::FontAvailability,
+    pub(crate) font_availability: FontAvailability,
     pub skin: String,
     pub mode: String,
     pub hc: bool,
@@ -110,9 +111,7 @@ impl Default for PresentationPreferences {
 
 impl PresentationPreferences {
     /// Construct the initial projection with the one startup font snapshot.
-    pub(crate) fn with_font_availability(
-        font_availability: taskmanager_theme::FontAvailability,
-    ) -> Self {
+    pub(crate) fn with_font_availability(font_availability: FontAvailability) -> Self {
         Self {
             font_availability,
             ..Self::default()

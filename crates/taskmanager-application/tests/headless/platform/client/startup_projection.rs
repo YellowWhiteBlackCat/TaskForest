@@ -13,6 +13,7 @@ use crate::platform::{
     EnvironmentFacets, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     StartupEvidenceEvent, StartupEvidenceRequest, StartupEvidenceUnavailable,
 };
+use taskmanager_platform_contract::RequestId;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -78,7 +79,7 @@ fn snapshot(now_ms: u64) -> StartupBootEvidenceSnapshot {
 }
 
 fn success(
-    request_id: taskmanager_platform_contract::RequestId,
+    request_id: RequestId,
     sequence: u64,
     observed_at_ms: u64,
 ) -> EventEnvelope<PlatformEvent> {

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_shell::QuitReason;
 
 #[test]
 fn action_mapping_is_complete_and_rejects_unknown_ids() {
@@ -68,8 +69,5 @@ fn tray_quit_event_records_the_typed_reason() {
 
     assert!(!drain_tray_events(&mut app));
     assert!(app.shell.should_quit());
-    assert_eq!(
-        app.shell.quit_reason(),
-        Some(taskmanager_shell::QuitReason::Tray)
-    );
+    assert_eq!(app.shell.quit_reason(), Some(QuitReason::Tray));
 }

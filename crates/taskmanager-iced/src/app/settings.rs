@@ -6,6 +6,7 @@
 use super::*;
 use std::time::Duration;
 use taskmanager_application::TelemetryInterval;
+use taskmanager_theme::fonts;
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontPreference, resolve_fonts,
 };
@@ -22,10 +23,10 @@ impl IcedApp {
             SettingsChange::Mode(choice) => config.mode = choice.token().to_string(),
             SettingsChange::HighContrast(on) => config.hc = on,
             SettingsChange::UiFont(choice) => {
-                config.ui_font = font_token(choice, taskmanager_theme::fonts::FONT_MISANS_VF);
+                config.ui_font = font_token(choice, fonts::FONT_MISANS_VF);
             }
             SettingsChange::MonoFont(choice) => {
-                config.mono_font = font_token(choice, taskmanager_theme::fonts::FONT_ROBOTO_MONO);
+                config.mono_font = font_token(choice, fonts::FONT_ROBOTO_MONO);
             }
             SettingsChange::CompactDensity(compact) => {
                 config.density = if compact { "Compact" } else { "Comfortable" }.to_string();

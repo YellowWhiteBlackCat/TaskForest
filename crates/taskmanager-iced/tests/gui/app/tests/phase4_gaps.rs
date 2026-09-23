@@ -2,7 +2,10 @@
 
 use crate::IcedApp;
 use crate::app::{FocusTarget, Message};
+use taskmanager_application::PlatformEvent;
+use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskmanager_core::core::metrics::CpuMetrics;
 use taskmanager_core::core::metrics::{
     CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryCompressionObservations,
     MemoryMetrics, MemoryOptionalObservations, OptionalObservation, ScalarObservation,
@@ -12,14 +15,25 @@ use taskmanager_core::core::services::{
     ServiceDeps, ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
     ServiceStatus,
 };
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::CapabilityCatalog;
+use taskmanager_platform_contract::CapabilitySnapshot;
+use taskmanager_platform_contract::EventEnvelope;
+use taskmanager_platform_contract::EventPort;
+use taskmanager_platform_contract::EventPortError;
+use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 #[test]
 fn test_disk_partition_panel_renders_active_partitions_and_usage() {
     let app = IcedApp::demo();
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .model("Samsung SSD 990 PRO 2TB".to_string())
         .partitions(vec![
-            taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+            DiskPartitionFixtureBuilder::new()
                 .device_id(String::new())
                 .parent_device_id(String::new())
                 .device_generation(Default::default())
@@ -31,7 +45,7 @@ fn test_disk_partition_panel_renders_active_partitions_and_usage() {
                 .current_used_bytes(400_000_000_000)
                 .current_free_bytes(600_000_000_000)
                 .build(),
-            taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+            DiskPartitionFixtureBuilder::new()
                 .device_id(String::new())
                 .parent_device_id(String::new())
                 .device_generation(Default::default())
@@ -102,9 +116,9 @@ fn test_memory_compression_card_savings() {
 #[test]
 fn test_service_details_interactive_dependency_links() {
     let mut app = IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             ServiceItem::from_inventory(
                 "network.target",
                 "network.target",
@@ -133,17 +147,10 @@ fn test_service_details_interactive_dependency_links() {
         ServiceRelationEdge::new(ServiceRelationKind::After, "network.target"),
     ]));
 
-    let service_id = taskmanager_core::core::target::ServiceId::new("systemd:demo.service");
-    let mut lifecycle = taskmanager_application::ServiceDependenciesLifecycle::default();
-    lifecycle.begin(
-        taskmanager_platform_contract::RequestId::MIN,
-        service_id.clone(),
-    );
-    lifecycle.resolve(
-        taskmanager_platform_contract::RequestId::MIN,
-        service_id,
-        deps,
-    );
+    let service_id = ServiceId::new("systemd:demo.service");
+    let mut lifecycle = ServiceDependenciesLifecycle::default();
+    lifecycle.begin(RequestId::MIN, service_id.clone());
+    lifecycle.resolve(RequestId::MIN, service_id, deps);
     let panel = crate::ui::service_details::dependency_panel(&app, &lifecycle);
     drop(panel);
 }
@@ -152,12 +159,10 @@ fn test_service_details_interactive_dependency_links() {
 fn test_thermal_heatmap_and_sensor_badges() {
     let app = IcedApp::demo();
     let mut snapshot = SystemSnapshot {
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-            CpuScalarObservations {
-                temperature_c: ScalarObservation::available(65.0, 1),
-                ..Default::default()
-            },
-        ),
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            temperature_c: ScalarObservation::available(65.0, 1),
+            ..Default::default()
+        }),
         ..Default::default()
     };
 
@@ -196,9 +201,9 @@ fn test_heterogeneous_cpu_core_breakdown_and_tags() {
         ],
         ..Default::default()
     };
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Hardware(Some(Box::new(hw))),
+        ProjectionSeedFact::Hardware(Some(Box::new(hw))),
     );
 
     let panel = crate::ui::core_grid::per_core_grid_panel(&app, app.theme());
@@ -266,23 +271,18 @@ fn submitting_run_task_launches_the_command_through_the_platform_lane() {
 
     #[derive(Default)]
     struct EmptyCapabilities;
-    impl taskmanager_platform_contract::CapabilityCatalog for EmptyCapabilities {
-        fn snapshot(&self) -> taskmanager_platform_contract::CapabilitySnapshot {
-            taskmanager_platform_contract::CapabilitySnapshot::default()
+    impl CapabilityCatalog for EmptyCapabilities {
+        fn snapshot(&self) -> CapabilitySnapshot {
+            CapabilitySnapshot::default()
         }
     }
 
     #[derive(Default)]
     struct EmptyEvents;
-    impl taskmanager_platform_contract::EventPort for EmptyEvents {
-        type Event = taskmanager_application::PlatformEvent;
+    impl EventPort for EmptyEvents {
+        type Event = PlatformEvent;
 
-        fn try_recv(
-            &self,
-        ) -> Result<
-            Option<taskmanager_platform_contract::EventEnvelope<Self::Event>>,
-            taskmanager_platform_contract::EventPortError,
-        > {
+        fn try_recv(&self) -> Result<Option<EventEnvelope<Self::Event>>, EventPortError> {
             Ok(None)
         }
     }

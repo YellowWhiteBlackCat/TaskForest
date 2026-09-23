@@ -14,7 +14,18 @@ use taskmanager_shell::{ShellApp, ShellKeyEvent};
 use crate::app::{IcedApp, IcedKey, Message};
 use crate::ui::overlays::process_details::{filtered_environment_rows, working_directory_value};
 use crate::ui::perf_devices::network::{network_summary_lines, network_title};
+use taskmanager_application::AppAction;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::NetworkScalarObservations;
+use taskmanager_core::core::metrics::NetworkWirelessObservations;
+use taskmanager_core::core::metrics::OptionalObservation;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
 fn test_environment_filter_matches_keys_case_insensitively() {
@@ -49,10 +60,8 @@ fn working_directory_is_collecting_until_the_typed_insight_arrives() {
     use taskmanager_application::i18n::{Language, set_language};
     set_language(Language::En);
     let shell = ShellApp::default();
-    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
-        1, "init", 100, 1_000,
-    )
-    .expect("fixture identity");
+    let target = FrozenProcessIdentity::from_authoritative_parts(1, "init", 100, 1_000)
+        .expect("fixture identity");
     assert_eq!(working_directory_value(&shell, &target), "collecting…");
 }
 
@@ -60,17 +69,14 @@ fn working_directory_is_collecting_until_the_typed_insight_arrives() {
 fn test_network_wifi_signal_formatting() {
     let mut nic = NetworkMetrics::default();
     nic.ipv4_addr = Some("192.168.1.100".into());
-    let wireless_observations = taskmanager_core::core::metrics::NetworkWirelessObservations {
-        signal_dbm: taskmanager_core::core::metrics::OptionalObservation::present(-60, 0),
-        ssid: taskmanager_core::core::metrics::OptionalObservation::present(
-            "HomeWiFi_5G".into(),
-            0,
-        ),
+    let wireless_observations = NetworkWirelessObservations {
+        signal_dbm: OptionalObservation::present(-60, 0),
+        ssid: OptionalObservation::present("HomeWiFi_5G".into(), 0),
         ..Default::default()
     };
     nic.apply_observations(
         NetworkAdapterType::WiFi,
-        taskmanager_core::core::metrics::NetworkScalarObservations::default(),
+        NetworkScalarObservations::default(),
         wireless_observations,
     );
 
@@ -87,9 +93,7 @@ fn test_network_wifi_signal_formatting() {
         "the SSID stats row is retired (it is the page title now)"
     );
 
-    let sig_row = rows
-        .iter()
-        .find(|row| row.label() == taskmanager_application::i18n::t("common.signal"));
+    let sig_row = rows.iter().find(|row| row.label() == t("common.signal"));
     assert!(sig_row.is_some());
     assert!(
         sig_row
@@ -112,7 +116,7 @@ fn test_wifi_quality_mapping_and_hardware_facts_live_in_the_stats_rail() {
 
     // The dedicated hardware card is retired (pure duplication of the stats
     // rail): adapter and driver ride the statistics rows like GPUI.
-    let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let nic = NetworkMetricsFixtureBuilder::new()
         .adapter_type(NetworkAdapterType::WiFi)
         .adapter(Some("Intel Wi-Fi 6E AX211".into()))
         .driver(Some("iwlwifi".into()))
@@ -120,11 +124,11 @@ fn test_wifi_quality_mapping_and_hardware_facts_live_in_the_stats_rail() {
     let rows = network_summary_lines(&nic, true, true);
     let adapter = rows
         .iter()
-        .find(|row| row.label() == taskmanager_application::i18n::t("common.adapter"))
+        .find(|row| row.label() == t("common.adapter"))
         .and_then(|row| row.value());
     let driver = rows
         .iter()
-        .find(|row| row.label() == taskmanager_application::i18n::t("common.driver"))
+        .find(|row| row.label() == t("common.driver"))
         .and_then(|row| row.value());
     assert_eq!(adapter, Some("Intel Wi-Fi 6E AX211"));
     assert_eq!(driver, Some("iwlwifi"));
@@ -218,10 +222,8 @@ fn test_system_hardware_rows_include_panorama_facts() {
 
 #[test]
 fn test_shell_home_and_end_keys() {
-    let mut shell = taskmanager_shell::demo_app();
-    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
-        AppPage::Applications,
-    ));
+    let mut shell = demo_app();
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     let count = shell.visible_process_count();
     assert!(count > 1);
 
@@ -251,16 +253,13 @@ fn test_visual_navigation_home_and_end() {
     let _ = app.update(Message::SelectPage(AppPage::Applications));
     let mut procs = Vec::new();
     for pid in 1..=10 {
-        let p = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        let p = ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(format!("proc_{pid}"))
             .build();
         procs.push(p);
     }
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(procs)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
     app.process_presentation.visual_cursor = 5;
     let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
         KeyCode::Home,
@@ -299,9 +298,9 @@ fn ctrl_c_copies_the_selected_row_summary() {
 fn ctrl_c_is_inert_without_a_selectable_row() {
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(Vec::new())),
+        ProjectionSeedFact::Processes(Some(Vec::new())),
     );
     let before = app.shell.feedback_text().to_owned();
     let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(

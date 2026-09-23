@@ -16,6 +16,7 @@ use crate::ui::perf_overview::{
     cpu_memory_header_and_stats, msr_readout_needs_authorization, msr_readouts_card,
     rapl_power_card, rapl_power_needs_authorization,
 };
+use taskmanager_test_support::pin_english;
 
 #[test]
 fn test_authorize_rapl_power_message_yields_effect() {
@@ -82,7 +83,7 @@ fn test_focus_targets_for_rapl_and_msr_authorization() {
 
 #[test]
 fn test_rapl_power_authorization_and_ready_presentation() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::IcedApp::demo();
 
     // 1. When escalation is required via rejection
@@ -161,7 +162,7 @@ fn test_rapl_power_authorization_and_ready_presentation() {
 
 #[test]
 fn test_msr_readouts_authorization_and_ready_presentation() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::IcedApp::demo();
 
     // 1. When escalation is required via rejection

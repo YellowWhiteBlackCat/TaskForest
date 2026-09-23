@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use taskmanager_application::ConfigWorkerState;
 use taskmanager_application::{
     ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigDrain, ConfigLoadSource,
     ConfigPublication, ConfigPublicationOutcome, ConfigRecoveryNotice, ConfigRuntimeOptions,
@@ -382,10 +383,7 @@ fn last_runtime_handle_drop_stops_worker_through_independent_control_lane() {
     let mut client = coordinator.client();
     observe_initial(&mut client);
     drop(coordinator);
-    assert_ne!(
-        monitor.state(),
-        taskmanager_application::ConfigWorkerState::Stopped
-    );
+    assert_ne!(monitor.state(), ConfigWorkerState::Stopped);
     drop(client);
     assert!(monitor.wait_stopped(Duration::from_secs(2)));
 }

@@ -1,39 +1,25 @@
 use super::*;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::trend::TrendSeries;
 
 #[test]
 fn series_snapshot_reuses_until_the_data_epoch_changes() {
-    let shell = taskmanager_shell::ShellApp::new();
+    let shell = ShellApp::new();
     let mut cache = HistorySeriesCache::default();
-    let first = cache.get(
-        &shell,
-        4,
-        taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent,
-    );
-    let second = cache.get(
-        &shell,
-        4,
-        taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent,
-    );
+    let first = cache.get(&shell, 4, TrendSeries::CpuUsagePercent);
+    let second = cache.get(&shell, 4, TrendSeries::CpuUsagePercent);
     assert!(Rc::ptr_eq(&first, &second));
 
-    let next_epoch = cache.get(
-        &shell,
-        5,
-        taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent,
-    );
+    let next_epoch = cache.get(&shell, 5, TrendSeries::CpuUsagePercent);
     assert!(!Rc::ptr_eq(&first, &next_epoch));
 
-    let other_series = cache.get(
-        &shell,
-        5,
-        taskmanager_shell::presentation::trend::TrendSeries::MemoryUsagePercent,
-    );
+    let other_series = cache.get(&shell, 5, TrendSeries::MemoryUsagePercent);
     assert!(!Rc::ptr_eq(&next_epoch, &other_series));
 }
 
 #[test]
 fn core_and_device_snapshots_reuse_until_the_revision_changes() {
-    let shell = taskmanager_shell::ShellApp::new();
+    let shell = ShellApp::new();
     let mut cache = HistorySeriesCache::default();
 
     let cores = cache.core(&shell, 7);

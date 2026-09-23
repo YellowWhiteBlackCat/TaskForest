@@ -2,6 +2,7 @@ use super::{
     MergedSourceState, SourceNotice, SourceStateKind, device_source_line, merge_source_lines,
     source_line, source_lines, source_notice, source_status_from_operation_failure, truncate_text,
 };
+use taskmanager_core::DeviceState;
 use taskmanager_core::{DeviceStatus, FailureKind, ProviderId, SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::{
     CapabilityId, EventSequence, OperationFailure, RequestIdGenerator, RetryDisposition,
@@ -130,7 +131,7 @@ fn device_status_maps_to_neutral_kind_with_its_typed_cause() {
     for (status, kind, failure) in cases {
         let line = device_source_line(
             &ProviderId::borrowed("linux.proc"),
-            &taskmanager_core::DeviceState {
+            &DeviceState {
                 status,
                 last_success_ms: Some(12),
             },

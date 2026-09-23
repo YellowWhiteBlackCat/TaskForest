@@ -14,11 +14,14 @@ use crate::platform::{
     StorageTelemetryRequest, SystemFacets, SystemTelemetryDomain, SystemTelemetryDomainEvent,
     SystemTelemetryDomainOutcome, SystemTelemetryRevision, SystemTelemetryUnavailable,
 };
+use taskmanager_core::FailureKind::IdentityChanged;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, ScalarObservation,
 };
+use taskmanager_platform_contract::CapabilityRecoveryOutcome;
+use taskmanager_platform_contract::CapabilityRecoveryTrigger;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -54,9 +57,9 @@ impl CapabilityScheduler for DueScheduler {
     fn request_recovery(
         &self,
         _capability: &CapabilityId,
-        _trigger: taskmanager_platform_contract::CapabilityRecoveryTrigger,
-    ) -> taskmanager_platform_contract::CapabilityRecoveryOutcome {
-        taskmanager_platform_contract::CapabilityRecoveryOutcome::UnknownCapability
+        _trigger: CapabilityRecoveryTrigger,
+    ) -> CapabilityRecoveryOutcome {
+        CapabilityRecoveryOutcome::UnknownCapability
     }
 
     fn scheduling_snapshot(&self) -> RuntimeSchedulingSnapshot {
@@ -280,10 +283,7 @@ fn stale_domain_event_becomes_a_typed_unavailable_outcome() {
     let batch = client.try_drain().expect("event port remains live");
 
     assert_eq!(batch.failures.len(), 1);
-    assert_eq!(
-        batch.failures[0].kind,
-        taskmanager_core::FailureKind::IdentityChanged
-    );
+    assert_eq!(batch.failures[0].kind, IdentityChanged);
     assert_eq!(batch.system_telemetry_projections.len(), 1);
     assert!(matches!(
         batch.system_telemetry_outcomes.as_slice(),

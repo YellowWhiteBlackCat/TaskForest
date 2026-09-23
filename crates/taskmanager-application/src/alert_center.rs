@@ -31,6 +31,7 @@ use crate::platform::DesktopNotificationRequest;
 use super::AlertDispatcher;
 use crate::managed_alert_rules::reduce_managed_alert_rules;
 use crate::{ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome};
+use taskmanager_core::core::alerts::MAX_ALERT_EVENTS;
 
 /// One evaluation pass: the current active alerts plus the requests the
 /// frontend should submit to the desktop notification service.
@@ -115,9 +116,7 @@ impl AlertCenter {
     /// bounded replacement exists so visual evidence can exercise the same
     /// shared projection without a fake renderer-local history.
     pub fn replace_event_history(&mut self, mut events: Vec<AlertEvent>) {
-        let excess = events
-            .len()
-            .saturating_sub(taskmanager_core::core::alerts::MAX_ALERT_EVENTS);
+        let excess = events.len().saturating_sub(MAX_ALERT_EVENTS);
         if excess > 0 {
             events.drain(..excess);
         }
@@ -226,10 +225,7 @@ impl AlertCenter {
             alert,
             observed_at_ms,
         });
-        let excess = self
-            .event_history
-            .len()
-            .saturating_sub(taskmanager_core::core::alerts::MAX_ALERT_EVENTS);
+        let excess = self.event_history.len().saturating_sub(MAX_ALERT_EVENTS);
         if excess > 0 {
             self.event_history.drain(..excess);
         }

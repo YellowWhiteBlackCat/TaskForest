@@ -21,6 +21,10 @@ use crate::app::Message;
 use crate::focus;
 use crate::theme;
 use crate::ui::components::key_value_rows;
+use taskmanager_core::core::SmartSelfTestKind;
+use taskmanager_core::core::SmartSelfTestPhase;
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::metrics::SmartAvailability;
 
 pub(crate) mod alerts;
 pub(crate) use alerts::*;
@@ -118,12 +122,10 @@ pub(super) fn smart_overlay<'a>(
                             .find(|obs| obs.device_id.as_str() == disk.device_id)
                             .map(|obs| &obs.report);
 
-                        let is_running = report.is_some_and(|r| {
-                            r.phase == taskmanager_core::core::SmartSelfTestPhase::Running
-                        });
+                        let is_running =
+                            report.is_some_and(|r| r.phase == SmartSelfTestPhase::Running);
                         let can_test = !is_running
-                            && (disk.smart_availability
-                                == taskmanager_core::core::metrics::SmartAvailability::Available
+                            && (disk.smart_availability == SmartAvailability::Available
                                 || has_smart_fields(disk));
 
                         let mut test_row = row![
@@ -140,7 +142,7 @@ pub(super) fn smart_overlay<'a>(
                                     t("health.short_test"),
                                     Message::RequestSmartSelfTest {
                                         index,
-                                        kind: taskmanager_core::core::SmartSelfTestKind::Short,
+                                        kind: SmartSelfTestKind::Short,
                                     },
                                 ))
                                 .push(focus::ghost_button(
@@ -149,7 +151,7 @@ pub(super) fn smart_overlay<'a>(
                                     t("health.extended_test"),
                                     Message::RequestSmartSelfTest {
                                         index,
-                                        kind: taskmanager_core::core::SmartSelfTestKind::Extended,
+                                        kind: SmartSelfTestKind::Extended,
                                     },
                                 ));
                         } else if is_running {
@@ -190,7 +192,7 @@ pub(super) fn smart_overlay<'a>(
     )
 }
 
-fn smart_rows(disk: &taskmanager_core::core::metrics::DiskMetrics) -> Vec<(String, String)> {
+fn smart_rows(disk: &DiskMetrics) -> Vec<(String, String)> {
     let mut rows = vec![(
         t("disk.smart_status").to_owned(),
         t(device_status_i18n_key(effective_smart_status(disk))).to_owned(),

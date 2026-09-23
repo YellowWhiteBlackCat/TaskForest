@@ -16,6 +16,8 @@ use taskmanager_shell::presentation::search_url_for;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 use super::{IcedApp, Message};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::PriorityTier;
 
 /// One action exposed by the Applications-row context menu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +27,7 @@ pub enum ProcessMenuAction {
     Kill,
     Suspend,
     Resume,
-    Priority(taskmanager_core::core::process::PriorityTier),
+    Priority(PriorityTier),
     EfficiencyMode,
     Signal(ProcessSignal),
     OpenLocation,
@@ -53,7 +55,7 @@ impl IcedApp {
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("feedback.process_gone"),
+                t("feedback.process_gone"),
             );
             return None;
         }
@@ -124,7 +126,7 @@ impl IcedApp {
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("feedback.process_gone"),
+                t("feedback.process_gone"),
             );
             return;
         };
@@ -134,7 +136,7 @@ impl IcedApp {
                 FeedbackSource::Clipboard,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("hint.nothing_to_copy"),
+                t("hint.nothing_to_copy"),
             );
             return;
         }
@@ -142,11 +144,7 @@ impl IcedApp {
             FeedbackSource::Clipboard,
             FeedbackSeverity::Success,
             FeedbackLifecycle::SHORT,
-            format!(
-                "{} · {}",
-                taskmanager_application::i18n::t("hint.copied"),
-                taskmanager_application::i18n::t(label_key),
-            ),
+            format!("{} · {}", t("hint.copied"), t(label_key),),
         );
         *clipboard_task = Some(iced::clipboard::write(payload));
     }
@@ -163,7 +161,7 @@ impl IcedApp {
                         FeedbackSource::Interaction,
                         FeedbackSeverity::Warning,
                         FeedbackLifecycle::SHORT,
-                        taskmanager_application::i18n::t("hint.location_unavailable"),
+                        t("hint.location_unavailable"),
                     );
                     None
                 }
@@ -173,7 +171,7 @@ impl IcedApp {
                     FeedbackSource::Interaction,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::SHORT,
-                    taskmanager_application::i18n::t("empty.no_process_selected"),
+                    t("empty.no_process_selected"),
                 );
                 None
             }
@@ -192,7 +190,7 @@ impl IcedApp {
                     FeedbackSource::Interaction,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::SHORT,
-                    taskmanager_application::i18n::t("hint.no_process_name"),
+                    t("hint.no_process_name"),
                 );
                 None
             }

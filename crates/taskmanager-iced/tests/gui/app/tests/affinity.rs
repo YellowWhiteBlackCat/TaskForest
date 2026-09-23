@@ -1,5 +1,10 @@
 use super::*;
+use taskmanager_application::PlatformEffect;
+use taskmanager_application::ProcessAffinityReady;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 #[test]
 fn process_affinity_editor_freezes_identity_and_applies_a_sorted_mask() {
@@ -9,15 +14,13 @@ fn process_affinity_editor_freezes_identity_and_applies_a_sorted_mask() {
         .shell
         .selected_process_identity()
         .expect("demo process must have an authoritative identity");
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ProcessAffinity(Some(
-            taskmanager_application::ProcessAffinityReady {
-                request_id: taskmanager_platform_contract::RequestId::MIN,
-                target: target.clone(),
-                cpus: vec![2, 0],
-            },
-        )),
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityReady {
+            request_id: RequestId::MIN,
+            target: target.clone(),
+            cpus: vec![2, 0],
+        })),
     );
 
     let _ = app.update(Message::OpenProcessAffinity);
@@ -36,7 +39,7 @@ fn process_affinity_editor_freezes_identity_and_applies_a_sorted_mask() {
     let _ = app.update(Message::ToggleProcessAffinityCpu(2));
     let effect = app.apply_process_affinity_effect();
     match effect {
-        Some(taskmanager_application::PlatformEffect::ProcessAffinityControl(request)) => {
+        Some(PlatformEffect::ProcessAffinityControl(request)) => {
             assert_eq!(request.target, target);
             assert_eq!(request.cpus, vec![0]);
         }

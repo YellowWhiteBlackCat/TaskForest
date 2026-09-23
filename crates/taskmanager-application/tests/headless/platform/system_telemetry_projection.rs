@@ -17,6 +17,7 @@ use crate::platform::event_batch::{
 };
 
 use super::*;
+use taskmanager_core::CpuScalarObservations;
 
 fn source(name: &'static str) -> Vec<SourceStatus> {
     vec![SourceStatus {
@@ -52,7 +53,7 @@ fn cpu_with_usage(
     usage: Option<f32>,
 ) -> SystemTelemetryDomainEvent {
     let metrics = usage.map_or_else(CpuMetrics::default, |usage| {
-        let observations = taskmanager_core::CpuScalarObservations {
+        let observations = CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(usage, 11),
             ..Default::default()
         };

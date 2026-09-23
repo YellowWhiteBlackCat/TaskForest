@@ -4,6 +4,7 @@ use super::*;
 use iced::Element;
 use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
 
+use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
 use taskmanager_shell::presentation::{
     bytes, device_status_i18n_key, gpu_display_identity, missing_value,
 };
@@ -11,6 +12,7 @@ use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
 use super::super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
+use taskmanager_theme::Theme;
 
 /// The Performance-page GPU panel readiness.
 #[must_use]
@@ -329,7 +331,7 @@ pub(super) fn gpu_headline_label_value(
 
 fn gpu_headline_readouts(
     gpu: &GpuMetrics,
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     perf_layout::headline_readouts(
         theme_snapshot,
@@ -394,7 +396,7 @@ use engine_graph::{GpuBlockProps, gpu_block};
 /// unavailable data must not masquerade as a measured 0%).
 pub(crate) fn gpu_vram_meters_panel<'a>(
     gpu: &'a GpuMetrics,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let observed = super::projection::GpuObservation::from(gpu);
     let mut bars: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
@@ -459,11 +461,9 @@ pub(crate) fn gpu_vram_meters_panel<'a>(
 pub(crate) fn gpu_engines_panel<'a>(
     app: &'a crate::IcedApp,
     gpu: &'a GpuMetrics,
-    engine_rows: &taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation<'a>,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    engine_rows: &GpuEngineRowsPresentation<'a>,
+    theme_snapshot: &'a Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
-    use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
-
     let mut engine_items: Vec<(String, f32)> = Vec::new();
     for engine in &gpu.engines {
         if !engine.name.trim().is_empty() && engine.usage_pct.is_finite() {

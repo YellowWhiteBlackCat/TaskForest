@@ -10,6 +10,9 @@
 use std::time::{Duration, Instant};
 
 use taskmanager_application::AppPage;
+use taskmanager_application::service_submission_failure;
+use taskmanager_core::core::services::ServiceLogErrorKind;
+use taskmanager_core::core::services::ServiceLogFailure;
 use taskmanager_theme::tokens::{DURATION_MEDIUM, MotionPolicy};
 
 /// The persisted `Config::motion` token for one policy — the shared core
@@ -231,7 +234,7 @@ impl crate::IcedApp {
                 }
             }
             Err(error) => {
-                let failure = taskmanager_application::service_submission_failure(error);
+                let failure = service_submission_failure(error);
                 if let Some(attempt_id) = details_attempt {
                     self.service_details.reject_stream(attempt_id, failure);
                 }
@@ -242,10 +245,8 @@ impl crate::IcedApp {
                 {
                     open.lifecycle.reject_attempt(
                         attempt_id,
-                        taskmanager_core::core::services::ServiceLogFailure::with_detail(
-                            taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
-                                failure,
-                            ),
+                        ServiceLogFailure::with_detail(
+                            ServiceLogErrorKind::from_failure(failure),
                             "service log request submission failed",
                         ),
                     );

@@ -5,6 +5,8 @@
 
 use super::*;
 use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_shell::presentation::priority_tier_label;
 
 /// The three nice-level presets the Applications action bar offers (mirrors the
 /// GPUI batch `SetPriority` high/normal/low projection). A small `Display` +
@@ -20,8 +22,7 @@ pub(super) enum PriorityChoice {
 impl PriorityChoice {
     pub(super) const ALL: [Self; 3] = [Self::High, Self::Normal, Self::Low];
 
-    pub(super) fn action(self) -> taskmanager_core::core::process::ProcessBatchAction {
-        use taskmanager_core::core::process::ProcessBatchAction;
+    pub(super) fn action(self) -> ProcessBatchAction {
         match self {
             // The typed tier carries the semantics; the platform adapter owns
             // the tier→native-primitive mapping (mirrors GPUI's action bar
@@ -41,11 +42,7 @@ impl std::fmt::Display for PriorityChoice {
             Self::Normal => PriorityTier::Normal,
             Self::Low => PriorityTier::Low,
         };
-        write!(
-            f,
-            "{}",
-            taskmanager_shell::presentation::priority_tier_label(tier)
-        )
+        write!(f, "{}", priority_tier_label(tier))
     }
 }
 

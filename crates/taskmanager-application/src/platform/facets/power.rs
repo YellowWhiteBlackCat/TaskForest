@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, RequestPort};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

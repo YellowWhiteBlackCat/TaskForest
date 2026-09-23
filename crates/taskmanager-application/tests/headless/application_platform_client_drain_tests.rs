@@ -18,6 +18,7 @@ use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::{
     ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot, ProcessNetworkSnapshot,
 };
+use taskmanager_platform_contract::RequestId;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -97,7 +98,7 @@ fn client(
 }
 
 fn successful_event(
-    request_id: taskmanager_platform_contract::RequestId,
+    request_id: RequestId,
     capability: CapabilityId,
     payload: PlatformEvent,
     sequence: u64,
@@ -113,7 +114,7 @@ fn successful_event(
 }
 
 fn failed_event(
-    request_id: taskmanager_platform_contract::RequestId,
+    request_id: RequestId,
     envelope_capability: CapabilityId,
     failure_capability: CapabilityId,
     kind: FailureKind,
@@ -300,7 +301,7 @@ fn direct_event_port_cannot_route_a_payload_under_an_unrelated_capability() {
     let events = Arc::new(QueuedEvents::default());
     let network = Arc::new(AcceptingNetwork::default());
     let mut client = client(events.clone(), network, None);
-    let request_id = taskmanager_platform_contract::RequestId::new(70).expect("fixture id");
+    let request_id = RequestId::new(70).expect("fixture id");
     events.push(successful_event(
         request_id,
         CapabilityId::PROCESS_LIST,

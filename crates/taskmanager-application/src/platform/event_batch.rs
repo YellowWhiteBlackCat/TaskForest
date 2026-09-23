@@ -15,6 +15,7 @@ use super::{
     SessionEvent, ShellEvent, SmartEvent, SmbiosMemoryEvent, StartupEvent, StartupEvidenceEvent,
     StorageHealthEvent,
 };
+use taskmanager_core::FailureKind;
 
 mod environment;
 mod integration;
@@ -306,7 +307,7 @@ impl PlatformEventVisitor for BatchEventVisitor<'_> {
 
     fn visit_startup_evidence(&mut self, event: StartupEvidenceEvent) {
         let _ = event;
-        let kind = taskmanager_core::FailureKind::ProviderFault;
+        let kind = FailureKind::ProviderFault;
         self.batch.failures.push(OperationFailure {
             request_id: self.context.request_id,
             capability: self.context.capability.clone(),

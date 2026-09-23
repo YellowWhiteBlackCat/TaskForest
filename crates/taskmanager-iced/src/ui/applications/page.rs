@@ -8,7 +8,11 @@ use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
 use taskmanager_core::core::process::ProcessBatchAction;
 
+use taskmanager_shell::presentation::process_anomaly_summary;
+use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_shell::{ProcessControlScope, SortDir};
+use taskmanager_theme::tokens::FONT_13;
+use taskmanager_theme::tokens::FONT_CAPTION;
 
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
@@ -87,8 +91,8 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                     .as_ref()
                     .map(|items| items.as_slice());
                 [
-                    taskmanager_shell::presentation::uninterruptible_process_summary(processes),
-                    taskmanager_shell::presentation::process_anomaly_summary(processes),
+                    uninterruptible_process_summary(processes),
+                    process_anomaly_summary(processes),
                 ]
                 .into_iter()
                 .flatten()
@@ -167,16 +171,13 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         // GPUI-parity empty state: a centered message instead of a blank
         // header + scrollable (render.rs: `proc.no_processes` /
         // `proc.no_processes_match`).
-        container(
-            text(empty_state_message(shell.query.as_str()))
-                .size(f32::from(taskmanager_theme::tokens::FONT_13)),
-        )
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(move |_| theme::panel_style(theme_snapshot))
-        .into()
+        container(text(empty_state_message(shell.query.as_str())).size(f32::from(FONT_13)))
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_| theme::panel_style(theme_snapshot))
+            .into()
     } else {
         let key = applications_virtual_table_key(projection_generation, &row_context, window);
         let model = ApplicationsTableModel {
@@ -318,7 +319,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             actions.push(
                 row![
                     text(t("proc.priority"))
-                        .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+                        .size(f32::from(FONT_CAPTION))
                         .color(theme::muted_text_color(theme_snapshot)),
                     priority_picker,
                 ]

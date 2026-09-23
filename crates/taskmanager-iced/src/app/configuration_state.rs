@@ -8,6 +8,7 @@ use taskmanager_theme::tokens::MotionPolicy;
 
 use super::PresentationPreferences;
 use crate::i18n::Language;
+use taskmanager_theme::FontAvailability;
 
 pub(super) struct IcedConfiguration {
     client: Option<ConfigClient>,
@@ -21,10 +22,7 @@ pub(super) struct IcedConfiguration {
 }
 
 impl IcedConfiguration {
-    pub(super) fn new(
-        client: Option<ConfigClient>,
-        font_availability: taskmanager_theme::FontAvailability,
-    ) -> Self {
+    pub(super) fn new(client: Option<ConfigClient>, font_availability: FontAvailability) -> Self {
         Self {
             client,
             applied_revision: None,

@@ -13,6 +13,9 @@ use crate::platform::{
 use taskmanager_core::core::process::FrozenProcessIdentity;
 
 use super::PlatformClient;
+use taskmanager_platform_contract::CapabilityRecoveryOutcome;
+use taskmanager_platform_contract::CapabilityRecoveryTrigger;
+use taskmanager_platform_contract::RuntimeSchedulingSnapshot;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -63,13 +66,13 @@ impl CapabilityScheduler for RecordingScheduler {
     fn request_recovery(
         &self,
         _capability: &CapabilityId,
-        _trigger: taskmanager_platform_contract::CapabilityRecoveryTrigger,
-    ) -> taskmanager_platform_contract::CapabilityRecoveryOutcome {
-        taskmanager_platform_contract::CapabilityRecoveryOutcome::UnknownCapability
+        _trigger: CapabilityRecoveryTrigger,
+    ) -> CapabilityRecoveryOutcome {
+        CapabilityRecoveryOutcome::UnknownCapability
     }
 
-    fn scheduling_snapshot(&self) -> taskmanager_platform_contract::RuntimeSchedulingSnapshot {
-        taskmanager_platform_contract::RuntimeSchedulingSnapshot::default()
+    fn scheduling_snapshot(&self) -> RuntimeSchedulingSnapshot {
+        RuntimeSchedulingSnapshot::default()
     }
 }
 

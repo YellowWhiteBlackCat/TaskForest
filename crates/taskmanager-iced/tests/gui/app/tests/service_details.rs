@@ -1,4 +1,8 @@
 use super::*;
+use taskmanager_application::i18n::Language;
+use taskmanager_core::core::services::ServiceLogState;
+use taskmanager_core::core::services::ServiceRelationKind;
+use taskmanager_platform_contract::RequestId;
 
 #[test]
 fn service_details_entry_projects_lifecycle_and_dependency_facts() {
@@ -19,13 +23,11 @@ fn service_details_entry_projects_lifecycle_and_dependency_facts() {
         .projected()
         .expect("demo dependencies are ready");
     assert_eq!(
-        dependencies
-            .relation_projection(&taskmanager_core::core::services::ServiceRelationKind::Requires),
+        dependencies.relation_projection(&ServiceRelationKind::Requires),
         "sysinit.target basic.target"
     );
     assert_eq!(
-        dependencies
-            .relation_projection(&taskmanager_core::core::services::ServiceRelationKind::WantedBy),
+        dependencies.relation_projection(&ServiceRelationKind::WantedBy),
         "multi-user.target"
     );
     assert_eq!(
@@ -63,7 +65,7 @@ fn service_details_merged_log_panel_folds_its_own_stream() {
     };
     use taskmanager_core::core::target::ServiceId;
 
-    set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
 
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Services));
@@ -107,7 +109,7 @@ fn service_details_merged_log_panel_folds_its_own_stream() {
     // A stream for ANOTHER service never leaks into the open panel.
     let other = ServiceId::new("systemd:other.service");
     app.apply_service_details_updates([ServiceUpdate::LogStream {
-        request_id: taskmanager_platform_contract::RequestId::new(2).expect("fixture id"),
+        request_id: RequestId::new(2).expect("fixture id"),
         observed_at_ms: 2,
         snapshot: ServiceLogStreamSnapshot {
             query: ServiceLogQuery {
@@ -144,7 +146,7 @@ fn service_details_merged_log_panel_folds_its_own_stream() {
     let mut state = app.service_details.clone();
     let first = state.poll_log(10_000).expect("resumed panel polls");
     assert_eq!(first.0, service_id);
-    let request_id = taskmanager_platform_contract::RequestId::new(3).expect("fixture id");
+    let request_id = RequestId::new(3).expect("fixture id");
     let attempt_id = state
         .begin_stream_attempt(first.1.clone())
         .expect("targeted attempt starts");
@@ -175,13 +177,9 @@ fn service_details_merged_log_panel_folds_its_own_stream() {
 
     // Helper: a tiny local mirror of the state enum for matching without
     // importing the private inner types.
-    fn state_variant<'a>(
-        state: &'a taskmanager_core::core::services::ServiceLogState,
-    ) -> ServiceLogStateVariant<'a> {
+    fn state_variant<'a>(state: &'a ServiceLogState) -> ServiceLogStateVariant<'a> {
         match state {
-            taskmanager_core::core::services::ServiceLogState::Ready(lines) => {
-                ServiceLogStateVariant::Ready(lines.as_slice())
-            }
+            ServiceLogState::Ready(lines) => ServiceLogStateVariant::Ready(lines.as_slice()),
             _ => ServiceLogStateVariant::Other,
         }
     }

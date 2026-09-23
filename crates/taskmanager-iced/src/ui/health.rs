@@ -15,9 +15,12 @@ use crate::i18n::{self, Key, Language};
 use crate::theme;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::{
     bytes, health_score_for_snapshot, health_score_summary, missing_value,
 };
+use taskmanager_theme::Theme;
 
 mod projection;
 
@@ -249,10 +252,7 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
     rows.push(HealthRow {
         label: i18n::t(language, Key::SystemDomain).to_owned(),
         value: i18n::t(language, Key::HealthSystemValue)
-            .replace(
-                "{uptime}",
-                &taskmanager_shell::presentation::duration(snapshot.uptime_secs),
-            )
+            .replace("{uptime}", &duration(snapshot.uptime_secs))
             .replace("{processes}", &snapshot.processes.to_string())
             .replace(
                 "{threads}",
@@ -278,7 +278,7 @@ fn count_value(language: Language, one: Key, many: Key, count: usize, model: &st
 }
 
 fn health_row<'a>(
-    theme_snapshot: &taskmanager_theme::Theme,
+    theme_snapshot: &Theme,
     row: HealthRow,
     language: Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -301,9 +301,9 @@ fn health_row<'a>(
 }
 
 fn alert_row<'a>(
-    _theme_snapshot: &taskmanager_theme::Theme,
+    _theme_snapshot: &Theme,
     metric: AlertMetric,
-    shell: &taskmanager_shell::ShellApp,
+    shell: &ShellApp,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
         text(metric_label(metric)).width(Length::Fixed(190.0)),
@@ -316,7 +316,7 @@ fn alert_row<'a>(
 }
 
 fn panel<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     title: &'static str,
     body: Element<'a, Message, iced::Theme, iced::Renderer>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -339,7 +339,7 @@ fn panel<'a>(
 /// Thermal heat-map badges and fan tachometer gauges panel.
 pub(crate) fn sensors_and_thermal_panel<'a>(
     snapshot: &SystemSnapshot,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let mut items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
@@ -438,7 +438,7 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
 /// snapshot carries no temperature channel at all.
 pub(super) fn thermal_zone_sensor_panel<'a>(
     sensors: &SensorCenterSnapshot,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let rows = projection::thermal_zone_rows(sensors);
@@ -463,7 +463,7 @@ pub(super) fn thermal_zone_sensor_panel<'a>(
 /// normal foreground; a typed absence takes the status tint so an unread zone
 /// cannot read as a real temperature.
 fn thermal_zone_row<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     row: projection::ThermalZoneRow,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let value = text(row.value).width(Length::Fill);

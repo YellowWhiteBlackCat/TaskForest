@@ -3,6 +3,8 @@ use taskmanager_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::metrics::ScalarObservationGroup;
+use taskmanager_core::core::metrics::ScalarObservationSlot;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, DiskScalarObservations, GpuMetrics,
     GpuScalarObservations, MemoryScalarObservations, NetworkAdapterType, NetworkMetrics,
@@ -153,17 +155,14 @@ fn snapshot_json_keeps_unknown_cpu_observations_distinct_from_zero() {
             frequency_mhz: ScalarObservation::available(0, 10),
             max_frequency_mhz: ScalarObservation::available(0, 10),
             temperature_c: ScalarObservation::available(0.0, 10),
-            per_core_frequency_group:
-                taskmanager_core::core::metrics::ScalarObservationGroup::partial(
-                    vec![
-                        taskmanager_core::core::metrics::ScalarObservationSlot::Current(0),
-                        taskmanager_core::core::metrics::ScalarObservationSlot::Unavailable(
-                            FailureKind::Unsupported,
-                        ),
-                    ],
-                    10,
-                    FailureKind::Unsupported,
-                ),
+            per_core_frequency_group: ScalarObservationGroup::partial(
+                vec![
+                    ScalarObservationSlot::Current(0),
+                    ScalarObservationSlot::Unavailable(FailureKind::Unsupported),
+                ],
+                10,
+                FailureKind::Unsupported,
+            ),
             ..Default::default()
         }),
         ..Default::default()

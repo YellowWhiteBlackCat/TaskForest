@@ -16,6 +16,7 @@ use super::{SystemTelemetryDomainEvent, SystemTelemetryRevision};
 use crate::device_lifecycle::{
     DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
 };
+use taskmanager_platform_contract::CapabilityId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemTelemetryDomain {
@@ -38,21 +39,19 @@ impl SystemTelemetryDomain {
     ];
 
     #[must_use]
-    pub const fn capability(self) -> taskmanager_platform_contract::CapabilityId {
+    pub const fn capability(self) -> CapabilityId {
         match self {
-            Self::Host => taskmanager_platform_contract::CapabilityId::TELEMETRY_HOST,
-            Self::Cpu => taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU,
-            Self::Memory => taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY,
-            Self::Storage => taskmanager_platform_contract::CapabilityId::TELEMETRY_STORAGE,
-            Self::Network => taskmanager_platform_contract::CapabilityId::TELEMETRY_NETWORK,
-            Self::Gpu => taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU,
+            Self::Host => CapabilityId::TELEMETRY_HOST,
+            Self::Cpu => CapabilityId::TELEMETRY_CPU,
+            Self::Memory => CapabilityId::TELEMETRY_MEMORY,
+            Self::Storage => CapabilityId::TELEMETRY_STORAGE,
+            Self::Network => CapabilityId::TELEMETRY_NETWORK,
+            Self::Gpu => CapabilityId::TELEMETRY_GPU,
         }
     }
 
     #[must_use]
-    pub fn from_capability(
-        capability: &taskmanager_platform_contract::CapabilityId,
-    ) -> Option<Self> {
+    pub fn from_capability(capability: &CapabilityId) -> Option<Self> {
         Self::ALL
             .into_iter()
             .find(|domain| domain.capability() == *capability)

@@ -9,6 +9,7 @@
 //! `Unavailable(Unsupported)` until a stable kernel interface exists.
 
 use taskmanager_core::NpuInventorySnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One accelerator inventory read for the host.

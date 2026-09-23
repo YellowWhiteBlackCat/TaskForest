@@ -10,9 +10,11 @@ use super::*;
 use iced::widget::canvas;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::presentation::{
     missing_value, optional_bytes, optional_duration, optional_nice,
 };
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 /// Render one projected row: the process lookup joins the projection's
@@ -84,7 +86,7 @@ fn tree_node_row(
         format!("{marker} ")
     };
     let mut name_row = iced::widget::row![
-        iced::widget::text(guide_prefix).size(f32::from(taskmanager_theme::tokens::FONT_CAPTION)),
+        iced::widget::text(guide_prefix).size(f32::from(tokens::FONT_CAPTION)),
         crate::ui::components::highlight::cell(
             &theme_snapshot,
             process.name.as_str(),
@@ -140,9 +142,8 @@ fn tree_node_row(
             theme_snapshot,
             &process.cpu_history,
             row.row_key().and_then(|key| match key {
-                taskmanager_shell::ProcessRowId::Process(identity) => Some(identity),
-                taskmanager_shell::ProcessRowId::Category(_)
-                | taskmanager_shell::ProcessRowId::Application(_) => None,
+                ProcessRowId::Process(identity) => Some(identity),
+                ProcessRowId::Category(_) | ProcessRowId::Application(_) => None,
             }),
             !*has_children,
             ctx.compact,
@@ -263,16 +264,16 @@ fn tree_node_row(
 /// only borrow the returned cells carry).
 #[derive(Clone)]
 pub(crate) struct RowRender {
-    pub(crate) theme: taskmanager_theme::Theme,
+    pub(crate) theme: Theme,
     pub(crate) query: String,
     pub(crate) search_active: bool,
     pub(crate) swap_visible: bool,
     pub(crate) compact: bool,
-    pub(crate) ui_size: taskmanager_theme::tokens::UiSize,
+    pub(crate) ui_size: tokens::UiSize,
     /// The full multi-select target set. A row highlights when its pid is a
     /// member (covers the keyboard anchor AND every Ctrl/Shift-selected row).
     pub(crate) selected_identities: std::rc::Rc<std::collections::HashSet<ProcessLiveKey>>,
-    pub(crate) selected_row: Option<taskmanager_shell::ProcessRowId>,
+    pub(crate) selected_row: Option<ProcessRowId>,
     /// GPUI-parity zero-value policy: when enabled, measured zero resource
     /// values render in the muted foreground instead of their category color
     /// (unavailable values stay dashes and are never dimmed as zero).
@@ -566,7 +567,7 @@ fn aggregate_count_text(metric: &AggregateMetric<u64>) -> (String, bool) {
 /// resolves; the blank branch keeps the column boundary pixel-aligned so the
 /// Trend header stays over the sparkline column for every row.
 fn process_sparkline_cell(
-    theme_snapshot: taskmanager_theme::Theme,
+    theme_snapshot: Theme,
     history: &std::rc::Rc<[f32]>,
     identity: Option<ProcessLiveKey>,
     show: bool,

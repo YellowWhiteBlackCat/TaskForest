@@ -18,6 +18,7 @@ use taskmanager_theme::tokens;
 use taskmanager_theme::with_alpha;
 
 use super::{ColGroup, SortState, TableDelegate, TableRowLayout, TableSelection, TableState};
+use taskmanager_ui_contract::IconId;
 
 /// Drag payload for column moves (typed, absorbed from gc `DragColumn`).
 #[derive(Clone)]
@@ -218,9 +219,9 @@ impl<D: TableDelegate> TableState<D> {
             return None;
         }
         let (icon_id, active) = match col_group.sort {
-            SortState::Ascending => (taskmanager_ui_contract::IconId::NavigateUp, true),
-            SortState::Descending => (taskmanager_ui_contract::IconId::NavigateDown, true),
-            SortState::Unsorted => (taskmanager_ui_contract::IconId::NavigateUp, false),
+            SortState::Ascending => (IconId::NavigateUp, true),
+            SortState::Descending => (IconId::NavigateDown, true),
+            SortState::Unsorted => (IconId::NavigateUp, false),
         };
         let palette = self.palette;
         Some(

@@ -24,8 +24,29 @@ use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
 use taskmanager_shell::presentation::{bytes, duration};
 
+use taskmanager_application::CommandId;
+use taskmanager_application::Modifiers;
+use taskmanager_application::ProcessAffinityReady;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::AlertMetric;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_icons::asset_bytes;
+use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::command_help;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedDomain;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_shell::page_help;
 use taskmanager_shell::{SortCol, SortDir};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::pin_english;
+use taskmanager_theme::Theme;
 
 #[test]
 fn byte_and_duration_formatting_matches_the_other_frontends() {
@@ -92,7 +113,7 @@ fn navigation_pages_use_real_embedded_semantic_svg_assets() {
     for help in page_help() {
         let icon = page_icon(help.page);
         assert!(
-            taskmanager_icons::asset_bytes(icon).is_some(),
+            asset_bytes(icon).is_some(),
             "page {:?} must resolve to an embedded SVG icon",
             help.page
         );
@@ -106,15 +127,13 @@ fn process_affinity_modal_renders_a_bounded_focusable_cpu_grid() {
         .shell
         .selected_process_identity()
         .expect("demo process must have an authoritative identity");
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ProcessAffinity(Some(
-            taskmanager_application::ProcessAffinityReady {
-                request_id: taskmanager_platform_contract::RequestId::MIN,
-                target,
-                cpus: vec![0, 3],
-            },
-        )),
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityReady {
+            request_id: RequestId::MIN,
+            target,
+            cpus: vec![0, 3],
+        })),
     );
     let _ = app.update(crate::app::Message::OpenProcessAffinity);
 
@@ -178,7 +197,7 @@ fn unavailable_performance_metrics_do_not_become_zero_percent() {
 #[test]
 fn segment_color_maps_each_kind_to_its_theme_token() {
     use taskmanager_shell::memory::MemSegmentKind;
-    let theme = taskmanager_theme::Theme::dark();
+    let theme = Theme::dark();
     assert_eq!(
         segment_color(MemSegmentKind::Active, &theme),
         crate::theme_binding::color(theme.memory)
@@ -320,11 +339,11 @@ fn applications_table_keeps_intrinsic_width_and_localized_headers() {
         "hiding advanced columns must reduce content width"
     );
 
-    taskmanager_test_support::pin_english();
+    pin_english();
     assert_eq!(localized_sort_column_label(SortCol::DiskRead), "Disk read");
     set_language(Language::Zh);
     assert_eq!(localized_sort_column_label(SortCol::DiskRead), "磁盘读取");
-    taskmanager_test_support::pin_english();
+    pin_english();
 }
 
 #[test]
@@ -344,40 +363,35 @@ fn applications_header_renders_a_clickable_sort_target_for_every_column() {
         );
     }
     // A no-snapshot host keeps Swap hidden yet still renders every header.
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
-    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
     let _view = view(&app);
 }
 
 #[test]
 fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
-    taskmanager_test_support::pin_english();
-    let mut process = taskmanager_core::core::process::ProcessItem::default();
+    pin_english();
+    let mut process = ProcessItem::default();
     let mut observations = *process.scalar_observations();
-    observations.memory_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(1024 * 1024 * 1024, 1);
-    observations.memory_pss_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(512 * 1024 * 1024, 1);
-    observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::available(0, 1);
+    observations.memory_bytes = ScalarObservation::available(1024 * 1024 * 1024, 1);
+    observations.memory_pss_bytes = ScalarObservation::available(512 * 1024 * 1024, 1);
+    observations.swap_bytes = ScalarObservation::available(0, 1);
     process.apply_scalar_observations(observations);
 
     let cells = crate::ui::process_projection::build_row_cells_with_rules(
         &process,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(cells.memory, "1.0 GiB");
     assert_eq!(cells.pss, "512.0 MiB");
     assert_eq!(cells.swap, "0 B");
 
     let mut observations = *process.scalar_observations();
-    observations.memory_pss_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
-    observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
+    observations.memory_pss_bytes = ScalarObservation::default();
+    observations.swap_bytes = ScalarObservation::default();
     process.apply_scalar_observations(observations);
     let cells = crate::ui::process_projection::build_row_cells_with_rules(
         &process,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        &LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(
         (cells.pss.as_str(), cells.swap.as_str()),
@@ -389,29 +403,25 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     // feeds the properties overlay, so an observed USS reaches the painted
     // row (the table's own columns stay resident/PSS/swap), and an unobserved
     // USS keeps the shared dash instead of a fabricated zero.
-    let mut private = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut private = ProcessItemFixtureBuilder::new()
         .pid(4_242)
         .name("private".to_owned())
         .current_memory_bytes(1024 * 1024 * 1024)
         .build();
     let mut observations = *private.scalar_observations();
-    observations.start_token = taskmanager_core::core::metrics::ScalarObservation::available(7, 1);
-    observations.memory_uss_bytes =
-        taskmanager_core::core::metrics::ScalarObservation::available(256 * 1024 * 1024, 1);
+    observations.start_token = ScalarObservation::available(7, 1);
+    observations.memory_uss_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
     private.apply_scalar_observations(observations);
-    let mut shell = taskmanager_shell::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut shell = demo_app();
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![private.clone()])),
+        ProjectionSeedFact::Processes(Some(vec![private.clone()])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
-    let identity = taskmanager_core::core::process::ProcessLiveKey::from_process(&private)
-        .expect("observed private identity");
+    let identity = ProcessLiveKey::from_process(&private).expect("observed private identity");
     let rows = overlays::process_details::property_rows(identity, &shell);
     assert_eq!(
         rows.iter()
@@ -424,28 +434,25 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     // (`RSS - USS`), so the overlay paints 1.0 GiB - 256.0 MiB.
     assert_eq!(
         rows.iter()
-            .find(|(label, _)| label == taskmanager_application::i18n::t("proc.shared"))
+            .find(|(label, _)| label == t("proc.shared"))
             .map(|(_, value)| value.as_str()),
         Some("768.0 MiB"),
         "the details surface must paint the derived-shared facet"
     );
 
     let mut observations = *private.scalar_observations();
-    observations.memory_uss_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
+    observations.memory_uss_bytes = ScalarObservation::default();
     private.apply_scalar_observations(observations);
-    let mut cold = taskmanager_shell::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut cold = demo_app();
+    seed_projection_fact(
         &mut cold,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![private.clone()])),
+        ProjectionSeedFact::Processes(Some(vec![private.clone()])),
     );
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut cold,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
-            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
-        ),
+        ProjectionSeedFact::AdvanceRevision(ProjectionSeedDomain::Processes),
     );
-    let cold_identity = taskmanager_core::core::process::ProcessLiveKey::from_process(&private)
-        .expect("cold private identity");
+    let cold_identity = ProcessLiveKey::from_process(&private).expect("cold private identity");
     let cold_rows = overlays::process_details::property_rows(cold_identity, &cold);
     assert_eq!(
         cold_rows
@@ -464,7 +471,7 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     assert_eq!(
         cold_rows
             .iter()
-            .find(|(label, _)| label == taskmanager_application::i18n::t("proc.shared"))
+            .find(|(label, _)| label == t("proc.shared"))
             .map(|(_, value)| value.as_str()),
         Some("—"),
         "an unobserved USS makes the derived-shared facet absent, never 0 B"
@@ -507,13 +514,10 @@ fn help_state_projects_shared_command_rows_into_the_iced_view() {
 
     let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Character(
         '?',
-        taskmanager_application::Modifiers::NONE,
+        Modifiers::NONE,
     )));
     assert!(app.shell.help_open());
-    assert_eq!(
-        taskmanager_shell::command_help().len(),
-        taskmanager_application::CommandId::ALL.len()
-    );
+    assert_eq!(command_help().len(), CommandId::ALL.len());
 
     // Construct the actual modal branch as a compile/runtime projection; the
     // behavior assertions above prove the shell state that selects it.
@@ -526,10 +530,7 @@ fn suggestions_overlay_preserves_typed_insufficient_state_in_iced() {
     app.shell.dismiss_informational_overlay();
     app.shell.toggle_suggestions();
 
-    let text = overlays::suggestion_text(
-        taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
-        &app.shell,
-    );
+    let text = overlays::suggestion_text(AlertMetric::CpuUsagePercent, &app.shell);
     assert!(text.contains("Insufficient"));
     assert!(text.contains("0/20") || text.contains("1/20"));
     let _view = view(&app);
@@ -540,8 +541,8 @@ fn system_projection_keeps_fixture_facts_and_telemetry_separate() {
     // Pin English like the other t()-consuming tests; the labels resolve
     // through the shared catalog, so a concurrent language-flip test must not
     // change what this projection asserts.
-    taskmanager_test_support::pin_english();
-    let shell = taskmanager_shell::demo_app();
+    pin_english();
+    let shell = demo_app();
     let hardware = shell
         .projection()
         .hardware
@@ -582,7 +583,7 @@ fn system_projection_keeps_fixture_facts_and_telemetry_separate() {
 
 #[test]
 fn system_projection_distinguishes_unloaded_and_empty_hardware() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let unloaded = ShellApp::new();
     assert_eq!(hardware_list_state(None, &[]), ListState::Loading);
 
@@ -638,9 +639,9 @@ fn startup_projection_preserves_identity_status_source_and_impact_evidence() {
     // `startup_status_text` now resolves through the shared catalog, which
     // auto-detects the host locale on first use; pin English so the status
     // assertion is deterministic and independent of the host language.
-    taskmanager_test_support::pin_english();
+    pin_english();
 
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     assert_eq!(startup_list_state(&shell), ListState::Ready);
 
     let rows = startup_rows(&shell);
@@ -658,7 +659,7 @@ fn startup_projection_preserves_identity_status_source_and_impact_evidence() {
 fn startup_projection_distinguishes_loading_and_confirmed_empty() {
     // Localized copy: pin English so the assertion is identical on every
     // runner regardless of the host locale.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let shell = ShellApp::new();
     assert_eq!(startup_list_state(&shell), ListState::Loading);
     assert_eq!(
@@ -667,9 +668,9 @@ fn startup_projection_distinguishes_loading_and_confirmed_empty() {
     );
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::StartupEntries(Some(Vec::new())),
+        ProjectionSeedFact::StartupEntries(Some(Vec::new())),
     );
     assert_eq!(startup_list_state(&shell), ListState::Empty);
     assert_eq!(startup_heading(ListState::Empty, 0), "Startup · 0 reported");
@@ -680,7 +681,7 @@ mod startup_timeline;
 
 #[test]
 fn service_projection_preserves_fixture_rows_and_typed_status() {
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
 
     assert_eq!(service_list_state(&shell), ListState::Ready);
     let rows = service_rows(&shell);
@@ -716,10 +717,10 @@ fn service_projection_preserves_fixture_rows_and_typed_status() {
     };
     let first_id = "fixture.service:cycle-first.service";
     let second_id = "fixture.service:cycle-second.service";
-    let mut cyclic_shell = taskmanager_shell::demo_app();
-    taskmanager_shell::fixture::seed_projection_fact(
+    let mut cyclic_shell = demo_app();
+    seed_projection_fact(
         &mut cyclic_shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+        ProjectionSeedFact::Services(Some(vec![
             cyclic(first_id, "cycle-first", second_id),
             cyclic(second_id, "cycle-second", first_id),
         ])),
@@ -737,7 +738,7 @@ fn service_projection_preserves_fixture_rows_and_typed_status() {
 
 #[test]
 fn services_filter_matches_name_and_description_case_insensitively() {
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let rows = service_rows(&shell);
     assert_eq!(rows.len(), 5);
 
@@ -793,7 +794,7 @@ fn services_search_message_stays_frontend_local_and_renders_filtered() {
 fn service_projection_distinguishes_loading_empty_and_missing_description() {
     // Localized copy: pin English so the assertion is identical on every
     // runner regardless of the host locale.
-    taskmanager_test_support::pin_english();
+    pin_english();
     let shell = ShellApp::new();
     assert_eq!(service_list_state(&shell), ListState::Loading);
     assert!(service_rows(&shell).is_empty());
@@ -803,29 +804,24 @@ fn service_projection_distinguishes_loading_empty_and_missing_description() {
     );
 
     let mut shell = ShellApp::new();
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(Vec::new())),
-    );
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Services(Some(Vec::new())));
     assert_eq!(service_list_state(&shell), ListState::Empty);
     assert_eq!(
         service_heading(ListState::Empty, 0),
         "Services · 0 reported"
     );
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            taskmanager_core::core::services::ServiceItem::from_inventory(
-                "",
-                "no-description.service",
-                ServiceStatus::Unknown,
-                "",
-                "",
-                "",
-                "",
-            ),
-        ])),
+        ProjectionSeedFact::Services(Some(vec![ServiceItem::from_inventory(
+            "",
+            "no-description.service",
+            ServiceStatus::Unknown,
+            "",
+            "",
+            "",
+            "",
+        )])),
     );
     assert_eq!(service_list_state(&shell), ListState::Ready);
     let rows = service_rows(&shell);
@@ -838,7 +834,7 @@ fn service_projection_distinguishes_loading_empty_and_missing_description() {
 
 #[test]
 fn search_highlight_segments_flow_from_the_shared_shell_filter() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     shell.open_search();
     shell.query = "a".into();
 
@@ -886,33 +882,27 @@ fn search_highlight_segments_flow_from_the_shared_shell_filter() {
 
 #[test]
 fn export_without_an_injected_host_worker_reports_unavailable() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::IcedApp::demo();
     let _task = app.update(crate::app::Message::ExportSnapshot);
     let feedback = app.shell.feedback_notice().expect("export feedback set");
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Error
-    );
+    assert_eq!(feedback.severity(), FeedbackSeverity::Error);
     assert_eq!(feedback.text(), "Snapshot export is unavailable");
 }
 
 #[test]
 fn export_without_data_is_an_honest_message_not_a_failure() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let mut app = crate::IcedApp::default();
     let _task = app.update(crate::app::Message::ExportSnapshot);
     let feedback = app.shell.feedback_notice().expect("feedback");
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Warning
-    );
+    assert_eq!(feedback.severity(), FeedbackSeverity::Warning);
     assert_eq!(feedback.text(), "No snapshot data to export yet");
 }
 
 #[test]
 fn startup_page_renders_the_enable_disable_toggle_and_routes_through_shell() {
-    taskmanager_test_support::pin_english();
+    pin_english();
 
     let mut app = crate::IcedApp::demo();
     let _ = app.update(crate::app::Message::SelectPage(AppPage::Startup));
@@ -920,7 +910,7 @@ fn startup_page_renders_the_enable_disable_toggle_and_routes_through_shell() {
     // The demo fixture carries two startup entries; rendering the page for each
     // selection must build the contextual Enable/Disable action bar without
     // panic (both the enabled and the disabled entry branches).
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let rows = startup_rows(&shell);
     assert_eq!(rows.len(), 2, "demo fixture carries two startup entries");
     for index in 0..rows.len() {
@@ -942,7 +932,7 @@ fn startup_page_renders_the_enable_disable_toggle_and_routes_through_shell() {
         "confirm must submit the gated startup control: {}",
         app.shell.feedback_text()
     );
-    taskmanager_test_support::pin_english();
+    pin_english();
 }
 
 #[test]
@@ -950,14 +940,14 @@ fn services_page_projects_rows_and_action_labels_for_every_variant() {
     // `service_action_label` now resolves through the shared catalog, which
     // auto-detects the host locale on first use; pin English so the label
     // assertion is deterministic and independent of the host language.
-    taskmanager_test_support::pin_english();
+    pin_english();
 
     for action in [
-        taskmanager_core::core::services::ServiceAction::Start,
-        taskmanager_core::core::services::ServiceAction::Stop,
-        taskmanager_core::core::services::ServiceAction::Restart,
-        taskmanager_core::core::services::ServiceAction::Enable,
-        taskmanager_core::core::services::ServiceAction::Disable,
+        ServiceAction::Start,
+        ServiceAction::Stop,
+        ServiceAction::Restart,
+        ServiceAction::Enable,
+        ServiceAction::Disable,
     ] {
         let label = service_action_label(action);
         assert!(!label.is_empty());
@@ -968,7 +958,7 @@ fn services_page_projects_rows_and_action_labels_for_every_variant() {
     let _ = app.update(crate::app::Message::SelectPage(AppPage::Services));
     let _view = view(&app);
 
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let rows = service_rows(&shell);
     assert_eq!(rows.len(), 5);
     assert_eq!(service_list_state(&shell), ListState::Ready);
@@ -979,7 +969,7 @@ fn zebra_rows_compose_across_the_four_inventory_tables() {
     // The zebra parity seam drives the row surface of every inventory table;
     // the demo fixture must exercise multiple striped rows per table, and each
     // page must still compose with stripes for its full row set.
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     assert!(
         shell.visible_processes().len() >= 4
             && service_rows(&shell).len() >= 4
@@ -1021,7 +1011,7 @@ fn shared_page_body_strings_follow_the_active_language() {
     // it via `i18n::sync_shared_languages`.
     use taskmanager_application::i18n::{Language, set_language};
 
-    taskmanager_test_support::pin_english();
+    pin_english();
     assert_eq!(service_action_label(ServiceAction::Start), "Start");
     assert_eq!(service_action_label(ServiceAction::Stop), "Stop");
     assert_eq!(service_action_label(ServiceAction::Restart), "Restart");
@@ -1033,7 +1023,7 @@ fn shared_page_body_strings_follow_the_active_language() {
 
     // Restore En so the rest of the suite (which assumes the English default)
     // is unaffected by this global mutation.
-    taskmanager_test_support::pin_english();
+    pin_english();
 }
 
 #[test]
@@ -1042,14 +1032,14 @@ fn service_control_bar_replaces_the_action_hint_while_pending() {
     let _ = app.update(crate::app::Message::SelectPage(AppPage::Services));
     let _ = app.update(crate::app::Message::RequestServiceAction {
         index: 0,
-        action: taskmanager_core::core::services::ServiceAction::Restart,
+        action: ServiceAction::Restart,
     });
     assert!(app.shell.pending_service_control().is_some());
     assert_eq!(
         app.shell
             .pending_service_control()
             .map(|target| target.action),
-        Some(taskmanager_core::core::services::ServiceAction::Restart)
+        Some(ServiceAction::Restart)
     );
     let _view = view(&app);
 }

@@ -11,6 +11,7 @@ use taskmanager_theme::tokens;
 use crate::app::Message;
 use crate::text_metrics::truncate_to_width;
 use crate::theme;
+use taskmanager_theme::Theme;
 
 /// Waterfall bar track width in px in standard layout (a layout contract, not a theme token).
 pub(crate) const TIMELINE_BAR_WIDTH: f32 = 220.0;
@@ -104,7 +105,7 @@ pub(crate) fn startup_timeline(
 
 /// The display-only waterfall block; `None` when silent.
 pub(crate) fn boot_timeline_block<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+    theme_snapshot: &'a Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
     compact: bool,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {

@@ -11,6 +11,14 @@
 //!
 //! Extracted from [`super::overlays`] so the overlays module stays under the
 //! repository's source-size budget.
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::ConnectionAddressFamily;
+use taskmanager_core::core::process_telemetry::ConnectionTransport;
+use taskmanager_core::core::process_telemetry::ProcessConnection;
+use taskmanager_shell::presentation::capabilities_summary;
+use taskmanager_shell::presentation::namespaces_summary;
+use taskmanager_shell::presentation::network_connection_counters_summary;
+use taskmanager_shell::presentation::sandbox_details_summary;
 mod helpers;
 pub(crate) use helpers::*;
 
@@ -46,7 +54,7 @@ const MAX_FACET_ROWS: usize = 8;
 pub(super) fn insights_block<'a>(
     theme_snapshot: &'a Theme,
     shell: &ShellApp,
-    target: &taskmanager_core::core::process::FrozenProcessIdentity,
+    target: &FrozenProcessIdentity,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let projection = shell
         .projection()
@@ -114,8 +122,7 @@ fn network_section<'a>(
                 ),
             ];
             if let Some(counters) = network.connection_counters.as_ref()
-                && let Some(summary) =
-                    taskmanager_shell::presentation::network_connection_counters_summary(counters)
+                && let Some(summary) = network_connection_counters_summary(counters)
             {
                 rows.push(muted_text(theme_snapshot, summary));
             }
@@ -170,18 +177,10 @@ fn escalation_pill<'a>(
 /// family-aware transport naming (TCP6/UDP6), mirroring gpui's
 /// `format_connection` so the local/remote endpoints are never dropped.
 #[must_use]
-fn format_connection(
-    connection: &taskmanager_core::core::process_telemetry::ProcessConnection,
-) -> String {
+fn format_connection(connection: &ProcessConnection) -> String {
     let transport = match (&connection.transport, &connection.family) {
-        (
-            taskmanager_core::core::process_telemetry::ConnectionTransport::Tcp,
-            taskmanager_core::core::process_telemetry::ConnectionAddressFamily::Ipv6,
-        ) => "TCP6".to_string(),
-        (
-            taskmanager_core::core::process_telemetry::ConnectionTransport::Udp,
-            taskmanager_core::core::process_telemetry::ConnectionAddressFamily::Ipv6,
-        ) => "UDP6".to_string(),
+        (ConnectionTransport::Tcp, ConnectionAddressFamily::Ipv6) => "TCP6".to_string(),
+        (ConnectionTransport::Udp, ConnectionAddressFamily::Ipv6) => "UDP6".to_string(),
         _ => connection.transport.to_string(),
     };
     let scope = if connection.is_loopback() {
@@ -458,7 +457,7 @@ pub(crate) fn isolation_section<'a>(
                 isolation
                     .capabilities
                     .as_ref()
-                    .map(taskmanager_shell::presentation::capabilities_summary)
+                    .map(capabilities_summary)
                     .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             ));
             rows.push(kv_row(
@@ -467,12 +466,10 @@ pub(crate) fn isolation_section<'a>(
                 isolation
                     .namespaces
                     .as_ref()
-                    .map(taskmanager_shell::presentation::namespaces_summary)
+                    .map(namespaces_summary)
                     .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             ));
-            if let Some(details) =
-                taskmanager_shell::presentation::sandbox_details_summary(isolation)
-            {
+            if let Some(details) = sandbox_details_summary(isolation) {
                 rows.push(kv_row(
                     theme_snapshot,
                     t("proc_insights.sandbox_details").to_string(),

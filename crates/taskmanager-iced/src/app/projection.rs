@@ -8,6 +8,12 @@ use taskmanager_shell::{InfoSortCol, SortDir};
 use crate::ui::process_projection::{ProcessProjection, ProcessProjectionFingerprint};
 
 use super::{IcedApp, PerfDevice};
+use taskmanager_application::ApplicationHistoryRow;
+use taskmanager_application::ApplicationHistoryStatus;
+use taskmanager_application::HistoryReplayRequestId;
+use taskmanager_core::core::history::HistoryWindow;
+use taskmanager_core::core::sensors::SensorQuantity;
+use taskmanager_shell::presentation::trend::TrendSeries;
 
 /// The inputs that can change the owned facts/order of one inventory table.
 /// A query is deliberately not part of this fingerprint: changing a filter
@@ -107,16 +113,16 @@ pub(crate) struct AppHistoryMemo {
 /// misses and shared by the Canvas program thereafter.
 #[derive(Clone)]
 pub(crate) struct AppHistoryRowModel {
-    pub(crate) row: taskmanager_application::ApplicationHistoryRow,
+    pub(crate) row: ApplicationHistoryRow,
     pub(crate) samples: Rc<[f32]>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub(super) struct AppHistoryFingerprint {
-    source_request: Option<taskmanager_application::HistoryReplayRequestId>,
-    status: taskmanager_application::ApplicationHistoryStatus,
-    selected_window: taskmanager_core::core::history::HistoryWindow,
-    rows_window: Option<taskmanager_core::core::history::HistoryWindow>,
+    source_request: Option<HistoryReplayRequestId>,
+    status: ApplicationHistoryStatus,
+    selected_window: HistoryWindow,
+    rows_window: Option<HistoryWindow>,
 }
 
 /// Complete invalidation identity for the materialized Performance rail.
@@ -190,10 +196,7 @@ impl IcedApp {
                     sensors
                         .readings
                         .iter()
-                        .filter(|reading| {
-                            reading.quantity()
-                                == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
-                        })
+                        .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
                         .nth(index)
                 })
                 .map(|fan| fan.label().to_owned()),
@@ -227,12 +230,8 @@ impl IcedApp {
                 sensors: self.shell.projection().sensors.as_ref(),
                 shell: &self.shell,
                 device_samples: Some(&device_samples),
-                cpu_samples: self.cached_metric_series(
-                    taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent,
-                ),
-                memory_samples: self.cached_metric_series(
-                    taskmanager_shell::presentation::trend::TrendSeries::MemoryUsagePercent,
-                ),
+                cpu_samples: self.cached_metric_series(TrendSeries::CpuUsagePercent),
+                memory_samples: self.cached_metric_series(TrendSeries::MemoryUsagePercent),
                 memory_units: crate::ui::UnitPrefs {
                     use_bytes: self.memory_use_bytes(),
                     use_base2: self.memory_use_base2(),
@@ -250,9 +249,7 @@ impl IcedApp {
             sensors
                 .readings
                 .iter()
-                .filter(|reading| {
-                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
-                })
+                .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
                 .collect::<Vec<_>>()
         });
         devices

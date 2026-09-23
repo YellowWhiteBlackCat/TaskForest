@@ -10,6 +10,7 @@
 //! [`super::rapl_power::RaplPowerRequest`].
 
 use taskmanager_core::MsrReadoutSnapshot;
+use taskmanager_platform_contract::CapabilityRequest;
 use taskmanager_platform_contract::{CapabilityId, RequestPort};
 
 /// One CPU MSR-readout read for the host.

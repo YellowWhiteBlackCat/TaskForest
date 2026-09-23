@@ -16,6 +16,8 @@ use taskmanager_core::core::tray::{
 use taskmanager_shell::QuitReason;
 
 use crate::IcedApp;
+use taskmanager_app_host::spawn_tray;
+use taskmanager_application::i18n::t;
 
 /// Stable action ids shared by the frontend-local mapping and the native menu.
 pub const TRAY_ACTION_SHOW: TrayActionId = 1;
@@ -61,26 +63,26 @@ pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
     let menu = TrayMenuSpec::from_items(vec![
         TrayMenuItem::Action {
             id: TRAY_ACTION_SHOW,
-            label: taskmanager_application::i18n::t("tray.show_window").to_owned(),
+            label: t("tray.show_window").to_owned(),
             enabled: true,
         },
         TrayMenuItem::Checkmark {
             id: TRAY_ACTION_PAUSE,
-            label: taskmanager_application::i18n::t("tray.pause_refresh").to_owned(),
+            label: t("tray.pause_refresh").to_owned(),
             checked: paused,
             enabled: true,
         },
         TrayMenuItem::Separator,
         TrayMenuItem::Action {
             id: TRAY_ACTION_QUIT,
-            label: taskmanager_application::i18n::t("tray.quit").to_owned(),
+            label: t("tray.quit").to_owned(),
             enabled: true,
         },
     ])
     .map_err(TraySpecError::Menu)?;
     TraySpec::new(
         icon,
-        Some(taskmanager_application::i18n::t("tray.tooltip").to_owned()),
+        Some(t("tray.tooltip").to_owned()),
         Some(product::ICED_NAME.to_owned()),
         menu,
         false,
@@ -99,7 +101,7 @@ pub(crate) fn spawn_tray_host(app: &mut IcedApp) -> bool {
         }
     };
     let (events_tx, events_rx) = channel::<TrayEvent>();
-    let controller = match taskmanager_app_host::spawn_tray(spec, events_tx) {
+    let controller = match spawn_tray(spec, events_tx) {
         Ok(controller) => controller,
         Err(failure) => {
             eprintln!("taskforest-i: system tray unavailable: {failure:?}");

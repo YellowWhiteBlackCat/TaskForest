@@ -189,7 +189,7 @@ fn source_notice_action<'a>(
         crate::focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::SourceRetry(request),
-            taskmanager_ui_contract::IconId::Refresh,
+            IconId::Refresh,
             t("common.refresh"),
             Message::RefreshSource(request),
         )

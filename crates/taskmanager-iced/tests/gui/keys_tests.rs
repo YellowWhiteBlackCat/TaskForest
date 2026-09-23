@@ -1,4 +1,8 @@
 use super::*;
+use taskmanager_application::AppAction;
+use taskmanager_application::CommandContext;
+use taskmanager_application::CommandScope;
+use taskmanager_application::FocusDirection;
 use taskmanager_shell::route_key;
 
 #[test]
@@ -126,16 +130,11 @@ fn mapped_fixed_keys_survive_the_shared_router() {
     let event = ShellKeyEvent::new(KeyCode::Tab, Modifiers::NONE);
     let action = route_key(
         event,
-        taskmanager_application::CommandContext {
-            scope: taskmanager_application::CommandScope::Shell,
+        CommandContext {
+            scope: CommandScope::Shell,
             text_input_focused: true,
-            ..taskmanager_application::CommandContext::default()
+            ..CommandContext::default()
         },
     );
-    assert_eq!(
-        action,
-        Some(taskmanager_application::AppAction::MoveFocus(
-            taskmanager_application::FocusDirection::Next
-        ))
-    );
+    assert_eq!(action, Some(AppAction::MoveFocus(FocusDirection::Next)));
 }

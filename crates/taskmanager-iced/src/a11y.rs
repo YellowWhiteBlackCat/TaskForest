@@ -10,11 +10,16 @@
 //! hover/focus repaint.
 
 use std::cmp::Ordering;
+use taskmanager_accessibility_linux::LinuxAccessKitBridge;
+use taskmanager_application::AppAction;
+use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
+#[cfg(not(target_os = "linux"))]
+use taskmanager_ui_contract::DetachedAccessibilityBridge;
 use taskmanager_ui_contract::{
     AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, AlertRuleInput,
     GraphSummary, ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot,
@@ -22,9 +27,9 @@ use taskmanager_ui_contract::{
 };
 
 #[cfg(target_os = "linux")]
-pub type AppAccessibilityBridge = taskmanager_accessibility_linux::LinuxAccessKitBridge;
+pub type AppAccessibilityBridge = LinuxAccessKitBridge;
 #[cfg(not(target_os = "linux"))]
-pub type AppAccessibilityBridge = taskmanager_ui_contract::DetachedAccessibilityBridge;
+pub type AppAccessibilityBridge = DetachedAccessibilityBridge;
 
 const MAX_PUBLISHED_ROWS: usize = 64;
 
@@ -89,9 +94,7 @@ pub fn apply_accessibility_action(
             SemanticAction::Focus | SemanticAction::Select => {
                 let _ = app
                     .shell
-                    .apply_action(taskmanager_application::AppAction::SelectPage(
-                        taskmanager_application::AppPage::Applications,
-                    ));
+                    .apply_action(AppAction::SelectPage(AppPage::Applications));
                 let _ = app.shell.select_row_id(ProcessRowId::Process(identity));
                 app.sync_visual_cursor();
             }

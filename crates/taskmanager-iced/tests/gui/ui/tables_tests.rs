@@ -2,12 +2,13 @@ use super::super::components::banner_title_key;
 use super::super::tests::filtered_services;
 use super::*;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_shell::demo_app;
 
 /// Unsorted/unfiltered rows carry their provider-order position as
 /// `source_index` (the identity the action messages resolve).
 #[test]
 fn service_rows_carry_provider_order_indices_by_default() {
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let provider = shell.projection().services.as_deref().unwrap_or(&[]);
     for (position, row) in service_rows(&shell).into_iter().enumerate() {
         assert_eq!(row.source_index, position);
@@ -22,7 +23,7 @@ fn service_rows_carry_provider_order_indices_by_default() {
 /// position would otherwise authorize Start/Stop on a neighbor.
 #[test]
 fn service_action_identity_survives_sort_and_filter() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     // Name sort toggled to Desc reverses the fixture order; the
     // "network" filter then drops every row whose name AND description
     // both miss — the exact reorder + shrink scenario from the audit.
@@ -54,7 +55,7 @@ fn service_action_identity_survives_sort_and_filter() {
 /// the services box filtered the rows but highlighted none of them).
 #[test]
 fn services_name_highlight_follows_the_page_local_query_not_the_shared_one() {
-    let shell = taskmanager_shell::demo_app();
+    let shell = demo_app();
     let rows = service_rows(&shell);
     let services_query = "timesync";
     let shared_query = "NetworkManager";

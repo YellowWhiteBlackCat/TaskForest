@@ -6,6 +6,7 @@
 //! through exhaustive events, so two local modals or two row menus cannot be
 //! represented at the same time.
 
+use taskmanager_application::ConfirmationKind;
 use taskmanager_application::SurfaceKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceItem;
@@ -278,9 +279,9 @@ impl InputScope {
             Self::SharedSurface(SurfaceKind::ProcessProperties) => true,
             Self::SharedSurface(SurfaceKind::Confirmation(kind)) => !matches!(
                 kind,
-                taskmanager_application::ConfirmationKind::EndTask
-                    | taskmanager_application::ConfirmationKind::ServiceControl
-                    | taskmanager_application::ConfirmationKind::SmartSelfTest
+                ConfirmationKind::EndTask
+                    | ConfirmationKind::ServiceControl
+                    | ConfirmationKind::SmartSelfTest
             ),
             Self::LocalSurface(_) | Self::ServiceLog | Self::Help | Self::Suggestions => true,
             Self::ContextMenu(_) | Self::Search | Self::Content => false,
@@ -373,9 +374,7 @@ impl IcedApp {
         matches!(self.local_surface(), Some(LocalSurface::RunTask))
     }
 
-    pub(crate) const fn affinity_target(
-        &self,
-    ) -> Option<&taskmanager_core::core::process::FrozenProcessIdentity> {
+    pub(crate) const fn affinity_target(&self) -> Option<&FrozenProcessIdentity> {
         match self.local_surface() {
             Some(LocalSurface::ProcessAffinity { target }) => Some(target),
             _ => None,

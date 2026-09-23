@@ -1,6 +1,7 @@
 use super::*;
 use gpui::DefiniteLength;
 use std::time::Duration;
+use taskmanager_theme::tokens::FONT_BODY;
 use taskmanager_theme::tokens::{DURATION_HOVER, MotionPolicy};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
 
@@ -53,7 +54,7 @@ fn ratio_maps_to_relative_definite_length() {
 /// Small-profile baseline, so the body token must be exactly 1.0 rem.
 #[test]
 fn gpui_font_tokens_are_root_relative_on_the_small_profile_baseline() {
-    let AbsoluteLength::Rems(body) = font_size(taskmanager_theme::tokens::FONT_BODY) else {
+    let AbsoluteLength::Rems(body) = font_size(FONT_BODY) else {
         panic!("font tokens must resolve through the GPUI root rem");
     };
     assert_eq!(body.0, 1.0);

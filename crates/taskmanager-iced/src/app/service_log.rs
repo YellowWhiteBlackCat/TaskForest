@@ -14,6 +14,7 @@ use taskmanager_application::{
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::{IcedApp, Message};
+use taskmanager_application::i18n::t;
 
 #[derive(Debug, Default)]
 pub(super) enum IcedServiceLogExportRuntime {
@@ -93,7 +94,7 @@ impl IcedApp {
                 FeedbackSource::Clipboard,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_nothing_to_copy"),
+                t("svc.logs_nothing_to_copy"),
             );
         } else {
             let payload = entries
@@ -105,11 +106,7 @@ impl IcedApp {
                 FeedbackSource::Clipboard,
                 FeedbackSeverity::Success,
                 FeedbackLifecycle::SHORT,
-                format!(
-                    "{} · {}",
-                    taskmanager_application::i18n::t("hint.copied"),
-                    taskmanager_application::i18n::t("svc.logs"),
-                ),
+                format!("{} · {}", t("hint.copied"), t("svc.logs"),),
             );
             *clipboard_task = Some(iced::clipboard::write(payload));
         }
@@ -133,7 +130,7 @@ impl IcedApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_nothing_to_export"),
+                t("svc.logs_nothing_to_export"),
             );
             return;
         }
@@ -150,7 +147,7 @@ impl IcedApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("svc.logs_export_failed"),
+                t("svc.logs_export_failed"),
             );
             return;
         };
@@ -170,7 +167,7 @@ impl IcedApp {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("svc.logs_export_failed"),
+                t("svc.logs_export_failed"),
             );
             return;
         };
@@ -180,7 +177,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::UntilReplaced,
-                    taskmanager_application::i18n::t("svc.logs_exporting"),
+                    t("svc.logs_exporting"),
                 );
             }
             Err(_) => {
@@ -188,7 +185,7 @@ impl IcedApp {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::UntilReplaced,
-                    taskmanager_application::i18n::t("svc.logs_export_failed"),
+                    t("svc.logs_export_failed"),
                 );
             }
         }
@@ -206,13 +203,12 @@ impl IcedApp {
             Ok(()) => (
                 FeedbackSeverity::Success,
                 FeedbackLifecycle::SHORT,
-                taskmanager_application::i18n::t("svc.logs_exported")
-                    .replace("{path}", &result.destination.display().to_string()),
+                t("svc.logs_exported").replace("{path}", &result.destination.display().to_string()),
             ),
             Err(_) => (
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                taskmanager_application::i18n::t("svc.logs_export_failed").to_owned(),
+                t("svc.logs_export_failed").to_owned(),
             ),
         };
         self.shell

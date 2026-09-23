@@ -14,8 +14,30 @@ use super::focus_state::service_control_focus_target;
 use super::*;
 use crate::test_support::temp_dir;
 use taskmanager_application::ConfigStore;
+use taskmanager_application::KeyCode;
+use taskmanager_application::Modifiers;
+use taskmanager_application::PlatformEffect;
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::CpuScalarObservations;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessSignal;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::ShellKeyEvent;
+use taskmanager_shell::SortCol;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_telemetry_store::live_graph::MetricSeries;
+use taskmanager_theme::FONT_MISANS_VF;
+use taskmanager_theme::FONT_ROBOTO_MONO;
+use taskmanager_theme::FontAvailability;
+use taskmanager_theme::tokens::UiSize;
 
 #[test]
 fn user_row_menu_opens_selects_and_routes_actions() {
@@ -31,7 +53,7 @@ fn user_row_menu_opens_selects_and_routes_actions() {
     // A menu action routes through the shared session-control path and closes
     // the menu.
     let _ = app.update(Message::RequestSessionControl(
-        taskmanager_core::core::session::SessionControlAction::Disconnect,
+        SessionControlAction::Disconnect,
     ));
     assert_eq!(app.user_menu_row(), None);
     assert!(app.shell.feedback_text().contains("Demo mode"));
@@ -39,10 +61,7 @@ fn user_row_menu_opens_selects_and_routes_actions() {
     // Escape closes an open menu without touching the selection.
     let _ = app.update(Message::OpenUserRowMenu(0));
     assert_eq!(app.user_menu_row(), Some(0));
-    let escape = IcedKey::Fixed(ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Escape,
-        taskmanager_application::Modifiers::NONE,
-    ));
+    let escape = IcedKey::Fixed(ShellKeyEvent::new(KeyCode::Escape, Modifiers::NONE));
     let _ = app.update(Message::Key(escape));
     assert_eq!(app.user_menu_row(), None);
     assert_eq!(app.shell.selected, 0, "Escape keeps the row selection");
@@ -102,7 +121,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     assert!(app.process_menu_identity().is_none());
     assert_eq!(
         app.shell.pending_batch().map(|intent| intent.action),
-        Some(taskmanager_core::core::process::ProcessBatchAction::Kill)
+        Some(ProcessBatchAction::Kill)
     );
     let _ = app.update(Message::DismissOverlay);
 
@@ -110,7 +129,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     // selected row and still suppressed honestly in demo mode.
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Signal(
-        taskmanager_core::core::process::ProcessSignal::Interrupt,
+        ProcessSignal::Interrupt,
     )));
     assert!(app.process_menu_identity().is_none());
     assert!(app.shell.feedback_text().contains("Demo mode"));
@@ -118,8 +137,8 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     // Escape closes an open menu without changing the selected row.
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Escape,
-        taskmanager_application::Modifiers::NONE,
+        KeyCode::Escape,
+        Modifiers::NONE,
     ))));
     assert!(app.process_menu_identity().is_none());
     assert_eq!(app.shell.selected, 1);
@@ -225,10 +244,7 @@ fn process_action_menu_popover_provides_complete_action_coverage() {
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     let direct_location = app.process_location_effect();
     assert!(
-        matches!(
-            direct_location,
-            Some(taskmanager_application::PlatformEffect::RevealResource(_))
-        ),
+        matches!(direct_location, Some(PlatformEffect::RevealResource(_))),
         "process_location_effect produces RevealResource effect"
     );
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::OpenLocation));
@@ -244,10 +260,7 @@ fn process_action_menu_popover_provides_complete_action_coverage() {
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     let direct_search = app.process_search_effect();
     assert!(
-        matches!(
-            direct_search,
-            Some(taskmanager_application::PlatformEffect::OpenUrl(_))
-        ),
+        matches!(direct_search, Some(PlatformEffect::OpenUrl(_))),
         "process_search_effect produces OpenUrl effect"
     );
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::SearchOnline));
@@ -267,24 +280,20 @@ fn applications_column_menu_changes_only_the_iced_table_projection() {
     assert!(app.process_columns_menu_open());
     let _ = crate::ui::view(&app);
 
-    let _ = app.update(Message::ToggleProcessColumn(
-        taskmanager_shell::SortCol::Memory,
-    ));
+    let _ = app.update(Message::ToggleProcessColumn(SortCol::Memory));
     assert!(!app.process_columns_menu_open());
     assert!(
         app.process_presentation
             .hidden_columns
-            .contains(&taskmanager_shell::SortCol::Memory)
+            .contains(&SortCol::Memory)
     );
     let _ = crate::ui::view(&app);
 
-    let _ = app.update(Message::ToggleProcessColumn(
-        taskmanager_shell::SortCol::Name,
-    ));
+    let _ = app.update(Message::ToggleProcessColumn(SortCol::Name));
     assert!(
         !app.process_presentation
             .hidden_columns
-            .contains(&taskmanager_shell::SortCol::Name)
+            .contains(&SortCol::Name)
     );
 }
 
@@ -321,8 +330,8 @@ fn service_log_entry_opens_the_shared_feed_and_modal_controls() {
     ));
 
     let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Escape,
-        taskmanager_application::Modifiers::NONE,
+        KeyCode::Escape,
+        Modifiers::NONE,
     ))));
     assert!(!app.modal_open());
     assert!(app.shell.service_log.is_none());
@@ -342,9 +351,9 @@ fn disk_smart_dialog_is_a_real_local_view() {
     disk.smart_temp_critical_c = Some(70.0);
     disk.smart_percent_used = Some(3.0);
     disk.smart_power_on_hours = Some(1_234);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let _ = app.update(Message::OpenDiskSmart { index: 0 });
@@ -412,30 +421,27 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
     // The SHARED history store the chart reads follows the persisted window
     // (G-02: one sanctioned store, sized at the settings edge): shrinking
     // keeps the newest samples, growing never fabricates history.
-    let snapshot = taskmanager_core::core::metrics::SystemSnapshot {
+    let snapshot = SystemSnapshot {
         timestamp_ms: 1,
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-            taskmanager_core::core::metrics::CpuScalarObservations {
-                global_usage_pct: taskmanager_core::core::metrics::ScalarObservation::available(
-                    30.0, 1,
-                ),
-                ..Default::default()
-            },
-        ),
-        ..taskmanager_core::core::metrics::SystemSnapshot::default()
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            global_usage_pct: ScalarObservation::available(30.0, 1),
+            ..Default::default()
+        }),
+        ..SystemSnapshot::default()
     };
-    taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
-    let series_before = app.shell.history.series_sample_count(
-        taskmanager_telemetry_store::live_graph::MetricSeries::CpuUsagePercent,
-    );
+    record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+    let series_before = app
+        .shell
+        .history
+        .series_sample_count(MetricSeries::CpuUsagePercent);
     let _ = app.update(Message::SettingsChanged(SettingsChange::GraphDataPoints(
         10,
     )));
     assert_eq!(app.shell.history.capacity(), 10);
     assert_eq!(
-        app.shell.history.series_sample_count(
-            taskmanager_telemetry_store::live_graph::MetricSeries::CpuUsagePercent
-        ),
+        app.shell
+            .history
+            .series_sample_count(MetricSeries::CpuUsagePercent),
         series_before.min(10),
         "samples survive the shrink (bounded at the new window)"
     );
@@ -501,10 +507,7 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-fn config_device_visible(
-    config: &taskmanager_core::core::config::Config,
-    kind: DeviceKind,
-) -> bool {
+fn config_device_visible(config: &Config, kind: DeviceKind) -> bool {
     match kind {
         DeviceKind::Cpu => config.show_cpu,
         DeviceKind::Memory => config.show_memory,
@@ -526,10 +529,7 @@ fn demo_app_runs_without_a_platform_client() {
     // Demo mode: ticks are inert (no platform to poll), effects are
     // honestly suppressed.
     let _ = app.update(Message::Tick);
-    let _task = app.update(Message::Key(IcedKey::Character(
-        'q',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _task = app.update(Message::Key(IcedKey::Character('q', Modifiers::NONE)));
     assert!(app.shell.should_quit());
     app.queue(PlatformEffect::Refresh(RefreshRequest::Telemetry));
     assert!(app.shell.feedback_text().contains("Demo mode"));
@@ -556,32 +556,21 @@ fn demo_constructor_exposes_shared_fixture_data_without_platform_io() {
         Some(2)
     );
 
-    let _ = app.update(Message::RequestSessionControl(
-        taskmanager_core::core::session::SessionControlAction::Lock,
-    ));
+    let _ = app.update(Message::RequestSessionControl(SessionControlAction::Lock));
     assert!(app.shell.feedback_text().contains("Demo mode"));
 }
 
 #[test]
 fn modal_escape_and_close_messages_use_the_shared_overlay_lifecycle() {
     let mut app = IcedApp::demo();
-    let escape = IcedKey::Fixed(ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Escape,
-        taskmanager_application::Modifiers::NONE,
-    ));
+    let escape = IcedKey::Fixed(ShellKeyEvent::new(KeyCode::Escape, Modifiers::NONE));
 
-    let _ = app.update(Message::Key(IcedKey::Character(
-        '?',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _ = app.update(Message::Key(IcedKey::Character('?', Modifiers::NONE)));
     assert!(app.shell.help_open());
     let _ = app.update(Message::Key(escape));
     assert!(!app.shell.help_open());
 
-    let _ = app.update(Message::Key(IcedKey::Character(
-        'T',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _ = app.update(Message::Key(IcedKey::Character('T', Modifiers::NONE)));
     assert!(app.shell.suggestions_open());
     let _ = app.update(Message::DismissOverlay);
     assert!(!app.shell.suggestions_open());
@@ -604,7 +593,7 @@ fn settings_change_round_trips_through_the_store_and_rebuilds_the_theme() {
         true,
     )));
     let _ = app.update(Message::SettingsChanged(SettingsChange::UiSize(
-        taskmanager_theme::tokens::UiSize::Large,
+        UiSize::Large,
     )));
 
     assert_eq!(app.theme().skin, Skin::Kde);
@@ -613,7 +602,7 @@ fn settings_change_round_trips_through_the_store_and_rebuilds_the_theme() {
     assert!(app.compact_density());
     assert_eq!(
         app.ui_size(),
-        taskmanager_theme::tokens::UiSize::Large,
+        UiSize::Large,
         "UI size is independent from compact density"
     );
     assert_eq!(app.preferences().skin, "KDE");
@@ -633,7 +622,7 @@ fn settings_change_round_trips_through_the_store_and_rebuilds_the_theme() {
     assert_eq!(reloaded.theme().mode, LightDark::Dark);
     assert!(reloaded.theme().hc);
     assert!(reloaded.compact_density());
-    assert_eq!(reloaded.ui_size(), taskmanager_theme::tokens::UiSize::Large);
+    assert_eq!(reloaded.ui_size(), UiSize::Large);
 
     drop(reloaded);
     drop(app);
@@ -681,11 +670,7 @@ fn settings_custom_font_uses_only_the_observed_catalog_family() {
     let mut app = IcedApp::with_config_store_and_font_availability(
         None,
         ConfigStore::new(&path),
-        taskmanager_theme::FontAvailability::from_installed_families([
-            taskmanager_theme::FONT_MISANS_VF,
-            taskmanager_theme::FONT_ROBOTO_MONO,
-            "Fira Sans",
-        ]),
+        FontAvailability::from_installed_families([FONT_MISANS_VF, FONT_ROBOTO_MONO, "Fira Sans"]),
     );
     let choice = app
         .preferences()
@@ -710,26 +695,17 @@ fn local_modals_open_close_and_swallow_quit_keys() {
     assert!(app.modal_open());
 
     // 'q' must not quit behind an open modal.
-    let _ = app.update(Message::Key(IcedKey::Character(
-        'q',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _ = app.update(Message::Key(IcedKey::Character('q', Modifiers::NONE)));
     assert!(!app.shell.should_quit());
 
-    let escape = IcedKey::Fixed(taskmanager_shell::ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Escape,
-        taskmanager_application::Modifiers::NONE,
-    ));
+    let escape = IcedKey::Fixed(ShellKeyEvent::new(KeyCode::Escape, Modifiers::NONE));
     let _ = app.update(Message::Key(escape));
     assert!(!app.settings_open());
     assert!(!app.modal_open());
 
     // Ctrl+A opens the about modal (the shared ShowSystemAbout chord
     // rendered locally) and never touches shell status.
-    let _ = app.update(Message::Key(IcedKey::Character(
-        'a',
-        taskmanager_application::Modifiers::CONTROL,
-    )));
+    let _ = app.update(Message::Key(IcedKey::Character('a', Modifiers::CONTROL)));
     assert!(app.about_open());
     assert!(!app.shell.feedback_text().contains("System information"));
 
@@ -741,12 +717,10 @@ fn local_modals_open_close_and_swallow_quit_keys() {
     assert!(!app.health_open());
     assert!(!app.settings_open());
     // Escape closes every local modal at once.
-    let _ = app.update(Message::Key(IcedKey::Fixed(
-        taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::Escape,
-            taskmanager_application::Modifiers::NONE,
-        ),
-    )));
+    let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+        KeyCode::Escape,
+        Modifiers::NONE,
+    ))));
     assert!(!app.containers_open());
     assert!(!app.health_open());
 }
@@ -778,10 +752,7 @@ fn service_control_confirmation_enters_the_modal_focus_scope() {
     assert!(app.shell.pending_service_control().is_some());
     assert_eq!(app.modal_focus_target(), FocusTarget::ConfirmServiceControl);
 
-    let tab = taskmanager_shell::ShellKeyEvent::new(
-        taskmanager_application::KeyCode::Tab,
-        taskmanager_application::Modifiers::NONE,
-    );
+    let tab = ShellKeyEvent::new(KeyCode::Tab, Modifiers::NONE);
     let _ = app.update(Message::Key(IcedKey::Fixed(tab)));
     assert_eq!(
         app.input.focused_control,
@@ -798,19 +769,14 @@ fn properties_overlay_counts_as_a_modal_and_swallows_characters() {
     assert!(app.process_properties_open());
     assert!(app.modal_open());
 
-    let _ = app.update(Message::Key(IcedKey::Character(
-        'q',
-        taskmanager_application::Modifiers::NONE,
-    )));
+    let _ = app.update(Message::Key(IcedKey::Character('q', Modifiers::NONE)));
     assert!(!app.shell.should_quit());
 
     // Escape dismisses through the shared route.
-    let _ = app.update(Message::Key(IcedKey::Fixed(
-        taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::Escape,
-            taskmanager_application::Modifiers::NONE,
-        ),
-    )));
+    let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+        KeyCode::Escape,
+        Modifiers::NONE,
+    ))));
     assert!(!app.process_properties_open());
 }
 
@@ -818,19 +784,17 @@ fn properties_overlay_counts_as_a_modal_and_swallows_characters() {
 fn escape_clears_active_feedback_notice_when_no_modal_open() {
     let mut app = IcedApp::demo();
     app.shell.report_notice(
-        taskmanager_shell::FeedbackSource::Persistence,
-        taskmanager_shell::FeedbackSeverity::Info,
-        taskmanager_shell::FeedbackLifecycle::TIMED_SHORT,
+        FeedbackSource::Persistence,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::TIMED_SHORT,
         "Active notice",
     );
     assert!(app.shell.feedback_notice().is_some());
 
-    let _ = app.update(Message::Key(IcedKey::Fixed(
-        taskmanager_shell::ShellKeyEvent::new(
-            taskmanager_application::KeyCode::Escape,
-            taskmanager_application::Modifiers::NONE,
-        ),
-    )));
+    let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+        KeyCode::Escape,
+        Modifiers::NONE,
+    ))));
     assert!(app.shell.feedback_notice().is_none());
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_application::MAX_CONTAINER_ROWS;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::ContainerSummary;
 
@@ -58,7 +59,7 @@ fn healthy_empty_rollup_is_not_a_blank_panel() {
 #[test]
 fn container_table_caps_materialized_rows_and_reports_the_overflow() {
     let (shown, hidden) = container_row_window(203);
-    assert_eq!(shown, taskmanager_application::MAX_CONTAINER_ROWS);
+    assert_eq!(shown, MAX_CONTAINER_ROWS);
     assert_eq!(hidden, 3);
     let label = more_rows_label(hidden);
     assert!(label.contains('3'));

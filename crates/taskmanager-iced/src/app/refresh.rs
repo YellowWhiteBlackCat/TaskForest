@@ -5,6 +5,14 @@ use crate::ui::first_run::FirstRunEvent;
 use taskmanager_application::ServiceUpdate;
 use taskmanager_core::core::identity::DeviceId;
 
+use taskmanager_application::GpuEngineRowsState;
+use taskmanager_application::ServiceEvent;
+use taskmanager_application::service_submission_failure;
+use taskmanager_core::core::services::ServiceLogErrorKind;
+use taskmanager_core::core::services::ServiceLogFailure;
+use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_shell::gpu_chart_metric_gate;
+use taskmanager_shell::queue_effect_result;
 use taskmanager_shell::{ShellApp, queue_effect};
 
 const GPU_ENGINE_ROWS_REFRESH: std::time::Duration = std::time::Duration::from_millis(2500);
@@ -70,8 +78,7 @@ impl IcedApp {
         };
         let gpu_device = if matches!(
             self.shell.gpu_engine_rows_state(),
-            taskmanager_application::GpuEngineRowsState::Loading { .. }
-                | taskmanager_application::GpuEngineRowsState::Ready(_)
+            GpuEngineRowsState::Loading { .. } | GpuEngineRowsState::Ready(_)
         ) && selected_gpu_index.is_some()
             && self.runtime.gpu_engine_rows_due(GPU_ENGINE_ROWS_REFRESH)
         {
@@ -106,9 +113,7 @@ impl IcedApp {
             ..
         } = self;
         let Some(platform) = runtime.platform_mut() else {
-            let failure = taskmanager_application::service_submission_failure(
-                taskmanager_platform_contract::SubmissionErrorKind::RuntimeStopped,
-            );
+            let failure = service_submission_failure(SubmissionErrorKind::RuntimeStopped);
             if let Some(PlatformEffect::ServiceLogStream(request)) = plan.details_log_effect
                 && let Some(attempt_id) =
                     service_details.begin_stream_attempt(request.query.clone())
@@ -122,10 +127,8 @@ impl IcedApp {
             {
                 open.lifecycle.reject_attempt(
                     attempt_id,
-                    taskmanager_core::core::services::ServiceLogFailure::with_detail(
-                        taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
-                            failure,
-                        ),
+                    ServiceLogFailure::with_detail(
+                        ServiceLogErrorKind::from_failure(failure),
                         "service log runtime is stopped",
                     ),
                 );
@@ -141,10 +144,8 @@ impl IcedApp {
                     .service_events
                     .iter()
                     .filter_map(|event| match &event.event {
-                        taskmanager_application::ServiceEvent::Update(update) => {
-                            Some(update.clone())
-                        }
-                        taskmanager_application::ServiceEvent::Snapshot(_) => None,
+                        ServiceEvent::Update(update) => Some(update.clone()),
+                        ServiceEvent::Snapshot(_) => None,
                     })
                     .collect();
                 // Correlate the first-run lane's own requests before the
@@ -192,20 +193,15 @@ impl IcedApp {
             let Some(attempt_id) = service_details.begin_stream_attempt(query) else {
                 return (service_updates, first_run_events);
             };
-            match taskmanager_shell::queue_effect_result(
-                shell,
-                platform,
-                PlatformEffect::ServiceLogStream(request),
-            ) {
+            match queue_effect_result(shell, platform, PlatformEffect::ServiceLogStream(request)) {
                 Ok(request_ids) => {
                     if let Some(request_id) = request_ids.into_iter().next() {
                         service_details.accept_stream(attempt_id, request_id);
                     }
                 }
-                Err(error) => service_details.reject_stream(
-                    attempt_id,
-                    taskmanager_application::service_submission_failure(error),
-                ),
+                Err(error) => {
+                    service_details.reject_stream(attempt_id, service_submission_failure(error))
+                }
             }
         }
         (service_updates, first_run_events)
@@ -219,7 +215,7 @@ impl IcedApp {
         // chart-metric selection against the viewed device's fresh facts so
         // a generation change or a family going dark falls back to the
         // default in the frame that carried the fact.
-        let gate = taskmanager_shell::gpu_chart_metric_gate(self.viewed_gpu());
+        let gate = gpu_chart_metric_gate(self.viewed_gpu());
         self.shell.reconcile_gpu_chart_metric(&gate);
         self.advance_motion(Instant::now());
     }

@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 
 #[test]
@@ -35,7 +38,7 @@ fn about_modal_renders_fixture_hardware_and_snapshot_facts() {
 
 #[test]
 fn about_modal_renders_dashes_when_facts_are_absent() {
-    let shell = taskmanager_shell::ShellApp::new();
+    let shell = ShellApp::new();
     let rows = about_rows(
         shell.projection().hardware.as_ref(),
         shell.projection().snapshot.as_ref(),
@@ -88,14 +91,11 @@ fn copy_about_details_message_records_the_footer_feedback() {
     assert!(app.about_open());
     assert_ne!(
         app.shell.feedback_notice().map(|notice| notice.source()),
-        Some(taskmanager_shell::FeedbackSource::Clipboard)
+        Some(FeedbackSource::Clipboard)
     );
     let _ = app.update(Message::CopyAboutDetails);
     let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(
-        feedback.source(),
-        taskmanager_shell::FeedbackSource::Clipboard
-    );
+    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
     assert!(
         feedback.text().contains("Copied"),
         "feedback: {}",
@@ -115,14 +115,8 @@ fn export_diagnostics_report_records_clipboard_feedback_notice() {
 
     let _ = app.update(Message::GenerateDiagnosticsReport);
     let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(
-        feedback.source(),
-        taskmanager_shell::FeedbackSource::Clipboard
-    );
-    assert_eq!(
-        feedback.severity(),
-        taskmanager_shell::FeedbackSeverity::Success
-    );
+    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
+    assert_eq!(feedback.severity(), FeedbackSeverity::Success);
     assert!(
         feedback.text().contains("Copied"),
         "feedback text must indicate copied status: {}",

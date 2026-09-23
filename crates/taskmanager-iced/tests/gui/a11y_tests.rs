@@ -5,11 +5,31 @@ use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 use crate::app::{AlertsMessage, Message};
+use taskmanager_accessibility_linux::snapshot_to_tree_update;
+use taskmanager_application::AppAction;
+use taskmanager_application::InteractionEvent;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
+use taskmanager_core::core::alerts::Alert;
+use taskmanager_core::core::alerts::AlertMetric;
+use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
+use taskmanager_ui_contract::AccessibilityActionRequest;
 
 fn process_row_id(pid: u32) -> SemanticNodeId {
     SemanticNodeId::owned(format!(
         "row:process:pid:{pid}:start:{}",
-        taskmanager_test_support::fixture_start_token(pid)
+        fixture_start_token(pid)
     ))
 }
 
@@ -19,7 +39,7 @@ fn process_cell_id(pid: u32, cell: &str) -> SemanticNodeId {
 
 #[test]
 fn alerts_route_publishes_rule_switches_while_open() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::IcedApp::demo();
     // Closed: the frontend-local group is absent from the tree.
     let closed = semantic_snapshot_with_local(&app).expect("closed tree must build");
@@ -79,7 +99,7 @@ fn closing_the_alerts_route_removes_the_rule_switches() {
 
 #[test]
 fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
 
@@ -90,20 +110,18 @@ fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
     // Make the second rule (memory) fire: mirror one active alert whose
     // rule_id matches, exactly like the shell's evaluation mirror.
     let memory_rule_id = app.alerts_rules()[1].rule.id.clone();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::ActiveAlerts(vec![
-            taskmanager_core::core::alerts::Alert {
-                instance_id: format!("{memory_rule_id}:"),
-                rule_id: memory_rule_id.clone(),
-                target: String::new(),
-                metric: taskmanager_core::core::alerts::AlertMetric::MemoryUsagePercent,
-                severity: taskmanager_core::core::alerts::AlertSeverity::Warning,
-                value: 91.0,
-                threshold: 90.0,
-                active_since_ms: 0,
-            },
-        ]),
+        ProjectionSeedFact::ActiveAlerts(vec![Alert {
+            instance_id: format!("{memory_rule_id}:"),
+            rule_id: memory_rule_id.clone(),
+            target: String::new(),
+            metric: AlertMetric::MemoryUsagePercent,
+            severity: AlertSeverity::Warning,
+            value: 91.0,
+            threshold: 90.0,
+            active_since_ms: 0,
+        }]),
     );
 
     let snapshot = semantic_snapshot_with_local(&app).expect("tree must build");
@@ -126,7 +144,7 @@ fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
 
 #[test]
 fn demo_shell_projects_process_rows_graph_and_selection() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     shell.selected = 1;
     let snapshot = semantic_snapshot(&shell).expect("demo semantic tree must build");
 
@@ -158,13 +176,13 @@ fn demo_shell_projects_process_rows_graph_and_selection() {
 
 #[test]
 fn application_aggregate_never_fabricates_a_selected_process_semantic() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     shell.selected = 1;
     let root = shell.visible_processes()[1];
     shell.selected_row = root
         .current_start_token()
         .and_then(|token| ProcessLiveKey::from_parts(root.pid, token))
-        .map(taskmanager_shell::ProcessRowId::Application);
+        .map(ProcessRowId::Application);
     shell.selected_rows.clear();
 
     let snapshot = semantic_snapshot(&shell).expect("semantic tree must build");
@@ -178,26 +196,21 @@ fn application_aggregate_never_fabricates_a_selected_process_semantic() {
 
 #[test]
 fn first_loading_frame_omits_unobserved_graph_and_keeps_row_scalars_honest() {
-    let mut shell = taskmanager_shell::ShellApp::new();
-    let mut process = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut shell = ShellApp::new();
+    let mut process = ProcessItemFixtureBuilder::new()
         .pid(77)
         .name(String::from("unobserved"))
         .build();
     let mut observations = *process.scalar_observations();
-    observations.cpu_percentage = ScalarObservation::unavailable(
-        taskmanager_core::core::failure::FailureKind::PermissionDenied,
-    );
+    observations.cpu_percentage = ScalarObservation::unavailable(FailureKind::PermissionDenied);
     process.apply_scalar_observations(observations);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![process])),
+        ProjectionSeedFact::Processes(Some(vec![process])),
     );
     // The direct slot swap follows the simulate-a-batch convention so the
     // shell's watermarked memos see it.
-    taskmanager_shell::fixture::seed_projection_fact(
-        &mut shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
-    );
+    seed_projection_fact(&mut shell, ProjectionSeedFact::AdvanceRefresh);
 
     let snapshot = semantic_snapshot(&shell).expect("loading semantic tree must build");
     assert!(
@@ -221,7 +234,7 @@ fn first_loading_frame_omits_unobserved_graph_and_keeps_row_scalars_honest() {
 
 #[test]
 fn active_iced_modal_is_exposed_as_dismissible_dialog_semantics() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     shell.toggle_suggestions();
     let snapshot = semantic_snapshot(&shell).expect("modal semantic tree must build");
     let modal = snapshot
@@ -235,13 +248,10 @@ fn active_iced_modal_is_exposed_as_dismissible_dialog_semantics() {
 
 #[test]
 fn service_control_confirmation_is_a_dismissible_dialog_in_semantics() {
-    let mut shell = taskmanager_shell::demo_app();
+    let mut shell = demo_app();
     let service = shell.projection().services.as_ref().expect("demo services")[0].clone();
-    assert!(shell.select_service_control(
-        &service,
-        taskmanager_core::core::services::ServiceAction::Stop
-    ));
-    let _ = shell.apply_action(taskmanager_application::AppAction::RequestServiceControl);
+    assert!(shell.select_service_control(&service, ServiceAction::Stop));
+    let _ = shell.apply_action(AppAction::RequestServiceControl);
     let snapshot = semantic_snapshot(&shell).expect("modal semantic tree must build");
     let modal = snapshot
         .get(&SemanticNodeId::owned("modal:service-control-confirmation"))
@@ -254,18 +264,13 @@ fn service_control_confirmation_is_a_dismissible_dialog_in_semantics() {
 
 #[test]
 fn process_properties_modal_is_a_dismissible_dialog_in_semantics() {
-    let mut shell = taskmanager_shell::demo_app();
-    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
-        4242,
-        "worker.exe",
-        7_500,
-        9_000,
-    )
-    .expect("valid identity");
+    let mut shell = demo_app();
+    let target = FrozenProcessIdentity::from_authoritative_parts(4242, "worker.exe", 7_500, 9_000)
+        .expect("valid identity");
     let _ = shell
         .application
         .interaction
-        .reduce(taskmanager_application::InteractionEvent::OpenProcessProperties(target));
+        .reduce(InteractionEvent::OpenProcessProperties(target));
     let snapshot = semantic_snapshot(&shell).expect("properties modal semantic tree must build");
     let modal = snapshot
         .get(&SemanticNodeId::owned("modal:process-properties-modal"))
@@ -278,10 +283,8 @@ fn process_properties_modal_is_a_dismissible_dialog_in_semantics() {
 
 #[test]
 fn service_log_modal_is_a_dismissible_dialog_in_semantics() {
-    let mut shell = taskmanager_shell::demo_app();
-    let _ = shell.open_service_log_for(taskmanager_core::core::target::ServiceId::from(
-        "systemd-journald",
-    ));
+    let mut shell = demo_app();
+    let _ = shell.open_service_log_for(ServiceId::from("systemd-journald"));
     let snapshot = semantic_snapshot(&shell).expect("service log modal semantic tree must build");
     let modal = snapshot
         .get(&SemanticNodeId::owned("modal:service-log-modal"))
@@ -296,7 +299,7 @@ fn service_log_modal_is_a_dismissible_dialog_in_semantics() {
 fn mapped_tree_is_well_formed_under_accesskit_consumer_oracle() {
     let app = crate::IcedApp::demo();
     let snapshot = semantic_snapshot_with_local(&app).expect("snapshot must build");
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let update = snapshot_to_tree_update(&snapshot);
     let tree = accesskit_consumer::Tree::new(update, false);
 
     let root = tree.state().root();
@@ -311,7 +314,7 @@ fn assistive_technology_actions_drive_iced_selection_and_modal() {
 
     let process = app.shell.visible_processes()[1].clone();
     let row_node_id = format!("row:{}", process_semantic_key(&process));
-    let request = taskmanager_ui_contract::AccessibilityActionRequest {
+    let request = AccessibilityActionRequest {
         snapshot_revision: snapshot.revision(),
         node: SemanticNodeId::owned(row_node_id),
         action: SemanticAction::Select,
@@ -330,7 +333,7 @@ fn assistive_technology_actions_drive_iced_selection_and_modal() {
     app.shell.toggle_suggestions();
     let modal_snapshot = semantic_snapshot_with_local(&app).expect("modal snapshot");
     assert!(app.shell.suggestions_open());
-    let dismiss_request = taskmanager_ui_contract::AccessibilityActionRequest {
+    let dismiss_request = AccessibilityActionRequest {
         snapshot_revision: modal_snapshot.revision(),
         node: SemanticNodeId::borrowed("modal:threshold-suggestions"),
         action: SemanticAction::Dismiss,

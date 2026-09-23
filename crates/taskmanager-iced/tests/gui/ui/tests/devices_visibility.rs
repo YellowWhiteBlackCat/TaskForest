@@ -9,6 +9,9 @@ use super::super::*;
 use super::{available_perf_devices, resolved_perf_device};
 use crate::test_support::temp_dir;
 use taskmanager_application::ConfigStore;
+use taskmanager_core::core::metrics::NetworkWirelessObservations;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::seed_projection_fact;
 
 fn visibility_test_app(label: &str) -> (crate::IcedApp, std::path::PathBuf) {
     // An isolated config store (a shared real-path store would be written by
@@ -18,11 +21,9 @@ fn visibility_test_app(label: &str) -> (crate::IcedApp, std::path::PathBuf) {
     let path = dir.join("config.json");
     let mut app = crate::IcedApp::with_config_store(None, ConfigStore::new(&path));
     let fixture = crate::IcedApp::demo_for_capture();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(
-            fixture.shell.projection().snapshot.clone(),
-        )),
+        ProjectionSeedFact::Snapshot(Box::new(fixture.shell.projection().snapshot.clone())),
     );
     (app, dir)
 }
@@ -95,7 +96,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     wired.apply_observations(
         NetworkAdapterType::Ethernet,
         wired_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks[0] = wired;
     let mut vpn = snapshot.networks[0].clone();
@@ -104,7 +105,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     vpn.apply_observations(
         NetworkAdapterType::Vpn,
         vpn_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     let mut loopback = snapshot.networks[0].clone();
     loopback.interface_name = "lo".into();
@@ -112,13 +113,13 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     loopback.apply_observations(
         NetworkAdapterType::Loopback,
         loopback_scalars,
-        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
+        NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks.push(vpn);
     snapshot.networks.push(loopback);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
     );
 
     let all = available_perf_devices(&app);

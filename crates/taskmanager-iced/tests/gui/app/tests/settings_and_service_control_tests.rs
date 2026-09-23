@@ -1,15 +1,23 @@
 use std::sync::Arc;
 
 use super::*;
+use taskmanager_application::DirectoryUsageRequest;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{
     PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
 };
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::services::ServiceStatus;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     RequestEnvelope, RequestPort, SubmissionError,
 };
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::ProjectionSeedFact;
+use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 /// Minimal recording service-control port (the same mock shape the shell
 /// tests use): submissions are recorded, never forwarded.
@@ -56,12 +64,10 @@ fn service_control_client(port: Arc<RecordingServiceControl>) -> PlatformClient 
 /// Minimal recording directory-usage port (same mock shape): scan lifecycle
 /// submissions are recorded, never forwarded (G-13).
 #[derive(Default)]
-struct RecordingDirectoryUsage(
-    std::sync::Mutex<Vec<taskmanager_application::DirectoryUsageRequest>>,
-);
+struct RecordingDirectoryUsage(std::sync::Mutex<Vec<DirectoryUsageRequest>>);
 
 impl RequestPort for RecordingDirectoryUsage {
-    type Request = taskmanager_application::DirectoryUsageRequest;
+    type Request = DirectoryUsageRequest;
 
     fn try_submit(&self, request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
         self.0.lock().unwrap().push(request.payload);
@@ -94,7 +100,7 @@ fn directory_usage_action_queues_start_then_cancel_through_the_shell_lane() {
 
     let recorded = Arc::new(RecordingDirectoryUsage::default());
     let mut app = IcedApp::new(Some(directory_usage_client(recorded.clone())));
-    app.shell = taskmanager_shell::demo_app();
+    app.shell = demo_app();
     // The demo fixture's disk carries a disk-level "/" mount and no partition
     // children; select the Disk device so the action resolves against it.
     let _ = app.update(Message::SelectPerfDevice(crate::app::PerfDevice::Disk(0)));
@@ -113,17 +119,15 @@ fn directory_usage_action_queues_start_then_cancel_through_the_shell_lane() {
     drop(submitted);
 
     // An active scan of that disk toggles to Cancel by its own scan id.
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::DirectoryUsage(Some(
-            DirectoryUsageSnapshot {
-                scan_id: DirectoryScanId::new(9),
-                root: "/".to_string(),
-                status: DirectoryScanStatus::Scanning,
-                entries: Vec::new(),
-                totals: DirectoryScanTotals::fresh(10),
-            },
-        )),
+        ProjectionSeedFact::DirectoryUsage(Some(DirectoryUsageSnapshot {
+            scan_id: DirectoryScanId::new(9),
+            root: "/".to_string(),
+            status: DirectoryScanStatus::Scanning,
+            entries: Vec::new(),
+            totals: DirectoryScanTotals::fresh(10),
+        })),
     );
     let _ = app.update(Message::ToggleDirectoryUsageScan);
     let submitted = recorded.0.lock().unwrap();
@@ -139,7 +143,7 @@ fn directory_usage_action_queues_start_then_cancel_through_the_shell_lane() {
 fn service_control_select_request_confirm_round_trip_reaches_the_port() {
     let recorded = Arc::new(RecordingServiceControl::default());
     let mut app = IcedApp::new(Some(service_control_client(recorded.clone())));
-    app.shell = taskmanager_shell::demo_app();
+    app.shell = demo_app();
     app.shell.application.active_page = AppPage::Services;
 
     let _ = app.update(Message::RequestServiceAction {
@@ -211,7 +215,7 @@ fn service_control_select_request_confirm_round_trip_reaches_the_port() {
 fn service_control_cancel_dismisses_without_submitting() {
     let recorded = Arc::new(RecordingServiceControl::default());
     let mut app = IcedApp::new(Some(service_control_client(recorded.clone())));
-    app.shell = taskmanager_shell::demo_app();
+    app.shell = demo_app();
 
     let _ = app.update(Message::RequestServiceAction {
         index: 0,
@@ -227,19 +231,17 @@ fn service_control_cancel_dismisses_without_submitting() {
 #[test]
 fn request_service_action_rejects_rows_without_provider_authority() {
     let mut app = IcedApp::demo();
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            taskmanager_core::core::services::ServiceItem::from_inventory(
-                "",
-                "read-only.service",
-                taskmanager_core::core::services::ServiceStatus::Active,
-                "",
-                "",
-                "",
-                "",
-            ),
-        ])),
+        ProjectionSeedFact::Services(Some(vec![ServiceItem::from_inventory(
+            "",
+            "read-only.service",
+            ServiceStatus::Active,
+            "",
+            "",
+            "",
+            "",
+        )])),
     );
     app.shell.application.active_page = AppPage::Services;
 
@@ -309,15 +311,10 @@ fn headline_chart_reads_one_finite_point_per_snapshot_from_the_shared_store() {
         (33.0, Some(70.0), 3),
     ] {
         let snapshot = perf_snapshot(cpu, memory_pct, ts);
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+        seed_projection_fact(
             &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
-        taskmanager_shell::fixture::seed_projection_fact(
-            &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+            ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
         );
     }
     assert_eq!(
@@ -337,7 +334,7 @@ fn headline_chart_reads_one_finite_point_per_snapshot_from_the_shared_store() {
 fn process_ring_samples_once_per_advancing_snapshot_watermark() {
     let mut app = IcedApp::new(None);
     app.shell.application.active_page = AppPage::Applications;
-    let mut trusted = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut trusted = ProcessItemFixtureBuilder::new()
         .pid(42)
         .name("sampled".into())
         .current_cpu_percentage(25.0)
@@ -348,24 +345,19 @@ fn process_ring_samples_once_per_advancing_snapshot_watermark() {
     // start token the properties overlay refuses to open (fixture mirrors the
     // shared demo shell's process shape).
     let mut observations = *trusted.scalar_observations();
-    observations.start_token =
-        taskmanager_core::core::metrics::ScalarObservation::available(420_001, 1);
+    observations.start_token = ScalarObservation::available(420_001, 1);
     trusted.apply_scalar_observations(observations);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![trusted])),
+        ProjectionSeedFact::Processes(Some(vec![trusted])),
     );
     assert!(app.shell.select_row(0));
     let _ = app.shell.apply_action(AppAction::OpenProperties);
     assert!(app.process_properties_open());
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(
-            50.0,
-            Some(50.0),
-            42,
-        )))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(50.0, Some(50.0), 42)))),
     );
     app.sample_process_history();
     // Two more ticks arrive before the next snapshot lands — the ring must
@@ -382,7 +374,7 @@ fn process_ring_samples_once_per_advancing_snapshot_watermark() {
 fn process_property_series_reuse_until_the_ring_revision_advances() {
     let mut app = IcedApp::new(None);
     app.shell.application.active_page = AppPage::Applications;
-    let mut trusted = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let mut trusted = ProcessItemFixtureBuilder::new()
         .pid(42)
         .name("sampled".into())
         .current_cpu_percentage(25.0)
@@ -390,22 +382,17 @@ fn process_property_series_reuse_until_the_ring_revision_advances() {
         .current_start_time_secs(1_785_290_000)
         .build();
     let mut observations = *trusted.scalar_observations();
-    observations.start_token =
-        taskmanager_core::core::metrics::ScalarObservation::available(420_001, 1);
+    observations.start_token = ScalarObservation::available(420_001, 1);
     trusted.apply_scalar_observations(observations);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![trusted])),
+        ProjectionSeedFact::Processes(Some(vec![trusted])),
     );
     assert!(app.shell.select_row(0));
     let _ = app.shell.apply_action(AppAction::OpenProperties);
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(
-            50.0,
-            Some(50.0),
-            42,
-        )))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(50.0, Some(50.0), 42)))),
     );
     app.sample_process_history();
 
@@ -420,13 +407,9 @@ fn process_property_series_reuse_until_the_ring_revision_advances() {
     assert!(std::rc::Rc::ptr_eq(&first.disk_read, &second.disk_read));
     assert!(std::rc::Rc::ptr_eq(&first.disk_write, &second.disk_write));
 
-    taskmanager_shell::fixture::seed_projection_fact(
+    seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(
-            60.0,
-            Some(55.0),
-            43,
-        )))),
+        ProjectionSeedFact::Snapshot(Box::new(Some(perf_snapshot(60.0, Some(55.0), 43)))),
     );
     app.sample_process_history();
     let changed = app
@@ -454,15 +437,10 @@ fn performance_page_renders_the_chart_once_history_is_populated() {
     // Feed enough samples for a strokeable polyline on both series.
     for (cpu, mem, ts) in [(10.0, 50.0, 1), (35.0, 52.0, 2), (70.0, 49.0, 3)] {
         let snapshot = perf_snapshot(cpu, Some(mem), ts);
-        taskmanager_shell::fixture::record_demo_history_frame(
+        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
+        seed_projection_fact(
             &mut app.shell,
-            &snapshot,
-            None,
-            None,
-        );
-        taskmanager_shell::fixture::seed_projection_fact(
-            &mut app.shell,
-            taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+            ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
         );
     }
     assert!(
