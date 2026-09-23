@@ -28,12 +28,13 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    ContainerRollupEvent, DesktopNotificationRequest, DirectoryUsageRequest, LatestControlRequest,
-    PlatformClient, PlatformEventBatch, PlatformFacets, ProcessAffinityControlRequest,
-    ProcessControlRequest, ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest,
-    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceUpdate,
+    ContainerRollupEvent, DesktopNotificationRequest, DirectoryUsageRequest, EnvironmentFacets,
+    IntegrationFacets, LatestControlRequest, PlatformClient, PlatformEventBatch, PlatformFacets,
+    PowerFacets, ProcessAffinityControlRequest, ProcessControlRequest, ProcessFacets,
+    ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest, SensorFacets,
+    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceFacets, ServiceUpdate,
     SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
-    SmartObservationBatch,
+    SmartObservationBatch, StorageFacets, SystemFacets,
 };
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::failure::FailureKind;
@@ -446,84 +447,113 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
 
 /// The full facet census of the composed runtime: every request port the
 /// standard surface wires must be present. Split out of the composition
-/// test so the flat assert list stays under the complexity ratchet.
+/// test so the flat assert list stays under the complexity ratchet, then
+/// grouped by facet owner so every battery stays small.
 fn assert_complete_facet_surface(facets: &PlatformFacets) {
-    assert!(facets.system().host().is_some());
-    assert!(facets.system().cpu().is_some());
-    assert!(facets.system().memory().is_some());
-    assert!(facets.system().storage().is_some());
-    assert!(facets.system().network().is_some());
-    assert!(facets.system().gpu().is_some());
-    assert!(facets.system().hardware_inventory().is_some());
+    assert_system_facet_surface(facets.system());
+    assert_process_facet_surface(facets.process());
+    assert_service_facet_surface(facets.service());
+    assert_environment_facet_surface(facets.environment());
+    assert_integration_facet_surface(facets.integration());
+    assert_storage_facet_surface(facets.storage());
+    assert_sensor_and_power_facet_surface(facets.sensor(), facets.power());
+}
+
+fn assert_system_facet_surface(facets: &SystemFacets) {
+    assert!(facets.host().is_some());
+    assert!(facets.cpu().is_some());
+    assert!(facets.memory().is_some());
+    assert!(facets.storage().is_some());
+    assert!(facets.network().is_some());
+    assert!(facets.gpu().is_some());
+    assert!(facets.hardware_inventory().is_some());
     assert!(
-        facets.system().gpu_engine_rows().is_some(),
+        facets.gpu_engine_rows().is_some(),
         "the engine-rows facet must expose its request port"
     );
     assert!(
-        facets.system().smbios_memory().is_some(),
+        facets.smbios_memory().is_some(),
         "the registered-pending smbios facet must expose its request port"
     );
     assert!(
-        facets.system().rapl_power().is_some(),
+        facets.rapl_power().is_some(),
         "the registered-pending rapl facet must expose its request port"
     );
     assert!(
-        facets.system().cpu_throttle().is_some(),
+        facets.cpu_throttle().is_some(),
         "the registered-pending cpu-throttle facet must expose its request port"
     );
     assert!(
-        facets.system().containers().is_some(),
+        facets.containers().is_some(),
         "containers port must be present"
     );
-    assert!(facets.process().list().is_some());
-    assert!(facets.process().control().is_some());
-    assert!(facets.process().network().is_some());
-    assert!(facets.process().gpu().is_some());
-    assert!(facets.process().resources().is_some());
-    assert!(facets.process().isolation().is_some());
-    assert!(facets.process().threads().is_some());
-    assert!(facets.process().affinity().is_some());
-    assert!(facets.process().affinity_control().is_some());
-    assert!(facets.process().resource_control().is_some());
+}
+
+fn assert_process_facet_surface(facets: &ProcessFacets) {
+    assert!(facets.list().is_some());
+    assert!(facets.control().is_some());
+    assert!(facets.network().is_some());
+    assert!(facets.gpu().is_some());
+    assert!(facets.resources().is_some());
+    assert!(facets.isolation().is_some());
+    assert!(facets.threads().is_some());
+    assert!(facets.affinity().is_some());
+    assert!(facets.affinity_control().is_some());
+    assert!(facets.resource_control().is_some());
     assert!(
-        facets.process().open_files().is_some(),
+        facets.open_files().is_some(),
         "the open-files facet must expose its request port"
     );
     assert!(
-        facets.process().environment().is_some(),
+        facets.environment().is_some(),
         "the environment facet must expose its request port"
     );
-    assert!(facets.service().inventory().is_some());
-    assert!(facets.service().dependencies().is_some());
-    assert!(facets.service().control().is_some());
-    assert!(facets.service().log_snapshot().is_some());
-    assert!(facets.service().log_stream().is_some());
-    assert!(facets.environment().startup_inventory().is_some());
-    assert!(facets.environment().startup_evidence().is_some());
-    assert!(facets.environment().startup_control().is_some());
-    assert!(facets.environment().session_inventory().is_some());
-    assert!(facets.environment().session_control().is_some());
-    assert!(facets.integration().command_launch().is_some());
-    assert!(facets.integration().resource_reveal().is_some());
-    assert!(facets.integration().url_open().is_some());
-    assert!(facets.integration().desktop_appearance().is_some());
+}
+
+fn assert_service_facet_surface(facets: &ServiceFacets) {
+    assert!(facets.inventory().is_some());
+    assert!(facets.dependencies().is_some());
+    assert!(facets.control().is_some());
+    assert!(facets.log_snapshot().is_some());
+    assert!(facets.log_stream().is_some());
+}
+
+fn assert_environment_facet_surface(facets: &EnvironmentFacets) {
+    assert!(facets.startup_inventory().is_some());
+    assert!(facets.startup_evidence().is_some());
+    assert!(facets.startup_control().is_some());
+    assert!(facets.session_inventory().is_some());
+    assert!(facets.session_control().is_some());
+}
+
+fn assert_integration_facet_surface(facets: &IntegrationFacets) {
+    assert!(facets.command_launch().is_some());
+    assert!(facets.resource_reveal().is_some());
+    assert!(facets.url_open().is_some());
+    assert!(facets.desktop_appearance().is_some());
     assert!(
-        facets.integration().desktop_notification().is_some(),
+        facets.desktop_notification().is_some(),
         "the notification facet must expose its request port"
     );
     assert!(
-        facets.integration().setup_script().is_some(),
+        facets.setup_script().is_some(),
         "the registered-pending setup facet must expose its request port"
     );
-    assert!(facets.storage().health().is_some());
-    assert!(facets.storage().smart_observation().is_some());
-    assert!(facets.storage().smart_control().is_some());
+}
+
+fn assert_storage_facet_surface(facets: &StorageFacets) {
+    assert!(facets.health().is_some());
+    assert!(facets.smart_observation().is_some());
+    assert!(facets.smart_control().is_some());
     assert!(
-        facets.storage().directory_usage().is_some(),
+        facets.directory_usage().is_some(),
         "the wired directory-usage facet must expose its request port"
     );
-    assert!(facets.sensor().observation().is_some());
-    assert!(facets.power().supplies().is_some());
+}
+
+fn assert_sensor_and_power_facet_surface(sensor: &SensorFacets, power: &PowerFacets) {
+    assert!(sensor.observation().is_some());
+    assert!(power.supplies().is_some());
 }
 
 #[test]
