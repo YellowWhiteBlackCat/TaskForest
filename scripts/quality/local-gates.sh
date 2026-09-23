@@ -579,6 +579,15 @@ fi
 if maybe allow-ceiling; then
     run_stage allow-ceiling quick run_py scripts/quality/allow_ceiling_guard.py
 fi
+if maybe inline-path-self; then
+    # Owner types are imported at the module boundary, never spelled inline and
+    # never aliased (`rust-surface-guard` owns the alias half). The self-test
+    # proves this guard goes red on a new inline owner path.
+    run_stage inline-path-self quick run_py scripts/quality/inline_path_guard.py --self-test
+fi
+if maybe inline-path; then
+    run_stage inline-path quick run_py scripts/quality/inline_path_guard.py
+fi
 if maybe production-config-wiring-self; then
     # clippy-parity proves the clippy *command* is the same on both hosts; this
     # guard proves the production-config helper is still *wired into* both hosts
