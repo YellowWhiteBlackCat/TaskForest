@@ -8,6 +8,17 @@
 //! raw building blocks (`performance_split`, `stats_panel`, the card
 //! assembly) stay module-private on purpose: the only way out is this module.
 
+use taskmanager_shell::presentation::fan_rpm;
+use taskmanager_shell::presentation::power_w;
+use taskmanager_shell::presentation::temperature_c;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rgba;
 /// Debug-selector identity of the ONE Performance composition root.
 ///
 /// Shared with the page-family render guard (ADR-039/042) so the chart
@@ -302,9 +313,9 @@ fn format_graph_value(unit: GraphUnit, value: f32) -> String {
         GraphUnit::DriveRate(units) => {
             crate::gpui_app::formatting::format_drive_graph_megabytes(units, value)
         }
-        GraphUnit::Rpm => taskmanager_shell::presentation::fan_rpm(value),
-        GraphUnit::Watts => taskmanager_shell::presentation::power_w(value),
-        GraphUnit::Temperature => taskmanager_shell::presentation::temperature_c(value),
+        GraphUnit::Rpm => fan_rpm(value),
+        GraphUnit::Watts => power_w(value),
+        GraphUnit::Temperature => temperature_c(value),
     }
 }
 
@@ -346,9 +357,7 @@ pub(crate) fn render_chart(
     let mut section = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .w_full()
         .min_w(px(0.0));
     section = match spec.tier {
@@ -375,20 +384,17 @@ pub(crate) fn render_chart(
             // section was the source of the old bottom-overlap behaviour.
             None => section.flex_auto().flex_shrink(),
         },
-        ChartTier::Secondary => section
-            .flex_auto()
-            .min_h(taskmanager_ui::theme_binding::length(
-                spec.tier.min_height(),
-            )),
-        ChartTier::Compact => section.flex_none().h(COMPACT_GRAPH_SECTION_HEIGHT).min_h(
-            taskmanager_ui::theme_binding::length(spec.tier.min_height()),
-        ),
+        ChartTier::Secondary => section.flex_auto().min_h(length(spec.tier.min_height())),
+        ChartTier::Compact => section
+            .flex_none()
+            .h(COMPACT_GRAPH_SECTION_HEIGHT)
+            .min_h(length(spec.tier.min_height())),
     };
     if let Some(title) = spec.title.as_deref() {
         section = section.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(caption_font))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(caption_font))
+                .text_color(hsla(theme.fg_dim))
                 .child(title.to_owned()),
         );
     }
@@ -400,7 +406,7 @@ pub(crate) fn render_chart(
                 id: spec.id.clone(),
                 slide_key: spec.slide_key,
                 samples: Rc::clone(&samples),
-                base: taskmanager_ui::theme_binding::rgba(spec.color),
+                base: rgba(spec.color),
                 opts: graph_opts,
                 format_value: fmt,
                 slot: hover_slot.clone(),
@@ -430,8 +436,7 @@ pub(crate) fn render_chart(
             // the summed lane can be all-gap while one direction is measured.
             let aggregate = limited_window(settings, aggregate, &graph_cache);
             let summary_row = graph_summary_row(theme, &aggregate, &fmt);
-            let (primary_color, secondary_color) =
-                dual_series_colors(taskmanager_ui::theme_binding::rgba(spec.color));
+            let (primary_color, secondary_color) = dual_series_colors(rgba(spec.color));
             let graph = graph_element_hover_dual(
                 GraphHoverElement {
                     id: spec.id.clone(),
@@ -464,9 +469,7 @@ pub(crate) fn render_chart(
                 None => card,
             };
             section = section
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(elements::graph_legend(
                     theme,
                     &[
@@ -515,18 +518,10 @@ fn summary_overlay(theme: &Theme, row: Div) -> Div {
         .max_w(px(320.0))
         .min_w(px(0.0))
         .child(
-            row.rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::control_radius(theme),
-            ))
-            .bg(taskmanager_ui::theme_binding::fill(
-                theme.card_surface().with_alpha(0.85),
-            ))
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_8,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_2,
-            )),
+            row.rounded(absolute(tokens::control_radius(theme)))
+                .bg(fill(theme.card_surface().with_alpha(0.85)))
+                .px(definite_length(tokens::SPACE_8))
+                .py(definite_length(tokens::SPACE_2)),
         )
 }
 
@@ -550,20 +545,18 @@ fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) ->
                     .h(max_height)
                     .min_h(px(HEADLINE_COMPANION_FLOOR))
                     .flex_shrink(),
-                None => card
-                    .flex_1()
-                    .min_h(taskmanager_ui::theme_binding::length(tier.min_height())),
+                None => card.flex_1().min_h(length(tier.min_height())),
             }
         }
         ChartTier::Secondary => card
             .flex_auto()
             .min_w(px(0.0))
-            .min_h(taskmanager_ui::theme_binding::length(tier.min_height()))
+            .min_h(length(tier.min_height()))
             .w_full(),
         ChartTier::Compact => card
             .flex_none()
             .h(COMPACT_GRAPH_HEIGHT)
-            .min_h(taskmanager_ui::theme_binding::length(tier.min_height()))
+            .min_h(length(tier.min_height()))
             .w_full(),
     }
 }
@@ -660,18 +653,12 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         .w_full()
         .child(stats);
     if let Some(footer) = stats_footer {
-        stats_col = stats_col.child(
-            div()
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
-                .child(footer),
-        );
+        stats_col = stats_col.child(div().mt(length(tokens::SPACE_6)).child(footer));
     }
     let mut main_body = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .min_w(px(0.0))
         .min_h(px(0.0))
         .w_full()
@@ -698,8 +685,8 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
             .flex_row()
             .child(
                 elements::truncated_text(&vital)
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
+                    .text_size(font_size(tokens::FONT_13))
+                    .text_color(hsla(theme.fg_dim)),
             );
         #[cfg(any(test, feature = "test-support"))]
         let line = line.debug_selector(|| "tm-perf-vital-line".to_string());
@@ -741,17 +728,13 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         // An owned bottom inset keeps the last row/card clear of the
         // viewport edge. It is part of the shared page contract, so every
         // Performance device receives the same pixel safety margin.
-        .pb(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .pb(definite_length(tokens::SPACE_12))
         .overflow_hidden()
         .debug_selector(|| PERF_MAIN_VIEWPORT_SELECTOR.to_string());
     let mut left = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .flex_1()
         .min_w(px(0.0))
         .min_h(px(0.0))
@@ -783,9 +766,7 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
         .items_center()
         .w_full()
         .min_w(px(0.0))
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             elements::truncated_text(&title)
                 .debug_selector(|| "tm-perf-title-text".to_string())
@@ -793,14 +774,10 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
                 // truncates inside its own slot and can never widen the
                 // whole split or overlap the context slot.
                 .flex_shrink()
-                .max_w(taskmanager_ui::theme_binding::length(
-                    PERFORMANCE_TITLE_MAX_WIDTH,
-                ))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_26))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_EXTRA_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
+                .max_w(length(PERFORMANCE_TITLE_MAX_WIDTH))
+                .text_size(font_size(tokens::FONT_26))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD))
+                .text_color(hsla(theme.fg)),
         )
         .child(
             elements::truncated_text(&subtitle)
@@ -809,11 +786,9 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
                 .flex_shrink()
                 .min_w(px(0.0))
                 .text_right()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_16))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
+                .text_size(font_size(tokens::FONT_16))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg_dim)),
         );
     // Geometry breakpoint on the page header — the render-path assertion looks
     // this up to prove a perf page paints its chrome when device data exists.

@@ -5,15 +5,17 @@
 //! Collection, revision correlation, and provider selection remain
 //! outside the toolkit.
 
+use taskmanager_application::SystemTelemetryRevision;
 use taskmanager_application::{CorrelatedSystemTelemetryOutcome, SystemTelemetryDomain};
+use taskmanager_shell::history::HistoryIngestionError;
 
 use taskmanager_telemetry_store::{CorrelatedIngestionReport, CorrelatedSystemTelemetryIngestor};
 
-pub(super) type SystemHistoryIngestionError = taskmanager_shell::history::HistoryIngestionError;
+pub(super) type SystemHistoryIngestionError = HistoryIngestionError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct SystemHistoryIngestionDiagnostic {
-    pub(super) revision: taskmanager_application::SystemTelemetryRevision,
+    pub(super) revision: SystemTelemetryRevision,
     pub(super) domain: SystemTelemetryDomain,
     pub(super) error: SystemHistoryIngestionError,
 }
@@ -27,7 +29,9 @@ pub(super) fn ingest_correlated_system_outcome(
     ingestor: &CorrelatedSystemTelemetryIngestor,
     correlated: &CorrelatedSystemTelemetryOutcome,
 ) -> Result<CorrelatedIngestionReport, SystemHistoryIngestionError> {
-    taskmanager_shell::history::ingest_correlated_system_outcome(ingestor, correlated)
+    use taskmanager_shell::history::ingest_correlated_system_outcome;
+
+    ingest_correlated_system_outcome(ingestor, correlated)
 }
 
 pub(super) fn record_history_ingestion_error(

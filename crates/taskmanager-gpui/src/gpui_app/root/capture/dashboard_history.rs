@@ -2,6 +2,11 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use taskmanager_core::core::CpuTelemetryObservation;
+use taskmanager_core::core::MemoryTelemetryObservation;
+use taskmanager_core::core::NetworkTelemetryObservation;
+use taskmanager_core::core::StorageTelemetryObservation;
+use taskmanager_core::core::metrics::MemoryScalarObservations;
 
 use taskmanager_core::core::{
     CpuMetrics, CpuScalarObservations, DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence,
@@ -54,7 +59,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_cpu(
                 stamp,
-                &taskmanager_core::core::CpuTelemetryObservation::current(
+                &CpuTelemetryObservation::current(
                     cpu(index, timestamp_ms),
                     timestamp_ms,
                     Vec::new(),
@@ -67,11 +72,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_memory(
                 stamp,
-                &taskmanager_core::core::MemoryTelemetryObservation::current(
-                    memory(index),
-                    timestamp_ms,
-                    Vec::new(),
-                ),
+                &MemoryTelemetryObservation::current(memory(index), timestamp_ms, Vec::new()),
             )
             .is_err()
         {
@@ -82,7 +83,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_storage(
                 stamp,
-                &taskmanager_core::core::StorageTelemetryObservation::current(
+                &StorageTelemetryObservation::current(
                     disks,
                     timestamp_ms,
                     Vec::new(),
@@ -99,7 +100,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_network(
                 stamp,
-                &taskmanager_core::core::NetworkTelemetryObservation::current(
+                &NetworkTelemetryObservation::current(
                     networks,
                     timestamp_ms,
                     Vec::new(),
@@ -126,7 +127,7 @@ pub(super) fn cpu(index: u64, observed_at_ms: u64) -> CpuMetrics {
 
 pub(super) fn memory(index: u64) -> MemoryMetrics {
     MemoryMetrics::from_observations(
-        taskmanager_core::core::metrics::MemoryScalarObservations {
+        MemoryScalarObservations {
             total_bytes: ScalarObservation::available(1_000, index),
             used_bytes: ScalarObservation::available(
                 480_u64.saturating_add((index % 16).saturating_mul(7)),

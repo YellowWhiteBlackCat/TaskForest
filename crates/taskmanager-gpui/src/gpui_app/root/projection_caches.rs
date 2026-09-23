@@ -6,6 +6,7 @@
 
 use std::cell::RefCell;
 use std::{rc::Rc, sync::Arc};
+use taskmanager_application::ApplicationHistoryRow;
 
 use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::session::SessionItem;
@@ -44,7 +45,7 @@ struct SessionsEntry {
 }
 
 struct AppHistoryEntry {
-    source: std::sync::Arc<[taskmanager_application::ApplicationHistoryRow]>,
+    source: std::sync::Arc<[ApplicationHistoryRow]>,
     rows: Rc<Vec<AppHistoryRow>>,
 }
 
@@ -166,7 +167,7 @@ impl GpuiProjectionCaches {
 
     pub(super) fn app_history(
         &self,
-        source: &std::sync::Arc<[taskmanager_application::ApplicationHistoryRow]>,
+        source: &std::sync::Arc<[ApplicationHistoryRow]>,
         build: impl FnOnce() -> Vec<AppHistoryRow>,
     ) -> Rc<Vec<AppHistoryRow>> {
         {

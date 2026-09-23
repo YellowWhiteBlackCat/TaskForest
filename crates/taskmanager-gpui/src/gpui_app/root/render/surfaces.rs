@@ -8,9 +8,12 @@ use super::super::{
 };
 use super::overlays;
 use gpui::{AnyElement, App, Context, Div, IntoElement, ParentElement, Stateful, Window, px};
+use taskmanager_application::SmartSelfTestState;
 use taskmanager_application::{PendingConfirmation, SurfaceDismissReason, SurfaceKind};
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::SPACE_16;
 
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 
@@ -108,9 +111,7 @@ fn compose_shared_surface(
             }
             Some(PendingConfirmation::SmartSelfTest(intent)) => {
                 let error = match view.shell.smart_self_test_state() {
-                    taskmanager_application::SmartSelfTestState::Failed(failed)
-                        if failed.intent == intent =>
-                    {
+                    SmartSelfTestState::Failed(failed) if failed.intent == intent => {
                         Some(failed.failure)
                     }
                     _ => None,
@@ -176,7 +177,7 @@ fn render_process_properties(
     // The insights grid must receive the post-rail width, otherwise two cards
     // sized from the pre-rail width wrap into one left column and leave a
     // misleading empty half of the Properties dialog.
-    let insights_width = (content_width - taskmanager_theme::tokens::SPACE_16.0).max(240.0);
+    let insights_width = (content_width - SPACE_16.0).max(240.0);
     let content_height = (f32::from(viewport.height) - 150.0).max(260.0);
     let content: AnyElement = bounded_scroll_region_with_rail(
         BoundedScrollRailSpec {
@@ -220,7 +221,7 @@ fn render_service_details(
     view: &mut RootView,
     root: Stateful<Div>,
     theme: &Theme,
-    service_id: taskmanager_core::core::target::ServiceId,
+    service_id: ServiceId,
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {

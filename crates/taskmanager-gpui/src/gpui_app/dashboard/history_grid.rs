@@ -11,6 +11,7 @@ use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::definite_length;
 
 pub(super) fn render_history_grid(
     theme: &Theme,
@@ -43,9 +44,7 @@ pub(super) fn render_history_grid(
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(card(
             TimelineMetric::Cpu,
             i18n::t("common.cpu"),

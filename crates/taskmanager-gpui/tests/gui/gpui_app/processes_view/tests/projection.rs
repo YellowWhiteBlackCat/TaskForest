@@ -5,6 +5,10 @@
 //! GPUI state — they exercise the pure `rows` helpers directly.
 
 use std::collections::HashSet;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 
 use crate::gpui_app::processes_view::rows::{
     effective_process_hidden_cols, effective_process_sort_col, sort_col_step, visible_sort_cols,
@@ -143,6 +147,7 @@ fn sort_col_step_cycles_the_full_default_header() {
 // ── Canonical category row projection ───────────────────────────────────────
 
 mod canonical_category {
+    use super::*;
     use std::collections::HashSet;
 
     use crate::gpui_app::processes_view::rows::{
@@ -160,16 +165,16 @@ mod canonical_category {
 
     /// The expected row id of one fixture process (token from
     /// `fixture_start_token`, the builder's single source).
-    fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-        taskmanager_shell::ProcessRowId::Process(
-            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+    fn row_id(pid: u32) -> ProcessRowId {
+        ProcessRowId::Process(
+            ProcessLiveKey::from_parts(pid, fixture_start_token(pid))
                 .expect("fixture pid and token are non-zero"),
         )
     }
 
-    fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-        taskmanager_shell::ProcessRowId::Application(
-            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+    fn application_row_id(pid: u32) -> ProcessRowId {
+        ProcessRowId::Application(
+            ProcessLiveKey::from_parts(pid, fixture_start_token(pid))
                 .expect("fixture pid and token are non-zero"),
         )
     }
@@ -177,7 +182,7 @@ mod canonical_category {
     fn app_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
             .expect("fixture identity must be non-empty");
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.to_owned())
             .current_cpu_percentage(cpu)
@@ -188,7 +193,7 @@ mod canonical_category {
     }
 
     fn background_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.to_owned())
             .current_cpu_percentage(cpu)
@@ -201,7 +206,7 @@ mod canonical_category {
     }
 
     fn unknown_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.to_owned())
             .current_cpu_percentage(cpu)
@@ -236,7 +241,7 @@ mod canonical_category {
             false,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
 
         assert_eq!(rows.len(), 3, "collapsed: one header per non-empty bucket");
@@ -288,7 +293,7 @@ mod canonical_category {
             true,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Uncategorized");
@@ -300,7 +305,7 @@ mod canonical_category {
             true,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Background processes");
@@ -320,7 +325,7 @@ mod canonical_category {
             true,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Background processes");
@@ -334,7 +339,7 @@ mod canonical_category {
             true,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Applications");
@@ -372,7 +377,7 @@ mod canonical_category {
             false,
             &expanded,
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(
             rows.len(),
@@ -406,7 +411,7 @@ mod canonical_category {
             true,
             &expanded,
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows[1].name, "Editor", "CPU% asc puts the 1.0% app first");
         assert_eq!(rows[2].process_identity.map(ProcessLiveKey::pid), Some(11));
@@ -427,7 +432,7 @@ mod canonical_category {
             ProcessApplicationIdentity::new("org.example.MissionCenter", "Mission Center", None)
                 .expect("fixture identity must be non-empty");
         let item = |pid: u32, name: &str, cpu: f32, mem: u64, parent_pid: Option<u32>| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .parent_pid(parent_pid)
                 .name(name.to_owned())
@@ -461,7 +466,7 @@ mod canonical_category {
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &expanded,
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         });
 
         assert_eq!(rows.len(), 7, "category + app total + five process rows");
@@ -513,7 +518,7 @@ mod canonical_category {
             true,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert!(rows[0].has_children);
@@ -541,7 +546,7 @@ mod canonical_category {
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &HashSet::new(),
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         });
         let direct = category_tree_rows(
             &refs,
@@ -550,7 +555,7 @@ mod canonical_category {
             false,
             &HashSet::new(),
             &HashSet::new(),
-            taskmanager_core::core::units::UnitPreferences::default(),
+            UnitPreferences::default(),
         );
         let names: Vec<&str> = rows.iter().map(|row| row.name.as_str()).collect();
         let direct_names: Vec<&str> = direct.iter().map(|row| row.name.as_str()).collect();
@@ -597,7 +602,7 @@ mod canonical_category {
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &expanded,
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         });
 
         assert_eq!(
@@ -687,7 +692,7 @@ mod canonical_category {
             ProcessApplicationIdentity::new("org.example.MissionCenter", "Mission Center", None)
                 .expect("fixture identity must be non-empty");
         let item = |pid: u32, name: &str, cpu: f32, mem: u64, parent_pid: Option<u32>| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .parent_pid(parent_pid)
                 .name(name.to_owned())
@@ -701,7 +706,7 @@ mod canonical_category {
                 .build()
         };
         let background = |pid: u32, name: &str, parent_pid: Option<u32>| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .parent_pid(parent_pid)
                 .name(name.to_owned())
@@ -737,7 +742,7 @@ mod canonical_category {
                 category_expansion_key(ProcessCategory::Background),
                 "app-tree:pid:100:start:1001".to_owned(),
             ]),
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         });
 
         // Applications: header, aggregate, then the fully expanded tree.
@@ -794,7 +799,7 @@ mod canonical_category {
                 }),
                 ..ProcessScalarObservations::default()
             };
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .name(name.to_owned())
                 .status("S".to_owned())
@@ -817,7 +822,7 @@ mod canonical_category {
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &HashSet::from([category_expansion_key(ProcessCategory::Uncategorized)]),
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
         });
         assert_eq!(
             rows.len(),

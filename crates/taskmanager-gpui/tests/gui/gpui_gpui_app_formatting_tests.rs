@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_core::core::units::format_quantity;
+use taskmanager_core::core::units::format_quantity_f64;
+use taskmanager_core::core::units::format_quantity_pair;
 
 const TWO_POW_53: u64 = 1 << 53;
 const GIB_IN_BYTES: u64 = 1024 * 1024 * 1024;
@@ -112,34 +115,21 @@ fn drive_and_network_families_are_byte_identical_to_the_core_single_source() {
                     let family = kind;
                     assert_eq!(
                         units.format_quantity(value, kind, per_second),
-                        taskmanager_core::core::units::format_quantity(
-                            value, family, per_second, &prefs
-                        ),
+                        format_quantity(value, family, per_second, &prefs),
                         "{kind:?} {value} B ({use_bytes}, {use_base2}, {per_second})"
                     );
                 }
             }
             assert_eq!(
                 units.format_quantity_pair(value, value * 2, QuantityFamily::Network, true),
-                taskmanager_core::core::units::format_quantity_pair(
-                    value,
-                    value * 2,
-                    QuantityFamily::Network,
-                    true,
-                    &prefs
-                )
+                format_quantity_pair(value, value * 2, QuantityFamily::Network, true, &prefs)
             );
         }
         // The megabyte-valued network graph-sample entry projects through
         // the same core ladder.
         assert_eq!(
             crate::gpui_app::formatting::format_network_graph_megabytes(units, 1.0),
-            taskmanager_core::core::units::format_quantity_f64(
-                1_000_000.0,
-                QuantityFamily::Network,
-                true,
-                &prefs
-            )
+            format_quantity_f64(1_000_000.0, QuantityFamily::Network, true, &prefs)
         );
     }
 }

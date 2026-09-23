@@ -117,7 +117,9 @@ fn resolve_startup_runtime(host: &NativeAppHost) -> Option<crate::gpui_app::Star
 /// Install the in-process frame-capture seam consumed by the window-capture
 /// runtime, with the same bounded five-second handoff as before.
 fn register_in_process_capture() {
-    taskmanager_app_host::register_in_process_capture(Box::new(|output| {
+    use taskmanager_app_host::register_in_process_capture;
+
+    register_in_process_capture(Box::new(|output| {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         gpui::request_window_frame_capture_with_channel(output.to_path_buf(), tx);
         match rx.recv_timeout(std::time::Duration::from_secs(5)) {

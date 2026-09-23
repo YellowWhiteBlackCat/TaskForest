@@ -1,4 +1,7 @@
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, px};
+use taskmanager_core::core::metrics::ScalarAvailability;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 use crate::gpui_app::root::RootView;
 use taskmanager_core::core::device_state::DeviceState;
@@ -12,9 +15,9 @@ use taskmanager_theme::Theme;
 use super::*;
 
 fn disk_with_mount(mount_point: &str) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .partitions(vec![
-            taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+            DiskPartitionFixtureBuilder::new()
                 .mount_point(mount_point.to_string())
                 .device_state(DeviceState::healthy(10))
                 .build(),
@@ -23,12 +26,12 @@ fn disk_with_mount(mount_point: &str) -> DiskMetrics {
 }
 
 fn two_partition_disk() -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .partitions(vec![
-            taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+            DiskPartitionFixtureBuilder::new()
                 .mount_point("/".to_string())
                 .build(),
-            taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+            DiskPartitionFixtureBuilder::new()
                 .mount_point("/home".to_string())
                 .build(),
         ])
@@ -126,9 +129,7 @@ fn entry_with_unreadable_subtree_renders_the_typed_state_not_a_zero() {
     assert!(unreadable.unreadable.is_some());
     assert_eq!(
         unreadable.size_bytes.availability(),
-        taskmanager_core::core::metrics::ScalarAvailability::Unavailable(
-            FailureKind::PermissionDenied
-        )
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
 }
 

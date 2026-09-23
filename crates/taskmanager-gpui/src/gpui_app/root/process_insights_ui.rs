@@ -13,6 +13,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessDetailsSection, RootView, platform_submission_time_ms};
@@ -51,7 +52,7 @@ pub(super) enum ProcessInsightsLifecycle {
     },
     Ready {
         request: ProcessInsightsRequest,
-        snapshot: Box<taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot>,
+        snapshot: Box<ProcessTelemetrySnapshot>,
     },
     Failed {
         attempt: ProcessInsightsAttempt,

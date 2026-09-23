@@ -9,8 +9,10 @@
 //! `perf_views::dynamic_stats::tests`) and the thermal surface is the System
 //! Health sensor center (`system_health_view::stats::tests`).
 
+use taskmanager_core::core::units::UnitPreferences;
 #[cfg(test)]
 mod tests_inner {
+    use super::*;
     // Import ONLY the helpers under test — NOT `use super::*`. The parent module
     // has `use gpui::*;`, whose prelude shadows the built-in `#[test]` attribute
     // macro once re-globbed in here, which trips a recursion-limit error on the
@@ -23,25 +25,10 @@ mod tests_inner {
 
     #[test]
     fn cache_readout_distinguishes_unknown_from_measured_zero() {
+        assert_eq!(fmt_cache_kb(None, UnitPreferences::default()), "—");
+        assert_eq!(fmt_cache_kb(Some(0), UnitPreferences::default()), "0 B");
         assert_eq!(
-            fmt_cache_kb(
-                None,
-                taskmanager_core::core::units::UnitPreferences::default()
-            ),
-            "—"
-        );
-        assert_eq!(
-            fmt_cache_kb(
-                Some(0),
-                taskmanager_core::core::units::UnitPreferences::default()
-            ),
-            "0 B"
-        );
-        assert_eq!(
-            fmt_cache_kb(
-                Some(2048),
-                taskmanager_core::core::units::UnitPreferences::default()
-            ),
+            fmt_cache_kb(Some(2048), UnitPreferences::default()),
             "2.0 MiB"
         );
     }

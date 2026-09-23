@@ -8,6 +8,10 @@ use gpui::{
     App, ClipboardItem, Context, Div, Entity, InteractiveElement, ParentElement, Styled, Window,
     div, px,
 };
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{RootView, platform_submission_time_ms};
@@ -77,13 +81,11 @@ fn info_row(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t(label_key)),
         )
         .child(
@@ -91,15 +93,13 @@ fn info_row(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(
                     div()
                         .flex_1()
                         .min_w(px(0.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg))
                         .child(value),
                 )
                 .child(elements::pill(
@@ -149,15 +149,9 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
         let mut body = div()
             .flex()
             .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_12,
-            ))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-            .text_color(taskmanager_ui::theme_binding::hsla(if failed {
-                theme.danger
-            } else {
-                theme.fg_dim
-            }))
+            .gap(definite_length(tokens::SPACE_12))
+            .text_size(font_size(tokens::FONT_13))
+            .text_color(hsla(if failed { theme.danger } else { theme.fg_dim }))
             .child(i18n::t(empty_state_message_key(&state.phase)));
         if failed {
             body = body.child(elements::pill(
@@ -198,13 +192,11 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
         .max_w(px(520.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg))
                 .child(i18n::t("first_run.description")),
         )
         .child(info_row(
@@ -232,8 +224,8 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     let failure = if let FirstRunPhase::Failed(kind) = state.phase {
         body = body.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.danger))
                 .child(i18n::t(failure_key(kind))),
         );
         Some(kind)
@@ -250,8 +242,8 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     if let Some(status_key) = status_key {
         body = body.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.accent))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.accent))
                 .child(i18n::t(status_key)),
         );
     }
@@ -260,9 +252,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(elements::pill(
             theme,
             "first-run-open-docs",
@@ -393,22 +383,18 @@ pub(crate) fn render_settings_row(theme: &Theme, entity: Entity<RootView>) -> Di
         .flex()
         .items_center()
         .justify_between()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             div()
                 .flex_1()
                 .min_w(px(0.0))
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(theme.fg))
                         .child(i18n::t("settings.additional_setup_detail")),
                 ),
         )
@@ -578,7 +564,7 @@ impl RootView {
         failure: &OperationFailure,
         cx: &mut Context<Self>,
     ) -> bool {
-        if failure.capability != taskmanager_platform_contract::CapabilityId::FIRST_RUN_SETUP {
+        if failure.capability != CapabilityId::FIRST_RUN_SETUP {
             return false;
         }
         let Some(action) = self.first_run_requests.remove(&failure.request_id) else {

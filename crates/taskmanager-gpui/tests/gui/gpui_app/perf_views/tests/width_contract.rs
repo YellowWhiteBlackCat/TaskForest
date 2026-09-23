@@ -16,6 +16,7 @@ use crate::gpui_app::perf_views::PERF_MAIN_VIEWPORT_SELECTOR;
 use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MIN_WIDTH;
 use taskmanager_core::core::hardware::CpuType;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn contract_page_snapshot() -> SystemSnapshot {
     SystemSnapshot {
@@ -35,7 +36,7 @@ fn contract_page_snapshot() -> SystemSnapshot {
             MemoryOptionalObservations::default(),
         ),
         networks: vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id("width-nic".into())
                 .interface_name("width0".into())
                 .build(),

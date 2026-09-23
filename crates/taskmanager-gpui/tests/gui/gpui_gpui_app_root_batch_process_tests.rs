@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use taskmanager_application::i18n::t;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use super::{
     export_process_batch_history_with, process_batch_failure_feedback_key,
@@ -21,7 +23,7 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
     use taskmanager_theme::Theme;
 
     let process = |pid, parent_pid, token| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .parent_pid(parent_pid)
             .name(format!("worker-{pid}"))
@@ -69,7 +71,7 @@ fn multi_select_reversible_verb_arms_the_shared_confirmation(cx: &mut gpui::Test
     use taskmanager_theme::Theme;
 
     let process = |pid: u32, name: String| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name)
             .scalar_observations(ProcessScalarObservations {
@@ -116,7 +118,7 @@ fn single_reversible_verb_submits_without_the_shared_gate(cx: &mut gpui::TestApp
     use taskmanager_core::core::process::ProcessScalarObservations;
     use taskmanager_theme::Theme;
 
-    let item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    let item = ProcessItemFixtureBuilder::new()
         .pid(44)
         .name("worker-44".to_string())
         .scalar_observations(ProcessScalarObservations {
@@ -158,10 +160,7 @@ fn clipboard_adapter_receives_the_exact_deterministic_payload() {
 
 #[test]
 fn completed_result_is_consumed_once_into_history() {
-    let identity =
-        taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
-            42, "worker", 123, 1_230,
-        )
+    let identity = FrozenProcessIdentity::from_authoritative_parts(42, "worker", 123, 1_230)
         .expect("fixture identity");
     let result = ProcessBatchResult {
         intent: ProcessBatchIntent {
@@ -180,9 +179,7 @@ fn completed_result_is_consumed_once_into_history() {
 
     assert_eq!(history.len(), 1);
     assert_eq!(history.entries()[0].completed_at_unix_ms, 789);
-    assert!(summary.ends_with(taskmanager_application::i18n::t(
-        "feedback.permission_denied"
-    )));
+    assert!(summary.ends_with(t("feedback.permission_denied")));
     assert!(matches!(
         history.entries()[0].targets[0].result,
         ProcessBatchTargetResult::Failed(FailureKind::PermissionDenied)

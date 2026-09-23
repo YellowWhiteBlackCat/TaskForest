@@ -17,7 +17,9 @@ pub enum ProcessControlAction {
 }
 
 pub(super) fn priority_tier_label(tier: PriorityTier) -> &'static str {
-    taskmanager_shell::presentation::priority_tier_label(tier)
+    use taskmanager_shell::presentation::priority_tier_label;
+
+    priority_tier_label(tier)
 }
 
 fn process_control_action_label(action: ProcessControlAction) -> String {

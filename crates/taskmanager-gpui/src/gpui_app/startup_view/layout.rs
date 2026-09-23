@@ -1,6 +1,8 @@
 //! Startup-page allocation projected from the shared viewport budget.
 
 use gpui::{AnyElement, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use taskmanager_core::core::BootTimeline;
+use taskmanager_ui::theme_binding::definite_length;
 
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget, VerticalSpace};
@@ -86,7 +88,7 @@ impl StartupPageBudget {
 pub(super) fn compose_content(
     theme: &Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
-    baseline: Option<&taskmanager_core::core::BootTimeline>,
+    baseline: Option<&BootTimeline>,
     layout: StartupPageBudget,
     primary: Div,
 ) -> AnyElement {
@@ -101,9 +103,7 @@ pub(super) fn compose_content(
                 .min_h(px(0.0))
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(primary)
                 .children(timeline.map(|timeline| {
                     div()
@@ -122,9 +122,7 @@ pub(super) fn compose_content(
                 .min_h(px(0.0))
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(primary)
                 .children(timeline.map(|timeline| {
                     div()

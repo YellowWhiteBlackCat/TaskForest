@@ -4,12 +4,12 @@
 //! module only maps the contract to GPUI's protocol-free adapter type and
 //! provides an opt-in development switch for the first layer-shell slice.
 
-use gpui::{
-    LayerShellFallback, LayerShellKeyboardInteractivity, LayerShellLayer, LayerShellOptions,
-};
+use gpui::{LayerShellFallback, LayerShellOptions};
+use taskmanager_app_host::LayerShellFallbackPolicy;
 #[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellSpec;
 use taskmanager_app_host::WindowPresentation;
+use taskmanager_app_host::{LayerShellKeyboardInteractivity, LayerShellLayer};
 #[cfg(target_os = "linux")]
 use tracing::warn;
 
@@ -49,9 +49,9 @@ pub(crate) fn from_environment() -> WindowPresentation {
             return WindowPresentation::standalone();
         };
 
-        return WindowPresentation::layer_shell(spec.with_keyboard_interactivity(
-            taskmanager_app_host::LayerShellKeyboardInteractivity::OnDemand,
-        ));
+        return WindowPresentation::layer_shell(
+            spec.with_keyboard_interactivity(LayerShellKeyboardInteractivity::OnDemand),
+        );
     }
 
     WindowPresentation::standalone()
@@ -64,12 +64,10 @@ pub(crate) fn to_gpui(presentation: &WindowPresentation) -> gpui::WindowPresenta
         WindowPresentation::LayerShell(spec) => {
             let options = LayerShellOptions::new(spec.namespace())
                 .with_layer(match spec.layer() {
-                    taskmanager_app_host::LayerShellLayer::Background => {
-                        LayerShellLayer::Background
-                    }
-                    taskmanager_app_host::LayerShellLayer::Bottom => LayerShellLayer::Bottom,
-                    taskmanager_app_host::LayerShellLayer::Top => LayerShellLayer::Top,
-                    taskmanager_app_host::LayerShellLayer::Overlay => LayerShellLayer::Overlay,
+                    LayerShellLayer::Background => gpui::LayerShellLayer::Background,
+                    LayerShellLayer::Bottom => gpui::LayerShellLayer::Bottom,
+                    LayerShellLayer::Top => gpui::LayerShellLayer::Top,
+                    LayerShellLayer::Overlay => gpui::LayerShellLayer::Overlay,
                 })
                 .with_anchor(spec.anchor().bits())
                 .with_size(spec.size().width(), spec.size().height())
@@ -81,24 +79,20 @@ pub(crate) fn to_gpui(presentation: &WindowPresentation) -> gpui::WindowPresenta
                 ))
                 .with_exclusive_zone(spec.exclusive_zone())
                 .with_keyboard_interactivity(match spec.keyboard_interactivity() {
-                    taskmanager_app_host::LayerShellKeyboardInteractivity::None => {
-                        LayerShellKeyboardInteractivity::None
+                    LayerShellKeyboardInteractivity::None => {
+                        gpui::LayerShellKeyboardInteractivity::None
                     }
-                    taskmanager_app_host::LayerShellKeyboardInteractivity::Exclusive => {
-                        LayerShellKeyboardInteractivity::Exclusive
+                    LayerShellKeyboardInteractivity::Exclusive => {
+                        gpui::LayerShellKeyboardInteractivity::Exclusive
                     }
-                    taskmanager_app_host::LayerShellKeyboardInteractivity::OnDemand => {
-                        LayerShellKeyboardInteractivity::OnDemand
+                    LayerShellKeyboardInteractivity::OnDemand => {
+                        gpui::LayerShellKeyboardInteractivity::OnDemand
                     }
                 })
                 .with_output(spec.output().name().map(str::to_owned))
                 .with_fallback(match spec.fallback() {
-                    taskmanager_app_host::LayerShellFallbackPolicy::NormalWindow => {
-                        LayerShellFallback::NormalWindow
-                    }
-                    taskmanager_app_host::LayerShellFallbackPolicy::Unavailable => {
-                        LayerShellFallback::Unavailable
-                    }
+                    LayerShellFallbackPolicy::NormalWindow => LayerShellFallback::NormalWindow,
+                    LayerShellFallbackPolicy::Unavailable => LayerShellFallback::Unavailable,
                 });
 
             gpui::WindowPresentation::LayerShell(options)

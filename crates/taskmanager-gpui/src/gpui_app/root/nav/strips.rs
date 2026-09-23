@@ -9,6 +9,11 @@ use gpui::{
 };
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 /// The page-navigation strip: a floating rounded row or column of page tabs.
@@ -42,9 +47,7 @@ pub fn nav_strip_horizontal(
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .flex_1()
         .min_w(px(0.0))
         // Labels are a semantic slot, not a reason to clip the last page. At
@@ -169,15 +172,9 @@ pub fn nav_strip_horizontal(
         .w_full()
         .min_w(px(0.0))
         .flex_shrink_0()
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
-        .pt(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .pb(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .px(definite_length(tokens::SPACE_12))
+        .pt(definite_length(tokens::SPACE_6))
+        .pb(definite_length(tokens::SPACE_4))
         .child(
             div()
                 .debug_selector(|| "tm-navigation-strip".to_string())
@@ -187,26 +184,20 @@ pub fn nav_strip_horizontal(
                 .flex()
                 .flex_row()
                 .items_center()
-                .bg(taskmanager_ui::theme_binding::fill(t.sidebar_bg))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::card_radius(t),
-                ))
+                .bg(fill(t.sidebar_bg))
+                .rounded(absolute(tokens::card_radius(t)))
                 .border_1()
-                .border_color(taskmanager_ui::theme_binding::hsla(t.border))
+                .border_color(hsla(t.border))
                 .shadow_sm()
-                .px(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .px(definite_length(tokens::SPACE_6))
                 .child(tabs)
-                .child(
-                    div()
-                        .w(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
-                        .flex_shrink_0(),
-                )
+                .child(div().w(length(tokens::SPACE_6)).flex_shrink_0())
                 .child({
-                    let controls = div().flex_shrink_0().flex().items_center().gap(
-                        taskmanager_ui::theme_binding::definite_length(tokens::SPACE_2),
-                    );
+                    let controls = div()
+                        .flex_shrink_0()
+                        .flex()
+                        .items_center()
+                        .gap(definite_length(tokens::SPACE_2));
                     let controls =
                         controls.child(super::super::window_capture::current_window_capture_btn(
                             t,
@@ -232,9 +223,7 @@ pub fn nav_strip_vertical(
         .id("tm-navigation-tabs-vertical")
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .flex_1()
         .min_h(px(0.0))
         .w_full()
@@ -359,15 +348,9 @@ pub fn nav_strip_vertical(
         .min_w(px(0.0))
         .min_h(px(0.0))
         .flex_shrink_0()
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .pl(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .pr(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .py(definite_length(tokens::SPACE_6))
+        .pl(definite_length(tokens::SPACE_8))
+        .pr(definite_length(tokens::SPACE_4))
         .child(
             div()
                 .debug_selector(|| "tm-navigation-rail".to_string())
@@ -379,16 +362,12 @@ pub fn nav_strip_vertical(
                 .flex_shrink_0()
                 .flex()
                 .flex_col()
-                .bg(taskmanager_ui::theme_binding::fill(t.sidebar_bg))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::card_radius(t),
-                ))
+                .bg(fill(t.sidebar_bg))
+                .rounded(absolute(tokens::card_radius(t)))
                 .border_1()
-                .border_color(taskmanager_ui::theme_binding::hsla(t.border))
+                .border_color(hsla(t.border))
                 .shadow_sm()
-                .p(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .p(definite_length(tokens::SPACE_6))
                 .child(tabs)
                 .child(
                     div()
@@ -396,11 +375,9 @@ pub fn nav_strip_vertical(
                         .flex_row()
                         .items_center()
                         .justify_around()
-                        .pt(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_6,
-                        ))
+                        .pt(definite_length(tokens::SPACE_6))
                         .border_t_1()
-                        .border_color(taskmanager_ui::theme_binding::hsla(t.border))
+                        .border_color(hsla(t.border))
                         .flex_shrink_0()
                         // Vertical controls are stacked at the bottom instead
                         // of sharing a row. Compact icon targets keep both the
@@ -412,12 +389,8 @@ pub fn nav_strip_vertical(
                                 controls
                                     .flex_col()
                                     .justify_center()
-                                    .gap(taskmanager_ui::theme_binding::definite_length(
-                                        tokens::SPACE_2,
-                                    ))
-                                    .pt(taskmanager_ui::theme_binding::definite_length(
-                                        tokens::SPACE_4,
-                                    ))
+                                    .gap(definite_length(tokens::SPACE_2))
+                                    .pt(definite_length(tokens::SPACE_4))
                             },
                         )
                         .child({
@@ -426,9 +399,11 @@ pub fn nav_strip_vertical(
                             // action has a localized label, so a horizontal
                             // controls row cannot satisfy the rail's width
                             // budget even in labeled mode.
-                            let controls = div().flex().flex_col().items_center().gap(
-                                taskmanager_ui::theme_binding::definite_length(tokens::SPACE_2),
-                            );
+                            let controls = div()
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .gap(definite_length(tokens::SPACE_2));
                             let controls = controls.child(
                                 super::super::window_capture::current_window_capture_btn(
                                     t, hovered, true, cx,

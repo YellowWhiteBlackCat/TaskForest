@@ -16,6 +16,9 @@
 
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_core::core::ProcessGpuEngineUsage;
@@ -82,8 +85,8 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
     if engines.state.status != DeviceStatus::Healthy {
         return super::card(theme, TITLE, width).child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(super::status_label(engines.state.status, labels).to_string()),
         );
     }
@@ -91,24 +94,22 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
     if engines.engines.is_empty() {
         return content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(NO_ENGINES.to_string()),
         );
     }
     content = content.child(
         div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(font_size(tokens::FONT_11))
+            .text_color(hsla(theme.fg_dim))
             .child(format!("{} · {}", TITLE, engines.engines.len())),
     );
     content = content.child(
         div()
             .flex()
             .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
+            .gap(definite_length(tokens::SPACE_3))
             .children(
                 engines
                     .engines
@@ -117,7 +118,7 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
                     .map(|line| {
                         div()
                             .min_w(px(0.0))
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                            .text_size(font_size(tokens::FONT_10))
                             .font(mono_font_with_fallback(theme))
                             .whitespace_normal()
                             .child(line)

@@ -8,6 +8,7 @@
 //! and unit-tested: every non-ready variant is a typed placeholder, never a
 //! fabricated slot or module row.
 
+use taskmanager_application::SmbiosMemoryRequestFailure;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::i18n;
 use taskmanager_core::core::failure::FailureKind;
@@ -148,10 +149,10 @@ fn module_row(module: &SmbiosModuleRow, units: UnitPreferences) -> (String, Stri
 
 /// Both failure spellings carry one `FailureKind`; the provider's detail
 /// string is host-specific and never parsed here.
-fn failure_kind(failure: &taskmanager_application::SmbiosMemoryRequestFailure) -> FailureKind {
+fn failure_kind(failure: &SmbiosMemoryRequestFailure) -> FailureKind {
     match failure {
-        taskmanager_application::SmbiosMemoryRequestFailure::Submission(kind) => *kind,
-        taskmanager_application::SmbiosMemoryRequestFailure::Provider(failed) => failed.kind,
+        SmbiosMemoryRequestFailure::Submission(kind) => *kind,
+        SmbiosMemoryRequestFailure::Provider(failed) => failed.kind,
     }
 }
 

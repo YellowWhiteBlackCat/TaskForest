@@ -4,7 +4,11 @@
 //! before it can drift.
 
 use super::*;
+use taskmanager_core::core::CpuTelemetryObservation;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 /// The shared chrome every device page must paint: the semantic title row and
 /// the ONE fixed main viewport. No page may mount its own scrolling main
@@ -76,7 +80,7 @@ fn contract_snapshot() -> SystemSnapshot {
             MemoryOptionalObservations::default(),
         ),
         disks: vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("contract-disk".into())
                 .name("contract0n1".into())
                 .disk_type("NVMe SSD".into())
@@ -84,7 +88,7 @@ fn contract_snapshot() -> SystemSnapshot {
                 .build(),
         ],
         networks: vec![
-            taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+            NetworkMetricsFixtureBuilder::new()
                 .device_id("contract-nic".into())
                 .interface_name("contract0".into())
                 .build(),
@@ -229,7 +233,7 @@ async fn vertical_runway_degrades_in_order_before_the_headline_floor(cx: &mut Te
         for (revision, usage) in [(1_u64, 40.0_f32), (2, 42.0)] {
             let stamp = CorrelatedTelemetryStamp::from_accepted_event(revision, revision * 10 + 1)
                 .expect("fixture revision is non-zero");
-            let observation = taskmanager_core::core::CpuTelemetryObservation::current(
+            let observation = CpuTelemetryObservation::current(
                 CpuMetrics::from_observations(CpuScalarObservations {
                     global_usage_pct: ScalarObservation::available(usage, revision * 10),
                     ..Default::default()
@@ -351,7 +355,7 @@ async fn disk_page_keeps_its_capacity_fact_through_every_vertical_rung(cx: &mut 
         v.page = TopPage::Performance;
         v.selected = SelectedDevice::Disk(0);
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("vital-disk".into())
                 .name("vital0n1".into())
                 .disk_type("NVMe SSD".into())
@@ -359,7 +363,7 @@ async fn disk_page_keeps_its_capacity_fact_through_every_vertical_rung(cx: &mut 
                 .current_capacity_bytes(gib(2000))
                 .current_available_bytes(gib(1200))
                 .partitions(vec![
-                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                    DiskPartitionFixtureBuilder::new()
                         .device_id("partition:vital:vital0n1p1".into())
                         .parent_device_id("vital-disk".into())
                         .device_generation(DeviceGeneration::new(1))
@@ -368,7 +372,7 @@ async fn disk_page_keeps_its_capacity_fact_through_every_vertical_rung(cx: &mut 
                         .mount_point("/".into())
                         .fs_type("ext4".into())
                         .build(),
-                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                    DiskPartitionFixtureBuilder::new()
                         .device_id("partition:vital:vital0n1p2".into())
                         .parent_device_id("vital-disk".into())
                         .device_generation(DeviceGeneration::new(1))

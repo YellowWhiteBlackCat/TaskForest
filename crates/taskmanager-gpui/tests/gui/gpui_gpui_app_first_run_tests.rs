@@ -1,5 +1,9 @@
 use super::*;
 use gpui::AppContext;
+use taskmanager_application::CorrelatedSetupScriptEvent;
+use taskmanager_platform_contract::CapabilityId;
+use taskmanager_platform_contract::EventSequence;
+use taskmanager_platform_contract::RequestId;
 
 #[gpui::test]
 async fn background_setup_observation_does_not_open_first_run_surface(
@@ -7,15 +11,15 @@ async fn background_setup_observation_does_not_open_first_run_surface(
 ) {
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, cx| {
-        let request_id = taskmanager_platform_contract::RequestId::MIN;
+        let request_id = RequestId::MIN;
         view.first_run_requests
             .insert(request_id, SetupScriptAction::Observe);
         let handled = view.apply_first_run_event(
-            taskmanager_application::CorrelatedSetupScriptEvent {
+            CorrelatedSetupScriptEvent {
                 request_id,
-                capability: taskmanager_platform_contract::CapabilityId::FIRST_RUN_SETUP,
+                capability: CapabilityId::FIRST_RUN_SETUP,
                 provider: None,
-                sequence: taskmanager_platform_contract::EventSequence::new(1),
+                sequence: EventSequence::new(1),
                 observed_at_ms: 1,
                 event: SetupScriptEvent::Observed(Some(SetupScriptInfo {
                     path: std::path::PathBuf::from(

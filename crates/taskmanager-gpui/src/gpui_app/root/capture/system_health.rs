@@ -3,6 +3,9 @@
 use crate::gpui_app::dashboard::{DashboardState, SystemSection};
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use taskmanager_core::core::FilesystemHealthSnapshot;
+use taskmanager_core::core::SensorCenterSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::{
     DeviceGeneration, FilesystemHealthStatus, SensorQuantity, SmartSelfTestKind,
     SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
@@ -18,9 +21,9 @@ impl CaptureEvidence {
         &mut self,
         page: &mut TopPage,
         dashboard: &mut DashboardState,
-        snapshot: &mut taskmanager_core::core::metrics::SystemSnapshot,
-        filesystems: &mut taskmanager_core::core::FilesystemHealthSnapshot,
-        sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
+        snapshot: &mut SystemSnapshot,
+        filesystems: &mut FilesystemHealthSnapshot,
+        sensors: &mut SensorCenterSnapshot,
     ) -> SystemHealthCaptureOutcome {
         if !self.is_enabled()
             || !self.telemetry_ready()

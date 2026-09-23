@@ -1,4 +1,5 @@
 use std::time::Duration;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
 
@@ -9,11 +10,11 @@ use super::{
 #[test]
 fn duration_hysteresis_and_target_edits_are_bounded_and_reversible() {
     let targets = target_options(&[
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:a".into())
             .name("nvme0n1".into())
             .build(),
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:b".into())
             .name("sda".into())
             .build(),

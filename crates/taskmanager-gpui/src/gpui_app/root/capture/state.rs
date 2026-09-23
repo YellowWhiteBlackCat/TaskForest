@@ -5,6 +5,7 @@ use super::scenarios::CaptureScenario;
 use crate::gpui_app::process_insights::ProcessInsightsState;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
+use taskmanager_core::core::startup::BootTimeline;
 use taskmanager_core::core::{AlertEvent, SmartSelfTestObservation};
 
 #[derive(Debug, PartialEq)]
@@ -145,7 +146,7 @@ pub(crate) struct CaptureEvidence {
     /// Capture-only comparison evidence. Persistent history runtime is
     /// reader-only; deterministic screenshots must not reintroduce its retired
     /// boot writer/controller state.
-    pub(super) startup_boot_baseline: Option<taskmanager_core::core::startup::BootTimeline>,
+    pub(super) startup_boot_baseline: Option<BootTimeline>,
     /// Strict-capture-only typed observation. Production reports are borrowed
     /// directly from the shell projection and never copied into this slot.
     pub(super) system_health_observation: Option<SmartSelfTestObservation>,

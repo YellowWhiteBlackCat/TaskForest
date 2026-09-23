@@ -5,8 +5,13 @@ use gpui::{
     Point, StyleRefinement, Styled, StyledText, canvas, div, px,
 };
 use std::rc::Rc;
+use taskmanager_core::core::text::match_ranges_ascii_ci;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rgba;
 
 use crate::gpui_app::graph::GraphCacheHandle;
 
@@ -33,9 +38,9 @@ const INACTIVE_BORDER_ALPHA: f32 = 0.6;
 /// inventing a per-theme dim color.
 pub fn titlebar_border(t: &Theme, active: bool) -> gpui::Rgba {
     if active {
-        taskmanager_ui::theme_binding::rgba(t.border)
+        rgba(t.border)
     } else {
-        taskmanager_ui::theme_binding::rgba(t.border.with_alpha(t.border.a * INACTIVE_BORDER_ALPHA))
+        rgba(t.border.with_alpha(t.border.a * INACTIVE_BORDER_ALPHA))
     }
 }
 
@@ -74,7 +79,7 @@ pub fn titlebar_border(t: &Theme, active: bool) -> gpui::Rgba {
 /// so the ring adapts to all 8 skin variants.
 pub fn focus_ring_shadow(t: &Theme) -> BoxShadow {
     BoxShadow {
-        color: taskmanager_ui::theme_binding::hsla(t.accent.with_alpha(0.6)),
+        color: hsla(t.accent.with_alpha(0.6)),
         offset: Point::default(),
         blur_radius: px(0.0),
         spread_radius: px(2.0),
@@ -113,24 +118,18 @@ pub fn status_bar(theme: &Theme, left: &[String], right: &[String]) -> Div {
         .h(px(26.0))
         .flex_shrink_0()
         .border_t_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .border_color(hsla(theme.border))
+        .px(definite_length(tokens::SPACE_12))
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+        .gap(definite_length(tokens::SPACE_16))
+        .text_size(font_size(tokens::FONT_11))
+        .text_color(hsla(theme.fg_dim))
         .child(
             div()
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_16,
-                ))
+                .gap(definite_length(tokens::SPACE_16))
                 .children(left.iter().map(|part| div().child(part.clone()))),
         )
         .child(div().flex_1())
@@ -138,9 +137,7 @@ pub fn status_bar(theme: &Theme, left: &[String], right: &[String]) -> Div {
             div()
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_16,
-                ))
+                .gap(definite_length(tokens::SPACE_16))
                 .children(right.iter().map(|part| div().child(part.clone()))),
         )
 }
@@ -159,7 +156,7 @@ pub fn highlighted_text(text: &str, query: &str, theme: &Theme) -> impl IntoElem
     if query.is_empty() {
         return div().child(text.to_string()).into_any_element();
     }
-    let matches = taskmanager_core::core::text::match_ranges_ascii_ci(text, query);
+    let matches = match_ranges_ascii_ci(text, query);
     highlighted_text_with_ranges(text, &matches, theme)
 }
 
@@ -188,7 +185,7 @@ pub fn highlighted_text_with_ranges(
     let mut label = StyledText::new(text.to_string());
     if !ranges.is_empty() {
         let highlight = HighlightStyle {
-            color: Some(taskmanager_ui::theme_binding::hsla(theme.highlight_fg())),
+            color: Some(hsla(theme.highlight_fg())),
             ..Default::default()
         };
         label = label.with_highlights(ranges.iter().cloned().map(|range| (range, highlight)));

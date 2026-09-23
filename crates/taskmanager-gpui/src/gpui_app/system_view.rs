@@ -7,6 +7,15 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::sync::Arc;
+use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::truncate_text;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_ui::primitives::scrollbar::rail::ScrollbarRail;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
@@ -25,7 +34,7 @@ pub struct SystemViewData<'a> {
     /// Latest NPU accelerator inventory (capability `accelerator.npu`). The
     /// section renders only when real devices exist; `None`, an empty list,
     /// and typed failures all leave the page unchanged.
-    pub npu_inventory: Option<&'a taskmanager_core::core::npu::NpuInventorySnapshot>,
+    pub npu_inventory: Option<&'a NpuInventorySnapshot>,
     /// Shared by refcount: the render rows borrow it and the export pill's
     /// `'static` closure captures a clone of the handle — no per-frame deep
     /// copy of the process table.
@@ -99,7 +108,7 @@ fn kernel_display(version: Option<&str>, build_description: Option<&str>) -> Str
 /// unit-tested below.
 fn truncate_cmdline(s: &str) -> String {
     const MAX: usize = 80;
-    taskmanager_application::truncate_text(s, MAX)
+    truncate_text(s, MAX)
 }
 
 mod cards;
@@ -134,8 +143,8 @@ pub(crate) fn memory_inventory_card_is_visible(
 pub(super) fn graphics_scroll_item(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
-    smbios: &taskmanager_application::SmbiosMemoryState,
+    npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios: &SmbiosMemoryState,
     units: UnitPreferences,
     inventory_card_visible: bool,
 ) -> Option<usize> {
@@ -185,9 +194,7 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
     let mut col = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .flex_1()
         .min_h(px(0.0));
     // Header: "System" headline on the left, action pills on the right.
@@ -209,9 +216,7 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .flex_row()
         .flex_wrap()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .min_w(px(0.0))
         .child(elements::pill(
             theme,
@@ -289,19 +294,13 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
             .flex_wrap()
             .items_center()
             .justify_between()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_8,
-            ))
-            .pb(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_10,
-            ))
+            .gap(definite_length(tokens::SPACE_8))
+            .pb(definite_length(tokens::SPACE_10))
             .child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_26))
-                    .font_weight(taskmanager_ui::theme_binding::font_weight(
-                        tokens::FONT_WEIGHT_EXTRA_BOLD,
-                    ))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                    .text_size(font_size(tokens::FONT_26))
+                    .font_weight(font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD))
+                    .text_color(hsla(theme.fg))
                     .child(i18n::t("system.title")),
             )
             .child(actions),
@@ -313,14 +312,10 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .id("system-scroll")
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .flex_1()
         .min_h(px(0.0))
-        .pr(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ));
+        .pr(definite_length(tokens::SPACE_16));
     // Hero: product name (hostname/OS fallbacks) + a dim identity subtitle.
     let hero_title = hw
         .product_name
@@ -334,10 +329,7 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
             .as_deref()
             .map(str::trim)
             .filter(|h| !h.is_empty()),
-        os_line
-            .trim()
-            .ne(taskmanager_shell::presentation::MISSING_VALUE)
-            .then_some(os_line.as_str()),
+        os_line.trim().ne(MISSING_VALUE).then_some(os_line.as_str()),
         hw.kernel_version
             .as_deref()
             .map(str::trim)
@@ -379,13 +371,11 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .flex_1()
         .min_h(px(0.0))
         .child(scroll_col)
-        .child(
-            taskmanager_ui::primitives::scrollbar::rail::ScrollbarRail::vertical(
-                "system-scrollbar",
-                "tm-system-scrollbar",
-                std::rc::Rc::new(scroll.clone()),
-                theme.palette(),
-            ),
-        );
+        .child(ScrollbarRail::vertical(
+            "system-scrollbar",
+            "tm-system-scrollbar",
+            std::rc::Rc::new(scroll.clone()),
+            theme.palette(),
+        ));
     col.child(scroll_panel)
 }

@@ -1,4 +1,13 @@
 use super::*;
+use taskmanager_application::AlertRuleImportMode;
+use taskmanager_application::ConfigBootstrap;
+use taskmanager_application::ConfigCoordinator;
+use taskmanager_application::ConfigPublicationOutcome;
+use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::ManagedAlertRuleEdit;
+use taskmanager_application::i18n::Language;
+use taskmanager_core::core::config::Config;
+use taskmanager_theme::Theme;
 
 use crate::gpui_app::root::TopPage;
 use gpui::{AppContext, TestAppContext};
@@ -38,16 +47,14 @@ fn presentation_changes_submit_on_the_next_owner_tick_without_duplicate_resubmis
 fn pristine_first_launch_has_no_gpui_recovery_feedback() {
     let dir = crate::test_support::scratch_dir("config-pristine-default");
     let path = dir.join("config.json");
-    let coordinator = taskmanager_application::ConfigCoordinator::start_path(&path)
-        .expect("start configuration runtime");
+    let coordinator = ConfigCoordinator::start_path(&path).expect("start configuration runtime");
     let mut client = coordinator.client();
-    let taskmanager_application::ConfigBootstrap::Published(publication) =
+    let ConfigBootstrap::Published(publication) =
         client.wait_for_initial(std::time::Duration::from_secs(2))
     else {
         panic!("expected initial publication");
     };
-    let taskmanager_application::ConfigPublicationOutcome::Loaded(recovery) = publication.outcome()
-    else {
+    let ConfigPublicationOutcome::Loaded(recovery) = publication.outcome() else {
         panic!("expected initial load outcome");
     };
 
@@ -62,7 +69,7 @@ fn pristine_first_launch_has_no_gpui_recovery_feedback() {
 fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
     cx: &mut TestAppContext,
 ) {
-    let root = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let snapshot = SystemSnapshot {
         cpu: CpuMetrics::from_observations(CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(95.0, 1_000),
@@ -78,7 +85,7 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         std::time::Duration::ZERO,
         0.0,
     );
-    let config = taskmanager_core::core::config::Config {
+    let config = Config {
         notify_enabled: true,
         history_persistence: true,
         ui_size: "Large".into(),
@@ -90,7 +97,7 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         language: Some("zh".into()),
         process_hidden_columns_configured: true,
         process_hidden_columns: Vec::new(),
-        ..taskmanager_core::core::config::Config::default()
+        ..Config::default()
     };
 
     root.update(cx, |view, cx| {
@@ -105,9 +112,9 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         let fingerprint_before = view.presentation_fingerprint();
 
         view.shell
-            .edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Import {
-                rules: vec![taskmanager_application::ManagedAlertRule::new(rule, true)],
-                mode: taskmanager_application::AlertRuleImportMode::Replace,
+            .edit_alert_rules(ManagedAlertRuleEdit::Import {
+                rules: vec![ManagedAlertRule::new(rule, true)],
+                mode: AlertRuleImportMode::Replace,
             })
             .unwrap();
         view.shell.set_alert_policy(NotificationPolicy {
@@ -140,10 +147,7 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         assert!(fingerprint_after.graphs() > fingerprint_before.graphs());
         assert!(fingerprint_after.sidebar() > fingerprint_before.sidebar());
         assert!(fingerprint_after.apps() > fingerprint_before.apps());
-        assert_eq!(
-            presentation.language(),
-            Some(taskmanager_application::i18n::Language::Zh)
-        );
+        assert_eq!(presentation.language(), Some(Language::Zh));
         assert_eq!(
             super::super::super::persistence::config_from_view(view)
                 .language
@@ -171,13 +175,13 @@ fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
     use crate::gpui_app::chrome::WindowDecorationsPreference;
     use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
 
-    let root = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _cx| {
         // An unknown (future / hand-edited) token fails closed to System, and
         // the snapshot is normalized to the canonical empty sentinel.
-        let config = taskmanager_core::core::config::Config {
+        let config = Config {
             window_decorations: "glass".into(),
-            ..taskmanager_core::core::config::Config::default()
+            ..Config::default()
         };
         apply_root_persisted_projection(view, &config);
         assert_eq!(
@@ -188,9 +192,9 @@ fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
 
         // An explicit token seeds BOTH the persisted snapshot and the
         // session-side enum the render-time outcome check compares against.
-        let config = taskmanager_core::core::config::Config {
+        let config = Config {
             window_decorations: WINDOW_DECORATIONS_CUSTOM.into(),
-            ..taskmanager_core::core::config::Config::default()
+            ..Config::default()
         };
         apply_root_persisted_projection(view, &config);
         assert_eq!(

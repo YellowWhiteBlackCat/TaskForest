@@ -1,4 +1,6 @@
 use std::{rc::Rc, sync::Arc};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 
 use gpui::TestAppContext;
 
@@ -9,7 +11,7 @@ use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cmdline: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.to_owned())
         .cmdline(cmdline.to_owned())
@@ -17,8 +19,7 @@ fn process(pid: u32, name: &str, cmdline: &str) -> ProcessItem {
 }
 
 fn identity(pid: u32) -> ProcessLiveKey {
-    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-        .expect("fixture identity")
+    ProcessLiveKey::from_parts(pid, fixture_start_token(pid)).expect("fixture identity")
 }
 
 /// The memoized history series share the item memo's identity contract:

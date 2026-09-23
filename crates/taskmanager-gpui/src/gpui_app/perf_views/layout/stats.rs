@@ -8,6 +8,9 @@ use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::responsive::{
@@ -75,9 +78,7 @@ pub(crate) fn stats_panel(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ));
+        .gap(definite_length(tokens::SPACE_10));
     // Geometry breakpoint on the stats column root.
     #[cfg(any(test, feature = "test-support"))]
     {
@@ -100,8 +101,8 @@ pub(crate) fn stats_panel(
     if omitted > 0 {
         col = col.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("common.more_rows").replace("{count}", &omitted.to_string())),
         );
     }

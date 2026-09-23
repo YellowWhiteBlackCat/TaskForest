@@ -1,6 +1,7 @@
 use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext};
+use taskmanager_core::core::DeviceId;
 use taskmanager_core::core::HistoryMetric;
 use taskmanager_theme::Theme;
 
@@ -20,7 +21,7 @@ fn row_headings_carry_the_series_scope() {
     assert!(
         row_heading(&HistorySeriesKey::for_device(
             HistoryMetric::GpuUsagePct,
-            taskmanager_core::core::DeviceId::new("card0")
+            DeviceId::new("card0")
         ))
         .ends_with("card0")
     );

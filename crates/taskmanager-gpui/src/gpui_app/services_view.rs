@@ -15,6 +15,12 @@
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use taskmanager_shell::InfoTable;
+use taskmanager_shell::service_cycle_members;
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
@@ -60,11 +66,9 @@ pub use projection::{ServiceFilter, filter_services, sorted_services};
 
 /// The search-box `Entity<TextInputState>`, owned per window on the
 /// `RootView` that renders the Services page.
-pub(crate) fn init_search_entity(
-    cx: &mut Context<RootView>,
-) -> gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState> {
+pub(crate) fn init_search_entity(cx: &mut Context<RootView>) -> gpui::Entity<TextInputState> {
     let entity = cx.new(|cx| {
-        let mut state = taskmanager_ui::inputs::text_input::TextInputState::new(cx);
+        let mut state = TextInputState::new(cx);
         state.set_placeholder(i18n::t("search.services"), cx);
         state
     });
@@ -110,7 +114,7 @@ pub struct ServicesDelegate {
     /// Live search query for name-cell highlighting (set per render).
     query: String,
     /// Stable IDs participating in an observed typed service cycle.
-    cycle_members: BTreeSet<taskmanager_core::ServiceId>,
+    cycle_members: BTreeSet<ServiceId>,
 }
 
 impl ServicesDelegate {
@@ -161,7 +165,7 @@ impl ServicesDelegate {
         rows: Rc<Vec<ServiceItem>>,
         theme: Theme,
         query: &str,
-        cycle_members: BTreeSet<taskmanager_core::ServiceId>,
+        cycle_members: BTreeSet<ServiceId>,
     ) {
         if !Rc::ptr_eq(&self.rows, &rows) {
             self.rows = rows;
@@ -272,8 +276,8 @@ impl TableDelegate for ServicesDelegate {
                     _ => theme.fg_dim,
                 };
                 let cell = div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(color))
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(color))
                     .child(status.as_str().to_string());
                 // The status cell is the inventory's typed-active-state readout.
                 // A test-support selector carries the same typed token that the
@@ -291,13 +295,13 @@ impl TableDelegate for ServicesDelegate {
                     .items_center()
                     .gap(px(4.0))
                     .min_w(px(0.0))
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg));
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(theme.fg));
                 if cycle {
                     cell = cell.child(
-                        taskmanager_ui::icons_binding::icon(IconId::TriangleAlert)
+                        icon(IconId::TriangleAlert)
                             .size(px(12.0))
-                            .text_color(taskmanager_ui::theme_binding::hsla(theme.warning)),
+                            .text_color(hsla(theme.warning)),
                     );
                 }
                 cell.child(div().flex_1().min_w(px(0.0)).truncate().child(
@@ -307,8 +311,8 @@ impl TableDelegate for ServicesDelegate {
             _ => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex_1()
@@ -344,7 +348,7 @@ pub(crate) fn init_table_entity(
         }
         TableEvent::SortChanged { col_ix, sort } => {
             let column = state_ent.read(cx).delegate().info_sort_column(*col_ix);
-            this.apply_table_sort(taskmanager_shell::InfoTable::Services, column, *sort);
+            this.apply_table_sort(InfoTable::Services, column, *sort);
             cx.notify();
         }
         _ => {}
@@ -415,7 +419,7 @@ pub struct ServicesViewProps<'a> {
     /// `filter`/`query` stay for the controls row, the table body reads this.
     pub rows: std::rc::Rc<Vec<ServiceItem>>,
     pub feedback: Option<ActionFeedback>,
-    pub search_input: gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState>,
+    pub search_input: gpui::Entity<TextInputState>,
     pub table_entity: Entity<TableState<ServicesDelegate>>,
     pub retry_button: Entity<ButtonState>,
 }
@@ -444,7 +448,7 @@ pub fn render_services(
     } = props;
     let theme = *theme;
     let selected = selected.cloned();
-    let cycle_members = taskmanager_shell::service_cycle_members(items);
+    let cycle_members = service_cycle_members(items);
 
     // The persistent Table entity, created lazily per window by `RootView::render`
     // (RootView::services_table) on the first Services render; reused after.
@@ -510,9 +514,12 @@ pub fn render_services(
         });
         // Table is size_full internally; wrap so it expands to fill the
         // remaining vertical space below the action bar + controls row.
-        let mut body = div().flex_1().min_h(px(0.0)).flex().flex_col().gap(
-            taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8),
-        );
+        let mut body = div()
+            .flex_1()
+            .min_h(px(0.0))
+            .flex()
+            .flex_col()
+            .gap(definite_length(tokens::SPACE_8));
         if let Some(notice) = list_view::source_notice(
             &theme,
             sources,

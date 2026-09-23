@@ -5,6 +5,13 @@
 //! provider and application layers remain unaware of GPUI layout concerns.
 
 use std::{cell::RefCell, rc::Rc};
+use taskmanager_core::core::DeviceStatus;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_telemetry_store::TelemetryStore;
@@ -237,12 +244,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
     })
 }
 
-fn dynamic_device_empty(
-    theme: &Theme,
-    title: &str,
-    message: &str,
-    status: taskmanager_core::core::DeviceStatus,
-) -> Div {
+fn dynamic_device_empty(theme: &Theme, title: &str, message: &str, status: DeviceStatus) -> Div {
     div()
         .size_full()
         .flex()
@@ -251,39 +253,31 @@ fn dynamic_device_empty(
         .child(
             div()
                 .max_w(px(460.0))
-                .p(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_16,
-                ))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::card_radius(theme),
-                ))
+                .p(definite_length(tokens::SPACE_16))
+                .rounded(absolute(tokens::card_radius(theme)))
                 .border_1()
-                .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-                .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+                .border_color(hsla(theme.border))
+                .bg(fill(theme.sidebar_card_bg))
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
-                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                            tokens::FONT_WEIGHT_SEMIBOLD,
-                        ))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_20))
+                        .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+                        .text_color(hsla(theme.fg))
                         .child(title.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(theme.fg_dim))
                         .child(message.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg_dim))
                         .child(i18n::t(device_status_i18n_key(status))),
                 ),
         )

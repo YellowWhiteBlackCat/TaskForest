@@ -1,6 +1,7 @@
 //! Landscape (horizontal-navigation) layout regressions for the Apps page.
 
 use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px, size};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::{NavOrientation, TopPage};
 use taskmanager_shell::SortCol;
@@ -20,7 +21,7 @@ async fn apps_scrollbars_move_their_real_handles(cx: &mut TestAppContext) {
         v.replace_processes_for_test(
             (1..=80)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("scroll-worker-{pid}"))
                         .build()
@@ -81,7 +82,7 @@ async fn apps_column_edge_drag_updates_the_live_width(cx: &mut TestAppContext) {
         v.replace_processes_for_test(
             (1..=8)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("resize-worker-{pid}"))
                         .build()
@@ -155,7 +156,7 @@ async fn landscape_apps_page_keeps_table_and_chrome_inside_window(cx: &mut TestA
         v.replace_processes_for_test(
             (1..=8)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("landscape-worker-{pid}"))
                         .build()
@@ -325,7 +326,7 @@ async fn vertical_navigation_keeps_tabs_inside_the_rail(cx: &mut TestAppContext)
         v.replace_processes_for_test(
             (1..=8)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("vertical-worker-{pid}"))
                         .build()

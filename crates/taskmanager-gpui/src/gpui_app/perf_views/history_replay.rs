@@ -8,6 +8,17 @@
 //! blank graph.
 
 use std::rc::Rc;
+use taskmanager_application::ApplicationHistoryCapability;
+use taskmanager_application::ApplicationHistoryProjection;
+use taskmanager_application::HistoryReplayError;
+use taskmanager_core::core::HistoryMetric;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::presentation::local_timestamp;
+use taskmanager_theme::Color;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rgba;
 
 use gpui::{
     AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, SharedString,
@@ -83,7 +94,7 @@ impl HistoryReplayState {
         &self.rows
     }
 
-    pub(crate) fn failure(&self) -> Option<&taskmanager_application::HistoryReplayError> {
+    pub(crate) fn failure(&self) -> Option<&HistoryReplayError> {
         self.controller.failure()
     }
 
@@ -97,8 +108,8 @@ impl HistoryReplayState {
 
     pub(crate) fn application_history_projection(
         &self,
-        capability: taskmanager_application::ApplicationHistoryCapability,
-    ) -> taskmanager_application::ApplicationHistoryProjection {
+        capability: ApplicationHistoryCapability,
+    ) -> ApplicationHistoryProjection {
         self.controller.application_history_projection(capability)
     }
 
@@ -122,7 +133,7 @@ impl HistoryReplayState {
     pub(crate) fn reject_submission(
         &mut self,
         request: HistoryReplayRequest,
-        error: taskmanager_application::HistoryReplayError,
+        error: HistoryReplayError,
     ) {
         let _ = self.controller.reject_submission(request, error);
         self.sync_rows_projection();
@@ -269,20 +280,17 @@ impl RootView {
 pub(crate) fn render_history_replay(
     theme: &Theme,
     state: &HistoryReplayState,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
     content_height: f32,
     entity: gpui::Entity<RootView>,
     graph_cache: GraphCacheHandle,
 ) -> AnyElement {
     let window = state.window();
-    let mut controls =
-        div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_6,
-            ));
+    let mut controls = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(definite_length(tokens::SPACE_6));
     for candidate in HistoryWindow::ALL {
         let label = history_window_label(candidate).to_string();
         let ent = entity.clone();
@@ -321,9 +329,7 @@ pub(crate) fn render_history_replay(
         .id("tm-replay-panel")
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .size_full()
         .min_h(px(0.0))
         .overflow_hidden()
@@ -340,8 +346,8 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-loaded-at")
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(format!(
                     "{} {}",
                     i18n::t("perf.replay.loaded_at"),
@@ -353,8 +359,8 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-loading")
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("perf.replay.loading")),
         );
     }
@@ -362,7 +368,7 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-failure")
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_color(hsla(theme.fg))
                 .child(failure.to_string()),
         );
         if let Some(last_good_window) = state.rows_window()
@@ -371,7 +377,7 @@ pub(crate) fn render_history_replay(
             column = column.child(
                 div()
                     .id("tm-replay-last-good-window")
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .text_color(hsla(theme.fg_dim))
                     .child(format!(
                         "{}: {}",
                         i18n::t("perf.replay.last_good_window"),
@@ -384,7 +390,7 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-empty")
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_color(hsla(theme.fg))
                 .child(i18n::t("perf.replay.empty").to_string()),
         );
     } else {
@@ -396,8 +402,8 @@ pub(crate) fn render_history_replay(
         if state.rows().len() > row_limit {
             column = column.child(
                 div()
-                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .text_size(font_size(tokens::FONT_11))
+                    .text_color(hsla(theme.fg_dim))
                     .child(
                         i18n::t("common.more_rows")
                             .replace("{count}", &(state.rows().len() - row_limit).to_string()),
@@ -457,16 +463,12 @@ fn replay_row(
         .id(("tm-replay-row", index))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
+        .gap(definite_length(tokens::SPACE_4))
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(row_heading(&row.key))
                 .child(summary)
                 .children(clock_note),
@@ -474,7 +476,7 @@ fn replay_row(
         .child(div().h(px(72.0)).child(graph_element(
             (ElementId::from("tm-replay-graph"), row.key.file_stem()),
             Rc::clone(&row.samples),
-            taskmanager_ui::theme_binding::rgba(series_color(theme, row.key.metric())),
+            rgba(series_color(theme, row.key.metric())),
             GraphOpts {
                 gradient_fill: true,
                 ref_lines: true,
@@ -500,47 +502,41 @@ fn format_peak(peak: f64) -> String {
 
 /// Curve color follows the series' device family, mirroring the live
 /// Performance pages' palette (fans use the accent the battery/fan views use).
-fn series_color(
-    theme: &Theme,
-    metric: taskmanager_core::core::HistoryMetric,
-) -> taskmanager_theme::Color {
+fn series_color(theme: &Theme, metric: HistoryMetric) -> Color {
     match metric {
-        taskmanager_core::core::HistoryMetric::CpuUsagePct
-        | taskmanager_core::core::HistoryMetric::CpuCoreUsagePct
-        | taskmanager_core::core::HistoryMetric::CpuTemperatureC
-        | taskmanager_core::core::HistoryMetric::CpuFrequencyMhz
-        | taskmanager_core::core::HistoryMetric::CpuPowerW
-        | taskmanager_core::core::HistoryMetric::ApplicationCpuUsagePct => theme.cpu,
-        taskmanager_core::core::HistoryMetric::MemoryUsedPct
-        | taskmanager_core::core::HistoryMetric::SwapUsedPct
-        | taskmanager_core::core::HistoryMetric::ApplicationMemoryBytes => theme.memory,
-        taskmanager_core::core::HistoryMetric::StorageActivityPct => theme.disk,
-        taskmanager_core::core::HistoryMetric::NetworkRateBps => theme.network,
-        taskmanager_core::core::HistoryMetric::GpuUsagePct
-        | taskmanager_core::core::HistoryMetric::GpuPowerW
-        | taskmanager_core::core::HistoryMetric::GpuTemperatureC
-        | taskmanager_core::core::HistoryMetric::GpuFrequencyMhz => theme.gpu,
-        taskmanager_core::core::HistoryMetric::BatteryCapacityPct
-        | taskmanager_core::core::HistoryMetric::BatteryPowerW
-        | taskmanager_core::core::HistoryMetric::BatteryHealthPct => theme.battery,
-        taskmanager_core::core::HistoryMetric::FanRpm
-        | taskmanager_core::core::HistoryMetric::FanPwmPct
-        | taskmanager_core::core::HistoryMetric::FanTemperatureC => theme.accent,
-        taskmanager_core::core::HistoryMetric::UptimeSecs
-        | taskmanager_core::core::HistoryMetric::ProcessCount
-        | taskmanager_core::core::HistoryMetric::ThreadCount
-        | taskmanager_core::core::HistoryMetric::ApplicationProcessCount => theme.fg,
+        HistoryMetric::CpuUsagePct
+        | HistoryMetric::CpuCoreUsagePct
+        | HistoryMetric::CpuTemperatureC
+        | HistoryMetric::CpuFrequencyMhz
+        | HistoryMetric::CpuPowerW
+        | HistoryMetric::ApplicationCpuUsagePct => theme.cpu,
+        HistoryMetric::MemoryUsedPct
+        | HistoryMetric::SwapUsedPct
+        | HistoryMetric::ApplicationMemoryBytes => theme.memory,
+        HistoryMetric::StorageActivityPct => theme.disk,
+        HistoryMetric::NetworkRateBps => theme.network,
+        HistoryMetric::GpuUsagePct
+        | HistoryMetric::GpuPowerW
+        | HistoryMetric::GpuTemperatureC
+        | HistoryMetric::GpuFrequencyMhz => theme.gpu,
+        HistoryMetric::BatteryCapacityPct
+        | HistoryMetric::BatteryPowerW
+        | HistoryMetric::BatteryHealthPct => theme.battery,
+        HistoryMetric::FanRpm | HistoryMetric::FanPwmPct | HistoryMetric::FanTemperatureC => {
+            theme.accent
+        }
+        HistoryMetric::UptimeSecs
+        | HistoryMetric::ProcessCount
+        | HistoryMetric::ThreadCount
+        | HistoryMetric::ApplicationProcessCount => theme.fg,
     }
 }
 
 /// Local wall-clock for the "data as of" line, projected only from the
 /// composition-injected rule snapshot. Missing/out-of-range rules render the
 /// shared unavailable marker; UTC is never relabeled as local.
-fn format_loaded_at(
-    loaded_at_ms: u64,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
-) -> String {
-    taskmanager_shell::presentation::local_timestamp(loaded_at_ms, local_time_rules)
+fn format_loaded_at(loaded_at_ms: u64, local_time_rules: &LocalTimeRulesObservation) -> String {
+    local_timestamp(loaded_at_ms, local_time_rules)
 }
 
 #[cfg(test)]

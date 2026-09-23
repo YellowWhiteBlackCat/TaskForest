@@ -8,6 +8,7 @@ use gpui::{
     Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, VisualTestContext, point,
     px, size,
 };
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::TopPage;
 
@@ -39,7 +40,7 @@ fn setup_apps(
         v.replace_processes_for_test(
             (1..=120)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("wheel-worker-{pid}"))
                         .build()

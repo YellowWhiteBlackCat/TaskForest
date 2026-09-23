@@ -31,6 +31,9 @@
 
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use taskmanager_application::history_decimation::lttb_indices;
+use taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD;
+use taskmanager_ui::theme_binding::font_weight;
 
 use gpui::{
     App, Background, Bounds, Hsla, Path, PathBuilder, Pixels, Point, Rgba, Window, fill, point, px,
@@ -604,9 +607,7 @@ fn draw_value_badge(
         };
         let mut run = window.text_style().to_run(text.len());
         run.color = Hsla::from(base);
-        run.font.weight = taskmanager_ui::theme_binding::font_weight(
-            taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD,
-        );
+        run.font.weight = font_weight(FONT_WEIGHT_SEMIBOLD);
         let line = window
             .text_system()
             .shape_line(text.into(), px(10.0), &[run], None);
@@ -790,7 +791,7 @@ fn build_sparkline_paths(
 /// thin adapter exists because the sparkline path consumes `(index, sample)`
 /// pairs while the neutral kernel returns run positions.
 fn decimate_run(run: &[(usize, f32)], budget: usize) -> Vec<(usize, f32)> {
-    taskmanager_application::history_decimation::lttb_indices(run, budget)
+    lttb_indices(run, budget)
         .into_iter()
         .map(|position| run[position])
         .collect()

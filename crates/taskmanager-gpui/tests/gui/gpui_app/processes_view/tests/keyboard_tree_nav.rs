@@ -15,7 +15,11 @@
 //! can lag a count change by one frame, hence the double draw there.
 
 use super::*;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn seed_three_level_tree(
     cx: &mut TestAppContext,
@@ -23,7 +27,7 @@ fn seed_three_level_tree(
     win: WindowHandle<RootView>,
 ) {
     let unknown = |pid: u32, parent: Option<u32>, name: &str| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .parent_pid(parent)
             .name(name.to_owned())
@@ -74,7 +78,7 @@ fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, pid: u32) {
             .iter()
             .find(|process| process.pid == pid)
             .and_then(ProcessLiveKey::from_process)
-            .map(taskmanager_shell::ProcessRowId::Process);
+            .map(ProcessRowId::Process);
         assert_eq!(v.selected_process_row(), expected);
     });
 }
@@ -86,7 +90,7 @@ fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, pid: u32) {
 /// and a second Left on a collapsed row climbs to its parent.
 #[gpui::test]
 async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (win, view) = wrapped_root(cx);
     seed_three_level_tree(cx, &view, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -184,7 +188,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
 /// the focused row's subtree.
 #[gpui::test]
 async fn structural_keys_act_on_the_live_selection_not_the_focused_row(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (win, view) = wrapped_root(cx);
     seed_three_level_tree(cx, &view, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -226,7 +230,7 @@ async fn structural_keys_act_on_the_live_selection_not_the_focused_row(cx: &mut 
 /// structural resolver.
 #[gpui::test]
 async fn alt_right_keeps_column_stepping_on_a_subtree_row(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let (win, view) = wrapped_root(cx);
     seed_three_level_tree(cx, &view, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);

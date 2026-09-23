@@ -17,6 +17,9 @@
 
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessTelemetrySnapshot};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_theme::Theme;
@@ -56,8 +59,8 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
     if open_files.state.status != DeviceStatus::Healthy {
         return super::card(theme, labels.open_files, width).child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(super::status_label(open_files.state.status, labels).to_string()),
         );
     }
@@ -65,8 +68,8 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
     if open_files.entries.is_empty() {
         return content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(labels.no_open_files.to_string()),
         );
     }
@@ -83,8 +86,8 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
     };
     content = content.child(
         div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(font_size(tokens::FONT_11))
+            .text_color(hsla(theme.fg_dim))
             .child(header),
     );
     let (shown, hidden) = super::capped_card_rows(open_files.entries.len());
@@ -93,9 +96,7 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_3,
-                ))
+                .gap(definite_length(tokens::SPACE_3))
                 .children(open_files.entries.iter().take(shown).enumerate().map(
                     |(index, entry)| {
                         // The selector token comes from the same typed
@@ -109,7 +110,7 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                         };
                         let row = div()
                             .min_w(px(0.0))
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                            .text_size(font_size(tokens::FONT_10))
                             .font(mono_font_with_fallback(theme))
                             .whitespace_normal()
                             .child(format_open_file(entry, labels.unreadable));

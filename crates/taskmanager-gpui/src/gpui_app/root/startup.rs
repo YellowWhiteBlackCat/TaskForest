@@ -11,8 +11,36 @@ use gpui::{
     AnyWindowHandle, App, AppContext, AsyncApp, Bounds, Entity, SharedString, Timer,
     TitlebarOptions, WeakEntity, WindowBounds, WindowDecorations, WindowOptions, point, px, size,
 };
+use taskmanager_app_host::DiagnosticBundleClient;
+use taskmanager_app_host::HistoryFrontendConnector;
+use taskmanager_app_host::HistoryFrontendConnectorStartError;
+use taskmanager_app_host::SnapshotExportClient;
+use taskmanager_app_host::WindowCaptureClient;
+use taskmanager_app_host::WindowPresentation;
+use taskmanager_app_host::acquire_single_instance;
+use taskmanager_application::ConfigBootstrap;
+use taskmanager_application::ConfigPublicationOutcome;
+use taskmanager_application::ConfigRevision;
+use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
+use taskmanager_application::TelemetryInterval;
+use taskmanager_application::TelemetryRefreshPolicy;
+use taskmanager_assets::embedded_fonts;
 use taskmanager_assets::product;
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_platform_contract::InstanceEvent;
+use taskmanager_platform_contract::InstanceGuard;
+use taskmanager_platform_contract::InstanceRole;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::SortCol;
+use taskmanager_shell::SortDir;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
+use taskmanager_theme::FontAvailability;
+use taskmanager_theme::FontPreference;
+use taskmanager_theme::Skin;
 use taskmanager_theme::{HighContrast, resolve_fonts};
 use taskmanager_ui::theme_binding::{background_appearance, detect_font_availability};
 use tracing::{error, warn};
@@ -56,8 +84,8 @@ fn requested_window_decorations(pref: WindowDecorationsPreference) -> WindowDeco
 
 enum InstanceStartup {
     Continue {
-        guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
-        events: std::sync::mpsc::Receiver<taskmanager_platform_contract::InstanceEvent>,
+        guard: Option<Box<dyn InstanceGuard>>,
+        events: std::sync::mpsc::Receiver<InstanceEvent>,
     },
     Secondary,
 }
@@ -70,14 +98,12 @@ fn acquire_instance(capture_mode: bool) -> InstanceStartup {
             events,
         };
     }
-    match taskmanager_app_host::acquire_single_instance(product::GPUI_NAME, events_tx) {
-        Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => {
-            InstanceStartup::Continue {
-                guard: Some(guard),
-                events,
-            }
-        }
-        Ok(taskmanager_platform_contract::InstanceRole::Secondary) => InstanceStartup::Secondary,
+    match acquire_single_instance(product::GPUI_NAME, events_tx) {
+        Ok(InstanceRole::Primary(guard)) => InstanceStartup::Continue {
+            guard: Some(guard),
+            events,
+        },
+        Ok(InstanceRole::Secondary) => InstanceStartup::Secondary,
         Err(failure) => {
             warn!(
                 ?failure,
@@ -92,21 +118,18 @@ fn acquire_instance(capture_mode: bool) -> InstanceStartup {
 }
 
 struct RootStartupFacts {
-    history_connector: Result<
-        taskmanager_app_host::HistoryFrontendConnector,
-        taskmanager_app_host::HistoryFrontendConnectorStartError,
-    >,
+    history_connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     appearance: appearance::StartupAppearanceObservation,
-    font_pref: taskmanager_theme::FontPreference,
-    skin_preference: Option<taskmanager_theme::Skin>,
+    font_pref: FontPreference,
+    skin_preference: Option<Skin>,
     language_preference: Option<i18n::Language>,
-    font_availability: taskmanager_theme::FontAvailability,
-    local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+    font_availability: FontAvailability,
+    local_time_rules: LocalTimeRulesObservation,
 }
 
 fn apply_root_startup_config(
     view: &mut RootView,
-    cfg: &taskmanager_core::core::config::Config,
+    cfg: &Config,
     facts: RootStartupFacts,
     has_explicit_page_override: bool,
     cx: &mut gpui::Context<RootView>,
@@ -117,9 +140,9 @@ fn apply_root_startup_config(
     view.sync_history_persistence_sink();
     if let Some(reason) = view.history_runtime.unavailable_reason() {
         view.shell.report_notice(
-            taskmanager_shell::FeedbackSource::Persistence,
-            taskmanager_shell::FeedbackSeverity::Warning,
-            taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::UntilReplaced,
             i18n::t("perf.replay.startup_failure_notice").replace("{kind}", reason.stable_code()),
         );
     }
@@ -144,10 +167,7 @@ fn apply_root_startup_config(
     if view.capture_evidence.apps_zero_gray_enabled() {
         view.page = TopPage::Apps;
         view.set_gray_zero_values(true, cx);
-        view.set_process_sort(
-            taskmanager_shell::SortCol::Name,
-            taskmanager_shell::SortDir::Asc,
-        );
+        view.set_process_sort(SortCol::Name, SortDir::Asc);
         view.set_process_query("capture-");
     }
     if !view.capture_evidence.first_run_fixture_enabled() {
@@ -160,7 +180,7 @@ fn spawn_update_loop(
     weak: WeakEntity<RootView>,
     window_handle: AnyWindowHandle,
     mut config_client: ConfigClient,
-    mut applied_config_revision: Option<taskmanager_application::ConfigRevision>,
+    mut applied_config_revision: Option<ConfigRevision>,
 ) {
     cx.spawn(async move |cx: &mut AsyncApp| {
         let mut tick = 0u32;
@@ -274,21 +294,18 @@ fn poll_window_systems(view: &mut RootView, cx: &mut gpui::Context<RootView>) {
 /// Open the main window and start the telemetry + process polling loops.
 pub struct StartupRuntime {
     pub config_client: ConfigClient,
-    pub snapshot_export_client: taskmanager_app_host::SnapshotExportClient,
-    pub window_capture_client: taskmanager_app_host::WindowCaptureClient,
-    pub diagnostic_bundle_client: taskmanager_app_host::DiagnosticBundleClient,
-    pub service_log_export_client: taskmanager_app_host::DiagnosticBundleClient,
-    pub history_connector: Result<
-        taskmanager_app_host::HistoryFrontendConnector,
-        taskmanager_app_host::HistoryFrontendConnectorStartError,
-    >,
+    pub snapshot_export_client: SnapshotExportClient,
+    pub window_capture_client: WindowCaptureClient,
+    pub diagnostic_bundle_client: DiagnosticBundleClient,
+    pub service_log_export_client: DiagnosticBundleClient,
+    pub history_connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
 }
 
 pub struct StartupEnvironment {
     pub native_locale_name: Option<String>,
-    pub local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub local_time_rules: LocalTimeRulesObservation,
     pub custom_app_id: Option<String>,
-    pub presentation: taskmanager_app_host::WindowPresentation,
+    pub presentation: WindowPresentation,
 }
 
 pub fn init<E>(
@@ -297,6 +314,8 @@ pub fn init<E>(
     runtime: StartupRuntime,
     environment: StartupEnvironment,
 ) -> Result<(), E> {
+    use taskmanager_ui::init;
+
     let StartupRuntime {
         mut config_client,
         snapshot_export_client,
@@ -336,15 +355,12 @@ pub fn init<E>(
     // Own UI-layer bootstrap: focus registry, input/dialog/popup/table/tree
     // keymaps (P6: replaces the old `gpui_component::init`). Idempotent; runs
     // once before the window opens.
-    taskmanager_ui::init(cx);
+    init(cx);
     // Register the bundled fonts (MiSans VF + Roboto Mono) BEFORE any
     // text shapes. The subsequent text-system probe verifies that the family
     // names actually became resolvable; an asset existing in the binary is not
     // treated as proof that toolkit registration succeeded.
-    if let Err(font_error) = cx
-        .text_system()
-        .add_fonts(taskmanager_assets::embedded_fonts())
-    {
+    if let Err(font_error) = cx.text_system().add_fonts(embedded_fonts()) {
         error!(%font_error, "embedded font registration failed; falling back to system fonts");
     }
     // Receive the initial immutable config publication from the background
@@ -354,11 +370,11 @@ pub fn init<E>(
     // material depends on the skin) and to the frontend refresh interval + RootView
     // toggles/page inside the open_window closure below.
     let (cfg, applied_config_revision, config_bootstrap_notice) = match config_client
-        .wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT)
+        .wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT)
     {
-        taskmanager_application::ConfigBootstrap::Published(publication) => {
+        ConfigBootstrap::Published(publication) => {
             let notice = match publication.outcome() {
-                taskmanager_application::ConfigPublicationOutcome::Loaded(recovery) => {
+                ConfigPublicationOutcome::Loaded(recovery) => {
                     initial_config_recovery_message(*recovery)
                 }
                 _ => None,
@@ -369,7 +385,7 @@ pub fn init<E>(
                 notice,
             )
         }
-        taskmanager_application::ConfigBootstrap::Fallback { snapshot, source } => (
+        ConfigBootstrap::Fallback { snapshot, source } => (
             snapshot.as_ref().clone(),
             None,
             Some(i18n::t("settings.config_fallback").replace("{source}", &format!("{source:?}"))),
@@ -391,16 +407,13 @@ pub fn init<E>(
     // Native appearance observation belongs to the platform adapter. It runs
     // before window creation on its own bounded lane, so shared GPUI code never
     // launches gsettings/defaults/reg or reads platform configuration files.
-    let initial_interval =
-        taskmanager_application::TelemetryInterval::clamped(Duration::from_millis(cfg.refresh_ms));
-    let telemetry_refresh_policy =
-        taskmanager_application::TelemetryRefreshPolicy::new(initial_interval);
+    let initial_interval = TelemetryInterval::clamped(Duration::from_millis(cfg.refresh_ms));
+    let telemetry_refresh_policy = TelemetryRefreshPolicy::new(initial_interval);
     // Physical retention is a product bound, not a renderer preference. GPUI
     // dashboard windows and device pages project the same canonical rings;
     // shrinking a graph tail must never discard history for another surface.
-    let (telemetry, telemetry_ingestor) = TelemetryStore::shared_with_correlated_ingestion(
-        taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
-    );
+    let (telemetry, telemetry_ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
     // Continuous history belongs to this frontend process. Enabled persistence
     // starts the paired writer/replay session without blocking the UI thread.
     let mut platform = spawn_client()?;

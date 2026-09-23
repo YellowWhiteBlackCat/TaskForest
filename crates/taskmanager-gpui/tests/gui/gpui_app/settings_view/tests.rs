@@ -1,6 +1,10 @@
 //! Settings-page unit tests (line split).
 
+use taskmanager_core::core::DeviceGeneration;
+use taskmanager_core::core::metrics::GpuMetrics;
+use taskmanager_ui::theme_binding::definite_length;
 mod tests_inner {
+    use super::*;
     // NOTE: no `use super::*` (or any glob) here — the parent module's
     // `use gpui::*` would re-import the `test` attribute macro, and a
     // `#[gpui::test]` expansion that emits `#[test]` would then recurse into
@@ -201,11 +205,7 @@ mod tests_inner {
                     .into_any_element()
                 }
             });
-            div()
-                .p(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
-                .child(content)
+            div().p(definite_length(tokens::SPACE_4)).child(content)
         }
     }
 
@@ -219,11 +219,7 @@ mod tests_inner {
             let row = root.read_with(cx, |view, _| {
                 first_run::render_settings_row(&view.theme, root.clone())
             });
-            div()
-                .p(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
-                .child(row)
+            div().p(definite_length(tokens::SPACE_4)).child(row)
         }
     }
 
@@ -306,11 +302,8 @@ mod tests_inner {
     async fn settings_permission_center_lists_each_registered_lane(cx: &mut TestAppContext) {
         let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
         root_view.update(cx, |view, _cx| {
-            let mut gpu = taskmanager_core::core::metrics::GpuMetrics::new(
-                "gpu:settings-test",
-                "Settings GPU",
-            );
-            gpu.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+            let mut gpu = GpuMetrics::new("gpu:settings-test", "Settings GPU");
+            gpu.device_generation = DeviceGeneration::new(1);
             view.system_snapshot_mut_for_test().gpu = vec![gpu];
             view.shell
                 .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
@@ -372,11 +365,8 @@ mod tests_inner {
     async fn settings_permission_center_keeps_failure_classes_distinct(cx: &mut TestAppContext) {
         let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
         root_view.update(cx, |view, _cx| {
-            let mut gpu = taskmanager_core::core::metrics::GpuMetrics::new(
-                "gpu:settings-state-test",
-                "Settings state GPU",
-            );
-            gpu.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+            let mut gpu = GpuMetrics::new("gpu:settings-state-test", "Settings state GPU");
+            gpu.device_generation = DeviceGeneration::new(1);
             view.system_snapshot_mut_for_test().gpu = vec![gpu];
             view.shell
                 .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([

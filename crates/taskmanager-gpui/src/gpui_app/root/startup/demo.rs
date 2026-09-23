@@ -8,9 +8,11 @@ use gpui::{
     App, AppContext, Bounds, Entity, TitlebarOptions, WindowBounds, WindowOptions, point, px, size,
 };
 use taskmanager_app_host::WindowPresentation;
+use taskmanager_assets::embedded_fonts;
 use taskmanager_assets::product;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_theme::Theme;
+use taskmanager_ui::init;
 use taskmanager_ui::theme_binding::background_appearance;
 use tracing::{error, warn};
 
@@ -19,11 +21,8 @@ use tracing::{error, warn};
 /// it owns configuration, native appearance, platform collection, history
 /// persistence, single-instance and tray lifetimes.
 pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
-    taskmanager_ui::init(cx);
-    if let Err(font_error) = cx
-        .text_system()
-        .add_fonts(taskmanager_assets::embedded_fonts())
-    {
+    init(cx);
+    if let Err(font_error) = cx.text_system().add_fonts(embedded_fonts()) {
         warn!(%font_error, "embedded demo font registration failed; falling back to system fonts");
     }
 

@@ -4,7 +4,9 @@ use super::super::{CaptureEvidence, CaptureMode, HistoryReplayOpenState};
 use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
 use std::path::PathBuf;
+use taskmanager_application::ApplicationHistoryStatus;
 use taskmanager_core::core::setup::SetupScriptInfo;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
 impl CaptureEvidence {
@@ -515,7 +517,7 @@ impl CaptureEvidence {
     pub fn mark_startup_failure_evidence_ready(
         &mut self,
         page_ready: bool,
-        evidence: Option<&taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: Option<&StartupBootEvidenceSnapshot>,
     ) {
         if self.scenario == Some(CaptureScenario::StartupFailureEvidence)
             && page_ready
@@ -574,14 +576,14 @@ impl CaptureEvidence {
     pub fn mark_application_history_replay_ready(
         &mut self,
         page_ready: bool,
-        status: taskmanager_application::ApplicationHistoryStatus,
+        status: ApplicationHistoryStatus,
         row_count: usize,
     ) {
         if self.scenario == Some(CaptureScenario::ApplicationHistoryReplay)
             && self.telemetry_ready()
             && self.ui_data_ready()
             && page_ready
-            && status == taskmanager_application::ApplicationHistoryStatus::Ready
+            && status == ApplicationHistoryStatus::Ready
             && row_count > 0
             && !self.scenario_ready()
         {

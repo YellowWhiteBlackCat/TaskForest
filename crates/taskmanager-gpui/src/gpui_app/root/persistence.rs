@@ -1,6 +1,7 @@
 //! Strict Config ↔ GPUI mappings for process state and user-saved views.
 
 use std::collections::HashMap;
+use taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT;
 
 use gpui::Pixels;
 
@@ -189,7 +190,7 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // selectable subpixel/grayscale token would claim a renderer change
         // that never happened; keep the stored state honest until the API is
         // available in the dependency we ship.
-        text_rendering: taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT.to_string(),
+        text_rendering: TEXT_RENDERING_PLATFORM_DEFAULT.to_string(),
         startup_page: presentation.startup_page.to_string(),
         // Persist the normalized window-frame token. System keeps the empty
         // sentinel so an untouched preference round-trips byte-identically

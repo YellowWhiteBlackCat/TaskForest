@@ -9,6 +9,9 @@
 use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
 use crate::gpui_app::process_insights::process_insights_capture_fixture;
 use crate::gpui_app::timeline::HistoryWindow;
+use taskmanager_core::core::NpuInventorySnapshot;
+use taskmanager_core::core::PowerSupplySnapshot;
+use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
@@ -16,11 +19,14 @@ use taskmanager_core::core::process::{
     process_category,
 };
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::startup::BootTimeline;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::{AlertEvent, ServiceId};
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
 };
+use taskmanager_theme::Theme;
 
 use super::{ProcessDetailsSection, TopPage};
 
@@ -91,7 +97,7 @@ impl CaptureEvidence {
         }
     }
 
-    pub fn mark_theme(&self, theme: &taskmanager_theme::Theme) {
+    pub fn mark_theme(&self, theme: &Theme) {
         if self.is_enabled() {
             emit_theme_marker(self.scenario, theme);
         }
@@ -416,7 +422,7 @@ impl CaptureEvidence {
         &mut self,
         startup_updated: bool,
         entries: &mut Vec<StartupEntry>,
-        evidence: &mut Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: &mut Option<StartupBootEvidenceSnapshot>,
     ) -> bool {
         if !self.is_enabled()
             || !startup_updated
@@ -456,7 +462,7 @@ impl CaptureEvidence {
     pub fn restore_startup_fixture(
         &mut self,
         entries: &mut Vec<StartupEntry>,
-        evidence: &mut Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: &mut Option<StartupBootEvidenceSnapshot>,
     ) {
         match self.scenario {
             Some(CaptureScenario::StartupFailureEvidence) => {
@@ -473,7 +479,7 @@ impl CaptureEvidence {
         }
     }
 
-    pub fn startup_boot_baseline(&self) -> Option<&taskmanager_core::core::startup::BootTimeline> {
+    pub fn startup_boot_baseline(&self) -> Option<&BootTimeline> {
         self.startup_boot_baseline.as_ref()
     }
 
@@ -483,9 +489,7 @@ impl CaptureEvidence {
         self.event_history_fixture.take()
     }
 
-    pub fn system_hardware_npu_fixture(
-        &self,
-    ) -> Option<taskmanager_core::core::NpuInventorySnapshot> {
+    pub fn system_hardware_npu_fixture(&self) -> Option<NpuInventorySnapshot> {
         self.system_hardware_fixture_requested()
             .then(npu_inventory_fixture)
     }
@@ -630,7 +634,7 @@ impl CaptureEvidence {
     pub fn on_live_dynamic_device_state(
         &mut self,
         page: &mut TopPage,
-        power_supplies: &taskmanager_core::core::PowerSupplySnapshot,
+        power_supplies: &PowerSupplySnapshot,
     ) -> bool {
         if !self.is_enabled()
             || !self.telemetry_ready()
@@ -658,8 +662,8 @@ impl CaptureEvidence {
     pub fn on_dynamic_device_state(
         &mut self,
         page: &mut TopPage,
-        power_supplies: &mut taskmanager_core::core::PowerSupplySnapshot,
-        sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
+        power_supplies: &mut PowerSupplySnapshot,
+        sensors: &mut SensorCenterSnapshot,
     ) -> bool {
         if !self.is_enabled()
             || !self.telemetry_ready()

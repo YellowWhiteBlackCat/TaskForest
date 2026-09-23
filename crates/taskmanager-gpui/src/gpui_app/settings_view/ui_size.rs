@@ -1,6 +1,7 @@
 //! Product-wide desktop interface-size chooser (Small / Standard / Large).
 
 use gpui::{Context, Div, Entity, ParentElement, Styled, div};
+use taskmanager_ui::theme_binding::definite_length;
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
@@ -18,9 +19,7 @@ pub(super) fn ui_size_row(
     let mut row = div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ));
+        .gap(definite_length(tokens::SPACE_6));
     for (size, id, key) in [
         (UiSize::Small, "ui-size-small", "settings.ui_size_small"),
         (

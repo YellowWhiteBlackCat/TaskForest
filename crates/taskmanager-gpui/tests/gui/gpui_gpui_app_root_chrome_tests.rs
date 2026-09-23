@@ -8,6 +8,16 @@ use super::{
     properties_unit_preferences, vm_display, vm_rows,
 };
 use taskmanager_application::i18n;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
+use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessMetadataObservations;
+use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::time::LocalTimeRules;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::presentation::start_clock_local;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 /// The dialog's row sections fold straight through the neutral
 /// process-details VM: a fixed fixture's overview and command rows carry
@@ -17,26 +27,22 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     use taskmanager_application::process_details_vm::{DetailValue, detail_value};
     use taskmanager_core::core::metrics::ScalarObservation;
 
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-        taskmanager_core::core::process::ProcessItem::default(),
-    )
-    .pid(4242)
-    .parent_pid(Some(1))
-    .name("sample".to_owned())
-    .cmdline("sample --flag value".to_owned())
-    .current_cpu_percentage(12.5)
-    .current_memory_bytes(100 * 1024 * 1024)
-    .status("S".to_owned())
-    .metadata_observations(
-        taskmanager_core::core::process::ProcessMetadataObservations::current(
-            taskmanager_core::core::process::ProcessOwner::opaque("root"),
+    let mut item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+        .pid(4242)
+        .parent_pid(Some(1))
+        .name("sample".to_owned())
+        .cmdline("sample --flag value".to_owned())
+        .current_cpu_percentage(12.5)
+        .current_memory_bytes(100 * 1024 * 1024)
+        .status("S".to_owned())
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
             Some(std::path::PathBuf::from("/usr/bin/sample")),
             42,
-        ),
-    )
-    .current_threads(8)
-    .current_start_time_secs(1_600_000_000)
-    .build();
+        ))
+        .current_threads(8)
+        .current_start_time_secs(1_600_000_000)
+        .build();
     let mut observations = *item.scalar_observations();
     observations.start_token = ScalarObservation::available(600, 42);
     observations.memory_pss_bytes = ScalarObservation::available(50 * 1024 * 1024, 42);
@@ -44,15 +50,8 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
 
-    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
-        taskmanager_core::core::time::LocalTimeRules::utc(),
-        0,
-    );
-    let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        &item,
-        &properties_unit_preferences(),
-        &utc,
-    );
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+    let vm = process_details_rows_with_local_time(&item, &properties_unit_preferences(), &utc);
     let text = |field| match detail_value(&vm, field) {
         DetailValue::Text(text) => text.clone(),
         DetailValue::Missing => missing_value(),
@@ -107,12 +106,10 @@ fn memory_breakdown_rows_render_every_narrowed_facet() {
     use taskmanager_application::process_details_vm::{DetailValue, detail_value};
     use taskmanager_core::core::metrics::ScalarObservation;
 
-    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-        taskmanager_core::core::process::ProcessItem::default(),
-    )
-    .pid(4242)
-    .name("sample".to_owned())
-    .build();
+    let mut item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+        .pid(4242)
+        .name("sample".to_owned())
+        .build();
     let mut observations = *item.scalar_observations();
     observations.start_token = ScalarObservation::available(600, 42);
     observations.memory_bytes = ScalarObservation::available(100 * 1024 * 1024, 42);
@@ -120,15 +117,8 @@ fn memory_breakdown_rows_render_every_narrowed_facet() {
     observations.memory_uss_bytes = ScalarObservation::available(40 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
 
-    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
-        taskmanager_core::core::time::LocalTimeRules::utc(),
-        0,
-    );
-    let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-        &item,
-        &properties_unit_preferences(),
-        &utc,
-    );
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+    let vm = process_details_rows_with_local_time(&item, &properties_unit_preferences(), &utc);
     assert_eq!(
         vm_display(&vm, ProcessDetailsField::Memory),
         "100.0 MiB",
@@ -165,11 +155,7 @@ fn memory_breakdown_rows_render_every_narrowed_facet() {
     assert_eq!(cold_overview[cold_shared].1, missing_value());
     assert_eq!(
         detail_value(
-            &taskmanager_application::process_details_vm::process_details_rows_with_local_time(
-                &cold,
-                &properties_unit_preferences(),
-                &utc
-            ),
+            &process_details_rows_with_local_time(&cold, &properties_unit_preferences(), &utc),
             ProcessDetailsField::Shared
         ),
         &DetailValue::Missing,
@@ -185,15 +171,13 @@ fn memory_breakdown_rows_render_every_narrowed_facet() {
 fn performance_currents_mirror_the_neutral_vm() {
     use taskmanager_application::process_details_vm::process_details_rows;
 
-    let item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-        taskmanager_core::core::process::ProcessItem::default(),
-    )
-    .pid(4242)
-    .current_cpu_percentage(12.5)
-    .current_memory_bytes(100 * 1024 * 1024)
-    .current_disk_read_bytes_per_sec(1536)
-    .current_disk_write_bytes_per_sec(1024 * 1024)
-    .build();
+    let item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+        .pid(4242)
+        .current_cpu_percentage(12.5)
+        .current_memory_bytes(100 * 1024 * 1024)
+        .current_disk_read_bytes_per_sec(1536)
+        .current_disk_write_bytes_per_sec(1024 * 1024)
+        .build();
     let vm = process_details_rows(&item, &properties_unit_preferences());
     // The fixture builder publishes canonical current observations.
     assert_eq!(
@@ -220,26 +204,14 @@ fn performance_currents_mirror_the_neutral_vm() {
 /// fixed-UTC fixture output for known epochs.
 #[test]
 fn injected_start_time_keeps_the_sentinel_and_fixture_shape() {
-    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
-        taskmanager_core::core::time::LocalTimeRules::utc(),
-        0,
-    );
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+    assert_eq!(start_clock_local(Some(0), &utc), "—");
     assert_eq!(
-        taskmanager_shell::presentation::start_clock_local(Some(0), &utc),
-        "—"
-    );
-    assert_eq!(
-        taskmanager_application::process_details_vm::format_local_timestamp_seconds(
-            1_600_000_000,
-            &utc,
-        ),
+        format_local_timestamp_seconds(1_600_000_000, &utc,),
         Some("2020-09-13 12:26:40".to_owned())
     );
     assert_eq!(
-        taskmanager_application::process_details_vm::format_local_timestamp_seconds(
-            1_709_251_199,
-            &utc,
-        ),
+        format_local_timestamp_seconds(1_709_251_199, &utc,),
         Some("2024-02-29 23:59:59".to_owned())
     );
 }
@@ -249,7 +221,7 @@ fn injected_start_time_keeps_the_sentinel_and_fixture_shape() {
 /// `format!("{}: ...")` in the render path).
 #[test]
 fn legend_pairs_join_through_the_locale_catalog() {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    i18n::set_language(Language::En);
     let joined = kv_label_value("prop.current", "3.1%");
     assert_eq!(
         joined,

@@ -1,6 +1,7 @@
 //! GPUI adapter for the application-correlated snapshot export session.
 
 use std::sync::Arc;
+use taskmanager_application::i18n::t;
 
 use taskmanager_app_host::SnapshotExportClient;
 use taskmanager_application::snapshot_export::{
@@ -46,7 +47,7 @@ impl RootView {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::TIMED_LONG,
-                taskmanager_application::i18n::t("system.export_unavailable"),
+                t("system.export_unavailable"),
             );
             return;
         };
@@ -66,20 +67,20 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("system.export_queued"),
+                    t("system.export_queued"),
                 );
             }
             Err(SnapshotExportSubmitError::Busy(_)) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::TIMED_SHORT,
-                taskmanager_application::i18n::t("system.export_busy"),
+                t("system.export_busy"),
             ),
             Err(SnapshotExportSubmitError::RequestSpaceExhausted) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::TIMED_LONG,
-                taskmanager_application::i18n::t("system.export_unavailable"),
+                t("system.export_unavailable"),
             ),
             Err(SnapshotExportSubmitError::Rejected(error)) => {
                 warn!(
@@ -92,8 +93,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("system.export_failed")
-                        .replace("{}", error.detail()),
+                    t("system.export_failed").replace("{}", error.detail()),
                 );
             }
         }
@@ -119,7 +119,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::TIMED_SHORT,
-                    taskmanager_application::i18n::t("system.export_success").replace("{}", &base),
+                    t("system.export_success").replace("{}", &base),
                 );
             }
             SnapshotExportState::Failed { request, error } => {
@@ -134,8 +134,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::TIMED_LONG,
-                    taskmanager_application::i18n::t("system.export_failed")
-                        .replace("{}", error.detail()),
+                    t("system.export_failed").replace("{}", error.detail()),
                 );
             }
             SnapshotExportState::Closed

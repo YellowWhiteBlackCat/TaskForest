@@ -1,5 +1,11 @@
 use super::*;
+use taskmanager_core::core::hardware::CpuIdentity;
 use taskmanager_core::core::metrics::CpuPackageMetrics;
+use taskmanager_core::core::metrics::CpuPerformancePolicy;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_test_support::pin_english;
 
 fn value_of(rows: &[(String, String)], key: &'static str) -> String {
     rows.iter()
@@ -15,7 +21,7 @@ fn cpu_spec_rows_omit_missing_facts() {
     let rows = cpu_spec_rows(
         &CpuMetrics::default(),
         &HardwareInfo::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     for key in ["cpu.base_speed", "common.sockets"] {
         assert_eq!(value_of(&rows, key), "", "{key} must be omitted");
@@ -45,7 +51,7 @@ fn cpu_spec_rows_omit_missing_facts() {
 #[test]
 fn cpu_spec_rows_emit_identity_rows_first_when_probed() {
     let hardware = HardwareInfo {
-        cpu_identity: taskmanager_core::core::hardware::CpuIdentity::from_cpuid_parts(
+        cpu_identity: CpuIdentity::from_cpuid_parts(
             Some("GenuineIntel".into()),
             0x6,
             0x0,
@@ -59,7 +65,7 @@ fn cpu_spec_rows_emit_identity_rows_first_when_probed() {
     let rows = cpu_spec_rows(
         &CpuMetrics::default(),
         &hardware,
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(rows[0].0, i18n::t("system.cpu_codename"));
     assert_eq!(rows[0].1, "Raptor Lake-S/HX (13th/14th gen)");
@@ -90,11 +96,7 @@ fn cpu_spec_rows_format_present_facts() {
         sockets: Some(1),
         ..HardwareInfo::default()
     };
-    let rows = cpu_spec_rows(
-        &cpu,
-        &hardware,
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default());
     assert_eq!(value_of(&rows, "cpu.base_speed"), "2.40 GHz");
     assert_eq!(value_of(&rows, "common.sockets"), "1");
     assert_eq!(value_of(&rows, "common.cores"), "8");
@@ -108,7 +110,7 @@ fn cpu_spec_rows_format_present_facts() {
 #[test]
 fn cpu_spec_rows_emit_hybrid_rows_in_order() {
     let mut cpu = CpuMetrics::default();
-    cpu.performance_policy = taskmanager_core::core::metrics::CpuPerformancePolicy {
+    cpu.performance_policy = CpuPerformancePolicy {
         frequency_implementation: Some("driver".into()),
         active_policy: Some("governor".into()),
         energy_preference: Some("preference".into()),
@@ -122,11 +124,7 @@ fn cpu_spec_rows_emit_hybrid_rows_in_order() {
         },
         ..HardwareInfo::default()
     };
-    let rows = cpu_spec_rows(
-        &cpu,
-        &hardware,
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default());
     let expected_keys = [
         "cpu.performance_cores",
         "cpu.efficiency_cores",
@@ -148,7 +146,7 @@ fn missing_policy_rows_are_omitted_instead_of_dashed() {
     let rows = cpu_spec_rows(
         &CpuMetrics::default(),
         &HardwareInfo::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     for key in [
         "cpu.cpufreq_driver",
@@ -172,8 +170,8 @@ fn missing_policy_rows_are_omitted_instead_of_dashed() {
 /// package observed a counter.
 #[test]
 fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
-    taskmanager_test_support::pin_english();
-    let units = taskmanager_core::core::units::UnitPreferences::default();
+    pin_english();
+    let units = UnitPreferences::default();
     let hardware = HardwareInfo::default();
     let mut cpu = CpuMetrics::default();
     let mut cold_package = CpuPackageMetrics::new(0);
@@ -196,14 +194,14 @@ fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
     cpu.packages = vec![observed, package_only];
     let rows = cpu_spec_rows(&cpu, &hardware, units);
     let value = value_of(&rows, "cpu.thermal_throttle");
-    let expected = taskmanager_shell::presentation::cpu_thermal_throttle_summary(&cpu)
-        .expect("observed counters must produce the shared fold");
+    let expected =
+        cpu_thermal_throttle_summary(&cpu).expect("observed counters must produce the shared fold");
     assert_eq!(
         value, expected,
         "the spec row must paint the shared thermal-throttle fold"
     );
     assert!(
-        value.contains(taskmanager_shell::presentation::MISSING_VALUE),
+        value.contains(MISSING_VALUE),
         "the unobserved sibling counter must keep the labeled dash: {value}"
     );
     assert!(

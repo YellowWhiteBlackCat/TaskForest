@@ -1,6 +1,7 @@
 //! Platform-neutral identities for root navigation and device selection.
 
 use taskmanager_application::AppPage;
+use taskmanager_application::RefreshRequest;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TopPage {
@@ -137,22 +138,18 @@ impl super::RootView {
 /// shared automatic schedule; Services/Startup/Users request their inventories
 /// only when the corresponding surface becomes visible, and Apps/AppHistory
 /// are driven by the always-on process/telemetry flow.
-pub(crate) fn page_refresh_request(
-    page: TopPage,
-) -> Option<taskmanager_application::RefreshRequest> {
+pub(crate) fn page_refresh_request(page: TopPage) -> Option<RefreshRequest> {
     match page {
         // The CPU and System pages' pinned details (base clock, sockets, the
         // P/E/LP core-class breakdown) consume the hardware inventory. Under
         // the Dashboard automatic profile hardware is not background work, so
         // the page requests its own copy when it becomes visible — one static
         // fetch, never a schedule.
-        TopPage::Performance | TopPage::System => {
-            Some(taskmanager_application::RefreshRequest::HardwareInventory)
-        }
-        TopPage::Containers => Some(taskmanager_application::RefreshRequest::Containers),
-        TopPage::Services => Some(taskmanager_application::RefreshRequest::Services),
-        TopPage::Startup => Some(taskmanager_application::RefreshRequest::Startup),
-        TopPage::Users => Some(taskmanager_application::RefreshRequest::Sessions),
+        TopPage::Performance | TopPage::System => Some(RefreshRequest::HardwareInventory),
+        TopPage::Containers => Some(RefreshRequest::Containers),
+        TopPage::Services => Some(RefreshRequest::Services),
+        TopPage::Startup => Some(RefreshRequest::Startup),
+        TopPage::Users => Some(RefreshRequest::Sessions),
         TopPage::Apps | TopPage::AppHistory => None,
     }
 }

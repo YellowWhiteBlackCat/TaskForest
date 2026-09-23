@@ -1,5 +1,16 @@
 use super::*;
+use taskmanager_application::SmbiosMemoryState;
+use taskmanager_core::DmiIdentityFacts;
+use taskmanager_core::SmbiosMemorySnapshot;
+use taskmanager_core::core::CpuInstructionFeature;
+use taskmanager_core::core::hardware::DisplayInfo;
+use taskmanager_core::core::metrics::GpuScalarObservations;
+use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::units::QuantityFamily;
+use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn hardware() -> HardwareInfo {
     HardwareInfo {
@@ -71,7 +82,7 @@ fn device_section_surfaces_session_facts_only_when_present() {
 #[test]
 fn device_section_surfaces_edid_display_facts_as_one_compact_row() {
     let rich = HardwareInfo {
-        displays: vec![taskmanager_core::core::hardware::DisplayInfo {
+        displays: vec![DisplayInfo {
             connector: "DP-1".into(),
             manufacturer: Some("DEL".into()),
             model: Some("TaskPanel".into()),
@@ -125,7 +136,7 @@ fn device_section_kernel_facts_stay_conditional() {
 
 /// Drive the real session through admission so the projection observes the
 /// same Ready state production produces.
-fn ready_state(identity: Option<taskmanager_core::DmiIdentityFacts>) -> SmbiosMemoryState {
+fn ready_state(identity: Option<DmiIdentityFacts>) -> SmbiosMemoryState {
     use taskmanager_application::SmbiosMemorySession;
     use taskmanager_platform_contract::RequestId;
     let mut session = SmbiosMemorySession::default();
@@ -134,13 +145,13 @@ fn ready_state(identity: Option<taskmanager_core::DmiIdentityFacts>) -> SmbiosMe
     assert!(session.accept_attempt(attempt, request));
     assert!(session.complete(
         request,
-        taskmanager_core::SmbiosMemorySnapshot::success(2, 1, Vec::new(), identity),
+        SmbiosMemorySnapshot::success(2, 1, Vec::new(), identity),
     ));
     session.state().clone()
 }
 
-fn identity_facts() -> taskmanager_core::DmiIdentityFacts {
-    taskmanager_core::DmiIdentityFacts {
+fn identity_facts() -> DmiIdentityFacts {
+    DmiIdentityFacts {
         bios_vendor: Some("AMI".into()),
         bios_version: Some("P1.27".into()),
         bios_date: Some("04/17/2024".into()),
@@ -230,11 +241,11 @@ fn device_section_keeps_last_good_identity_while_refreshing() {
     use taskmanager_application::SmbiosMemorySession;
     let mut session = SmbiosMemorySession::default();
     let attempt = session.begin_attempt();
-    let request = taskmanager_platform_contract::RequestId::new(7).expect("fixture id");
+    let request = RequestId::new(7).expect("fixture id");
     assert!(session.accept_attempt(attempt, request));
     assert!(session.complete(
         request,
-        taskmanager_core::SmbiosMemorySnapshot::success(2, 1, Vec::new(), Some(identity_facts())),
+        SmbiosMemorySnapshot::success(2, 1, Vec::new(), Some(identity_facts())),
     ));
     let _ = session.begin_attempt();
     let section = device_section(&hardware(), session.state());
@@ -252,15 +263,8 @@ fn device_section_keeps_last_good_identity_while_refreshing() {
 fn cpu_section_breaks_down_hybrid_topology_and_feature_chips() {
     use taskmanager_core::core::hardware::CoreBreakdown;
     let mut hw = hardware();
-    hw.instruction_features = vec![
-        taskmanager_core::core::CpuInstructionFeature::AesNi,
-        taskmanager_core::core::CpuInstructionFeature::Avx2,
-    ];
-    let homogeneous = cpu_section(
-        &hw,
-        &SystemSnapshot::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    hw.instruction_features = vec![CpuInstructionFeature::AesNi, CpuInstructionFeature::Avx2];
+    let homogeneous = cpu_section(&hw, &SystemSnapshot::default(), UnitPreferences::default());
     let p_label = i18n::t("cpu.performance_cores").to_string();
     let e_label = i18n::t("cpu.efficiency_cores").to_string();
     assert!(
@@ -277,11 +281,7 @@ fn cpu_section_breaks_down_hybrid_topology_and_feature_chips() {
         e_cores: 8,
         lp_cores: 0,
     };
-    let hybrid = cpu_section(
-        &hw,
-        &SystemSnapshot::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let hybrid = cpu_section(&hw, &SystemSnapshot::default(), UnitPreferences::default());
     assert!(
         hybrid.rows.iter().any(|(k, _)| *k == p_label),
         "hybrid part renders the P-core row"
@@ -297,7 +297,7 @@ fn cpu_section_surfaces_cpuid_identity_only_when_probed() {
     let bare = cpu_section(
         &hardware(),
         &SystemSnapshot::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     let vendor_label = i18n::t("system.cpu_vendor");
     assert!(
@@ -311,7 +311,7 @@ fn cpu_section_surfaces_cpuid_identity_only_when_probed() {
     let probed = cpu_section(
         &probed_hw,
         &SystemSnapshot::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     let vendor_row = probed
         .rows
@@ -348,11 +348,7 @@ fn memory_section_uses_static_capacity_and_conditional_rows() {
         ..hardware()
     };
     let snap = SystemSnapshot::default();
-    let s = memory_section(
-        &hardware,
-        &snap,
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let s = memory_section(&hardware, &snap, UnitPreferences::default());
     assert!(
         s.meters.is_empty(),
         "live memory usage must stay off System"
@@ -370,17 +366,13 @@ fn memory_section_uses_static_capacity_and_conditional_rows() {
 
     // Missing hardware inventory stays an honest dash even if telemetry has a
     // live total; the page must not fall back to a changing runtime scalar.
-    let s = memory_section(
-        &HardwareInfo::default(),
-        &snap,
-        taskmanager_core::core::units::UnitPreferences::default(),
-    );
+    let s = memory_section(&HardwareInfo::default(), &snap, UnitPreferences::default());
     let capacity = s
         .rows
         .iter()
         .find(|(k, _)| k == i18n::t("common.memory"))
         .expect("capacity row still renders");
-    assert_eq!(capacity.1, taskmanager_shell::presentation::MISSING_VALUE);
+    assert_eq!(capacity.1, MISSING_VALUE);
 }
 
 /// GPU identity/capacity remains stable when live utilization, temperature, or
@@ -395,13 +387,13 @@ fn graphics_section_omits_live_gpu_facts() {
             ..SystemSnapshot::default()
         },
         None,
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(bare.rows[0].1, "Example Arc");
 
-    gpu.apply_scalar_observations(taskmanager_core::core::metrics::GpuScalarObservations {
-        utilization_pct: taskmanager_core::core::metrics::ScalarObservation::available(37.5, 1),
-        temperature_c: taskmanager_core::core::metrics::ScalarObservation::available(61.0, 1),
+    gpu.apply_scalar_observations(GpuScalarObservations {
+        utilization_pct: ScalarObservation::available(37.5, 1),
+        temperature_c: ScalarObservation::available(61.0, 1),
         ..Default::default()
     });
     gpu.driver = Some("xe".into());
@@ -411,7 +403,7 @@ fn graphics_section_omits_live_gpu_facts() {
             ..SystemSnapshot::default()
         },
         None,
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(live.rows[0].1, "Example Arc");
 }
@@ -453,30 +445,25 @@ fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_wi
     let section = graphics_section(
         &SystemSnapshot::default(),
         Some(&inventory),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(section.rows[0].1, "Example Neural Engine (example_npu)");
     assert_eq!(section.rows[1].1, "38%");
     assert_eq!(section.rows[2].1, "13%");
     assert_eq!(
-        section.rows[3].1,
-        taskmanager_shell::presentation::MISSING_VALUE,
+        section.rows[3].1, MISSING_VALUE,
         "a reported engine with unavailable utilization stays visible as a gap"
     );
     assert_eq!(
         section.rows[4].1,
-        taskmanager_core::core::units::UnitPreferences::default().format_quantity(
-            0,
-            taskmanager_core::core::units::QuantityFamily::Memory,
-            false
-        ),
+        UnitPreferences::default().format_quantity(0, QuantityFamily::Memory, false),
         "measured zero dedicated memory must not be confused with unavailable"
     );
     assert_eq!(
         section.rows[5].1,
-        taskmanager_core::core::units::UnitPreferences::default().format_quantity(
+        UnitPreferences::default().format_quantity(
             1024 * 1024 * 1024,
-            taskmanager_core::core::units::QuantityFamily::Memory,
+            QuantityFamily::Memory,
             false
         )
     );
@@ -486,7 +473,7 @@ fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_wi
         graphics_section(
             &SystemSnapshot::default(),
             Some(&failed),
-            taskmanager_core::core::units::UnitPreferences::default()
+            UnitPreferences::default()
         )
         .is_empty(),
         "a failed inventory cannot fabricate an NPU identity or telemetry row"
@@ -495,7 +482,7 @@ fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_wi
 
 #[test]
 fn storage_section_surfaces_identity_type_and_capacity_without_live_io() {
-    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    let disk = DiskMetricsFixtureBuilder::new()
         .name("nvme0n1".into())
         .model("Example NVMe".into())
         .disk_type("NVMe SSD".into())
@@ -508,7 +495,7 @@ fn storage_section_surfaces_identity_type_and_capacity_without_live_io() {
             disks: vec![disk],
             ..SystemSnapshot::default()
         },
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(section.rows[0].0, i18n::t("common.disk"));
     assert_eq!(section.rows[0].1, "Example NVMe · NVMe SSD · 2048.0 GiB");
@@ -522,7 +509,7 @@ fn empty_sections_are_omitted() {
         &SystemSnapshot::default(),
         None,
         &SmbiosMemoryState::Closed,
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     // Default host: graphics has no devices and the static inventory sections
     // still never emit empty cards.
@@ -546,19 +533,13 @@ fn tiles_show_static_hardware_parameters() {
     let tiles = build_tiles(
         &hardware,
         &SystemSnapshot::default(),
-        taskmanager_core::core::units::UnitPreferences::default(),
+        UnitPreferences::default(),
     );
     assert_eq!(tiles.len(), 4);
     assert_eq!(tiles[0].value, "Example CPU 8");
     assert_eq!(tiles[1].value, "16.0 GiB");
-    assert_eq!(
-        tiles[2].value,
-        taskmanager_shell::presentation::MISSING_VALUE
-    );
-    assert_eq!(
-        tiles[3].value,
-        taskmanager_shell::presentation::MISSING_VALUE
-    );
+    assert_eq!(tiles[2].value, MISSING_VALUE);
+    assert_eq!(tiles[3].value, MISSING_VALUE);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -569,6 +550,7 @@ mod memory_inventory_lane {
     use super::super::memory_inventory::{
         MemoryInventoryInputs, MemoryInventoryModel, memory_inventory_model,
     };
+    use super::*;
     use taskmanager_application::SmbiosMemorySession;
     use taskmanager_application::i18n;
     use taskmanager_core::core::failure::FailureKind;
@@ -577,14 +559,14 @@ mod memory_inventory_lane {
     use taskmanager_platform_contract::{CapabilityStatus, RequestId};
 
     fn inputs<'a>(
-        state: &'a taskmanager_application::SmbiosMemoryState,
+        state: &'a SmbiosMemoryState,
         capability: Option<CapabilityStatus>,
     ) -> MemoryInventoryInputs<'a> {
         MemoryInventoryInputs { state, capability }
     }
 
     fn model(
-        state: &taskmanager_application::SmbiosMemoryState,
+        state: &SmbiosMemoryState,
         capability: Option<CapabilityStatus>,
     ) -> MemoryInventoryModel {
         memory_inventory_model(&inputs(state, capability), UnitPreferences::default())
@@ -654,7 +636,7 @@ mod memory_inventory_lane {
                 // No locator: the slot-indexed label; a record with no
                 // readable facts keeps its row with the shared dash.
                 assert_eq!(rows[2].0, format!("{} 2", i18n::t("system.memory_module")));
-                assert_eq!(rows[2].1, taskmanager_shell::presentation::MISSING_VALUE);
+                assert_eq!(rows[2].1, MISSING_VALUE);
             }
             other => panic!("accepted payload must project rows, got {other:?}"),
         }
@@ -723,7 +705,7 @@ mod memory_inventory_lane {
     /// payload is the pending row, and a refresh keeps the last rows.
     #[test]
     fn closed_and_loading_states_render_honestly() {
-        let closed = taskmanager_application::SmbiosMemoryState::Closed;
+        let closed = SmbiosMemoryState::Closed;
         assert_eq!(
             model(&closed, None),
             MemoryInventoryModel::Hidden,

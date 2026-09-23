@@ -1,4 +1,6 @@
 use super::*;
+use taskmanager_core::core::hardware::ComputeTopology;
+use taskmanager_core::core::hardware::DisplayInfo;
 use taskmanager_core::core::hardware::{CoreBreakdown, FirmwareInfo, HostIdentity, KernelInfo};
 
 fn hardware() -> HardwareInfo {
@@ -29,7 +31,7 @@ fn hardware() -> HardwareInfo {
             build: Some("builder".into()),
             ..KernelInfo::default()
         },
-        taskmanager_core::core::hardware::ComputeTopology {
+        ComputeTopology {
             cpu_brand: Some("Example CPU".into()),
             logical_cpu_count: Some(8),
             total_memory_mb: Some(16_384),
@@ -38,7 +40,7 @@ fn hardware() -> HardwareInfo {
                 e_cores: 4,
                 lp_cores: 0,
             },
-            ..taskmanager_core::core::hardware::ComputeTopology::default()
+            ..ComputeTopology::default()
         },
         FirmwareInfo {
             virtualization: Some("KVM".into()),
@@ -81,19 +83,18 @@ fn groups_keep_provider_facts_and_omit_unavailable_rows() {
 #[test]
 fn groups_project_connected_display_facts_into_hardware_details() {
     let mut info = hardware();
-    info.displays
-        .push(taskmanager_core::core::hardware::DisplayInfo {
-            connector: "DP-1".into(),
-            manufacturer: Some("DEL".into()),
-            model: Some("TaskPanel".into()),
-            serial: Some("A-42".into()),
-            width_mm: Some(600),
-            height_mm: Some(340),
-            width_px: Some(1920),
-            height_px: Some(1080),
-            refresh_hz: Some(60.0),
-            hdr_supported: Some(true),
-        });
+    info.displays.push(DisplayInfo {
+        connector: "DP-1".into(),
+        manufacturer: Some("DEL".into()),
+        model: Some("TaskPanel".into()),
+        serial: Some("A-42".into()),
+        width_mm: Some(600),
+        height_mm: Some(340),
+        width_px: Some(1920),
+        height_px: Some(1080),
+        refresh_hz: Some(60.0),
+        hdr_supported: Some(true),
+    });
     let groups = groups(&info, DesktopAppearance::default());
     let hardware_group = groups
         .iter()

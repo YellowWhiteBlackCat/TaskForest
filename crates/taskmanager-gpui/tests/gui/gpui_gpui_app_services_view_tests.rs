@@ -5,6 +5,7 @@ use gpui::{
     AppContext, Context, InteractiveElement, IntoElement, ParentElement, Render, Styled,
     TestAppContext, VisualTestContext, Window, div, px,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
@@ -34,12 +35,12 @@ async fn service_row_context_menu_offers_all_six_actions(cx: &mut gpui::TestAppC
     assert_eq!(
         labels,
         vec![
-            taskmanager_application::i18n::t("svc.start").to_string(),
-            taskmanager_application::i18n::t("svc.stop").to_string(),
-            taskmanager_application::i18n::t("svc.restart").to_string(),
-            taskmanager_application::i18n::t("svc.enable").to_string(),
-            taskmanager_application::i18n::t("svc.disable").to_string(),
-            taskmanager_application::i18n::t("svc.reload_daemon").to_string(),
+            t("svc.start").to_string(),
+            t("svc.stop").to_string(),
+            t("svc.restart").to_string(),
+            t("svc.enable").to_string(),
+            t("svc.disable").to_string(),
+            t("svc.reload_daemon").to_string(),
         ],
         "the context menu must list lifecycle actions and daemon reload"
     );

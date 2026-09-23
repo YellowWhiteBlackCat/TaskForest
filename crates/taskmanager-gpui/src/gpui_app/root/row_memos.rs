@@ -8,6 +8,8 @@
 //! interior mutability; this module only supplies the root-level projections.
 
 use std::rc::Rc;
+use taskmanager_application::ApplicationHistoryProjection;
+use taskmanager_shell::order_session_rows;
 
 use super::RootView;
 use crate::gpui_app::{app_history_view, services_view, startup_view};
@@ -58,7 +60,7 @@ impl RootView {
         let generation = self.sessions_generation();
         self.projection_caches.sessions(generation, sort, || {
             let mut rows = self.sessions().to_vec();
-            taskmanager_shell::order_session_rows(&mut rows, sort);
+            order_session_rows(&mut rows, sort);
             rows
         })
     }
@@ -68,7 +70,7 @@ impl RootView {
     /// only converts Arc samples to GPUI's Rc graph identity once per load.
     pub(crate) fn app_history_rows(
         &self,
-        projection: &taskmanager_application::ApplicationHistoryProjection,
+        projection: &ApplicationHistoryProjection,
     ) -> Rc<Vec<app_history_view::AppHistoryRow>> {
         self.projection_caches.app_history(&projection.rows, || {
             app_history_view::projected_app_history_rows(&projection.rows)

@@ -1,6 +1,9 @@
 //! Mission Center-compatible unit/base choices for Performance readouts.
 
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, div};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
@@ -57,9 +60,7 @@ pub(super) fn units_group(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(unit_row(
             t,
             ent.clone(),
@@ -195,24 +196,20 @@ fn unit_row(
         .flex_row()
         .items_center()
         .justify_between()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
                 .flex_1()
                 .min_w(gpui::px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(t.fg))
                 .child(i18n::t(spec.title_key)),
         )
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(unit_pill(
                     t,
                     ent.clone(),

@@ -9,17 +9,25 @@ use super::{
     config_from_view, i18n, normalize_graph_data_points, normalize_sidebar_preferences,
     startup_page_from_token, text_rendering_from_token,
 };
+use taskmanager_application::ConfigDrain;
+use taskmanager_application::ConfigPublicationOutcome;
+use taskmanager_application::ConfigRecovery;
+use taskmanager_application::ConfigRecoveryNotice;
+use taskmanager_application::ConfigRevision;
+use taskmanager_application::ConfigStoreErrorKind;
+use taskmanager_application::TelemetryInterval;
+use taskmanager_application::TelemetryRefreshPolicyChange;
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_theme::tokens::UiSize;
 
-pub(super) fn apply_root_persisted_projection(
-    view: &mut RootView,
-    cfg: &taskmanager_core::core::config::Config,
-) {
+pub(super) fn apply_root_persisted_projection(view: &mut RootView, cfg: &Config) {
     let mut next = view.presentation_snapshot();
     next.appearance = view.resolved_persisted_appearance(cfg);
     if let Some(density) = super::super::persistence::density_from_token(&cfg.density) {
         next.appearance.density = density;
     }
-    next.appearance.ui_size = taskmanager_theme::tokens::UiSize::from_config_token(&cfg.ui_size);
+    next.appearance.ui_size = UiSize::from_config_token(&cfg.ui_size);
     next.appearance.text_rendering = text_rendering_from_token(&cfg.text_rendering);
     next.appearance.language = cfg.language.as_deref().and_then(i18n::Language::from_code);
     next.startup_page = SharedString::from(startup_page_from_token(&cfg.startup_page));
@@ -46,7 +54,7 @@ pub(super) fn apply_root_persisted_projection(
         network_other: cfg.show_network_other,
         gpus: cfg.show_gpus,
     };
-    next.units = taskmanager_core::core::units::UnitPreferences {
+    next.units = UnitPreferences {
         memory_use_bytes: cfg.memory_use_bytes,
         memory_use_base2: cfg.memory_use_base2,
         drive_use_bytes: cfg.drive_use_bytes,
@@ -76,7 +84,7 @@ pub(super) fn apply_root_persisted_projection(
 
 pub(super) fn apply_root_runtime_config(
     view: &mut RootView,
-    cfg: &taskmanager_core::core::config::Config,
+    cfg: &Config,
     cx: &mut gpui::Context<RootView>,
 ) {
     let history_preference_changed =
@@ -87,10 +95,9 @@ pub(super) fn apply_root_runtime_config(
         view.sync_history_persistence_sink();
     }
     view.sync_theme_from_presentation(cx);
-    let interval =
-        taskmanager_application::TelemetryInterval::clamped(Duration::from_millis(cfg.refresh_ms));
+    let interval = TelemetryInterval::clamped(Duration::from_millis(cfg.refresh_ms));
     view.telemetry_refresh_policy
-        .apply(taskmanager_application::TelemetryRefreshPolicyChange::SetInterval(interval));
+        .apply(TelemetryRefreshPolicyChange::SetInterval(interval));
     if let Some(platform) = &mut view.platform {
         platform.set_telemetry_interval(interval);
     }
@@ -158,13 +165,13 @@ pub(super) fn drain_config_publications(
     weak: &WeakEntity<RootView>,
     cx: &mut AsyncApp,
     config_client: &mut ConfigClient,
-    applied_revision: &mut Option<taskmanager_application::ConfigRevision>,
+    applied_revision: &mut Option<ConfigRevision>,
 ) {
     let drain = config_client.drain();
     let mut publications = match drain {
-        taskmanager_application::ConfigDrain::Empty => return,
-        taskmanager_application::ConfigDrain::Publications(publications) => publications,
-        taskmanager_application::ConfigDrain::ResyncRequired {
+        ConfigDrain::Empty => return,
+        ConfigDrain::Publications(publications) => publications,
+        ConfigDrain::ResyncRequired {
             missed_publications,
             latest,
         } => {
@@ -190,13 +197,14 @@ pub(super) fn drain_config_publications(
             *applied_revision = Some(publication.revision());
         }
         let feedback = match publication.outcome() {
-            taskmanager_application::ConfigPublicationOutcome::SaveFailed { error, .. } => Some(
+            ConfigPublicationOutcome::SaveFailed { error, .. } => Some(
                 i18n::t("settings.config_not_saved").replace("{kind}", error.kind().stable_code()),
             ),
-            taskmanager_application::ConfigPublicationOutcome::RefreshFailed(recovery) => Some(
-                config_recovery_message(i18n::t("settings.config_refresh_failed"), *recovery),
-            ),
-            taskmanager_application::ConfigPublicationOutcome::Refreshed(recovery) => {
+            ConfigPublicationOutcome::RefreshFailed(recovery) => Some(config_recovery_message(
+                i18n::t("settings.config_refresh_failed"),
+                *recovery,
+            )),
+            ConfigPublicationOutcome::Refreshed(recovery) => {
                 initial_config_recovery_message(*recovery)
             }
             _ => None,
@@ -207,37 +215,30 @@ pub(super) fn drain_config_publications(
     }
 }
 
-pub(super) fn initial_config_recovery_message(
-    recovery: taskmanager_application::ConfigRecovery,
-) -> Option<String> {
+pub(super) fn initial_config_recovery_message(recovery: ConfigRecovery) -> Option<String> {
     match recovery.initial_notice() {
-        taskmanager_application::ConfigRecoveryNotice::None => None,
-        taskmanager_application::ConfigRecoveryNotice::Recovered => Some(config_recovery_message(
+        ConfigRecoveryNotice::None => None,
+        ConfigRecoveryNotice::Recovered => Some(config_recovery_message(
             i18n::t("settings.config_recovered"),
             recovery,
         )),
-        taskmanager_application::ConfigRecoveryNotice::Failed => Some(config_recovery_message(
+        ConfigRecoveryNotice::Failed => Some(config_recovery_message(
             i18n::t("settings.config_load_failed"),
             recovery,
         )),
     }
 }
 
-pub(super) fn config_recovery_message(
-    prefix: &str,
-    recovery: taskmanager_application::ConfigRecovery,
-) -> String {
+pub(super) fn config_recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
     format!(
         "{prefix}: source={:?}, primary={}, backup={}",
         recovery.source(),
-        recovery.primary_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
-        recovery.backup_error().map_or(
-            "none",
-            taskmanager_application::ConfigStoreErrorKind::stable_code
-        ),
+        recovery
+            .primary_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
+        recovery
+            .backup_error()
+            .map_or("none", ConfigStoreErrorKind::stable_code),
     )
 }
 

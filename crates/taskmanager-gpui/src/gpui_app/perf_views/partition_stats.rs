@@ -3,6 +3,13 @@
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px, relative};
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -38,24 +45,18 @@ pub(super) fn partition_panel(
             div()
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
-                .child(taskmanager_ui::icons_binding::icon(IconId::Disk).size(px(14.0)))
+                .gap(definite_length(tokens::SPACE_6))
+                .text_size(font_size(tokens::FONT_13))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg))
+                .child(icon(IconId::Disk).size(px(14.0)))
                 .child(i18n::t("disk.partitions")),
         )
         .render()
         .flex()
         .flex_col()
         .w_full()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ));
+        .gap(definite_length(tokens::SPACE_8));
     #[cfg(any(test, feature = "test-support"))]
     {
         panel = panel.debug_selector(|| "tm-disk-partitions".to_string());
@@ -64,8 +65,8 @@ pub(super) fn partition_panel(
     if partitions.is_empty() {
         return panel.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("disk.no_partitions")),
         );
     }
@@ -95,8 +96,8 @@ pub(super) fn partition_panel(
     if mounted.len() > MAX_VISIBLE_MOUNTED_PARTITIONS {
         panel = panel.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("disk.partitions_more").replace(
                     "{count}",
                     &(mounted.len() - MAX_VISIBLE_MOUNTED_PARTITIONS).to_string(),
@@ -154,11 +155,9 @@ fn partition_row(
         .flex_row()
         .w_full()
         .h(px(6.0))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::small_radius(theme),
-        ))
+        .rounded(absolute(tokens::small_radius(theme)))
         .overflow_hidden()
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg));
+        .bg(fill(theme.sidebar_bg));
     if let Some(fraction) = usage.1 {
         // The fill width is the typed used/total fraction; the test-support
         // selector exposes only that painted bar (never a value), so a render
@@ -170,7 +169,7 @@ fn partition_row(
                 .top_0()
                 .bottom_0()
                 .w(relative(fraction))
-                .bg(taskmanager_ui::theme_binding::fill(theme.disk)),
+                .bg(fill(theme.disk)),
             index,
             "fill",
         ));
@@ -185,8 +184,8 @@ fn partition_row(
     let label_text = div().w_full().min_w(px(0.0)).child(
         elements::truncated_text(&label)
             .w_full()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(theme.fg)),
     );
     let label_row = partition_slot(
         div().flex().w_full().min_w(px(0.0)).child(
@@ -204,8 +203,8 @@ fn partition_row(
                 .flex_1()
                 .min_w(px(0.0))
                 .text_right()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim)),
         ),
         index,
         "usage",
@@ -215,9 +214,7 @@ fn partition_row(
         .flex()
         .flex_col()
         .w_full()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_5,
-        ))
+        .gap(definite_length(tokens::SPACE_5))
         .child(label_row)
         .child(usage_row)
         .child(bar)
@@ -244,15 +241,13 @@ fn unmounted_summary(theme: &Theme, partitions: &[&DiskPartition]) -> Div {
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             elements::truncated_text(&summary)
                 .flex_1()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim)),
         );
     #[cfg(any(test, feature = "test-support"))]
     let row = row.debug_selector(|| "tm-disk-partitions-unmounted".to_string());

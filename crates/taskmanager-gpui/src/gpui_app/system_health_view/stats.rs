@@ -3,6 +3,10 @@
 //! live here so the render module only paints folded strings.
 
 use std::path::Path;
+use taskmanager_core::core::units::bytes_percent;
+use taskmanager_shell::presentation::fan_rpm;
+use taskmanager_shell::presentation::power_w_precise;
+use taskmanager_shell::presentation::temperature_c_precise;
 
 use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_core::core::{DeviceStatus, FilesystemHealth, SensorQuantity, SensorReading};
@@ -65,15 +69,9 @@ pub(super) fn sensor_rows(
 
 fn sensor_value_text(reading: &SensorReading, copy: &dyn Fn(SystemHealthText) -> String) -> String {
     match (reading.quantity(), reading.current_number()) {
-        (SensorQuantity::Temperature, Some(value)) => {
-            taskmanager_shell::presentation::temperature_c_precise(value as f32)
-        }
-        (SensorQuantity::FanSpeed, Some(value)) => {
-            taskmanager_shell::presentation::fan_rpm(value as f32)
-        }
-        (SensorQuantity::Power, Some(value)) => {
-            taskmanager_shell::presentation::power_w_precise(value as f32)
-        }
+        (SensorQuantity::Temperature, Some(value)) => temperature_c_precise(value as f32),
+        (SensorQuantity::FanSpeed, Some(value)) => fan_rpm(value as f32),
+        (SensorQuantity::Power, Some(value)) => power_w_precise(value as f32),
         _ => copy(SystemHealthText::Unavailable),
     }
 }
@@ -95,7 +93,7 @@ pub(super) fn filesystem_capacity(
         return None;
     }
     let used = total.saturating_sub(available);
-    let used_pct = taskmanager_core::core::units::bytes_percent(used, total)?;
+    let used_pct = bytes_percent(used, total)?;
     Some((used_pct, available))
 }
 

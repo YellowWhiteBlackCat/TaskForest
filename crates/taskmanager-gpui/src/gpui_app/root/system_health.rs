@@ -15,7 +15,13 @@ use taskmanager_application::{
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::{DeviceGeneration, SmartSelfTestReport};
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
 use taskmanager_theme::Theme;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::RootView;
 use taskmanager_theme::tokens;
@@ -48,9 +54,9 @@ impl RootView {
     pub fn confirm_system_health_self_test(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(effect) = self.confirm_confirmation(ConfirmationKind::SmartSelfTest) else {
             self.shell.report_notice(
-                taskmanager_shell::FeedbackSource::Interaction,
-                taskmanager_shell::FeedbackSeverity::Warning,
-                taskmanager_shell::FeedbackLifecycle::SHORT,
+                FeedbackSource::Interaction,
+                FeedbackSeverity::Warning,
+                FeedbackLifecycle::SHORT,
                 i18n::t("health.no_pending"),
             );
             return false;
@@ -140,20 +146,18 @@ pub(super) fn render_system_health_confirmation_dialog(
         .max_w(relative(1.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg))
                 .child(message),
         );
     if let Some(error) = error {
         content = content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.danger))
                 .child(self_test_failure_text(error)),
         );
     }
@@ -162,9 +166,7 @@ pub(super) fn render_system_health_confirmation_dialog(
             div()
                 .flex()
                 .justify_end()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(elements::pill(
                     theme,
                     "health-self-test-cancel",

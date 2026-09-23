@@ -10,7 +10,14 @@ use gpui::{
 };
 use std::rc::Rc;
 use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
+use taskmanager_shell::presentation::effective_smart_status;
+use taskmanager_shell::presentation::smart_section_visible;
 use taskmanager_telemetry_store::TelemetryStore;
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::formatting::{PerformanceSettings, gpu_identity_text};
@@ -105,13 +112,7 @@ fn sidebar_resize_handle(
         .flex_none()
         .justify_end()
         .items_center()
-        .child(
-            div()
-                .h_full()
-                .justify_center()
-                .bg(taskmanager_ui::theme_binding::fill(border))
-                .w(px(1.0)),
-        )
+        .child(div().h_full().justify_center().bg(fill(border)).w(px(1.0)))
         .on_drag_move(
             move |e: &DragMoveEvent<SidebarResize>, _win, cx: &mut App| {
                 let payload = *e.drag(cx);
@@ -217,30 +218,18 @@ pub(crate) fn render_sidebar(
     let mut body = div()
         .flex()
         .flex_col()
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
+        .py(definite_length(tokens::SPACE_10))
+        .gap(definite_length(tokens::SPACE_2))
         .child(
             div()
-                .px(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_14,
-                ))
-                .pb(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .px(definite_length(tokens::SPACE_14))
+                .pb(definite_length(tokens::SPACE_8))
                 .flex()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_STRONG,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .child(taskmanager_ui::icons_binding::icon(IconId::System).size(px(18.0)))
+                .gap(definite_length(tokens::SPACE_6))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_STRONG))
+                .text_color(hsla(theme.fg_dim))
+                .child(icon(IconId::System).size(px(18.0)))
                 .child(div().flex_1().child(i18n::t("sidebar.devices")))
                 .child(edit::edit_button(theme, edit_mode, cx)),
         );
@@ -331,11 +320,8 @@ pub(crate) fn render_sidebar(
             Some(t) if t > 0.0 => format!("{base}  ·  {}  ·  {:.0} °C", d.disk_type, t.round()),
             _ => format!("{base}  ·  {}", d.disk_type),
         };
-        if taskmanager_shell::presentation::smart_section_visible(d) {
-            append_status_badge(
-                &mut c2,
-                taskmanager_shell::presentation::effective_smart_status(d),
-            );
+        if smart_section_visible(d) {
+            append_status_badge(&mut c2, effective_smart_status(d));
         }
         entries.push((
             key.clone(),
@@ -589,7 +575,7 @@ pub(crate) fn render_sidebar(
     .min_w(content_width)
     .max_w(content_width)
     .h_full()
-    .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
+    .bg(fill(theme.sidebar_bg))
     // Round the sidebar's BOTTOM-LEFT corner: it spans the full window
     // height beside the content area and would otherwise paint a square
     // pixel into the transparent CSD corner (its top-left sits under the
@@ -617,7 +603,7 @@ pub(crate) fn render_sidebar(
         .min_w(width)
         .max_w(width)
         .flex_none()
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
+        .bg(fill(theme.sidebar_bg))
         .child(col)
         .child(sidebar_resize_handle(theme, width, &cx.entity()))
 }

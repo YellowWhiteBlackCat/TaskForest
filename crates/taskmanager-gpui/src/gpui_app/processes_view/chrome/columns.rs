@@ -5,6 +5,11 @@ use gpui::{
     div,
 };
 use std::collections::HashSet;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::processes_view::rows::{columns, header_label, is_hideable};
@@ -34,21 +39,13 @@ pub fn columns_dropdown(
         .id("columns-trigger")
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(background))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_14))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .gap(definite_length(tokens::SPACE_6))
+        .px(definite_length(tokens::SPACE_12))
+        .py(definite_length(tokens::SPACE_6))
+        .rounded(absolute(tokens::control_radius(theme)))
+        .bg(fill(background))
+        .text_size(font_size(tokens::FONT_14))
+        .text_color(hsla(theme.fg))
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(theme))

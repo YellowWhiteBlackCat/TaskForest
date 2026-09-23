@@ -12,6 +12,7 @@
 use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskmanager_shell::ProcessControlAvailability;
 use taskmanager_shell::{
     InfoSortCol, InfoTable, ProcessRowId, ProcessStatusFilter, SortCol, SortDir,
 };
@@ -107,7 +108,7 @@ impl RootView {
     /// GPUI only renders this result; it never reconstructs a control scope
     /// from a PID, label, or local menu state.
     #[must_use]
-    pub fn process_control_availability(&self) -> taskmanager_shell::ProcessControlAvailability {
+    pub fn process_control_availability(&self) -> ProcessControlAvailability {
         self.shell.process_control_availability()
     }
 

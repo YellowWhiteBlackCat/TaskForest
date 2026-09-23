@@ -1,4 +1,6 @@
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{overview_stats, summary_tiles, swap_bar_stats};
@@ -18,15 +20,12 @@ fn measured_memory() -> MemoryMetrics {
 
 #[test]
 fn summary_tiles_fold_measured_and_missing_memory_states() {
-    let units = taskmanager_core::core::units::UnitPreferences::default();
+    let units = UnitPreferences::default();
     let tiles = summary_tiles(&measured_memory(), units);
     assert_eq!(tiles.used, "4.0 GiB");
     assert_eq!(tiles.used_note, "50%");
     assert_eq!(tiles.available, "4.0 GiB");
-    assert_eq!(
-        tiles.available_note,
-        format!("{} 8.0 GiB", taskmanager_application::i18n::t("mem.of"))
-    );
+    assert_eq!(tiles.available_note, format!("{} 8.0 GiB", t("mem.of")));
     assert_eq!(tiles.swap, "1.0 GiB");
     assert_eq!(tiles.swap_note, "50%");
 
@@ -52,7 +51,7 @@ fn overview_stats_fold_totals_and_swap_presence() {
 
 #[test]
 fn swap_bar_label_composes_zram_and_zswap_annotations() {
-    let units = taskmanager_core::core::units::UnitPreferences::default();
+    let units = UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .compressed_swap_used_bytes(512 * MIB)
         .compressed_swap_cache_enabled(true)
@@ -72,7 +71,7 @@ fn swap_bar_label_composes_zram_and_zswap_annotations() {
 
 #[test]
 fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
-    let units = taskmanager_core::core::units::UnitPreferences::default();
+    let units = UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .compressed_swap_used_bytes(512 * MIB)
         .compressed_swap_original_bytes(3 * GIB)
@@ -87,10 +86,10 @@ fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
         stats.label,
         format!(
             "Swap  1.0 GiB / 2.0 GiB  (50%)   ·   zram 512.0 MiB   ·   {} 256.0 MiB   ·   {} 3.0:1 · {} 3.0 GiB → {} 1.0 GiB",
-            taskmanager_application::i18n::t("mem.zram_ram_used"),
-            taskmanager_application::i18n::t("mem.compression_ratio"),
-            taskmanager_application::i18n::t("mem.compression_original"),
-            taskmanager_application::i18n::t("mem.compression_compressed"),
+            t("mem.zram_ram_used"),
+            t("mem.compression_ratio"),
+            t("mem.compression_original"),
+            t("mem.compression_compressed"),
         )
     );
 
@@ -112,7 +111,7 @@ fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
 
 #[test]
 fn available_tile_layers_the_zfs_arc_onto_kernel_availability() {
-    let units = taskmanager_core::core::units::UnitPreferences::default();
+    let units = UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .zfs_arc_bytes(2 * GIB)
         .build();

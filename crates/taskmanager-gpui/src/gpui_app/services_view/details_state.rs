@@ -7,6 +7,7 @@
 //! state, so an asynchronous result cannot cross into another dialog.
 
 use std::path::PathBuf;
+use taskmanager_application::ServiceAttemptId;
 
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
@@ -163,23 +164,15 @@ impl ServiceDetailsState {
     pub(crate) fn begin_stream_attempt(
         &mut self,
         query: ServiceLogQuery,
-    ) -> Option<taskmanager_application::ServiceAttemptId> {
+    ) -> Option<ServiceAttemptId> {
         self.stream.begin_attempt(query)
     }
 
-    pub(crate) fn accept_stream(
-        &mut self,
-        attempt_id: taskmanager_application::ServiceAttemptId,
-        request_id: taskmanager_platform_contract::RequestId,
-    ) {
+    pub(crate) fn accept_stream(&mut self, attempt_id: ServiceAttemptId, request_id: RequestId) {
         self.stream.accept_attempt(attempt_id, request_id);
     }
 
-    pub(crate) fn reject_stream(
-        &mut self,
-        attempt_id: taskmanager_application::ServiceAttemptId,
-        failure: FailureKind,
-    ) {
+    pub(crate) fn reject_stream(&mut self, attempt_id: ServiceAttemptId, failure: FailureKind) {
         let failure = ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
             i18n::t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}")),

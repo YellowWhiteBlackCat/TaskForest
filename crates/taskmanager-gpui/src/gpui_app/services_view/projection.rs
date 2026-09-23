@@ -1,5 +1,7 @@
 //! Pure Services filter/sort projection and its render cache key.
 
+use taskmanager_core::core::text::contains_ascii_ci;
+use taskmanager_shell::order_service_rows;
 use taskmanager_shell::{InfoSortCol, SortDir};
 use taskmanager_ui_contract::IconId;
 
@@ -65,7 +67,7 @@ pub fn sorted_services(
     sort: Option<(InfoSortCol, SortDir)>,
 ) -> Vec<ServiceItem> {
     let mut filtered = filter_services(items, filter, query);
-    taskmanager_shell::order_service_rows(&mut filtered, sort);
+    order_service_rows(&mut filtered, sort);
     filtered
 }
 
@@ -81,8 +83,8 @@ pub fn filter_services(
         .filter(|service| {
             filter.matches(service.status)
                 && (query.is_empty()
-                    || taskmanager_core::core::text::contains_ascii_ci(&service.name, query)
-                    || taskmanager_core::core::text::contains_ascii_ci(&service.description, query))
+                    || contains_ascii_ci(&service.name, query)
+                    || contains_ascii_ci(&service.description, query))
         })
         .cloned()
         .collect()

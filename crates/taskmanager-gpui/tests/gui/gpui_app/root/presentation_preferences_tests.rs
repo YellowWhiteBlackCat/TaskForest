@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_theme::tokens::UiSize;
 
 fn changed_axes(before: PresentationFingerprint, after: PresentationFingerprint) -> [bool; 6] {
     [
@@ -58,7 +59,7 @@ fn named_mutations_invalidate_only_their_owned_projection_axis() {
 
     let before = preferences.fingerprint();
     preferences.set_appearance(AppearancePreferences {
-        ui_size: taskmanager_theme::tokens::UiSize::Large,
+        ui_size: UiSize::Large,
         ..preferences.appearance()
     });
     assert_eq!(

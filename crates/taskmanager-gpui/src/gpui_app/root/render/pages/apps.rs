@@ -4,6 +4,9 @@
 //! history table (with its status bar), from the frame-local render context.
 
 use gpui::{Context, Div, ParentElement, Styled, Window, div, px};
+use taskmanager_shell::SortDir;
+use taskmanager_shell::presentation::process_anomaly_summary;
+use taskmanager_shell::presentation::uninterruptible_process_count;
 use taskmanager_ui::layout::PageScaffold;
 
 use super::{PageRenderContext, RootView, init_search_entity, vm};
@@ -33,13 +36,13 @@ impl RootView {
         let appearance = presentation.appearance;
         let page_metrics = vm::process_page_metrics(snap);
         let process_count = self.processes().len();
-        let uninterruptible_count = taskmanager_shell::presentation::uninterruptible_process_count(
+        let uninterruptible_count = uninterruptible_process_count(
             self.projection()
                 .processes
                 .as_ref()
                 .map(|items| items.as_slice()),
         );
-        let anomaly_summary = taskmanager_shell::presentation::process_anomaly_summary(
+        let anomaly_summary = process_anomaly_summary(
             self.projection()
                 .processes
                 .as_ref()
@@ -51,7 +54,7 @@ impl RootView {
         );
         let (sort_column, sort_direction) = self.process_sort();
         let sort_col = processes_view::effective_process_sort_col(sort_column, &hidden_cols);
-        let sort_asc = matches!(sort_direction, taskmanager_shell::SortDir::Asc);
+        let sort_asc = matches!(sort_direction, SortDir::Asc);
         let (rows, _pids, query) = self.processes_projection();
         let application_count = self.process_application_count();
         // Own TextInput backed by this window's persistent per-window

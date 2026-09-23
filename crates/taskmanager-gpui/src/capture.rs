@@ -18,6 +18,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use taskmanager_app_host::NativeAppHost;
+use taskmanager_app_host::WindowPresentation;
+use taskmanager_assets::product::GPUI_NAME;
 
 use gpui::{App, Application, AsyncApp};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -41,7 +44,7 @@ pub fn run(out: &Path) -> Result<(), String> {
     let out = out.to_path_buf();
     let outcome: Arc<Mutex<Option<Result<(), String>>>> = Arc::new(Mutex::new(None));
     let outcome_task = outcome.clone();
-    let host = taskmanager_app_host::NativeAppHost::production();
+    let host = NativeAppHost::production();
     let config_client = host
         .config_client()
         .map_err(|error| format!("configuration runtime unavailable: {error}"))?;
@@ -79,7 +82,7 @@ pub fn run(out: &Path) -> Result<(), String> {
                     native_locale_name,
                     local_time_rules,
                     custom_app_id: None,
-                    presentation: taskmanager_app_host::WindowPresentation::standalone(),
+                    presentation: WindowPresentation::standalone(),
                 },
             ) {
                 error!(%composition_error, "native platform composition failed");
@@ -232,9 +235,8 @@ fn capture_window_blocking(hwnd: isize, out: PathBuf) -> Result<CapturedFrame, S
         .and_then(|windows| {
             windows.into_iter().find(|w| {
                 w.as_raw_hwnd() == (hwnd as *mut std::ffi::c_void)
-                    || w.title().is_ok_and(|t| {
-                        t.contains("任务森林") || t.contains(taskmanager_assets::product::GPUI_NAME)
-                    })
+                    || w.title()
+                        .is_ok_and(|t| t.contains("任务森林") || t.contains(GPUI_NAME))
             })
         })
         .unwrap_or_else(|| Window::from_raw_hwnd(hwnd as *mut std::ffi::c_void));

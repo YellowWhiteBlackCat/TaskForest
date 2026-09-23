@@ -15,6 +15,8 @@
 use std::path::Path;
 
 use taskmanager_cli::{FrontendHandlers, run};
+#[cfg(target_os = "windows")]
+use taskmanager_gpui::capture;
 
 /// Windows-only window self-capture (`Windows.Graphics.Capture` through the
 /// gpui crate's audited capture edge). On every other platform the capability
@@ -22,7 +24,7 @@ use taskmanager_cli::{FrontendHandlers, run};
 fn capture_window(out: &Path) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        taskmanager_gpui::capture::run(out)
+        capture::run(out)
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -34,12 +36,13 @@ fn capture_window(out: &Path) -> Result<(), String> {
 }
 
 fn main() {
-    run(
-        "taskforest-g",
+    run("taskforest-g", {
+        use taskmanager_gpui::run;
+
         FrontendHandlers {
-            run_gui: taskmanager_gpui::run,
+            run_gui: run,
             snapshot_text: None,
             capture_window: Some(capture_window),
-        },
-    );
+        }
+    });
 }

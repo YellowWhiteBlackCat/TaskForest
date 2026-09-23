@@ -2,6 +2,12 @@
 
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div};
 use std::collections::HashSet;
+use taskmanager_application::ProcessAffinityState;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::{ActionBtnProps, action_btn};
 use crate::gpui_app::elements;
@@ -22,7 +28,7 @@ pub(super) struct AffinityOverlayProps<'a> {
     pub theme: &'a Theme,
     pub hovered: Option<&'a Hover>,
     pub identity: ProcessLiveKey,
-    pub state: &'a taskmanager_application::ProcessAffinityState,
+    pub state: &'a ProcessAffinityState,
     pub cpus: &'a HashSet<u32>,
     pub hover_chip: Option<usize>,
 }
@@ -44,17 +50,15 @@ pub(super) fn affinity_overlay(
     let count = logical_cpu_count();
     let close_entity = entity.clone();
     let content = match state {
-        taskmanager_application::ProcessAffinityState::Ready(ready)
-            if ready.target.live_key() == Some(identity) =>
-        {
+        ProcessAffinityState::Ready(ready) if ready.target.live_key() == Some(identity) => {
             affinity_content(theme, count, cpus, hover_chip, hovered, &entity, cx)
         }
-        taskmanager_application::ProcessAffinityState::Failed { failure, .. } => {
+        ProcessAffinityState::Failed { failure, .. } => {
             affinity_status_content(theme, identity, Some(*failure), hovered, cx)
         }
-        taskmanager_application::ProcessAffinityState::Closed
-        | taskmanager_application::ProcessAffinityState::Loading { .. }
-        | taskmanager_application::ProcessAffinityState::Ready(_) => {
+        ProcessAffinityState::Closed
+        | ProcessAffinityState::Loading { .. }
+        | ProcessAffinityState::Ready(_) => {
             affinity_status_content(theme, identity, None, hovered, cx)
         }
     };
@@ -83,20 +87,18 @@ pub(super) fn affinity_overlay(
 fn affinity_status_content(
     theme: &Theme,
     identity: ProcessLiveKey,
-    failure: Option<taskmanager_core::core::failure::FailureKind>,
+    failure: Option<FailureKind>,
     hovered: Option<&Hover>,
     cx: &mut Context<RootView>,
 ) -> Div {
     let text = failure.map_or_else(
         || i18n::t("common.collecting_telemetry").to_owned(),
-        |failure| taskmanager_shell::presentation::control_error_detail(failure).to_owned(),
+        |failure| control_error_detail(failure).to_owned(),
     );
     let mut actions = div()
         .flex()
         .flex_row()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .justify_end();
     if failure.is_some() {
         actions = actions.child(action_btn(
@@ -136,13 +138,11 @@ fn affinity_status_content(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(text),
         )
         .child(actions)
@@ -161,13 +161,11 @@ fn affinity_content(
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(format!(
                     "{} {} {} {} {}",
                     selected,
@@ -182,9 +180,7 @@ fn affinity_content(
             div()
                 .flex()
                 .flex_row()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .justify_end()
                 .child(action_btn(
                     ActionBtnProps {
@@ -243,14 +239,11 @@ fn cpu_chip_grid(
     hover_chip: Option<usize>,
     entity: &Entity<RootView>,
 ) -> Div {
-    let mut grid =
-        div()
-            .flex()
-            .flex_row()
-            .flex_wrap()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_6,
-            ));
+    let mut grid = div()
+        .flex()
+        .flex_row()
+        .flex_wrap()
+        .gap(definite_length(tokens::SPACE_6));
     for index in 0..logical_cpus {
         let active = cpus.contains(&(index as u32));
         let click_entity = entity.clone();

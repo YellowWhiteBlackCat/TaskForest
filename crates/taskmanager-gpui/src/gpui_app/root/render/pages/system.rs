@@ -4,8 +4,10 @@
 //! selected `SystemSection` body, from the frame-local render context.
 
 use gpui::{AnyElement, Context, Div, IntoElement, ParentElement, Styled, div, px};
+use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageScaffold;
+use taskmanager_ui::theme_binding::definite_length;
 
 use super::{PageRenderContext, RootView, SelectedDevice};
 use crate::gpui_app::dashboard::SystemSection;
@@ -61,9 +63,9 @@ impl RootView {
                     units: self.display_units(),
                     memory_inventory: system_view::MemoryInventoryInputs {
                         state: self.shell.smbios_memory_state(),
-                        capability: self.projection().capability_status(
-                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
-                        ),
+                        capability: self
+                            .projection()
+                            .capability_status(&CapabilityId::TELEMETRY_MEMORY_SMBIOS),
                     },
                 },
                 entity.clone(),
@@ -116,9 +118,7 @@ impl RootView {
                 .flex_col()
                 .flex_1()
                 .min_h(px(0.0))
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(dashboard::render_system_header(
                     t,
                     &self.dashboard,

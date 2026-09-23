@@ -1,4 +1,10 @@
 use super::*;
+use taskmanager_app_host::LayerShellAnchor;
+use taskmanager_app_host::LayerShellFallbackPolicy;
+use taskmanager_app_host::LayerShellKeyboardInteractivity;
+use taskmanager_app_host::LayerShellLayer;
+use taskmanager_app_host::LayerShellMargins;
+use taskmanager_app_host::LayerShellOutput;
 // The neutral presentation contract is platform-independent, but the module
 // above imports `LayerShellSpec` only for Linux (its only live consumer).
 // Import it here from the app-host contract directly so these headless
@@ -10,22 +16,15 @@ use taskmanager_app_host::LayerShellSpec;
 fn neutral_layer_profile_reaches_gpui_without_losing_role_or_policy() {
     let spec = LayerShellSpec::new("taskforest.panel")
         .expect("valid namespace")
-        .with_layer(taskmanager_app_host::LayerShellLayer::Overlay)
-        .with_anchor(
-            taskmanager_app_host::LayerShellAnchor::TOP
-                | taskmanager_app_host::LayerShellAnchor::RIGHT,
-        )
+        .with_layer(LayerShellLayer::Overlay)
+        .with_anchor(LayerShellAnchor::TOP | LayerShellAnchor::RIGHT)
         .with_size(1_280, 720)
-        .with_margins(taskmanager_app_host::LayerShellMargins::new(1, 2, 3, 4))
+        .with_margins(LayerShellMargins::new(1, 2, 3, 4))
         .with_exclusive_zone(32)
         .expect("valid exclusive zone")
-        .with_keyboard_interactivity(
-            taskmanager_app_host::LayerShellKeyboardInteractivity::OnDemand,
-        )
-        .with_output(
-            taskmanager_app_host::LayerShellOutput::named("DP-1").expect("valid output name"),
-        )
-        .with_fallback(taskmanager_app_host::LayerShellFallbackPolicy::Unavailable);
+        .with_keyboard_interactivity(LayerShellKeyboardInteractivity::OnDemand)
+        .with_output(LayerShellOutput::named("DP-1").expect("valid output name"))
+        .with_fallback(LayerShellFallbackPolicy::Unavailable);
 
     let gpui::WindowPresentation::LayerShell(options) =
         to_gpui(&WindowPresentation::layer_shell(spec))
@@ -34,14 +33,14 @@ fn neutral_layer_profile_reaches_gpui_without_losing_role_or_policy() {
     };
 
     assert_eq!(options.namespace(), "taskforest.panel");
-    assert_eq!(options.layer(), LayerShellLayer::Overlay);
+    assert_eq!(options.layer(), gpui::LayerShellLayer::Overlay);
     assert_eq!(options.anchor(), 0b0011);
     assert_eq!(options.size(), (1_280, 720));
     assert_eq!(options.margins(), (1, 2, 3, 4));
     assert_eq!(options.exclusive_zone(), 32);
     assert_eq!(
         options.keyboard_interactivity(),
-        LayerShellKeyboardInteractivity::OnDemand
+        gpui::LayerShellKeyboardInteractivity::OnDemand
     );
     assert_eq!(options.output(), Some("DP-1"));
     assert_eq!(options.fallback(), LayerShellFallback::Unavailable);

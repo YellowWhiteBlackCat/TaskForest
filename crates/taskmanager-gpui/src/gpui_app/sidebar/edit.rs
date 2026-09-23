@@ -2,6 +2,10 @@ use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -38,19 +42,9 @@ pub(super) fn edit_button(
                 cx,
             );
         }))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_4,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(if active {
-            theme.accent
-        } else {
-            theme.fg_dim
-        }))
-        .child(taskmanager_ui::icons_binding::icon(IconId::Settings).size(px(14.0)))
+        .px(definite_length(tokens::SPACE_4))
+        .py(definite_length(tokens::SPACE_2))
+        .rounded(absolute(tokens::control_radius(theme)))
+        .text_color(hsla(if active { theme.accent } else { theme.fg_dim }))
+        .child(icon(IconId::Settings).size(px(14.0)))
 }

@@ -4,6 +4,8 @@
 //! Helpers (`wrapped_root`) and the row/sort types come from the parent module.
 
 use super::*;
+use taskmanager_shell::SortDir;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[gpui::test]
 async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestAppContext) {
@@ -14,7 +16,7 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
         v.replace_processes_for_test(
             (1..=4)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("proc-{pid}"))
                         .build()
@@ -45,7 +47,7 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
         v.replace_processes_for_test(
             (10..=12)
                 .map(|pid| {
-                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                    ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("proc-{pid}"))
                         .build()
@@ -71,7 +73,7 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
 
     // A sort change must rebuild too (through the shell-owned sort state).
     view.update(cx, |v, cx| {
-        v.set_process_sort(SortCol::Pid, taskmanager_shell::SortDir::Desc);
+        v.set_process_sort(SortCol::Pid, SortDir::Desc);
         cx.notify();
     });
     let after_sort = view.update(cx, |v, _cx| v.processes_projection());

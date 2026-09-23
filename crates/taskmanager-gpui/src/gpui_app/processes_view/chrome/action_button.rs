@@ -4,6 +4,12 @@ use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
+use taskmanager_ui::icons_binding;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -52,23 +58,15 @@ where
         .id(label)
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(background))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-        .text_color(taskmanager_ui::theme_binding::hsla(foreground));
+        .gap(definite_length(tokens::SPACE_6))
+        .px(definite_length(tokens::SPACE_12))
+        .py(definite_length(tokens::SPACE_6))
+        .rounded(absolute(tokens::control_radius(theme)))
+        .bg(fill(background))
+        .text_size(font_size(tokens::FONT_13))
+        .text_color(hsla(foreground));
     if let Some(icon) = icon {
-        button = button.child(taskmanager_ui::icons_binding::icon(icon).size(px(14.0)));
+        button = button.child(icons_binding::icon(icon).size(px(14.0)));
     }
     button = button.child(label);
     if enabled {

@@ -15,6 +15,8 @@ use taskmanager_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
 use taskmanager_core::core::{DeviceGeneration, DeviceState};
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -57,7 +59,7 @@ fn partition(
         },
         _ => DiskPartitionScalarObservations::default(),
     };
-    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+    DiskPartitionFixtureBuilder::new()
         .device_id(format!("partition:fixture:{name}"))
         .parent_device_id("fixture".into())
         .device_generation(DeviceGeneration::new(1))
@@ -70,7 +72,7 @@ fn partition(
 }
 
 fn disk_with(partitions: Vec<DiskPartition>) -> DiskMetrics {
-    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+    DiskMetricsFixtureBuilder::new()
         .device_id("fixture".into())
         .name("nvme0n1".into())
         .disk_type("NVMe SSD".into())

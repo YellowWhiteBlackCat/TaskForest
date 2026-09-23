@@ -4,6 +4,14 @@
 //! [`super::sections`] — no telemetry access happens here.
 
 use gpui::{Div, ParentElement, Styled, div, px, relative};
+use taskmanager_ui::icons_binding;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 use taskmanager_application::i18n;
@@ -22,40 +30,30 @@ pub(super) fn hero_card(theme: &Theme, title: &str, subtitle: &str, badge: Optio
     let mut title_col = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
+        .gap(definite_length(tokens::SPACE_2))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_EXTRA_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_20))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(title.to_string()),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(subtitle.to_string()),
         );
     if let Some(badge) = badge {
         title_col = title_col.child(
             div()
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_2))
-                .px(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
-                .py(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_2,
-                ))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::control_radius(theme),
-                ))
-                .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .mt(length(tokens::SPACE_2))
+                .px(definite_length(tokens::SPACE_8))
+                .py(definite_length(tokens::SPACE_2))
+                .rounded(absolute(tokens::control_radius(theme)))
+                .bg(fill(theme.sidebar_bg))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(badge.to_string()),
         );
     }
@@ -69,9 +67,7 @@ pub(super) fn hero_card(theme: &Theme, title: &str, subtitle: &str, badge: Optio
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_12,
-                ))
+                .gap(definite_length(tokens::SPACE_12))
                 .child(icon_block(theme, IconId::System, 40.0, theme.accent))
                 .child(title_col),
         )
@@ -88,23 +84,19 @@ pub(super) fn tile_row(theme: &Theme, tiles: &[SystemTile]) -> Div {
             .flex()
             .flex_row()
             .items_center()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_8,
-            ))
+            .gap(definite_length(tokens::SPACE_8))
             .min_w(px(0.0))
             .child(icon_block(theme, tile.icon, 28.0, theme.fg_dim))
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .gap(taskmanager_ui::theme_binding::definite_length(
-                        tokens::SPACE_1,
-                    ))
+                    .gap(definite_length(tokens::SPACE_1))
                     .min_w(px(0.0))
                     .child(
                         div()
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                            .text_size(font_size(tokens::FONT_11))
+                            .text_color(hsla(theme.fg_dim))
                             .child(tile.title.clone()),
                     )
                     // Truncating text lives in a flex-row wrapper (the
@@ -114,22 +106,16 @@ pub(super) fn tile_row(theme: &Theme, tiles: &[SystemTile]) -> Div {
                     .child(
                         div().flex().flex_row().min_w(px(0.0)).child(
                             crate::gpui_app::elements::truncated_text(&tile.value)
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_16,
-                                ))
-                                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                                    tokens::FONT_WEIGHT_BOLD,
-                                ))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
+                                .text_size(font_size(tokens::FONT_16))
+                                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                                .text_color(hsla(theme.fg)),
                         ),
                     )
                     .child(
                         div().flex().flex_row().min_w(px(0.0)).child(
                             crate::gpui_app::elements::truncated_text(&tile.note)
-                                .text_size(taskmanager_ui::theme_binding::font_size(
-                                    tokens::FONT_11,
-                                ))
-                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
+                                .text_size(font_size(tokens::FONT_11))
+                                .text_color(hsla(theme.fg_dim)),
                         ),
                     ),
             );
@@ -155,9 +141,7 @@ pub(super) fn section_card(theme: &Theme, section: &SystemSection) -> Div {
     let mut content = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(section_header(
             theme,
             section.icon,
@@ -168,18 +152,20 @@ pub(super) fn section_card(theme: &Theme, section: &SystemSection) -> Div {
     }
     // Meter fill follows the section's semantic color (memory capacity vs
     // battery charge), both token-sourced.
-    let fill = if section.icon == IconId::Health {
+    let meter_fill = if section.icon == IconId::Health {
         theme.disk
     } else {
         theme.memory
     };
     for meter in &section.meters {
-        content = content.child(meter_bar(theme, meter, fill));
+        content = content.child(meter_bar(theme, meter, meter_fill));
     }
     if !section.chips.is_empty() {
-        let mut chip_row = div().flex().flex_row().flex_wrap().gap(
-            taskmanager_ui::theme_binding::definite_length(tokens::SPACE_6),
-        );
+        let mut chip_row = div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap(definite_length(tokens::SPACE_6));
         for chip in &section.chips {
             chip_row = chip_row.child(feature_chip(theme, chip));
         }
@@ -201,20 +187,14 @@ fn section_header(theme: &Theme, icon: IconId, title: &str) -> Div {
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .pb(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
+        .pb(definite_length(tokens::SPACE_2))
         .child(icon_block(theme, icon, 20.0, theme.accent))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(title.to_string()),
         )
 }
@@ -227,11 +207,9 @@ fn icon_block(theme: &Theme, icon: IconId, size: f32, tint: Color) -> Div {
         .items_center()
         .justify_center()
         .flex_shrink_0()
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(tint.with_alpha(0.12)))
-        .child(taskmanager_ui::icons_binding::icon(icon).size(px(size * 0.55)))
+        .rounded(absolute(tokens::control_radius(theme)))
+        .bg(fill(tint.with_alpha(0.12)))
+        .child(icons_binding::icon(icon).size(px(size * 0.55)))
 }
 
 /// One spec row: dim label left, value right.
@@ -245,7 +223,7 @@ fn spec_row(theme: &Theme, label: &str, value: &str) -> Div {
 
 /// One horizontal meter: label + note around a thin rounded track with a
 /// clamped fill. pct is 0..=100.
-fn meter_bar(theme: &Theme, m: &SystemMeter, fill: Color) -> Div {
+fn meter_bar(theme: &Theme, m: &SystemMeter, meter_fill: Color) -> Div {
     let pct = m
         .pct
         .map(|value| value.clamp(0.0, 100.0) / 100.0)
@@ -254,40 +232,36 @@ fn meter_bar(theme: &Theme, m: &SystemMeter, fill: Color) -> Div {
         .h(px(6.0))
         .w_full()
         .rounded(px(3.0))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg));
+        .bg(fill(theme.sidebar_bg));
     if m.pct.is_some() {
         track = track.child(
             div()
                 .h_full()
                 .w(relative(pct))
                 .rounded(px(3.0))
-                .bg(taskmanager_ui::theme_binding::fill(fill)),
+                .bg(fill(meter_fill)),
         );
     }
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
+        .gap(definite_length(tokens::SPACE_2))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .justify_between()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg_dim))
                         .child(m.label.clone()),
                 )
                 .child(
                     div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(m.note.clone()),
                 ),
         )
@@ -297,17 +271,11 @@ fn meter_bar(theme: &Theme, m: &SystemMeter, fill: Color) -> Div {
 /// One static feature chip (instruction set, badges) — never interactive.
 fn feature_chip(theme: &Theme, label: &str) -> Div {
     div()
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_2))
+        .rounded(absolute(tokens::control_radius(theme)))
+        .bg(fill(theme.sidebar_bg))
+        .text_size(font_size(tokens::FONT_11))
+        .text_color(hsla(theme.fg_dim))
         .child(label.to_string())
 }

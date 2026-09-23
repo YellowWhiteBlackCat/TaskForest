@@ -3,6 +3,7 @@
 use crate::gpui_app::formatting::missing_value;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
+use taskmanager_shell::presentation::peak_of;
 
 use super::ProcessHistories;
 
@@ -43,5 +44,5 @@ pub(super) fn performance_peaks(
 }
 
 fn optional_peak(samples: &[f32], current: Option<f32>, format: impl Fn(f32) -> String) -> String {
-    taskmanager_shell::presentation::peak_of(samples, current).map_or_else(missing_value, format)
+    peak_of(samples, current).map_or_else(missing_value, format)
 }

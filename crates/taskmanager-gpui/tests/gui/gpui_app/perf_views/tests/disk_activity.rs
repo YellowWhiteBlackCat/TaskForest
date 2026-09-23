@@ -3,6 +3,7 @@
 //! module under the line guard.
 
 use super::*;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 use std::collections::BTreeMap;
 use taskmanager_core::core::{
@@ -16,7 +17,7 @@ use taskmanager_core::core::{
 #[gpui::test]
 async fn disk_page_projects_the_active_time_graph_from_its_own_ring(cx: &mut TestAppContext) {
     let activity_disk = |active_pct: f32| {
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:wwid:activity".into())
             .device_generation(DeviceGeneration::new(1))
             .device_state(DeviceState::healthy(10))
@@ -56,7 +57,7 @@ async fn disk_page_projects_the_active_time_graph_from_its_own_ring(cx: &mut Tes
                 .expect("activity fixture enters system history");
         }
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("disk:wwid:activity".into())
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState::healthy(10))
@@ -108,7 +109,7 @@ async fn disk_without_activity_samples_renders_no_activity_graph(cx: &mut TestAp
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Performance;
         v.system_snapshot_mut_for_test().disks = vec![
-            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+            DiskMetricsFixtureBuilder::new()
                 .device_id("disk:wwid:cold".into())
                 .device_generation(DeviceGeneration::new(1))
                 .device_state(DeviceState::healthy(10))

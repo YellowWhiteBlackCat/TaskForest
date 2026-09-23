@@ -6,7 +6,15 @@ use gpui::{
     AnyElement, Context, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div, px,
 };
+use taskmanager_shell::presentation::GraphSummary;
+use taskmanager_shell::presentation::fan_rpm;
+use taskmanager_shell::presentation::graph_summary;
+use taskmanager_shell::presentation::power_w;
+use taskmanager_shell::presentation::temperature_c;
 use taskmanager_telemetry_store::TelemetryStore;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
@@ -225,13 +233,13 @@ pub(super) fn drive_badge_format(units: UnitPreferences) -> fn(f32) -> String {
     }
 }
 fn badge_rpm(v: f32) -> String {
-    taskmanager_shell::presentation::fan_rpm(v)
+    fan_rpm(v)
 }
 fn badge_watts(v: f32) -> String {
-    taskmanager_shell::presentation::power_w(v)
+    power_w(v)
 }
 fn badge_temperature(v: f32) -> String {
-    taskmanager_shell::presentation::temperature_c(v)
+    temperature_c(v)
 }
 /// Generation-keyed cache of the Memory page header-chart sample projections.
 ///
@@ -575,8 +583,8 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
                     }))
                     .child(
                         div()
-                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                            .text_color(taskmanager_ui::theme_binding::hsla(theme.accent))
+                            .text_size(font_size(tokens::FONT_12))
+                            .text_color(hsla(theme.accent))
                             .child(i18n::t("disk.smart_health")),
                     )
                     .into_any_element(),
@@ -630,9 +638,7 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
                 .flex()
                 .flex_col()
                 .flex_none()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .children(activity_graph)
                 .child(partition_panel(theme, &d.partitions, units))
                 .children(usage_panel)
@@ -773,19 +779,17 @@ pub(super) fn graph_summary_row(
             .flex_row()
             .flex_wrap()
             .min_w(px(0.0))
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_12,
-            ))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .gap(definite_length(tokens::SPACE_12))
+            .text_size(font_size(tokens::FONT_11))
+            .text_color(hsla(theme.fg_dim))
             .child(item(i18n::t("common.latest"), format_value(summary.latest)))
             .child(item(i18n::t("common.avg"), format_value(summary.average)))
             .child(item(i18n::t("common.peak"), format_value(summary.maximum))),
     )
 }
 
-fn finite_graph_summary(samples: &[f32]) -> Option<taskmanager_shell::presentation::GraphSummary> {
-    taskmanager_shell::presentation::graph_summary(samples)
+fn finite_graph_summary(samples: &[f32]) -> Option<GraphSummary> {
+    graph_summary(samples)
 }
 
 pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {

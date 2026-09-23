@@ -12,13 +12,14 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::TopPage;
 
 fn process_batch(count: u32) -> PlatformEventBatch {
     let processes = (1..=count)
         .map(|pid| {
-            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            ProcessItemFixtureBuilder::new()
                 .pid(pid)
                 .name(format!("readability-worker-{pid:02}"))
                 .current_cpu_percentage(pid as f32)

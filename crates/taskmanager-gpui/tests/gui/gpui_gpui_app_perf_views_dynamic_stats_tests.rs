@@ -1,7 +1,10 @@
 use super::battery_stats;
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceState, ScalarObservation,
 };
+use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_test_support::pin_english;
 
 fn battery_with_scalars(scalars: BatteryScalarObservations) -> BatteryInfo {
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(10));
@@ -9,9 +12,9 @@ fn battery_with_scalars(scalars: BatteryScalarObservations) -> BatteryInfo {
     battery
 }
 
-fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], key: &'static str) -> Option<String> {
+fn row_value(rows: &[StatRow], key: &'static str) -> Option<String> {
     rows.iter()
-        .find(|row| row.label() == taskmanager_application::i18n::t(key))
+        .find(|row| row.label() == t(key))
         .and_then(|row| row.value().map(str::to_owned))
 }
 
@@ -20,9 +23,8 @@ fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], key: &'static str) 
 /// fact that does not exist on this host. (The shared `stats_panel` filters
 /// valueless rows before painting, so neither shape can become a fabricated
 /// numeric zero on the delivered surface.)
-fn row_present(rows: &[taskmanager_shell::viewmodel::StatRow], key: &'static str) -> bool {
-    rows.iter()
-        .any(|row| row.label() == taskmanager_application::i18n::t(key))
+fn row_present(rows: &[StatRow], key: &'static str) -> bool {
+    rows.iter().any(|row| row.label() == t(key))
 }
 
 /// Health and the native runtime estimates render only as typed facts: a
@@ -31,7 +33,7 @@ fn row_present(rows: &[taskmanager_shell::viewmodel::StatRow], key: &'static str
 /// fact leaves its row entirely absent — never "0%" or "00h 00m".
 #[test]
 fn battery_stats_render_health_and_estimates_only_when_current() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let full = battery_stats(&battery_with_scalars(BatteryScalarObservations {
         energy_full_uwh: ScalarObservation::available(49_000_000.0, 10),
         energy_full_design_uwh: ScalarObservation::available(56_000_000.0, 10),
@@ -62,7 +64,7 @@ fn battery_stats_render_health_and_estimates_only_when_current() {
 /// no clause can ever surface as a fabricated "0%"/"0 W"/"0.00 V"/"0" value.
 #[test]
 fn battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence() {
-    taskmanager_test_support::pin_english();
+    pin_english();
     let battery = battery_with_scalars(BatteryScalarObservations {
         capacity_pct: ScalarObservation::available(82, 10),
         voltage_uv: ScalarObservation::available(12_400_000, 10),

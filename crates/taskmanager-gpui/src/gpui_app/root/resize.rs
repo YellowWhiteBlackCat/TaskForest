@@ -4,6 +4,10 @@
 //! that read / apply a column's stored width.
 
 use gpui::{Context, Pixels, px};
+use taskmanager_shell::SortCol;
+use taskmanager_ui::data::table::COLUMN_RESIZE_MAX_WIDTH;
+use taskmanager_ui::data::table::COLUMN_RESIZE_MIN_WIDTH;
+use taskmanager_ui::data::table::clamp_column_width;
 
 use crate::gpui_app::processes_view::rows::default_width;
 
@@ -16,7 +20,7 @@ impl RootView {
     /// header + body stay pixel-aligned after a drag. `Name` is non-resizable and
     /// sized via `flex_grow`; this still returns its floor for any caller that
     /// wants a numeric fallback.
-    pub fn proc_col_width(&self, col: taskmanager_shell::SortCol) -> Pixels {
+    pub fn proc_col_width(&self, col: SortCol) -> Pixels {
         self.processes_state
             .col_widths
             .get(&col)
@@ -33,12 +37,7 @@ impl RootView {
     /// calling it directly is a no-op for `Name` (the clamp still runs but the
     /// result is never applied to a fixed `.w(..)` — Name keeps its `flex_grow`
     /// sizing).
-    pub fn resize_proc_col(
-        &mut self,
-        col: taskmanager_shell::SortCol,
-        size: Pixels,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn resize_proc_col(&mut self, col: SortCol, size: Pixels, cx: &mut Context<Self>) {
         let old = self.proc_col_width(col);
         if let Some(clamped) = clamp_proc_col_width(size, old) {
             self.processes_state.col_widths.insert(col, clamped);
@@ -65,7 +64,7 @@ impl RootView {
 /// resize.rs`). Shared between the drag clamp ([`clamp_proc_col_width`]) and the
 /// config-load clamp ([`crate::gpui_app::root::persistence`]) so a hand-edited
 /// config file cannot smuggle in an unusable column sliver.
-pub(crate) const PROC_COL_MIN_WIDTH: f32 = taskmanager_ui::data::table::COLUMN_RESIZE_MIN_WIDTH;
+pub(crate) const PROC_COL_MIN_WIDTH: f32 = COLUMN_RESIZE_MIN_WIDTH;
 /// Floor for the devices-sidebar width (device pixels): the narrowest the user
 /// can drag it before the device rows lose their icon + label. Shared between
 /// the drag clamp and the config-load clamp.
@@ -77,7 +76,7 @@ pub(crate) const SIDEBAR_MAX_WIDTH: f32 = 460.0;
 /// table crate's `resize_cols` ceiling). Shared between the drag clamp and the
 /// config-load clamp so an absurd hand-edited width clamps down rather than
 /// blowing out the table layout.
-pub(crate) const PROC_COL_MAX_WIDTH: f32 = taskmanager_ui::data::table::COLUMN_RESIZE_MAX_WIDTH;
+pub(crate) const PROC_COL_MAX_WIDTH: f32 = COLUMN_RESIZE_MAX_WIDTH;
 
 /// Clamp a candidate processes-column width with the exact bounds + jitter rule
 /// the shared table crate's `TableState::resize_cols` uses
@@ -87,7 +86,7 @@ pub(crate) const PROC_COL_MAX_WIDTH: f32 = taskmanager_ui::data::table::COLUMN_R
 /// otherwise `Some(clamped)` with the ceiling applied. Pure / host-independent so
 /// the unit test can pin the three boundary classes.
 pub(crate) fn clamp_proc_col_width(new: Pixels, old: Pixels) -> Option<Pixels> {
-    taskmanager_ui::data::table::clamp_column_width(new, old)
+    clamp_column_width(new, old)
 }
 
 /// Clamp a candidate sidebar width: floor `200px`, ceiling `460px`, drop any

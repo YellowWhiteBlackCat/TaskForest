@@ -1,6 +1,7 @@
 use super::{
     ProcessInsightsErrorKind, ProcessInsightsLifecycle, process_insights_submission_error,
 };
+use taskmanager_application::ProjectedProcessInsights;
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
     ProcessInsightsRevision,
@@ -17,7 +18,7 @@ fn target(pid: u32, start_token: u64) -> FrozenProcessIdentity {
 fn terminal_failure(
     target: FrozenProcessIdentity,
     revision: ProcessInsightsRevision,
-) -> taskmanager_application::ProjectedProcessInsights {
+) -> ProjectedProcessInsights {
     let mut tracker = ProcessInsightsProjection::default();
     tracker.begin(target, revision);
     let mut projection = tracker.snapshot().expect("begin publishes a projection");

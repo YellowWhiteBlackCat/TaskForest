@@ -4,6 +4,19 @@ use super::{ProcessInsightsErrorKind, ProcessInsightsRenderState};
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px};
+use taskmanager_application::NetworkEscalationState;
+use taskmanager_application::process_details_vm::render_environment_value;
+use taskmanager_core::core::ProcessNetworkSnapshot;
+use taskmanager_shell::presentation::capabilities_summary;
+use taskmanager_shell::presentation::namespaces_summary;
+use taskmanager_shell::presentation::network_connection_counters_summary;
+use taskmanager_shell::presentation::sandbox_details_summary;
+use taskmanager_theme::Length;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 use taskmanager_application::{ProjectedProcessResources, project_process_resources};
 use taskmanager_core::core::device_state::DeviceStatus;
@@ -96,14 +109,17 @@ pub(crate) fn render_process_insights(
     state: ProcessInsightsRenderState<'_>,
     labels: &ProcessInsightsLabels,
     available_width: f32,
-    net_escalation: taskmanager_application::NetworkEscalationState,
+    net_escalation: NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
     units: UnitPreferences,
 ) -> Div {
     let layout = process_insights_layout(available_width);
-    let root = div().w_full().min_w(px(0.0)).flex().flex_col().gap(
-        taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8),
-    );
+    let root = div()
+        .w_full()
+        .min_w(px(0.0))
+        .flex()
+        .flex_col()
+        .gap(definite_length(tokens::SPACE_8));
     match state {
         ProcessInsightsRenderState::Loading => root.child(message_panel(
             theme,
@@ -123,9 +139,7 @@ pub(crate) fn render_process_insights(
                 .flex_row()
                 .flex_wrap()
                 .items_start()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
+                .gap(definite_length(tokens::SPACE_8))
                 .min_w(px(0.0))
                 .child(network_card(
                     theme,
@@ -176,25 +190,23 @@ fn card(theme: &Theme, title: &str, width: f32) -> Div {
         .bordered(false)
         .child(
             div()
-                .mb(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_HEADER,
-                ))
+                .mb(length(tokens::SPACE_7))
+                .text_size(font_size(tokens::FONT_13))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
                 .child(title.to_string()),
         )
         .render()
         .w(px(width))
         .min_w(px(0.0))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .text_color(hsla(theme.fg))
 }
 
 fn message_panel(theme: &Theme, message: &str, color: Color, width: f32) -> Div {
     card(theme, "", width).child(
         div()
             .min_w(px(0.0))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(color))
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(color))
             .whitespace_normal()
             .child(message.to_string()),
     )
@@ -202,7 +214,7 @@ fn message_panel(theme: &Theme, message: &str, color: Color, width: f32) -> Div 
 
 fn metric_row(theme: &Theme, label: &str, value: String) -> Div {
     KeyValueRow::new(label, value, theme.palette())
-        .label_width(taskmanager_theme::Length(102.0))
+        .label_width(Length(102.0))
         .value_align_right(false)
         .selectable_value(gpui::ElementId::Name(
             format!("process-insight-value:{label}").into(),
@@ -215,37 +227,33 @@ fn network_card(
     snapshot: &ProcessTelemetrySnapshot,
     labels: &ProcessInsightsLabels,
     width: f32,
-    net_escalation: taskmanager_application::NetworkEscalationState,
+    net_escalation: NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
     units: UnitPreferences,
 ) -> Div {
     let network = &snapshot.network;
     let availability = status_label(network.traffic_state.status, labels);
     let mut connections = div()
-        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
-        .pt(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_7,
-        ))
+        .mt(length(tokens::SPACE_7))
+        .pt(definite_length(tokens::SPACE_7))
         .border_t_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .border_color(hsla(theme.border))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_3,
-        ));
+        .gap(definite_length(tokens::SPACE_3));
     if network.connections.is_empty() {
         connections = connections.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(labels.no_connections.to_string()),
         );
     } else {
         let (shown, hidden) = capped_card_rows(network.connections.len());
         connections = connections.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(format!(
                     "{} · {}",
                     labels.connections,
@@ -256,13 +264,11 @@ fn network_card(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_3,
-                ))
+                .gap(definite_length(tokens::SPACE_3))
                 .children(network.connections.iter().take(shown).map(|connection| {
                     div()
                         .min_w(px(0.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                        .text_size(font_size(tokens::FONT_10))
                         .font(mono_font_with_fallback(theme))
                         .whitespace_normal()
                         .child(format_connection(connection))
@@ -276,7 +282,7 @@ fn network_card(
     let counter_row = network
         .connection_counters
         .as_ref()
-        .and_then(taskmanager_shell::presentation::network_connection_counters_summary)
+        .and_then(network_connection_counters_summary)
         .map(|summary| metric_row(theme, labels.network_throughput, summary))
         .unwrap_or_else(|| div());
     card(theme, labels.network_throughput, width)
@@ -302,8 +308,8 @@ fn network_card(
 /// event; a rejected submission shows the typed reason.
 fn escalation_row(
     theme: &Theme,
-    network: &taskmanager_core::core::ProcessNetworkSnapshot,
-    net_escalation: taskmanager_application::NetworkEscalationState,
+    network: &ProcessNetworkSnapshot,
+    net_escalation: NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
 ) -> Div {
     use taskmanager_core::core::FailureKind;
@@ -313,19 +319,13 @@ fn escalation_row(
     }
     let entity = entity.clone();
     let (label, active) = match net_escalation {
-        taskmanager_application::NetworkEscalationState::Closed => {
-            ("Enable per-process network", false)
-        }
-        taskmanager_application::NetworkEscalationState::Loading(_) => {
-            ("Waiting for authorization…", true)
-        }
-        taskmanager_application::NetworkEscalationState::Ready(_) => ("Enabled", true),
-        taskmanager_application::NetworkEscalationState::Failed(_) => {
-            ("Authorization failed — retry", false)
-        }
+        NetworkEscalationState::Closed => ("Enable per-process network", false),
+        NetworkEscalationState::Loading(_) => ("Waiting for authorization…", true),
+        NetworkEscalationState::Ready(_) => ("Enabled", true),
+        NetworkEscalationState::Failed(_) => ("Authorization failed — retry", false),
     };
     div()
-        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
+        .mt(length(tokens::SPACE_7))
         .flex()
         .flex_row()
         .items_center()
@@ -355,8 +355,8 @@ fn gpu_card(
     if snapshot.gpu.devices.is_empty() {
         return content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(if snapshot.gpu.state.status == DeviceStatus::Healthy {
                     labels.no_gpu.to_string()
                 } else {
@@ -367,12 +367,12 @@ fn gpu_card(
     for device in &snapshot.gpu.devices {
         content = content.child(
             div()
-                .mb(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
+                .mb(length(tokens::SPACE_7))
                 .min_w(px(0.0))
                 .child(
                     div()
                         .truncate()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_size(font_size(tokens::FONT_11))
                         .font(mono_font_with_fallback(theme))
                         .child(device.device_id.clone()),
                 )
@@ -515,7 +515,7 @@ fn isolation_card(
         isolation
             .capabilities
             .as_ref()
-            .map(taskmanager_shell::presentation::capabilities_summary)
+            .map(capabilities_summary)
             .unwrap_or_else(|| labels.unknown.to_owned()),
     ));
     content = content.child(metric_row(
@@ -524,10 +524,10 @@ fn isolation_card(
         isolation
             .namespaces
             .as_ref()
-            .map(taskmanager_shell::presentation::namespaces_summary)
+            .map(namespaces_summary)
             .unwrap_or_else(|| labels.unknown.to_owned()),
     ));
-    if let Some(details) = taskmanager_shell::presentation::sandbox_details_summary(isolation) {
+    if let Some(details) = sandbox_details_summary(isolation) {
         content = content.child(metric_row(theme, labels.sandbox_details, details));
     }
     content
@@ -543,8 +543,8 @@ pub(crate) fn environment_card(
     if environment.state.status != DeviceStatus::Healthy {
         return card(theme, labels.environment, width).child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(status_label(environment.state.status, labels).to_string()),
         );
     }
@@ -552,8 +552,8 @@ pub(crate) fn environment_card(
     if environment.entries.is_empty() {
         return content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(labels.no_environment.to_string()),
         );
     }
@@ -569,8 +569,8 @@ pub(crate) fn environment_card(
     };
     content = content.child(
         div()
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(font_size(tokens::FONT_11))
+            .text_color(hsla(theme.fg_dim))
             .child(header),
     );
     let (shown, hidden) = capped_card_rows(environment.entries.len());
@@ -578,9 +578,7 @@ pub(crate) fn environment_card(
         div()
             .flex()
             .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
+            .gap(definite_length(tokens::SPACE_3))
             .children(
                 environment
                     .entries
@@ -588,13 +586,9 @@ pub(crate) fn environment_card(
                     .take(shown)
                     .enumerate()
                     .map(|(i, entry)| {
-                        let value =
-                            taskmanager_application::process_details_vm::render_environment_value(
-                                &entry.key,
-                                &entry.value,
-                            );
+                        let value = render_environment_value(&entry.key, &entry.value);
                         KeyValueRow::new(&entry.key, value, theme.palette())
-                            .label_width(taskmanager_theme::Length(110.0))
+                            .label_width(Length(110.0))
                             .value_align_right(false)
                             .selectable_value(gpui::ElementId::Name(
                                 format!("process-insight-env:{i}:{}", entry.key).into(),

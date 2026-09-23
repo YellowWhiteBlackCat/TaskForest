@@ -1,8 +1,13 @@
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::CpuScalarObservations;
 use taskmanager_core::core::metrics::{
     GpuMetrics, GpuScalarObservations, NetworkAdapterType, NetworkScalarObservations,
     NetworkWirelessObservations, OptionalObservation, ScalarObservation, SystemSnapshot,
 };
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
+use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 use super::{
     NetworkVisibility, cpu_caption, gpu_caption_line1, gpu_caption_line2, nic_caption_line2,
@@ -55,9 +60,7 @@ fn gpu_caption_uses_only_current_typed_observation_truth() {
     assert_eq!(gpu_caption_line2(&measured), "12%  ·  41 °C");
 
     let failed = GpuMetrics::from_observations(GpuScalarObservations {
-        utilization_pct: ScalarObservation::unavailable(
-            taskmanager_core::core::FailureKind::PermissionDenied,
-        ),
+        utilization_pct: ScalarObservation::unavailable(FailureKind::PermissionDenied),
         ..Default::default()
     });
     assert_eq!(gpu_caption_line2(&failed), "—");
@@ -77,12 +80,8 @@ fn vram_captions_follow_current_dedicated_observations() {
     assert!(gpu_caption_line2(&wired_zero_but_observed).contains("VRAM 25%"));
 
     let stale_dedicated = GpuMetrics::from_observations(GpuScalarObservations {
-        dedicated_vram_used_bytes: ScalarObservation::unavailable(
-            taskmanager_core::core::FailureKind::PermissionDenied,
-        ),
-        dedicated_vram_total_bytes: ScalarObservation::unavailable(
-            taskmanager_core::core::FailureKind::PermissionDenied,
-        ),
+        dedicated_vram_used_bytes: ScalarObservation::unavailable(FailureKind::PermissionDenied),
+        dedicated_vram_total_bytes: ScalarObservation::unavailable(FailureKind::PermissionDenied),
         ..Default::default()
     });
     assert!(gpu_caption_line1(&stale_dedicated, UnitPreferences::default()).is_empty());
@@ -93,37 +92,29 @@ fn vram_captions_follow_current_dedicated_observations() {
 #[test]
 fn cpu_caption_renders_dash_when_typed_usage_is_unavailable() {
     let snapshot = SystemSnapshot {
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-            taskmanager_core::core::metrics::CpuScalarObservations {
-                global_usage_pct: ScalarObservation::unavailable(
-                    taskmanager_core::core::FailureKind::PermissionDenied,
-                ),
-                ..Default::default()
-            },
-        ),
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            global_usage_pct: ScalarObservation::unavailable(FailureKind::PermissionDenied),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     assert_eq!(cpu_caption(&snapshot).1, "—");
 
     let measured = SystemSnapshot {
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-            taskmanager_core::core::metrics::CpuScalarObservations {
-                global_usage_pct: ScalarObservation::available(42.0, 9),
-                ..Default::default()
-            },
-        ),
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            global_usage_pct: ScalarObservation::available(42.0, 9),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     assert_eq!(cpu_caption(&measured).1, "42%");
 
     let measured_with_temp = SystemSnapshot {
-        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-            taskmanager_core::core::metrics::CpuScalarObservations {
-                global_usage_pct: ScalarObservation::available(42.0, 9),
-                temperature_c: ScalarObservation::available(55.0, 9),
-                ..Default::default()
-            },
-        ),
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            global_usage_pct: ScalarObservation::available(42.0, 9),
+            temperature_c: ScalarObservation::available(55.0, 9),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     assert!(
@@ -135,20 +126,20 @@ fn cpu_caption_renders_dash_when_typed_usage_is_unavailable() {
 
 #[test]
 fn nic_caption_uses_typed_wireless_and_link_truth() {
-    let wifi = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let wifi = NetworkMetricsFixtureBuilder::new()
         .interface_name("wlan0".into())
         .adapter_type(NetworkAdapterType::WiFi)
         .ssid_observation(match Some("office".into()) {
-            Some(value) => taskmanager_core::OptionalObservation::present(value, 1),
-            None => taskmanager_core::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .signal_observation(match Some(-50) {
-            Some(value) => taskmanager_core::OptionalObservation::present(value, 1),
-            None => taskmanager_core::OptionalObservation::default(),
+            Some(value) => OptionalObservation::present(value, 1),
+            None => OptionalObservation::default(),
         })
         .link_speed_observation(match Some(866) {
-            Some(value) => taskmanager_core::ScalarObservation::available(value, 1),
-            None => taskmanager_core::ScalarObservation::default(),
+            Some(value) => ScalarObservation::available(value, 1),
+            None => ScalarObservation::default(),
         })
         .wireless_observations(NetworkWirelessObservations {
             ssid: OptionalObservation::present("office".into(), 7),
@@ -162,11 +153,11 @@ fn nic_caption_uses_typed_wireless_and_link_truth() {
         .build();
     assert_eq!(nic_caption_line2(&wifi), "office  ·  67%  ·  866 Mbps");
 
-    let wired = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+    let wired = NetworkMetricsFixtureBuilder::new()
         .interface_name("enp3s0".into())
         .link_speed_observation(match Some(1000) {
-            Some(value) => taskmanager_core::ScalarObservation::available(value, 1),
-            None => taskmanager_core::ScalarObservation::default(),
+            Some(value) => ScalarObservation::available(value, 1),
+            None => ScalarObservation::default(),
         })
         .scalar_observations(NetworkScalarObservations {
             link_speed_mbps: ScalarObservation::available(1000, 7),
@@ -190,12 +181,12 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
         view.mark_telemetry_frame_ready();
         view.page = TopPage::Performance;
         view.resize_sidebar(px(276.0), cx);
-        let mut cpu = taskmanager_core::core::metrics::CpuMetrics::default();
+        let mut cpu = CpuMetrics::default();
         cpu.brand = Some("A deliberately overlong provider CPU identity that must truncate".into());
         view.replace_system_snapshot_for_test(SystemSnapshot {
             cpu,
             disks: vec![
-                taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+                DiskMetricsFixtureBuilder::new()
                     .name("/dev/nvme0n1".into())
                     .model(
                         "A deliberately overlong storage model that must never resize chrome"

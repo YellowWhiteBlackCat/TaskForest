@@ -6,7 +6,16 @@ use gpui::{
 };
 use std::rc::Rc;
 use taskmanager_theme::color::mix;
+use taskmanager_ui::icons_binding;
 use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rgba;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -113,31 +122,23 @@ pub(super) fn device_row(
                 cx,
             );
         }))
-        .mx(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_7,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::card_radius(theme),
-        ))
+        .mx(length(tokens::SPACE_8))
+        .px(definite_length(tokens::SPACE_10))
+        .py(definite_length(tokens::SPACE_7))
+        .rounded(absolute(tokens::card_radius(theme)))
         // Static idle fill; the hover/selection fills are painted by an
         // animated overlay UNDER the content (keyed 120ms transition) — a
         // descendant of the focusable shell, never wrapping it (a keyed
         // animation id that changes between frames on a focused element's
         // ancestor path breaks gpui 0.2.2 key dispatch; the same absolute-
         // child pattern as the process-row selection rail).
-        .bg(taskmanager_ui::theme_binding::fill(Color::TRANSPARENT))
+        .bg(fill(Color::TRANSPARENT))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(taskmanager_ui::theme_binding::absolute(
-                        tokens::card_radius(theme),
-                    ))
+                    .rounded(absolute(tokens::card_radius(theme)))
                     .with_animation(
                         ("sidebar-row-bg", hover_state_key(is_sel, is_hov)),
                         hover_animation(),
@@ -149,24 +150,18 @@ pub(super) fn device_row(
                             } else {
                                 idle_bg
                             };
-                            el.bg(taskmanager_ui::theme_binding::fill(bg))
+                            el.bg(fill(bg))
                         },
                     ),
             ),
         )
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .gap(definite_length(tokens::SPACE_10))
         .child(
-            taskmanager_ui::icons_binding::icon(icon)
+            icons_binding::icon(icon)
                 .size(px(16.0))
-                .text_color(taskmanager_ui::theme_binding::hsla(if is_sel {
-                    base
-                } else {
-                    theme.fg_dim
-                })),
+                .text_color(hsla(if is_sel { base } else { theme.fg_dim })),
         )
         .child(
             div()
@@ -180,7 +175,7 @@ pub(super) fn device_row(
                 .child(graph_element(
                     (ElementId::from("tm-sidebar-graph"), key.clone()),
                     samples,
-                    taskmanager_ui::theme_binding::rgba(base),
+                    rgba(base),
                     opts,
                     graph_cache,
                 )),
@@ -198,31 +193,27 @@ pub(super) fn device_row(
                 // children render at natural height + the column's stretched width,
                 // and truncate() only fires for genuinely over-long device names.
                 .min_w(px(0.0))
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_1,
-                ))
+                .gap(definite_length(tokens::SPACE_1))
                 .child(
                     div()
                         .truncate()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                        .font_weight(taskmanager_ui::theme_binding::font_weight(
-                            tokens::FONT_WEIGHT_STRONG,
-                        ))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                        .text_size(font_size(tokens::FONT_13))
+                        .font_weight(font_weight(tokens::FONT_WEIGHT_STRONG))
+                        .text_color(hsla(theme.fg))
                         .child(heading),
                 )
                 .child(
                     div()
                         .truncate()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(cap1),
                 )
                 .child(
                     div()
                         .truncate()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .text_size(font_size(tokens::FONT_11))
+                        .text_color(hsla(theme.fg_dim))
                         .child(cap2),
                 ),
         );
@@ -249,7 +240,7 @@ pub(super) fn device_row(
                 },
             )
             .drag_over(move |mut style, _: &SidebarDeviceDrag, _, _| {
-                style.border_color = Some(taskmanager_ui::theme_binding::hsla(accent));
+                style.border_color = Some(hsla(accent));
                 style
             })
             .on_drop(cx.listener(move |view, drag: &SidebarDeviceDrag, _, cx| {
@@ -269,13 +260,9 @@ pub(super) fn device_row(
                         cx.stop_propagation();
                         view.set_sidebar_device_override(&override_key, !visible, cx);
                     }))
-                    .text_color(taskmanager_ui::theme_binding::hsla(if visible {
-                        theme.accent
-                    } else {
-                        theme.fg_dim
-                    }))
+                    .text_color(hsla(if visible { theme.accent } else { theme.fg_dim }))
                     .child(
-                        taskmanager_ui::icons_binding::icon(if visible {
+                        icons_binding::icon(if visible {
                             IconId::CircleCheck
                         } else {
                             IconId::CircleX

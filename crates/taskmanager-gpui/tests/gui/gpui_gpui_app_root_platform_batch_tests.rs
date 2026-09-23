@@ -7,10 +7,11 @@ use taskmanager_core::core::source::SourceOutcome;
 use taskmanager_platform_contract::{
     CapabilityId, EventSequence, OperationFailure, RequestIdGenerator, RetryDisposition,
 };
+use taskmanager_theme::Theme;
 
 #[gpui::test]
 fn inventory_operation_failure_reaches_the_page_source_projection(cx: &mut gpui::TestAppContext) {
-    let entity = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let entity = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let mut request_ids = RequestIdGenerator::default();
     let failure = OperationFailure {
         request_id: request_ids.next_id(),

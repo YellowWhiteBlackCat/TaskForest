@@ -17,12 +17,17 @@
 //! can never prompt.
 
 use gpui::{Context, Div, InteractiveElement, ParentElement, Styled, div};
+use taskmanager_application::MsrReadoutRequestFailure;
 use taskmanager_application::{
     MsrReadoutRequest, MsrReadoutState, i18n, request_submission_failure,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::MsrReadoutSnapshot;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::platform_submission_time_ms;
@@ -137,10 +142,10 @@ fn node_label(node: &str, key: &'static str) -> String {
 
 /// Both failure spellings carry one `FailureKind`; the provider's detail
 /// string is host-specific and never parsed here.
-fn failure_kind(failure: &taskmanager_application::MsrReadoutRequestFailure) -> FailureKind {
+fn failure_kind(failure: &MsrReadoutRequestFailure) -> FailureKind {
     match failure {
-        taskmanager_application::MsrReadoutRequestFailure::Submission(kind) => *kind,
-        taskmanager_application::MsrReadoutRequestFailure::Provider(failed) => failed.kind,
+        MsrReadoutRequestFailure::Submission(kind) => *kind,
+        MsrReadoutRequestFailure::Provider(failed) => failed.kind,
     }
 }
 
@@ -221,19 +226,15 @@ pub(super) fn render_msr_readouts_section(theme: &Theme, model: &MsrReadoutsMode
         return div();
     };
     let heading = div()
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .font_weight(taskmanager_ui::theme_binding::font_weight(
-            tokens::FONT_WEIGHT_BOLD,
-        ))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+        .text_size(font_size(tokens::FONT_12))
+        .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+        .text_color(hsla(theme.fg_dim))
         .child(i18n::t("cpu.msr_readouts"));
     let mut col = div()
         .debug_selector(|| "tm-cpu-msr-readouts".to_string())
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_5,
-        ))
+        .gap(definite_length(tokens::SPACE_5))
         .w_full()
         .child(heading);
     if rows.is_empty() {
@@ -258,8 +259,8 @@ pub(super) fn render_msr_readouts_section(theme: &Theme, model: &MsrReadoutsMode
 
 fn dim_text(theme: &Theme, text: &str) -> Div {
     div()
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+        .text_size(font_size(tokens::FONT_12))
+        .text_color(hsla(theme.fg_dim))
         .child(text.to_owned())
 }
 

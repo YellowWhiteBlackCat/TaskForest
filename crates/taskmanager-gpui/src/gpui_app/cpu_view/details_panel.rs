@@ -1,6 +1,19 @@
 //! CPU detail/specification surface kept separate from the graph renderer.
 
 use gpui::{Div, InteractiveElement, ParentElement, ScrollHandle, Styled, div, px};
+use taskmanager_shell::presentation::cpu_idle_state_summary;
+use taskmanager_shell::presentation::cpu_interrupt_summary;
+use taskmanager_shell::presentation::cpu_power_limits_summary;
+use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::presentation::cpu_topology_summary;
+use taskmanager_shell::presentation::load_average_basis_summary;
+use taskmanager_shell::presentation::load_average_values_compact_summary;
+use taskmanager_shell::presentation::pressure_window_values_compact_summary;
+use taskmanager_ui::layout::scroll_region_with_rail;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
 use taskmanager_application::i18n;
@@ -45,9 +58,7 @@ pub(super) fn render_pinned(
         .min_w(px(0.0))
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         // Top stats as a clean label-left / value-right list (Win11 Task Manager /
         // Mission Center style): every row is one aligned line instead of the prior
         // alternating 2-up big-number blocks + full-width blocks, which read as a
@@ -68,12 +79,7 @@ pub(super) fn render_pinned(
                 .then(|| super::msr_readouts::render_msr_readouts_section(theme, msr_readouts)),
         )
         // Hairline section divider between the live stats and the static spec list.
-        .child(
-            div()
-                .h(px(1.0))
-                .w_full()
-                .bg(taskmanager_ui::theme_binding::fill(theme.border)),
-        )
+        .child(div().h(px(1.0)).w_full().bg(fill(theme.border)))
         // The complete projection belongs to one bounded, independently
         // scrollable rail. Previously a height budget silently replaced lower
         // topology/policy facts with "N more rows"; that made the screenshot
@@ -89,7 +95,7 @@ pub(super) fn render_pinned(
         .min_h(px(0.0))
         .w_full()
         .debug_selector(|| "tm-cpu-details-scroll-frame".to_string())
-        .child(taskmanager_ui::layout::scroll_region_with_rail(
+        .child(scroll_region_with_rail(
             "cpu-details-scroll",
             "tm-cpu-details-scroll",
             "cpu-details-scrollbar",
@@ -105,9 +111,7 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
         .debug_selector(|| "tm-cpu-details-live-stats".to_string())
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_5,
-        ))
+        .gap(definite_length(tokens::SPACE_5))
         .w_full();
     if let Some(utilization) = live.utilization.as_deref() {
         col = col.child(kv_row(theme, i18n::t("common.utilization"), utilization));
@@ -145,14 +149,11 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
     {
         let some = format!(
             "some {}",
-            taskmanager_shell::presentation::pressure_window_values_compact_summary(
-                &cpu_pressure.some,
-            )
+            pressure_window_values_compact_summary(&cpu_pressure.some,)
         );
         col = col.child(kv_row_bounded(theme, i18n::t("perf.stall"), &some));
         if let Some(full) = cpu_pressure.full.as_ref() {
-            let full_summary =
-                taskmanager_shell::presentation::pressure_window_values_compact_summary(full);
+            let full_summary = pressure_window_values_compact_summary(full);
             col = col.child(kv_row_bounded(
                 theme,
                 i18n::t("perf.stall_full"),
@@ -161,13 +162,13 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
         }
     }
     if let Some(load) = snap.load_average.as_ref() {
-        let summary = taskmanager_shell::presentation::load_average_values_compact_summary(load);
+        let summary = load_average_values_compact_summary(load);
         col = col.child(kv_row_bounded(
             theme,
             i18n::t("system.load_normalized"),
             &summary,
         ));
-        let basis = taskmanager_shell::presentation::load_average_basis_summary(load);
+        let basis = load_average_basis_summary(load);
         col = col.child(kv_row_bounded(theme, i18n::t("system.load_basis"), &basis));
     }
     col.child(kv_row(
@@ -212,9 +213,7 @@ fn kv_row_with_note(theme: &Theme, label: &str, value: &str, note: Option<&str>)
     let mut col = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_1,
-        ))
+        .gap(definite_length(tokens::SPACE_1))
         .w_full()
         .child(kv_row(theme, label, value));
     if let Some(n) = note {
@@ -222,8 +221,8 @@ fn kv_row_with_note(theme: &Theme, label: &str, value: &str, note: Option<&str>)
             div()
                 .flex()
                 .justify_end()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(theme.fg_dim))
                 .child(n.to_string()),
         );
     }
@@ -296,7 +295,7 @@ pub(crate) fn cpu_spec_rows(
         });
     let mut rows: Vec<(String, String)> = cpu_identity_rows(hardware);
     rows.push((i18n::t("cpu.base_speed").to_string(), base_speed));
-    if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+    if let Some(power_limits) = cpu_power_limits_summary(cpu) {
         rows.push((i18n::t("cpu.power_limits").to_string(), power_limits));
     }
     rows.extend([
@@ -364,20 +363,20 @@ pub(crate) fn cpu_spec_rows(
     // Lower-priority topology counters come after policy facts. The rail has
     // a finite height and admits whole rows; at the reference viewport this
     // keeps governor/EPP evidence visible before optional diagnostic rows.
-    if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+    if let Some(topology) = cpu_topology_summary(cpu) {
         rows.push((i18n::t("cpu.topology").to_string(), topology));
     }
-    if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+    if let Some(idle_states) = cpu_idle_state_summary(cpu) {
         rows.push((i18n::t("cpu.idle_states").to_string(), idle_states));
     }
-    if let Some(interrupts) = taskmanager_shell::presentation::cpu_interrupt_summary(cpu) {
+    if let Some(interrupts) = cpu_interrupt_summary(cpu) {
         rows.push((i18n::t("cpu.interrupts").to_string(), interrupts));
     }
     // Diagnostic reliability counters follow the same "absent whole fact =
     // absent row" discipline as the topology/idle/interrupt summaries; the
     // shared shell fold never fabricates a zero counter for an unobserved
     // package.
-    if let Some(throttle) = taskmanager_shell::presentation::cpu_thermal_throttle_summary(cpu) {
+    if let Some(throttle) = cpu_thermal_throttle_summary(cpu) {
         rows.push((i18n::t("cpu.thermal_throttle").to_string(), throttle));
     }
     // An unavailable optional value is represented by absence and its

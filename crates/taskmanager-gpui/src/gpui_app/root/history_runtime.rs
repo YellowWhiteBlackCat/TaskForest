@@ -5,11 +5,15 @@ use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
     HistoryFrontendSession, HistoryReplayClient,
 };
+use taskmanager_application::ApplicationHistoryCapability;
+use taskmanager_application::ApplicationHistoryUnavailableReason;
+use taskmanager_application::HistoryReplayRequest;
+use taskmanager_core::core::history::HistoryRecordSink;
 
 enum HistoryRuntimeResources {
     Disabled,
     Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(taskmanager_application::ApplicationHistoryUnavailableReason),
+    Unavailable(ApplicationHistoryUnavailableReason),
     Active(HistoryFrontendSession),
 }
 
@@ -71,7 +75,7 @@ impl HistoryRuntimeState {
         }
         let Some(connector) = self.connector.as_mut() else {
             self.resources = HistoryRuntimeResources::Unavailable(
-                taskmanager_application::ApplicationHistoryUnavailableReason::ConnectorStopped,
+                ApplicationHistoryUnavailableReason::ConnectorStopped,
             );
             return;
         };
@@ -143,7 +147,7 @@ impl HistoryRuntimeState {
 
     pub(in crate::gpui_app) const fn unavailable_reason(
         &self,
-    ) -> Option<taskmanager_application::ApplicationHistoryUnavailableReason> {
+    ) -> Option<ApplicationHistoryUnavailableReason> {
         match self.resources {
             HistoryRuntimeResources::Unavailable(reason) => Some(reason),
             HistoryRuntimeResources::Disabled
@@ -154,20 +158,14 @@ impl HistoryRuntimeState {
 
     pub(in crate::gpui_app) const fn application_history_capability(
         &self,
-    ) -> taskmanager_application::ApplicationHistoryCapability {
+    ) -> ApplicationHistoryCapability {
         match self.resources {
-            HistoryRuntimeResources::Disabled => {
-                taskmanager_application::ApplicationHistoryCapability::Disabled
-            }
-            HistoryRuntimeResources::Connecting(_) => {
-                taskmanager_application::ApplicationHistoryCapability::Connecting
-            }
+            HistoryRuntimeResources::Disabled => ApplicationHistoryCapability::Disabled,
+            HistoryRuntimeResources::Connecting(_) => ApplicationHistoryCapability::Connecting,
             HistoryRuntimeResources::Unavailable(reason) => {
-                taskmanager_application::ApplicationHistoryCapability::Unavailable(reason)
+                ApplicationHistoryCapability::Unavailable(reason)
             }
-            HistoryRuntimeResources::Active(_) => {
-                taskmanager_application::ApplicationHistoryCapability::Available
-            }
+            HistoryRuntimeResources::Active(_) => ApplicationHistoryCapability::Available,
         }
     }
 
@@ -178,9 +176,7 @@ impl HistoryRuntimeState {
         None
     }
 
-    pub(in crate::gpui_app) fn record_sink(
-        &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
+    pub(in crate::gpui_app) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
         match &self.resources {
             HistoryRuntimeResources::Active(session) => {
                 Some(session.persistence.record_sink.clone())
@@ -191,7 +187,7 @@ impl HistoryRuntimeState {
         }
     }
 
-    fn submit_replay(&mut self, request: Option<taskmanager_application::HistoryReplayRequest>) {
+    fn submit_replay(&mut self, request: Option<HistoryReplayRequest>) {
         let Some(request) = request else {
             return;
         };

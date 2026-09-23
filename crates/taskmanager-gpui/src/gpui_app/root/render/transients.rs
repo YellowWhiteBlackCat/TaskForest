@@ -6,9 +6,20 @@ use gpui::{
     AnimationExt, Context, Div, InteractiveElement, ParentElement, RenderOnce, Stateful,
     StatefulInteractiveElement, Styled, Window, deferred, div, px,
 };
+use taskmanager_shell::FeedbackSeverity;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::overlays::toast::Toast;
+use taskmanager_ui::primitives::badge::Badge;
+use taskmanager_ui::primitives::badge::BadgeTone;
 use taskmanager_ui::primitives::spinner::Spinner;
+use taskmanager_ui::theme_binding::appear;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 pub(super) fn compose(
     view: &mut RootView,
@@ -43,9 +54,9 @@ fn compose_pause(
     if !view.telemetry_refresh_policy.is_paused() {
         return root;
     }
-    let badge = taskmanager_ui::primitives::badge::Badge::new(
+    let badge = Badge::new(
         format!("\u{23f8} {}", i18n::t("common.paused")),
-        taskmanager_ui::primitives::badge::BadgeTone::Accent,
+        BadgeTone::Accent,
         theme.palette(),
     )
     .render(window, cx);
@@ -70,7 +81,7 @@ fn compose_feedback(
         return compose_shell_feedback(view, root, theme, cx);
     };
     let weak = cx.entity().downgrade();
-    let card = taskmanager_ui::overlays::toast::Toast::new(toast, theme.palette())
+    let card = Toast::new(toast, theme.palette())
         .on_dismiss(move |_window, cx| {
             let _ = weak.update(cx, |view, cx| {
                 view.local_feedback_toast = None;
@@ -100,39 +111,33 @@ fn compose_shell_feedback(
         return root;
     };
     let color = match notice.severity() {
-        taskmanager_shell::FeedbackSeverity::Info => theme.accent,
-        taskmanager_shell::FeedbackSeverity::Success => theme.success,
-        taskmanager_shell::FeedbackSeverity::Warning => theme.warning,
-        taskmanager_shell::FeedbackSeverity::Error => theme.danger,
+        FeedbackSeverity::Info => theme.accent,
+        FeedbackSeverity::Success => theme.success,
+        FeedbackSeverity::Warning => theme.warning,
+        FeedbackSeverity::Error => theme.danger,
     };
     let weak = cx.entity().downgrade();
     let card = div()
         .max_w(px(640.0))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .px(definite_length(tokens::SPACE_10))
+        .py(definite_length(tokens::SPACE_6))
         .rounded(px(6.0))
-        .bg(taskmanager_ui::theme_binding::fill(theme.card_bg))
+        .bg(fill(theme.card_bg))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(color.with_alpha(0.45)))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .border_color(hsla(color.with_alpha(0.45)))
+        .text_size(font_size(tokens::FONT_12))
+        .text_color(hsla(theme.fg))
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(div().flex_1().child(notice.text().to_owned()))
         .child(
             div()
                 .id("dismiss-shell-feedback")
                 .debug_selector(|| "dismiss-shell-feedback".to_string())
                 .cursor_pointer()
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .hover(|s| s.text_color(taskmanager_ui::theme_binding::hsla(theme.fg)))
+                .text_color(hsla(theme.fg_dim))
+                .hover(|s| s.text_color(hsla(theme.fg)))
                 .on_click(move |_event, _window, cx| {
                     let _ = weak.update(cx, |view, cx| {
                         view.shell.clear_feedback_notice();
@@ -181,31 +186,27 @@ fn compose_warmup(
         .flex()
         .flex_col()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(Spinner::new(theme.palette()).size(18.0))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_16))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_16))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(headline),
         )
         .child(
             div()
                 .max_w(px(420.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(theme.fg_dim))
                 .child(detail),
         );
     let content = if let Some(retry) = retry {
         content.child(
             div()
                 .debug_selector(|| "tm-telemetry-warmup-retry".to_string())
-                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+                .mt(length(tokens::SPACE_8))
                 .child(retry),
         )
     } else {
@@ -216,7 +217,7 @@ fn compose_warmup(
             .absolute()
             .inset_0()
             .debug_selector(|| "tm-telemetry-warmup".to_string())
-            .bg(taskmanager_ui::theme_binding::fill(theme.view_bg))
+            .bg(fill(theme.view_bg))
             .occlude()
             .on_any_mouse_down(|_event, _window, cx| cx.stop_propagation())
             .flex()
@@ -225,7 +226,7 @@ fn compose_warmup(
             .justify_center()
             .child(content.with_animation(
                 "telemetry-warmup-content",
-                taskmanager_ui::theme_binding::appear(),
+                appear(),
                 |element, delta| element.opacity(delta).mt(px((1.0 - delta) * 6.0)),
             )),
     ))

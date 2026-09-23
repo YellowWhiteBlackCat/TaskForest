@@ -31,6 +31,11 @@ use taskmanager_core::core::config::{
 use taskmanager_theme::WindowControls;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Skin, Theme};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::length;
 
 /// User-selected window-frame policy (Settings → Appearance → Window frame).
 ///
@@ -184,15 +189,11 @@ pub fn traffic_lights(
     div()
         .h_full()
         .pl(px(13.0))
-        .pr(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .pr(definite_length(tokens::SPACE_6))
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(light(
             t,
             rgb(0xff5f57),
@@ -275,7 +276,7 @@ fn light(
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_8))
+                .text_size(font_size(tokens::FONT_8))
                 .text_color(rgb(0x000000))
                 .child(if is_hov { glyph } else { "" }),
         )
@@ -368,9 +369,9 @@ fn cap_btn(
         .flex()
         .items_center()
         .justify_center()
-        .bg(taskmanager_ui::theme_binding::fill(bg))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-        .text_color(taskmanager_ui::theme_binding::hsla(fg))
+        .bg(fill(bg))
+        .text_size(font_size(tokens::FONT_11))
+        .text_color(hsla(fg))
         .on_hover(cx.listener(move |v, is_hov: &bool, _win, cx| {
             v.set_hover(
                 if *is_hov {
@@ -409,7 +410,7 @@ fn close_circle(
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .mr(taskmanager_ui::theme_binding::length(tokens::SPACE_10))
+        .mr(length(tokens::SPACE_10))
         .w(px(28.0))
         .h(px(28.0))
         .flex()
@@ -434,11 +435,11 @@ fn close_circle(
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(taskmanager_ui::theme_binding::fill(bg))
+                .bg(fill(bg))
                 .border_1()
-                .border_color(taskmanager_ui::theme_binding::hsla(t.border))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(fg))
+                .border_color(hsla(t.border))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(fg))
                 .child("\u{2715}"),
         )
 }

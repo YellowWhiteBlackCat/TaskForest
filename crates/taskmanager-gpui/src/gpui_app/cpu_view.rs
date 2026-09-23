@@ -1,6 +1,10 @@
 //! CPU performance view: one dominant aggregate utilization graph above an
 //! elastic per-core matrix, plus the shared pinned details surface.
 
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 mod details_panel;
 mod msr_readouts;
 mod package_power;
@@ -287,9 +291,7 @@ fn readouts(theme: &Theme, stats: &CpuLiveStats) -> Div {
         // divs is unreliable with mixed font sizes, and the drifted label
         // row was visibly uneven (labels sit one line-height low).
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_16,
-        ))
+        .gap(definite_length(tokens::SPACE_16))
         .child(readout(
             theme,
             i18n::t("common.utilization"),
@@ -327,33 +329,23 @@ fn readout(theme: &Theme, label: &str, value: String, primary: bool) -> Div {
     div()
         .flex()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .gap(definite_length(tokens::SPACE_6))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(if primary {
-                    theme.fg
-                } else {
-                    theme.fg_dim
-                }))
+                .text_size(font_size(tokens::FONT_13))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(if primary { theme.fg } else { theme.fg_dim }))
                 .child(label.to_owned()),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(if primary {
+                .text_size(font_size(if primary {
                     tokens::FONT_20
                 } else {
                     tokens::FONT_18
                 }))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_EXTRA_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(value),
         )
 }

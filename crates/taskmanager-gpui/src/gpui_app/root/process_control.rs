@@ -2,6 +2,12 @@
 //! of process control, affinity, and batch intents, plus failure feedback.
 
 use gpui::Context;
+use taskmanager_application::ProcessAffinityState;
+use taskmanager_shell::FeedbackLifecycle;
+use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::ProcessControlFeedback;
+use taskmanager_shell::process_control_notice_text;
 
 use taskmanager_application::{
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
@@ -19,9 +25,9 @@ use super::{
 impl RootView {
     pub(crate) fn accept_shared_process_control_feedback(
         &mut self,
-        feedback: &taskmanager_shell::ProcessControlFeedback,
+        feedback: &ProcessControlFeedback,
     ) {
-        let (text, succeeded) = taskmanager_shell::process_control_notice_text(feedback);
+        let (text, succeeded) = process_control_notice_text(feedback);
         self.report_process_control_notice(text, succeeded);
     }
 
@@ -44,16 +50,16 @@ impl RootView {
         self.local_feedback_toast = None;
         self.local_feedback_subscription = None;
         self.shell.report_notice(
-            taskmanager_shell::FeedbackSource::Control,
+            FeedbackSource::Control,
             if succeeded {
-                taskmanager_shell::FeedbackSeverity::Success
+                FeedbackSeverity::Success
             } else {
-                taskmanager_shell::FeedbackSeverity::Error
+                FeedbackSeverity::Error
             },
             if succeeded {
-                taskmanager_shell::FeedbackLifecycle::SHORT
+                FeedbackLifecycle::SHORT
             } else {
-                taskmanager_shell::FeedbackLifecycle::UntilReplaced
+                FeedbackLifecycle::UntilReplaced
             },
             text,
         );
@@ -163,9 +169,7 @@ impl RootView {
         cpus: Vec<u32>,
         cx: &mut Context<Self>,
     ) -> bool {
-        let taskmanager_application::ProcessAffinityState::Ready(ready) =
-            self.shell.process_affinity_state().clone()
-        else {
+        let ProcessAffinityState::Ready(ready) = self.shell.process_affinity_state().clone() else {
             self.record_process_control_result(
                 ProcessControlAction::SetAffinity,
                 identity,

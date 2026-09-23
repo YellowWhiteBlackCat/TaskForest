@@ -5,13 +5,20 @@
 
 use super::*;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::startup::BootTimeline;
+use taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS;
+use taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED;
+use taskmanager_core::core::startup::segment_deltas;
+use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::fixture_start_token;
 
 #[test]
 fn process_and_service_capture_actions_are_typed_and_non_destructive() {
     let mut properties =
         CaptureEvidence::for_test(Some(CaptureScenario::ProcessPropertiesPerformance));
     let mut processes = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(42)
             .name("capture-process".into())
             .build(),
@@ -19,8 +26,7 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
     assert_eq!(
         properties.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
         Some(CaptureProcessAction::Properties(
-            ProcessLiveKey::from_parts(42, taskmanager_test_support::fixture_start_token(42))
-                .expect("fixture identity"),
+            ProcessLiveKey::from_parts(42, fixture_start_token(42)).expect("fixture identity"),
             ProcessDetailsSection::Performance
         ))
     );
@@ -214,12 +220,12 @@ fn boot_markers_capture_seeds_waterfall_and_baseline_pair() {
     {
         assert!(units.contains(&unit), "baseline must cover unit {unit}");
     }
-    let current = taskmanager_core::core::startup::BootTimeline::from_critical_chain(
+    let current = BootTimeline::from_critical_chain(
         &evidence_snapshot.critical_chain,
-        taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS,
-        taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
+        DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS,
+        DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     );
-    let deltas: Vec<i64> = taskmanager_core::core::startup::segment_deltas(&current, baseline)
+    let deltas: Vec<i64> = segment_deltas(&current, baseline)
         .into_iter()
         .map(|delta| delta.delta_ms)
         .collect();
@@ -330,14 +336,14 @@ fn diagnostic_failure_capture_prepares_ui_state_without_worker_action() {
 fn force_kill_scenario_only_returns_one_non_executing_intent() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::ProcessForceKill));
     let mut processes = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(1)
             .name("init".into())
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(4242)
             .name("capture-worker".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            .scalar_observations(ProcessScalarObservations {
                 start_token: ScalarObservation::available(42_420, 1),
                 ..Default::default()
             })
@@ -370,26 +376,26 @@ fn force_kill_scenario_only_returns_one_non_executing_intent() {
 fn force_kill_capture_prefers_a_readable_process_name() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::ProcessForceKill));
     let mut processes = vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(20)
             .name("worker/u65:0-btrfs-endio-meta".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            .scalar_observations(ProcessScalarObservations {
                 start_token: ScalarObservation::available(2_000, 1),
                 ..Default::default()
             })
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(30)
             .name("bash".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            .scalar_observations(ProcessScalarObservations {
                 start_token: ScalarObservation::available(3_000, 1),
                 ..Default::default()
             })
             .build(),
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(40)
             .name("taskmanager".into())
-            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            .scalar_observations(ProcessScalarObservations {
                 start_token: ScalarObservation::available(4_000, 1),
                 ..Default::default()
             })

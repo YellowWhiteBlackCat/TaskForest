@@ -5,6 +5,11 @@ use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -98,23 +103,17 @@ pub fn render_banner(
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
         .w_full()
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
+        .px(definite_length(tokens::SPACE_10))
+        .py(definite_length(tokens::SPACE_6))
         .flex()
         .items_center()
         .justify_between()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+        .gap(definite_length(tokens::SPACE_8))
+        .bg(fill(theme.sidebar_card_bg))
         .border_b_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(color))
-        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+        .border_color(hsla(color))
+        .text_size(font_size(tokens::FONT_12))
+        .text_color(hsla(theme.fg))
         .cursor_pointer()
         .on_click(move |_event, _window, cx| {
             entity.update(cx, |view, cx| {
@@ -126,10 +125,8 @@ pub fn render_banner(
         .child(
             div()
                 .flex_none()
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_SEMIBOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(color))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+                .text_color(hsla(color))
                 .child(i18n::t("alert.view")),
         )
 }

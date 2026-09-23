@@ -2,6 +2,7 @@ use super::memory_stats::optional_memory;
 use super::network_stats::network_link_speed_graph_max_mbps;
 use super::{finite_graph_summary, gpu_percentage_readout};
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_theme::Theme;
 
 #[test]
 fn gpu_optional_percentages_distinguish_unknown_from_measured_zero() {
@@ -37,7 +38,7 @@ fn network_fixed_scale_uses_decimal_link_speed_and_fails_closed() {
 
 #[test]
 fn graph_summary_row_builds_wrapping_readout_for_finite_samples() {
-    let theme = taskmanager_theme::Theme::dark();
+    let theme = Theme::dark();
     let row = super::graph_summary_row(&theme, &[10.0, 20.0, 30.0], &|v| format!("{v:.0} MB/s"));
     assert!(row.is_some());
     let empty_row = super::graph_summary_row(&theme, &[f32::NAN], &|v| format!("{v:.0} MB/s"));

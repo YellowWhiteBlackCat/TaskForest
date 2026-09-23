@@ -9,6 +9,7 @@
 
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
+use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_application::ServiceUpdate;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
@@ -152,7 +153,7 @@ async fn service_details_paints_the_stream_rows_and_the_level_filter_drops_lower
     view.read_with(cx, |v, _| {
         assert_eq!(
             v.service_details
-                .snapshot(&taskmanager_application::ServiceDependenciesLifecycle::default())
+                .snapshot(&ServiceDependenciesLifecycle::default())
                 .feed
                 .level,
             ServiceLogLevelFilter::Errors,

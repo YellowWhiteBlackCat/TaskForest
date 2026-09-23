@@ -5,11 +5,19 @@
 //! capacities — the same shell contract the Iced and TUI frontends consume.
 
 use super::*;
+use taskmanager_core::core::DeviceId;
+use taskmanager_core::core::DeviceLifecycle;
+use taskmanager_core::core::DevicePresence;
+use taskmanager_core::core::DeviceState;
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::GpuTelemetryObservation;
+use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
+use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 
 fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> GpuMetrics {
     let mut gpu = GpuMetrics::new(device_id, "Fixture GPU");
     gpu.device_generation = DeviceGeneration::new(1);
-    gpu.device_state = taskmanager_core::core::DeviceState::healthy(10);
+    gpu.device_state = DeviceState::healthy(10);
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(temperature_c, 1),
@@ -23,22 +31,19 @@ fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> Gp
     gpu
 }
 
-fn chart_metric_observation(
-    gpu: GpuMetrics,
-    observed_at_ms: u64,
-) -> taskmanager_core::core::GpuTelemetryObservation {
+fn chart_metric_observation(gpu: GpuMetrics, observed_at_ms: u64) -> GpuTelemetryObservation {
     let lifecycle = (
-        taskmanager_core::core::DeviceId::new(gpu.device_id.clone()),
-        taskmanager_core::core::DeviceLifecycle {
-            presence: taskmanager_core::core::DevicePresence::Present,
-            state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
+        DeviceId::new(gpu.device_id.clone()),
+        DeviceLifecycle {
+            presence: DevicePresence::Present,
+            state: DeviceState::healthy(observed_at_ms),
             generation: DeviceGeneration::INITIAL,
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),
             absent_since_ms: None,
         },
     );
-    taskmanager_core::core::GpuTelemetryObservation::current(
+    GpuTelemetryObservation::current(
         vec![gpu],
         observed_at_ms,
         Vec::new(),
@@ -119,7 +124,7 @@ async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_wi
     // `render_gpu` makes over this direct track's live-graph view), not a
     // frontend-local fold.
     view.read_with(cx, |v, _| {
-        let window = taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
+        let window = gpu_chart_metric_history(
             &v.live_graph_history,
             "gpu:chart:metric",
             1,
@@ -127,7 +132,7 @@ async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_wi
         );
         assert_eq!(window, [42.0, 55.0]);
         // The unobserved family's window stays explicit gaps, never a zero.
-        let power = taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
+        let power = gpu_chart_metric_history(
             &v.live_graph_history,
             "gpu:chart:metric",
             1,
@@ -160,7 +165,7 @@ const MIB: u64 = 1024 * 1024;
 fn fully_observed_gpu(utilization: f32) -> GpuMetrics {
     let mut gpu = GpuMetrics::new(TRACKS_DEVICE_ID, "Probe GPU");
     gpu.device_generation = DeviceGeneration::new(1);
-    gpu.device_state = taskmanager_core::core::DeviceState::healthy(10);
+    gpu.device_state = DeviceState::healthy(10);
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(61.0, 1),
@@ -178,18 +183,15 @@ fn fully_observed_gpu(utilization: f32) -> GpuMetrics {
     gpu
 }
 
-fn seed_tracks_frames(
-    ingestor: &taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor,
-    frames: &[GpuMetrics],
-) {
+fn seed_tracks_frames(ingestor: &CorrelatedSystemTelemetryIngestor, frames: &[GpuMetrics]) {
     for (index, gpu) in frames.iter().enumerate() {
         let revision = u64::try_from(index + 1).expect("small revision");
         let observed_at_ms = revision * 10;
         let lifecycle = (
-            taskmanager_core::core::DeviceId::new(TRACKS_DEVICE_ID.to_owned()),
-            taskmanager_core::core::DeviceLifecycle {
-                presence: taskmanager_core::core::DevicePresence::Present,
-                state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
+            DeviceId::new(TRACKS_DEVICE_ID.to_owned()),
+            DeviceLifecycle {
+                presence: DevicePresence::Present,
+                state: DeviceState::healthy(observed_at_ms),
                 generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(observed_at_ms),
                 last_seen_ms: Some(observed_at_ms),
@@ -200,7 +202,7 @@ fn seed_tracks_frames(
             .ingest_correlated_gpu(
                 CorrelatedTelemetryStamp::from_accepted_event(revision, observed_at_ms + 1)
                     .expect("tracks fixture revision is non-zero"),
-                &taskmanager_core::core::GpuTelemetryObservation::current(
+                &GpuTelemetryObservation::current(
                     vec![gpu.clone()],
                     observed_at_ms,
                     Vec::new(),
@@ -238,11 +240,9 @@ fn mc04_gpu_metric_track_case_gpu_chart_metric_sampling_is_one_track_across_view
     // measured — the Utilization family alone must gap there.
     let mut gap_frame = GpuMetrics::new(TRACKS_DEVICE_ID, "Probe GPU");
     gap_frame.device_generation = DeviceGeneration::new(1);
-    gap_frame.device_state = taskmanager_core::core::DeviceState::healthy(10);
+    gap_frame.device_state = DeviceState::healthy(10);
     gap_frame.apply_scalar_observations(GpuScalarObservations {
-        utilization_pct: ScalarObservation::unavailable(
-            taskmanager_core::core::FailureKind::TemporarilyUnavailable,
-        ),
+        utilization_pct: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
         temperature_c: ScalarObservation::available(61.0, 1),
         power_w: ScalarObservation::available(88.5, 1),
         frequency_mhz: ScalarObservation::available(2_400, 1),

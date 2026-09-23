@@ -6,6 +6,9 @@ use super::{
 use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::hsla;
 
 /// Canonical Performance page split: a shrinkable main column and a pinned,
 /// non-scrolling statistics column.
@@ -21,7 +24,7 @@ pub(super) fn performance_split(theme: &Theme, left: Div, stats: Div, stats_widt
         .min_w(px(0.0))
         .min_h(px(0.0))
         .size_full()
-        .bg(taskmanager_ui::theme_binding::fill(theme.window_bg))
+        .bg(fill(theme.window_bg))
         .child(
             left.flex_grow()
                 .flex_shrink()
@@ -43,10 +46,8 @@ pub(super) fn performance_stack(theme: &Theme, left: Div, stats: Div, stats_widt
         .h(PERFORMANCE_STATS_STACK_HEIGHT)
         .max_h(PERFORMANCE_STATS_STACK_HEIGHT)
         .border_t_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-        .pt(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
+        .border_color(hsla(theme.border))
+        .pt(definite_length(tokens::SPACE_10))
         .debug_selector(|| "tm-perf-stats-surface".to_string());
     div()
         .flex()
@@ -56,7 +57,7 @@ pub(super) fn performance_stack(theme: &Theme, left: Div, stats: Div, stats_widt
         .min_w(px(0.0))
         .min_h(px(0.0))
         .size_full()
-        .bg(taskmanager_ui::theme_binding::fill(theme.window_bg))
+        .bg(fill(theme.window_bg))
         .child(
             left.flex_1()
                 .min_w(px(0.0))
@@ -95,14 +96,12 @@ pub(super) fn performance_stats_surface(
         // The split is one continuous workspace. A real divider plus padding on
         // the stats surface replaces a transparent parent gap that exposed the
         // window background as a visual crack between sibling components.
-        .bg(taskmanager_ui::theme_binding::fill(theme.window_bg));
+        .bg(fill(theme.window_bg));
     if pinned {
         surface = surface
             .border_l_1()
-            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
-            .pl(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_16,
-            ));
+            .border_color(hsla(theme.border))
+            .pl(definite_length(tokens::SPACE_16));
     }
     surface.child(stats)
 }

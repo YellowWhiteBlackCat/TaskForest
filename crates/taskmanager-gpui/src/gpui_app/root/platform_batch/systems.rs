@@ -1,7 +1,10 @@
 //! Window-local systems that materialize the shared platform fold.
 
 use gpui::Context;
+use taskmanager_application::ProcessAffinityState;
 use taskmanager_application::{DesktopAppearanceEvent, RefreshRequest, SystemTelemetryDomain};
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use taskmanager_shell::BatchFoldOutput;
 
@@ -82,19 +85,14 @@ impl RootView {
         );
         // Token-aware reconcile (CORE-01): a pid reused by a new process
         // drops instead of retargeting.
-        let snapshot: &[taskmanager_core::core::process::ProcessItem] =
-            self.materialized.processes();
+        let snapshot: &[ProcessItem] = self.materialized.processes();
         self.shell.selection.reconcile(snapshot);
         if let Some(identity) = self.process_affinity_identity() {
             let expected = match self.shell.process_affinity_state() {
-                taskmanager_application::ProcessAffinityState::Loading { target, .. }
-                | taskmanager_application::ProcessAffinityState::Failed { target, .. } => {
-                    Some(target.clone())
-                }
-                taskmanager_application::ProcessAffinityState::Ready(ready) => {
-                    Some(ready.target.clone())
-                }
-                taskmanager_application::ProcessAffinityState::Closed => None,
+                ProcessAffinityState::Loading { target, .. }
+                | ProcessAffinityState::Failed { target, .. } => Some(target.clone()),
+                ProcessAffinityState::Ready(ready) => Some(ready.target.clone()),
+                ProcessAffinityState::Closed => None,
             };
             if expected
                 .is_some_and(|target| self.frozen_process(identity).as_ref() != Some(&target))
@@ -235,10 +233,10 @@ impl RootView {
             return;
         }
         match self.shell.process_affinity_state().clone() {
-            taskmanager_application::ProcessAffinityState::Ready(ready) => {
+            ProcessAffinityState::Ready(ready) => {
                 self.processes_state.affinity_editor.cpus = ready.cpus.into_iter().collect();
             }
-            taskmanager_application::ProcessAffinityState::Failed {
+            ProcessAffinityState::Failed {
                 target, failure, ..
             } => {
                 self.processes_state.affinity_editor.cpus.clear();
@@ -251,8 +249,7 @@ impl RootView {
                     );
                 }
             }
-            taskmanager_application::ProcessAffinityState::Closed
-            | taskmanager_application::ProcessAffinityState::Loading { .. } => {}
+            ProcessAffinityState::Closed | ProcessAffinityState::Loading { .. } => {}
         }
     }
 
@@ -268,11 +265,10 @@ impl RootView {
                     sensors.clone(),
                     sources.to_vec(),
                 )
-                && let Some(stamp) =
-                    taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(
-                        stamp.sequence,
-                        stamp.observed_at_ms,
-                    )
+                && let Some(stamp) = CorrelatedTelemetryStamp::from_accepted_event(
+                    stamp.sequence,
+                    stamp.observed_at_ms,
+                )
             {
                 let _ = self
                     .telemetry_ingestor
@@ -285,11 +281,10 @@ impl RootView {
                     power_supplies.clone(),
                     sources.to_vec(),
                 )
-                && let Some(stamp) =
-                    taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(
-                        stamp.sequence,
-                        stamp.observed_at_ms,
-                    )
+                && let Some(stamp) = CorrelatedTelemetryStamp::from_accepted_event(
+                    stamp.sequence,
+                    stamp.observed_at_ms,
+                )
             {
                 let _ = self
                     .telemetry_ingestor

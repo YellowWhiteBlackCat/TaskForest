@@ -4,6 +4,7 @@
 //! and bars.
 
 use taskmanager_shell::memory::MemSegmentKind;
+use taskmanager_shell::memory::memory_segments;
 
 use crate::gpui_app::formatting;
 use taskmanager_application::i18n;
@@ -27,7 +28,7 @@ pub(super) fn segment_shares(memory: &MemoryMetrics) -> Vec<SegmentShare> {
         return Vec::new();
     };
     let total_gib = bytes_to_gib(total_bytes);
-    taskmanager_shell::memory::memory_segments(memory)
+    memory_segments(memory)
         .into_iter()
         .map(|seg| SegmentShare {
             share: (bytes_to_gib(seg.bytes) / total_gib) as f32,

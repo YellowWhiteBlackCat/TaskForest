@@ -1,6 +1,7 @@
 use gpui::{
     AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, Window, px, size,
 };
+use taskmanager_core::core::units::UnitPreferences;
 
 use crate::gpui_app::root::responsive::{PageLayoutBudget, SystemPageBudget};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -30,7 +31,7 @@ impl Render for FixtureView {
             smart_report: Some(&self.fixture.smart_report),
             layout: self.layout,
             copy: &capture_english_text,
-            units: taskmanager_core::core::units::UnitPreferences::default(),
+            units: UnitPreferences::default(),
             callbacks: &callbacks,
         })
     }

@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::sync::Arc;
+use taskmanager_theme::Theme;
 
 use gpui::AppContext;
 use taskmanager_application::{
@@ -79,8 +80,7 @@ fn renderer_projection_preserves_durable_identity_peaks_and_downtime_gap() {
 
 #[gpui::test]
 fn renderer_projection_cache_is_keyed_by_durable_rows_publication(cx: &mut gpui::TestAppContext) {
-    let root =
-        cx.new(|cx| crate::gpui_app::root::RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let root = cx.new(|cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _cx| {
         let first_projection = projection(Arc::from([durable_row("org.example.Editor", true)]));
         let first = view.app_history_rows(&first_projection);

@@ -2,6 +2,7 @@
 //! completion of command-launch, resource-reveal, and URL-open intents, plus
 //! failure feedback.
 
+use taskmanager_application::RequestCorrelation;
 use taskmanager_application::{
     CommandLaunchRequest, CorrelatedShellEvent, RefreshRequest, RequestAttemptId,
     ResourceRevealRequest, ShellUiActionIntent, ShellUiActionReceipt, ShellUiActionState,
@@ -160,8 +161,7 @@ impl RootView {
         let ShellUiActionState::Failed(failed) = self.shell.shell_ui_action_state() else {
             return false;
         };
-        if failed.correlation
-            != taskmanager_application::RequestCorrelation::Request(failure.request_id)
+        if failed.correlation != RequestCorrelation::Request(failure.request_id)
             || failed.intent.capability() != failure.capability
         {
             return false;

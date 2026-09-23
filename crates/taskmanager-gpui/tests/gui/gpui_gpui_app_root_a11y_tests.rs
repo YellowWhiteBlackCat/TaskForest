@@ -1,9 +1,17 @@
 use super::{apply_accessibility_action, build_snapshot};
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
+use taskmanager_accessibility_linux::snapshot_to_tree_update;
+use taskmanager_accessibility_linux::stable_node_id;
+use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::set_language;
+use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
+use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::SemanticSnapshot;
 use taskmanager_ui_contract::{
     AccessibilityActionRejection, AccessibilityActionRequest, SemanticAction, SemanticNodeId,
     SemanticRole,
@@ -19,13 +27,13 @@ fn snapshot_of(
     cx: &mut TestAppContext,
     root: &Entity<RootView>,
     revision: u64,
-) -> taskmanager_ui_contract::SemanticSnapshot {
+) -> SemanticSnapshot {
     root.read_with(cx, |view, _| build_snapshot(view, revision))
         .expect("canonical snapshot must build for view state")
 }
 
 fn process(pid: u32, name: &str) -> ProcessItem {
-    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+    ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .scalar_observations(ProcessScalarObservations {
@@ -60,13 +68,11 @@ async fn apps_page_snapshot_has_expected_roles_and_values(cx: &mut TestAppContex
         view.replace_process_selection([identity(2002)], None);
         // Make the graph assertion data-backed; RootView starts with an
         // unobserved snapshot and must not turn that state into 0%.
-        view.replace_system_snapshot_for_test(taskmanager_core::core::metrics::SystemSnapshot {
-            cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-                CpuScalarObservations {
-                    global_usage_pct: ScalarObservation::available(31.0, 1),
-                    ..Default::default()
-                },
-            ),
+        view.replace_system_snapshot_for_test(SystemSnapshot {
+            cpu: CpuMetrics::from_observations(CpuScalarObservations {
+                global_usage_pct: ScalarObservation::available(31.0, 1),
+                ..Default::default()
+            }),
             ..Default::default()
         });
     });
@@ -170,13 +176,11 @@ async fn snapshot_stays_well_formed_with_edge_values_and_modal_open(cx: &mut Tes
     // panic and must keep the canonical tree shape.
     root.update(cx, |view, _| {
         view.replace_processes_for_test(vec![process(3, "hog"), process(4, "idle")]);
-        view.replace_system_snapshot_for_test(taskmanager_core::core::metrics::SystemSnapshot {
-            cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
-                CpuScalarObservations {
-                    global_usage_pct: ScalarObservation::available(88.0, 1),
-                    ..Default::default()
-                },
-            ),
+        view.replace_system_snapshot_for_test(SystemSnapshot {
+            cpu: CpuMetrics::from_observations(CpuScalarObservations {
+                global_usage_pct: ScalarObservation::available(88.0, 1),
+                ..Default::default()
+            }),
             ..Default::default()
         });
         view.show_run_task();
@@ -209,7 +213,7 @@ async fn snapshot_stays_well_formed_with_edge_values_and_modal_open(cx: &mut Tes
 /// well-formed with the process table still published.
 #[gpui::test]
 async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &mut TestAppContext) {
-    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    set_language(Language::En);
     let root = make_root(cx);
     root.update(cx, |view, _| {
         view.mark_telemetry_frame_ready();
@@ -275,7 +279,7 @@ async fn rows_are_published_highest_cpu_first_with_a_deterministic_tie_break(
     }
 
     let cpu_process = |pid: u32, name: &str, cpu: f32| {
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        ProcessItemFixtureBuilder::new()
             .pid(pid)
             .name(name.into())
             .scalar_observations(ProcessScalarObservations {
@@ -424,13 +428,11 @@ async fn mapped_tree_is_well_formed_under_accesskit_bridge_contract(cx: &mut Tes
         view.replace_processes_for_test(vec![process(1001, "alpha"), process(2002, "bravo")]);
     });
     let snapshot = snapshot_of(cx, &root, 42);
-    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let update = snapshot_to_tree_update(&snapshot);
     let tree_update = update.tree.expect("tree metadata present");
     assert_eq!(
         tree_update.root,
-        taskmanager_accessibility_linux::stable_node_id(
-            &taskmanager_ui_contract::SemanticNodeId::borrowed("app")
-        )
+        stable_node_id(&SemanticNodeId::borrowed("app"))
     );
     assert!(!update.nodes.is_empty());
 }

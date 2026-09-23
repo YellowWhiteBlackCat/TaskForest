@@ -1,7 +1,9 @@
 //! Process-table numeric and local start-time formatting.
 
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::cpu_time_compact;
+use taskmanager_shell::presentation::start_clock_local;
 
 /// Disk-throughput cell on the Drive ladder (a `/s` rate).
 pub(super) fn format_bytes_rate(units: UnitPreferences, bytes: u64) -> String {
@@ -53,9 +55,6 @@ pub(super) fn format_nice(nice: i32) -> String {
     }
 }
 
-pub(super) fn format_start_time(
-    seconds: Option<u64>,
-    rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
-) -> String {
-    taskmanager_shell::presentation::start_clock_local(seconds, rules)
+pub(super) fn format_start_time(seconds: Option<u64>, rules: &LocalTimeRulesObservation) -> String {
+    start_clock_local(seconds, rules)
 }

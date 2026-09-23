@@ -5,6 +5,7 @@ use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceState, PowerSupplySnapshot,
     ScalarObservation,
 };
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
 fn live_battery_capture_waits_for_real_data_and_never_inserts_a_fixture() {
@@ -56,7 +57,7 @@ fn live_partition_capture_waits_for_two_real_children_and_never_inserts_them() {
     assert!(!evidence.scenario_ready());
 
     snapshot.disks = vec![
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id("disk:real-partition-host".into())
             .partitions(vec![DiskPartition::default(), DiskPartition::default()])
             .build(),

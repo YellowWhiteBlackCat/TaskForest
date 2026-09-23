@@ -2,6 +2,7 @@
 //! geometry tests so each test module remains a single semantic family.
 
 use gpui::{TestAppContext, VisualTestContext};
+use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -42,7 +43,7 @@ async fn mc01_dynamic_readout_case_battery_and_fan_pages_paint_typed_dynamic_dev
         );
         v.telemetry_ingestor
             .ingest_correlated_power_supplies(
-                taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(1, 20)
+                CorrelatedTelemetryStamp::from_accepted_event(1, 20)
                     .expect("fixture revision is non-zero"),
                 &battery_snapshot,
             )
@@ -74,7 +75,7 @@ async fn mc01_dynamic_readout_case_battery_and_fan_pages_paint_typed_dynamic_dev
         v.replace_dynamic_devices_for_test(fan_snapshot.clone(), power_supplies);
         v.telemetry_ingestor
             .ingest_correlated_sensors(
-                taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(1, 40)
+                CorrelatedTelemetryStamp::from_accepted_event(1, 40)
                     .expect("fixture revision is non-zero"),
                 &fan_snapshot,
             )

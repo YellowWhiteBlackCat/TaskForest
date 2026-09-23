@@ -15,6 +15,7 @@ use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::{
     CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
 };
+use taskmanager_theme::Theme;
 use taskmanager_ui_contract::page_descriptors;
 
 #[test]
@@ -81,7 +82,7 @@ fn every_page_round_trips_through_the_refresh_contract() {
 
 #[gpui::test]
 fn page_switch_dispatches_refresh_and_snapshot_populates_page_rows(cx: &mut gpui::TestAppContext) {
-    let entity = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    let entity = cx.new(|cx| RootView::new(Theme::dark(), cx));
 
     // 1. Initial state: on Performance page, lists are empty.
     entity.update(cx, |view, _cx| {

@@ -1,6 +1,7 @@
 //! Static hardware summary tiles for the System page.
 
 use taskmanager_application::i18n;
+use taskmanager_application::truncate_text;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
@@ -24,7 +25,7 @@ fn compact_cpu_label(value: Option<&str>) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    taskmanager_application::truncate_text(&compact, 28)
+    truncate_text(&compact, 28)
 }
 
 pub(crate) fn build_tiles(

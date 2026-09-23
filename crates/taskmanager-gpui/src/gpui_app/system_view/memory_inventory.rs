@@ -9,6 +9,10 @@
 use gpui::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Styled, div};
 use taskmanager_application::{SmbiosMemoryRequest, i18n, request_submission_failure};
 use taskmanager_platform_contract::{CapabilityId, SubmissionErrorKind};
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::hsla;
 
 use super::sections::memory_inventory::{
     MemoryInventoryInputs, MemoryInventoryModel, memory_inventory_model,
@@ -89,16 +93,12 @@ pub(super) fn render_memory_inventory(
     let mut content = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .font_weight(taskmanager_ui::theme_binding::font_weight(
-                    tokens::FONT_WEIGHT_BOLD,
-                ))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .text_size(font_size(tokens::FONT_13))
+                .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
+                .text_color(hsla(theme.fg))
                 .child(i18n::t("system.memory_inventory")),
         )
         .debug_selector(|| "tm-memory-inventory-card".to_string());

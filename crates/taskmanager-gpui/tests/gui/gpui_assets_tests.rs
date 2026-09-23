@@ -1,11 +1,12 @@
 use gpui::AssetSource;
+use taskmanager_assets::all_asset_paths;
 
 use super::TaskManagerAssets;
 
 #[test]
 fn every_declared_path_is_loadable_through_gpui() {
     let assets = TaskManagerAssets;
-    let paths: Vec<_> = taskmanager_assets::all_asset_paths().collect();
+    let paths: Vec<_> = all_asset_paths().collect();
 
     assert_eq!(paths.len(), 101);
     for path in paths {

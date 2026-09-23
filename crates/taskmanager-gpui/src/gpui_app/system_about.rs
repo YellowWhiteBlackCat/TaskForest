@@ -9,6 +9,12 @@ use gpui::{
     App, ClipboardItem, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
+use taskmanager_core::core::hardware::DisplayInfo;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
@@ -231,7 +237,7 @@ fn format_memory(total_memory_mb: u64) -> String {
     }
 }
 
-fn display_summary(display: &taskmanager_core::core::hardware::DisplayInfo) -> Option<String> {
+fn display_summary(display: &DisplayInfo) -> Option<String> {
     let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
         .into_iter()
         .flatten()
@@ -263,9 +269,7 @@ fn display_summary(display: &taskmanager_core::core::hardware::DisplayInfo) -> O
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
 
-fn display_hdr_capability(
-    display: &taskmanager_core::core::hardware::DisplayInfo,
-) -> Option<String> {
+fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
     let state = match display.hdr_supported {
         Some(true) => i18n::t("system.hdr_supported"),
         Some(false) => i18n::t("system.hdr_unsupported"),
@@ -324,24 +328,18 @@ fn render_row(
         .on_click(cx.listener(move |_view, _event, _window, cx| {
             cx.write_to_clipboard(ClipboardItem::new_string(copy_value.clone()));
         }))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_10,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .px(definite_length(tokens::SPACE_10))
+        .py(definite_length(tokens::SPACE_8))
         .flex()
         .items_center()
         .justify_between()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ))
+        .gap(definite_length(tokens::SPACE_12))
         .child(
             elements::truncated_text(i18n::t(row.label_key))
                 .flex_1()
                 .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg)),
         )
         .child(
             div()
@@ -350,8 +348,8 @@ fn render_row(
                 .min_w(px(0.0))
                 .truncate()
                 .text_right()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg_dim))
                 .child(
                     SelectableText::new(
                         ("system-about-selectable-value", index),
@@ -380,9 +378,7 @@ pub fn render_system_about(
     let mut content = div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_12,
-        ));
+        .gap(definite_length(tokens::SPACE_12));
     let mut row_index = 0;
     for (group_index, group) in groups.iter().enumerate() {
         let mut rows = div().flex().flex_col();
@@ -394,19 +390,15 @@ pub fn render_system_about(
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_4,
-                ))
+                .gap(definite_length(tokens::SPACE_4))
                 .child(
                     div()
                         .debug_selector(move || {
                             format!("tm-system-about-section-title-{group_index}")
                         })
-                        .pl(taskmanager_ui::theme_binding::definite_length(
-                            tokens::SPACE_2,
-                        ))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                        .pl(definite_length(tokens::SPACE_2))
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(theme.fg_dim))
                         .child(i18n::t(group.title_key)),
                 )
                 .child(
@@ -414,10 +406,8 @@ pub fn render_system_about(
                         .debug_selector(move || {
                             format!("tm-system-about-section-card-{group_index}")
                         })
-                        .rounded(taskmanager_ui::theme_binding::absolute(
-                            tokens::card_radius(theme),
-                        ))
-                        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+                        .rounded(absolute(tokens::card_radius(theme)))
+                        .bg(fill(theme.sidebar_card_bg))
                         .overflow_hidden()
                         .child(rows),
                 ),
@@ -426,8 +416,8 @@ pub fn render_system_about(
     if groups.is_empty() {
         content = content.child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(font_size(tokens::FONT_13))
+                .text_color(hsla(theme.fg_dim))
                 .child(i18n::t("system_about.unavailable")),
         );
     }

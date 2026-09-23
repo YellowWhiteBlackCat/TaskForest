@@ -14,6 +14,11 @@ use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_shell::presentation::device_action_i18n_key;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 /// The actionable status footer for a non-healthy device status: an accent-tinted
 /// callout carrying the shared action hint ([`device_action_i18n_key`]). Returns
@@ -26,20 +31,12 @@ pub(super) fn status_footer(theme: &Theme, status: DeviceStatus) -> Option<AnyEl
     }
     Some(
         div()
-            .px(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_10,
-            ))
-            .py(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_7,
-            ))
-            .rounded(taskmanager_ui::theme_binding::absolute(
-                tokens::small_radius(theme),
-            ))
-            .bg(taskmanager_ui::theme_binding::fill(
-                theme.accent.with_alpha(0.12),
-            ))
-            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+            .px(definite_length(tokens::SPACE_10))
+            .py(definite_length(tokens::SPACE_7))
+            .rounded(absolute(tokens::small_radius(theme)))
+            .bg(fill(theme.accent.with_alpha(0.12)))
+            .text_size(font_size(tokens::FONT_12))
+            .text_color(hsla(theme.fg))
             .child(i18n::t(device_action_i18n_key(status)))
             .into_any_element(),
     )

@@ -19,6 +19,14 @@ use gpui::ScrollHandle;
 use gpui::{
     AnyElement, App, Div, InteractiveElement, IntoElement, ParentElement, Styled, Window, div, px,
 };
+use taskmanager_shell::command_help;
+use taskmanager_shell::page_help;
+use taskmanager_shell::shell_local_bindings;
+use taskmanager_ui::theme_binding::absolute;
+use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::hsla;
 
 use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration, FrontendShape};
 
@@ -78,8 +86,8 @@ pub fn render_help_overlay(
 /// catalog strings are introduced; row copy comes from the shared shell
 /// presentation.
 fn help_content(t: &Theme) -> Div {
-    let pages = taskmanager_shell::page_help();
-    let commands = taskmanager_shell::command_help();
+    let pages = page_help();
+    let commands = command_help();
     let local_rows = local_binding_rows(t);
     let command_rows = commands
         .into_iter()
@@ -88,18 +96,14 @@ fn help_content(t: &Theme) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_14,
-        ))
+        .gap(definite_length(tokens::SPACE_14))
         .child(section(
             t,
             i18n::t("settings.keys_pages"),
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .children(
                     pages
                         .into_iter()
@@ -112,9 +116,7 @@ fn help_content(t: &Theme) -> Div {
             div()
                 .flex()
                 .flex_col()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
+                .gap(definite_length(tokens::SPACE_6))
                 .children(command_rows),
         ))
 }
@@ -123,7 +125,7 @@ fn help_content(t: &Theme) -> Div {
 /// overlay advertises its own `F1` / `?` opener (shell `keys.rs` convention:
 /// frontends list their local chords in the shared help data).
 fn local_binding_rows(t: &Theme) -> Vec<Div> {
-    taskmanager_shell::shell_local_bindings()
+    shell_local_bindings()
         .iter()
         .filter(|binding| binding.shortcut == "?")
         .map(|binding| command_row(t, binding.label, "", "F1 / ?"))
@@ -144,7 +146,7 @@ fn local_binding_rows(t: &Theme) -> Vec<Div> {
 pub fn binding_declaration() -> FrontendBindingDeclaration {
     FrontendBindingDeclaration {
         frontend: FrontendShape::Gpui,
-        entries: taskmanager_shell::command_help()
+        entries: command_help()
             .into_iter()
             .map(|help| BindingEntry {
                 command: help.command,
@@ -190,34 +192,26 @@ fn row(t: &Theme, shortcut: &str, label: &str, description: Option<&str>, select
         .flex()
         .flex_row()
         .items_center()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
-        ))
-        .rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::small_radius(t),
-        ))
+        .gap(definite_length(tokens::SPACE_8))
+        .px(definite_length(tokens::SPACE_8))
+        .py(definite_length(tokens::SPACE_6))
+        .rounded(absolute(tokens::small_radius(t)))
         .border_1()
-        .border_color(taskmanager_ui::theme_binding::hsla(t.border))
-        .bg(taskmanager_ui::theme_binding::fill(t.card_bg))
+        .border_color(hsla(t.border))
+        .bg(fill(t.card_bg))
         .child(
             div()
                 .w(px(88.0))
                 .flex_shrink_0()
                 .font(mono_font_with_fallback(t))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.accent))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(t.accent))
                 .child(shortcut.to_string()),
         )
         .child(
             div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(t.fg))
                 .child(label.to_string()),
         );
     if let Some(description) = description
@@ -226,8 +220,8 @@ fn row(t: &Theme, shortcut: &str, label: &str, description: Option<&str>, select
         el = el.child(
             div()
                 .flex_1()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
+                .text_size(font_size(tokens::FONT_11))
+                .text_color(hsla(t.fg_dim))
                 .child(description.to_string()),
         );
     }
@@ -240,9 +234,7 @@ fn section(t: &Theme, title: &'static str, content: Div) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             SectionHeader::new(title.to_owned(), t.palette())
                 .debug_selector(title)

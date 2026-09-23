@@ -1,5 +1,7 @@
 use super::*;
+use taskmanager_core::core::SmartAvailability;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn stamp(revision: u64) -> CorrelatedTelemetryStamp {
     CorrelatedTelemetryStamp::from_accepted_event(revision, revision * 10)
@@ -91,11 +93,11 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
         )
     };
     let disk = |device_id: &str, temperature_c| {
-        taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        DiskMetricsFixtureBuilder::new()
             .device_id(device_id.to_owned())
             .device_generation(DeviceGeneration::new(1))
             .device_state(DeviceState::healthy(10))
-            .smart_availability(taskmanager_core::core::SmartAvailability::Available)
+            .smart_availability(SmartAvailability::Available)
             .smart_state(DeviceState::healthy(10))
             .smart_temperature_c(Some(temperature_c))
             .build()
