@@ -87,14 +87,17 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 
 ## 跨代升级
 
-0.2.0 起共享图标资产由 `taskforest-common` 独占，而 ≤0.1.3 的
-`taskforest`/`taskforest-i`/`taskforest-b` 仍自带该路径。升级由新数据包声明接管，
+0.2.0 起共享图标资产由 `taskforest-common` 独占。升级由新数据包声明接管，
 避免包管理器报文件归属冲突或留下两代并存的归属：
 
-- DEB：`taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0`），
+- DEB：≤0.1.3 曾发布自带该路径的 `taskforest`、`taskforest-i`、`taskforest-b`；
+  `taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0`）接管，
   符合 Debian Policy 7.6.1 的拆包规则；
-- RPM：`taskforest-common` 声明版本化 `Conflicts`（`< 0.2.0`），让 dnf 在同一
-  事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting Packages」）；不使用
+- RPM：≤0.1.3 只发布过 `taskforest`（GPUI）一个 RPM（其 `%files` 自带该路径），
+  故 `taskforest-common` 的版本化 `Conflicts`（`< 0.2.0`）只列 `taskforest`，
+  让 dnf 在同一事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting
+  Packages」）；`taskforest-i`/`taskforest-b` 的 RPM spec 首见于未发布的 0.1.4
+  树、从未发布过 RPM，0.2.0 起其 RPM 又移除公共路径，所以不列；也不使用
   `Obsoletes`，因为它会删除前端产品而非升级；
 - MSI：不涉及拆包；`MajorUpgrade` 配合 `AllowSameVersionUpgrades` 与固定的
   `UpgradeCode`/组件 GUID 已覆盖代际替换，四端各持独立 `UpgradeCode` 以并存。

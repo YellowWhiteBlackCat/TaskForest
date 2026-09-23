@@ -30,7 +30,17 @@ Source0:    taskforest-tree.tar.gz
 # is the first release that ships this package (CHANGELOG 0.2.0); it must not
 # float with the current version. Fedora Packaging:Conflicts, "Splitting
 # Packages".
-Conflicts:  taskforest < 0.2.0, taskforest-i < 0.2.0, taskforest-b < 0.2.0
+#
+# Only `taskforest` (GPUI) is named. It is the one RPM ever published before
+# the split (v0.1.3, whose %files carried the shared hicolor path), so it is
+# the only RPM owner this conflict can meet. `taskforest-i`/`taskforest-b`
+# shipped as DEBs at <=0.1.3 and are covered by control-common's `Replaces`/
+# `Breaks`, but their RPM specs first landed after v0.1.3 (the never-released
+# 0.1.4 tree), no `taskforest-i`/`taskforest-b` RPM was ever published, and
+# their 0.2.0 RPMs strip the common destinations (build-rpm.sh). No reachable
+# RPM upgrade path carries the shared icon under those names, so naming them
+# would guard a package that cannot exist.
+Conflicts:  taskforest < 0.2.0
 ExclusiveArch: x86_64 aarch64
 
 %description

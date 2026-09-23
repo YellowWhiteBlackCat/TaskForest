@@ -24,6 +24,33 @@ fn full_declaration(
     }
 }
 
+/// The live per-area census. The registry is the roadmap matrix growing per
+/// area toward the 225-item blueprint, not a uniform grid, so this is the pin's
+/// authority: the exhaustive `match` makes a new [`FeatureArea`] variant a
+/// compile-time census decision, and changing a count is the deliberate
+/// admission or removal of that area's feature. `memory-forensics` already
+/// carries six (`memory.process-swap-charge`); every other area carries the
+/// five-item baseline.
+const fn area_census(area: FeatureArea) -> usize {
+    match area {
+        FeatureArea::ProcessLifecycle => 5,
+        FeatureArea::MemoryForensics => 6,
+        FeatureArea::HandleDescriptorAudit => 5,
+        FeatureArea::ThreadTopology => 5,
+        FeatureArea::NetworkSockets => 5,
+        FeatureArea::StorageFilesystemIo => 5,
+        FeatureArea::HardwareTopologyNuma => 5,
+        FeatureArea::AcceleratorTelemetry => 5,
+        FeatureArea::PowerThermal => 5,
+        FeatureArea::SecurityIsolation => 5,
+        FeatureArea::ServicesInit => 5,
+        FeatureArea::PressureSaturation => 5,
+        FeatureArea::IpcDbus => 5,
+        FeatureArea::DynamicTracing => 5,
+        FeatureArea::HistoryTimeTravel => 5,
+    }
+}
+
 /// The gate set is total and duplicate-free: `ALL` is non-empty, every feature
 /// id is unique, and the pinned count makes adding or dropping a gated feature
 /// a conscious registry change.
@@ -41,21 +68,10 @@ fn all_covers_features_exactly_once() {
             .all(|feature| !feature.id().is_empty()),
         "every feature names a stable machine id"
     );
-    // The registry is the uniform 15 x 5 grid plus one deliberate addition:
-    // the memory-forensics area carries a sixth representative
-    // (`memory.process-swap-charge`) so the already-rendered per-process swap
-    // projection has a feature authority. The census stays explicit so a
-    // silent addition or drop still fails.
-    let memory_forensics = FeatureId::ALL
-        .iter()
-        .filter(|feature| feature.area() == FeatureArea::MemoryForensics)
-        .count();
-    assert_eq!(memory_forensics, 6, "the memory-forensics census moved");
-    assert_eq!(
-        FeatureId::ALL.len(),
-        FeatureArea::ALL.len() * 5 + 1,
-        "the uniform 15 x 5 registry plus the one memory-forensics addition"
-    );
+    // The gate set is a per-area census, not a fixed 15 x 5 grid: it grows one
+    // blueprint area at a time toward the 225-item matrix. The exact per-area
+    // counts and their sum live in `feature_areas_are_well_formed_and_total`;
+    // this test pins the total and the id discipline only.
 }
 
 /// Every feature carries one explicit, non-empty, toolkit-neutral semantic
@@ -74,12 +90,14 @@ fn every_feature_has_explicit_toolkit_neutral_semantic_specification() {
     }
 }
 
-/// Every feature files under a known blueprint area, the per-area census is
-/// pinned (five per area, with the one deliberate sixth memory-forensics
-/// representative), and the areas themselves are total and unique. (The
-/// 225-item completeness TODO grows the per-area feature count toward the
-/// blueprint's 15; it never empties an area, and a single-area addition is a
-/// conscious census change like `memory.process-swap-charge`.)
+/// Every feature files under a known blueprint area, the areas themselves are
+/// total and unique, and the per-area census is pinned against the exact total.
+/// The census is the registry's real structural invariant, NOT a uniform
+/// 15 x 5 grid: the five-item baseline only starts the 225-item blueprint, and
+/// an area admits a later item (`memory-forensics` already carries six for
+/// `memory.process-swap-charge`). This pin asserts each area's live count and
+/// the sum the total must equal, never fixed grid arithmetic; the 225-item
+/// completeness TODO only raises a count and never empties an area.
 #[test]
 fn feature_areas_are_well_formed_and_total() {
     assert_eq!(FeatureArea::ALL.len(), 15);
@@ -100,18 +118,25 @@ fn feature_areas_are_well_formed_and_total() {
             feature.id()
         );
     }
+    let mut total = 0usize;
     for area in FeatureArea::ALL {
         let representatives = FeatureId::ALL
             .iter()
             .filter(|feature| feature.area() == *area)
             .count();
-        let expected = if *area == FeatureArea::MemoryForensics {
-            6
-        } else {
-            5
-        };
-        assert_eq!(representatives, expected, "area {} census moved", area.id());
+        assert_eq!(
+            representatives,
+            area_census(*area),
+            "area {} census moved",
+            area.id()
+        );
+        total += representatives;
     }
+    assert_eq!(
+        FeatureId::ALL.len(),
+        total,
+        "the total is the per-area census sum; a silent addition, drop, or reassignment moved"
+    );
 }
 
 /// `area()` classifies representatives correctly across the blueprint, not
