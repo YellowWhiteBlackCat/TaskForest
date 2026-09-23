@@ -10,7 +10,7 @@
 //! styling boundary (`.bg`/`.text_color` accept the neutral [`Color`] through
 //! the theme's `gpui` feature).
 
-use gpui::{Hsla, Refineable, StyleRefinement, Styled, transparent_black};
+use gpui::{Hsla, transparent_black};
 
 use taskmanager_theme::color::mix;
 use taskmanager_theme::color::relative_luminance;
@@ -45,24 +45,6 @@ pub fn active_fill(color: Color) -> Color {
 #[must_use]
 pub fn disabled_fg(palette: &Palette) -> Color {
     blend(palette.fg, palette.surface, 0.55)
-}
-
-/// The focus-ring border color refinement. Ring alpha already encodes the
-/// focus-visible decision, so this is safe to apply on plain `focus()`
-/// styling: pointer focus renders transparent. The border width is set by the
-/// component (e.g. `.border_1()`), since widths are geometry, not color.
-#[must_use]
-pub fn focus_ring_refinement(palette: &Palette) -> StyleRefinement {
-    StyleRefinement {
-        border_color: Some(crate::theme_binding::hsla(palette.ring)),
-        ..StyleRefinement::default()
-    }
-}
-
-/// Focus ring for a full-width / panel-shaped element (keeps radius intact).
-pub fn apply_focus_ring(mut element: impl Styled, palette: &Palette) -> impl Styled {
-    element.style().refine(&focus_ring_refinement(palette));
-    element
 }
 
 /// Translucent scrim over the window (dialog masks read `palette.surface`).

@@ -118,6 +118,24 @@
 //! ([`CapabilityFindingKind::ReferenceShapeCannotDefer`]): the reference layer
 //! cannot defer itself, and the vocabulary grows only when that layer grows.
 //!
+//! ## Semantic contract vs mounted component
+//!
+//! `taskmanager-ui` owns the SEMANTICS of every entry, but for some
+//! capabilities it owns only a semantic CONTRACT: the capability's
+//! `reference_path` names the module whose behavior defines the result, yet no
+//! shape mounts that component. [`ComponentCapability::is_semantic_contract`]
+//! registers those audited exceptions (currently `SearchInput`). The reference
+//! shape must not claim such a capability through
+//! [`CapabilitySupport::Reference`], which asserts a MOUNTED reference
+//! component; it declares [`CapabilitySupport::Ported`] for the frontend-local
+//! composition instead. A `Reference` claim for a semantic-contract capability
+//! is rejected as [`CapabilityFindingKind::ReferenceComponentNotMounted`]. The
+//! registry therefore distinguishes semantic CONSUMPTION from component
+//! MOUNTING instead of treating the existence of a reference file as delivery
+//! proof. The exception list is an audit result, not a proof that unlisted
+//! capabilities mount their reference component: it grows only when evidence
+//! shows a capability has no mounted reference component.
+//!
 //! [`crate::feature_coverage`] is deliberately NOT symmetric. It is the full
 //! ROADMAP coverage matrix, so its reference shape MAY declare
 //! [`CapabilitySupport::Unsupported`] for a feature the reference surface has
@@ -158,6 +176,16 @@ pub struct CapabilitySemanticSpec {
     pub keyboard_pointer_semantics: &'static str,
     /// Invariant expectations (e.g. side-effect-free cancel, bounds safety, focus containment).
     pub invariant_expectations: &'static str,
+}
+
+impl CapabilitySemanticSpec {
+    /// Whether this specification describes a semantic CONTRACT rather than a
+    /// mounted reference component (see
+    /// [`ComponentCapability::is_semantic_contract`]).
+    #[must_use]
+    pub const fn is_semantic_contract(self) -> bool {
+        self.capability.is_semantic_contract()
+    }
 }
 
 /// One component/surface capability the product offers through its
@@ -241,6 +269,13 @@ pub enum ComponentCapability {
     TextInput,
 
     /// A specialized type-to-filter query input.
+    ///
+    /// This capability is a SEMANTIC CONTRACT, not a mounted reference
+    /// component ([`Self::is_semantic_contract`]): the reference layer owns the
+    /// search semantics, but each shape delivers them through its own
+    /// composition (GPUI's `list_view::search_box_sized`), so the reference
+    /// shape declares [`CapabilitySupport::Ported`] rather than a mounted
+    /// [`CapabilitySupport::Reference`].
     ///
     /// - **User-facing behavior**: A dedicated filter field equipped with a search
     ///   icon, match feedback, and instant list filtering.
@@ -454,6 +489,8 @@ impl ComponentCapability {
     /// semantics (GPUI-05). A root-level existence gate keeps the pairing
     /// real: renaming or removing the reference component breaks the gate
     /// instead of silently orphaning the parallel frontends' declarations.
+    /// For a capability registered as [`Self::is_semantic_contract`] this names
+    /// the module that owns the semantics, not a component any shape mounts.
     #[must_use]
     pub const fn reference_path(self) -> &'static str {
         match self {
@@ -475,16 +512,33 @@ impl ComponentCapability {
             Self::VirtualList => "data/virtual_list.rs",
             Self::Tree => "data/tree.rs",
             Self::Scrollbar => "primitives/scrollbar.rs",
-            // Focus-visible is ring composition, not the modal focus policy:
-            // `styled.rs` owns the toolkit-neutral ring contract
-            // (`focus_ring_refinement`/`apply_focus_ring`) over
-            // `palette.ring`, whose alpha already encodes the
-            // keyboard/pointer modality decision. The modality signal itself
-            // is frontend-owned (GPUI: `gpui_app/root/input_modality.rs`).
-            // `focus.rs` owns the modal trap/restore chain instead — that is
-            // ModalOverlay's invariant, not this capability's.
-            Self::FocusVisible => "styled.rs",
+            // Focus-visible is ring composition, not the modal focus policy.
+            // `palette.ring` (owned by `taskmanager-theme`) already encodes the
+            // keyboard/pointer modality decision in its alpha; each interactive
+            // component composes it inline in its `.focus` hook over the
+            // `theme_binding::hsla` conversion. `primitives/button.rs` is the
+            // canonical control and idiom. The modality signal itself is
+            // frontend-owned (GPUI: `gpui_app/root/input_modality.rs`); the
+            // app-layer ring adapter is `gpui_app/elements/visual.rs`
+            // (`focus_ring`). `focus.rs` owns the modal trap/restore chain
+            // instead — that is ModalOverlay's invariant, not this capability's.
+            Self::FocusVisible => "primitives/button.rs",
         }
+    }
+
+    /// Whether the reference layer owns only this capability's SEMANTICS
+    /// rather than a mounted component. `SearchInput` is the registered
+    /// exception: `taskmanager-ui/src/inputs/search_input.rs` defines the
+    /// contract (search glyph + text field over the shared `TextInputState`),
+    /// but the reference shape reaches the same result through frontend-local
+    /// composition instead of mounting it, so no shape can claim a mounted
+    /// reference component ([`CapabilitySupport::Reference`]). The rule and its
+    /// finding are pinned by
+    /// `semantic_contract_capability_cannot_claim_a_mounted_reference_component`
+    /// in `tests/headless/ui_capabilities.rs`.
+    #[must_use]
+    pub const fn is_semantic_contract(self) -> bool {
+        matches!(self, Self::SearchInput)
     }
 
     /// Returns the explicit, toolkit-neutral semantic specification for this
@@ -614,15 +668,23 @@ impl ComponentCapability {
 /// One frontend's support decision for a capability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CapabilitySupport {
-    /// The reference semantics themselves, owned by `taskmanager-ui`; only
-    /// the GPUI shape may declare this (GPUI-05).
+    /// The reference semantics themselves, owned by `taskmanager-ui`. For a
+    /// component capability this asserts a MOUNTED reference component: the
+    /// shape renders the component named by
+    /// [`ComponentCapability::reference_path`]. Only the GPUI shape may declare
+    /// this (GPUI-05), and never for a capability registered as
+    /// [`ComponentCapability::is_semantic_contract`] (see
+    /// [`CapabilityFindingKind::ReferenceComponentNotMounted`]).
     Reference,
     /// The toolkit/platform supplies the mechanism and its semantics;
     /// `via` names the supplier (e.g. "iced scrollable", "terminal
     /// emulator selection").
     Native { via: &'static str },
     /// A frontend-local port of the reference semantics, with the intent to
-    /// match them (behavior proof stays with the shape's tests).
+    /// match them (behavior proof stays with the shape's tests). For a
+    /// semantic-contract capability this is also the reference shape's honest
+    /// declaration: it composes the reference semantics locally instead of
+    /// mounting a reference component.
     Ported,
     /// Deliberate divergence from the reference semantics, with the
     /// architecture driver stated.
@@ -731,8 +793,19 @@ pub enum CapabilityFindingKind {
     ReferenceOutsideReferenceShape,
     /// The reference shape declared `Ported`/`Divergent`/`Unsupported` —
     /// the shape that owns the semantics cannot port, diverge from, or
-    /// defer itself; grow (or shrink) the shared vocabulary instead.
+    /// defer itself; grow (or shrink) the shared vocabulary instead. The one
+    /// exception is `Ported` for a capability registered as
+    /// [`ComponentCapability::is_semantic_contract`]: the reference layer owns
+    /// only that capability's semantics, so the shape's frontend-local
+    /// composition is the only honest delivery claim.
     ReferenceShapeCannotDefer,
+    /// The reference shape declared [`CapabilitySupport::Reference`] for a
+    /// capability registered as [`ComponentCapability::is_semantic_contract`]:
+    /// the reference layer owns only that capability's semantics, no shape
+    /// mounts the component at `reference_path`, and the honest declaration is
+    /// [`CapabilitySupport::Ported`]. This keeps "the reference file exists"
+    /// from being read as "the reference shape mounts a control".
+    ReferenceComponentNotMounted,
     /// A `Native`/`Divergent`/`Unsupported` decision without its required
     /// supplier/reason text.
     EmptyExplanation,
@@ -771,25 +844,7 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
         let CapabilityCoverageStatus::Declared(support) = status else {
             continue;
         };
-        let kind = if support == CapabilitySupport::Reference
-            && !declaration.frontend.is_capability_reference_shape()
-        {
-            Some(CapabilityFindingKind::ReferenceOutsideReferenceShape)
-        } else if declaration.frontend.is_capability_reference_shape()
-            && matches!(
-                support,
-                CapabilitySupport::Ported
-                    | CapabilitySupport::Divergent { .. }
-                    | CapabilitySupport::Unsupported { .. }
-            )
-        {
-            Some(CapabilityFindingKind::ReferenceShapeCannotDefer)
-        } else if support.explanation().is_some_and(str::is_empty) {
-            Some(CapabilityFindingKind::EmptyExplanation)
-        } else {
-            None
-        };
-        if let Some(kind) = kind {
+        if let Some(kind) = support_finding_kind(declaration.frontend, capability, support) {
             findings.push(CapabilityFinding {
                 frontend: declaration.frontend,
                 capability,
@@ -800,6 +855,44 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
     findings.sort_by_key(|finding| finding.capability);
     findings.dedup();
     findings
+}
+
+/// The shape-discipline finding for one explicit declaration, independent of
+/// drift. Kept separate so [`capability_findings`] stays a flat fold and the
+/// semantic-contract exception stays in one place.
+fn support_finding_kind(
+    frontend: FrontendShape,
+    capability: ComponentCapability,
+    support: CapabilitySupport,
+) -> Option<CapabilityFindingKind> {
+    let reference_shape = frontend.is_capability_reference_shape();
+    let overclaim = if support == CapabilitySupport::Reference {
+        if !reference_shape {
+            Some(CapabilityFindingKind::ReferenceOutsideReferenceShape)
+        } else if capability.is_semantic_contract() {
+            Some(CapabilityFindingKind::ReferenceComponentNotMounted)
+        } else {
+            None
+        }
+    } else if reference_shape
+        && matches!(
+            support,
+            CapabilitySupport::Ported
+                | CapabilitySupport::Divergent { .. }
+                | CapabilitySupport::Unsupported { .. }
+        )
+        && !(support == CapabilitySupport::Ported && capability.is_semantic_contract())
+    {
+        Some(CapabilityFindingKind::ReferenceShapeCannotDefer)
+    } else {
+        None
+    };
+    overclaim.or_else(|| {
+        support
+            .explanation()
+            .is_some_and(str::is_empty)
+            .then_some(CapabilityFindingKind::EmptyExplanation)
+    })
 }
 
 /// The fold against a restricted known set — the seam that keeps the

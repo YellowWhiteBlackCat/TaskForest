@@ -6,7 +6,8 @@ use std::path::Path;
 use taskmanager_ui_contract::{capability_drift, capability_findings, capability_report};
 
 /// Contract gate: every capability is declared exactly once with an
-/// explicit decision, and this shape owns the reference role everywhere.
+/// explicit decision, and this shape owns the reference role everywhere
+/// except an audited semantic contract, which it composes locally.
 #[test]
 fn declaration_covers_every_capability_as_the_reference() {
     let declaration = capability_declaration();
@@ -23,10 +24,12 @@ fn declaration_covers_every_capability_as_the_reference() {
         capability_findings(&declaration)
     );
     assert!(
-        declaration
-            .entries
-            .iter()
-            .all(|entry| entry.support == CapabilitySupport::Reference)
+        declaration.entries.iter().all(|entry| match entry.support {
+            CapabilitySupport::Reference => !entry.capability.is_semantic_contract(),
+            CapabilitySupport::Ported => entry.capability.is_semantic_contract(),
+            _ => false,
+        }),
+        "the reference shape declares Reference for mounted components and Ported for semantic contracts"
     );
 }
 

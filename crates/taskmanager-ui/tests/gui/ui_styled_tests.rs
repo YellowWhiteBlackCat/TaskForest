@@ -1,5 +1,4 @@
-use super::{active_fill, blend, disabled_fg, focus_ring_refinement, hover_fill, scrim};
-use gpui::Hsla;
+use super::{active_fill, blend, disabled_fg, hover_fill, scrim};
 use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{Color, Theme};
 
@@ -45,14 +44,6 @@ fn disabled_fg_is_muted_relative_to_fg() {
     let p = palette();
     let d = disabled_fg(&p);
     assert_ne!(d, p.fg);
-}
-
-#[test]
-fn focus_ring_uses_palette_ring() {
-    let p = palette();
-    let refinement = focus_ring_refinement(&p);
-    let ring_color: Hsla = crate::theme_binding::hsla(p.ring);
-    assert_eq!(refinement.border_color, Some(ring_color));
 }
 
 #[test]

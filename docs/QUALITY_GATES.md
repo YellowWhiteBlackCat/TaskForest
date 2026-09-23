@@ -19,6 +19,7 @@
 | doctests / rustdoc | 文档代码和公开 API 链接 |
 | fallback feature matrix | 验证可选 provider 不产生产品 SKU 分叉 |
 | CORE-04 functional matrix | 验证每个产品意图在 GPUI/Iced/TUI/Bevy 都有显式 surface decision |
+| capability delivery registry | 拒绝参考层把语义合同能力声明为已挂载组件（`Reference`）；语义合同须声明 `Ported` |
 
 CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 stable 最新版；
 `Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。

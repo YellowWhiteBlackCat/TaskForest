@@ -34,6 +34,16 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 释放时同步主选择区；同一窗口只有一个活动文本选择，新选择必须清除旧高亮。密集表格必须
 先解决与行选择、双击和列拖动的仲裁，不能直接套用。
 
+## 参考语义与组件挂载
+
+`taskmanager-ui` 拥有每条能力的语义，但这不等于每个能力都挂载了同名参考组件。能力注册表在
+语义合同（semantic contract）与已挂载组件（mounted component）之间做 typed 区分：
+`ComponentCapability::reference_path` 指向定义该能力语义的模块；当没有任何前端挂载该组件、
+各端各自组合同一套语义时，该能力登记为语义合同（`is_semantic_contract`，当前只有 `SearchInput`）。
+参考端 GPUI 对语义合同能力声明 `Ported`（前端本地组合），不得声明 `Reference`；把“参考文件存在”
+当成“参考端挂载了控件”会触发 `ReferenceComponentNotMounted` 门禁。语义合同集合只按证据增长，
+未登记的能力沿用其既有参考声明，不等于已证明组件被挂载。
+
 ## 尺寸与密度合同
 
 - 桌面界面尺寸只有 `UiSize::{Small, Standard, Large}` 一条产品轴；Standard 是新安装和旧配置
