@@ -113,6 +113,14 @@ installed_size=$(du -sk --exclude=DEBIAN "$work/usr" | cut -f1)
 mkdir -p "$work/DEBIAN"
 chmod 755 "$work/DEBIAN"
 
+# control-common carries fixed `Replaces`/`Breaks` on the pre-split frontend
+# packages (taskforest/-i/-b, all earlier than 0.2.0). They let dpkg move the
+# shared hicolor icon out of an installed frontend into this data package
+# instead of failing the upgrade with "trying to overwrite ... which is also in
+# package ..." (Debian Policy 7.6.1). The 0.2.0 boundary is the first release
+# that ships taskforest-common (CHANGELOG 0.2.0); it names the split and must
+# not be replaced with __VERSION__, which would float and eventually break a
+# compatible frontend.
 control_src="$script_dir/control-common"
 [[ -f "$control_src" ]] || { echo "build-deb-common: missing control template $control_src" >&2; exit 1; }
 
