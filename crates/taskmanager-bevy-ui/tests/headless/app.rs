@@ -260,6 +260,35 @@ fn unshared_actions_never_invent_pages() {
     );
 }
 
+/// The nav label is a shared fact, not a frontend choice: every route that
+/// maps onto a shared `AppPage` must render the shell's `page_help()` label —
+/// the same `page_label` fold the GPUI and TUI nav strips render. A future
+/// locally chosen key (the `tab.apphistory` deviation this pins against) fails
+/// here.
+#[test]
+fn nav_labels_consume_the_shared_page_descriptor() {
+    for help in taskmanager_shell::page_help() {
+        let page = page_for_action(taskmanager_application::AppAction::SelectPage(help.page))
+            .expect("every shared page routes in this frontend");
+        assert_eq!(
+            page.nav_label(),
+            help.label,
+            "the {page:?} tab word must come from the shared descriptor"
+        );
+    }
+    // The exact deviation this pins: AppHistory renders the shared short tab
+    // word, never the longer command word a local `tab.apphistory` key gave.
+    assert_eq!(
+        Page::AppHistory.nav_label(),
+        taskmanager_application::i18n::t("tab.apphistory_short")
+    );
+    assert_ne!(
+        Page::AppHistory.nav_label(),
+        taskmanager_application::i18n::t("tab.apphistory"),
+        "a locally chosen full-word key must not leak into the tab"
+    );
+}
+
 // ---- nav highlight model ----
 
 #[test]

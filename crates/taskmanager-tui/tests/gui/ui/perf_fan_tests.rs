@@ -155,8 +155,16 @@ fn thermal_zone_lines_traverse_every_temperature_reading_and_name_its_source() {
 
     assert_eq!(
         text[0],
+        taskmanager_application::i18n::t("common.thermal_zones"),
+        "the group is headed by its own thermal-zone surface label: {text:?}"
+    );
+    // The heading must NOT be the same catalog word the fan block uses for its
+    // same-device temperature channel, or the page would label the device row
+    // and the system group with one duplicated word.
+    assert_ne!(
+        taskmanager_application::i18n::t("common.thermal_zones"),
         taskmanager_application::i18n::t("common.temperature"),
-        "the group is headed by the shared temperature label: {text:?}"
+        "the system group and the device temperature row must not share one label"
     );
     assert_eq!(
         &text[1..],

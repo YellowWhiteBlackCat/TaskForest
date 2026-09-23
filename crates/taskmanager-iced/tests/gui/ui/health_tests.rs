@@ -10,14 +10,14 @@ fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
     bogomips_only.cpu.frequency_source =
         taskmanager_core::core::metrics::CpuFrequencySource::BogoMips;
 
-    let rows = health_rows(&bogomips_only);
+    let rows = health_rows(&bogomips_only, Language::En);
     // A BogoMIPS-only host must read the BogoMIPS readout, never "MHz".
     let cpu = rows.iter().find(|row| row.label == "CPU").expect("CPU row");
     assert!(cpu.value.contains("BogoMIPS"));
     assert!(!cpu.value.contains("MHz"));
 
     // The untouched native fixture stays an MHz clock.
-    let native = health_rows(snapshot);
+    let native = health_rows(snapshot, Language::En);
     let native_cpu = native
         .iter()
         .find(|row| row.label == "CPU")
@@ -30,7 +30,7 @@ fn health_rows_cover_every_domain_with_fixture_values() {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let shell = demo_app();
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
-    let rows = health_rows(snapshot);
+    let rows = health_rows(snapshot, Language::En);
 
     assert_eq!(rows.len(), 8);
     let row = |label: &str| rows.iter().find(|row| row.label == label).expect(label);
@@ -38,8 +38,8 @@ fn health_rows_cover_every_domain_with_fixture_values() {
     assert!(row("CPU").value.contains("37.4%"));
     assert!(row("Memory").healthy);
     assert!(row("Memory").value.contains("GiB"));
-    assert!(row("Networks").healthy);
-    assert!(row("Networks").value.contains("wlan0"));
+    assert!(row("Network").healthy);
+    assert!(row("Network").value.contains("wlan0"));
     assert!(row("GPU").healthy);
     assert!(row("GPU").value.contains("Intel Graphics (xe)"));
     assert!(row("System").healthy);
@@ -49,7 +49,7 @@ fn health_rows_cover_every_domain_with_fixture_values() {
 #[test]
 fn health_rows_stay_honest_when_domains_are_absent() {
     let snapshot = SystemSnapshot::default();
-    let rows = health_rows(&snapshot);
+    let rows = health_rows(&snapshot, Language::En);
     assert_eq!(rows.len(), 7);
     for row in &rows {
         assert!(!row.healthy, "{} must not claim health", row.label);
@@ -70,6 +70,177 @@ fn health_modal_renders_with_and_without_telemetry() {
         taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(None)),
     );
     let _view = render(&app);
+}
+
+/// The device-summary labels and composed values resolve through the active
+/// locale: the shared domain terms come from the shared catalog, the count
+/// templates and the System row from the iced dictionary. These assert the
+/// resolved rows (not the source key literals) in both tongues.
+#[test]
+fn health_rows_resolve_labels_and_values_in_both_locales() {
+    let shell = demo_app();
+    let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
+
+    let labels = |language: Language| {
+        health_rows(snapshot, language)
+            .into_iter()
+            .map(|row| row.label)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        labels(Language::En),
+        [
+            "Health", "CPU", "Memory", "Swap", "Disk", "Network", "GPU", "System"
+        ]
+    );
+    assert_eq!(
+        labels(Language::Zh),
+        [
+            "健康度",
+            "CPU",
+            "内存",
+            "交换空间",
+            "磁盘",
+            "网络",
+            "GPU",
+            "系统"
+        ]
+    );
+
+    let value = |language: Language, label: &str| {
+        health_rows(snapshot, language)
+            .into_iter()
+            .find(|row| row.label == label)
+            .expect(label)
+            .value
+    };
+    assert_eq!(value(Language::En, "Disk"), "1 device · TiPro9000 2TB");
+    assert_eq!(value(Language::En, "Network"), "1 interface · wlan0");
+    assert_eq!(value(Language::En, "GPU"), "1 GPU · Intel Graphics (xe)");
+    assert_eq!(value(Language::Zh, "磁盘"), "1 个设备 · TiPro9000 2TB");
+    assert_eq!(value(Language::Zh, "网络"), "1 个接口 · wlan0");
+    assert_eq!(value(Language::Zh, "GPU"), "1 个 GPU · Intel Graphics (xe)");
+
+    let en_system = value(Language::En, "System");
+    assert!(en_system.starts_with("uptime "), "{en_system}");
+    assert!(en_system.contains(" · 347 processes · "), "{en_system}");
+    assert!(en_system.ends_with(" threads"), "{en_system}");
+    let zh_system = value(Language::Zh, "系统");
+    assert!(zh_system.starts_with("运行时间 "), "{zh_system}");
+    assert!(zh_system.contains(" · 347 个进程 · "), "{zh_system}");
+    assert!(zh_system.ends_with(" 个线程"), "{zh_system}");
+}
+
+/// The modal chrome (subtitle), status cells, thermal badge tags, and the two
+/// sensor-panel headings resolve in both locales. The status cells reuse the
+/// shared verdict/absence vocabulary the TUI health overlay already renders.
+#[test]
+fn health_modal_chrome_resolves_in_both_locales() {
+    for (key, en, zh) in [
+        (
+            Key::HealthObservedHint,
+            "Observed samples only · Esc closes",
+            "仅显示已观测样本 · Esc 关闭",
+        ),
+        (
+            Key::HealthThermalHeatmap,
+            "Thermal Heatmap & Sensors",
+            "温度热图与传感器",
+        ),
+        (
+            Key::HealthSensorsThermal,
+            "Sensors & Thermal Health",
+            "传感器与温度健康",
+        ),
+        (Key::HealthVerdictOk, "ok", "正常"),
+        (Key::HealthUnavailable, "Unavailable", "不可用"),
+        (Key::HealthThermalCool, "Cool", "凉爽"),
+        (Key::HealthThermalNormal, "Normal", "正常"),
+        (Key::HealthThermalWarm, "Warm", "偏热"),
+        (Key::HealthThermalHot, "Hot", "过热"),
+    ] {
+        assert_eq!(i18n::t(Language::En, key), en, "{key:?} en");
+        assert_eq!(i18n::t(Language::Zh, key), zh, "{key:?} zh");
+    }
+}
+
+/// Every shared product term the iced summary now renders points at the
+/// existing catalog key and resolves to the same string the shared catalog
+/// resolves (so the two dictionaries cannot drift), in both locales.
+#[test]
+fn health_shared_terms_match_the_shared_catalog_in_both_locales() {
+    let prior = taskmanager_application::i18n::current_language();
+    for (key, code) in [
+        (Key::Cpu, "common.cpu"),
+        (Key::Memory, "common.memory"),
+        (Key::Swap, "mem.swap"),
+        (Key::Disk, "common.disk"),
+        (Key::Network, "common.network"),
+        (Key::Gpu, "common.gpu"),
+        (Key::SystemDomain, "system.title"),
+        (Key::HealthScore, "system.health_score"),
+        (Key::HealthUnavailable, "health.unavailable"),
+        (Key::HealthVerdictOk, "health.verdict_ok"),
+    ] {
+        assert_eq!(key.code(), code, "{key:?} must name the shared catalog key");
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+        assert_eq!(
+            i18n::t(Language::En, key),
+            taskmanager_application::i18n::t(code),
+            "{key:?} en"
+        );
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+        assert_eq!(
+            i18n::t(Language::Zh, key),
+            taskmanager_application::i18n::t(code),
+            "{key:?} zh"
+        );
+    }
+    taskmanager_application::i18n::set_language(prior);
+}
+
+/// The synthesized CPU/GPU thermal-pill labels resolve through the active
+/// locale too: the CPU package sensor and the branded/unbranded GPU labels are
+/// named in the same tongue as the rest of the panel.
+#[test]
+fn thermal_reading_labels_resolve_in_both_locales() {
+    use taskmanager_core::core::metrics::{
+        CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations, ScalarObservation,
+    };
+
+    let mut branded = GpuMetrics::new("", "Test GPU");
+    branded.apply_scalar_observations(GpuScalarObservations {
+        temperature_c: ScalarObservation::available(82.0, 1),
+        ..Default::default()
+    });
+    let mut unbranded = GpuMetrics::new("", "");
+    unbranded.apply_scalar_observations(GpuScalarObservations {
+        temperature_c: ScalarObservation::available(50.0, 1),
+        ..Default::default()
+    });
+    let snapshot = SystemSnapshot {
+        cpu: CpuMetrics::from_observations(CpuScalarObservations {
+            temperature_c: ScalarObservation::available(65.0, 1),
+            ..Default::default()
+        }),
+        gpu: vec![branded, unbranded],
+        ..Default::default()
+    };
+
+    let labels = |language: Language| {
+        projection::thermal_readings(&snapshot, language)
+            .into_iter()
+            .map(|(label, _)| label)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        labels(Language::En),
+        ["CPU Package", "GPU 0 (Test GPU)", "GPU 1"]
+    );
+    assert_eq!(
+        labels(Language::Zh),
+        ["CPU 封装", "GPU 0 (Test GPU)", "GPU 1"]
+    );
 }
 
 mod thermal_zone_tests {
@@ -202,7 +373,7 @@ mod thermal_zone_tests {
             .as_ref()
             .expect("seeded sensor projection");
         assert!(
-            thermal_zone_sensor_panel(projected, app.theme()).is_some(),
+            thermal_zone_sensor_panel(projected, app.theme(), Language::En).is_some(),
             "a temperature channel must produce the thermal-zone panel"
         );
         let _view = render(&app);
@@ -212,7 +383,7 @@ mod thermal_zone_tests {
             ..Default::default()
         };
         assert!(
-            thermal_zone_sensor_panel(&fan_only, app.theme()).is_none(),
+            thermal_zone_sensor_panel(&fan_only, app.theme(), Language::En).is_none(),
             "a snapshot without a temperature channel has no thermal-zone surface"
         );
     }
@@ -270,6 +441,42 @@ mod thermal_zone_tests {
         assert!(
             rows.iter().all(|row| !row.value.contains("0.0 °C")),
             "an unreadable zone must never fabricate a temperature: {rows:?}"
+        );
+    }
+
+    /// The zone heading is a localized system surface label, not the shared
+    /// device-temperature quantity word. Both locales must resolve the iced
+    /// dictionary's `common.thermal_zones` key (the same catalog spelling the
+    /// other frontends use) and differ from the shared catalog's
+    /// `common.temperature`, which stays the device channel label.
+    #[test]
+    fn thermal_zone_heading_resolves_the_shared_zone_key_in_both_locales() {
+        let prior = taskmanager_application::i18n::current_language();
+
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+        let en_heading = crate::i18n::t(crate::i18n::Language::En, crate::i18n::Key::ThermalZones);
+        let en_temperature = taskmanager_application::i18n::t("common.temperature");
+
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+        let zh_heading = crate::i18n::t(crate::i18n::Language::Zh, crate::i18n::Key::ThermalZones);
+        let zh_temperature = taskmanager_application::i18n::t("common.temperature");
+
+        taskmanager_application::i18n::set_language(prior);
+
+        assert_eq!(
+            crate::i18n::Key::ThermalZones.code(),
+            "common.thermal_zones",
+            "the iced key must spell the shared catalog key"
+        );
+        assert_eq!(en_heading, "Thermal zones");
+        assert_eq!(zh_heading, "温度区");
+        assert_ne!(
+            en_heading, en_temperature,
+            "the zone heading must not reuse the device temperature quantity word"
+        );
+        assert_ne!(
+            zh_heading, zh_temperature,
+            "the zone heading must not reuse the device temperature quantity word"
         );
     }
 }

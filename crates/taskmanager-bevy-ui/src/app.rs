@@ -168,29 +168,55 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    /// Rail label through the shared tab vocabulary — the same label fold
-    /// every frontend uses (ARCH §8 semantic-parity law; Processes renders
-    /// the Applications tab word, exactly like GPUI's nav). Locale keys:
-    /// `tab.apps`, `tab.performance`, `tab.services`, `tab.startup`,
-    /// `tab.users`, `tab.alerts`, `tab.settings`, `tab.apphistory`.
-    #[must_use]
-    pub(crate) fn nav_label(self) -> String {
-        taskmanager_application::i18n::t(self.label_key()).to_owned()
+    /// The shared `AppPage` this route renders, for the routes that exist in
+    /// the shared application vocabulary. Containers, Alerts, and Settings are
+    /// frontend-owned and have no shared page shape.
+    pub(crate) const fn shared_page(self) -> Option<AppPage> {
+        match self {
+            Page::Processes => Some(AppPage::Applications),
+            Page::Performance => Some(AppPage::Performance),
+            Page::Services => Some(AppPage::Services),
+            Page::System => Some(AppPage::System),
+            Page::Startup => Some(AppPage::Startup),
+            Page::Sessions => Some(AppPage::Users),
+            Page::AppHistory => Some(AppPage::AppHistory),
+            Page::Containers | Page::Alerts | Page::Settings => None,
+        }
     }
 
-    /// The shared locale key for this page's tab word.
-    pub(crate) const fn label_key(self) -> &'static str {
+    /// Rail label. A shared route reads the shell's shared page descriptor
+    /// (`taskmanager_shell::page_help()` — the same `page_label` fold the GPUI
+    /// and TUI nav strips render, ARCH §8 semantic-parity law), so a page's tab
+    /// word cannot drift per frontend. A frontend-owned route keeps its local
+    /// `tab.*` key because it has no shared page shape to consume.
+    #[must_use]
+    pub(crate) fn nav_label(self) -> String {
+        if let Some(page) = self.shared_page()
+            && let Some(help) = taskmanager_shell::page_help()
+                .iter()
+                .find(|help| help.page == page)
+        {
+            return help.label.to_owned();
+        }
+        self.local_label_key().map_or_else(String::new, |key| {
+            taskmanager_application::i18n::t(key).to_owned()
+        })
+    }
+
+    /// The local locale key for a frontend-owned route, or `None` for a route
+    /// that resolves its label through the shared page descriptor.
+    pub(crate) const fn local_label_key(self) -> Option<&'static str> {
         match self {
-            Page::Processes => "tab.apps",
-            Page::Performance => "tab.performance",
-            Page::Services => "tab.services",
-            Page::System => "tab.system",
-            Page::Startup => "tab.startup",
-            Page::Sessions => "tab.users",
-            Page::Containers => "tab.containers",
-            Page::Alerts => "tab.alerts",
-            Page::Settings => "tab.settings",
-            Page::AppHistory => "tab.apphistory",
+            Page::Containers => Some("tab.containers"),
+            Page::Alerts => Some("tab.alerts"),
+            Page::Settings => Some("tab.settings"),
+            Page::Processes
+            | Page::Performance
+            | Page::Services
+            | Page::System
+            | Page::Startup
+            | Page::Sessions
+            | Page::AppHistory => None,
         }
     }
 
