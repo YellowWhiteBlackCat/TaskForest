@@ -114,17 +114,27 @@ mkdir -p "$work/DEBIAN"
 chmod 755 "$work/DEBIAN"
 
 # control-common carries fixed `Replaces`/`Breaks` on the pre-split frontend
-# packages (taskforest/-i/-b, all earlier than 0.2.0). They let dpkg move the
-# shared hicolor icon out of an installed frontend into this data package
-# instead of failing the upgrade with "trying to overwrite ... which is also in
-# package ..." (Debian Policy 7.6.1). The 0.2.0 boundary is the first release
-# that ships taskforest-common (CHANGELOG 0.2.0); it names the split and must
-# not be replaced with __VERSION__, which would float and eventually break a
-# compatible frontend.
+# packages (taskforest/-i/-b). They let dpkg move the shared hicolor icon out
+# of an installed frontend into this data package instead of failing the
+# upgrade with "trying to overwrite ... which is also in package ..." (Debian
+# Policy 7.6.1). The boundary names the FIRST release that ships
+# taskforest-common, held once in packaging/split-version (shared with the RPM
+# spec). It is a historical constant, not the current version: replacing it
+# with __VERSION__ would float and eventually Breaks a compatible frontend.
+# Debian orders `~` below the final release, so the boundary carries the same
+# `-`→`~` transform as the package version (`0.2.0-rc1` → `0.2.0~rc1`); a plain
+# `<< 0.2.0` would also match the prerelease and Break its own frontends.
+split_version_src="$repo/packaging/split-version"
+[[ -f "$split_version_src" ]] || { echo "build-deb-common: missing $split_version_src" >&2; exit 1; }
+split_version_cargo=$(head -n1 "$split_version_src")
+[[ -n "$split_version_cargo" ]] || { echo "build-deb-common: empty $split_version_src" >&2; exit 1; }
+split_version=${split_version_cargo//'-'/'~'}
+
 control_src="$script_dir/control-common"
 [[ -f "$control_src" ]] || { echo "build-deb-common: missing control template $control_src" >&2; exit 1; }
 
 sed -e "s/__VERSION__/$deb_version/" \
+    -e "s/__SPLIT_VERSION__/$split_version/g" \
     -e "s/__ARCH__/$deb_arch/" \
     -e "s/__INSTALLED_SIZE__/$installed_size/" \
     "$control_src" >"$work/DEBIAN/control"

@@ -31,8 +31,9 @@ catalog 为每个平台未注册的期望身份发布 typed 缺席 descriptor（
 归属），"无条目"不是合法的产品答案；机制与不可逆性见
 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 
-只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下 28 项
-产物：四端各 4 个 DEB/RPM 包，加共享数据包 `taskforest-common` 的两架构 DEB/RPM。
+只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应
+Release（预发布 tag 自动标记为 GitHub prerelease）并生成以下 28 项产物：四端各 4 个
+DEB/RPM 包，加共享数据包 `taskforest-common` 的两架构 DEB/RPM。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为 `G`、`I`、`T`、`B`，
 共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
 包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
@@ -87,17 +88,22 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 
 ## 跨代升级
 
-0.2.0 起共享图标资产由 `taskforest-common` 独占。升级由新数据包声明接管，
-避免包管理器报文件归属冲突或留下两代并存的归属：
+共享图标资产自首个携带拆分的发行（本线为预发布 `0.2.0-rc1`）起由 `taskforest-common`
+独占。接管下界是历史常量（首个拆包版本），不是当前版本：它以 Cargo 形式唯一存放在
+`packaging/split-version`，DEB 与 RPM 各用与包版本相同的 `-`→`~` 变换渲染
+（DEB `<<`、RPM `<`），不得各写一份。`~` 在两种排序中均低于正式版，故预发布边界须按
+格式自身排序命名（`0.2.0-rc1` → `0.2.0~rc1`），只接管更旧的旧前端，不会让同一预发布
+版本的 `taskforest-common` 与自己的前端相互 `Breaks`/`Conflicts`；边界不随 tag 或
+`Cargo.toml` 版本浮动，否则最终会错误接管更晚的兼容前端。
 
 - DEB：≤0.1.3 曾发布自带该路径的 `taskforest`、`taskforest-i`、`taskforest-b`；
-  `taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0`）接管，
+  `taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0~rc1`）接管，
   符合 Debian Policy 7.6.1 的拆包规则；
 - RPM：≤0.1.3 只发布过 `taskforest`（GPUI）一个 RPM（其 `%files` 自带该路径），
-  故 `taskforest-common` 的版本化 `Conflicts`（`< 0.2.0`）只列 `taskforest`，
+  故 `taskforest-common` 的版本化 `Conflicts`（`< 0.2.0~rc1`）只列 `taskforest`，
   让 dnf 在同一事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting
   Packages」）；`taskforest-i`/`taskforest-b` 的 RPM spec 首见于未发布的 0.1.4
-  树、从未发布过 RPM，0.2.0 起其 RPM 又移除公共路径，所以不列；也不使用
+  树、从未发布过 RPM，拆分起其 RPM 又移除公共路径，所以不列；也不使用
   `Obsoletes`，因为它会删除前端产品而非升级；
 - MSI：不涉及拆包；`MajorUpgrade` 配合 `AllowSameVersionUpgrades` 与固定的
   `UpgradeCode`/组件 GUID 已覆盖代际替换，四端各持独立 `UpgradeCode` 以并存。
@@ -124,15 +130,16 @@ CI 在构建后使用 Windows Installer 管理提取验证 MSI 数据库和关�
 
 ## 版本与 tag
 
-- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-rcN`；预发布后缀统一连写不带点
-  （如 `v0.1.0-rc5`），与 Cargo 版本、产物文件名逐字一致；
-  semver 按字典序比较预发布标识（`rc10` 会排在 `rc5` 之前），因此 `rcN`
-  只用于个位数编号，需要更多轮次时应直接发布正式版；
+- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-rcN`（本线为 `v0.2.0-rc1`）；预发布后缀统一连写不带点
+  （如 `v0.1.0-rc5`），与 Cargo 版本、产物文件名逐字一致；semver 按字典序比较预发布
+  标识（`rc10` 排在 `rc5` 前），故 `rcN` 仅用于个位数编号，更多轮次应直接发正式版；
 - 默认要求 tag 版本与根 `Cargo.toml` 完全一致；
 - `Cargo.lock` 必须提交且 `cargo metadata --locked` 通过；
 - prerelease tag 自动创建 GitHub prerelease；
 - DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc5` 落盘为 `0.1.0~rc5`
   （~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
+- `packaging/split-version` 是 `taskforest-common` 接管下界的单一来源（Cargo 形式），
+  与 tag 和 `Cargo.toml` 版本独立：固定为首个拆包版本 `0.2.0-rc1`，渲染为 `0.2.0~rc1`；
 - MSI 文件名使用完整 Cargo 版本（含 `rcN` 预发布后缀），与其他产物一致；
   MSI `ProductVersion` 属性只使用数字段 `X.Y.Z`（WiX 要求），由 CI 从完整版本剥离；
 - 每个平台输出独立 SHA-256 清单；
