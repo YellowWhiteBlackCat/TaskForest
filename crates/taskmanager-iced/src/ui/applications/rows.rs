@@ -5,7 +5,7 @@
 //! dispatch and the `RowRender` context are re-exported so callers keep
 //! compiling unchanged.
 
-use super::process_projection::{ProcessRowFacts, ProjectedRow};
+use super::process_projection::{ProcessRowFacts, ProjectedRow, RowCells};
 use super::*;
 use iced::widget::canvas;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -31,7 +31,8 @@ pub(super) fn project_row_element(
         ProjectedRow::GroupHeader { .. } => Some(group_header_row(ctx, row)),
         ProjectedRow::Tree { flat_index, .. } => {
             let process = projection.process_facts(*flat_index)?;
-            Some(tree_node_row(ctx, row, process, zebra))
+            let cells = projection.row_cells(*flat_index)?;
+            Some(tree_node_row(ctx, row, process, cells, zebra))
         }
     }
 }
@@ -47,6 +48,7 @@ fn tree_node_row(
     ctx: &RowRender,
     row: &ProjectedRow,
     process: &ProcessRowFacts,
+    cells: &RowCells,
     zebra: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let ProjectedRow::Tree {
@@ -55,7 +57,6 @@ fn tree_node_row(
         depth,
         has_children,
         collapsed,
-        cells,
         ..
     } = row
     else {

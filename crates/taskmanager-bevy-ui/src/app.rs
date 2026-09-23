@@ -3,13 +3,13 @@
 //! This module is the composition point the M1+ page agents integrate with.
 //! It owns four things, and nothing else in this crate may:
 //!
-//! 1. **The route model** ([`Page`], [`Route`]): a frontend-owned nine-page
+//! 1. **The route model** (`Page`, `Route`): a frontend-owned nine-page
 //!    surface. The shared application vocabulary (`AppPage`) has no
 //!    Processes/Settings/Alerts *page* shape — `AppAction::OpenAlerts` is
 //!    explicitly "the route itself is frontend-owned" — so this enum is the
 //!    bevy frontend's own navigation authority. It maps onto the shared
 //!    pages where they exist and never redefines a shared page's meaning.
-//! 2. **Keyboard routing** ([`route_key_press`]): the frontend-local route
+//! 2. **Keyboard routing** (`route_key_press`): the frontend-local route
 //!    chords (Alt+1..8, bare `P`) resolve here; every other key is forwarded
 //!    through the shell's own routers by [`crate::input`], the real-input
 //!    seam — same chords, same page semantics as the TUI (Alt+1
@@ -17,12 +17,12 @@
 //!    has no shared chord (the TUI binds a frontend-local bare `p`), so it
 //!    gets the same treatment here: a documented frontend-local binding on
 //!    unmodified `P`.
-//! 3. **The shell-state seam** ([`FrontendTrack`] + [`ShellTrack`]): the
+//! 3. **The shell-state seam** (`FrontendTrack` + `ShellTrack`): the
 //!    drain folds platform batches into one `ShellApp`, which lives in the
 //!    bevy `World` as a non-send resource (it memoizes behind `Rc`/`RefCell`).
-//!    [`ShellTrack`] is the typed [`SystemParam`] every page system reads the
+//!    `ShellTrack` is the typed [`SystemParam`] every page system reads the
 //!    projection through — see its docs for the data-entry contract.
-//! 4. **Page mounting** ([`PageContext`], [`PageContent`]): the currently
+//! 4. **Page mounting** (`PageContext`, `PageContent`): the currently
 //!    routed page's content scene is spawned under the content slot and
 //!    rebuilt on every accepted route change. Page modules expose one
 //!    `content(&PageContext) -> impl Scene` function; see `crate::pages`.
@@ -383,48 +383,70 @@ pub(crate) fn request_route(route: &mut Route, page: Page, commands: &mut Comman
     }
 }
 
+/// Every mounted nav item with the state the highlight observer reads and
+/// rewrites. A named alias keeps the bundle's field readable; the raw tuple
+/// would trip `clippy::type_complexity`.
+type NavItems<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static NavTarget,
+        &'static Children,
+        &'static mut ControlVisual,
+        Option<&'static PickingInteraction>,
+        Has<Pressed>,
+        &'static mut BackgroundColor,
+    ),
+>;
+
+/// The nav-strip restyle surface: the route authority, the resolved palette,
+/// and the marker queries every nav item, label, and icon plate restyles
+/// through. Bundled as a `SystemParam` (the same policy as
+/// [`crate::pages::processes::TableSurface`]) so the observer's parameter list
+/// stays its dependency list.
+#[derive(SystemParam)]
+struct NavRestyleTargets<'w, 's> {
+    route: Res<'w, Route>,
+    palette: Res<'w, WindowPalette>,
+    items: NavItems<'w, 's>,
+    labels: Query<'w, 's, &'static mut TextColor, With<NavItemLabel>>,
+    inks: Query<'w, 's, &'static mut crate::icons::IconInk>,
+    plates: Query<
+        'w,
+        's,
+        (
+            &'static crate::icons::IconPlate,
+            &'static mut bevy::ui::widget::ImageNode,
+        ),
+    >,
+}
+
 /// Observer: restyle nav items after a route change. The highlight model is
 /// [`nav_item_background`]; this observer is its only applier. Icon plates
 /// restyle through their [`crate::icons::IconInk`] sibling component — the
 /// icon ink and the label ink always move together.
-#[allow(clippy::type_complexity)]
-fn highlight_nav_items(
-    _changed: On<RouteChanged>,
-    route: Res<Route>,
-    palette: Res<WindowPalette>,
-    mut items: Query<(
-        &NavTarget,
-        &Children,
-        &mut ControlVisual,
-        Option<&PickingInteraction>,
-        Has<Pressed>,
-        &mut BackgroundColor,
-    )>,
-    mut labels: Query<&mut TextColor, With<NavItemLabel>>,
-    mut inks: Query<&mut crate::icons::IconInk>,
-    mut plates: Query<(&crate::icons::IconPlate, &mut bevy::ui::widget::ImageNode)>,
-) {
-    for (target, children, mut visual, interaction, pressed, mut fill) in &mut items {
-        let active = target.0 == route.page;
+fn highlight_nav_items(_changed: On<RouteChanged>, mut targets: NavRestyleTargets) {
+    for (target, children, mut visual, interaction, pressed, mut fill) in &mut targets.items {
+        let active = target.0 == targets.route.page;
         *visual = ControlVisual(ControlTone::Nav, active);
         fill.0 = control_background(
             &visual,
             interaction.copied().unwrap_or_default(),
             pressed,
-            &palette.inner,
+            &targets.palette.inner,
         );
         let ink = if active {
-            palette.inner.nav_active_ink
+            targets.palette.inner.nav_active_ink
         } else {
-            palette.inner.dim_color
+            targets.palette.inner.dim_color
         };
         for child in children.iter() {
-            if let Ok(mut color) = labels.get_mut(*child) {
+            if let Ok(mut color) = targets.labels.get_mut(*child) {
                 color.0 = ink;
             }
-            if let Ok(mut icon_ink) = inks.get_mut(*child) {
+            if let Ok(mut icon_ink) = targets.inks.get_mut(*child) {
                 icon_ink.0 = ink;
-                if let Ok((_, mut node)) = plates.get_mut(*child) {
+                if let Ok((_, mut node)) = targets.plates.get_mut(*child) {
                     node.color = ink;
                 }
             }

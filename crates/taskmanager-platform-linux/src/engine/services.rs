@@ -17,14 +17,21 @@ pub use init_runtime::InitSystem;
 pub(crate) mod inventory;
 mod parsing;
 mod target;
-#[cfg(any(test, feature = "test-support"))]
-#[allow(unused_imports)]
-pub use parsing::{
-    parse_openrc_description, parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps,
-    parse_systemctl_show_diagnostics, parse_systemctl_show_inventory, parse_unit_description,
-};
+// In-crate tests and external `test-support` consumers both read the parsers
+// through `services`; `parse_openrc_description` and `parse_unit_description`
+// are read only outside `cfg(test)` — the former by external service tests and
+// the latter by root `tests/logic/services_test.rs` — so both are gated on the
+// feature alone. Splitting the two keeps each re-export consumed in the build
+// that compiles it, without silencing the lint.
+#[cfg(feature = "test-support")]
+pub use parsing::{parse_openrc_description, parse_unit_description};
 #[cfg(not(any(test, feature = "test-support")))]
 pub(crate) use parsing::{parse_openrc_status, parse_openrc_update};
+#[cfg(any(test, feature = "test-support"))]
+pub use parsing::{
+    parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps,
+    parse_systemctl_show_diagnostics, parse_systemctl_show_inventory,
+};
 pub(crate) use target::{valid_openrc_service_name, valid_systemd_service_name};
 
 use std::collections::HashSet;

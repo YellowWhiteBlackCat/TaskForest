@@ -37,12 +37,6 @@ pub enum ProcessMenuAction {
     CopyCommandLine,
 }
 
-impl ProcessMenuAction {
-    /// Alias for `OpenLocation` for complete parity across product vocabularies.
-    #[allow(non_upper_case_globals)]
-    pub const OpenFileLocation: Self = Self::OpenLocation;
-}
-
 impl IcedApp {
     /// Apply one renderer-local menu choice after re-resolving the selected
     /// live identity against the current process snapshot. A refresh cannot

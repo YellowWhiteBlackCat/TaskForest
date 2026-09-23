@@ -127,7 +127,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
 
 /// Complete coverage for process context actions and popover state:
 /// EndTask, Kill, Suspend, Resume, Priority tiers (High/Normal/Low),
-/// EfficiencyMode, Affinity, OpenFileLocation, and SearchOnline.
+/// EfficiencyMode, Affinity, OpenLocation, and SearchOnline.
 #[test]
 fn process_action_menu_popover_provides_complete_action_coverage() {
     use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
@@ -220,11 +220,7 @@ fn process_action_menu_popover_provides_complete_action_coverage() {
     let _ = app.update(Message::DismissOverlay);
     assert!(!app.affinity_open(), "dismiss closes affinity modal");
 
-    // 8. OpenFileLocation / OpenLocation
-    assert_eq!(
-        ProcessMenuAction::OpenFileLocation,
-        ProcessMenuAction::OpenLocation
-    );
+    // 8. OpenLocation
     app.shell.clear_feedback_notice();
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     let direct_location = app.process_location_effect();
@@ -235,13 +231,11 @@ fn process_action_menu_popover_provides_complete_action_coverage() {
         ),
         "process_location_effect produces RevealResource effect"
     );
-    let _ = app.update(Message::ProcessMenuAction(
-        ProcessMenuAction::OpenFileLocation,
-    ));
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::OpenLocation));
     assert!(app.process_menu_identity().is_none());
     assert!(
         app.shell.feedback_text().contains("Demo mode"),
-        "OpenFileLocation routes to platform effect: {}",
+        "OpenLocation routes to platform effect: {}",
         app.shell.feedback_text()
     );
 
