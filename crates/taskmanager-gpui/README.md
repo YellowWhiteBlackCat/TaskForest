@@ -265,6 +265,8 @@ src/assets.rs  capture.rs  run.rs      assets, evidence capture, binary entry
 src/window_presentation.rs             layer-shell / standalone host adapter
 src/gpui_app.rs                        RootView composition root
 ├── root/                              root view layout and lifecycle
+│   ├── render.rs  render/             page rendering and shell composition
+│   └── render/pages/                  page bodies (inventory, performance, apps, system)
 ├── chrome.rs  containers_view.rs      window skeleton and containers
 ├── sidebar/                           navigation sidebar
 ├── dashboard/                         dashboard page and cards
