@@ -8,6 +8,15 @@ use std::collections::HashSet;
 
 use taskmanager_core::process::ProcessItem;
 
+/// A process's CPU percentage is normalised **per core** (the `top`/`htop`
+/// convention): the Linux adapter divides the CPU-tick delta by the elapsed
+/// wall time rather than by the machine's capacity, so a multi-threaded
+/// process legitimately reports more than 100% (212% means 2.12 cores). The
+/// row invariant therefore cannot cap at 100%. It still rejects corrupt
+/// arithmetic with a bound no real host can reach: 100% of every core on a
+/// machine with up to 1024 logical CPUs.
+const MAX_PLAUSIBLE_CPU_PERCENTAGE: f32 = 100.0 * 1024.0;
+
 /// Every row must be internally consistent and the snapshot must not contain
 /// duplicate identities.
 pub fn assert_process_rows_consistent(rows: &[ProcessItem]) -> Result<(), String> {
@@ -24,9 +33,9 @@ pub fn assert_process_rows_consistent(rows: &[ProcessItem]) -> Result<(), String
             if !cpu_usage.is_finite() {
                 violations.push(format!("pid {} reported non-finite CPU usage", row.pid));
             }
-            if !(0.0..=100.0).contains(&cpu_usage) {
+            if !(0.0..=MAX_PLAUSIBLE_CPU_PERCENTAGE).contains(&cpu_usage) {
                 violations.push(format!(
-                    "pid {} reported CPU {cpu_usage:.3} outside [0,100]",
+                    "pid {} reported CPU {cpu_usage:.3} outside [0,{MAX_PLAUSIBLE_CPU_PERCENTAGE:.0}]",
                     row.pid
                 ));
             }

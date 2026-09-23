@@ -21,10 +21,22 @@ fn duplicate_pids_fail() {
 }
 
 #[test]
-fn out_of_range_cpu_fails() {
+fn multi_core_cpu_above_one_hundred_percent_passes() {
+    // Per-core normalisation: 212% means the process used 2.12 cores, which a
+    // multi-threaded build legitimately does on a loaded host.
     let mut item = row(1, None);
     item.apply_scalar_observations(ProcessScalarObservations {
-        cpu_percentage: ScalarObservation::available(101.0, 1),
+        cpu_percentage: ScalarObservation::available(212.0, 1),
+        ..Default::default()
+    });
+    assert_eq!(assert_process_rows_consistent(&[item]), Ok(()));
+}
+
+#[test]
+fn implausible_cpu_fails() {
+    let mut item = row(1, None);
+    item.apply_scalar_observations(ProcessScalarObservations {
+        cpu_percentage: ScalarObservation::available(1.0e9, 1),
         ..Default::default()
     });
     assert!(assert_process_rows_consistent(&[item]).is_err());
