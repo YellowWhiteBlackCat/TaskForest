@@ -1,5 +1,11 @@
 # Workspace-wide structural ratchets. These are deliberately global rather
 # than per-file allowlists: new code cannot exceed the largest audited legacy
 # function while named-system refactors continue lowering the ceiling.
-cognitive-complexity-threshold = 48
-too-many-lines-threshold = 650
+#
+# Lowered from 48/650 after the W27 refactors (windows/macos facet-surface
+# assertion batteries, gpui `run_production`) removed every function above 44.
+# The next target is 44/500: `platform-runtime::channel::construction::build`
+# (591) and `gpui::render_page_body` (563) must be split into named helpers
+# first, and the threshold may only move in the same change as that refactor.
+cognitive-complexity-threshold = 44
+too-many-lines-threshold = 600

@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Fail-closed wiring guard: two hosts must keep enforcing the production-config gate.
+"""Fail-closed wiring guard: three hosts must keep enforcing the production-config gate.
 
 ``scripts/quality/production-config-check.sh`` closes a real blind spot: every
 clippy stage and every nextest layer compiles with the dev-only ``test-support``
 feature, so frontend code that only compiles when that feature is OFF (typically
 a ``#[cfg(any(test, feature = "test-support"))]`` debug selector) had no local
 gate at all. W19-A brought the check home, W20-A wired it into CI, W21-A made its
-external deadline portable, and W24-C documented the rule.
+external deadline portable, W24-C documented the rule, and W27-C brought the
+macOS portability lane under the same assertion.
 
 Those rounds only proved the gate was wired *at that time*. A later refactor can
-delete the CI step, move it to another job, mark it ``continue-on-error``,
-comment it out, or drop the local stage — and every remaining signal stays
-green: the helper script still exists and still passes when someone runs it by
-hand. This guard turns "wired once" into a mechanical invariant over the two
-hosts that must keep enforcing it:
+delete a step, move it to another job, mark it ``continue-on-error``, comment it
+out, or drop the local stage — and every remaining signal stays green: the
+helper script still exists and still passes when someone runs it by hand. This
+guard turns "wired once" into a mechanical invariant over the three hosts that
+must keep enforcing it:
 
 ``scripts/quality/local-gates.sh`` (standard tier)
     the stage named ``production-config`` must contain exactly one live
@@ -24,17 +25,23 @@ hosts that must keep enforcing it:
     exactly one live ``run:`` step must invoke
     ``bash scripts/quality/production-config-check.sh`` and must not be
     neutralised with ``continue-on-error``.
+``.github/workflows/portability.yml`` (``macos`` job)
+    exactly one live ``run:`` step must invoke
+    ``bash scripts/quality/production-config-check.sh iced tui bevy`` and must
+    not be neutralised with ``continue-on-error``; that job is the only native
+    macOS compile of the Iced/TUI/Bevy product configurations, so losing the
+    step would silently restore the ``test-support`` blind spot on that host.
 
 The question this guard answers is "is the gate still enforced", not "is the
 command text identical": flag-for-flag comparison belongs to the helper
 script's own contract and to ``clippy_command_parity_guard.py``. Structural
 drift is a finding (exit 1); anything the guard cannot statically locate — a
-missing file, no ``lint`` job, an ambiguous second invocation, a missing stage
-block — is a parse failure (exit 2), so a reformat can never be mistaken for a
-passing gate.
+missing file, no ``lint``/``macos`` job, an ambiguous second invocation, a
+missing stage block — is a parse failure (exit 2), so a reformat can never be
+mistaken for a passing gate.
 
-Exit codes: 0 both hosts enforce the gate, 1 a host no longer does, 2 parse
-failure. ``--json`` emits the same verdict machine-readably.
+Exit codes: 0 all three hosts enforce the gate, 1 a host no longer does, 2
+parse failure. ``--json`` emits the same verdict machine-readably.
 
 Usage::
 
@@ -55,14 +62,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CI_WORKFLOW = ".github/workflows/ci.yml"
+CI_JOB = "lint"
+PORTABILITY_WORKFLOW = ".github/workflows/portability.yml"
+PORTABILITY_JOB = "macos"
 LOCAL_GATES = "scripts/quality/local-gates.sh"
 GATE_SCRIPT = "scripts/quality/production-config-check.sh"
 GATE_BASENAME = "production-config-check.sh"
-CI_JOB = "lint"
 LOCAL_STAGE = "production-config"
 LOCAL_TIER = "standard"
 
 CI_SITE = f"{CI_WORKFLOW} (job {CI_JOB})"
+PORTABILITY_SITE = f"{PORTABILITY_WORKFLOW} (job {PORTABILITY_JOB})"
 LOCAL_SITE = f"{LOCAL_GATES} ({LOCAL_TIER} tier, stage {LOCAL_STAGE})"
 
 LINE_CONTINUATION = re.compile(r"\\\n[ \t]*")
@@ -139,19 +149,54 @@ class WiringSite:
 
 
 @dataclass(frozen=True)
+class RunStepHost:
+    """A workflow job that must keep exactly one live helper invocation."""
+
+    label: str
+    workflow: str
+    job: str
+    site: str
+    missing_detail: str
+
+
+CI_HOST = RunStepHost(
+    label="ci",
+    workflow=CI_WORKFLOW,
+    job=CI_JOB,
+    site=CI_SITE,
+    missing_detail=(
+        f"job '{CI_JOB}' has no live `run:` step invoking {GATE_SCRIPT}; the CI "
+        "prod-config companion no longer enforces the feature-off configuration"
+    ),
+)
+
+PORTABILITY_HOST = RunStepHost(
+    label="portability",
+    workflow=PORTABILITY_WORKFLOW,
+    job=PORTABILITY_JOB,
+    site=PORTABILITY_SITE,
+    missing_detail=(
+        f"job '{PORTABILITY_JOB}' has no live `run:` step invoking {GATE_SCRIPT}; "
+        "the macOS lane no longer enforces the Iced/TUI/Bevy product configurations"
+    ),
+)
+
+
+@dataclass(frozen=True)
 class Report:
     local: WiringSite
     ci: WiringSite
+    portability: WiringSite
 
-    def sites(self) -> tuple[WiringSite, WiringSite]:
-        return (self.local, self.ci)
+    def sites(self) -> tuple[WiringSite, ...]:
+        return (self.local, self.ci, self.portability)
 
     def failures(self) -> list[WiringSite]:
         return [site for site in self.sites() if not site.ok]
 
 
 def verdict(report: Report) -> int:
-    """0 = both hosts enforce the gate, 1 = at least one no longer does."""
+    """0 = all three hosts enforce the gate, 1 = at least one no longer does."""
     return 1 if report.failures() else 0
 
 
@@ -228,7 +273,7 @@ class Step:
     continue_on_error: str | None
 
 
-def yaml_job_blocks(lines: list[str]) -> list[JobBlock]:
+def yaml_job_blocks(lines: list[str], workflow: str) -> list[JobBlock]:
     """Return every top-level job as a line range, without a YAML dependency."""
     jobs_index: int | None = None
     for index, line in enumerate(lines):
@@ -236,7 +281,7 @@ def yaml_job_blocks(lines: list[str]) -> list[JobBlock]:
             jobs_index = index
             break
     if jobs_index is None:
-        raise ParseError(f"{CI_WORKFLOW}: no top-level `jobs:` section")
+        raise ParseError(f"{workflow}: no top-level `jobs:` section")
 
     entries: list[tuple[str, int, int, int]] = []
     job_indent: int | None = None
@@ -252,16 +297,16 @@ def yaml_job_blocks(lines: list[str]) -> list[JobBlock]:
         if job_indent is None:
             job_indent = indent
         if indent < job_indent:
-            raise ParseError(f"{CI_WORKFLOW}:{index + 1}: unexpected dedent under `jobs:`")
+            raise ParseError(f"{workflow}:{index + 1}: unexpected dedent under `jobs:`")
         if indent != job_indent:
             continue
         match = MAPPING_KEY.match(line)
         if match is None:
-            raise ParseError(f"{CI_WORKFLOW}:{index + 1}: job key is not a mapping")
+            raise ParseError(f"{workflow}:{index + 1}: job key is not a mapping")
         entries.append((match.group("key"), index + 1, indent, index))
 
     if not entries:
-        raise ParseError(f"{CI_WORKFLOW}: `jobs:` declares no job")
+        raise ParseError(f"{workflow}: `jobs:` declares no job")
     blocks: list[JobBlock] = []
     for position, (key, line_number, indent, start) in enumerate(entries):
         end = entries[position + 1][3] if position + 1 < len(entries) else jobs_end
@@ -269,13 +314,13 @@ def yaml_job_blocks(lines: list[str]) -> list[JobBlock]:
     return blocks
 
 
-def find_job(blocks: list[JobBlock], key: str) -> JobBlock:
+def find_job(blocks: list[JobBlock], key: str, workflow: str) -> JobBlock:
     matches = [block for block in blocks if block.key == key]
     if not matches:
         declared = ", ".join(block.key for block in blocks)
-        raise ParseError(f"{CI_WORKFLOW}: no job named '{key}' (jobs: {declared})")
+        raise ParseError(f"{workflow}: no job named '{key}' (jobs: {declared})")
     if len(matches) > 1:
-        raise ParseError(f"{CI_WORKFLOW}: `{key}` is declared {len(matches)} times")
+        raise ParseError(f"{workflow}: `{key}` is declared {len(matches)} times")
     return matches[0]
 
 
@@ -296,11 +341,13 @@ def resolve_scalar(lines: list[str], index: int, value: str, field_indent: int) 
     return "\n".join(body).strip("\n")
 
 
-def parse_step(lines: list[str], start: int, end: int, item_indent: int) -> Step:
+def parse_step(
+    lines: list[str], start: int, end: int, item_indent: int, workflow: str
+) -> Step:
     """Parse the top-level fields of one step list item."""
     dash = LIST_ITEM.match(lines[start])
     if dash is None:
-        raise ParseError(f"{CI_WORKFLOW}:{start + 1}: malformed step item")
+        raise ParseError(f"{workflow}:{start + 1}: malformed step item")
 
     candidates: list[tuple[int, int, str, str]] = []
     rest = dash.group("rest")
@@ -339,7 +386,7 @@ def parse_step(lines: list[str], start: int, end: int, item_indent: int) -> Step
     return Step(line=start + 1, name=name, run=run, continue_on_error=continue_on_error)
 
 
-def parse_job_steps(lines: list[str], job: JobBlock) -> list[Step]:
+def parse_job_steps(lines: list[str], job: JobBlock, workflow: str) -> list[Step]:
     """Return the steps of one job, in file order."""
     steps_index: int | None = None
     steps_indent = 0
@@ -353,7 +400,7 @@ def parse_job_steps(lines: list[str], job: JobBlock) -> list[Step]:
             steps_indent = indent
             break
     if steps_index is None:
-        raise ParseError(f"{CI_WORKFLOW}:{job.line}: job '{job.key}' has no `steps:` key")
+        raise ParseError(f"{workflow}:{job.line}: job '{job.key}' has no `steps:` key")
 
     item_indent: int | None = None
     starts: list[int] = []
@@ -383,7 +430,7 @@ def parse_job_steps(lines: list[str], job: JobBlock) -> list[Step]:
     steps: list[Step] = []
     for position, start in enumerate(starts):
         end = starts[position + 1] if position + 1 < len(starts) else list_end
-        steps.append(parse_step(lines, start, end, item_indent or 0))
+        steps.append(parse_step(lines, start, end, item_indent or 0, workflow))
     return steps
 
 
@@ -397,11 +444,12 @@ def commented_references(lines: list[str], start: int, end: int) -> list[int]:
 
 
 # ---------------------------------------------------------------------------
-# CI wiring site
+# Workflow wiring sites
 # ---------------------------------------------------------------------------
 
 
-def _ci_site(
+def _run_step_site(
+    host: RunStepHost,
     ok: bool,
     location: str,
     command: str,
@@ -410,8 +458,8 @@ def _ci_site(
     notes: tuple[str, ...],
 ) -> WiringSite:
     return WiringSite(
-        label="ci",
-        site=CI_SITE,
+        label=host.label,
+        site=host.site,
         ok=ok,
         location=location,
         command=single_line(command),
@@ -421,13 +469,13 @@ def _ci_site(
     )
 
 
-def parse_ci_wiring(text: str) -> WiringSite:
-    """Check the one canonical production-config step of the CI ``lint`` job."""
+def _parse_run_step_wiring(text: str, host: RunStepHost) -> WiringSite:
+    """Check the one canonical production-config step of one workflow job."""
     lines = text.splitlines()
-    job = find_job(yaml_job_blocks(lines), CI_JOB)
-    steps = parse_job_steps(lines, job)
+    job = find_job(yaml_job_blocks(lines, host.workflow), host.job, host.workflow)
+    steps = parse_job_steps(lines, job, host.workflow)
     notes = tuple(
-        f"{CI_WORKFLOW}:{number} names the helper only in a comment"
+        f"{host.workflow}:{number} names the helper only in a comment"
         for number in commented_references(lines, job.start, job.end)
     )
 
@@ -441,40 +489,40 @@ def parse_ci_wiring(text: str) -> WiringSite:
     if len(matched) > 1:
         locations = ", ".join(f"line {step.line}" for step, _ in matched)
         raise ParseError(
-            f"{CI_WORKFLOW}: job '{CI_JOB}' has {len(matched)} steps invoking "
+            f"{host.workflow}: job '{host.job}' has {len(matched)} steps invoking "
             f"{GATE_SCRIPT} ({locations}); the guard pins exactly one canonical step"
         )
     if not matched:
-        return _ci_site(
+        return _run_step_site(
+            host,
             ok=False,
-            location=f"{CI_WORKFLOW} (job {CI_JOB})",
+            location=host.site,
             command="",
             code="missing",
-            detail=(
-                f"job '{CI_JOB}' has no live `run:` step invoking {GATE_SCRIPT}; the CI "
-                "prod-config companion no longer enforces the feature-off configuration"
-            ),
+            detail=host.missing_detail,
             notes=notes,
         )
 
     step, tokens = matched[0]
-    location = f"{CI_WORKFLOW}:{step.line} (job {CI_JOB})"
+    location = f"{host.workflow}:{step.line} (job {host.job})"
     if step.continue_on_error is not None:
         raw = unquote_yaml_scalar(step.continue_on_error).lower()
         if raw != "false":
-            return _ci_site(
+            return _run_step_site(
+                host,
                 ok=False,
                 location=location,
                 command=step.run or "",
                 code="continue_on_error",
                 detail=(
                     f"the step is marked `continue-on-error: {step.continue_on_error.strip()}`; "
-                    "a failing product configuration would no longer fail the lint job"
+                    f"a failing product configuration would no longer fail the {host.job} job"
                 ),
                 notes=notes,
             )
     if "||" in tokens or "&" in tokens:
-        return _ci_site(
+        return _run_step_site(
+            host,
             ok=False,
             location=location,
             command=step.run or "",
@@ -482,7 +530,8 @@ def parse_ci_wiring(text: str) -> WiringSite:
             detail="the command is combined with `||`/`&`, so a failure no longer fails the step",
             notes=notes,
         )
-    return _ci_site(
+    return _run_step_site(
+        host,
         ok=True,
         location=location,
         command=step.run or "",
@@ -490,6 +539,16 @@ def parse_ci_wiring(text: str) -> WiringSite:
         detail="",
         notes=notes,
     )
+
+
+def parse_ci_wiring(text: str) -> WiringSite:
+    """Check the one canonical production-config step of the CI ``lint`` job."""
+    return _parse_run_step_wiring(text, CI_HOST)
+
+
+def parse_portability_wiring(text: str) -> WiringSite:
+    """Check the macOS lane of the portability workflow still runs the helper."""
+    return _parse_run_step_wiring(text, PORTABILITY_HOST)
 
 
 # ---------------------------------------------------------------------------
@@ -685,9 +744,10 @@ def parse_local_wiring(text: str) -> WiringSite:
 
 
 def collect(repository: Path) -> Report:
-    """Read the three files the wiring contract spans."""
+    """Read the four files the wiring contract spans."""
     sources = {
         "ci workflow": repository / CI_WORKFLOW,
+        "portability workflow": repository / PORTABILITY_WORKFLOW,
         "local gate": repository / LOCAL_GATES,
         "helper script": repository / GATE_SCRIPT,
     }
@@ -697,6 +757,9 @@ def collect(repository: Path) -> Report:
     return Report(
         local=parse_local_wiring(sources["local gate"].read_text(encoding="utf-8")),
         ci=parse_ci_wiring(sources["ci workflow"].read_text(encoding="utf-8")),
+        portability=parse_portability_wiring(
+            sources["portability workflow"].read_text(encoding="utf-8")
+        ),
     )
 
 
@@ -811,6 +874,70 @@ SYNTHETIC_CI_LINT_WITHOUT_STEPS = "\n".join(
     ["jobs:", "  lint:", "    runs-on: ubuntu-latest"]
 )
 
+SYNTHETIC_PORTABILITY_OK = "\n".join(
+    [
+        "jobs:",
+        "  windows:",
+        "    steps:",
+        "      - run: bash scripts/quality/production-config-check.sh windows-decoy",
+        "  macos:",
+        "    steps:",
+        "      - uses: actions/checkout@v7",
+        "      - run: cargo build --locked -p taskmanager-gpui --bin taskforest-g",
+        "      - name: Check Iced, TUI, and Bevy product configs on macOS",
+        "        run: bash scripts/quality/production-config-check.sh iced tui bevy",
+    ]
+)
+
+SYNTHETIC_PORTABILITY_COMMENTED_OUT = "\n".join(
+    [
+        "jobs:",
+        "  macos:",
+        "    steps:",
+        "      - run: cargo build --locked -p taskmanager-gpui --bin taskforest-g",
+        "      # - run: bash scripts/quality/production-config-check.sh iced tui bevy",
+    ]
+)
+
+SYNTHETIC_PORTABILITY_CONTINUE_ON_ERROR = "\n".join(
+    [
+        "jobs:",
+        "  macos:",
+        "    steps:",
+        "      - continue-on-error: true",
+        "        run: bash scripts/quality/production-config-check.sh iced tui bevy",
+    ]
+)
+
+SYNTHETIC_PORTABILITY_SWALLOWED = "\n".join(
+    [
+        "jobs:",
+        "  macos:",
+        "    steps:",
+        "      - run: bash scripts/quality/production-config-check.sh "
+        "iced tui bevy || true",
+    ]
+)
+
+SYNTHETIC_PORTABILITY_TWO_INVOCATIONS = "\n".join(
+    [
+        "jobs:",
+        "  macos:",
+        "    steps:",
+        "      - run: bash scripts/quality/production-config-check.sh iced tui bevy",
+        "      - run: bash scripts/quality/production-config-check.sh gpui",
+    ]
+)
+
+SYNTHETIC_PORTABILITY_NO_MACOS_JOB = "\n".join(
+    [
+        "jobs:",
+        "  windows:",
+        "    steps:",
+        "      - run: cargo check --locked -p taskmanager-bevy-ui -j 4",
+    ]
+)
+
 SYNTHETIC_LOCAL_OK = "\n".join(
     [
         '[[ "$tier" == "quick" ]] && exit "$((failures > 0))"',
@@ -916,14 +1043,16 @@ def _expect_parse_error(label: str, function, text: str) -> None:
 
 
 def self_test() -> int:
-    # Both hosts wired: the folded block scalar, the decoy in another job, and
-    # the backslash continuation all parse to a green verdict.
+    # All three hosts wired: the folded block scalar, the decoys in other jobs,
+    # the backslash continuation, and the macOS portability step all parse to a
+    # green verdict.
     report = Report(
         local=parse_local_wiring(SYNTHETIC_LOCAL_OK),
         ci=parse_ci_wiring(SYNTHETIC_CI_OK),
+        portability=parse_portability_wiring(SYNTHETIC_PORTABILITY_OK),
     )
-    assert not report.failures(), "a fully wired pair must pass"
-    assert verdict(report) == 0, "a fully wired pair must map to exit code 0"
+    assert not report.failures(), "a fully wired trio must pass"
+    assert verdict(report) == 0, "a fully wired trio must map to exit code 0"
 
     # Deleting the CI step goes red and keeps the commented-out reference as a note.
     commented = parse_ci_wiring(SYNTHETIC_CI_COMMENTED_OUT)
@@ -935,6 +1064,21 @@ def self_test() -> int:
     neutralised = parse_ci_wiring(SYNTHETIC_CI_CONTINUE_ON_ERROR)
     assert not neutralised.ok and neutralised.code == "continue_on_error"
     assert parse_ci_wiring(SYNTHETIC_CI_FALSE_CONTINUE_ON_ERROR).ok
+
+    # The macOS portability lane is the third asserted host: a live decoy in
+    # the windows job must not satisfy it, while the real step must.
+    portability = parse_portability_wiring(SYNTHETIC_PORTABILITY_OK)
+    assert portability.ok and portability.code == "ok", "a wired macOS lane must pass"
+    portability_commented = parse_portability_wiring(SYNTHETIC_PORTABILITY_COMMENTED_OUT)
+    assert not portability_commented.ok and portability_commented.code == "missing"
+    assert portability_commented.notes, (
+        "a commented-out portability reference must be reported as a note"
+    )
+    portability_neutralised = parse_portability_wiring(SYNTHETIC_PORTABILITY_CONTINUE_ON_ERROR)
+    assert not portability_neutralised.ok
+    assert portability_neutralised.code == "continue_on_error"
+    portability_swallowed = parse_portability_wiring(SYNTHETIC_PORTABILITY_SWALLOWED)
+    assert not portability_swallowed.ok and portability_swallowed.code == "swallowed"
 
     # Local drift: commented out, wrong tier, bypassing run_stage, swallowed, moved.
     commented_local = parse_local_wiring(SYNTHETIC_LOCAL_COMMENTED_OUT)
@@ -959,6 +1103,16 @@ def self_test() -> int:
     _expect_parse_error(
         "lint job without steps", parse_ci_wiring, SYNTHETIC_CI_LINT_WITHOUT_STEPS
     )
+    _expect_parse_error(
+        "portability without the macos job",
+        parse_portability_wiring,
+        SYNTHETIC_PORTABILITY_NO_MACOS_JOB,
+    )
+    _expect_parse_error(
+        "portability with two invocations",
+        parse_portability_wiring,
+        SYNTHETIC_PORTABILITY_TWO_INVOCATIONS,
+    )
     _expect_parse_error("local without the stage", parse_local_wiring, SYNTHETIC_LOCAL_NO_STAGE)
     _expect_parse_error(
         "local without the quick dispatch",
@@ -967,7 +1121,8 @@ def self_test() -> int:
     )
 
     # A missing file is a parse failure, never a silent pass. The partial tree
-    # also proves the helper script itself is part of the contract.
+    # also proves the helper script and the portability workflow itself are
+    # part of the contract.
     with tempfile.TemporaryDirectory(prefix="wiring-guard-") as directory:
         root = Path(directory)
         try:
@@ -988,6 +1143,22 @@ def self_test() -> int:
             pass
         else:
             raise AssertionError("collect must fail closed when the helper is missing")
+        (root / "scripts/quality/production-config-check.sh").write_text(
+            "#!/usr/bin/env bash\n", encoding="utf-8"
+        )
+        try:
+            collect(root)
+        except ParseError:
+            pass
+        else:
+            raise AssertionError(
+                "collect must fail closed when the portability workflow is missing"
+            )
+        (root / ".github/workflows/portability.yml").write_text(
+            SYNTHETIC_PORTABILITY_OK, encoding="utf-8"
+        )
+        complete = collect(root)
+        assert not complete.failures(), "a complete synthetic tree must pass"
 
     print("production-config-wiring guard self-test: PASS")
     return 0
@@ -1030,7 +1201,10 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     if code == 0:
-        print("production-config-wiring: PASS (both hosts enforce the production-config gate)")
+        print(
+            "production-config-wiring: PASS "
+            "(all three hosts enforce the production-config gate)"
+        )
         for site in report.sites():
             print(f"  {site.label:5s} {site.location}")
             print(f"        {site.command}")
@@ -1038,7 +1212,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"production-config-wiring: FAIL "
-        f"({len(report.failures())} of 2 wiring site(s) no longer enforced)"
+        f"({len(report.failures())} of 3 wiring site(s) no longer enforced)"
     )
     for site in report.sites():
         status = "ok" if site.ok else site.code.upper()

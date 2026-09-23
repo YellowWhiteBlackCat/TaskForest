@@ -18,12 +18,13 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, LatestControlRequest,
-    PlatformClient, PlatformEventBatch, PlatformFacets, ProcessAffinityControlRequest,
-    ProcessControlRequest, ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest,
-    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceUpdate,
+    CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, EnvironmentFacets,
+    IntegrationFacets, LatestControlRequest, PlatformClient, PlatformEventBatch, PlatformFacets,
+    PowerFacets, ProcessAffinityControlRequest, ProcessControlRequest, ProcessFacets,
+    ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest, SensorFacets,
+    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceFacets, ServiceUpdate,
     SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
-    SmartObservationBatch,
+    SmartObservationBatch, StorageFacets, SystemFacets,
 };
 use taskmanager_core::DeviceStatus;
 use taskmanager_core::core::alerts::AlertSeverity;
@@ -373,51 +374,81 @@ fn assert_standard_descriptors(snapshot: &CapabilitySnapshot) {
     }
 }
 
+/// Grouped by facet owner so every flat assert battery stays under the
+/// complexity ratchet while the census itself stays complete.
 fn assert_complete_facets(facets: &PlatformFacets) {
-    assert!(facets.system().host().is_some());
-    assert!(facets.system().cpu().is_some());
-    assert!(facets.system().memory().is_some());
-    assert!(facets.system().storage().is_some());
-    assert!(facets.system().network().is_some());
-    assert!(facets.system().gpu().is_some());
-    assert!(facets.system().hardware_inventory().is_some());
-    assert!(facets.system().smbios_memory().is_some());
-    assert!(facets.system().rapl_power().is_some());
-    assert!(facets.system().msr_readout().is_some());
-    assert!(facets.system().cpu_throttle().is_some());
-    assert!(facets.system().containers().is_some());
-    assert!(facets.process().list().is_some());
-    assert!(facets.process().control().is_some());
-    assert!(facets.process().network().is_some());
-    assert!(facets.process().gpu().is_some());
-    assert!(facets.process().resources().is_some());
-    assert!(facets.process().isolation().is_some());
-    assert!(facets.process().threads().is_some());
-    assert!(facets.process().affinity().is_some());
-    assert!(facets.process().affinity_control().is_some());
-    assert!(facets.process().resource_control().is_some());
-    assert!(facets.process().open_files().is_some());
-    assert!(facets.service().inventory().is_some());
-    assert!(facets.service().dependencies().is_some());
-    assert!(facets.service().control().is_some());
-    assert!(facets.service().log_snapshot().is_some());
-    assert!(facets.service().log_stream().is_some());
-    assert!(facets.environment().startup_inventory().is_some());
-    assert!(facets.environment().startup_evidence().is_some());
-    assert!(facets.environment().startup_control().is_some());
-    assert!(facets.environment().session_inventory().is_some());
-    assert!(facets.environment().session_control().is_some());
-    assert!(facets.integration().command_launch().is_some());
-    assert!(facets.integration().resource_reveal().is_some());
-    assert!(facets.integration().url_open().is_some());
-    assert!(facets.integration().desktop_appearance().is_some());
-    assert!(facets.integration().desktop_notification().is_some());
-    assert!(facets.integration().setup_script().is_some());
-    assert!(facets.storage().health().is_some());
-    assert!(facets.storage().smart_observation().is_some());
-    assert!(facets.storage().smart_control().is_some());
-    assert!(facets.sensor().observation().is_some());
-    assert!(facets.power().supplies().is_some());
+    assert_system_facets(facets.system());
+    assert_process_facets(facets.process());
+    assert_service_facets(facets.service());
+    assert_environment_facets(facets.environment());
+    assert_integration_facets(facets.integration());
+    assert_storage_facets(facets.storage());
+    assert_sensor_and_power_facets(facets.sensor(), facets.power());
+}
+
+fn assert_system_facets(facets: &SystemFacets) {
+    assert!(facets.host().is_some());
+    assert!(facets.cpu().is_some());
+    assert!(facets.memory().is_some());
+    assert!(facets.storage().is_some());
+    assert!(facets.network().is_some());
+    assert!(facets.gpu().is_some());
+    assert!(facets.hardware_inventory().is_some());
+    assert!(facets.smbios_memory().is_some());
+    assert!(facets.rapl_power().is_some());
+    assert!(facets.msr_readout().is_some());
+    assert!(facets.cpu_throttle().is_some());
+    assert!(facets.containers().is_some());
+}
+
+fn assert_process_facets(facets: &ProcessFacets) {
+    assert!(facets.list().is_some());
+    assert!(facets.control().is_some());
+    assert!(facets.network().is_some());
+    assert!(facets.gpu().is_some());
+    assert!(facets.resources().is_some());
+    assert!(facets.isolation().is_some());
+    assert!(facets.threads().is_some());
+    assert!(facets.affinity().is_some());
+    assert!(facets.affinity_control().is_some());
+    assert!(facets.resource_control().is_some());
+    assert!(facets.open_files().is_some());
+}
+
+fn assert_service_facets(facets: &ServiceFacets) {
+    assert!(facets.inventory().is_some());
+    assert!(facets.dependencies().is_some());
+    assert!(facets.control().is_some());
+    assert!(facets.log_snapshot().is_some());
+    assert!(facets.log_stream().is_some());
+}
+
+fn assert_environment_facets(facets: &EnvironmentFacets) {
+    assert!(facets.startup_inventory().is_some());
+    assert!(facets.startup_evidence().is_some());
+    assert!(facets.startup_control().is_some());
+    assert!(facets.session_inventory().is_some());
+    assert!(facets.session_control().is_some());
+}
+
+fn assert_integration_facets(facets: &IntegrationFacets) {
+    assert!(facets.command_launch().is_some());
+    assert!(facets.resource_reveal().is_some());
+    assert!(facets.url_open().is_some());
+    assert!(facets.desktop_appearance().is_some());
+    assert!(facets.desktop_notification().is_some());
+    assert!(facets.setup_script().is_some());
+}
+
+fn assert_storage_facets(facets: &StorageFacets) {
+    assert!(facets.health().is_some());
+    assert!(facets.smart_observation().is_some());
+    assert!(facets.smart_control().is_some());
+}
+
+fn assert_sensor_and_power_facets(sensor: &SensorFacets, power: &PowerFacets) {
+    assert!(sensor.observation().is_some());
+    assert!(power.supplies().is_some());
 }
 
 #[test]
