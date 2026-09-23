@@ -505,14 +505,6 @@ fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
 /// an honest "…" when more remain — the same shape the connections and device
 /// previews already use.
 const THREADS_PREVIEW: usize = 3;
-#[allow(dead_code)]
-const OPEN_FILES_PREVIEW: usize = 3;
-#[allow(dead_code)]
-const GPU_ENGINES_PREVIEW: usize = 3;
-#[allow(dead_code)]
-const ENVIRONMENT_PREVIEW: usize = 3;
-#[allow(dead_code)]
-const CAPABILITIES_PREVIEW: usize = 3;
 
 /// Compact thread row: `tid  comm  state  cpu-time  cpu%`. Missing CPU time or
 /// percent render an explicit dash, never a fabricated `0.0` — the first

@@ -15,7 +15,6 @@ use crate::TuiApp;
 use crate::TuiTheme;
 
 #[cfg(test)]
-#[allow(dead_code)]
 #[path = "../../tests/headless/ui/confirmations_support.rs"]
 pub(crate) mod confirmations_support;
 

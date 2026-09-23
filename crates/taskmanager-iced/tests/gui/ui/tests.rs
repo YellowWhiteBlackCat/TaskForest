@@ -18,8 +18,9 @@
 //!   non-sortable Trend header layout.
 //! - [`views`]: the App-history page and canonical category-tree projection.
 
+pub(crate) use super::perf_rail::bounded_sidebar_label;
 pub(crate) use super::performance::{
-    CompactDetailViewport, PerfDetail, available_perf_devices, bounded_sidebar_label, chunk_count,
+    CompactDetailViewport, PerfDetail, available_perf_devices, chunk_count,
     compact_detail_viewport, perf_detail_kind, performance_sidebar_label, resolved_perf_device,
 };
 use super::process_projection::ProcessProjection;

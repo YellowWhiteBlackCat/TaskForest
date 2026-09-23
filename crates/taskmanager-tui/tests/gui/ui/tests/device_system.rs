@@ -273,23 +273,19 @@ fn system_sections_include_smbios_memory_slots_when_provided() {
 }
 
 #[test]
-fn diagnostic_bundle_export_status_feedback_parity_and_privacy() {
+fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
     use crate::ui::pages::system_data::{
-        DiagnosticBundleExportStatus, diagnostic_bundle_export_feedback, diagnostic_bundle_section,
-        diagnostic_failure_feedback_key, diagnostic_failure_message, format_redaction_summary,
-        format_system_spec_export, system_sections_with_diagnostics,
+        diagnostic_failure_feedback_key, diagnostic_failure_message,
     };
-    use std::path::PathBuf;
-    use taskmanager_core::core::diagnostics::{
-        DiagnosticBundleError, DiagnosticBundleErrorKind, RedactionSummary,
-    };
+    use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
 
-    // 1. Error kind mappings to localized feedback keys
+    // Error kind mappings to localized feedback keys, with raw sensitive paths
+    // never interpolated into the user-facing message.
     let error_cases = [
         (
             DiagnosticBundleErrorKind::InvalidSource,
@@ -321,81 +317,6 @@ fn diagnostic_bundle_export_status_feedback_parity_and_privacy() {
             "raw sensitive paths must never leak into feedback"
         );
     }
-
-    // 2. Export status state feedback
-    let writing_status = DiagnosticBundleExportStatus::writing();
-    assert!(writing_status.is_writing());
-    assert!(!writing_status.is_complete());
-    assert!(!writing_status.is_failed());
-    let writing_feedback = diagnostic_bundle_export_feedback(&writing_status);
-    assert!(writing_feedback.contains("Writing"));
-
-    let target_path = PathBuf::from("/tmp/taskmanager-bundle-2026.json");
-    let complete_status = DiagnosticBundleExportStatus::complete(target_path.clone());
-    assert!(!complete_status.is_writing());
-    assert!(complete_status.is_complete());
-    assert!(!complete_status.is_failed());
-    let complete_feedback = diagnostic_bundle_export_feedback(&complete_status);
-    assert!(complete_feedback.contains("/tmp/taskmanager-bundle-2026.json"));
-
-    let io_err = DiagnosticBundleError::new(DiagnosticBundleErrorKind::Io);
-    let failed_status = DiagnosticBundleExportStatus::failed(io_err);
-    assert!(!failed_status.is_writing());
-    assert!(!failed_status.is_complete());
-    assert!(failed_status.is_failed());
-    let failed_feedback = diagnostic_bundle_export_feedback(&failed_status);
-    assert!(failed_feedback.contains("The bundle could not be written"));
-
-    // 3. Redaction summary formatting
-    let summary = RedactionSummary {
-        usernames: 3,
-        paths: 7,
-        ipv4_addresses: 2,
-        ipv6_addresses: 1,
-    };
-    assert_eq!(summary.total(), 13);
-    let summary_text = format_redaction_summary(&summary);
-    assert!(summary_text.contains("13 redactions"));
-    assert!(summary_text.contains("users 3"));
-    assert!(summary_text.contains("paths 7"));
-    assert!(summary_text.contains("IPs 3"));
-
-    // 4. Diagnostic bundle section materialization
-    let section_complete = diagnostic_bundle_section(&complete_status);
-    assert_eq!(
-        section_complete.title,
-        taskmanager_application::i18n::t("diagnostics.title")
-    );
-    assert!(
-        section_complete
-            .facts
-            .iter()
-            .any(|f| f.label == taskmanager_application::i18n::t("common.status"))
-    );
-    assert!(section_complete.facts.iter().any(|f| f.label
-        == taskmanager_application::i18n::t("common.details")
-        && f.value.contains("/tmp/taskmanager-bundle-2026.json")));
-
-    // 5. System sections with diagnostics
-    let sections_without = system_sections_with_diagnostics(None, None, None, None, None);
-    assert!(
-        !sections_without
-            .iter()
-            .any(|s| s.title == taskmanager_application::i18n::t("diagnostics.title"))
-    );
-
-    let sections_with =
-        system_sections_with_diagnostics(None, None, None, None, Some(&complete_status));
-    assert!(
-        sections_with
-            .iter()
-            .any(|s| s.title == taskmanager_application::i18n::t("diagnostics.title"))
-    );
-
-    // 6. Format system spec export
-    let exported = format_system_spec_export(None, None, None, None);
-    assert!(exported.contains("# System Specifications"));
-    assert!(exported.contains("## Device"));
 
     drop(guard);
 }

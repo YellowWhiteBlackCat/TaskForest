@@ -36,28 +36,18 @@ fn status(outcome: SourceOutcome) -> SourceStatus {
     }
 }
 
-/// Every badge tone fills from its palette semantic token; the neutral chip
-/// stays quiet (muted foreground on the panel surface) while tinted chips
-/// pick their foreground by fill luminance — and that pick is the WCAG
-/// black/white choice, which never drops below the 4.5:1 text band over
-/// any skin or mode.
+/// Every badge tone fills from its palette semantic token and picks its
+/// foreground by fill luminance — and that pick is the WCAG black/white
+/// choice, which never drops below the 4.5:1 text band over any skin or mode.
 #[test]
 fn badge_tones_map_onto_palette_semantics_with_contrast_foregrounds() {
     let theme = theme_for(Skin::Gnome, LightDark::Dark);
     let palette = theme.palette();
-    assert_eq!(BadgeTone::Neutral.fill(&theme), palette.surface);
-    assert_eq!(BadgeTone::Success.fill(&theme), palette.success);
     assert_eq!(BadgeTone::Warning.fill(&theme), palette.warning);
     assert_eq!(BadgeTone::Danger.fill(&theme), palette.danger);
     assert_eq!(BadgeTone::Accent.fill(&theme), palette.accent);
-    assert_eq!(BadgeTone::Neutral.foreground(&theme), palette.fg_muted);
 
-    let tinted = [
-        BadgeTone::Success,
-        BadgeTone::Warning,
-        BadgeTone::Danger,
-        BadgeTone::Accent,
-    ];
+    let tinted = [BadgeTone::Warning, BadgeTone::Danger, BadgeTone::Accent];
     for skin in Skin::ALL {
         for mode in LightDark::ALL {
             let theme = theme_for(skin, mode);
@@ -94,9 +84,9 @@ fn unavailable_progress_never_resolves_to_a_measured_value() {
     assert_eq!(progress_fill(Some(1.9)), ProgressFill::Determinate(1.0));
 }
 
-/// The four-state grammar owns a fixed tone mapping per state: quiet muted
-/// for empty, failure for unanswered, caution for partial, success for
-/// recovery — constant across every skin and mode.
+/// The state grammar owns a fixed tone mapping per state: quiet muted for
+/// empty, failure for unanswered, caution for partial — constant across
+/// every skin and mode.
 #[test]
 fn panel_states_map_onto_their_palette_tone_grammar() {
     for skin in Skin::ALL {
@@ -106,7 +96,6 @@ fn panel_states_map_onto_their_palette_tone_grammar() {
             assert_eq!(PanelState::Empty.tone(&theme), palette.fg_muted);
             assert_eq!(PanelState::Unavailable.tone(&theme), palette.danger);
             assert_eq!(PanelState::Partial.tone(&theme), palette.warning);
-            assert_eq!(PanelState::Recovery.tone(&theme), palette.success);
         }
     }
 }
@@ -167,18 +156,11 @@ fn message_panel_wrapper_builds_and_absent_sources_stay_absent() {
 /// binding would otherwise panic in a real frame.
 #[test]
 fn primitives_build_across_skins_modes_and_degenerate_states() {
-    let tones = [
-        BadgeTone::Neutral,
-        BadgeTone::Success,
-        BadgeTone::Warning,
-        BadgeTone::Danger,
-        BadgeTone::Accent,
-    ];
+    let tones = [BadgeTone::Warning, BadgeTone::Danger, BadgeTone::Accent];
     let states = [
         PanelState::Empty,
         PanelState::Unavailable,
         PanelState::Partial,
-        PanelState::Recovery,
     ];
     for skin in Skin::ALL {
         for mode in LightDark::ALL {

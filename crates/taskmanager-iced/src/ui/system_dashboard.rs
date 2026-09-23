@@ -16,8 +16,6 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::AlertSeverity;
 
 pub use super::system_table::ResourceHistoryWindow;
-#[allow(dead_code)]
-pub type HistoryWindow = ResourceHistoryWindow;
 
 use crate::app::alerts::active_alert_lines;
 use crate::app::{FocusTarget, Message};

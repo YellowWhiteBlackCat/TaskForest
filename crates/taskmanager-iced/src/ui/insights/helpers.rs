@@ -5,7 +5,6 @@ use iced::{Element, Length};
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
 pub(crate) use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::LimitValue;
 pub(crate) use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessThreadInfo};
 pub(crate) use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_shell::presentation::missing_value;
@@ -188,24 +187,6 @@ pub(crate) fn format_engine_usage(
         })
         .unwrap_or_else(|| DASH.to_string());
     format!("{name}  {usage}  {cumulative}")
-}
-
-#[allow(dead_code)]
-pub(crate) fn format_resource_pair(
-    current: Option<String>,
-    limit: Option<LimitValue>,
-    format_val: impl Fn(u64) -> String,
-) -> Option<String> {
-    let limit_str = limit.map(|l| match l {
-        LimitValue::Unlimited => "∞".to_string(),
-        LimitValue::Value(v) => format_val(v),
-    });
-    match (current, limit_str) {
-        (Some(c), Some(m)) => Some(format!("{c} / {m}")),
-        (Some(c), None) => Some(c),
-        (None, Some(m)) => Some(format!("{DASH} / {m}")),
-        (None, None) => None,
-    }
 }
 
 pub(crate) fn facet_unavailable_text(reason: &ProcessInsightUnavailable) -> String {
