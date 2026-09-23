@@ -63,20 +63,8 @@ fn click_row(vcx: &mut VisualTestContext, index: usize) {
     let bounds = vcx
         .debug_bounds(row_bounds_key(index))
         .unwrap_or_else(|| panic!("row {index} must render"));
-    let position = bounds.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 1,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 1,
-    });
+    // Real primary click: a down/up pair through the platform input path.
+    vcx.simulate_click(bounds.center(), Modifiers::none());
 }
 
 fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, pid: u32) {

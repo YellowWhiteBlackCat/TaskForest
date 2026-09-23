@@ -176,6 +176,15 @@ fn thermal_zone_lines_traverse_every_temperature_reading_and_name_its_source() {
 /// fan's device context and the system thermal surface over the same facts.
 #[test]
 fn system_thermal_group_reaches_foreign_devices_the_fan_rows_cannot() {
+    // The assertions below pin the English catalog words and the `·`
+    // separators, so this test must hold the language guard and pin English:
+    // another test's `zh` window must not leak in (the row would then fail for
+    // a reason that has nothing to do with the device traversal it proves).
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+
     let sensors = SensorCenterSnapshot {
         readings: vec![
             fan_reading("CPU Fan", "hwmon:cpu", 1_500),

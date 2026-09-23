@@ -23,8 +23,8 @@ mod scroll_behavior;
 
 use gpui::{
     AppContext, Context, Entity, InteractiveElement, IntoElement, Keystroke, Modifiers,
-    MouseButton, MouseDownEvent, MouseUpEvent, ParentElement, Render, Styled, TestAppContext,
-    VisualTestContext, Window, WindowHandle, div, px, size,
+    MouseButton, ParentElement, Pixels, Point, Render, Styled, TestAppContext, VisualTestContext,
+    Window, WindowHandle, div, point, px, size,
 };
 use std::rc::Rc;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -56,6 +56,17 @@ fn wrapped_root(cx: &mut TestAppContext) -> (WindowHandle<RootView>, Entity<Root
 fn draw(cx: &mut TestAppContext, win: WindowHandle<RootView>) {
     cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();
+}
+
+/// Center of a tree/group row's chevron button, derived from the rendered row
+/// geometry because the chevron carries no debug selector. The name cell is
+/// `pl(SPACE_8)`, then a `depth * 14px` indent, then the 18px chevron box,
+/// vertically centred in the row.
+fn chevron_center(name_left: Pixels, row_center_y: Pixels, depth: usize) -> Point<Pixels> {
+    point(
+        name_left + px(8.0 + depth as f32 * 14.0 + 9.0),
+        row_center_y,
+    )
 }
 
 /// Move focus through the Apps-page tab stops until a sort-header cell is
@@ -420,12 +431,23 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
     );
 }
 
-/// A primary double-click on an Apps aggregate row must use the same expansion
-/// projection as the chevron and directional keys. This drives GPUI's real
-/// mouse event path with `click_count = 2`, then proves both the RootView state
-/// and the rendered visible-row projection changed in both directions.
+/// Case-anchor test for `mc03-apps-doubleclick`. The `_case_` name prefix is
+/// the GPUI stable case-prefix channel; the suffix names the gesture this test
+/// really drives.
+///
+/// The headless `TestPlatform` forwards `PlatformInput` straight to the window
+/// and its `simulate_mouse_down`/`simulate_mouse_up`/`simulate_click` helpers
+/// hard-code `click_count: 1`. The real multi-click count is derived only by
+/// the native platform backends (X11/Wayland `current_count`, Windows
+/// `ClickState::update`, macOS `native_event.clickCount()`), none of which run
+/// headlessly, so a genuine double-click sequence cannot be driven here. This
+/// test drives the real pointer gesture that shares the double-click's
+/// `toggle_expansion` policy — a primary click on the aggregate row's chevron
+/// — and asserts both the RootView state and the rendered visible-row
+/// projection in both directions. It also proves the click-count gate is not
+/// satisfied by a real single click: clicking the row body must not expand.
 #[gpui::test]
-async fn mc03_apps_doubleclick_case_apps_group_double_click_expands_and_collapses_the_row(
+async fn mc03_apps_doubleclick_case_chevron_click_expands_and_collapses_the_row(
     cx: &mut TestAppContext,
 ) {
     let (win, view) = wrapped_root(cx);
@@ -460,26 +482,33 @@ async fn mc03_apps_doubleclick_case_apps_group_double_click_expands_and_collapse
         "aggregate children must not render while the group is collapsed"
     );
 
-    let position = collapsed.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-    });
+    // A real single click on the row body selects it but must not expand it:
+    // the expansion branch is gated on a second click.
+    vcx.simulate_click(collapsed.center(), Modifiers::none());
+    assert!(
+        !view.read_with(cx, |v, _cx| v
+            .processes_state
+            .expanded_apps
+            .contains("category:uncategorized")),
+        "a single click on the row body must not expand the aggregate"
+    );
+
+    // A real primary click on the chevron runs the same `toggle_expansion`
+    // projection the row double-click branch calls.
+    let name_left = vcx
+        .debug_bounds("tm-proc-b-name")
+        .expect("the aggregate name cell must render")
+        .left();
+    vcx.simulate_click(
+        chevron_center(name_left, collapsed.center().y, 0),
+        Modifiers::none(),
+    );
     assert!(
         view.read_with(cx, |v, _cx| v
             .processes_state
             .expanded_apps
             .contains("category:uncategorized")),
-        "a primary double-click must expand the category root"
+        "a primary click on the chevron must expand the category root"
     );
 
     draw(cx, win);
@@ -491,26 +520,20 @@ async fn mc03_apps_doubleclick_case_apps_group_double_click_expands_and_collapse
     let expanded = vcx
         .debug_bounds("tm-proc-row-root:0")
         .expect("the expanded aggregate row must remain rendered");
-    let position = expanded.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-    });
+    let name_left = vcx
+        .debug_bounds("tm-proc-b-name")
+        .expect("the expanded aggregate name cell must render")
+        .left();
+    vcx.simulate_click(
+        chevron_center(name_left, expanded.center().y, 0),
+        Modifiers::none(),
+    );
     assert!(
         view.read_with(cx, |v, _cx| !v
             .processes_state
             .expanded_apps
             .contains("category:uncategorized")),
-        "a second primary double-click must collapse the same category root"
+        "a second primary click on the chevron must collapse the same category root"
     );
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
@@ -600,20 +623,8 @@ async fn apps_column_navigation_moves_without_losing_row_selection(cx: &mut Test
     let row = vcx
         .debug_bounds("tm-proc-row-root:1")
         .expect("expanded category process row renders");
-    let position = row.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 1,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 1,
-    });
+    // Real primary click: a down/up pair through the platform input path.
+    vcx.simulate_click(row.center(), Modifiers::none());
     cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
     assert_eq!(
         view.read_with(cx, |v, _| v.processes_state.column_cursor),

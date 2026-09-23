@@ -379,7 +379,7 @@ source.
 | `subject_kind` | `interaction` (the new subject type; the schema reserves room for future `requirement` rows) |
 | `case_id` | stable case id from the owning frontend's matrix |
 | `frontend` | `gpui`, `iced`, `tui`, or `bevy` — the new dimension |
-| `p0_id` | public requirement id from `scripts/interaction_requirements.tsv`; `-` where no mapping is declared yet (all Bevy rows) |
+| `p0_id` | public requirement id from `scripts/interaction_requirements.tsv`; `-` where no mapping is declared (26 Bevy rows retain `-` under the D1 partial mapping + reasoned exemption) |
 | `target` | `gui` or `lib` (matrix semantics, unchanged) |
 | `test_name` | nextest test path; `-` when the row uses a stable case-prefix channel; `pending` when the case is declared but no discoverable anchor exists yet |
 | `paths` | ordered behavior/contract paths (matrix semantics, unchanged) |
@@ -403,7 +403,7 @@ not relabelled: `mc02-tui-hotplug` anchors the storage-family fail-closed
 fallback and `mc07-tui-capture-visual` anchors the supervised capture frame's
 typed marker (see "Known S4/S5 residuals"). All 47 rows declare a `P0-MC-*` id;
 together with GPUI/Iced they cover all eight requirements on three frontends.
-Bevy still carries `-` (see "Bevy `p0_id`" below).
+Bevy covers four of the eight (see "Bevy `p0_id`" below).
 
 Anchor-source recognition in the resolver (`--interaction-matrix PATH`):
 
@@ -472,47 +472,99 @@ resolver
   `(frontend, requirement)` pair.
 
 Without either flag `p0_id` stays opaque and the coverage block is `null`, so
-existing callers are unaffected. This mechanism is what the two Bevy `p0_id`
-options below would use; it does not decide the mapping.
+existing callers are unaffected. This is the mechanism the D1 resolution below
+uses; it does not decide the mapping.
 
 The `parity-evidence` gate stage passes `--requirements` and deliberately omits
 `--require-requirement-coverage`. So the stage records the per-frontend coverage
-report and rejects an unknown `p0_id`, but an uncovered `(frontend, requirement)`
-pair does not fail the run while Bevy is 0/8. Release condition: when the Bevy
-`p0_id` mapping lands (D1 option A), the same change that fills the mapping adds
-`--require-requirement-coverage` to the stage and the requirement axis becomes a
-fail-closed 8/8 x 4 check.
+report and rejects an unknown `p0_id`; the fail-closed flag stays deferred
+because the D1 resolution maps Bevy 4/8 and declares `P0-MC-01/02/04/05` as a
+reasoned exemption (below), so the flag would report exactly those four exempt
+`(frontend, requirement)` pairs. Release condition: the flag lands when the four
+exempt Bevy pairs gain real success-path anchors and this matrix declares them
+(or the resolver gains an explicit exemption channel), at which point the
+requirement axis becomes a fail-closed 8/8 x 4 check.
 
-### Bevy `p0_id` (D1 open decision)
+### Bevy `p0_id` (D1 resolved: partial mapping + reasoned exemption)
 
-No authority in the repository maps Bevy interaction cases to `P0-MC-*`: the
-Bevy compatibility matrix has no `p0_id` column, and in committed files `P0-MC`
-appears only in `scripts/interaction_requirements.tsv`, the GPUI/Iced matrices,
-this unified matrix, and the private design note. W9-C/W10-B refuse to invent
-the mapping, so all 52 Bevy rows stay `-`. Two executable options exist:
+D1 is resolved on 2026-09-23 as a **partial hand-declared mapping with a
+reasoned exemption**, not a fabricated 8/8. Each of the 52 Bevy rows was read
+against its anchor's real assertions; 26 declare the requirement that anchor
+genuinely covers and the other 26 keep `-`. Bevy therefore covers **4 of the 8**
+`P0-MC-*` requirements (0 dangling, 26 unmapped cells).
 
-- **Option A (recommended): declare the mapping by hand, per Bevy row.** The
-  owner (or a designated Bevy line) fills the 52 `p0_id` cells from the same
-  requirement semantics GPUI/Iced declare, then the run is validated with
-  `--require-requirement-coverage`: every anchor stays discovery-checked and the
-  coverage block proves 8/8 × 4 mechanically. Cost: one declaration pass plus
-  review; risk: mapping disputes, mitigated by the coverage report naming the
-  uncovered pairs. No code or schema change is needed — the mechanism is
-  already here, and this is the only option that closes the four-frontend
-  requirement claim.
-- **Option B: formalize the exemption.** Keep `-` for Bevy and record the
-  "no mapping authority" status in the private decision register; the
-  four-frontend claim is then scoped to cases (not requirements) for Bevy. Cost:
-  zero now; risk: the requirement axis stays 3/4 indefinitely and will fail any
-  future `--require-requirement-coverage` gate on Bevy.
+Mapped (anchors read clause by clause, never inferred from the case id):
 
-Owner action (D1): pick A or B. If A, designate the reviewer and the review
-turn; if B, record the exemption expiry so it is revisited with S5/S6.
+- **P0-MC-00** (shared-page navigation/routing over the frozen page set):
+  `bev-route-keyboard` (Alt+1 through the shared router moves the route and
+  remounts exactly one page under the slot), `bev-route-programmatic`
+  (`RouteChanged` observer chain remounts the new page), `bev-route-history`
+  (the shared page chords resolve chord for chord), `bev-system-chord`
+  (Alt+4/Alt+7 resolve System/AppHistory), `bev-nav-vocabulary` (the nav tab set
+  routes to `AppPage::ALL` in order onto shared icons), `bev-input-router`
+  (page keys route through the shared router; wrong chords resolve to `None`).
+- **P0-MC-03** (Applications page: process tree/table/search/identity/columns/
+  icons): `bev-tree-projection`, `bev-tree-collapse`, `bev-table-wheel`,
+  `bev-table-search-display`, `bev-input-arrows-seam`, `bev-input-search-owner`,
+  `bev-input-semantic` (process-row semantic identity), `bev-control-disabled`,
+  `bev-a11y-row-identity`, `bev-a11y-values`, `bev-sort-indicator`,
+  `bev-icon-plates`.
+- **P0-MC-06** (dangerous local confirmation-modal lifecycle):
+  `bev-confirm-loop`, `bev-confirm-dismiss`, `bev-confirm-echo`,
+  `bev-a11y-modal-dismiss`, `bev-input-delete-gate`, `bev-input-gate-priority`,
+  `bev-input-escape-dismiss`.
+- **P0-MC-07** (focus handling): `bev-input-ime` (Tab moves focus through the
+  shared `MoveFocus` action; IME focus suppresses Delete/ArrowDown).
+
+Exempt pairs (deliberate, with the reason):
+
+- **P0-MC-01** (Battery/Fan Performance-page dynamic history): no declared Bevy
+  case drives the Performance page's device history/readout. The `bev-chart-*`
+  anchors drive the shared `widgets::chart` series widget, and `bev-history-*`
+  drives the separate Application History page; neither is the Performance-page
+  Battery/Fan history the requirement declares. Real undeclared Bevy tests exist
+  (`pages::performance::tests::device_blocks_follow_the_projection_device_list`
+  proves the dynamic device block list and per-device fact line, and
+  `...::compact_device_activation_updates_local_state_and_shared_curve_focus`
+  proves device activation/focus), so closing this pair is a
+  **case-declaration** decision (add a Bevy row anchored to one of them), not a
+  missing test.
+- **P0-MC-02** (per-partition disk usage): no declared Bevy disk/partition/SMART
+  interaction case.
+- **P0-MC-04** (GPU selectable middle graph): no declared Bevy GPU/NPU
+  interaction case.
+- **P0-MC-05** (Preferences/sidebar/units/graph options): no declared Bevy
+  settings/units/sidebar/density/hover interaction case.
+
+Unmapped rows and why (26): the seven `bev-chart-*` / `bev-history-*` rows are
+the shared-chart and Application-History surfaces (the P0-MC-01 near-misses
+above); the twelve `bev-svc-menu-*`, `bev-startup-menu`, `bev-sessions-menu`,
+`bev-menu-cancel` and `bev-log-*` rows drive service/startup/session control
+menus and the service log panel, and no `P0-MC-*` requirement covers that
+service-control surface; `bev-system-mount` / `bev-system-facts` project System
+page content (not the navigation/page-set clause MC-00 declares);
+`bev-window-drain` / `bev-input-quit-once` are app lifecycle; and
+`bev-icon-stamp` / `bev-tofu-law` / `bev-bounded-lines` are render-time icon and
+line mechanics rather than an interaction requirement (`bev-icon-plates`, the
+icon-asset identity anchor the other frontends declare under MC-03, is mapped).
+
+Evidence and verification (`cargo nextest list` discovery, never source
+scanning): the resolver reports `bevy 4/8 (unmapped cells: 26)` with
+`matrix 193 anchored / 0 dangling`, and a `--require-requirement-coverage` run is
+red on exactly the four exempt pairs (`bevy: P0-MC-01/02/04/05`). No test id,
+requirement id or path token was invented; every mapped row keeps its existing
+`paths`, `contract_tag` and anchor.
+
+Revisit condition: in the S5/S6 window, either declare new Bevy case rows
+anchored to the real Performance/disk/GPU/settings tests above and add their
+`p0_id`s (then the fail-closed flag can land), or keep the four pairs as the
+standing exemption. Until one of those happens the requirement axis stays
+`bevy 4/8` and the flag stays deferred.
 
 Known S4/S5 residuals (owner decisions, not silently papered over):
 
-- Bevy rows have no `p0_id` mapping (kept `-`; see D1 above) and no capture
-  scenarios.
+- Bevy rows carry the D1 partial mapping: 26 rows declare a requirement and 26
+  keep `-` (see D1 above), and every Bevy row still has no capture scenarios.
 - **Resolved in W12-A (D5):** the nine Bevy path tokens (`confirmation`,
   `history`, `identity`, `layout`, `navigation`, `projection`, `render`,
   `route`, `selection`) are folded into the Rust `ContractTag` enum, and the
@@ -655,9 +707,11 @@ order, each requiring its own decision:
    Iced/Bevy in-script validators), migrate `scripts/windows/local-gates.sh`
    off the legacy gate, and delete the compatibility views in one cutover
    (AGENTS forbids a standing second address).
-2. **D1**: declare the Bevy `p0_id` mapping (option A) and add
-   `--require-requirement-coverage` to the `parity-evidence` stage in the same
-   change.
+2. **D1 (resolved as partial mapping + exemption)**: the genuine Bevy rows are
+   declared (bevy 4/8). The remaining work is the four exempt pairs: declare new
+   cases anchored to the real Performance/disk/GPU/settings Bevy tests, or keep
+   the exemption; `--require-requirement-coverage` can only be added to the
+   `parity-evidence` stage once a fail-closed run is green.
 3. **D3**: decide whether the GPUI stable case-prefix channel stays or the 39
    rows get hand-verified explicit `test_name` ids.
 4. **Target ownership**: teach the resolver (or the driver) to carry the
@@ -744,7 +798,7 @@ one resolver pass: the facet manifest and the unified interaction matrix
 (`--interaction-matrix scripts/parity/cross_frontend_matrix.tsv`), plus the
 requirement vocabulary (`--requirements scripts/interaction_requirements.tsv`)
 as a report-only coverage input. `--require-requirement-coverage` is the
-deferred hard gate; its release condition is the Bevy `p0_id` mapping landing
+deferred hard gate; its release condition is the four exempt Bevy pairs closing
 (D1), at which point the stage adds the flag in the same change.
 
 The feature-level evidence table is consumed by the same pass **without a
@@ -838,9 +892,10 @@ python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery bevy=discovery/bevy.json \
   --interaction-matrix scripts/parity/cross_frontend_matrix.tsv
 
-# Add the requirement authority: per-frontend P0-MC coverage report, unknown
-# p0_id rejection, and fail-closed coverage (Bevy has no mapping yet, so
-# --require-requirement-coverage is red on Bevy until D1 is decided):
+# Add the requirement authority: per-frontend P0-MC coverage report and unknown
+# p0_id rejection. With the D1 partial mapping Bevy is 4/8; a
+# --require-requirement-coverage run is red on exactly the four declared-exempt
+# (bevy, P0-MC-01/02/04/05) pairs, which is the expected honest result:
 python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery tui=discovery/tui.json --nextest \
   --interaction-matrix scripts/parity/cross_frontend_matrix.tsv \
