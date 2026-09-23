@@ -18,6 +18,47 @@ use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 use super::build_snapshot;
 use crate::confirmation::PendingConfirmationView;
 
+/// Validate and execute one assistive-technology action against the frozen
+/// semantic snapshot. The windowed composition does not yet route an AT
+/// ingress here, so the applier lives with the tests that exercise it.
+fn apply_accessibility_action(
+    track: &mut crate::app::FrontendTrack,
+    request: &taskmanager_ui_contract::AccessibilityActionRequest,
+    snapshot: &super::SemanticSnapshot,
+) -> Result<(), taskmanager_ui_contract::AccessibilityActionRejection> {
+    request.validate_against(snapshot)?;
+
+    if let Some(identity) = track.shell.visible_processes().iter().find_map(|process| {
+        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
+            == request.node.as_str())
+        .then(|| taskmanager_core::core::process::ProcessLiveKey::from_process(process))
+        .flatten()
+    }) {
+        match request.action {
+            taskmanager_ui_contract::SemanticAction::Focus
+            | taskmanager_ui_contract::SemanticAction::Select => {
+                let _ = track
+                    .shell
+                    .apply_action(taskmanager_application::AppAction::SelectPage(
+                        taskmanager_application::AppPage::Applications,
+                    ));
+                let _ = track
+                    .shell
+                    .select_row_id(taskmanager_shell::ProcessRowId::Process(identity));
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
+    if request.action == taskmanager_ui_contract::SemanticAction::Dismiss
+        && request.node.as_str().starts_with("modal:")
+    {
+        track.shell.dismiss_overlay();
+    }
+    Ok(())
+}
+
 /// A process with a CPU value but no memory denominator — the honest
 /// unavailable memory share is exactly the case the snapshot must express.
 /// The start token makes the row selectable by the shared gate vocabulary.
@@ -217,7 +258,7 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
         action: SemanticAction::Select,
         value: None,
     };
-    super::apply_accessibility_action(&mut track, &request, &snapshot).expect("matching AT action");
+    apply_accessibility_action(&mut track, &request, &snapshot).expect("matching AT action");
     assert_eq!(
         track.shell.selected_row,
         Some(taskmanager_shell::ProcessRowId::Process(
@@ -238,7 +279,7 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
         action: SemanticAction::Dismiss,
         value: None,
     };
-    super::apply_accessibility_action(&mut track, &dismiss_request, &modal_snapshot)
+    apply_accessibility_action(&mut track, &dismiss_request, &modal_snapshot)
         .expect("dismiss action");
     assert!(track.shell.pending_confirmation().is_none());
 }

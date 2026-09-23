@@ -16,9 +16,6 @@ use crate::platform::{
     ProjectedSystemTelemetry, SystemTelemetryDomainState, SystemTelemetryUnavailable,
 };
 
-#[allow(dead_code)]
-pub const DIAGNOSTIC_BUNDLE_SCHEMA_VERSION: u32 = 1;
-
 /// Structured system overview projection facts for the diagnostic bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct DiagnosticSystemOverview {

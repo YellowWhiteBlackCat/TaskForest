@@ -777,7 +777,7 @@ fn text_input_paste_and_clipboard() {
     // Set clipboard buffer directly
     app.world_mut()
         .resource_mut::<super::TextInputState>()
-        .set_clipboard("pasted_term");
+        .clipboard = "pasted_term".to_owned();
 
     // Ctrl+V pastes
     press_ctrl(&mut app, KeyCode::KeyV, None);
@@ -787,12 +787,11 @@ fn text_input_paste_and_clipboard() {
     // Ctrl+C copies query to clipboard
     app.world_mut()
         .resource_mut::<super::TextInputState>()
-        .set_clipboard("");
+        .clipboard
+        .clear();
     press_ctrl(&mut app, KeyCode::KeyC, None);
     assert_eq!(
-        app.world()
-            .resource::<super::TextInputState>()
-            .get_clipboard(),
+        app.world().resource::<super::TextInputState>().clipboard,
         "pasted_term"
     );
 
@@ -800,9 +799,7 @@ fn text_input_paste_and_clipboard() {
     press_ctrl(&mut app, KeyCode::KeyX, None);
     assert_eq!(query_of(&app), "");
     assert_eq!(
-        app.world()
-            .resource::<super::TextInputState>()
-            .get_clipboard(),
+        app.world().resource::<super::TextInputState>().clipboard,
         "pasted_term"
     );
 
@@ -833,8 +830,8 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
     let buffer_before = app
         .world()
         .resource::<super::TextInputState>()
-        .get_clipboard()
-        .to_owned();
+        .clipboard
+        .clone();
     press_ctrl(&mut app, KeyCode::KeyC, None);
 
     let shell = &app.world().non_send::<FrontendTrack>().shell;
@@ -853,9 +850,7 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
         "Ctrl+C must not repaint the feedback line"
     );
     assert_eq!(
-        app.world()
-            .resource::<super::TextInputState>()
-            .get_clipboard(),
+        app.world().resource::<super::TextInputState>().clipboard,
         buffer_before,
         "with search closed, Ctrl+C must not touch the editor buffer either"
     );
@@ -870,7 +865,7 @@ fn text_input_word_navigation_and_deletion() {
     press_ctrl(&mut app, KeyCode::KeyF, None);
     app.world_mut()
         .resource_mut::<super::TextInputState>()
-        .set_clipboard("first second third");
+        .clipboard = "first second third".to_owned();
     press_ctrl(&mut app, KeyCode::KeyV, None);
 
     assert_eq!(query_of(&app), "first second third");

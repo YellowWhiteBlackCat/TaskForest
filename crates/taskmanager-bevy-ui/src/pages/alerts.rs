@@ -42,7 +42,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, ValueChange};
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRule, AlertSeverity,
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
 };
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
@@ -271,76 +271,6 @@ pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
     }
 }
 
-/// Create a new managed alert rule.
-#[allow(dead_code)]
-pub(crate) fn create_alert_rule(
-    shell: &mut ShellApp,
-    id: impl Into<String>,
-    metric: AlertMetric,
-    severity: AlertSeverity,
-    threshold: f32,
-    hysteresis: f32,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
-    let rule = AlertRule::new(
-        id,
-        metric,
-        severity,
-        threshold,
-        std::time::Duration::from_secs(5),
-        hysteresis,
-    );
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
-}
-
-/// Edit an existing managed alert rule.
-#[allow(dead_code)]
-pub(crate) fn edit_alert_rule(
-    shell: &mut ShellApp,
-    target_id: String,
-    metric: AlertMetric,
-    severity: AlertSeverity,
-    threshold: f32,
-    hysteresis: f32,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
-    let enabled = shell
-        .projection()
-        .alert_center
-        .managed_rules()
-        .iter()
-        .find(|m| m.rule.id == target_id)
-        .is_none_or(|m| m.enabled);
-    let rule = AlertRule::new(
-        target_id.clone(),
-        metric,
-        severity,
-        threshold,
-        std::time::Duration::from_secs(5),
-        hysteresis,
-    );
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Update {
-        target_id,
-        managed: ManagedAlertRule::new(rule, enabled),
-    })
-}
-
-/// Delete a managed alert rule.
-#[allow(dead_code)]
-pub(crate) fn delete_alert_rule(
-    shell: &mut ShellApp,
-    rule_id: String,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
-}
-
 fn rule_authoring_scene(palette: &UiPalette) -> impl Scene + use<> {
     let radius = palette.control_radius_px;
     let line = rule_authoring_line(AlertMetric::CpuUsagePercent, 85.0, AlertSeverity::Warning);
@@ -557,31 +487,3 @@ fn unchecked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> imp
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts.rs"]
 mod tests;
-
-#[allow(dead_code)]
-pub(crate) fn export_alert_rules(
-    shell: &ShellApp,
-) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
-    let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = shell
-        .projection()
-        .alert_center
-        .managed_rules()
-        .iter()
-        .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
-        .collect();
-    taskmanager_core::core::alerts::export_alert_rules_json(&entries)
-}
-
-#[allow(dead_code)]
-pub(crate) fn import_alert_rules(
-    shell: &mut ShellApp,
-    json: &str,
-    mode: taskmanager_application::AlertRuleImportMode,
-) -> Result<
-    taskmanager_application::ManagedAlertRuleEditOutcome,
-    taskmanager_core::core::alerts::AlertRuleTransferError,
-> {
-    let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
-    let rules: Vec<ManagedAlertRule> = entries.into_iter().map(ManagedAlertRule::from).collect();
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
-}

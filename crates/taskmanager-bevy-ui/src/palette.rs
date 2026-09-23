@@ -102,7 +102,6 @@ pub(crate) struct UiPalette {
     /// High-contrast theme active flag.
     pub(crate) high_contrast: bool,
     /// Panel and card border color.
-    #[allow(dead_code)]
     pub(crate) border_color: Color,
 }
 

@@ -47,11 +47,6 @@ pub(crate) struct ProcessAffinityModalState {
 }
 
 impl ProcessAffinityModalState {
-    #[allow(dead_code)]
-    pub(crate) fn is_open(&self) -> bool {
-        self.session.is_some()
-    }
-
     pub(crate) fn open(&mut self, target: FrozenProcessIdentity, logical_cpu_count: usize) {
         let count = logical_cpu_count.max(1);
         let default_mask = (0..count as u32).collect();

@@ -11,6 +11,7 @@ use std::time::Duration;
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::Assets;
+use bevy::camera::ClearColor;
 use bevy::ecs::entity::Entity;
 use bevy::text::Font;
 use taskmanager_application::i18n::{Language, set_language};
@@ -18,6 +19,7 @@ use taskmanager_application::{
     ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigStore, HostTelemetryRequest,
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, SystemFacets, TelemetryInterval,
 };
+use taskmanager_core::config::Config;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
@@ -25,14 +27,93 @@ use taskmanager_platform_contract::{
 use taskmanager_theme::{LightDark, Skin, Theme};
 
 use super::{
-    SettingsChoice, SettingsField, ThemePreferences, patch_persisted_config,
-    sync_preferences_from_config,
+    SettingsChoice, SettingsField, ThemePreferences, apply_preferences, patch_persisted_config,
 };
 use crate::app::{FrontendTrack, Page, PageContent, Route, SharedRuntimeHandle};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
+
+/// Apply a persisted [`Config`] snapshot to the live theme preferences and
+/// shell. The windowed composition does not yet restore persisted config at
+/// startup, so this lives with the config-sync tests that exercise it.
+fn apply_persisted_config(
+    config: &Config,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    if let Some(prefs) = prefs {
+        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+            prefs.mode = None;
+        } else if config.mode.eq_ignore_ascii_case("Light") {
+            prefs.mode = Some(LightDark::Light);
+        } else if config.mode.eq_ignore_ascii_case("Dark") {
+            prefs.mode = Some(LightDark::Dark);
+        } else if config.mode.eq_ignore_ascii_case("EyeForest") {
+            prefs.mode = Some(LightDark::EyeForest);
+        }
+
+        if !config.skin.is_empty() {
+            prefs.skin = match config.skin.to_ascii_lowercase().as_str() {
+                "kde" => Some(Skin::Kde),
+                "windows" => Some(Skin::Windows),
+                "macos" => Some(Skin::Macos),
+                _ => Some(Skin::Gnome),
+            };
+        }
+
+        prefs.hc = config.hc;
+        apply_preferences(prefs, palette, clear);
+    }
+
+    if let Some(lang) = config.language.as_deref().and_then(Language::from_code) {
+        set_language(lang);
+    }
+
+    if config.refresh_ms > 0 {
+        track
+            .shell
+            .set_telemetry_interval(TelemetryInterval::clamped(Duration::from_millis(
+                config.refresh_ms,
+            )));
+    }
+
+    if config.graph_data_points > 0 {
+        track
+            .shell
+            .set_history_capacity(usize::try_from(config.graph_data_points).unwrap_or(60));
+    }
+}
+
+/// Sync preferences from the coordinator via [`SharedRuntimeHandle`].
+fn sync_preferences_from_config(
+    runtime: Option<&SharedRuntimeHandle>,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    let Some(runtime) = runtime else {
+        return;
+    };
+    let mut config_guard = runtime.shared.lock_config();
+    let Some(client) = config_guard.as_mut() else {
+        return;
+    };
+
+    if client.snapshot().is_none() {
+        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
+    } else {
+        let _ = client.drain();
+    }
+
+    if let Some(snapshot) = client.snapshot().cloned() {
+        apply_persisted_config(&snapshot, prefs, palette, clear, track);
+    }
+}
 
 struct FixedCapabilities(CapabilitySnapshot);
 

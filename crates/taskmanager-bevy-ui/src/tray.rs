@@ -9,8 +9,6 @@
 //! Linux tray communication runs over DBus StatusNotifierItem (Wayland-native,
 //! zero X11 dependencies).
 
-#![allow(dead_code)]
-
 use std::fmt;
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, channel};
@@ -37,13 +35,6 @@ pub enum TrayIntent {
     TogglePause,
     /// Close the process and release resources.
     Quit,
-}
-
-impl TrayIntent {
-    /// Alias matching the GPUI/Iced intent naming convention.
-    #[allow(non_upper_case_globals)]
-    pub const ShowWindow: Self = Self::Show;
-    pub const SHOW_WINDOW: Self = Self::Show;
 }
 
 /// Pure mapping from a native action id to a Bevy UI tray intent.
@@ -110,30 +101,6 @@ impl TrayControllerTarget for TrayResource {
     }
 }
 
-impl TrayControllerTarget for Option<Box<dyn TrayController>> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        self.as_deref()
-    }
-}
-
-impl TrayControllerTarget for Option<&dyn TrayController> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        *self
-    }
-}
-
-impl TrayControllerTarget for Box<dyn TrayController> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        Some(&**self)
-    }
-}
-
-impl TrayControllerTarget for dyn TrayController {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        Some(self)
-    }
-}
-
 /// Update the pause checkmark state on the tray controller.
 pub fn sync_tray_pause_checkmark<T: TrayControllerTarget + ?Sized>(target: &T, paused: bool) {
     if let Some(controller) = target.controller() {
@@ -173,10 +140,6 @@ impl TrayResource {
 
     pub fn empty() -> Self {
         Self::default()
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.controller.is_some()
     }
 
     pub fn sync_pause_checkmark(&self, paused: bool) {

@@ -404,47 +404,6 @@ pub(crate) fn services_logs_button_activated(
     }
 }
 
-/// The Services toolbar row: the open-logs affordance, right-aligned. A
-/// disabled-looking (unselected) button still renders; the request observer
-/// drops a selection-less request honestly.
-#[allow(dead_code)]
-pub(crate) fn logs_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: percent(100.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-            ( Node { flex_grow: 1.0 } ),
-            (
-                Node {
-                    height: px(palette.control_height_px),
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                }
-                BackgroundColor({
-                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
-                })
-                ControlVisual(ControlTone::Surface, has_selection)
-                Button
-                on(services_logs_button_activated)
-                ServicesLogsOpenButton
-                Children [
-                    (
-                        Text({ t("svc.logs").to_owned() })
-                        TextRole(Role::Caption)
-                        template_value(no_wrap_text())
-                    )
-                ]
-            ),
-        ]
-    })
-}
-
 // ---- events, markers, observers -------------------------------------------
 
 /// Marker on the panel root (one panel per Services page mount).
