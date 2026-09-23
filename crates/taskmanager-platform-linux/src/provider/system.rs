@@ -15,13 +15,17 @@ use taskmanager_core::{
 };
 use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
-    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,
-    NetworkTelemetryProvider, StorageTelemetryProvider,
+    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
+    GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
+    MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,
+    RaplPowerProvider, SmbiosMemoryProvider, StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::ProviderRegistration;
 
-use crate::backend::{SystemAuxiliaryProviders, SystemObservationProviders, SystemProviders};
+use crate::backend::{
+    SystemAuxiliaryProviders, SystemAuxiliaryProvidersParams, SystemObservationProviders,
+    SystemProviders,
+};
 use crate::engine::collector::domains::{
     LinuxCpuTelemetryCollector, LinuxGpuTelemetryCollector, LinuxHostTelemetryCollector,
     LinuxMemoryTelemetryCollector, LinuxNetworkTelemetryCollector, LinuxStorageTelemetryCollector,
@@ -212,53 +216,57 @@ pub(super) fn native_system_providers() -> (SystemProviders, StorageTargetResolv
             },
         ),
     );
-    let auxiliary = SystemAuxiliaryProviders::new(
-        ProviderRegistration::<HardwareInventoryRequest, _>::new(
+    let auxiliary = SystemAuxiliaryProviders::new(SystemAuxiliaryProvidersParams {
+        hardware_inventory: ProviderRegistration::<HardwareInventoryRequest, _>::new(
             HARDWARE_INVENTORY_PROVIDER.clone(),
-            NativeHardwareInventoryProvider::default(),
+            Box::new(NativeHardwareInventoryProvider::default())
+                as Box<dyn HardwareInventoryProvider>,
         ),
-        {
+        gpu_engine_rows: {
             let provider = NativeGpuEngineRowsProvider::new();
             let initial_status = provider.initial_status();
             ProviderRegistration::<GpuEngineRowsRequest, _>::new(
                 GPU_ENGINE_ROWS_PROVIDER.clone(),
-                provider,
+                Box::new(provider) as Box<dyn GpuEngineRowsProvider>,
             )
             .with_initial_status(initial_status)
         },
-        ProviderRegistration::<NpuInventoryRequest, _>::new(
+        npu_inventory: ProviderRegistration::<NpuInventoryRequest, _>::new(
             NPU_INVENTORY_PROVIDER.clone(),
-            NativeNpuInventoryProvider::new(),
+            Box::new(NativeNpuInventoryProvider::new()) as Box<dyn NpuInventoryProvider>,
         ),
-        {
+        smbios_memory: {
             let provider = NativeSmbiosMemoryProvider::new();
             let initial_status = provider.initial_status();
             ProviderRegistration::<SmbiosMemoryRequest, _>::new(
                 SMBIOS_MEMORY_PROVIDER.clone(),
-                provider,
+                Box::new(provider) as Box<dyn SmbiosMemoryProvider>,
             )
             .with_initial_status(initial_status)
         },
-        {
+        rapl_power: {
             let provider = NativeRaplPowerProvider::new();
             let initial_status = provider.initial_status();
-            ProviderRegistration::<RaplPowerRequest, _>::new(RAPL_POWER_PROVIDER.clone(), provider)
-                .with_initial_status(initial_status)
+            ProviderRegistration::<RaplPowerRequest, _>::new(
+                RAPL_POWER_PROVIDER.clone(),
+                Box::new(provider) as Box<dyn RaplPowerProvider>,
+            )
+            .with_initial_status(initial_status)
         },
-        {
+        msr_readout: {
             let provider = NativeMsrReadoutProvider::new();
             let initial_status = provider.initial_status();
             ProviderRegistration::<MsrReadoutRequest, _>::new(
                 MSR_READOUT_PROVIDER.clone(),
-                provider,
+                Box::new(provider) as Box<dyn MsrReadoutProvider>,
             )
             .with_initial_status(initial_status)
         },
-        ProviderRegistration::<CpuThrottleRequest, _>::new(
+        cpu_throttle: ProviderRegistration::<CpuThrottleRequest, _>::new(
             CPU_THROTTLE_PROVIDER.clone(),
-            NativeCpuThrottleProvider,
+            Box::new(NativeCpuThrottleProvider) as Box<dyn CpuThrottleProvider>,
         ),
-    );
+    });
     (
         SystemProviders::new(observations, auxiliary),
         storage_target_resolver,

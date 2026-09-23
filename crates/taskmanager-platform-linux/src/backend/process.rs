@@ -68,52 +68,46 @@ pub struct ProcessObservationProviders {
     affinity: AffinityRegistration,
 }
 
+/// Named composition input for [`ProcessObservationProviders`].
+///
+/// Each field is one independently typed read-only process capability, already
+/// erased to the platform-neutral provider trait object the group stores.
+/// Naming the nine axes keeps the capability vocabulary explicit at the
+/// composition seam without a positional argument list.
+pub struct ProcessObservationProvidersParams {
+    /// Process list observation provider.
+    pub list: ListRegistration,
+    /// Per-process network byte-accounting provider.
+    pub network: NetworkRegistration,
+    /// Per-process GPU utilization provider.
+    pub gpu: GpuRegistration,
+    /// Per-process resource-usage provider.
+    pub resources: ResourcesRegistration,
+    /// Per-process isolation provider.
+    pub isolation: IsolationRegistration,
+    /// Per-process thread breakdown provider.
+    pub threads: ThreadsRegistration,
+    /// Per-process open-files provider.
+    pub open_files: OpenFilesRegistration,
+    /// Per-process environment provider.
+    pub environment: EnvironmentRegistration,
+    /// Per-process CPU-affinity provider.
+    pub affinity: AffinityRegistration,
+}
+
 impl ProcessObservationProviders {
-    // This is the trait-erasure seam: each independently typed provider is
-    // converted to the crate's boxed registration exactly once. A generic
-    // input bag would retain the same nine type axes without adding an
-    // invariant, so the capability vocabulary remains explicit here.
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new<L, N, G, R, I, T, O, E, A>(
-        list: ProviderRegistration<ProcessListRequest, L>,
-        network: ProviderRegistration<ProcessNetworkRequest, N>,
-        gpu: ProviderRegistration<ProcessGpuRequest, G>,
-        resources: ProviderRegistration<ProcessResourcesRequest, R>,
-        isolation: ProviderRegistration<ProcessIsolationRequest, I>,
-        threads: ProviderRegistration<ProcessThreadsRequest, T>,
-        open_files: ProviderRegistration<ProcessOpenFilesRequest, O>,
-        environment: ProviderRegistration<ProcessEnvironmentRequest, E>,
-        affinity: ProviderRegistration<ProcessAffinityRequest, A>,
-    ) -> Self
-    where
-        L: ProcessListProvider,
-        N: ProcessNetworkProvider,
-        G: ProcessGpuProvider,
-        R: ProcessResourcesProvider,
-        I: ProcessIsolationProvider,
-        T: ProcessThreadsProvider,
-        O: ProcessOpenFilesProvider,
-        E: ProcessEnvironmentProvider,
-        A: ProcessAffinityProvider,
-    {
+    pub fn new(params: ProcessObservationProvidersParams) -> Self {
         Self {
-            list: list.map_provider(|provider| Box::new(provider) as Box<dyn ProcessListProvider>),
-            network: network
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessNetworkProvider>),
-            gpu: gpu.map_provider(|provider| Box::new(provider) as Box<dyn ProcessGpuProvider>),
-            resources: resources
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessResourcesProvider>),
-            isolation: isolation
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessIsolationProvider>),
-            threads: threads
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessThreadsProvider>),
-            open_files: open_files
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessOpenFilesProvider>),
-            environment: environment
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessEnvironmentProvider>),
-            affinity: affinity
-                .map_provider(|provider| Box::new(provider) as Box<dyn ProcessAffinityProvider>),
+            list: params.list,
+            network: params.network,
+            gpu: params.gpu,
+            resources: params.resources,
+            isolation: params.isolation,
+            threads: params.threads,
+            open_files: params.open_files,
+            environment: params.environment,
+            affinity: params.affinity,
         }
     }
 

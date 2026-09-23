@@ -4,8 +4,8 @@
 use super::*;
 
 pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
-    LinuxProviderRegistry::new(
-        SystemProviders::new(
+    LinuxProviderRegistry::new(LinuxProviderRegistryParams {
+        system: SystemProviders::new(
             SystemObservationProviders::new(
                 ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.host"),
@@ -36,76 +36,76 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                     provider.clone(),
                 ),
             ),
-            SystemAuxiliaryProviders::new(
-                ProviderRegistration::new(
+            SystemAuxiliaryProviders::new(SystemAuxiliaryProvidersParams {
+                hardware_inventory: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.hardware-inventory"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn HardwareInventoryProvider>,
                 ),
-                ProviderRegistration::new(
+                gpu_engine_rows: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.gpu-engine-rows"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn GpuEngineRowsProvider>,
                 ),
-                ProviderRegistration::new(
+                npu_inventory: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.npu-inventory"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn NpuInventoryProvider>,
                 ),
-                ProviderRegistration::new(
+                smbios_memory: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.smbios-memory"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn SmbiosMemoryProvider>,
                 ),
-                ProviderRegistration::new(
+                rapl_power: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.rapl-power"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn RaplPowerProvider>,
                 ),
-                ProviderRegistration::new(
+                msr_readout: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.msr-readout"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn MsrReadoutProvider>,
                 ),
-                ProviderRegistration::new(
+                cpu_throttle: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.system.cpu-throttle"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn CpuThrottleProvider>,
                 ),
-            ),
+            }),
         ),
-        ProcessProviders::new(
-            ProcessObservationProviders::new(
-                ProviderRegistration::new(
+        processes: ProcessProviders::new(
+            ProcessObservationProviders::new(ProcessObservationProvidersParams {
+                list: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.list"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessListProvider>,
                 ),
-                ProviderRegistration::new(
+                network: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.network"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessNetworkProvider>,
                 ),
-                ProviderRegistration::new(
+                gpu: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.gpu"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessGpuProvider>,
                 ),
-                ProviderRegistration::new(
+                resources: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.resources"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessResourcesProvider>,
                 ),
-                ProviderRegistration::new(
+                isolation: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.isolation"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessIsolationProvider>,
                 ),
-                ProviderRegistration::new(
+                threads: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.threads"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessThreadsProvider>,
                 ),
-                ProviderRegistration::new(
+                open_files: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.open_files"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessOpenFilesProvider>,
                 ),
-                ProviderRegistration::new(
+                environment: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.environment"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessEnvironmentProvider>,
                 ),
-                ProviderRegistration::new(
+                affinity: ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.affinity"),
-                    provider.clone(),
+                    Box::new(provider.clone()) as Box<dyn ProcessAffinityProvider>,
                 ),
-            ),
+            }),
             ProcessControlProviders::new(
                 ProviderRegistration::new(
                     ProviderId::borrowed("fixture.process.affinity-control"),
@@ -125,7 +125,7 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                 ),
             ),
         ),
-        ServiceProviders::new(
+        services: ServiceProviders::new(
             ProviderRegistration::new(
                 ProviderId::borrowed("fixture.service.inventory"),
                 provider.clone(),
@@ -147,7 +147,7 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                 provider.clone(),
             ),
         ),
-        EnvironmentProviders::new(
+        environment: EnvironmentProviders::new(
             ProviderRegistration::new(
                 ProviderId::borrowed("fixture.environment.startup-inventory"),
                 provider.clone(),
@@ -169,7 +169,7 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                 provider.clone(),
             ),
         ),
-        IntegrationProviders::new(
+        integrations: IntegrationProviders::new(
             ProviderRegistration::new(
                 ProviderId::borrowed("fixture.integration.command"),
                 provider.clone(),
@@ -187,7 +187,7 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                 provider.clone(),
             ),
         ),
-        StorageProviders::new(
+        storage: StorageProviders::new(
             ProviderRegistration::new(
                 ProviderId::borrowed("fixture.storage.filesystem-health"),
                 provider.clone(),
@@ -205,13 +205,13 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                 provider.clone(),
             ),
         ),
-        SensorProviders::new(ProviderRegistration::new(
+        sensors: SensorProviders::new(ProviderRegistration::new(
             ProviderId::borrowed("fixture.sensor"),
             provider.clone(),
         )),
-        PowerProviders::new(ProviderRegistration::new(
+        power: PowerProviders::new(ProviderRegistration::new(
             ProviderId::borrowed("fixture.power-supply"),
             provider.clone(),
         )),
-    )
+    })
 }

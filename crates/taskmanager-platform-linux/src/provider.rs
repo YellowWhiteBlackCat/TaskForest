@@ -22,13 +22,19 @@ use taskmanager_escalation::polkit::PkexecNetLauncher;
 use taskmanager_platform_contract::{
     CapabilityId, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
+use taskmanager_platform_provider::{
+    ProcessAffinityProvider, ProcessEnvironmentProvider, ProcessGpuProvider,
+    ProcessIsolationProvider, ProcessListProvider, ProcessNetworkProvider,
+    ProcessOpenFilesProvider, ProcessResourcesProvider, ProcessThreadsProvider,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 use tracing::{info, warn};
 
 use crate::backend::{
-    EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, PowerProviders,
-    ProcessControlProviders, ProcessObservationProviders, ProcessProviders, SensorProviders,
-    ServiceProviders, StorageProviders,
+    EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, LinuxProviderRegistryParams,
+    PowerProviders, ProcessControlProviders, ProcessObservationProviders,
+    ProcessObservationProvidersParams, ProcessProviders, SensorProviders, ServiceProviders,
+    StorageProviders,
 };
 use crate::engine::process::ProcessManager;
 use crate::engine::process::telemetry::ProcessNetworkAccountingBackend;
@@ -305,19 +311,19 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
         Arc::new(Mutex::new(Box::new(
             crate::engine::process::telemetry::network::UnsupportedNetworkAccountingBackend,
         )));
-    LinuxProviderRegistry::new(
+    LinuxProviderRegistry::new(LinuxProviderRegistryParams {
         system,
-        ProcessProviders::new(
-            ProcessObservationProviders::new(
-                ProviderRegistration::<ProcessListRequest, _>::new(
+        processes: ProcessProviders::new(
+            ProcessObservationProviders::new(ProcessObservationProvidersParams {
+                list: ProviderRegistration::<ProcessListRequest, _>::new(
                     PROCESS_LIST_PROVIDER.clone(),
-                    ProcfsProcessListProvider {
+                    Box::new(ProcfsProcessListProvider {
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessListProvider>,
                 ),
-                ProviderRegistration::<ProcessNetworkRequest, _>::new(
+                network: ProviderRegistration::<ProcessNetworkRequest, _>::new(
                     PROCESS_NETWORK_PROVIDER.clone(),
-                    NativeProcessNetworkProvider {
+                    Box::new(NativeProcessNetworkProvider {
                         // ADR-024: per-process byte accounting via the audited
                         // AF_PACKET seam. Probes CAP_NET_RAW at construction —
                         // unprivileged hosts degrade to RequiresEscalation (the
@@ -329,55 +335,55 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
                             shared_net_accounting.clone(),
                         ),
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessNetworkProvider>,
                 ),
-                ProviderRegistration::<ProcessGpuRequest, _>::new(
+                gpu: ProviderRegistration::<ProcessGpuRequest, _>::new(
                     PROCESS_GPU_PROVIDER.clone(),
-                    NativeProcessGpuProvider {
+                    Box::new(NativeProcessGpuProvider {
                         collector: ProcessGpuCollector::default(),
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessGpuProvider>,
                 ),
-                ProviderRegistration::<ProcessResourcesRequest, _>::new(
+                resources: ProviderRegistration::<ProcessResourcesRequest, _>::new(
                     PROCESS_RESOURCES_PROVIDER.clone(),
-                    NativeProcessResourcesProvider {
+                    Box::new(NativeProcessResourcesProvider {
                         collector: ProcessResourcesCollector::default(),
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessResourcesProvider>,
                 ),
-                ProviderRegistration::<ProcessIsolationRequest, _>::new(
+                isolation: ProviderRegistration::<ProcessIsolationRequest, _>::new(
                     PROCESS_ISOLATION_PROVIDER.clone(),
-                    NativeProcessIsolationProvider {
+                    Box::new(NativeProcessIsolationProvider {
                         collector: ProcessIsolationCollector,
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessIsolationProvider>,
                 ),
-                ProviderRegistration::<ProcessThreadsRequest, _>::new(
+                threads: ProviderRegistration::<ProcessThreadsRequest, _>::new(
                     PROCESS_THREADS_PROVIDER.clone(),
-                    NativeProcessThreadsProvider {
+                    Box::new(NativeProcessThreadsProvider {
                         collector: ProcessThreadsCollector::default(),
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessThreadsProvider>,
                 ),
-                ProviderRegistration::<ProcessOpenFilesRequest, _>::new(
+                open_files: ProviderRegistration::<ProcessOpenFilesRequest, _>::new(
                     PROCESS_OPEN_FILES_PROVIDER.clone(),
-                    NativeProcessOpenFilesProvider {
+                    Box::new(NativeProcessOpenFilesProvider {
                         collector: ProcessOpenFilesCollector,
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessOpenFilesProvider>,
                 ),
-                ProviderRegistration::<ProcessEnvironmentRequest, _>::new(
+                environment: ProviderRegistration::<ProcessEnvironmentRequest, _>::new(
                     PROCESS_ENVIRONMENT_PROVIDER.clone(),
-                    NativeProcessEnvironmentProvider {
+                    Box::new(NativeProcessEnvironmentProvider {
                         collector: ProcessEnvironmentCollector,
                         process_manager: ProcessManager::new(),
-                    },
+                    }) as Box<dyn ProcessEnvironmentProvider>,
                 ),
-                ProviderRegistration::<ProcessAffinityRequest, _>::new(
+                affinity: ProviderRegistration::<ProcessAffinityRequest, _>::new(
                     PROCESS_AFFINITY_PROVIDER.clone(),
-                    NativeProcessAffinityProvider,
+                    Box::new(NativeProcessAffinityProvider) as Box<dyn ProcessAffinityProvider>,
                 ),
-            ),
+            }),
             ProcessControlProviders::new(
                 ProviderRegistration::<ProcessAffinityControlRequest, _>::new(
                     PROCESS_AFFINITY_CONTROL_PROVIDER.clone(),
@@ -420,7 +426,7 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
                 ),
             ),
         ),
-        ServiceProviders::new(
+        services: ServiceProviders::new(
             ProviderRegistration::new(
                 SERVICE_INVENTORY_PROVIDER.clone(),
                 NativeServiceInventoryProvider,
@@ -442,7 +448,7 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
                 NativeServiceLogStreamProvider,
             ),
         ),
-        EnvironmentProviders::new(
+        environment: EnvironmentProviders::new(
             ProviderRegistration::<StartupInventoryRequest, _>::new(
                 STARTUP_INVENTORY_PROVIDER.clone(),
                 NativeStartupProvider {
@@ -472,7 +478,7 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
                 },
             ),
         ),
-        IntegrationProviders::new(
+        integrations: IntegrationProviders::new(
             ProviderRegistration::new(COMMAND_LAUNCH_PROVIDER.clone(), NativeCommandLaunchProvider),
             ProviderRegistration::new(
                 RESOURCE_REVEAL_PROVIDER.clone(),
@@ -494,7 +500,7 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
             FIRST_RUN_SETUP_PROVIDER.clone(),
             NativeSetupScriptProvider,
         )),
-        StorageProviders::new(
+        storage: StorageProviders::new(
             ProviderRegistration::new(
                 FILESYSTEM_HEALTH_PROVIDER.clone(),
                 NativeFilesystemHealthProvider,
@@ -518,15 +524,15 @@ pub(super) fn real_provider_registry() -> LinuxProviderRegistry {
                 NativeDirectoryUsageProvider::new(),
             ),
         ),
-        SensorProviders::new(ProviderRegistration::new(
+        sensors: SensorProviders::new(ProviderRegistration::new(
             SENSOR_CAPABILITY_PROVIDER.clone(),
             NativeSensorProvider,
         )),
-        PowerProviders::new(ProviderRegistration::new(
+        power: PowerProviders::new(ProviderRegistration::new(
             POWER_SUPPLY_CAPABILITY_PROVIDER.clone(),
             NativePowerSupplyProvider,
         )),
-    )
+    })
 }
 
 fn log_provider_receipt() {

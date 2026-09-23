@@ -50,7 +50,7 @@ mod smbios_memory;
 mod virtualization;
 mod wsl;
 
-pub use auxiliary::WinSystemAuxiliaryProviders;
+pub use auxiliary::{WinSystemAuxiliaryProviders, WinSystemAuxiliaryProvidersParams};
 pub use cpu_freq::WinCpuTelemetryProvider;
 pub use cpu_throttle::PendingCpuThrottleProvider;
 pub use disk::WinStorageTelemetryProvider;

@@ -2,15 +2,7 @@
 //! domain observation ownership, boxed into one immutable composition group.
 //! Split from `system.rs` so that file stays inside the workspace line budget.
 
-use taskmanager_application::{
-    CpuThrottleRequest, GpuEngineRowsRequest, HardwareInventoryRequest, MsrReadoutRequest,
-    NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
-};
-use taskmanager_platform_provider::{
-    CpuThrottleProvider, GpuEngineRowsProvider, HardwareInventoryProvider, MsrReadoutProvider,
-    NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
-};
-use taskmanager_platform_runtime::{ProviderRegistration, SystemAuxiliaryExecutors};
+use taskmanager_platform_runtime::SystemAuxiliaryExecutors;
 
 use super::{
     CpuThrottleRegistration, GpuEngineRowsRegistration, HardwareInventoryRegistration,
@@ -29,42 +21,40 @@ pub struct WinSystemAuxiliaryProviders {
     pub(super) cpu_throttle: CpuThrottleRegistration,
 }
 
+/// Named composition input for [`WinSystemAuxiliaryProviders`].
+///
+/// Each field is one hardware capability outside domain observation ownership,
+/// already erased to the platform-neutral provider trait object the group
+/// stores. Naming the seven axes keeps the auxiliary vocabulary explicit at the
+/// composition seam without a positional argument list.
+pub struct WinSystemAuxiliaryProvidersParams {
+    /// Hardware inventory provider.
+    pub hardware_inventory: HardwareInventoryRegistration,
+    /// Per-engine GPU utilization provider.
+    pub gpu_engine_rows: GpuEngineRowsRegistration,
+    /// NPU accelerator inventory provider.
+    pub npu_inventory: NpuInventoryRegistration,
+    /// SMBIOS memory inventory provider.
+    pub smbios_memory: SmbiosMemoryRegistration,
+    /// CPU package power provider.
+    pub rapl_power: RaplPowerRegistration,
+    /// CPU MSR readout provider.
+    pub msr_readout: MsrReadoutRegistration,
+    /// CPU thermal-throttle counter provider.
+    pub cpu_throttle: CpuThrottleRegistration,
+}
+
 impl WinSystemAuxiliaryProviders {
-    #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new<P, E, N, S, R, M, C>(
-        hardware_inventory: ProviderRegistration<HardwareInventoryRequest, P>,
-        gpu_engine_rows: ProviderRegistration<GpuEngineRowsRequest, E>,
-        npu_inventory: ProviderRegistration<NpuInventoryRequest, N>,
-        smbios_memory: ProviderRegistration<SmbiosMemoryRequest, S>,
-        rapl_power: ProviderRegistration<RaplPowerRequest, R>,
-        msr_readout: ProviderRegistration<MsrReadoutRequest, M>,
-        cpu_throttle: ProviderRegistration<CpuThrottleRequest, C>,
-    ) -> Self
-    where
-        P: HardwareInventoryProvider,
-        E: GpuEngineRowsProvider,
-        N: NpuInventoryProvider,
-        S: SmbiosMemoryProvider,
-        R: RaplPowerProvider,
-        M: MsrReadoutProvider,
-        C: CpuThrottleProvider,
-    {
+    pub fn new(params: WinSystemAuxiliaryProvidersParams) -> Self {
         Self {
-            hardware_inventory: hardware_inventory
-                .map_provider(|provider| Box::new(provider) as Box<dyn HardwareInventoryProvider>),
-            gpu_engine_rows: gpu_engine_rows
-                .map_provider(|provider| Box::new(provider) as Box<dyn GpuEngineRowsProvider>),
-            npu_inventory: npu_inventory
-                .map_provider(|provider| Box::new(provider) as Box<dyn NpuInventoryProvider>),
-            smbios_memory: smbios_memory
-                .map_provider(|provider| Box::new(provider) as Box<dyn SmbiosMemoryProvider>),
-            rapl_power: rapl_power
-                .map_provider(|provider| Box::new(provider) as Box<dyn RaplPowerProvider>),
-            msr_readout: msr_readout
-                .map_provider(|provider| Box::new(provider) as Box<dyn MsrReadoutProvider>),
-            cpu_throttle: cpu_throttle
-                .map_provider(|provider| Box::new(provider) as Box<dyn CpuThrottleProvider>),
+            hardware_inventory: params.hardware_inventory,
+            gpu_engine_rows: params.gpu_engine_rows,
+            npu_inventory: params.npu_inventory,
+            smbios_memory: params.smbios_memory,
+            rapl_power: params.rapl_power,
+            msr_readout: params.msr_readout,
+            cpu_throttle: params.cpu_throttle,
         }
     }
 
