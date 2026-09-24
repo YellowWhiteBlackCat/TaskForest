@@ -27,6 +27,7 @@ use super::{perf_core_grid, perf_memory};
 use crate::PerfDevice;
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskmanager_application::MsrReadoutState;
 use taskmanager_application::RaplPowerState;
 
 /// Render the selected CPU or Memory overview through its dedicated layout.
@@ -155,7 +156,12 @@ fn render_cpu_overview(
     // body cannot afford both columns the whole rail is omitted. Its content
     // has an independent line viewport, so a short terminal can reach every
     // accepted row without overlapping the facts, graph, or core grid.
-    let rail_rows = cpu_rail_rows(snapshot, hardware, Some(app.shell.rapl_power_state()));
+    let rail_rows = cpu_rail_rows(
+        snapshot,
+        hardware,
+        Some(app.shell.rapl_power_state()),
+        Some(app.shell.msr_readout_state()),
+    );
     let rail_width = if body.width >= CPU_RAIL_WIDTH + CPU_RAIL_MIN_MAIN_WIDTH && body.height >= 8 {
         CPU_RAIL_WIDTH
     } else {
@@ -196,9 +202,10 @@ fn cpu_rail_rows(
     snapshot: &SystemSnapshot,
     hardware: Option<&HardwareInfo>,
     rapl_state: Option<&RaplPowerState>,
+    msr_state: Option<&MsrReadoutState>,
 ) -> Vec<CpuRailRow> {
     let mut rows = cpu_live_rail_rows(snapshot, rapl_state);
-    rows.extend(cpu_spec_rail_rows(&snapshot.cpu, hardware));
+    rows.extend(cpu_spec_rail_rows(&snapshot.cpu, hardware, msr_state));
     rows
 }
 

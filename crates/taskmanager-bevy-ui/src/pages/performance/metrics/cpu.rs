@@ -8,6 +8,7 @@ use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 use taskmanager_shell::presentation::cpu_topology_summary;
 use taskmanager_shell::presentation::load_average_basis_summary;
 use taskmanager_shell::presentation::load_average_values_summary;
+use taskmanager_shell::presentation::msr_thermal_status_summary;
 use taskmanager_shell::presentation::pressure_summary;
 
 pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
@@ -24,6 +25,13 @@ pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> Str
                     load_average_basis_summary(load),
                 )
             });
+    }
+    // The real-time thermal-status / PROCHOT assertion rides the privileged
+    // `telemetry.cpu.msr` lane, not the periodic CPU snapshot, so it is read
+    // before the snapshot gate: the mounted row keeps the shared dash while
+    // the lane produced no accepted readout.
+    if let CpuField::ThermalStatus = field {
+        return msr_thermal_status_summary(shell.msr_readout_state()).unwrap_or_else(missing_value);
     }
     let Some(cpu) = cpu_metrics(shell) else {
         return missing_value();
@@ -68,6 +76,9 @@ pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> Str
         CpuField::ThermalThrottle => {
             cpu_thermal_throttle_summary(cpu).unwrap_or_else(missing_value)
         }
+        // The real-time thermal-status / PROCHOT assertion from the privileged
+        // `telemetry.cpu.msr` lane is handled before the snapshot gate above.
+        CpuField::ThermalStatus => missing_value(),
         CpuField::Load => missing_value(),
         CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),
     }

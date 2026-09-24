@@ -1,11 +1,17 @@
 use super::*;
+use taskmanager_application::{
+    CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
+};
 use taskmanager_core::core::metrics::CpuPackageMetrics;
 use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_core::core::metrics::PressureWindow;
 use taskmanager_core::core::metrics::ResourcePressure;
+use taskmanager_core::core::metrics::{MsrReadoutSnapshot, MsrThermalStatusReadout};
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::presentation::msr_thermal_status_summary;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::pin_english;
 
@@ -430,6 +436,80 @@ mod cpu_throttle_tests {
         assert!(
             throttle_row(&stats).is_none(),
             "an unobserved counter family must omit its row, never fabricate a zero"
+        );
+    }
+
+    /// Seed the shared MSR session with an accepted readout carrying the given
+    /// real-time `IA32_THERM_STATUS` bits, through the same request-session and
+    /// platform-batch path production admission uses.
+    fn set_msr_thermal_status(app: &mut crate::IcedApp, bits: &[(u32, Option<bool>)]) {
+        let attempt = app.shell.begin_msr_readout_request();
+        let request_id = RequestId::new(41).expect("fixture request id");
+        assert!(app.shell.accept_msr_readout_request(attempt, request_id));
+        let mut batch = PlatformEventBatch::default();
+        batch.msr_readout_events.push(CorrelatedEvent::new(
+            PlatformEventContext {
+                request_id,
+                capability: CapabilityId::TELEMETRY_CPU_MSR,
+                provider: None,
+                sequence: EventSequence::new(1),
+                observed_at_ms: 10,
+            },
+            MsrReadoutEvent::Update(
+                MsrReadoutSnapshot::success(Vec::new()).with_thermal(
+                    bits.iter()
+                        .map(|&(cpu, thermal_status)| MsrThermalStatusReadout {
+                            cpu,
+                            thermal_status,
+                            ..MsrThermalStatusReadout::default()
+                        })
+                        .collect(),
+                ),
+            ),
+        ));
+        app.shell.apply_platform_batch(batch);
+    }
+
+    fn thermal_status_row(stats: &[StatRow]) -> Option<&StatRow> {
+        stats
+            .iter()
+            .find(|row| row.label() == t("cpu.thermal_status"))
+    }
+
+    /// The real-time thermal-status / PROCHOT delivery: the Performance CPU
+    /// stat column renders the shared
+    /// [`taskmanager_shell::presentation::msr_thermal_status_summary`] fold
+    /// beside the cumulative counters — the shared asserted/clear words and
+    /// the honest dash for an unreadable register — and omits the whole row
+    /// while the privileged lane produced no accepted readout.
+    #[test]
+    fn cpu_stats_render_the_real_time_thermal_status_with_honest_absence() {
+        pin_english();
+        let mut app = crate::IcedApp::demo();
+        let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
+        assert!(
+            thermal_status_row(&stats).is_none(),
+            "a session that never ran must not grow a real-time row"
+        );
+
+        set_msr_thermal_status(&mut app, &[(0, Some(true)), (1, Some(false)), (2, None)]);
+        let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
+        let row = thermal_status_row(&stats).expect("an accepted readout must grow a stat row");
+        let expected = msr_thermal_status_summary(app.shell.msr_readout_state())
+            .expect("an accepted readout must fold");
+        assert_eq!(
+            row.value(),
+            Some(expected.as_str()),
+            "the stat row must render the shared real-time status fold"
+        );
+        assert!(
+            expected.contains(t("cpu.thermal_status_asserted"))
+                && expected.contains(t("cpu.thermal_status_clear")),
+            "the fold must carry the shared asserted/clear vocabulary: {expected}"
+        );
+        assert!(
+            expected.contains(MISSING_VALUE),
+            "an unreadable register must keep the honest dash: {expected}"
         );
     }
 }

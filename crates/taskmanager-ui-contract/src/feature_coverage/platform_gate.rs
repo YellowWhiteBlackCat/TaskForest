@@ -716,7 +716,9 @@ static PRODUCT_EXPECTED_SURFACE: [CapabilityId; 81] = CapabilityId::EXPECTED_SUR
 /// `profiling.pmu`, `memory.vma-map`, `numa.topology`,
 /// `threads.context-switch`, `telemetry.cpu.throttle`,
 /// `profiling.syscalls`, `ipc.pipe-graph`, `desktop.responsiveness`). The
-/// identities that stay here are owned by no current feature: their facts
+/// PROCHOT delivery bound `telemetry.cpu.msr` through the thermal-throttle
+/// feature's real-time assertion surface. The identities that stay here are
+/// owned by no current feature: their facts
 /// either ride an already-bound lane (for example `process.scheduling` and
 /// `filesystem.fd-limits` ride the process row/resource lanes,
 /// `power.c-states` rides CPU telemetry) or belong to a surface the 75-item
@@ -724,7 +726,6 @@ static PRODUCT_EXPECTED_SURFACE: [CapabilityId; 81] = CapabilityId::EXPECTED_SUR
 static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
     CapabilityId::TELEMETRY_NETWORK,
     CapabilityId::TELEMETRY_MEMORY_SMBIOS,
-    CapabilityId::TELEMETRY_CPU_MSR,
     CapabilityId::CONTAINERS,
     CapabilityId::PROCESS_INSIGHTS_ENVIRONMENT,
     CapabilityId::PROCESS_RESOURCE_CONTROL,

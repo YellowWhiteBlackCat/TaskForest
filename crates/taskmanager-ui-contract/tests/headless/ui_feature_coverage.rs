@@ -594,13 +594,16 @@ fn authoritative_delivery_definitions_pin_their_boundaries() {
         .delivery_definition;
     assert!(thermal.contains("package_throttle_count"), "{thermal}");
     assert!(thermal.contains("is_throttled"), "{thermal}");
-    assert!(thermal.contains("OUTSIDE"), "{thermal}");
-    // The OUTSIDE clause names its delivery state so it stays actionable: the
-    // privileged read and its typed fact exist, the rendering surface does not.
+    // The real-time assertion is now INSIDE the definition: the privileged
+    // read's typed fact is named together with the surface that consumes it.
     assert!(thermal.contains("telemetry.cpu.msr"), "{thermal}");
     assert!(thermal.contains("IA32_THERM_STATUS"), "{thermal}");
     assert!(thermal.contains("/dev/cpu/N/msr"), "{thermal}");
     assert!(thermal.contains("MsrThermalStatusReadout"), "{thermal}");
+    assert!(
+        thermal.contains("never a fabricated clear state"),
+        "{thermal}"
+    );
     assert!(thermal.contains("telemetry.cpu.throttle"), "{thermal}");
 
     // The per-process swap charge keeps its own authority: it names the

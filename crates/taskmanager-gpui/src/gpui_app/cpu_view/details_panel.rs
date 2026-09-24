@@ -40,6 +40,7 @@ pub(super) fn render_pinned(
     let EscalationReadouts {
         package_power,
         msr_readouts,
+        thermal_status,
     } = escalation;
     let cpu = &snap.cpu;
     // Per-core average + maximum temperature, surfaced as a note beneath the
@@ -85,7 +86,13 @@ pub(super) fn render_pinned(
         // topology/policy facts with "N more rows"; that made the screenshot
         // look tidy while making accepted data unreachable. The owned rail
         // keeps the chart and page viewport pinned and exposes every row.
-        .child(spec_grid(theme, cpu, hardware, units));
+        .child(spec_grid(
+            theme,
+            cpu,
+            hardware,
+            units,
+            thermal_status.as_deref(),
+        ));
     div()
         .relative()
         .flex()
@@ -234,11 +241,12 @@ fn spec_grid(
     cpu: &CpuMetrics,
     hardware: &HardwareInfo,
     units: UnitPreferences,
+    thermal_status: Option<&str>,
 ) -> Div {
     // All accepted facts are painted in this one details viewport. The outer
     // CPU rail owns vertical scrolling; no row budget is allowed to turn
     // real telemetry into an unreachable count hint.
-    let rows = cpu_spec_rows(cpu, hardware, units);
+    let rows = cpu_spec_rows(cpu, hardware, units, thermal_status);
     let mut column = div()
         .flex()
         .flex_col()
@@ -270,6 +278,7 @@ pub(crate) fn cpu_spec_rows(
     cpu: &CpuMetrics,
     hardware: &HardwareInfo,
     units: UnitPreferences,
+    thermal_status: Option<&str>,
 ) -> Vec<(String, String)> {
     let cache = |kb: Option<u64>| -> String {
         // `*_cache_kb` from detect_cpu_cache is in KiB; format_mib_2 expects
@@ -378,6 +387,13 @@ pub(crate) fn cpu_spec_rows(
     // package.
     if let Some(throttle) = cpu_thermal_throttle_summary(cpu) {
         rows.push((i18n::t("cpu.thermal_throttle").to_string(), throttle));
+    }
+    // The real-time thermal-status / PROCHOT assertion rides the privileged
+    // MSR lane beside the cumulative counters. The row appears only when the
+    // lane produced an accepted readout; an unreadable per-node register is
+    // the shared dash inside the value, and an unrun lane is an absent row.
+    if let Some(status) = thermal_status {
+        rows.push((i18n::t("cpu.thermal_status").to_string(), status.to_owned()));
     }
     // An unavailable optional value is represented by absence and its
     // authorization/recovery affordance belongs to the Settings permission

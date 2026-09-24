@@ -525,7 +525,7 @@ fn scripted_runtime() -> &'static SharedRuntime {
 
 /// `MinimalPlugins` + the real window plugin (real route/mount systems and
 /// the real drain), with the font store `AssetPlugin` does not auto-create.
-fn headless_perf_app() -> App {
+pub(super) fn headless_perf_app() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(HeadlessFrontendPlugins);
@@ -539,7 +539,7 @@ fn headless_perf_app() -> App {
 
 /// Route to the Performance page the programmatic way (route resource move +
 /// `RouteChanged` trigger — the same pair the keyboard adapter performs).
-fn route_to_performance(app: &mut App) {
+pub(super) fn route_to_performance(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Performance;
     app.world_mut().commands().trigger(RouteChanged);
     app.update();

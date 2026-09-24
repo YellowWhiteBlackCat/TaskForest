@@ -314,23 +314,17 @@ impl FeatureId {
                                       thermal-throttle trigger counters (the cumulative \
                                       package and per-core event counts, \
                                       `package_throttle_count` / `core_throttle_count`) \
-                                      from the shared CPU projection. The real-time \
-                                      PROCHOT assertion state (`is_throttled`) is \
-                                      explicitly OUTSIDE this definition. The \
-                                      privileged read now EXISTS: the \
-                                      `telemetry.cpu.msr` lane's helper contract \
-                                      carries the `IA32_THERM_STATUS` (MSR 0x19C) \
-                                      thermal-status / PROCHOT bits (Linux-only via \
+                                      from the shared CPU projection, together with the \
+                                      real-time thermal-status / PROCHOT assertion \
+                                      (`MsrThermalStatusReadout::is_throttled`, the \
+                                      `IA32_THERM_STATUS` (MSR 0x19C) bit 0) from the \
+                                      privileged `telemetry.cpu.msr` lane (Linux-only via \
                                       the root-only `/dev/cpu/N/msr` nodes; \
-                                      Windows/macOS answer a typed `Unsupported`), \
-                                      and the provider publishes them as the typed \
-                                      `MsrThermalStatusReadout` fact. What does not \
-                                      exist yet is a thermal SURFACE that renders \
-                                      the real-time assertion, so the delivery \
-                                      stays OUTSIDE until one consumes the fact; \
-                                      the aggregate system-health deduction is not \
-                                      such a surface, and the feature's platform \
-                                      binding stays the unprivileged \
+                                      Windows/macOS answer a typed `Unsupported`). An \
+                                      unreadable or unimplemented register is an honest \
+                                      dash, and a lane that never ran is an absent fact, \
+                                      never a fabricated clear state. The cumulative \
+                                      counters stay on the unprivileged \
                                       `telemetry.cpu.throttle` lane.",
             },
             Self::LinuxNamespaceAudit => FeatureSemanticSpec {

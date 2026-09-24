@@ -298,14 +298,22 @@ power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_row
 # and the per-core event count painted from the shared projection, the
 # unobserved-family honest absence (GPUI/Iced/TUI omit the row; Bevy's
 # always-mounted diagnostic row keeps the shared dash), and the labeled dash
-# for an unobserved sibling counter — never a fabricated `0`.  The PROCHOT
-# clause stays unasserted because it is outside the definition; the Linux
+# for an unobserved sibling counter — never a fabricated `0`.  The Linux
 # `telemetry.cpu.throttle` lane keeps the whole cell host-derived.  This takes
 # the table to 71 anchored rows (gpui 16, iced 18, tui 20, bevy 17).
-power.thermal-throttle-events	gpui	gpui_app::cpu_view::details_panel::tests::cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence	anchored	-	-
-power.thermal-throttle-events	iced	ui::perf_overview::tests::cpu_throttle_tests::cpu_stats_render_the_thermal_throttle_counters_with_honest_absence	anchored	-	-
-power.thermal-throttle-events	tui	ui::tests::cpu_right_rail::thermal_throttle_counters_paint_with_honest_absence	anchored	-	-
-power.thermal-throttle-events	bevy	pages::performance::tests::cpu_thermal_throttle_counters_render_with_honest_absence	anchored	-	-
+power.thermal-throttle-events	gpui	gpui_app::cpu_view::details_panel::tests::cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence	anchored	-	gpui_app::cpu_view::details_panel::tests::cpu_spec_rows_render_the_real_time_thermal_status_with_honest_absence
+power.thermal-throttle-events	iced	ui::perf_overview::tests::cpu_throttle_tests::cpu_stats_render_the_thermal_throttle_counters_with_honest_absence	anchored	-	ui::perf_overview::tests::cpu_throttle_tests::cpu_stats_render_the_real_time_thermal_status_with_honest_absence
+power.thermal-throttle-events	tui	ui::tests::cpu_right_rail::thermal_throttle_counters_paint_with_honest_absence	anchored	-	ui::tests::cpu_right_rail::real_time_thermal_status_paints_with_honest_absence
+power.thermal-throttle-events	bevy	pages::performance::tests::cpu_thermal_throttle_counters_render_with_honest_absence	anchored	-	pages::performance::thermal_status_tests::cpu_real_time_thermal_status_renders_with_honest_absence
+# W46 PROCHOT delivery: the definition was widened to include the real-time
+# thermal-status / PROCHOT assertion (`IA32_THERM_STATUS` bit 0) from the
+# privileged `telemetry.cpu.msr` lane, and the platform binding moved to
+# `Requires(telemetry.cpu.throttle, telemetry.cpu.msr)`.  The co-anchor on each
+# cell is the test that drives an accepted MSR readout through the shared
+# `msr_thermal_status_summary` fold and proves the rendered asserted / clear /
+# absent-dash states; the primary anchor keeps proving the cumulative counters.
+# The privileged lane is absent unless it ran, so the real-time row is omitted
+# (GPUI/Iced/TUI) or keeps the shared dash (Bevy) on a host that never read it.
 # W28-A batch (2026-09-23): the per-process swap ownership addition.  The
 # `memory.process-swap-charge` feature was registered as the single authority
 # for the swap charged to one process - a fact the four shapes already render

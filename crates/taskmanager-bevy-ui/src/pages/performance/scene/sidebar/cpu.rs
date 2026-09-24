@@ -64,6 +64,7 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         (t("cpu.power_limits"), CpuField::PowerLimits),
         (t("cpu.interrupts"), CpuField::Interrupts),
         (t("cpu.thermal_throttle"), CpuField::ThermalThrottle),
+        (t("cpu.thermal_status"), CpuField::ThermalStatus),
     ]
     .into_iter()
     .map(|(label, field)| {
