@@ -8,7 +8,7 @@
 //! lane whose provider can only answer a typed absence.
 
 use std::collections::BTreeSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use taskmanager_application::{CpuThrottleEvent, CpuThrottleRequest, PlatformEvent};
 use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
@@ -129,7 +129,8 @@ fn the_linux_cpu_throttle_lane_answers_the_shared_counter_read() {
     })
     .expect("the throttle lane accepts a refresh");
 
-    for _ in 0..500 {
+    let started = Instant::now();
+    loop {
         if let Some(event) = handle.events().try_recv().expect("event port") {
             match event.outcome {
                 Ok(PlatformEvent::CpuThrottle(CpuThrottleEvent::Update(snapshot))) => {
@@ -163,7 +164,11 @@ fn the_linux_cpu_throttle_lane_answers_the_shared_counter_read() {
                 Err(failure) => panic!("the throttle lane reported a failure: {failure:?}"),
             }
         }
+        let waited = started.elapsed();
+        assert!(
+            waited < Duration::from_secs(10),
+            "timed out after {waited:?} waiting for a CpuThrottle update event from the live lane",
+        );
         std::thread::sleep(Duration::from_millis(2));
     }
-    panic!("no CpuThrottle update event arrived from the live lane");
 }

@@ -24,13 +24,10 @@ fn slow_batch_control_cannot_block_affinity_mutation_lane() {
             targets: vec![target.clone()],
         }),
     );
-    for _ in 0..100 {
-        if process_control_started.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(1));
-    }
-    assert!(process_control_started.load(Ordering::Acquire));
+    wait_for_flag(
+        &process_control_started,
+        "the process batch-control provider to start",
+    );
 
     let started = Instant::now();
     let affinity_id = submit_process_affinity_control(

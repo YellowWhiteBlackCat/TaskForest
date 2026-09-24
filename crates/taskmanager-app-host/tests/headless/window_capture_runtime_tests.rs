@@ -269,7 +269,7 @@ fn blocked_provider_does_not_make_coordinator_drop_wait_unboundedly() {
             std::time::Instant::now() < deadline,
             "released worker must finish and clean its staging file"
         );
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     }
     assert!(!destination.exists());
     fs::remove_dir(&directory).expect("remove isolated directory");

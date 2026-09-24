@@ -93,7 +93,7 @@ mod signal_identity {
     use std::process::Child;
     use std::process::Command;
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     fn spawn_own_child() -> Child {
         Command::new("sleep")
@@ -122,13 +122,20 @@ mod signal_identity {
     }
 
     fn wait_until(pid: u32, want_stopped: bool, what: &str) {
-        for _ in 0..400 {
-            if child_is_stopped(pid) == want_stopped {
-                return;
-            }
-            thread::sleep(Duration::from_millis(5));
+        // The kernel applies SIGSTOP/SIGCONT asynchronously relative to the
+        // signalling thread, so wait on the observable /proc state with a
+        // wall-clock deadline instead of a scheduler-turn budget.
+        const WAIT_LIMIT: Duration = Duration::from_secs(10);
+        const POLL_INTERVAL: Duration = Duration::from_millis(5);
+        let started = Instant::now();
+        while child_is_stopped(pid) != want_stopped {
+            let waited = started.elapsed();
+            assert!(
+                waited < WAIT_LIMIT,
+                "timed out after {waited:?} waiting for {what}",
+            );
+            thread::sleep(POLL_INTERVAL);
         }
-        panic!("child never reached the expected state: {what}");
     }
 
     fn cleanup(mut child: Child) {

@@ -408,13 +408,10 @@ fn slow_process_observation_cannot_block_process_control_lane() {
         CapabilityId::PROCESS_LIST,
         ProcessListRequest::Refresh,
     );
-    for _ in 0..100 {
-        if process_refresh_started.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(1));
-    }
-    assert!(process_refresh_started.load(Ordering::Acquire));
+    wait_for_flag(
+        &process_refresh_started,
+        "the process-list provider to start",
+    );
 
     let target = FrozenProcessIdentity::from_authoritative_parts(77, "control-lane", 500, 5_000)
         .expect("fixture identity");
@@ -449,13 +446,10 @@ fn slow_process_list_cannot_block_process_insights_lane() {
         CapabilityId::PROCESS_LIST,
         ProcessListRequest::Refresh,
     );
-    for _ in 0..100 {
-        if process_refresh_started.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(1));
-    }
-    assert!(process_refresh_started.load(Ordering::Acquire));
+    wait_for_flag(
+        &process_refresh_started,
+        "the process-list provider to start",
+    );
 
     let insights_id = ids.next_id();
     handle
