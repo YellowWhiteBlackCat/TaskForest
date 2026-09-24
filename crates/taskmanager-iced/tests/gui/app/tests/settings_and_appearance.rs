@@ -1,6 +1,6 @@
 //! Tests for graph settings, language preference, history seeding, and modal animation transitions.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::*;
 use crate::app::SettingsChange;
@@ -341,23 +341,27 @@ fn rejected_config_submission_rolls_renderer_preferences_back_to_canonical() {
     // Once the worker has taken the first command it blocks on the fixture's
     // OS lock. Queue a second command into the now-free one-slot lane; from
     // that accepted state the Settings submission below is deterministically
-    // rejected without a wall-clock assumption.
-    let mut queued_behind_blocked = false;
-    for _ in 0..10_000 {
+    // rejected. Wait on that observable acceptance with a wall-clock deadline
+    // rather than a scheduler-turn budget.
+    const WAIT_LIMIT: Duration = Duration::from_secs(10);
+    let started = Instant::now();
+    loop {
         let mut queued = base.clone();
         queued.ui_size = "Large".into();
         match app.configuration.client().unwrap().try_submit(queued) {
-            Ok(ConfigSubmissionStatus::Queued) => {
-                queued_behind_blocked = true;
-                break;
-            }
+            Ok(ConfigSubmissionStatus::Queued) => break,
             Err(ConfigSubmitError::Backpressure) => {
-                std::thread::yield_now();
+                let waited = started.elapsed();
+                assert!(
+                    waited < WAIT_LIMIT,
+                    "timed out after {waited:?} waiting for the blocked config worker to \
+                     free its one-slot command lane",
+                );
+                std::thread::sleep(Duration::from_millis(1));
             }
             outcome => panic!("unexpected queue outcome: {outcome:?}"),
         }
     }
-    assert!(queued_behind_blocked, "fixture must fill the bounded lane");
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::Skin(Skin::Kde)));
     assert_eq!(app.theme().skin, Skin::Gnome);

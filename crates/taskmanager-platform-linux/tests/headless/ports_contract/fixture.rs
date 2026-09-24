@@ -86,14 +86,39 @@ pub(super) fn frozen_process(pid: u32) -> FrozenProcessIdentity {
         .expect("fixture identity")
 }
 
+/// Poll `flag` (published by a fixture provider worker thread) until it is
+/// set, bounded by wall-clock time rather than by scheduler turns. A loaded
+/// parallel suite only stretches the wait; a real regression still fails
+/// naming the condition and the elapsed time.
+pub(super) fn wait_for_flag(flag: &AtomicBool, condition: &str) {
+    const WAIT_LIMIT: Duration = Duration::from_secs(10);
+    const POLL_INTERVAL: Duration = Duration::from_millis(1);
+    let started = Instant::now();
+    while !flag.load(Ordering::Acquire) {
+        let waited = started.elapsed();
+        assert!(
+            waited < WAIT_LIMIT,
+            "timed out after {waited:?} waiting for {condition}",
+        );
+        thread::sleep(POLL_INTERVAL);
+    }
+}
+
 pub(super) fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
-    for _ in 0..500 {
+    const WAIT_LIMIT: Duration = Duration::from_secs(10);
+    const POLL_INTERVAL: Duration = Duration::from_millis(1);
+    let started = Instant::now();
+    loop {
         if let Some(event) = handle.events().try_recv().expect("connected event port") {
             return event;
         }
-        thread::sleep(Duration::from_millis(2));
+        let waited = started.elapsed();
+        assert!(
+            waited < WAIT_LIMIT,
+            "timed out after {waited:?} waiting for a platform event",
+        );
+        thread::sleep(POLL_INTERVAL);
     }
-    panic!("platform event did not arrive within one second");
 }
 
 pub(super) fn submit_process_list(

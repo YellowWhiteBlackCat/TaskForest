@@ -103,16 +103,7 @@ fn concurrent_smart_poll_keeps_new_job_on_another_target() {
             payload: SmartObservationRequest::RefreshAll,
         })
         .expect("SMART poll accepted");
-    for _ in 0..100 {
-        if refresh_started.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    assert!(
-        refresh_started.load(Ordering::Acquire),
-        "SMART observation provider did not start"
-    );
+    wait_for_flag(&refresh_started, "the SMART observation provider to start");
 
     let new_id = ids.next_id();
     handle
@@ -190,13 +181,7 @@ fn stop_tracking_invalidates_an_inflight_poll_without_claiming_drive_abort() {
             payload: SmartObservationRequest::RefreshTarget(target.clone()),
         })
         .expect("targeted SMART poll accepted");
-    for _ in 0..100 {
-        if refresh_started.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(2));
-    }
-    assert!(refresh_started.load(Ordering::Acquire));
+    wait_for_flag(&refresh_started, "the SMART observation provider to start");
 
     let stop_id = ids.next_id();
     handle

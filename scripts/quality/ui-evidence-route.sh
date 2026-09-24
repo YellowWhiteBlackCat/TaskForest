@@ -40,8 +40,10 @@
 #                                    Bevy maps its own page labels)
 #   ui-contract `src/icon.rs`, `src/command.rs` -> all four (painted icon and
 #     command vocabulary resolved by the shared shell presentation)
-#   `locales/*`                   -> all four (catalog strings are embedded
-#                                    by the shared application layer)
+#   `locales/*`                   -> all four when a translated value can move,
+#                                    headless-only when the content classifier
+#                                    proves only whole keys were added/removed
+#                                    (see the locales paragraph below)
 #   `taskmanager-icons/*`         -> gpui + iced + bevy (semantic SVG assets;
 #                                    the TUI maps `IconId` to terminal glyphs
 #                                    itself and does not link this crate)
@@ -59,8 +61,17 @@
 # `command`, `navigation`) keep exactly those consumers' receipts, and an
 # unlisted ui-contract path stays fail-closed at all four because `lib.rs` can
 # re-point a re-export and `Cargo.toml` can change a dependency's behavior --
-# neither is provably pixel-neutral.  `locales/*` also keeps all four: by path
-# alone the route cannot separate a key-only edit from a translated-value edit.
+# neither is provably pixel-neutral.  `locales/*` no longer routes by path
+# alone: `scripts/quality/locale_keyset_classifier.py` reads the changed
+# catalogs' contents and separates a key-set-only edit (whole keys added or
+# removed, no surviving value changed, catalog set and cross-catalog key
+# relationship preserved) from a value-affecting one.  A key-set-only edit
+# demands only the headless channel (`ui_touched`, no capture flag) because it
+# changes no painted string; a translated value, a shape/symmetry move, or any
+# ambiguity keeps all four pixel receipts.  The classifier fails closed --
+# unparsable catalog, missing side, changed catalog set, duplicate/non-flat key,
+# or a non-catalog path under `locales/` all classify as value-affecting, and
+# so does a missing classifier, interpreter, or timeout in the route.
 #
 # S5 interaction route (W23-B): the headless requirement follows the unified
 # interaction declaration.  `scripts/parity/cross_frontend_matrix.tsv` carries
@@ -153,6 +164,31 @@ unified_matrix_frontends() {
     printf '%s\n' "$frontends"
 }
 
+# Content-level locale classification.  Path alone cannot separate "whole keys
+# added/removed" from "a translated value changed"; the helper reads the
+# catalogs and decides.  Fail closed to value-affecting on any doubt: no
+# interpreter, no helper, no timeout, no output, or an unexpected verdict all
+# keep the four receipts.  The helper itself fails closed on an unparsable
+# catalog, a missing side, a changed catalog set, and a broken cross-catalog
+# key relationship.
+locales_classification="value-affecting"
+locales_paths=()
+while IFS= read -r path; do
+    [[ "$path" == locales/* ]] && locales_paths+=("$path")
+done <"$changed"
+if [[ ${#locales_paths[@]} -gt 0 ]] &&
+    command -v python3 >/dev/null 2>&1 &&
+    command -v timeout >/dev/null 2>&1 &&
+    [[ -f scripts/quality/locale_keyset_classifier.py ]]; then
+    classifier_output="$(timeout --kill-after=5s 30s python3 \
+        scripts/quality/locale_keyset_classifier.py \
+        --repo-root "$repo" --base "$base" "${locales_paths[@]}" \
+        2>/dev/null || true)"
+    case "$classifier_output" in
+    key-set-only) locales_classification="key-set-only" ;;
+    esac
+fi
+
 ui_touched=0
 gpui_touched=0
 tui_touched=0
@@ -178,13 +214,18 @@ while IFS= read -r path; do
         ;;
     locales/*)
         # `locales/{en,zh}.json` are include_str!-embedded by the shared
-        # application layer every product links; a string change repaints all
-        # four frontends.
+        # application layer every product links, so a translated string change
+        # repaints all four frontends.  A key-set-only edit (whole keys added or
+        # removed, no surviving value changed) moves no painted string and owes
+        # only the headless channel; the content classifier proves which it is,
+        # and fail-closes to all four on any doubt.
         ui_touched=1
-        gpui_touched=1
-        tui_touched=1
-        iced_touched=1
-        bevy_touched=1
+        if [[ "$locales_classification" != "key-set-only" ]]; then
+            gpui_touched=1
+            tui_touched=1
+            iced_touched=1
+            bevy_touched=1
+        fi
         ;;
     crates/taskmanager-ui-contract/tests/* | \
         crates/taskmanager-ui-contract/README.md)
@@ -440,9 +481,12 @@ if [[ "$require_capture" == "1" ]]; then
     fi
 fi
 
-if [[ "$require_capture" == "1" && -z "$capture_frontends" ]]; then
-    echo "PASS ui-evidence-route: UI boundary is contract/registry-only (base=$base);"
-    echo "     headless matrix covers it and no pixel receipt is owed"
+if [[ -z "$capture_frontends" ]]; then
+    # Headless-only: a contract/registry/dev-test surface, or a locale edit the
+    # content classifier proved key-set-only.  No pixel frame is owed.
+    echo "PASS ui-evidence-route: UI boundary is headless-only"
+    echo "     (contract/registry or locale key-set; base=$base); headless matrix"
+    echo "     covers it and no pixel receipt is owed"
     exit 0
 fi
 

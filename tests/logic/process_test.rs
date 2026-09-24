@@ -374,13 +374,19 @@ fn proc_state(pid: u32) -> Option<char> {
 /// race instead of asserting on a single immediate read.
 #[cfg(target_os = "linux")]
 fn wait_for_state(pid: u32, want_stopped: bool) -> bool {
-    for _ in 0..250 {
+    // The kernel applies SIGSTOP/SIGCONT asynchronously, so poll the observable
+    // /proc state against a wall-clock deadline rather than a fixed iteration
+    // budget. Returns false (never panics) so the caller keeps its own message.
+    const WAIT_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+    const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(2);
+    let started = std::time::Instant::now();
+    while started.elapsed() < WAIT_LIMIT {
         if let Some(state) = proc_state(pid)
             && (state == 'T') == want_stopped
         {
             return true;
         }
-        std::thread::sleep(std::time::Duration::from_millis(2));
+        std::thread::sleep(POLL_INTERVAL);
     }
     false
 }

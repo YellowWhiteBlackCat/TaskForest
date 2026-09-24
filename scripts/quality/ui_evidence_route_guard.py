@@ -2,13 +2,15 @@
 """Mechanically pin the ui-evidence route's impact classification.
 
 ``scripts/quality/ui-evidence-route.sh`` decides, for a diff, which frontends
-owe a fresh pixel receipt.  Its classification is a hand-maintained path table,
-so a later edit can silently *re-broaden* it (demand a receipt for a dev-only
-test tree that cannot move a shipped pixel) or *weaken* it (drop a demand for a
-path that really reaches a frontend's paint path, or let an unknown ui-contract
-path fall through to a headless-only verdict).  Either drift is a gate defect:
-the first spends capture effort on a change no frame can reveal, the second
-ships a pixel change with no frame at all.
+owe a fresh pixel receipt.  Its classification is a hand-maintained path table
+plus a content-level locale classifier, so a later edit can silently
+*re-broaden* it (demand a receipt for a dev-only test tree that cannot move a
+shipped pixel, or for a key-set-only locale edit) or *weaken* it (drop a demand
+for a path that really reaches a frontend's paint path, let an unknown
+ui-contract path fall through to a headless-only verdict, or let a translated
+value change skip its receipts).  Either drift is a gate defect: the first
+spends capture effort on a change no frame can reveal, the second ships a pixel
+change with no frame at all.
 
 This guard runs the *real* route script (copied verbatim into a throwaway git
 repository) against a fixed set of synthetic diffs and asserts the verdict for
@@ -37,8 +39,18 @@ The expectations encode these proofs:
   ``Cargo.toml`` can change a dependency's behavior, neither provably
   pixel-neutral, so it stays fail-closed at all four.
 * ``locales/*`` strings are ``include_str!``-embedded by the shared application
-  layer every product links; by path alone the route cannot tell a key-only
-  edit from a translated-value edit, so it keeps all four.
+  layer every product links, so a translated value change can repaint all four.
+  The route therefore reads the change's *content* through
+  ``scripts/quality/locale_keyset_classifier.py``: a key-set-only edit (whole
+  keys added/removed, no surviving value changed, catalog set and cross-catalog
+  key relationship preserved) owes only the headless channel, while a
+  value-affecting edit, an asymmetric add/remove, an unparsable or missing
+  catalog, or a changed catalog file set stays fail-closed at all four.  The
+  fixtures below pin both halves, and the self-test proves the guard goes red
+  when the route ignores the classifier or inverts it.
+
+The helper is a shipped part of the route: the guard copies it next to the
+route in every fixture and fails closed (exit 2) when it is missing.
 
 Exit codes: 0 the live route matches every expectation, 1 a classification
 finding, 2 the guard could not build or parse its fixture (fail closed).
@@ -52,6 +64,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -62,6 +75,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROUTE_REL = "scripts/quality/ui-evidence-route.sh"
+HELPER_REL = "scripts/quality/locale_keyset_classifier.py"
 
 # Every baseline path the scenarios modify.  The untracked-create scenario
 # deliberately omits its path so the route sees it only through
@@ -79,10 +93,39 @@ BASELINE_PATHS = (
     "crates/taskmanager-bevy-ui/tests/headless/capabilities.rs",
     "tests/gui/accessibility_behavior.rs",
     "locales/en.json",
+    "locales/zh.json",
     "crates/taskmanager-core/src/lib.rs",
 )
 
-# The case-statement anchor both --self-test mutations are injected after.
+# Valid, symmetric catalogs for the locale scenarios (a non-JSON placeholder
+# would classify as unparsable and never exercise the key-set path).  English
+# deliberately carries one extra key, mirroring the repository's real fallback
+# fixture: the classifier must tolerate a *pre-existing* asymmetry while
+# refusing a new one.
+LOCALE_EN_KEYS = {
+    "tab.performance": "Performance",
+    "tooltip.cancel": "Cancel",
+    "fallback.sample": "Sample",
+}
+LOCALE_ZH_KEYS = {
+    "tab.performance": "性能",
+    "tooltip.cancel": "取消",
+}
+
+
+def _locale_json(keys: dict[str, str]) -> str:
+    return json.dumps(keys, ensure_ascii=False) + "\n"
+
+
+BASELINE_CONTENTS = {
+    "locales/en.json": _locale_json(LOCALE_EN_KEYS),
+    "locales/zh.json": _locale_json(LOCALE_ZH_KEYS),
+}
+
+
+# The case-statement anchor the --self-test mutations are injected after.  It
+# must be unique; run_self_test fails closed otherwise so a future second
+# `case "$path" in` cannot silently redirect the mutation.
 CASE_ANCHOR = '    case "$path" in\n'
 
 
@@ -93,6 +136,9 @@ class Scenario:
     verdict: str  # "no-ui" | "headless-only" | "capture"
     missing: tuple[str, ...] = ()
     create: bool = False
+    # Explicit current contents, used by the locale scenarios to write valid
+    # (or deliberately invalid) catalogs instead of appending "// changed".
+    writes: tuple[tuple[str, str], ...] = ()
 
 
 SCENARIOS: tuple[Scenario, ...] = (
@@ -166,11 +212,77 @@ SCENARIOS: tuple[Scenario, ...] = (
         "capture",
         missing=("gpui",),
     ),
+    # --- locale catalogs: content decides, not the path -------------------
+    # Pure key addition (to every catalog at once) moves no painted string.
     Scenario(
-        "locales",
+        "locale-keyset-add",
+        "locales/en.json",
+        "headless-only",
+        writes=(
+            ("locales/en.json", _locale_json({**LOCALE_EN_KEYS, "tab.alerts": "Alerts"})),
+            ("locales/zh.json", _locale_json({**LOCALE_ZH_KEYS, "tab.alerts": "警报"})),
+        ),
+    ),
+    # Pure key removal (from every catalog at once) moves no painted string.
+    # The pre-existing en-only fallback key is untouched, so the relationship
+    # survives; removing it would be a relationship change (see the helper).
+    Scenario(
+        "locale-keyset-remove",
+        "locales/en.json",
+        "headless-only",
+        writes=(
+            (
+                "locales/en.json",
+                _locale_json({"tab.performance": "Performance", "fallback.sample": "Sample"}),
+            ),
+            ("locales/zh.json", _locale_json({"tab.performance": "性能"})),
+        ),
+    ),
+    # A surviving translated value changed: every frontend can repaint.
+    Scenario(
+        "locale-value-change",
+        "locales/zh.json",
+        "capture",
+        missing=("gpui", "tui", "iced", "bevy"),
+        writes=(
+            ("locales/en.json", _locale_json(LOCALE_EN_KEYS)),
+            ("locales/zh.json", _locale_json({**LOCALE_ZH_KEYS, "tab.performance": "效能"})),
+        ),
+    ),
+    # A value changed on a key that is simultaneously removed elsewhere: the
+    # removal must not mask the value change.
+    Scenario(
+        "locale-value-change-on-removed-key",
         "locales/en.json",
         "capture",
         missing=("gpui", "tui", "iced", "bevy"),
+        writes=(
+            ("locales/en.json", _locale_json({**LOCALE_EN_KEYS, "tab.performance": "Perf"})),
+            ("locales/zh.json", _locale_json({"tooltip.cancel": "取消"})),
+        ),
+    ),
+    # An unparsable catalog cannot be classified safely: fail closed.
+    Scenario(
+        "locale-unparsable",
+        "locales/en.json",
+        "capture",
+        missing=("gpui", "tui", "iced", "bevy"),
+        writes=(
+            ("locales/en.json", "{ this is not valid json\n"),
+            ("locales/zh.json", _locale_json(LOCALE_ZH_KEYS)),
+        ),
+    ),
+    # An asymmetric add would move the cross-catalog key relationship (and fail
+    # the symmetry nextest gate): fail closed.
+    Scenario(
+        "locale-asymmetric-add",
+        "locales/en.json",
+        "capture",
+        missing=("gpui", "tui", "iced", "bevy"),
+        writes=(
+            ("locales/en.json", _locale_json({**LOCALE_EN_KEYS, "tab.alerts": "Alerts"})),
+            ("locales/zh.json", _locale_json(LOCALE_ZH_KEYS)),
+        ),
     ),
     # --- an unrelated change never enters the UI route --------------------
     Scenario(
@@ -187,6 +299,19 @@ EXPECTED_SELF_TEST_FAILURES = {
         "ui-contract-focus",
         "ui-contract-unknown",
     },
+    # Ignoring the locale content classifier re-broadens a key-set-only edit to
+    # all four receipts.
+    "remove-locales-classifier": {"locale-keyset-add", "locale-keyset-remove"},
+    # Inverting it sends a value-affecting edit to headless-only and a
+    # key-set-only edit to all four.
+    "invert-locales-classifier": {
+        "locale-keyset-add",
+        "locale-keyset-remove",
+        "locale-value-change",
+        "locale-value-change-on-removed-key",
+        "locale-unparsable",
+        "locale-asymmetric-add",
+    },
 }
 
 SELF_TEST_MUTATIONS = {
@@ -199,6 +324,29 @@ SELF_TEST_MUTATIONS = {
     "weaken-contract-table": (
         "    crates/taskmanager-ui-contract/*)\n"
         "        ui_touched=1\n"
+        "        ;;\n"
+    ),
+    # Force the old path-only locales arm, defeating the classifier.
+    "remove-locales-classifier": (
+        "    locales/*)\n"
+        "        ui_touched=1\n"
+        "        gpui_touched=1\n"
+        "        tui_touched=1\n"
+        "        iced_touched=1\n"
+        "        bevy_touched=1\n"
+        "        ;;\n"
+    ),
+    # Swap the two verdicts: key-set-only now demands all four and a value
+    # change demands none.
+    "invert-locales-classifier": (
+        "    locales/*)\n"
+        "        ui_touched=1\n"
+        "        if [[ \"$locales_classification\" == \"key-set-only\" ]]; then\n"
+        "            gpui_touched=1\n"
+        "            tui_touched=1\n"
+        "            iced_touched=1\n"
+        "            bevy_touched=1\n"
+        "        fi\n"
         "        ;;\n"
     ),
 }
@@ -231,17 +379,25 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def build_fixture(tmp: Path, route_text: str) -> tuple[Path, str]:
-    """Create a throwaway git repo holding ``route_text`` and a baseline."""
+    """Create a throwaway git repo holding the route, helper, and a baseline."""
     tmp.mkdir(parents=True, exist_ok=True)
     _git(tmp, "init", "-q")
     route_path = tmp / ROUTE_REL
     route_path.parent.mkdir(parents=True, exist_ok=True)
     route_path.write_text(route_text, encoding="utf-8")
+    # The route invokes the content classifier by path; a fixture without it
+    # would fail closed and the guard could not observe the key-set verdict.
+    helper_source = REPO_ROOT / HELPER_REL
+    if not helper_source.is_file():
+        raise FixtureError(f"route helper missing: {helper_source}")
+    (tmp / HELPER_REL).write_text(helper_source.read_text(encoding="utf-8"), encoding="utf-8")
     (tmp / ".tmp").mkdir(exist_ok=True)
     for rel in BASELINE_PATHS:
         target = tmp / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("// baseline placeholder\n", encoding="utf-8")
+        target.write_text(
+            BASELINE_CONTENTS.get(rel, "// baseline placeholder\n"), encoding="utf-8"
+        )
     _git(tmp, "add", "-A")
     _git(tmp, "commit", "-q", "-m", "baseline")
     return tmp, _git(tmp, "rev-parse", "HEAD").strip()
@@ -251,6 +407,12 @@ def apply_scenario(tmp: Path, base: str, scenario: Scenario) -> None:
     _git(tmp, "reset", "-q", "--hard", base)
     _git(tmp, "clean", "-qfdx")
     (tmp / ".tmp").mkdir(exist_ok=True)
+    if scenario.writes:
+        for rel, content in scenario.writes:
+            target = tmp / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        return
     target = tmp / scenario.path
     if scenario.create:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -283,7 +445,7 @@ def run_route(tmp: Path, base: str) -> tuple[int, str, str]:
 def observed_verdict(rc: int, stdout: str, stderr: str) -> tuple[str, tuple[str, ...]]:
     if rc == 0 and "no UI boundary changes" in stdout:
         return "no-ui", ()
-    if rc == 0 and "contract/registry-only" in stdout:
+    if rc == 0 and "headless-only" in stdout:
         return "headless-only", ()
     match = re.search(r"missing:(.*?)\s*\(run", stdout + stderr, re.DOTALL)
     if match is not None:
@@ -341,9 +503,9 @@ def run_self_test(route_path: Path) -> int:
         print(f"ui-evidence-route-guard: missing {route_path}", file=sys.stderr)
         return 2
     base_text = route_path.read_text(encoding="utf-8")
-    if CASE_ANCHOR not in base_text:
+    if base_text.count(CASE_ANCHOR) != 1:
         print(
-            "ui-evidence-route-guard: parse failure, case anchor not found in route",
+            "ui-evidence-route-guard: parse failure, case anchor is not unique in route",
             file=sys.stderr,
         )
         return 2
@@ -366,7 +528,7 @@ def run_self_test(route_path: Path) -> int:
         for failure in failures:
             print(f"ui-evidence-route-guard: self-test FAIL: {failure}", file=sys.stderr)
         return 1
-    print("ui-evidence-route-guard: self-test PASS (goes red on both mutations)")
+    print("ui-evidence-route-guard: self-test PASS (goes red on every route mutation)")
     return 0
 
 

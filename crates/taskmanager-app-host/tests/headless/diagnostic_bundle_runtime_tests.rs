@@ -30,7 +30,7 @@ fn wait_for_completion(
             return completion;
         }
         assert!(Instant::now() < deadline, "completion timed out");
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     }
 }
 
@@ -122,7 +122,7 @@ fn executor_panic_resolves_the_request_and_types_the_dead_lane() {
                     "lane never reported its typed stop (last outcome: {outcome:?})"
                 );
                 probe.close();
-                std::thread::yield_now();
+                std::thread::sleep(Duration::from_millis(1));
             }
         }
     }

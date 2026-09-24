@@ -169,14 +169,14 @@ fn exporter_panic_resolves_the_request_and_types_the_dead_lane() {
                     Instant::now() < deadline,
                     "lane never reported its typed stop (last error: {error:?})"
                 );
-                std::thread::yield_now();
+                std::thread::sleep(Duration::from_millis(1));
             }
             Ok(()) => {
                 assert!(
                     Instant::now() < deadline,
                     "lane never reported its typed stop"
                 );
-                std::thread::yield_now();
+                std::thread::sleep(Duration::from_millis(1));
             }
         }
     }

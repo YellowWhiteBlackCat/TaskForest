@@ -204,7 +204,7 @@ fn record_rejection_and_flush_failure_remain_typed_in_runtime_health() {
             break status;
         }
         assert!(Instant::now() < deadline, "health publication timed out");
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     };
     let record_failure = status.record_failure.expect("record failure partition");
     assert_eq!(
@@ -328,7 +328,7 @@ fn replay_during_writer_flush_never_poisons_the_later_complete_read() {
     let deadline = Instant::now() + Duration::from_secs(2);
     while monitor.status().flushes == 0 {
         assert!(Instant::now() < deadline, "real writer never flushed");
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     }
     drop(sink);
     drop(coordinator);
@@ -415,7 +415,7 @@ fn backend_panic_flips_the_monitor_off_running_and_keeps_drops_observable() {
             Instant::now() < deadline,
             "worker fault never flipped the monitor"
         );
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     };
     assert_eq!(status.worker, HistoryPersistenceWorkerState::Stopped);
     let fault = status.worker_fault.expect("bounded fault detail in health");
@@ -430,7 +430,7 @@ fn backend_panic_flips_the_monitor_off_running_and_keeps_drops_observable() {
             Instant::now() < deadline,
             "post-fault records never surfaced as drops"
         );
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     }
     drop(sink);
     drop(coordinator);

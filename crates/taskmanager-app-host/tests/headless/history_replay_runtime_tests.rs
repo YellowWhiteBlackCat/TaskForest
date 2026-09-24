@@ -217,7 +217,7 @@ fn loader_panic_resolves_requests_and_never_masquerades_as_backpressure() {
             Instant::now() < deadline,
             "lane never reported its typed stop (last error: {error:?})"
         );
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(1));
     }
     assert!(client.drain().is_empty());
     drop(client);
