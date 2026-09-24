@@ -14,11 +14,12 @@
 //! The live privileged read remains on-box-unverified: the helper JSON
 //! contract parsing/classification is unit-tested in
 //! `taskmanager-escalation::polkit`, but the live privileged read needs sudo
-//! and is an integrator on-box receipt item. No fabricated register values
-//! exist on any path.
+//! and is an integrator on-box receipt item. That receipt now also covers the
+//! `IA32_THERM_STATUS` (0x19C) thermal-status / PROCHOT bits. No fabricated
+//! register values exist on any path.
 
 use taskmanager_core::FailureKind;
-use taskmanager_core::{MsrPackageReadout, MsrReadoutSnapshot};
+use taskmanager_core::{MsrPackageReadout, MsrReadoutSnapshot, MsrThermalStatusReadout};
 use taskmanager_escalation::polkit::PolkitGate;
 use taskmanager_escalation::polkit::{MsrHelperErrorKind, MsrHelperOutcome, invoke_msr_helper};
 use taskmanager_escalation::{
@@ -100,16 +101,17 @@ fn capability_status_from_availability(availability: EscalationAvailability) -> 
 /// Map one typed helper outcome into a system-scoped snapshot — the single
 /// honest crossing from the escalation crate's MSR contract into the typed
 /// lane. `Success` copies every register field Option-by-Option (an
-/// unimplemented register stays `None`); `HelperError` (the helper ran, typed
-/// ERROR) stays a typed provider failure; `Unavailable` keeps its typed denial
-/// reason.
+/// unimplemented register stays `None`) and attaches the `IA32_THERM_STATUS`
+/// thermal-status rows to the same snapshot; `HelperError` (the helper ran,
+/// typed ERROR) stays a typed provider failure; `Unavailable` keeps its typed
+/// denial reason.
 fn result_from_outcome(outcome: MsrHelperOutcome) -> Result<MsrReadoutSnapshot, ProviderFailure> {
     match outcome {
-        MsrHelperOutcome::Success(success) => Ok(MsrReadoutSnapshot::success(
-            success
-                .packages
-                .iter()
-                .map(|reading| MsrPackageReadout {
+        MsrHelperOutcome::Success(success) => {
+            let mut packages = Vec::with_capacity(success.packages.len());
+            let mut thermal = Vec::with_capacity(success.packages.len());
+            for reading in &success.packages {
+                packages.push(MsrPackageReadout {
                     cpu: reading.cpu,
                     bclk_mhz: reading.bclk_mhz,
                     temperature_c: reading.temperature_c,
@@ -117,9 +119,17 @@ fn result_from_outcome(outcome: MsrHelperOutcome) -> Result<MsrReadoutSnapshot, 
                     multiplier_min: reading.multiplier_min,
                     multiplier_max: reading.multiplier_max,
                     vcore_v: reading.vcore_v,
-                })
-                .collect(),
-        )),
+                });
+                thermal.push(MsrThermalStatusReadout {
+                    cpu: reading.cpu,
+                    thermal_status: reading.thermal_status,
+                    thermal_status_log: reading.thermal_status_log,
+                    prochot_event: reading.prochot_event,
+                    prochot_event_log: reading.prochot_event_log,
+                });
+            }
+            Ok(MsrReadoutSnapshot::success(packages).with_thermal(thermal))
+        }
         MsrHelperOutcome::HelperError(error) => Err(match error.kind {
             MsrHelperErrorKind::PermissionDenied => ProviderFailure::PermissionDenied,
             MsrHelperErrorKind::NoMsr => ProviderFailure::Unsupported,

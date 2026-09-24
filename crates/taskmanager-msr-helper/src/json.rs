@@ -6,7 +6,9 @@
 //! SUCCESS: {"schema":1,"packages":[{"cpu":<u32>,"bclk_mhz":<f32>|null,
 //!           "temperature_c":<f32>|null,"multiplier":<f32>|null,
 //!           "multiplier_min":<f32>|null,"multiplier_max":<f32>|null,
-//!           "vcore_v":<f32>|null}]}
+//!           "vcore_v":<f32>|null,"thermal_status":<bool>|null,
+//!           "thermal_status_log":<bool>|null,"prochot_event":<bool>|null,
+//!           "prochot_event_log":<bool>|null}]}
 //! ERROR:   {"status":"error","kind":"permission_denied"|"no_msr"|"open_failed"|"read_failed",
 //!           "detail":"<string>"}
 //! ```
@@ -25,7 +27,10 @@
 //! `bclk_mhz` is populated only when CPUID leaf 0x16 enumerates the
 //! SDM-defined Bus (Reference) Frequency inside the plausibility envelope
 //! (ADR-048 amendment); AMD rows carry honest nulls for the readouts that
-//! have no MSR-indexed path on that vendor (ADR-049).
+//! have no MSR-indexed path on that vendor (ADR-049). The four
+//! `IA32_THERM_STATUS` (0x19C) status bits are `null` together when the
+//! register is unimplemented or unreadable — the group is never fabricated as
+//! a clear (`false`) state.
 
 use serde::Serialize;
 
@@ -63,6 +68,17 @@ pub struct PackageReadingJson {
     /// (`null` when the CPU leaves the field at 0 — all modern Intel do);
     /// `1.550 − 0.00625 × CpuVid` (SVI2) on AMD family 0x17–0x19.
     pub vcore_v: Option<f32>,
+    /// `IA32_THERM_STATUS` (0x19C) bit 0 — the processor is currently at or
+    /// above its thermal threshold (the real-time thermal-status / PROCHOT
+    /// assertion). `null` when the register is unimplemented or unreadable,
+    /// and always `null` on AMD (no 0x19C path — ADR-049).
+    pub thermal_status: Option<bool>,
+    /// `0x19C` bit 1 — sticky thermal-status log.
+    pub thermal_status_log: Option<bool>,
+    /// `0x19C` bit 2 — a PROCHOT# or FORCEPR# event has been observed.
+    pub prochot_event: Option<bool>,
+    /// `0x19C` bit 3 — sticky PROCHOT#/FORCEPR# event log.
+    pub prochot_event_log: Option<bool>,
 }
 
 /// The SUCCESS envelope. Serialized field order is `schema, packages` and

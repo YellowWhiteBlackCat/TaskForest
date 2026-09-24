@@ -58,6 +58,10 @@ fn rounded(value: Option<f32>, decimals: i32) -> Option<f64> {
 /// * `Success`     -> `{"status":"ok","packages":[{"cpu":..,"bclk_mhz":null|..,..}]}`
 /// * `HelperError` -> `{"status":"error","kind":..,"detail":..}`
 /// * `Unavailable` -> `{"status":"unavailable","reason":..,"feature":..,"detail":..}`
+///
+/// A success package row also carries the `IA32_THERM_STATUS` (0x19C)
+/// thermal-status / PROCHOT bits as `true`/`false`/`null`: a `null` is an
+/// unreadable or unimplemented register, never a fabricated clear state.
 fn render_outcome(outcome: &MsrHelperOutcome) -> String {
     let value = match outcome {
         MsrHelperOutcome::Success(success) => {
@@ -73,6 +77,10 @@ fn render_outcome(outcome: &MsrHelperOutcome) -> String {
                         "multiplier_min": rounded(package.multiplier_min, 2),
                         "multiplier_max": rounded(package.multiplier_max, 2),
                         "vcore_v": rounded(package.vcore_v, 3),
+                        "thermal_status": package.thermal_status,
+                        "thermal_status_log": package.thermal_status_log,
+                        "prochot_event": package.prochot_event,
+                        "prochot_event_log": package.prochot_event_log,
                     })
                 })
                 .collect::<Vec<_>>();

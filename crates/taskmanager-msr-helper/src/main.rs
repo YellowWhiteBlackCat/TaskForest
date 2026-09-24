@@ -25,7 +25,9 @@
 //! SUCCESS: {"schema":1,"packages":[{"cpu":<u32>,"bclk_mhz":<f32>|null,
 //!           "temperature_c":<f32>|null,"multiplier":<f32>|null,
 //!           "multiplier_min":<f32>|null,"multiplier_max":<f32>|null,
-//!           "vcore_v":<f32>|null}]}
+//!           "vcore_v":<f32>|null,"thermal_status":<bool>|null,
+//!           "thermal_status_log":<bool>|null,"prochot_event":<bool>|null,
+//!           "prochot_event_log":<bool>|null}]}
 //! ERROR:   {"status":"error","kind":"permission_denied"|"no_msr"|"open_failed"|"read_failed",
 //!           "detail":"<string>"}
 //! ```

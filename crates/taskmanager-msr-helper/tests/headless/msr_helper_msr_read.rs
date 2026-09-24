@@ -191,6 +191,12 @@ fn decode_reading_assembles_the_intel_contract_row() {
             multiplier_min: Some(8.0),
             multiplier_max: Some(55.0),
             vcore_v: Some(1.21875),
+            // No 0x19C word in this fixture, so the whole real-time
+            // thermal-status group is an honest null rather than a clear state.
+            thermal_status: None,
+            thermal_status_log: None,
+            prochot_event: None,
+            prochot_event_log: None,
         },
         "without a cpuid node the Intel row keeps today's shape and bclk stays null",
     );
@@ -216,6 +222,57 @@ fn decode_reading_assembles_the_intel_contract_row() {
 }
 
 // --- CPUID identity gates ---------------------------------------------------
+
+#[test]
+fn decode_therm_status_reads_the_four_documented_bits_and_keeps_absence_typed() {
+    // `IA32_THERM_STATUS` (0x19C) bits 3:0 per the Intel SDM: bit 0 Thermal
+    // Status (at/above threshold), bit 1 its log, bit 2 PROCHOT#/FORCEPR#
+    // Event, bit 3 its log. A readable register always yields all four bits.
+    let bits = |mask: u64| decode_therm_status(Some(mask)).expect("a readable register decodes");
+    assert_eq!(
+        bits(0b0000),
+        ThermalStatusBits {
+            thermal_status: false,
+            thermal_status_log: false,
+            prochot_event: false,
+            prochot_event_log: false,
+        },
+        "a clear register is a verified clear state, not an absence"
+    );
+    assert_eq!(
+        bits(0b0001),
+        ThermalStatusBits {
+            thermal_status: true,
+            thermal_status_log: false,
+            prochot_event: false,
+            prochot_event_log: false,
+        },
+        "bit 0 is the real-time thermal-status / PROCHOT assertion"
+    );
+    assert_eq!(
+        bits(0b1010),
+        ThermalStatusBits {
+            thermal_status: false,
+            thermal_status_log: true,
+            prochot_event: false,
+            prochot_event_log: true,
+        },
+        "bits 1 and 3 are the sticky logs and stay independent of bit 0"
+    );
+    assert_eq!(
+        bits(u64::MAX),
+        ThermalStatusBits {
+            thermal_status: true,
+            thermal_status_log: true,
+            prochot_event: true,
+            prochot_event_log: true,
+        },
+        "bits above 3 must not leak into the four named bits"
+    );
+    // An unimplemented or unreadable register is a typed absence: the whole
+    // group stays `None` rather than fabricating a clear state.
+    assert_eq!(decode_therm_status(None), None);
+}
 
 #[test]
 fn decode_family_reads_the_extended_family_of_the_version_leaf() {

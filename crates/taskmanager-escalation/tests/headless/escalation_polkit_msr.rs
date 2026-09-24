@@ -48,9 +48,13 @@ impl MsrHelperProcess for FixedProcess {
 const SUCCESS_FIXTURE: &str = concat!(
     r#"{"schema":1,"packages":["#,
     r#"{"cpu":0,"bclk_mhz":null,"temperature_c":58.0,"multiplier":45.0,"#,
-    r#""multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":1.21875},"#,
+    r#""multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":1.21875,"#,
+    r#""thermal_status":true,"thermal_status_log":false,"prochot_event":false,"#,
+    r#""prochot_event_log":false},"#,
     r#"{"cpu":2,"bclk_mhz":null,"temperature_c":null,"multiplier":null,"#,
-    r#""multiplier_min":null,"multiplier_max":null,"vcore_v":null}]}"#
+    r#""multiplier_min":null,"multiplier_max":null,"vcore_v":null,"#,
+    r#""thermal_status":null,"thermal_status_log":null,"prochot_event":null,"#,
+    r#""prochot_event_log":null}]}"#
 );
 
 #[test]
@@ -66,6 +70,13 @@ fn parse_success_reads_every_typed_field() {
             assert_eq!(first.multiplier_min, Some(8.0));
             assert_eq!(first.multiplier_max, Some(55.0));
             assert_eq!(first.vcore_v, Some(1.21875));
+            // The real-time thermal-status bits are part of the same contract:
+            // a readable register is a verified state, an unreadable one stays
+            // an absent group, never a fabricated clear.
+            assert_eq!(first.thermal_status, Some(true));
+            assert_eq!(first.thermal_status_log, Some(false));
+            assert_eq!(first.prochot_event, Some(false));
+            assert_eq!(first.prochot_event_log, Some(false));
             assert_eq!(first.bclk_mhz, None, "bclk stays null (ADR-048)");
             // A node without implemented registers is honest nulls, never zeros.
             let second = &success.packages[1];
@@ -73,6 +84,8 @@ fn parse_success_reads_every_typed_field() {
             assert_eq!(second.temperature_c, None);
             assert_eq!(second.multiplier, None);
             assert_eq!(second.vcore_v, None);
+            assert_eq!(second.thermal_status, None);
+            assert_eq!(second.prochot_event_log, None);
         }
         other => panic!("expected Success, got {other:?}"),
     }
@@ -120,11 +133,11 @@ fn parse_rejects_non_contract_documents() {
         // non-physical magnitudes.
         r#"{"schema":1,"packages":[{"cpu":0}]}"#,
         r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":100,"temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0}]}"#,
-        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":"100","temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null}]}"#,
-        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":1e999,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null}]}"#,
-        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":-5.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null}]}"#,
-        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":9000.0}]}"#,
-        r#"{"schema":1,"packages":[{"cpu":-1,"bclk_mhz":null,"temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null}]}"#,
+        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":"100","temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null,"thermal_status":null,"thermal_status_log":null,"prochot_event":null,"prochot_event_log":null}]}"#,
+        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":1e999,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null,"thermal_status":null,"thermal_status_log":null,"prochot_event":null,"prochot_event_log":null}]}"#,
+        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":-5.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null,"thermal_status":null,"thermal_status_log":null,"prochot_event":null,"prochot_event_log":null}]}"#,
+        r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":null,"temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":9000.0,"thermal_status":null,"thermal_status_log":null,"prochot_event":null,"prochot_event_log":null}]}"#,
+        r#"{"schema":1,"packages":[{"cpu":-1,"bclk_mhz":null,"temperature_c":58.0,"multiplier":45.0,"multiplier_min":8.0,"multiplier_max":55.0,"vcore_v":null,"thermal_status":null,"thermal_status_log":null,"prochot_event":null,"prochot_event_log":null}]}"#,
         // Unknown error kind / missing detail.
         r#"{"status":"error","kind":"fried","detail":"x"}"#,
         r#"{"status":"error","kind":"no_msr"}"#,
@@ -143,7 +156,9 @@ fn parse_treats_null_and_present_values_as_distinct_honest_states() {
     // null vs a real number must BOTH parse; the distinction is the payload.
     let stdout = concat!(
         r#"{"schema":1,"packages":[{"cpu":0,"bclk_mhz":100.0,"temperature_c":null,"#,
-        r#""multiplier":45.0,"multiplier_min":null,"multiplier_max":55.0,"vcore_v":null}]}"#
+        r#""multiplier":45.0,"multiplier_min":null,"multiplier_max":55.0,"vcore_v":null,"#,
+        r#""thermal_status":null,"thermal_status_log":null,"prochot_event":null,"#,
+        r#""prochot_event_log":null}]}"#
     );
     match parse_helper_output(stdout) {
         ParsedOutput::Success(success) => {

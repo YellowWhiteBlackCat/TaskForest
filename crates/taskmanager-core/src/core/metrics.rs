@@ -45,7 +45,9 @@ pub use memory::{
     MemoryModuleObservations, MemoryOptionalObservations, MemoryScalarObservations,
     VirtualMemoryCommitObservations,
 };
-pub use msr_readout::{MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot};
+pub use msr_readout::{
+    MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot, MsrThermalStatusReadout,
+};
 pub use network::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
 };

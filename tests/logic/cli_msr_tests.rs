@@ -30,6 +30,10 @@ fn render_success_lists_readouts_and_keeps_absent_fields_null() {
                 multiplier_min: Some(8.0),
                 multiplier_max: Some(55.0),
                 vcore_v: Some(1.21875),
+                thermal_status: Some(true),
+                thermal_status_log: Some(false),
+                prochot_event: Some(false),
+                prochot_event_log: Some(false),
             },
             MsrPackageReading {
                 cpu: 1,
@@ -39,6 +43,10 @@ fn render_success_lists_readouts_and_keeps_absent_fields_null() {
                 multiplier_min: None,
                 multiplier_max: None,
                 vcore_v: None,
+                thermal_status: None,
+                thermal_status_log: None,
+                prochot_event: None,
+                prochot_event_log: None,
             },
         ],
     });
@@ -55,6 +63,14 @@ fn render_success_lists_readouts_and_keeps_absent_fields_null() {
     assert_eq!(value["packages"][0]["vcore_v"], 1.219);
     // bclk is excluded by ADR-048: it must render null, never a guess.
     assert!(value["packages"][0]["bclk_mhz"].is_null());
+    // The real-time thermal-status group rides the same receipt: a readable
+    // register renders its verified bits, an unreadable one stays null.
+    assert_eq!(value["packages"][0]["thermal_status"], true);
+    assert_eq!(value["packages"][0]["thermal_status_log"], false);
+    assert_eq!(value["packages"][0]["prochot_event"], false);
+    assert_eq!(value["packages"][0]["prochot_event_log"], false);
+    assert!(value["packages"][1]["thermal_status"].is_null());
+    assert!(value["packages"][1]["prochot_event_log"].is_null());
     // A node without implemented registers renders all-null fields.
     assert!(value["packages"][1]["temperature_c"].is_null());
     assert!(value["packages"][1]["multiplier"].is_null());

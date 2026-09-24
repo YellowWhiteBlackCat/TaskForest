@@ -52,6 +52,10 @@ fn success_row_serializes_nulls_for_absent_readouts_never_zeros() {
         multiplier_min: None,
         multiplier_max: Some(55.0),
         vcore_v: None,
+        thermal_status: None,
+        thermal_status_log: None,
+        prochot_event: None,
+        prochot_event_log: None,
     };
     let value = success_value(vec![reading]);
     let row = &value["packages"][0];
