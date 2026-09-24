@@ -11,7 +11,7 @@ use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
-use taskmanager_shell::presentation::msr_thermal_status_summary;
+use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::pin_english;
 
@@ -470,50 +470,67 @@ mod cpu_throttle_tests {
         app.shell.apply_platform_batch(batch);
     }
 
-    fn thermal_status_row(stats: &[StatRow]) -> Option<&StatRow> {
+    fn thermal_status_rows(stats: &[StatRow]) -> Vec<String> {
         stats
             .iter()
-            .find(|row| row.label() == t("cpu.thermal_status"))
+            .filter(|row| row.label() == t("cpu.thermal_status"))
+            .filter_map(|row| row.value().map(str::to_owned))
+            .collect()
     }
 
     /// The real-time thermal-status / PROCHOT delivery: the Performance CPU
     /// stat column renders the shared
-    /// [`taskmanager_shell::presentation::msr_thermal_status_summary`] fold
-    /// beside the cumulative counters — the shared asserted/clear words and
-    /// the honest dash for an unreadable register — and omits the whole row
-    /// while the privileged lane produced no accepted readout.
+    /// [`taskmanager_shell::presentation::msr_thermal_status_segments`] fold
+    /// beside the cumulative counters — one `Thermal status` row per node,
+    /// each carrying a single `CPU {n} {state}` segment with the shared
+    /// asserted/clear words and the honest dash for an unreadable register.
+    /// One row per node keeps the value inside the stat column's bounded
+    /// single-line slot instead of clipping the joined summary, and the whole
+    /// row set is omitted while the privileged lane produced no accepted
+    /// readout.
     #[test]
     fn cpu_stats_render_the_real_time_thermal_status_with_honest_absence() {
         pin_english();
         let mut app = crate::IcedApp::demo();
         // The demo bootstrap now seeds a synthetic readout through the request
         // session; close it to reach the honest-absence branch the privileged
-        // lane shows before it ever runs (the fold is `None`, so no row).
+        // lane shows before it ever runs (the fold is empty, so no row).
         app.shell.close_msr_readout_request();
         let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
         assert!(
-            thermal_status_row(&stats).is_none(),
+            thermal_status_rows(&stats).is_empty(),
             "a session that never ran must not grow a real-time row"
         );
 
         set_msr_thermal_status(&mut app, &[(0, Some(true)), (1, Some(false)), (2, None)]);
         let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
-        let row = thermal_status_row(&stats).expect("an accepted readout must grow a stat row");
-        let expected = msr_thermal_status_summary(app.shell.msr_readout_state())
-            .expect("an accepted readout must fold");
+        let segments = msr_thermal_status_segments(app.shell.msr_readout_state());
+        let expected = vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"];
         assert_eq!(
-            row.value(),
-            Some(expected.as_str()),
-            "the stat row must render the shared real-time status fold"
+            segments, expected,
+            "the accepted readout must fold per node"
+        );
+        let painted = thermal_status_rows(&stats);
+        assert_eq!(
+            painted, expected,
+            "the stat rows must render one unclipped shared segment per node"
         );
         assert!(
-            expected.contains(t("cpu.thermal_status_asserted"))
-                && expected.contains(t("cpu.thermal_status_clear")),
-            "the fold must carry the shared asserted/clear vocabulary: {expected}"
+            painted.iter().all(|value| value.chars().count() <= 20),
+            "every painted segment must fit the stat column's bounded value slot: {painted:?}"
         );
         assert!(
-            expected.contains(MISSING_VALUE),
-            "an unreadable register must keep the honest dash: {expected}"
+            painted.iter().any(|value| value.contains(MISSING_VALUE)),
+            "an unreadable register must keep the honest dash: {painted:?}"
+        );
+        assert!(
+            painted
+                .iter()
+                .any(|value| value.contains(t("cpu.thermal_status_asserted")))
+                && painted
+                    .iter()
+                    .any(|value| value.contains(t("cpu.thermal_status_clear"))),
+            "the segments must carry the shared asserted/clear vocabulary: {painted:?}"
         );
     }
 }

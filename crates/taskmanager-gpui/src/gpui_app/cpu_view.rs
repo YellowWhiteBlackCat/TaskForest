@@ -25,11 +25,11 @@ use package_power::PackagePowerModel;
 pub(crate) struct EscalationReadouts {
     pub package_power: PackagePowerModel,
     pub msr_readouts: MsrReadoutsModel,
-    /// The real-time thermal-status / PROCHOT summary from the privileged
-    /// `telemetry.cpu.msr` lane, or `None` when the lane produced no accepted
-    /// snapshot. The details panel paints it beside the cumulative
-    /// thermal-throttle counters.
-    pub thermal_status: Option<String>,
+    /// The real-time thermal-status / PROCHOT per-node segments from the
+    /// privileged `telemetry.cpu.msr` lane, or an empty vector when the lane
+    /// produced no accepted snapshot. The details panel paints one row per
+    /// node beside the cumulative thermal-throttle counters.
+    pub thermal_status_segments: Vec<String>,
 }
 
 // Single source for the CPUID identity rows, the P/E/LP core-class row
@@ -59,7 +59,7 @@ use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::{
     CpuFrequencySource, CpuMetrics, CpuTemperatureSource, SystemSnapshot,
 };
-use taskmanager_shell::presentation::msr_thermal_status_summary;
+use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -168,11 +168,11 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     } = props;
     let package_model = package_power::package_power_model(&package_power);
     let msr_model = msr_readouts::msr_readouts_model(&msr_readouts);
-    let thermal_status = msr_thermal_status_summary(msr_readouts.state);
+    let thermal_status_segments = msr_thermal_status_segments(msr_readouts.state);
     let escalation = EscalationReadouts {
         package_power: package_model,
         msr_readouts: msr_model,
-        thermal_status,
+        thermal_status_segments,
     };
     let cpu = &snap.cpu;
     let stats = CpuLiveStats::from_snapshot(snap);

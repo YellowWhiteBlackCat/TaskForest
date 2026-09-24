@@ -208,10 +208,21 @@ fn thermal_status_summary_renders_asserted_clear_and_absent_per_node() {
         Some("CPU 0 Asserted | CPU 1 Clear | CPU 2 —"),
         "asserted, clear, and the honest dash are the three shared states"
     );
+    // The same words split one node per row, so a narrow value column can
+    // paint each node whole instead of clipping the joined summary.
+    assert_eq!(
+        cpu_thermal_status_segments(&thermal),
+        vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"],
+        "each node must be its own segment with the shared state word"
+    );
     assert_eq!(
         cpu_thermal_status_summary(&[]),
         None,
         "no thermal rows at all is an absent fact, never a fabricated clear"
+    );
+    assert!(
+        cpu_thermal_status_segments(&[]).is_empty(),
+        "an absent lane yields no per-node segments"
     );
 
     let mut session = MsrReadoutSession::default();
@@ -231,6 +242,11 @@ fn thermal_status_summary_renders_asserted_clear_and_absent_per_node() {
     assert_eq!(
         msr_thermal_status_summary(session.state()).as_deref(),
         expected
+    );
+    assert_eq!(
+        msr_thermal_status_segments(session.state()),
+        vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"],
+        "the session-aware segments must match the accepted snapshot"
     );
     let _ = session.begin_attempt();
     assert_eq!(

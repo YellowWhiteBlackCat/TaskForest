@@ -23,6 +23,8 @@ use taskmanager_core::core::startup::BootTimeline;
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::{AlertEvent, ServiceId};
+use taskmanager_shell::DirectTrackState;
+use taskmanager_shell::fixture::seed_capture_msr_readout;
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
 };
@@ -101,6 +103,24 @@ impl CaptureEvidence {
         if self.is_enabled() {
             emit_theme_marker(self.scenario, theme);
         }
+    }
+
+    /// Seed the deterministic synthetic real-time thermal-status readout into
+    /// the direct track exactly once, so the capture receipt shows the row even
+    /// though the privileged `telemetry.cpu.msr` lane cannot run on the
+    /// disposable capture host.
+    ///
+    /// This is FIXTURE DATA, not a live privileged read: it is reachable only
+    /// while capture evidence is enabled, so the production live path never
+    /// seeds it. It drives the real request-session lifecycle, so the painted
+    /// row exercises the same admission path a live read uses.
+    pub(crate) fn seed_msr_readout(&mut self, shell: &mut DirectTrackState) -> bool {
+        if !self.is_enabled() || self.msr_readout_seeded {
+            return false;
+        }
+        self.msr_readout_seeded = true;
+        seed_capture_msr_readout(shell);
+        true
     }
 
     pub fn on_snapshot(&mut self, snapshot: &mut SystemSnapshot) {

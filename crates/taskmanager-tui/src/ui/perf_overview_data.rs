@@ -14,7 +14,7 @@ use taskmanager_application::RaplPowerState;
 use taskmanager_shell::presentation::{
     cpu_idle_state_summary, cpu_interrupt_summary, cpu_power_limits_summary,
     cpu_thermal_throttle_summary, cpu_topology_summary, load_average_basis_summary,
-    msr_thermal_status_summary, pressure_summary,
+    msr_thermal_status_segments, pressure_summary,
 };
 
 pub(super) struct CpuMetricFact {
@@ -273,13 +273,18 @@ pub(super) fn cpu_spec_rail_rows(
     }
     // The real-time thermal-status / PROCHOT assertion (the privileged
     // `telemetry.cpu.msr` lane) beside the cumulative counters. The row is
-    // absent while the lane produced no accepted readout; an unreadable
-    // per-node register keeps the shared dash inside the value.
-    if let Some(status) = msr_state.and_then(msr_thermal_status_summary) {
-        rows.push(CpuRailRow {
-            label: t("cpu.thermal_status").to_owned(),
-            value: status,
-        });
+    // absent while the lane produced no accepted readout. This rail's value
+    // column is deliberately narrow, so the shared per-node segments become
+    // one `Thermal status` row per node — the same convention the load windows
+    // use — instead of clipping the joined summary; an unreadable register
+    // keeps the shared dash inside its own segment.
+    if let Some(msr_state) = msr_state {
+        for segment in msr_thermal_status_segments(msr_state) {
+            rows.push(CpuRailRow {
+                label: t("cpu.thermal_status").to_owned(),
+                value: segment,
+            });
+        }
     }
     rows
 }

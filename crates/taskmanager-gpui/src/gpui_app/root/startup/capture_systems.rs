@@ -227,6 +227,13 @@ fn apply_inventory_capture(
 }
 
 fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
+    // Capture evidence runs the production shell, where the privileged
+    // `telemetry.cpu.msr` lane cannot produce a readout on the disposable
+    // capture host. Seed the same synthetic readout the demo builders use so
+    // the receipt shows the real-time thermal-status row. FIXTURE DATA, not a
+    // live privileged read: the seed is a no-op unless capture evidence is
+    // enabled.
+    let _ = view.capture_evidence.seed_msr_readout(&mut view.shell);
     if let Some(snapshot) = view.capture_evidence.system_hardware_npu_fixture() {
         seed_direct_track_fact(&mut view.shell, DirectTrackSeedFact::NpuInventory(snapshot));
         let revision = view.projection().system_revision;

@@ -299,30 +299,39 @@ pub fn thermal_status_state_label(value: Option<bool>) -> &'static str {
     }
 }
 
-/// Compact per-node summary of the real-time thermal-status / PROCHOT
-/// assertion (`IA32_THERM_STATUS` bit 0) carried by the privileged
-/// `telemetry.cpu.msr` lane: one `CPU {n} {state}` segment per readout node.
-/// An empty slice — the lane never ran, or the CPU exposes no
-/// `IA32_THERM_STATUS` — returns `None` so the caller omits the whole row
-/// rather than fabricating a clear state; a node whose register is
-/// unreadable/unimplemented keeps the shared dash. This is the SINGLE
-/// real-time-status fold (ADR-020): GPUI, Iced, TUI, and Bevy must not
-/// re-implement it.
+/// Per-node segments of the real-time thermal-status / PROCHOT assertion
+/// (`IA32_THERM_STATUS` bit 0) carried by the privileged `telemetry.cpu.msr`
+/// lane: one `CPU {n} {state}` segment per readout node, using the shared
+/// asserted/clear words and the honest dash for an unreadable register. An
+/// empty slice — the lane never ran, or the CPU exposes no
+/// `IA32_THERM_STATUS` — yields no segments so the caller omits the whole row
+/// rather than fabricating a clear state. This is the SINGLE real-time-status
+/// vocabulary (ADR-020): frontends whose value column cannot fit the joined
+/// [`cpu_thermal_status_summary`] paint one segment per row instead of
+/// re-spelling the state.
+#[must_use]
+pub fn cpu_thermal_status_segments(thermal: &[MsrThermalStatusReadout]) -> Vec<String> {
+    thermal
+        .iter()
+        .map(|readout| {
+            format!(
+                "CPU {} {}",
+                readout.cpu,
+                thermal_status_state_label(readout.thermal_status)
+            )
+        })
+        .collect()
+}
+
+/// Compact one-line summary of the real-time thermal-status / PROCHOT
+/// assertion: the per-node [`cpu_thermal_status_segments`] joined with ` | `.
+/// `None` when the lane produced no thermal rows, so the caller omits the
+/// whole row. This is the SINGLE real-time-status fold (ADR-020): GPUI, Iced,
+/// TUI, and Bevy must not re-implement it.
 #[must_use]
 pub fn cpu_thermal_status_summary(thermal: &[MsrThermalStatusReadout]) -> Option<String> {
-    (!thermal.is_empty()).then(|| {
-        thermal
-            .iter()
-            .map(|readout| {
-                format!(
-                    "CPU {} {}",
-                    readout.cpu,
-                    thermal_status_state_label(readout.thermal_status)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(" | ")
-    })
+    let segments = cpu_thermal_status_segments(thermal);
+    (!segments.is_empty()).then(|| segments.join(" | "))
 }
 
 /// The last accepted MSR-readout snapshot of the current request session, or
@@ -353,4 +362,16 @@ pub fn msr_readout_snapshot(state: &MsrReadoutState) -> Option<&MsrReadoutSnapsh
 #[must_use]
 pub fn msr_thermal_status_summary(state: &MsrReadoutState) -> Option<String> {
     msr_readout_snapshot(state).and_then(|snapshot| cpu_thermal_status_summary(&snapshot.thermal))
+}
+
+/// Session-aware per-node segments of the current MSR-readout session. Empty
+/// when no accepted snapshot exists; otherwise the same
+/// [`cpu_thermal_status_segments`] the summary joins. Frontends with a narrow
+/// value column paint one segment per row from here, so the words stay the
+/// single shared vocabulary.
+#[must_use]
+pub fn msr_thermal_status_segments(state: &MsrReadoutState) -> Vec<String> {
+    msr_readout_snapshot(state).map_or_else(Vec::new, |snapshot| {
+        cpu_thermal_status_segments(&snapshot.thermal)
+    })
 }

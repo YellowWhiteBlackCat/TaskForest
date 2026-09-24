@@ -262,6 +262,21 @@ fn seed_demo_msr_readout(target: &mut impl DemoMsrReadoutTarget) {
     target.demo_msr_fold(batch);
 }
 
+/// Seed the same synthetic real-time thermal-status readout into a direct
+/// track from the capture-evidence route, which runs the production shell and
+/// therefore never reaches the demo builders. The privileged
+/// `telemetry.cpu.msr` lane cannot run on the disposable capture host, so
+/// without this seed the capture receipt would omit the real-time row
+/// entirely.
+///
+/// This is FIXTURE DATA, not a live privileged read: the production live path
+/// never calls it (the caller gates on capture evidence being enabled), and it
+/// drives the real request-session lifecycle so the painted row exercises the
+/// same admission path a live read uses.
+pub fn seed_capture_msr_readout(track: &mut DirectTrackState) {
+    seed_demo_msr_readout(track);
+}
+
 /// A stable full-product frame. It contains no control intent and performs no I/O.
 #[must_use]
 pub fn demo_app() -> ShellApp {
