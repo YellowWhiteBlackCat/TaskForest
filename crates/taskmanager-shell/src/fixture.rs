@@ -10,9 +10,10 @@ use taskmanager_core::core::metrics::{
     CpuScalarObservations, CpuTelemetryObservation, DiskMetrics, DiskScalarObservations,
     GpuGraphicsApi, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation,
     MemoryCompositionObservations, MemoryMetrics, MemoryOptionalObservations,
-    MemoryScalarObservations, MemoryTelemetryObservation, NetworkAdapterType, NetworkMetrics,
-    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    OptionalObservation, ScalarObservation, ScalarObservationGroup, SystemLoadAverage,
+    MemoryScalarObservations, MemoryTelemetryObservation, MsrReadoutSnapshot,
+    MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
+    NetworkTelemetryObservation, NetworkWirelessObservations, OptionalObservation,
+    ScalarObservation, ScalarObservationGroup, SystemLoadAverage,
 };
 use taskmanager_core::core::metrics::{StorageTelemetryObservation, SystemSnapshot};
 use taskmanager_core::core::npu::NpuInventorySnapshot;
@@ -31,7 +32,8 @@ use taskmanager_core::core::startup::{
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{
-    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId,
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventSequence,
+    RequestId,
 };
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp, live_graph::LiveGraphHistory,
@@ -49,7 +51,10 @@ use cpu_topology::{
     core_usage_seed, cpu_types_seed, per_core_frequency_seed, per_core_temperature_seed,
 };
 use taskmanager_application::i18n::t;
-use taskmanager_application::{ProcessAffinityReady, ProjectedProcessInsights};
+use taskmanager_application::{
+    CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
+    ProcessAffinityReady, ProjectedProcessInsights, RequestAttemptId,
+};
 use taskmanager_core::core::alerts::Alert;
 use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::process::ProcessBatchIntent;
@@ -162,6 +167,101 @@ pub fn seed_direct_track_fact(app: &mut crate::DirectTrackState, fact: DirectTra
     app.seed_fixture_fact(fact);
 }
 
+/// The deterministic, explicitly synthetic real-time MSR readout the
+/// demo/capture path seeds so the `Thermal status` row is visible in every
+/// frontend's evidence frame.
+///
+/// This is FIXTURE DATA, not a live read: demo mode never invokes the
+/// privileged `telemetry.cpu.msr` lane. It deliberately carries BOTH states in
+/// one frame — CPU 0 with readable bits (`thermal_status` asserted; the
+/// log/event bits clear) and CPU 1 with every bit `None` (an
+/// unreadable/unimplemented register, which the shared fold renders as the
+/// honest dash). The values are installed through the same request-session
+/// lifecycle production uses (begin → accept → correlated platform terminal),
+/// so the demo exercises the real path instead of poking projection internals.
+fn demo_msr_readout_snapshot() -> MsrReadoutSnapshot {
+    MsrReadoutSnapshot::success(Vec::new()).with_thermal(vec![
+        MsrThermalStatusReadout {
+            cpu: 0,
+            thermal_status: Some(true),
+            thermal_status_log: Some(false),
+            prochot_event: Some(false),
+            prochot_event_log: Some(false),
+        },
+        MsrThermalStatusReadout {
+            cpu: 1,
+            ..MsrThermalStatusReadout::default()
+        },
+    ])
+}
+
+/// The fixed nonzero request id the demo seed correlates its synthetic
+/// terminal with, so the seeded session state is identical across frontends
+/// and runs.
+const DEMO_MSR_READOUT_REQUEST_ID: RequestId = RequestId::MIN;
+
+/// The shell tracks a demo bootstrap can seed the synthetic MSR readout into.
+/// Both expose the same application-owned request-session API, so the seeding
+/// sequence lives once (in [`seed_demo_msr_readout`]) and cannot drift between
+/// the composed track (`ShellApp`) and the direct track (`DirectTrackState`).
+trait DemoMsrReadoutTarget {
+    fn demo_msr_begin(&mut self) -> RequestAttemptId;
+    fn demo_msr_accept(&mut self, attempt: RequestAttemptId, request_id: RequestId) -> bool;
+    fn demo_msr_fold(&mut self, batch: PlatformEventBatch);
+}
+
+impl DemoMsrReadoutTarget for ShellApp {
+    fn demo_msr_begin(&mut self) -> RequestAttemptId {
+        self.begin_msr_readout_request()
+    }
+
+    fn demo_msr_accept(&mut self, attempt: RequestAttemptId, request_id: RequestId) -> bool {
+        self.accept_msr_readout_request(attempt, request_id)
+    }
+
+    fn demo_msr_fold(&mut self, batch: PlatformEventBatch) {
+        self.apply_platform_batch(batch);
+    }
+}
+
+impl DemoMsrReadoutTarget for DirectTrackState {
+    fn demo_msr_begin(&mut self) -> RequestAttemptId {
+        self.begin_msr_readout_request()
+    }
+
+    fn demo_msr_accept(&mut self, attempt: RequestAttemptId, request_id: RequestId) -> bool {
+        self.accept_msr_readout_request(attempt, request_id)
+    }
+
+    fn demo_msr_fold(&mut self, batch: PlatformEventBatch) {
+        let _ = self.apply_platform_batch(batch);
+    }
+}
+
+/// Seed the deterministic, explicitly synthetic real-time thermal-status
+/// readout into one shell track through the SAME request-session lifecycle a
+/// live read uses: begin the attempt, accept its request, then fold the
+/// correlated platform terminal. This is the single demo/capture seeding path
+/// the shared demo builders call; the live path never reaches it.
+fn seed_demo_msr_readout(target: &mut impl DemoMsrReadoutTarget) {
+    let attempt = target.demo_msr_begin();
+    if !target.demo_msr_accept(attempt, DEMO_MSR_READOUT_REQUEST_ID) {
+        return;
+    }
+    let mut batch = PlatformEventBatch::default();
+    batch.msr_readout_events.push(CorrelatedEvent::new(
+        PlatformEventContext {
+            request_id: DEMO_MSR_READOUT_REQUEST_ID,
+            capability: CapabilityId::TELEMETRY_CPU_MSR,
+            provider: None,
+            sequence: EventSequence::new(1),
+            observed_at_ms: 0,
+        },
+        MsrReadoutEvent::Update(demo_msr_readout_snapshot()),
+    ));
+    target.demo_msr_fold(batch);
+}
+
 /// A stable full-product frame. It contains no control intent and performs no I/O.
 #[must_use]
 pub fn demo_app() -> ShellApp {
@@ -213,6 +313,9 @@ pub fn demo_app() -> ShellApp {
             last_success_at_ms: None,
         },
     ]));
+    // Install the synthetic real-time thermal-status readout through the real
+    // request-session path so every demo/capture frame paints the new row.
+    seed_demo_msr_readout(&mut app);
     app.report_notice(
         FeedbackSource::Demo,
         FeedbackSeverity::Info,
@@ -228,7 +331,12 @@ pub fn demo_app() -> ShellApp {
 #[must_use]
 pub fn demo_direct_track() -> DirectTrackState {
     let demo = demo_app();
-    DirectTrackState::from_fixture_projection(demo.projection().clone())
+    let mut track = DirectTrackState::from_fixture_projection(demo.projection().clone());
+    // The direct track owns its own request sessions (the projection copy does
+    // not carry them), so seed the same synthetic readout through the shared
+    // helper — one source of values for every frontend track.
+    seed_demo_msr_readout(&mut track);
+    track
 }
 
 /// Build a bounded live-graph store populated with deterministic samples for
