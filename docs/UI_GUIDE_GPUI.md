@@ -46,3 +46,10 @@
   结束任务等全局和弦，单按键事件直接派发至焦点实体。
 - **无头 Wayland 验收**：全量测试必须通过嵌套 Niri/KWin 虚拟 Framebuffer
   的像素级自动化验收套件（`accept-gpui-interactions.sh` 与 `accept-gpui-demo.sh`）。
+
+## 5. 锚定证据边界
+
+GPUI 的 headless 帧只暴露 debug selector 的几何（`debug_bounds`）与光栅化字形
+sprite，没有字符级回读。因此 Apps 表格 Swap 单元格的锚点断言渲染输入（投影的
+`cell_text.swap`），而不是绘制像素；要证明绘制文本需要 vendored gpui 增加帧级
+shaped-text 访问器，当前不存在。

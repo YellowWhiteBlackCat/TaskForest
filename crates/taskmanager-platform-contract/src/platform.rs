@@ -7,6 +7,16 @@
 //! to one axis belongs to composition, exactly like every other platform
 //! selection in this workspace; typed availability facts stay with
 //! [`crate::CapabilityStatus`] and never leak into the axis identity.
+//!
+//! The axis is deliberately the three SHIPPED product targets. Android and
+//! OpenHarmony have feature-gated placeholder seams
+//! (`taskmanager-platform-android`, `taskmanager-platform-ohos`) that publish
+//! the shared capability-absent handle and are not connected to any product
+//! frontend (ADR-043/044/053); they are not product platforms, so they are not
+//! variants here. Declaring one would fabricate product support. Admitting a
+//! fourth role is a hard cutover of every exhaustive match and of
+//! [`PlatformAxis::ALL`], moved together with the count pin in
+//! `tests/headless/platform_axis.rs`.
 
 use std::fmt;
 

@@ -63,6 +63,11 @@ registers with their honest source and pads every other product-expected
 identity with the unsupported absence, so the declaration covers the complete
 expected face and `Undeclared` never hides a missing lane.
 
+`platform.rs` owns the parity axis identity: exactly the three shipped product
+targets (`linux`/`windows`/`macos`). The Android/OpenHarmony placeholder seams
+are outside the axis by design (ADR-043/044/053) and never resolve from
+`PlatformAxis::from_id`; admitting a fourth variant is a conscious hard cutover.
+
 ## Module map
 
 ```text

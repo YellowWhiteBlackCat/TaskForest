@@ -51,3 +51,9 @@
   设置 `flex_shrink: 0.0`，为右侧数值预留充足弹性空间，杜绝数字左侧被裁切。
 - **服务生命周期控制**：顶栏工具条完整挂载启动（`Start`）、停止（`Stop`）、
   重启（`Restart`）按钮，并由观察者直接投递到 shell 门控，摆脱纯只读状态。
+
+## 5. 锚定证据边界
+
+Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单元格锚点因此
+在投影断言之外，把每个投影行的生产 `row_scene` 挂载并回读 `Text`，证明单元格文本
+进入绘制场景图；像素等价仍由 Wayland capture 矩阵承担。

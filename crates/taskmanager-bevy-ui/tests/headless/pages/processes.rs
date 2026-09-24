@@ -249,7 +249,10 @@ fn row_view_formats_contract_columns_from_typed_observations() {
 /// `ProcessItem::current_swap_bytes()` arm (e.g. falls back to a system total
 /// or to `Some(0)`), the two distinct charges below collapse to one text (or
 /// to `0 B`). The unobserved-Swap dash branch stays pinned by
-/// `row_view_formats_contract_columns_from_typed_observations`.
+/// `row_view_formats_contract_columns_from_typed_observations`. The test also
+/// spawns the production `row_scene` for each projected row and reads the
+/// `Text` nodes back, proving the observed charge reaches the painted scene
+/// graph, not only the projection cell.
 #[test]
 fn row_view_renders_the_observed_per_process_swap_charge() {
     let mut heavy = process(501, "heavy-swap");
@@ -290,6 +293,37 @@ fn row_view_renders_the_observed_per_process_swap_charge() {
         "0 B",
         "a measured zero charge must stay visible as an observed `0 B`"
     );
+
+    // Painted-scene half: the projection cells above are the renderer input, so
+    // spawn the production row scene for each projected row and read the `Text`
+    // nodes back. Bevy's headless tooling exposes the spawned scene graph, not a
+    // pixel dump, so this proves the observed charge survives into the scene the
+    // renderer paints (the closest end-to-end readback Bevy offers; pixel
+    // equality stays the Wayland capture matrix's job).
+    let columns = crate::widgets::table::visible_columns(&[]);
+    let mut scene_app = App::new();
+    scene_app.add_plugins(MinimalPlugins);
+    scene_app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    scene_app.init_resource::<Assets<Font>>();
+    for row in &projection.rows {
+        scene_app
+            .world_mut()
+            .spawn_scene(crate::widgets::table::row_scene(&row.cells, &columns))
+            .expect("the row scene resolves without assets");
+    }
+    scene_app.update();
+    let world = scene_app.world_mut();
+    let painted: Vec<String> = world
+        .query::<&Text>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .collect();
+    for expected in ["32.0 MiB", "4.0 MiB", "0 B"] {
+        assert!(
+            painted.iter().any(|text| text == expected),
+            "the spawned row scene must paint the observed swap charge {expected:?}: {painted:?}"
+        );
+    }
 }
 
 #[test]
