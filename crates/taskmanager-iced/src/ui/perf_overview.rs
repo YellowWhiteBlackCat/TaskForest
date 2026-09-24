@@ -11,6 +11,7 @@ use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 use taskmanager_shell::presentation::cpu_topology_summary;
 use taskmanager_shell::presentation::load_average_basis_summary;
 use taskmanager_shell::presentation::load_average_summary;
+use taskmanager_shell::presentation::msr_thermal_status_summary;
 use taskmanager_theme::Theme;
 
 mod cpu;
@@ -415,6 +416,13 @@ pub(crate) fn cpu_memory_header_and_stats(
         // never a zero.
         if let Some(throttle) = cpu_thermal_throttle_summary(cpu) {
             stats.push(StatRow::text(t("cpu.thermal_throttle"), Some(throttle)));
+        }
+        // Real-time thermal-status / PROCHOT assertion (the privileged
+        // `telemetry.cpu.msr` lane) beside the cumulative counters. The row is
+        // absent while the lane produced no accepted readout; an unreadable
+        // per-node register keeps the shared dash inside the value.
+        if let Some(status) = msr_thermal_status_summary(app.shell.msr_readout_state()) {
+            stats.push(StatRow::text(t("cpu.thermal_status"), Some(status)));
         }
         if let Some(load) = snapshot.load_average.as_ref() {
             stats.push(StatRow::text(

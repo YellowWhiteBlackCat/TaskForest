@@ -127,6 +127,7 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "services.logs.stream",
             "storage.smart",
             "telemetry.cpu",
+            "telemetry.cpu.msr",
             "telemetry.cpu.package_power",
             "telemetry.cpu.throttle",
             "telemetry.gpu",

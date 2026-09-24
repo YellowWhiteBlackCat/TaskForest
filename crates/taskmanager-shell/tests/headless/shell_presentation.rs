@@ -1,11 +1,14 @@
 use super::*;
 use taskmanager_application::AppAction;
+use taskmanager_application::MsrReadoutSession;
 use taskmanager_core::SystemLoadAverage;
 use taskmanager_core::core::metrics::{
-    CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, NetworkAdapterType, NetworkMetrics,
+    CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, MsrReadoutSnapshot,
+    MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics,
 };
 use taskmanager_core::core::services::ServiceDiagnostics;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_platform_contract::RequestId;
 
 #[test]
 fn service_exit_diagnostics_explain_configuration_failure_in_both_locales() {
@@ -171,6 +174,69 @@ fn thermal_throttle_summary_keeps_package_ids_dashes_and_honest_absence() {
     assert_eq!(
         cpu_thermal_throttle_summary(&cpu).as_deref(),
         Some("S4 Package 0 · Core 0")
+    );
+}
+
+/// The real-time thermal-status / PROCHOT fold: one `CPU {n} {state}` segment
+/// per readout node, the shared asserted/clear words for a verified bit, the
+/// shared honest dash for an unreadable/unimplemented register, and `None`
+/// when the privileged `telemetry.cpu.msr` lane produced no thermal rows. The
+/// session-aware entry reads the application-owned request session, so a fresh
+/// session has no real-time row and a refresh keeps the last accepted read.
+#[test]
+fn thermal_status_summary_renders_asserted_clear_and_absent_per_node() {
+    i18n::set_language(i18n::Language::En);
+    let thermal = vec![
+        MsrThermalStatusReadout {
+            cpu: 0,
+            thermal_status: Some(true),
+            ..MsrThermalStatusReadout::default()
+        },
+        MsrThermalStatusReadout {
+            cpu: 1,
+            thermal_status: Some(false),
+            ..MsrThermalStatusReadout::default()
+        },
+        MsrThermalStatusReadout {
+            cpu: 2,
+            thermal_status: None,
+            ..MsrThermalStatusReadout::default()
+        },
+    ];
+    assert_eq!(
+        cpu_thermal_status_summary(&thermal).as_deref(),
+        Some("CPU 0 Asserted | CPU 1 Clear | CPU 2 —"),
+        "asserted, clear, and the honest dash are the three shared states"
+    );
+    assert_eq!(
+        cpu_thermal_status_summary(&[]),
+        None,
+        "no thermal rows at all is an absent fact, never a fabricated clear"
+    );
+
+    let mut session = MsrReadoutSession::default();
+    assert_eq!(
+        msr_thermal_status_summary(session.state()),
+        None,
+        "a session that never ran has no real-time row"
+    );
+    let attempt = session.begin_attempt();
+    let request_id = RequestId::new(1).expect("fixture request id");
+    assert!(session.accept_attempt(attempt, request_id));
+    assert!(session.complete(
+        request_id,
+        MsrReadoutSnapshot::success(Vec::new()).with_thermal(thermal),
+    ));
+    let expected = Some("CPU 0 Asserted | CPU 1 Clear | CPU 2 —");
+    assert_eq!(
+        msr_thermal_status_summary(session.state()).as_deref(),
+        expected
+    );
+    let _ = session.begin_attempt();
+    assert_eq!(
+        msr_thermal_status_summary(session.state()).as_deref(),
+        expected,
+        "a refresh keeps the last accepted real-time read"
     );
 }
 

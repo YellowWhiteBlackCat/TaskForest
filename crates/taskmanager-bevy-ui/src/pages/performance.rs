@@ -336,6 +336,7 @@ pub(crate) enum CpuField {
     IdleStates,
     PowerLimits,
     ThermalThrottle,
+    ThermalStatus,
     Interrupts,
     Core(usize),
 }
@@ -867,3 +868,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_device_rows.rs"]
 mod device_rows_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_thermal.rs"]
+mod thermal_status_tests;

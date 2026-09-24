@@ -1,12 +1,14 @@
 //! CPU rail/detail folds shared by every frontend: package topology, cpuidle
-//! evidence, power limits, interrupt distribution, and the cumulative
-//! thermal-throttle trigger counters. Each fold is renderer-neutral and never
-//! fabricates an unobserved value.
+//! evidence, power limits, interrupt distribution, the cumulative
+//! thermal-throttle trigger counters, and the real-time thermal-status /
+//! PROCHOT assertion from the privileged MSR lane. Each fold is
+//! renderer-neutral and never fabricates an unobserved value.
 
+use taskmanager_application::MsrReadoutState;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::{CpuMetrics, MsrReadoutSnapshot, MsrThermalStatusReadout};
 
-use super::{megahertz, missing_value};
+use super::{MISSING_VALUE, megahertz, missing_value};
 
 /// Compact, renderer-neutral summary of the package topology collected by the
 /// native adapter. It intentionally uses only proven fields: a missing NUMA,
@@ -281,4 +283,74 @@ pub fn cpu_thermal_throttle_summary(cpu: &CpuMetrics) -> Option<String> {
         ));
     }
     (!packages.is_empty()).then(|| packages.join(" | "))
+}
+
+/// The shared word for one real-time `IA32_THERM_STATUS` bit (`Some(true)` =
+/// asserted, `Some(false)` = clear). An absent bit — the register is
+/// unimplemented or unreadable — is the shared honest dash, never a fabricated
+/// clear state. This is the SINGLE real-time thermal-status vocabulary
+/// (ADR-020); no frontend spells the state itself.
+#[must_use]
+pub fn thermal_status_state_label(value: Option<bool>) -> &'static str {
+    match value {
+        Some(true) => i18n::t("cpu.thermal_status_asserted"),
+        Some(false) => i18n::t("cpu.thermal_status_clear"),
+        None => MISSING_VALUE,
+    }
+}
+
+/// Compact per-node summary of the real-time thermal-status / PROCHOT
+/// assertion (`IA32_THERM_STATUS` bit 0) carried by the privileged
+/// `telemetry.cpu.msr` lane: one `CPU {n} {state}` segment per readout node.
+/// An empty slice — the lane never ran, or the CPU exposes no
+/// `IA32_THERM_STATUS` — returns `None` so the caller omits the whole row
+/// rather than fabricating a clear state; a node whose register is
+/// unreadable/unimplemented keeps the shared dash. This is the SINGLE
+/// real-time-status fold (ADR-020): GPUI, Iced, TUI, and Bevy must not
+/// re-implement it.
+#[must_use]
+pub fn cpu_thermal_status_summary(thermal: &[MsrThermalStatusReadout]) -> Option<String> {
+    (!thermal.is_empty()).then(|| {
+        thermal
+            .iter()
+            .map(|readout| {
+                format!(
+                    "CPU {} {}",
+                    readout.cpu,
+                    thermal_status_state_label(readout.thermal_status)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" | ")
+    })
+}
+
+/// The last accepted MSR-readout snapshot of the current request session, or
+/// `None` when the privileged lane produced none (it never ran, is in flight
+/// with no last-good, or failed with no last-good). The request-session
+/// lifecycle is owned by `taskmanager-application`; this fold only reads it so
+/// every frontend observes the same absence semantics.
+#[must_use]
+pub fn msr_readout_snapshot(state: &MsrReadoutState) -> Option<&MsrReadoutSnapshot> {
+    match state {
+        MsrReadoutState::Ready(ready) => Some(&ready.snapshot),
+        MsrReadoutState::Loading {
+            last_good: Some(ready),
+            ..
+        } => Some(&ready.snapshot),
+        MsrReadoutState::Failed(failed) => failed.last_good.as_ref().map(|ready| &ready.snapshot),
+        MsrReadoutState::Loading {
+            last_good: None, ..
+        }
+        | MsrReadoutState::Closed => None,
+    }
+}
+
+/// Session-aware fold: the real-time thermal-status summary of the current
+/// MSR-readout session, or `None` when no accepted snapshot exists. This is
+/// the entry every frontend calls so the privileged-lane absence is one fact,
+/// not four copies.
+#[must_use]
+pub fn msr_thermal_status_summary(state: &MsrReadoutState) -> Option<String> {
+    msr_readout_snapshot(state).and_then(|snapshot| cpu_thermal_status_summary(&snapshot.thermal))
 }

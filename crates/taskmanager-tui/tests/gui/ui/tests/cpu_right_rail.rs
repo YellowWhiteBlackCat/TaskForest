@@ -6,19 +6,23 @@
 //! fed below, asserted row-by-row like a reader would scan the column.
 
 use taskmanager_application::i18n::Language;
-use taskmanager_application::{AppAction, AppPage};
+use taskmanager_application::{
+    AppAction, AppPage, CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
+};
 use taskmanager_core::core::hardware::CoreBreakdown;
 use taskmanager_core::core::metrics::{
-    CpuFrequencySource, PressureWindow, ResourcePressure, ScalarObservation,
-    ScalarObservationGroup, SystemPressureSnapshot,
+    CpuFrequencySource, MsrReadoutSnapshot, MsrThermalStatusReadout, PressureWindow,
+    ResourcePressure, ScalarObservation, ScalarObservationGroup, SystemPressureSnapshot,
 };
 
 use super::acceptance_support::frame_in_language;
 use super::frame_text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::CpuPackageMetrics;
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{edit_hardware, edit_snapshot};
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
+use taskmanager_shell::presentation::msr_thermal_status_summary;
 
 fn cpu_app() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -325,7 +329,7 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
         .expect("demo snapshot");
     let expected = cpu_thermal_throttle_summary(&snapshot.cpu)
         .expect("observed counters must produce the shared fold");
-    let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(&snapshot.cpu, None);
+    let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(&snapshot.cpu, None, None);
     let throttle = rows
         .iter()
         .find(|row| row.label == t("cpu.thermal_throttle"))
@@ -344,6 +348,87 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
         !cold.contains("Thermal throttle"),
         "an unobserved counter family must not grow a rail row:\n{cold}"
     );
+}
+
+/// The real-time thermal-status / PROCHOT delivery: the CPU rail paints the
+/// shared [`taskmanager_shell::presentation::msr_thermal_status_summary`] fold
+/// beside the cumulative counters — the shared asserted/clear words and the
+/// honest dash for an unreadable register — and paints no row while the
+/// privileged `telemetry.cpu.msr` lane produced no accepted readout.
+#[test]
+fn real_time_thermal_status_paints_with_honest_absence() {
+    let mut app = cpu_app();
+
+    // No accepted MSR readout: the real-time row is absent.
+    app.scroll_cpu_details(isize::MAX);
+    let cold = frame_text(&app, 120, 48);
+    assert!(
+        !cold.contains("Thermal status"),
+        "a session that never ran must not grow a real-time rail row:\n{cold}"
+    );
+
+    set_msr_thermal_status(&mut app, &[(0, Some(true)), (1, Some(false)), (2, None)]);
+    let snapshot = app
+        .shell
+        .projection()
+        .snapshot
+        .clone()
+        .expect("demo snapshot");
+    let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(
+        &snapshot.cpu,
+        None,
+        Some(app.shell.msr_readout_state()),
+    );
+    let status = rows
+        .iter()
+        .find(|row| row.label == t("cpu.thermal_status"))
+        .expect("an accepted readout must grow a real-time rail row");
+    let expected = msr_thermal_status_summary(app.shell.msr_readout_state())
+        .expect("an accepted readout must fold");
+    assert_eq!(
+        status.value, expected,
+        "the rail row must paint the shared real-time status fold"
+    );
+    assert!(
+        expected.contains(t("cpu.thermal_status_asserted"))
+            && expected.contains(t("cpu.thermal_status_clear")),
+        "the fold must carry the shared asserted/clear vocabulary: {expected}"
+    );
+    assert!(
+        expected.contains("—"),
+        "an unreadable register must keep the honest dash: {expected}"
+    );
+}
+
+/// Seed the shared MSR session with an accepted readout carrying the given
+/// real-time `IA32_THERM_STATUS` bits, through the same request-session and
+/// platform-batch path production admission uses.
+fn set_msr_thermal_status(app: &mut crate::TuiApp, bits: &[(u32, Option<bool>)]) {
+    let attempt = app.shell.begin_msr_readout_request();
+    let request_id = RequestId::new(41).expect("fixture request id");
+    assert!(app.shell.accept_msr_readout_request(attempt, request_id));
+    let mut batch = PlatformEventBatch::default();
+    batch.msr_readout_events.push(CorrelatedEvent::new(
+        PlatformEventContext {
+            request_id,
+            capability: CapabilityId::TELEMETRY_CPU_MSR,
+            provider: None,
+            sequence: EventSequence::new(1),
+            observed_at_ms: 10,
+        },
+        MsrReadoutEvent::Update(
+            MsrReadoutSnapshot::success(Vec::new()).with_thermal(
+                bits.iter()
+                    .map(|&(cpu, thermal_status)| MsrThermalStatusReadout {
+                        cpu,
+                        thermal_status,
+                        ..MsrThermalStatusReadout::default()
+                    })
+                    .collect(),
+            ),
+        ),
+    ));
+    app.shell.apply_platform_batch(batch);
 }
 
 fn set_package_counters(app: &mut crate::TuiApp, counters: &[(u32, Option<u64>, Option<u64>)]) {

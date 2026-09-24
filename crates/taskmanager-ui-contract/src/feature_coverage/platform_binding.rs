@@ -118,7 +118,10 @@ static STORAGE_TELEMETRY_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_STOR
 static STORAGE_SMART_LANES: &[CapabilityId] = &[CapabilityId::SMART];
 static MEMORY_VMA_LANES: &[CapabilityId] = &[CapabilityId::MEMORY_VMA_MAP];
 static THREAD_CONTEXT_SWITCH_LANES: &[CapabilityId] = &[CapabilityId::THREADS_CONTEXT_SWITCH];
-static CPU_THROTTLE_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_CPU_THROTTLE];
+static CPU_THROTTLE_THERMAL_LANES: &[CapabilityId] = &[
+    CapabilityId::TELEMETRY_CPU_THROTTLE,
+    CapabilityId::TELEMETRY_CPU_MSR,
+];
 static PRESSURE_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_PRESSURE];
 static DESKTOP_RESPONSIVENESS_LANES: &[CapabilityId] = &[CapabilityId::DESKTOP_RESPONSIVENESS];
 static DBUS_LANES: &[CapabilityId] = &[CapabilityId::IPC_DBUS];
@@ -255,7 +258,10 @@ impl super::FeatureId {
             Self::BatteryPowerInventory => Requires(POWER_SUPPLY_LANES),
             // Thermal-throttle trigger counters are their own reliability fact,
             // distinct from the temperature readouts the sensor lane carries.
-            Self::ThermalThrottleEvents => Requires(CPU_THROTTLE_LANES),
+            // The real-time PROCHOT assertion rides the privileged MSR lane
+            // beside the unprivileged cumulative counters, so the delivery now
+            // requires both.
+            Self::ThermalThrottleEvents => Requires(CPU_THROTTLE_THERMAL_LANES),
             // -- Area 10: security isolation -------------------------------
             Self::LinuxNamespaceAudit
             | Self::PosixCapabilitiesAudit

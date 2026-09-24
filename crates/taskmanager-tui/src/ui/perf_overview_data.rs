@@ -9,11 +9,12 @@ use super::units::{
     cache_mib, observed_frequency_for_source, observed_percentage, observed_temperature_for_source,
     spec_ghz,
 };
+use taskmanager_application::MsrReadoutState;
 use taskmanager_application::RaplPowerState;
 use taskmanager_shell::presentation::{
     cpu_idle_state_summary, cpu_interrupt_summary, cpu_power_limits_summary,
     cpu_thermal_throttle_summary, cpu_topology_summary, load_average_basis_summary,
-    pressure_summary,
+    msr_thermal_status_summary, pressure_summary,
 };
 
 pub(super) struct CpuMetricFact {
@@ -154,6 +155,7 @@ pub(super) fn cpu_live_rail_rows(
 pub(super) fn cpu_spec_rail_rows(
     cpu: &CpuMetrics,
     hardware: Option<&HardwareInfo>,
+    msr_state: Option<&MsrReadoutState>,
 ) -> Vec<CpuRailRow> {
     let mut rows = vec![
         // Static advertised base clock — NOT the live frequency above.
@@ -267,6 +269,16 @@ pub(super) fn cpu_spec_rail_rows(
         rows.push(CpuRailRow {
             label: t("cpu.thermal_throttle").to_owned(),
             value: throttle,
+        });
+    }
+    // The real-time thermal-status / PROCHOT assertion (the privileged
+    // `telemetry.cpu.msr` lane) beside the cumulative counters. The row is
+    // absent while the lane produced no accepted readout; an unreadable
+    // per-node register keeps the shared dash inside the value.
+    if let Some(status) = msr_state.and_then(msr_thermal_status_summary) {
+        rows.push(CpuRailRow {
+            label: t("cpu.thermal_status").to_owned(),
+            value: status,
         });
     }
     rows
