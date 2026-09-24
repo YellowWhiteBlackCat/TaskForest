@@ -160,7 +160,7 @@ Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 
 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
 存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
-UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按真实渲染消费面路由：合同测试树、声明模块与 dev-only 前端测试树只要求 headless 交互矩阵，不索取像素回执；被真实渲染消费的合同输入模块、产品前端与 `locales/*` 才在 `--require-capture` 下按消费端要求新鲜回执，未列出的 `ui-contract` 路径保持四端 fail-closed。分类表由 `scripts/quality/ui_evidence_route_guard.py` 机械钉住（quick）。
+UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按真实渲染消费面路由：合同测试树、声明模块与 dev-only 前端测试树只要求 headless 交互矩阵，不索取像素回执；被真实渲染消费的合同输入模块与产品前端才在 `--require-capture` 下按消费端要求新鲜回执，未列出的 `ui-contract` 路径保持四端 fail-closed。`locales/*` 不再只按路径粗判：`scripts/quality/locale_keyset_classifier.py` 读取目录**内容**——仅当整键增删、无存活键值变更、目录文件集与跨目录键关系不变时才判为 key-set-only（只走 headless）；任一已存键值改变、形状/对称变化、目录不可解析、缺失一侧，或改动集含非目录路径，都 fail-closed 到四端。路径分类表与内容分类器均由 `scripts/quality/ui_evidence_route_guard.py` 机械钉住（quick）。
 
 真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与
 worktree clean/dirty 三元组；捕获期间工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，
