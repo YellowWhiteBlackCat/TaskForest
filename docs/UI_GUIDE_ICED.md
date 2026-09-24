@@ -43,3 +43,10 @@
   包含 `EndTask`、`Kill`、`Priority`（高/正常/低）、`EfficiencyMode` 等完整动作；
 - **纯净多语言**：严禁中英文混排（如 `Delete 确认` 统一为 `按 Delete 键确认`），
   浮层与提示文本统一通过 `taskmanager_application::i18n::t` 单源解析。
+
+## 5. 锚定证据边界
+
+iced 的 `view(&app)` 返回不透明 `Element` 树，headless 测试没有文本或像素回读
+（仓库也未引入 `iced_test` 依赖）。因此 Swap 单元格锚点断言
+`build_row_cells_with_rules` 产出的单元格文本（渲染输入）；要证明绘制帧文本需要
+iced 侧新增 headless 文本读取能力，当前不存在。

@@ -22,7 +22,9 @@
 #   platform           RESERVED P5 axis; empty = frontend axis, opaque here.
 # Anchors are declared by hand (transcribed from the per-frontend matrices on
 # 2026-09-22) and verified by set membership against `cargo nextest list`; test ids
-# are never derived by scanning Rust source.
+# are never derived by scanning Rust source.  The Bevy D1 follow-up rows
+# (bev-partition-rows, bev-settings-preferences) are hand-declared cases anchored
+# to existing tests discovery already lists, not transcribed from a matrix.
 subject_kind	case_id	frontend	p0_id	target	test_name	paths	capture_scenarios	contract_tag	platform
 interaction	mc00-page-sweep	gpui	P0-MC-00	gui	-	success|responsive	cpu-gnome-light|processes|services|system	success	
 interaction	mc00-nav-pointer	gpui	P0-MC-00	gui	-	success|pointer	-	success	
@@ -170,6 +172,8 @@ interaction	bev-log-status-typed	bevy	-	lib	pages::services::service_logs_tests:
 interaction	bev-log-chord-map	bevy	-	lib	pages::services::service_logs_tests::the_chord_mapping_is_total_and_exclusive	keyboard|render|success	-	keyboard	
 interaction	bev-log-controls-move-state	bevy	-	lib	pages::services::service_logs_tests::panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet	keyboard|lifecycle|success	-	keyboard	
 interaction	bev-log-repaint-gate	bevy	-	lib	pages::services::service_logs_tests::the_repaint_gate_fires_only_when_a_rendered_fact_moves	render|lifecycle|success	-	render	
+interaction	bev-partition-rows	bevy	P0-MC-02	lib	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	projection|render|success	-	projection	
+interaction	bev-settings-preferences	bevy	P0-MC-05	lib	pages::settings::tests::settings_page_projects_the_live_authorities_into_rows	success	-	success	
 interaction	mc00-tui-page-sweep	tui	P0-MC-00	lib	ui::tests::acceptance_size_matrix::every_page_paints_body_rows_at_every_meets_floor_size	success|responsive	-	success	
 interaction	mc00-tui-nav-digits	tui	P0-MC-00	lib	runtime::tests::keys_navigation::performance_digit_keys_select_a_resource_without_colliding_with_pages	success|keyboard	-	success	
 interaction	mc00-tui-nav-routes	tui	P0-MC-00	lib	runtime::tests::keys_navigation::alt_page_chords_cover_the_four_middle_routes	success|keyboard	-	success	

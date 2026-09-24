@@ -38,3 +38,8 @@
   作为第一优先级的退出退出通道。
 - **无头测试与验收矩阵**：通过 `scripts/accept-tui-interactions.sh`
   执行 600+ 项无头终端虚拟会话测试，自动验证按键序列、状态机响应与 ANSI 转义序列。
+
+## 5. 锚定证据边界
+
+TUI 通过 `ratatui::backend::TestBackend` 回读真实绘制帧文本，Swap 单元格锚点本身
+即绘制帧断言，无需额外能力。

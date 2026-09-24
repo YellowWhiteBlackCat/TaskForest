@@ -558,8 +558,9 @@ fn capability_and_feature_registries_are_deliberately_asymmetric() {
 /// full-stall deduction requirement, NUMA keeps the per-node requirement, the
 /// memory breakdown keeps the virtual address-space size (VmSize) OUTSIDE, and
 /// the thermal-throttle feature keeps the real-time PROCHOT state
-/// (`is_throttled`) OUTSIDE. Weakening one must fail here and be a conscious
-/// specification change, never an accidental overclaim.
+/// (`is_throttled`) OUTSIDE and names its delivery requirement (the privileged
+/// MSR lane + `IA32_THERM_STATUS`). Weakening one must fail here and be a
+/// conscious specification change, never an accidental overclaim.
 #[test]
 fn authoritative_delivery_definitions_pin_their_boundaries() {
     let cache = FeatureId::CpuCacheTopology
@@ -594,6 +595,12 @@ fn authoritative_delivery_definitions_pin_their_boundaries() {
     assert!(thermal.contains("package_throttle_count"), "{thermal}");
     assert!(thermal.contains("is_throttled"), "{thermal}");
     assert!(thermal.contains("OUTSIDE"), "{thermal}");
+    // The OUTSIDE clause names its delivery requirement so it stays actionable:
+    // the privileged MSR lane, the exact register, and the platform-axis gap.
+    assert!(thermal.contains("telemetry.cpu.msr"), "{thermal}");
+    assert!(thermal.contains("IA32_THERM_STATUS"), "{thermal}");
+    assert!(thermal.contains("/dev/cpu/N/msr"), "{thermal}");
+    assert!(thermal.contains("telemetry.cpu.throttle"), "{thermal}");
 
     // The per-process swap charge keeps its own authority: it names the
     // process-row `swap_bytes` scalar, stays distinct from RSS/PSS and the

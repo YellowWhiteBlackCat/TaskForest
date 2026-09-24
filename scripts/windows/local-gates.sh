@@ -15,8 +15,11 @@
 #              bottom-up dev loop), doctests, rustdoc, the three shape checks
 #              (check-only, the same scope as the portability Windows job),
 #              release build, and — with --with-gui — the headless GPUI
-#              interaction matrix (scripts/windows/accept-gpui-interactions.sh
-#              keeps Windows evidence separate and needs no compositor).
+#              interaction matrix through the shared S5 driver
+#              (scripts/parity/accept-frontend-interactions.sh gpui
+#              --scope windows, mirroring scripts/quality/local-gates.sh; a
+#              Windows-only workdir lease keeps the evidence off the Linux run
+#              and no compositor is needed).
 #              `cargo deny` is skipped when the tool or its advisory database
 #              is unavailable (probed, never assumed).
 #   extended   rejected: Miri/fuzz/mutants/coverage/bloat stay on the Linux
@@ -355,7 +358,17 @@ if [[ "$with_gui" == "1" ]]; then
         run_stage ui-capture-route standard bash scripts/quality/ui-evidence-route.sh --with-gui --require-capture
     fi
     if maybe gpui-interactions; then
-        run_stage gpui-interactions standard timeout --kill-after=10s 2400 bash scripts/windows/accept-gpui-interactions.sh
+        # S5/D6 phase 5: the Windows mirror runs the same unified driver as
+        # scripts/quality/local-gates.sh, with the Windows scope. The driver
+        # copies the environment and overrides only the scope and the evidence
+        # root, so the Windows-only workdir lease is exported first and this
+        # run never shares the Linux interaction lease. GPUI_INTERACTION_COMMAND
+        # keeps the base gate's receipt provenance line honest about the entry.
+        run_stage gpui-interactions standard \
+            env GPUI_INTERACTION_WORKDIR_TASK=windows-gpui-interactions \
+            GPUI_INTERACTION_COMMAND='bash scripts/parity/accept-frontend-interactions.sh gpui --scope windows' \
+            timeout --kill-after=10s 2400 \
+            bash scripts/parity/accept-frontend-interactions.sh gpui --scope windows
     fi
 fi
 

@@ -238,6 +238,24 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
         assert_eq!(rows[2].cpu, Some(10.0));
         assert_eq!(rows[3].cpu, Some(3.0));
     });
+
+    // The aggregate selection must not leak onto its root process row: the
+    // aggregate is anchored to the root's live key, so a `live_key()`-broad
+    // identity match would highlight row 2 as well and paint two rails. Only
+    // the LAST painted rail is observable through `debug_bounds`, so a leaked
+    // highlight would move the observed rail onto the root process row.
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    let app_row = vcx
+        .debug_bounds("tm-proc-row-root:1")
+        .expect("the selected application aggregate row must render");
+    let rail = vcx
+        .debug_bounds("tm-proc-rail")
+        .expect("the selected row must paint its accent rail");
+    assert!(
+        rail.origin.y >= app_row.origin.y - px(0.5) && rail.bottom() <= app_row.bottom() + px(0.5),
+        "selecting the application aggregate must highlight only its own row, \
+         never the root process row: app={app_row:?}, rail={rail:?}"
+    );
 }
 
 fn application_row_id(pid: u32) -> ProcessRowId {

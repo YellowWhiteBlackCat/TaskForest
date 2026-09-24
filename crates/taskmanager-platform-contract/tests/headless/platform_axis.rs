@@ -62,3 +62,28 @@ fn display_uses_the_stable_machine_id() {
         assert_eq!(axis.to_string(), axis.id());
     }
 }
+
+/// The Android/OpenHarmony placeholder seams are deliberately NOT product
+/// platform axes: their ids must not resolve, so a manifest or ledger cannot
+/// address a platform the product does not ship (ADR-043/044/053). This is the
+/// behavioural half of the "three shipped targets" decision; the count pin in
+/// `all_platform_axes_are_total_and_unique` is the other half, so admitting a
+/// fourth product role is a conscious change to both.
+#[test]
+fn placeholder_platform_seams_are_not_product_axes() {
+    for id in ["android", "ohos", "openharmony"] {
+        assert_eq!(
+            PlatformAxis::from_id(id),
+            None,
+            "{id} is a capability-absent placeholder seam, not a shipped product platform"
+        );
+    }
+    assert_eq!(
+        PlatformAxis::ALL
+            .iter()
+            .map(|axis| axis.id())
+            .collect::<Vec<_>>(),
+        vec!["linux", "windows", "macos"],
+        "the product parity axis is exactly the three shipped targets, in canonical order"
+    );
+}

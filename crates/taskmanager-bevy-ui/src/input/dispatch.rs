@@ -607,15 +607,6 @@ fn edit_search_line(
             state.clear_line(query);
             commit_query_to_shell(shell, query);
         }
-        KeyCode::KeyC if is_ctrl => state.copy_to_clipboard(query),
-        KeyCode::KeyX if is_ctrl => {
-            state.cut_to_clipboard(query);
-            commit_query_to_shell(shell, query);
-        }
-        KeyCode::KeyV if is_ctrl => {
-            state.paste_from_clipboard(query);
-            commit_query_to_shell(shell, query);
-        }
         _ => {
             let Some(character) = press.character else {
                 return false;

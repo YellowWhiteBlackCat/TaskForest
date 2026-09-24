@@ -4,7 +4,6 @@ use crate::gpui_app::formatting;
 use taskmanager_core::core::metrics::SystemSnapshot;
 
 pub(super) struct ProcessPageMetrics {
-    pub swap_total_bytes: Option<u64>,
     pub swap_auto_hidden: bool,
     pub cpu_usage: String,
     pub memory_usage: String,
@@ -13,7 +12,6 @@ pub(super) struct ProcessPageMetrics {
 pub(super) fn process_page_metrics(snapshot: &SystemSnapshot) -> ProcessPageMetrics {
     let swap_total_bytes = snapshot.memory.current_swap_total_bytes();
     ProcessPageMetrics {
-        swap_total_bytes,
         swap_auto_hidden: swap_total_bytes == Some(0),
         cpu_usage: snapshot
             .cpu

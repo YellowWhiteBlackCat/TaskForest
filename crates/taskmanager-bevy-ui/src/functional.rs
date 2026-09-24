@@ -59,9 +59,9 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::SmartSelfTest => SurfaceDecision::Local {
             route: "performance.disk.smart-self-test",
         },
-        ProductIntent::DiagnosticBundle => SurfaceDecision::AcceptedDifference {
-            route: "about.diagnostic-report",
-            reason: "Bevy provides a redacted clipboard report while GPUI provides the preview/write bundle workflow",
+        ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
+            reason: "the Bevy UI shape exposes no diagnostic report surface; the shared CLI \
+                     harness can still export the bundle",
         },
         ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
             route: "header.screenshot",

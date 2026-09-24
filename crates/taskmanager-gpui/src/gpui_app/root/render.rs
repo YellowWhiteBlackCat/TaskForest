@@ -327,7 +327,13 @@ impl Render for RootView {
         let snap = self.system_snapshot_rc().clone();
         let telemetry = self.telemetry.clone();
         let selected = self.selected;
-        let selected_identity = self.selected_process_row().and_then(ProcessRowId::live_key);
+        // Only an individual process row contributes a selectable identity
+        // here: an `Application(root)` aggregate is anchored to the same live
+        // key as its root process, so using `live_key()` would additionally
+        // highlight that root process row whenever the aggregate is selected.
+        let selected_identity = self
+            .selected_process_row()
+            .and_then(ProcessRowId::process_identity);
         // Snapshot the hover slot once: `.as_ref()` for synchronous helpers (titlebar,
         // sidebar, settings), `.clone()` for the uniform_list row builders (Apps/Services).
         let hovered = self.hovered.clone();
