@@ -316,18 +316,20 @@ impl FeatureId {
                                       `package_throttle_count` / `core_throttle_count`) \
                                       from the shared CPU projection. The real-time \
                                       PROCHOT assertion state (`is_throttled`) is \
-                                      explicitly OUTSIDE this definition. Delivering it \
-                                      would require two additions that do not exist \
-                                      today: the privileged `telemetry.cpu.msr` lane's \
-                                      helper contract extended with the \
-                                      `IA32_THERM_STATUS` (MSR 0x19C) thermal-status / \
-                                      PROCHOT bit (Linux-only via the root-only \
-                                      `/dev/cpu/N/msr` nodes; Windows/macOS would need \
-                                      their own typed driver seam and answer typed \
-                                      `Unsupported`), and a thermal surface that renders \
-                                      the real-time assertion; the aggregate \
-                                      system-health deduction that consumes the state is \
-                                      not such a surface, and the feature's platform \
+                                      explicitly OUTSIDE this definition. The \
+                                      privileged read now EXISTS: the \
+                                      `telemetry.cpu.msr` lane's helper contract \
+                                      carries the `IA32_THERM_STATUS` (MSR 0x19C) \
+                                      thermal-status / PROCHOT bits (Linux-only via \
+                                      the root-only `/dev/cpu/N/msr` nodes; \
+                                      Windows/macOS answer a typed `Unsupported`), \
+                                      and the provider publishes them as the typed \
+                                      `MsrThermalStatusReadout` fact. What does not \
+                                      exist yet is a thermal SURFACE that renders \
+                                      the real-time assertion, so the delivery \
+                                      stays OUTSIDE until one consumes the fact; \
+                                      the aggregate system-health deduction is not \
+                                      such a surface, and the feature's platform \
                                       binding stays the unprivileged \
                                       `telemetry.cpu.throttle` lane.",
             },

@@ -18,6 +18,10 @@ fn success_outcome_maps_to_real_per_node_rows() {
                 multiplier_min: Some(8.0),
                 multiplier_max: Some(58.0),
                 vcore_v: Some(1.219),
+                thermal_status: Some(true),
+                thermal_status_log: Some(false),
+                prochot_event: Some(false),
+                prochot_event_log: Some(false),
             },
             MsrPackageReading {
                 cpu: 1,
@@ -27,6 +31,10 @@ fn success_outcome_maps_to_real_per_node_rows() {
                 multiplier_min: None,
                 multiplier_max: None,
                 vcore_v: None,
+                thermal_status: None,
+                thermal_status_log: None,
+                prochot_event: None,
+                prochot_event_log: None,
             },
         ],
     });
@@ -39,6 +47,14 @@ fn success_outcome_maps_to_real_per_node_rows() {
     // A register the CPU does not implement stays typed-absent, never zero.
     assert_eq!(snapshot.packages[1].temperature_c, None);
     assert_eq!(snapshot.packages[1].vcore_v, None);
+    // The real-time thermal-status group is carried on the same snapshot: a
+    // readable register is a verified state, an unreadable one stays absent.
+    assert_eq!(snapshot.thermal.len(), 2);
+    assert_eq!(snapshot.thermal[0].cpu, 0);
+    assert_eq!(snapshot.thermal[0].thermal_status, Some(true));
+    assert_eq!(snapshot.thermal[0].prochot_event_log, Some(false));
+    assert_eq!(snapshot.thermal[1].thermal_status, None);
+    assert_eq!(snapshot.thermal[1].prochot_event, None);
 }
 
 #[test]

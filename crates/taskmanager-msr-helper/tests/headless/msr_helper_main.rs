@@ -37,6 +37,10 @@ fn success_payload_serializes_with_packages_and_no_status() {
         multiplier_min: Some(8.0),
         multiplier_max: Some(55.0),
         vcore_v: None,
+        thermal_status: None,
+        thermal_status_log: None,
+        prochot_event: None,
+        prochot_event_log: None,
     };
     let envelope = SuccessEnvelope {
         schema: SCHEMA_VERSION,

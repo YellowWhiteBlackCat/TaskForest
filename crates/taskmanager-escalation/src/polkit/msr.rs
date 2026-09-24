@@ -11,11 +11,17 @@
 //!                        "multiplier":<f32 finite|null>,
 //!                        "multiplier_min":<f32 finite|null>,
 //!                        "multiplier_max":<f32 finite|null>,
-//!                        "vcore_v":<f32 finite|null>}]}
+//!                        "vcore_v":<f32 finite|null>,
+//!                        "thermal_status":<bool|null>,
+//!                        "thermal_status_log":<bool|null>,
+//!                        "prochot_event":<bool|null>,
+//!                        "prochot_event_log":<bool|null>}]}
 //! ERROR:   {"status":"error","kind":"permission_denied"|"no_msr"|"open_failed"|"read_failed",
 //!           "detail":"<string>"}
 //! ```
-//! A SUCCESS object has NO `status`; an ERROR object has NO `packages`.
+//! A SUCCESS object has NO `status`; an ERROR object has NO `packages`. The
+//! four `IA32_THERM_STATUS` (0x19C) bits are `null` together when the register
+//! is unimplemented/unreadable — never a fabricated clear state.
 
 #![forbid(unsafe_code)]
 
@@ -60,6 +66,17 @@ pub struct MsrPackageReading {
     pub multiplier_max: Option<f32>,
     /// P-state core voltage in volts.
     pub vcore_v: Option<f32>,
+    /// `IA32_THERM_STATUS` (0x19C) bit 0 — the processor is currently at or
+    /// above its thermal threshold (the real-time thermal-status / PROCHOT
+    /// assertion). `None` when the register is unimplemented/unreadable, and
+    /// always `None` on AMD (no 0x19C path).
+    pub thermal_status: Option<bool>,
+    /// `0x19C` bit 1 — sticky thermal-status log.
+    pub thermal_status_log: Option<bool>,
+    /// `0x19C` bit 2 — a PROCHOT# or FORCEPR# event has been observed.
+    pub prochot_event: Option<bool>,
+    /// `0x19C` bit 3 — sticky PROCHOT#/FORCEPR# event log.
+    pub prochot_event_log: Option<bool>,
 }
 
 /// The typed SUCCESS payload: the per-node readout rows, sorted by CPU index.
@@ -190,6 +207,10 @@ fn parse_success(json: &Json) -> Option<MsrReadoutSuccess> {
             multiplier_min: optional_finite_field(entry, "multiplier_min", MAX_PLAUSIBLE_RATIO)?,
             multiplier_max: optional_finite_field(entry, "multiplier_max", MAX_PLAUSIBLE_RATIO)?,
             vcore_v: optional_finite_field(entry, "vcore_v", MAX_PLAUSIBLE_VOLTS)?,
+            thermal_status: optional_bool_field(entry, "thermal_status")?,
+            thermal_status_log: optional_bool_field(entry, "thermal_status_log")?,
+            prochot_event: optional_bool_field(entry, "prochot_event")?,
+            prochot_event_log: optional_bool_field(entry, "prochot_event_log")?,
         });
     }
     Some(MsrReadoutSuccess { schema, packages })
@@ -208,6 +229,18 @@ fn optional_finite_field(json: &Json, key: &str, ceiling: f64) -> Option<Option<
             }
             Some(Some(value as f32))
         }
+        _ => None,
+    }
+}
+
+/// Read one optional boolean field: the key must be present and its value is
+/// either JSON `null` (honest absence — the register is unimplemented or
+/// unreadable) or a JSON boolean. The outer `None` is a contract violation;
+/// there is no fabricated `false`.
+fn optional_bool_field(json: &Json, key: &str) -> Option<Option<bool>> {
+    match json.get(key)? {
+        Json::Null => Some(None),
+        Json::Bool(value) => Some(Some(*value)),
         _ => None,
     }
 }

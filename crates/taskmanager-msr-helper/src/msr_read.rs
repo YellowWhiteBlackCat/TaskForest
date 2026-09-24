@@ -15,7 +15,7 @@
 //! `/dev/cpu/<N>/msr` with a bare number name), sorts by `N`, caps at
 //! [`MAX_CPU_NODES`], reads the CPUID identity leaves from the FIRST node's
 //! `cpuid` file, then reads per node the register set selected by the CPUID
-//! family gate: the five Intel registers below, or the AMD P-state block of
+//! family gate: the six Intel registers below, or the AMD P-state block of
 //! ADR-049 (family 0x17–0x19), and decodes them through the pure functions
 //! of this module.
 //!
@@ -29,7 +29,11 @@
 //!   bits 47:32 ÷ 2^13 volts — P-state core voltage (0 = not populated);
 //! * `MSR_TEMPERATURE_TARGET` 0x1A2 bits 23:16 — TjMax (0 = not populated);
 //! * `IA32_PACKAGE_THERM_STATUS` 0x1B1 bits 23:16 — package digital readout,
-//!   valid only when bit 31 is set; temperature = TjMax − readout.
+//!   valid only when bit 31 is set; temperature = TjMax − readout;
+//! * `IA32_THERM_STATUS` 0x19C bits 3:0 — the real-time thermal-status group
+//!   (bit 0 Thermal Status = at/above threshold, bit 1 its log, bit 2
+//!   PROCHOT#/FORCEPR# Event, bit 3 its log). The register is unimplemented on
+//!   some CPUs and unreadable on others; the whole group then stays `null`.
 //!
 //! Verified AMD semantics (AMD PPR family 17h, BKDG family 15h p.50,
 //! libcpuid `rdtsc.c` = CPU-X's engine; ADR-049 records the sources and the
@@ -83,6 +87,11 @@ const MSR_TEMPERATURE_TARGET: u64 = 0x1A2;
 /// `IA32_PACKAGE_THERM_STATUS` — package digital readout in bits 23:16,
 /// readout-valid bit 31.
 const MSR_IA32_PACKAGE_THERM_STATUS: u64 = 0x1B1;
+/// `IA32_THERM_STATUS` — per-core real-time thermal-status bits: bit 0 Thermal
+/// Status, bit 1 Thermal Status Log, bit 2 PROCHOT#/FORCEPR# Event, bit 3
+/// PROCHOT#/FORCEPR# Log (Intel SDM Vol. 4). The Linux-only PROCHOT read path
+/// (ADR-048/023 Boundary 2); no AMD equivalent is read (ADR-049).
+const MSR_IA32_THERM_STATUS: u64 = 0x19C;
 
 /// `MSR_PSTATE_S` — CurPstate in bits 2:0 (AMD PPR family 17h).
 const MSR_PSTATE_STATUS: u64 = 0xC0010063;
@@ -159,7 +168,7 @@ pub struct ReadError {
     pub detail: String,
 }
 
-/// The five raw Intel register words of one node. `None` = the register
+/// The six raw Intel register words of one node. `None` = the register
 /// returned no data (not implemented on this CPU) — an honest absence, not a
 /// zero.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -169,6 +178,8 @@ pub struct RawRegisters {
     pub perf_status: Option<u64>,
     pub temperature_target: Option<u64>,
     pub package_therm_status: Option<u64>,
+    /// `IA32_THERM_STATUS` (0x19C) — the real-time thermal-status bits.
+    pub therm_status: Option<u64>,
     /// `MSR_PSTATE_S` (0xC0010063) — the AMD current-P-state selector.
     pub pstate_status: Option<u64>,
     /// The AMD P-state block 0xC0010064..0xC001006B, lowest index first
@@ -296,6 +307,7 @@ fn read_node(msr_path: &Path, amd: bool) -> Result<Option<RawRegisters>, ReadErr
         perf_status: read(MSR_IA32_PERF_STATUS)?,
         temperature_target: read(MSR_TEMPERATURE_TARGET)?,
         package_therm_status: read(MSR_IA32_PACKAGE_THERM_STATUS)?,
+        therm_status: read(MSR_IA32_THERM_STATUS)?,
         ..RawRegisters::default()
     }))
 }
@@ -400,8 +412,15 @@ pub fn decode_reading(cpu: u32, raw: &RawRegisters, identity: &CpuIdentity) -> P
             multiplier_min: decode_amd_multiplier_min(&raw.pstates),
             multiplier_max: decode_amd_multiplier_max(&raw.pstates),
             vcore_v: decode_amd_vcore_v(raw.pstate_status, &raw.pstates),
+            // No 0x19C thermal-status path is read on AMD (ADR-049): the whole
+            // group stays an honest null, never a fabricated clear state.
+            thermal_status: None,
+            thermal_status_log: None,
+            prochot_event: None,
+            prochot_event_log: None,
         }
     } else {
+        let thermal = decode_therm_status(raw.therm_status);
         PackageReadingJson {
             cpu,
             bclk_mhz: identity.bclk_mhz,
@@ -410,8 +429,42 @@ pub fn decode_reading(cpu: u32, raw: &RawRegisters, identity: &CpuIdentity) -> P
             multiplier_min: decode_multiplier_min(raw.platform_info),
             multiplier_max: decode_multiplier_max(raw.turbo_ratio_limit),
             vcore_v: decode_vcore_v(raw.perf_status),
+            thermal_status: thermal.map(|bits| bits.thermal_status),
+            thermal_status_log: thermal.map(|bits| bits.thermal_status_log),
+            prochot_event: thermal.map(|bits| bits.prochot_event),
+            prochot_event_log: thermal.map(|bits| bits.prochot_event_log),
         }
     }
+}
+
+/// The four real-time thermal-status bits of `IA32_THERM_STATUS` (0x19C),
+/// named per the Intel SDM. Produced only when the register was readable; an
+/// unreadable register is a typed absence, never a fabricated clear state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThermalStatusBits {
+    /// Bit 0 — the processor is currently at or above its thermal threshold
+    /// (the real-time thermal-status / PROCHOT assertion).
+    pub thermal_status: bool,
+    /// Bit 1 — sticky log of a thermal-status assertion.
+    pub thermal_status_log: bool,
+    /// Bit 2 — a PROCHOT# or FORCEPR# event has been observed.
+    pub prochot_event: bool,
+    /// Bit 3 — sticky log of the PROCHOT#/FORCEPR# event.
+    pub prochot_event_log: bool,
+}
+
+/// Decode the bits 3:0 thermal-status group of `IA32_THERM_STATUS` (0x19C).
+/// `None` when the register returned no data (unimplemented on this CPU or
+/// unreadable): the row's thermal fields then stay `null`.
+pub fn decode_therm_status(register: Option<u64>) -> Option<ThermalStatusBits> {
+    let register = register?;
+    let asserted = |index: u32| register & (1 << index) != 0;
+    Some(ThermalStatusBits {
+        thermal_status: asserted(0),
+        thermal_status_log: asserted(1),
+        prochot_event: asserted(2),
+        prochot_event_log: asserted(3),
+    })
 }
 
 /// CPUID display family from leaf 1 EAX: base family bits 11:8, extended

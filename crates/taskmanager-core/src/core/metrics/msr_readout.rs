@@ -5,7 +5,9 @@
 //! by the privileged MSR helper (ADR-023/048, permission-model Boundary 2),
 //! which reads the root-only `/dev/cpu/N/msr` registers once per request.
 //! Every register field the CPU does not implement stays `None` — a typed
-//! absence, never a fabricated zero.
+//! absence, never a fabricated zero. The same rule carries the
+//! [`MsrThermalStatusReadout`] bits decoded from `IA32_THERM_STATUS` (0x19C):
+//! an unreadable register is an absent bit, never a fabricated clear state.
 
 use serde::{Deserialize, Serialize};
 
@@ -38,12 +40,50 @@ pub struct MsrPackageReadout {
     pub vcore_v: Option<f32>,
 }
 
+/// One CPU node's real-time thermal-status readout, decoded from
+/// `IA32_THERM_STATUS` (MSR `0x19C`) by the privileged helper.
+///
+/// Every bit is an `Option<bool>`: `None` when the register is unimplemented
+/// on the CPU or was unreadable — a typed absence, never a fabricated clear
+/// (`false`) state. This is the typed fact behind the thermal feature's
+/// real-time PROCHOT assertion; it stays on the privileged `telemetry.cpu.msr`
+/// lane (ADR-023/048 Boundary 2), never on the unprivileged counter lane.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct MsrThermalStatusReadout {
+    /// The numeric suffix `N` of the `/dev/cpu/N` node.
+    pub cpu: u32,
+    /// Bit 0 — the processor is currently at or above its thermal threshold
+    /// (the real-time thermal-status / PROCHOT assertion).
+    pub thermal_status: Option<bool>,
+    /// Bit 1 — sticky log of a thermal-status assertion.
+    pub thermal_status_log: Option<bool>,
+    /// Bit 2 — a PROCHOT# or FORCEPR# event has been observed.
+    pub prochot_event: Option<bool>,
+    /// Bit 3 — sticky log of the PROCHOT#/FORCEPR# event.
+    pub prochot_event_log: Option<bool>,
+}
+
+impl MsrThermalStatusReadout {
+    /// True only when bit 0 is a verified assertion; an absent or clear bit is
+    /// not a throttle claim.
+    #[must_use]
+    pub const fn is_throttled(&self) -> bool {
+        matches!(self.thermal_status, Some(true))
+    }
+}
+
 /// The answer to one MSR-readout request.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct MsrReadoutSnapshot {
     /// The per-node readouts, sorted by node index.
     pub packages: Vec<MsrPackageReadout>,
     pub failure: Option<MsrReadoutFailure>,
+    /// The per-node real-time thermal-status readouts (`IA32_THERM_STATUS`),
+    /// sorted by node index and aligned with the same node set as `packages`.
+    /// Empty when the host/CPU exposes none; a node with an unimplemented or
+    /// unreadable register still carries a row whose bits are `None`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thermal: Vec<MsrThermalStatusReadout>,
 }
 
 impl MsrReadoutSnapshot {
@@ -53,7 +93,17 @@ impl MsrReadoutSnapshot {
         Self {
             packages,
             failure: None,
+            thermal: Vec::new(),
         }
+    }
+
+    /// Attach the per-node real-time thermal-status readouts. Kept as a builder
+    /// step so the package rows and the thermal rows stay one fact on one
+    /// snapshot.
+    #[must_use]
+    pub fn with_thermal(mut self, thermal: Vec<MsrThermalStatusReadout>) -> Self {
+        self.thermal = thermal;
+        self
     }
 
     /// Failed read: a typed reason, never a fabricated register value.
@@ -65,6 +115,7 @@ impl MsrReadoutSnapshot {
                 kind,
                 detail: detail.into(),
             }),
+            thermal: Vec::new(),
         }
     }
 
