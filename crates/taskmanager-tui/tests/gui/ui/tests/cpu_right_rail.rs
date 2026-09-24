@@ -359,6 +359,11 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
 fn real_time_thermal_status_paints_with_honest_absence() {
     let mut app = cpu_app();
 
+    // The demo bootstrap now seeds a synthetic readout through the request
+    // session; close it to reach the honest-absence branch the privileged
+    // lane shows before it ever runs (the fold is `None`, so no row).
+    app.shell.close_msr_readout_request();
+
     // No accepted MSR readout: the real-time row is absent.
     app.scroll_cpu_details(isize::MAX);
     let cold = frame_text(&app, 120, 48);

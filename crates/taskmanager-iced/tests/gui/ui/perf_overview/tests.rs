@@ -486,6 +486,10 @@ mod cpu_throttle_tests {
     fn cpu_stats_render_the_real_time_thermal_status_with_honest_absence() {
         pin_english();
         let mut app = crate::IcedApp::demo();
+        // The demo bootstrap now seeds a synthetic readout through the request
+        // session; close it to reach the honest-absence branch the privileged
+        // lane shows before it ever runs (the fold is `None`, so no row).
+        app.shell.close_msr_readout_request();
         let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
         assert!(
             thermal_status_row(&stats).is_none(),
