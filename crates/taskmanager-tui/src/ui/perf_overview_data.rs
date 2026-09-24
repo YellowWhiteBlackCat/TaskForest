@@ -102,8 +102,11 @@ pub(super) fn cpu_live_rail_rows(
     if let Some(pressure) = snapshot.pressure.as_ref()
         && let Some(cpu_pressure) = pressure.cpu.current_value()
     {
+        // The shared value already names both PSI windows ("some … · full …"),
+        // so the label stays the plain stall term: appending "(some)" printed
+        // the same token twice in one row.
         rows.push(CpuRailRow {
-            label: format!("{} (some)", t("perf.stall")),
+            label: t("perf.stall").to_owned(),
             value: pressure_summary(cpu_pressure),
         });
     }
