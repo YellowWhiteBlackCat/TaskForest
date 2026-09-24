@@ -767,45 +767,31 @@ fn text_input_clear_actions() {
 }
 
 #[test]
-fn text_input_paste_and_clipboard() {
+fn search_editor_binds_no_clipboard_chords() {
+    // TextSelection is declared `Unsupported`: no system-clipboard read/write
+    // is wired, so the search editor binds no clipboard chords. Ctrl+C/X/V
+    // must leave the shell-owned query untouched rather than edit a private
+    // buffer that never reaches the OS clipboard.
     let mut app = input_app(shell_with_selection());
     app.update();
     app.update();
 
     press_ctrl(&mut app, KeyCode::KeyF, None);
+    for ch in ["c", "l", "i", "p"] {
+        press_key(&mut app, KeyCode::KeyA, Some(ch));
+    }
+    assert_eq!(query_of(&app), "clip");
 
-    // Set clipboard buffer directly
-    app.world_mut()
-        .resource_mut::<super::TextInputState>()
-        .clipboard = "pasted_term".to_owned();
-
-    // Ctrl+V pastes
-    press_ctrl(&mut app, KeyCode::KeyV, None);
-    assert_eq!(query_of(&app), "pasted_term");
-    assert_eq!(cursor_of(&app), 11);
-
-    // Ctrl+C copies query to clipboard
-    app.world_mut()
-        .resource_mut::<super::TextInputState>()
-        .clipboard
-        .clear();
     press_ctrl(&mut app, KeyCode::KeyC, None);
-    assert_eq!(
-        app.world().resource::<super::TextInputState>().clipboard,
-        "pasted_term"
-    );
-
-    // Ctrl+X cuts query to clipboard
+    assert_eq!(query_of(&app), "clip", "Ctrl+C must not mutate the query");
     press_ctrl(&mut app, KeyCode::KeyX, None);
-    assert_eq!(query_of(&app), "");
-    assert_eq!(
-        app.world().resource::<super::TextInputState>().clipboard,
-        "pasted_term"
-    );
-
-    // Ctrl+V pastes it back
+    assert_eq!(query_of(&app), "clip", "Ctrl+X must not cut the query");
     press_ctrl(&mut app, KeyCode::KeyV, None);
-    assert_eq!(query_of(&app), "pasted_term");
+    assert_eq!(
+        query_of(&app),
+        "clip",
+        "Ctrl+V must not paste from any private buffer"
+    );
 }
 
 #[test]
@@ -813,8 +799,7 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
     // TextSelection is declared `Unsupported`: read-out text nodes are not
     // selectable, and Ctrl+C has no row/summary clipboard route. The shared
     // row-summary seam itself is available (other shapes write it to the OS
-    // clipboard); this shape leaves it untouched — and does not even reach
-    // the shell-owned editor buffer while search is closed.
+    // clipboard); this shape leaves it untouched.
     let shell = shell_with_selection();
     assert!(
         shell.selected_row_summary().is_some(),
@@ -827,11 +812,6 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
     app.update();
     app.update();
 
-    let buffer_before = app
-        .world()
-        .resource::<super::TextInputState>()
-        .clipboard
-        .clone();
     press_ctrl(&mut app, KeyCode::KeyC, None);
 
     let shell = &app.world().non_send::<FrontendTrack>().shell;
@@ -849,11 +829,6 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
         feedback_before,
         "Ctrl+C must not repaint the feedback line"
     );
-    assert_eq!(
-        app.world().resource::<super::TextInputState>().clipboard,
-        buffer_before,
-        "with search closed, Ctrl+C must not touch the editor buffer either"
-    );
 }
 
 #[test]
@@ -863,10 +838,10 @@ fn text_input_word_navigation_and_deletion() {
     app.update();
 
     press_ctrl(&mut app, KeyCode::KeyF, None);
-    app.world_mut()
-        .resource_mut::<super::TextInputState>()
-        .clipboard = "first second third".to_owned();
-    press_ctrl(&mut app, KeyCode::KeyV, None);
+    for ch in "first second third".chars() {
+        let text = ch.to_string();
+        press_key(&mut app, KeyCode::KeyA, Some(&text));
+    }
 
     assert_eq!(query_of(&app), "first second third");
     assert_eq!(cursor_of(&app), 18);

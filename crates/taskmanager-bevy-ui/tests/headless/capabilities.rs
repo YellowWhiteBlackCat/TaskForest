@@ -258,8 +258,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (Toast, Kind::Divergent),
         (TextInput, Kind::Divergent),
         (SearchInput, Kind::Ported),
-        // No selection surface at all; the editor buffer never leaves the
-        // process (no system-clipboard write).
+        // No selection surface at all; no system-clipboard read/write is
+        // wired and the search editor binds no clipboard chords.
         (TextSelection, Kind::Unsupported),
         // Boolean rows ride the official Checkbox.
         (Switch, Kind::Divergent),

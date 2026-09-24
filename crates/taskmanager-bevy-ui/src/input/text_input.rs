@@ -2,15 +2,17 @@
 
 use bevy::prelude::Resource;
 
-/// State for text input editing (cursor position, selection, clipboard buffer).
+/// State for text input editing (cursor position and selection anchor).
+///
+/// The shape owns no clipboard buffer: no system-clipboard read or write is
+/// wired, so the editor offers character editing only and binds no clipboard
+/// chords.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct TextInputState {
     /// Cursor character index (0..=text_len).
     pub(crate) cursor: usize,
     /// Selection anchor character index if a range is selected.
     pub(crate) selection_anchor: Option<usize>,
-    /// Clipboard content for paste operations.
-    pub(crate) clipboard: String,
 }
 
 impl TextInputState {
@@ -92,18 +94,6 @@ impl TextInputState {
         self.selection_anchor = None;
     }
 
-    /// Insert a string at the current cursor position.
-    pub(crate) fn insert_str(&mut self, text: &mut String, s: &str) {
-        let current = self.cursor_pos(text);
-        let mut chars: Vec<char> = text.chars().collect();
-        for (i, ch) in s.chars().enumerate() {
-            chars.insert(current + i, ch);
-        }
-        self.cursor = current + s.chars().count();
-        self.selection_anchor = None;
-        *text = chars.into_iter().collect();
-    }
-
     /// Delete character before cursor (Backspace).
     pub(crate) fn delete_backward(&mut self, text: &mut String) -> bool {
         let current = self.cursor_pos(text);
@@ -155,24 +145,5 @@ impl TextInputState {
         text.clear();
         self.cursor = 0;
         self.selection_anchor = None;
-    }
-
-    /// Copy current text to clipboard.
-    pub(crate) fn copy_to_clipboard(&mut self, text: &str) {
-        self.clipboard = text.to_owned();
-    }
-
-    /// Cut current text to clipboard.
-    pub(crate) fn cut_to_clipboard(&mut self, text: &mut String) {
-        self.clipboard = text.clone();
-        self.clear_line(text);
-    }
-
-    /// Paste from clipboard at cursor position.
-    pub(crate) fn paste_from_clipboard(&mut self, text: &mut String) {
-        let clip = self.clipboard.clone();
-        if !clip.is_empty() {
-            self.insert_str(text, &clip);
-        }
     }
 }
