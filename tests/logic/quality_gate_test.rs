@@ -197,6 +197,221 @@ fn every_i18n_t_callsite_literal_exists_in_the_catalog() {
     );
 }
 
+/// Enumerate every variant of a fieldless enum that has no owner-provided
+/// `ALL`/`variants`/`iter`. The `match` inside the helper has **no wildcard
+/// arm**, so adding a variant to `$ty` is a compile error here until it is named
+/// in the invocation — the guard cannot silently stop covering a variant.
+/// `PriorityTier` and `CommandId` expose an owner `ALL` and are iterated through
+/// that list instead (see [`dynamic_key_producers`]).
+macro_rules! enumerate_variants {
+    ($ty:ty; $($variant:path),+ $(,)?) => {{
+        let exhaustive = |value: $ty| match value {
+            $($variant => {}),+
+        };
+        [$({
+            exhaustive($variant);
+            $variant
+        }),+]
+    }};
+}
+
+/// Every dynamic key producer reachable from this gate host: a helper that
+/// returns a locale-catalog key from a typed input and is invoked as
+/// `t(helper(input))` somewhere in a product. The literal gate above only sees
+/// `t("...")`; a key these helpers emit is invisible to it, so removing that key
+/// from a catalog would silently degrade the rendered string to the raw key.
+///
+/// Enumeration uses the owner's own list where one exists (`PriorityTier::ALL`,
+/// `CommandId::ALL`); otherwise [`enumerate_variants`] pins the variant set with
+/// an exhaustive match, so a new variant is either covered automatically or
+/// fails to compile.
+///
+/// Frontend-local helpers (`DecorationOutcomeNotice::i18n_key` in gpui, iced's
+/// `device_label_key`, …) are not reachable from this host and stay uncovered;
+/// see the guard's report for that residual gap.
+fn dynamic_key_producers() -> Vec<(&'static str, Vec<&'static str>)> {
+    use taskmanager_application::CommandId;
+    use taskmanager_core::core::{
+        DeviceStatus, PriorityTier, ProcessAnomalyKind, SmartAvailability, StartupImpact,
+    };
+    use taskmanager_shell::presentation::{
+        device_action_i18n_key, device_status_i18n_key, smart_availability_i18n_key,
+    };
+
+    let device_statuses = enumerate_variants!(
+        DeviceStatus;
+        DeviceStatus::Healthy,
+        DeviceStatus::Stale,
+        DeviceStatus::PermissionDenied,
+        DeviceStatus::MissingTool,
+        DeviceStatus::Unsupported,
+    );
+
+    vec![
+        (
+            "PriorityTier::i18n_key (via PriorityTier::ALL)",
+            PriorityTier::ALL
+                .iter()
+                .map(|tier| tier.i18n_key())
+                .collect(),
+        ),
+        (
+            "ProcessAnomalyKind::i18n_key",
+            enumerate_variants!(
+                ProcessAnomalyKind;
+                ProcessAnomalyKind::ZombieStorm,
+                ProcessAnomalyKind::FileDescriptorPressure,
+                ProcessAnomalyKind::MonotonicMemoryGrowth,
+            )
+            .iter()
+            .map(|kind| kind.i18n_key())
+            .collect(),
+        ),
+        (
+            "StartupImpact::i18n_key",
+            enumerate_variants!(
+                StartupImpact;
+                StartupImpact::High,
+                StartupImpact::Medium,
+                StartupImpact::Low,
+                StartupImpact::None,
+            )
+            .iter()
+            .map(|impact| impact.i18n_key())
+            .collect(),
+        ),
+        (
+            "CommandId::label_key (via CommandId::ALL)",
+            CommandId::ALL.iter().map(|id| id.label_key()).collect(),
+        ),
+        (
+            "CommandId::description_key (via CommandId::ALL)",
+            CommandId::ALL
+                .iter()
+                .map(|id| id.description_key())
+                .collect(),
+        ),
+        (
+            "device_status_i18n_key",
+            device_statuses
+                .iter()
+                .map(|status| device_status_i18n_key(*status))
+                .collect(),
+        ),
+        (
+            "device_action_i18n_key",
+            device_statuses
+                .iter()
+                .map(|status| device_action_i18n_key(*status))
+                .collect(),
+        ),
+        (
+            "smart_availability_i18n_key",
+            enumerate_variants!(
+                SmartAvailability;
+                SmartAvailability::Available,
+                SmartAvailability::Unsupported,
+                SmartAvailability::Unavailable,
+                SmartAvailability::MissingTool,
+                SmartAvailability::PermissionDenied,
+            )
+            .iter()
+            .map(|availability| smart_availability_i18n_key(*availability))
+            .collect(),
+        ),
+    ]
+}
+
+/// Check every [`dynamic_key_producers`] key against both catalogs, and require
+/// each producer's outputs to be distinct (all of these helpers are total over
+/// their typed input). Returns one diagnostic per violation so a failure names
+/// the exact helper and key.
+fn missing_dynamic_i18n_keys(
+    en: &serde_json::Map<String, serde_json::Value>,
+    zh: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    for (helper, keys) in dynamic_key_producers() {
+        let mut seen = BTreeSet::new();
+        for key in keys {
+            if !en.contains_key(key) {
+                failures.push(format!(
+                    "{helper} produces {key:?} absent from locales/en.json"
+                ));
+            }
+            if !zh.contains_key(key) {
+                failures.push(format!(
+                    "{helper} produces {key:?} absent from locales/zh.json"
+                ));
+            }
+            if !seen.insert(key) {
+                failures.push(format!("{helper} produces duplicate key {key:?}"));
+            }
+        }
+    }
+    failures
+}
+
+/// A dynamic call site (`t(device_status_i18n_key(status))`) resolves a key the
+/// literal gate above cannot see. This guard iterates every typed input of every
+/// reachable dynamic key producer and asserts each emitted key is present in
+/// **both** catalogs, so a whole-key removal can no longer silently degrade the
+/// rendered string to the raw key.
+#[test]
+fn every_dynamic_i18n_key_producer_resolves_in_both_catalogs() {
+    let en = locale_messages(include_str!("../../locales/en.json"));
+    let zh = locale_messages(include_str!("../../locales/zh.json"));
+    let failures = missing_dynamic_i18n_keys(&en, &zh);
+    assert!(
+        failures.is_empty(),
+        "a dynamic t(...) key producer emits a key absent from a catalog (or a \
+         duplicate), so removing that key would silently render the raw key:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Negative proof the check above is not vacuous: prune one key the guard knows
+/// is produced from a scratch copy of each catalog (the committed catalogs are
+/// never touched) and confirm the check reports the missing key on that side.
+#[test]
+fn dynamic_i18n_key_check_reports_a_pruned_catalog() {
+    let pruned_key = "device.healthy";
+    assert!(
+        dynamic_key_producers()
+            .iter()
+            .any(|(_, keys)| keys.contains(&pruned_key)),
+        "fixture key {pruned_key:?} must be one the guard actually produces"
+    );
+
+    let mut en = locale_messages(include_str!("../../locales/en.json"));
+    let zh = locale_messages(include_str!("../../locales/zh.json"));
+    assert!(
+        en.remove(pruned_key).is_some(),
+        "en fixture key {pruned_key:?} must exist before pruning"
+    );
+    let failures = missing_dynamic_i18n_keys(&en, &zh);
+    assert!(
+        failures
+            .iter()
+            .any(|failure| failure.contains(pruned_key) && failure.contains("locales/en.json")),
+        "pruning {pruned_key:?} from en must be reported, got: {failures:?}"
+    );
+
+    let en = locale_messages(include_str!("../../locales/en.json"));
+    let mut zh = locale_messages(include_str!("../../locales/zh.json"));
+    assert!(
+        zh.remove(pruned_key).is_some(),
+        "zh fixture key {pruned_key:?} must exist before pruning"
+    );
+    let failures = missing_dynamic_i18n_keys(&en, &zh);
+    assert!(
+        failures
+            .iter()
+            .any(|failure| failure.contains(pruned_key) && failure.contains("locales/zh.json")),
+        "pruning {pruned_key:?} from zh must be reported, got: {failures:?}"
+    );
+}
+
 #[test]
 fn github_actions_release_gate_runs_on_push_pull_request_and_dispatch() {
     let workflow = include_str!("../../.github/workflows/ci.yml");
