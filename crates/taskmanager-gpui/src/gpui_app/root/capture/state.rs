@@ -153,6 +153,10 @@ pub(crate) struct CaptureEvidence {
     /// Capture-only handoff for deterministic alert events. The fixture is
     /// installed into the shared shell authority before the panel is shown.
     pub(super) event_history_fixture: Option<Vec<AlertEvent>>,
+    /// Capture-only: the synthetic real-time thermal-status readout has been
+    /// seeded into the direct track exactly once. This is fixture data for the
+    /// evidence frame, never a live privileged read.
+    pub(super) msr_readout_seeded: bool,
     /// Capture-only state machine that waits for two rendered frames before
     /// submitting the current-window provider request, then becomes terminal.
     pub(super) window_capture_schedule: WindowCaptureSchedule,

@@ -24,10 +24,13 @@ use super::{
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
 use crate::gpui_app::process_insights::ProcessInsightsState;
+use taskmanager_application::i18n;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 use taskmanager_core::core::startup::{StartupImpactEvidence, StartupImpactUnknownReason};
 use taskmanager_core::core::{ScalarObservation, SmartAvailability};
+use taskmanager_shell::DirectTrackState;
+use taskmanager_shell::presentation::msr_thermal_status_segments;
 
 impl CaptureEvidence {
     pub(super) fn for_test(scenario: Option<CaptureScenario>) -> Self {
@@ -895,4 +898,36 @@ fn system_npu_capture_waits_for_fixture_layout_and_visible_scroll_before_marker(
     evidence.mark_system_npu_scroll_applied(true);
     assert!(evidence.scenario_ready());
     assert!(!evidence.system_npu_layout_requested());
+}
+
+/// The capture-evidence route runs the production shell, where the privileged
+/// `telemetry.cpu.msr` lane cannot produce a readout on the disposable capture
+/// host. The capture hook must seed the same synthetic readout the demo
+/// builders use — exactly once, and only while capture evidence is enabled —
+/// so the receipt shows the real-time thermal-status row and the live path
+/// never does.
+#[test]
+fn capture_seeds_the_synthetic_thermal_status_readout_once() {
+    i18n::set_language(i18n::Language::En);
+    let mut evidence = CaptureEvidence::for_test(None);
+    let mut shell = DirectTrackState::default();
+    assert!(
+        evidence.seed_msr_readout(&mut shell),
+        "the capture hook must seed the synthetic readout"
+    );
+    assert_eq!(
+        msr_thermal_status_segments(shell.msr_readout_state()),
+        vec!["CPU 0 Asserted", "CPU 1 —"],
+        "the capture receipt must fold the same synthetic readout as the demo"
+    );
+    assert!(
+        !evidence.seed_msr_readout(&mut shell),
+        "the capture hook must seed exactly once per session"
+    );
+
+    let mut live = CaptureEvidence::default();
+    assert!(
+        !live.seed_msr_readout(&mut shell),
+        "the production live path must never seed the fixture readout"
+    );
 }

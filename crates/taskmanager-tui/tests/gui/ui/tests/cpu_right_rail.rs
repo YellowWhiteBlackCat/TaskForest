@@ -22,7 +22,7 @@ use taskmanager_core::core::metrics::CpuPackageMetrics;
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{edit_hardware, edit_snapshot};
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
-use taskmanager_shell::presentation::msr_thermal_status_summary;
+use taskmanager_shell::presentation::msr_thermal_status_segments;
 
 fn cpu_app() -> crate::TuiApp {
     let mut app = crate::demo_app();
@@ -351,20 +351,23 @@ fn thermal_throttle_counters_paint_with_honest_absence() {
 }
 
 /// The real-time thermal-status / PROCHOT delivery: the CPU rail paints the
-/// shared [`taskmanager_shell::presentation::msr_thermal_status_summary`] fold
-/// beside the cumulative counters — the shared asserted/clear words and the
-/// honest dash for an unreadable register — and paints no row while the
-/// privileged `telemetry.cpu.msr` lane produced no accepted readout.
+/// shared [`taskmanager_shell::presentation::msr_thermal_status_segments`] fold
+/// beside the cumulative counters — one `Thermal status` row per node, each
+/// carrying a single `CPU {n} {state}` segment with the shared asserted/clear
+/// words and the honest dash for an unreadable register — and paints no row
+/// while the privileged `telemetry.cpu.msr` lane produced no accepted readout.
+/// The narrow value column paints one node per row so every state stays
+/// readable instead of clipping the joined summary.
 #[test]
 fn real_time_thermal_status_paints_with_honest_absence() {
     let mut app = cpu_app();
 
     // The demo bootstrap now seeds a synthetic readout through the request
     // session; close it to reach the honest-absence branch the privileged
-    // lane shows before it ever runs (the fold is `None`, so no row).
+    // lane shows before it ever runs (the fold is empty, so no row).
     app.shell.close_msr_readout_request();
 
-    // No accepted MSR readout: the real-time row is absent.
+    // No accepted MSR readout: the real-time rows are absent.
     app.scroll_cpu_details(isize::MAX);
     let cold = frame_text(&app, 120, 48);
     assert!(
@@ -379,30 +382,54 @@ fn real_time_thermal_status_paints_with_honest_absence() {
         .snapshot
         .clone()
         .expect("demo snapshot");
+    let segments = msr_thermal_status_segments(app.shell.msr_readout_state());
+    let expected = vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"];
+    assert_eq!(
+        segments, expected,
+        "the accepted readout must fold per node"
+    );
     let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(
         &snapshot.cpu,
         None,
         Some(app.shell.msr_readout_state()),
     );
-    let status = rows
+    let painted: Vec<String> = rows
         .iter()
-        .find(|row| row.label == t("cpu.thermal_status"))
-        .expect("an accepted readout must grow a real-time rail row");
-    let expected = msr_thermal_status_summary(app.shell.msr_readout_state())
-        .expect("an accepted readout must fold");
+        .filter(|row| row.label == t("cpu.thermal_status"))
+        .map(|row| row.value.clone())
+        .collect();
     assert_eq!(
-        status.value, expected,
-        "the rail row must paint the shared real-time status fold"
+        painted, expected,
+        "the rail must grow one unclipped shared segment row per node"
     );
     assert!(
-        expected.contains(t("cpu.thermal_status_asserted"))
-            && expected.contains(t("cpu.thermal_status_clear")),
-        "the fold must carry the shared asserted/clear vocabulary: {expected}"
+        painted.iter().all(|value| value.chars().count() <= 20),
+        "every painted segment must fit the rail's bounded value slot: {painted:?}"
     );
     assert!(
-        expected.contains("—"),
-        "an unreadable register must keep the honest dash: {expected}"
+        painted.iter().any(|value| value.contains("—")),
+        "an unreadable register must keep the honest dash: {painted:?}"
     );
+    assert!(
+        painted
+            .iter()
+            .any(|value| value.contains(t("cpu.thermal_status_asserted")))
+            && painted
+                .iter()
+                .any(|value| value.contains(t("cpu.thermal_status_clear"))),
+        "the segments must carry the shared asserted/clear vocabulary: {painted:?}"
+    );
+
+    // The real painted frame carries each node whole: the label and its
+    // segment share one rail line and the segment is never ellipsized.
+    app.scroll_cpu_details(isize::MAX);
+    let frame = frame_text(&app, 120, 48);
+    for segment in &expected {
+        assert!(
+            row_paints(&frame, t("cpu.thermal_status"), segment),
+            "the rail must paint {segment:?} unclipped beside its label:\n{frame}"
+        );
+    }
 }
 
 /// Seed the shared MSR session with an accepted readout carrying the given

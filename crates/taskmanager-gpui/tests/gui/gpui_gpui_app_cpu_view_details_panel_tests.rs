@@ -8,7 +8,7 @@ use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
-use taskmanager_shell::presentation::msr_thermal_status_summary;
+use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_test_support::pin_english;
 
 fn value_of(rows: &[(String, String)], key: &'static str) -> String {
@@ -16,6 +16,15 @@ fn value_of(rows: &[(String, String)], key: &'static str) -> String {
         .find(|(k, _)| k == i18n::t(key))
         .map(|(_, v)| v.clone())
         .unwrap_or_default()
+}
+
+/// Every value the spec list paints for one label, in row order. A per-node
+/// fact grows one row per node, so a single `find` would hide the tail.
+fn values_of(rows: &[(String, String)], key: &'static str) -> Vec<String> {
+    rows.iter()
+        .filter(|(k, _)| k == i18n::t(key))
+        .map(|(_, v)| v.clone())
+        .collect()
 }
 
 /// Absent facts do not consume a row in the fixed, non-scrolling detail rail.
@@ -26,7 +35,7 @@ fn cpu_spec_rows_omit_missing_facts() {
         &CpuMetrics::default(),
         &HardwareInfo::default(),
         UnitPreferences::default(),
-        None,
+        &[],
     );
     for key in ["cpu.base_speed", "common.sockets"] {
         assert_eq!(value_of(&rows, key), "", "{key} must be omitted");
@@ -71,7 +80,7 @@ fn cpu_spec_rows_emit_identity_rows_first_when_probed() {
         &CpuMetrics::default(),
         &hardware,
         UnitPreferences::default(),
-        None,
+        &[],
     );
     assert_eq!(rows[0].0, i18n::t("system.cpu_codename"));
     assert_eq!(rows[0].1, "Raptor Lake-S/HX (13th/14th gen)");
@@ -102,7 +111,7 @@ fn cpu_spec_rows_format_present_facts() {
         sockets: Some(1),
         ..HardwareInfo::default()
     };
-    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default(), None);
+    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default(), &[]);
     assert_eq!(value_of(&rows, "cpu.base_speed"), "2.40 GHz");
     assert_eq!(value_of(&rows, "common.sockets"), "1");
     assert_eq!(value_of(&rows, "common.cores"), "8");
@@ -130,7 +139,7 @@ fn cpu_spec_rows_emit_hybrid_rows_in_order() {
         },
         ..HardwareInfo::default()
     };
-    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default(), None);
+    let rows = cpu_spec_rows(&cpu, &hardware, UnitPreferences::default(), &[]);
     let expected_keys = [
         "cpu.performance_cores",
         "cpu.efficiency_cores",
@@ -153,7 +162,7 @@ fn missing_policy_rows_are_omitted_instead_of_dashed() {
         &CpuMetrics::default(),
         &HardwareInfo::default(),
         UnitPreferences::default(),
-        None,
+        &[],
     );
     for key in [
         "cpu.cpufreq_driver",
@@ -185,7 +194,7 @@ fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
     cold_package.package_throttle_count = None;
     cold_package.core_throttle_count = None;
     cpu.packages = vec![cold_package];
-    let rows = cpu_spec_rows(&cpu, &hardware, units, None);
+    let rows = cpu_spec_rows(&cpu, &hardware, units, &[]);
     assert_eq!(
         value_of(&rows, "cpu.thermal_throttle"),
         "",
@@ -199,7 +208,7 @@ fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
     package_only.package_throttle_count = Some(12);
     package_only.core_throttle_count = None;
     cpu.packages = vec![observed, package_only];
-    let rows = cpu_spec_rows(&cpu, &hardware, units, None);
+    let rows = cpu_spec_rows(&cpu, &hardware, units, &[]);
     let value = value_of(&rows, "cpu.thermal_throttle");
     let expected =
         cpu_thermal_throttle_summary(&cpu).expect("observed counters must produce the shared fold");
@@ -218,10 +227,12 @@ fn cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence() {
 }
 
 /// The real-time thermal-status / PROCHOT delivery: the spec list paints the
-/// shared [`taskmanager_shell::presentation::msr_thermal_status_summary`] fold
-/// beside the cumulative counters — one `CPU {n} {state}` segment per node
-/// with the shared asserted/clear words and the honest dash for an
-/// unreadable/unimplemented register. The whole row is absent while the
+/// shared [`taskmanager_shell::presentation::msr_thermal_status_segments`] fold
+/// beside the cumulative counters — one `Thermal status` row per node, each
+/// carrying a single `CPU {n} {state}` segment with the shared asserted/clear
+/// words and the honest dash for an unreadable/unimplemented register. One row
+/// per node keeps the value inside this panel's bounded slot instead of
+/// clipping the joined summary, and the whole row set is absent while the
 /// privileged `telemetry.cpu.msr` lane produced no accepted readout.
 #[test]
 fn cpu_spec_rows_render_the_real_time_thermal_status_with_honest_absence() {
@@ -230,16 +241,15 @@ fn cpu_spec_rows_render_the_real_time_thermal_status_with_honest_absence() {
     let hardware = HardwareInfo::default();
     let cpu = CpuMetrics::default();
 
-    // No accepted MSR readout: the real-time row is absent, not a dash slot.
-    let rows = cpu_spec_rows(&cpu, &hardware, units, None);
-    assert_eq!(
-        value_of(&rows, "cpu.thermal_status"),
-        "",
+    // No accepted MSR readout: the real-time rows are absent, not a dash slot.
+    let rows = cpu_spec_rows(&cpu, &hardware, units, &[]);
+    assert!(
+        values_of(&rows, "cpu.thermal_status").is_empty(),
         "an unrun privileged lane must not grow a real-time row"
     );
 
-    // A session with an accepted readout folds to the shared value: asserted,
-    // clear, and the honest dash for the unreadable register.
+    // A session with an accepted readout folds to one paintable segment per
+    // node: asserted, clear, and the honest dash for the unreadable register.
     let mut session = MsrReadoutSession::default();
     let attempt = session.begin_attempt();
     let request_id = RequestId::new(1).expect("fixture request id");
@@ -264,21 +274,33 @@ fn cpu_spec_rows_render_the_real_time_thermal_status_with_honest_absence() {
             },
         ]),
     ));
-    let expected =
-        msr_thermal_status_summary(session.state()).expect("an accepted readout must fold");
-    let rows = cpu_spec_rows(&cpu, &hardware, units, Some(&expected));
+    let segments = msr_thermal_status_segments(session.state());
+    let expected = vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"];
     assert_eq!(
-        value_of(&rows, "cpu.thermal_status"),
-        expected,
-        "the spec row must paint the shared real-time status fold"
+        segments, expected,
+        "the accepted readout must fold per node"
+    );
+    let rows = cpu_spec_rows(&cpu, &hardware, units, &segments);
+    let painted = values_of(&rows, "cpu.thermal_status");
+    assert_eq!(
+        painted, expected,
+        "the spec rows must paint one unclipped shared segment per node"
     );
     assert!(
-        expected.contains(i18n::t("cpu.thermal_status_asserted"))
-            && expected.contains(i18n::t("cpu.thermal_status_clear")),
-        "the fold must carry the shared asserted/clear vocabulary: {expected}"
+        painted.iter().all(|value| value.chars().count() <= 20),
+        "every painted segment must fit the panel's bounded value slot: {painted:?}"
     );
     assert!(
-        expected.contains(MISSING_VALUE),
-        "an unreadable register must keep the honest dash: {expected}"
+        painted.iter().any(|value| value.contains(MISSING_VALUE)),
+        "an unreadable register must keep the honest dash: {painted:?}"
+    );
+    assert!(
+        painted
+            .iter()
+            .any(|value| value.contains(i18n::t("cpu.thermal_status_asserted")))
+            && painted
+                .iter()
+                .any(|value| value.contains(i18n::t("cpu.thermal_status_clear"))),
+        "the segments must carry the shared asserted/clear vocabulary: {painted:?}"
     );
 }
