@@ -1067,3 +1067,68 @@ async fn status_filter_segmented_keyboard_moves_the_typed_bucket_and_rows(cx: &m
         "the frame after the Sleeping switch must paint the empty body"
     );
 }
+
+/// A host-fact policy (or the default hidden set) can hide the persisted active
+/// sort column. The rendered header then falls back to the first visible
+/// column, so the row projection must sort by that SAME effective column —
+/// otherwise the sort indicator and the row order disagree.
+#[gpui::test]
+async fn hidden_active_sort_column_sorts_rows_by_the_effective_visible_column(
+    cx: &mut TestAppContext,
+) {
+    let (win, view) = wrapped_root(cx);
+    view.update(cx, |v, cx| {
+        v.mark_telemetry_frame_ready();
+        v.page = TopPage::Apps;
+        // Threads is the active sort column but is hidden (default hidden set).
+        v.processes_state.hidden_cols.insert(SortCol::Threads);
+        v.set_process_sort(SortCol::Threads, SortDir::Desc);
+        // Name and Threads disagree, so the raw (Threads) and effective (Name)
+        // orders are distinguishable: Threads desc = aaa,bbb,ccc; Name desc =
+        // ccc,bbb,aaa.
+        v.replace_processes_for_test(vec![
+            ProcessItemFixtureBuilder::new()
+                .pid(1)
+                .name("aaa".into())
+                .current_threads(3)
+                .build(),
+            ProcessItemFixtureBuilder::new()
+                .pid(2)
+                .name("bbb".into())
+                .current_threads(2)
+                .build(),
+            ProcessItemFixtureBuilder::new()
+                .pid(3)
+                .name("ccc".into())
+                .current_threads(1)
+                .build(),
+        ]);
+        cx.notify();
+    });
+    draw(cx, win);
+    assert_eq!(
+        view.read_with(cx, |v, _| v.effective_process_sort().0),
+        SortCol::Name,
+        "a hidden active column must fall back to the first visible column"
+    );
+    view.update(cx, |v, _cx| {
+        let (rows, pids, _) = v.processes_projection();
+        let names: Vec<&str> = rows
+            .iter()
+            .filter(|row| row.process_identity.is_some())
+            .map(|row| row.name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            ["ccc", "bbb", "aaa"],
+            "rows must sort by the effective (Name) column, not the hidden Threads column"
+        );
+        assert_eq!(
+            pids.iter()
+                .map(|identity| identity.pid())
+                .collect::<Vec<_>>(),
+            vec![3, 2, 1],
+            "the cached identity order must follow the effective column too"
+        );
+    });
+}

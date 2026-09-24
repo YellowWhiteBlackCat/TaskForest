@@ -11,6 +11,7 @@
 
 use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
+use crate::gpui_app::processes_view::{effective_process_hidden_cols, effective_process_sort_col};
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::ProcessControlAvailability;
 use taskmanager_shell::{
@@ -30,6 +31,31 @@ impl RootView {
     #[must_use]
     pub fn process_sort(&self) -> (SortCol, SortDir) {
         self.shell.processes.sort()
+    }
+
+    /// The Apps column set after host-fact policies are applied. `Swap` is
+    /// hidden when the provider has confirmed zero configured swap; the user's
+    /// saved preference is never mutated.
+    #[must_use]
+    pub fn effective_process_hidden_cols(&self) -> std::collections::HashSet<SortCol> {
+        effective_process_hidden_cols(
+            &self.processes_state.hidden_cols,
+            self.system_snapshot().memory.current_swap_total_bytes(),
+        )
+    }
+
+    /// The (column, direction) the RENDERED process header shows. A host-fact
+    /// policy (e.g. swap auto-hidden at zero configured swap) can hide the
+    /// persisted active column, in which case the header falls back to the first
+    /// visible column. The row projection sorts by this SAME value so the
+    /// header indicator and the row order can never disagree.
+    #[must_use]
+    pub fn effective_process_sort(&self) -> (SortCol, SortDir) {
+        let (column, direction) = self.process_sort();
+        (
+            effective_process_sort_col(column, &self.effective_process_hidden_cols()),
+            direction,
+        )
     }
 
     /// The active Apps status bucket.

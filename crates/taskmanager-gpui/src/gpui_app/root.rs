@@ -540,7 +540,7 @@ impl RootView {
         std::rc::Rc<Vec<ProcessLiveKey>>,
         String,
     ) {
-        let (sort_col, sort_dir) = self.shell.processes.sort();
+        let (sort_col, sort_dir) = self.effective_process_sort();
         let sort_asc = matches!(sort_dir, SortDir::Asc);
         let filter = self.shell.processes.status_filter();
         let query = self.shell.processes.query().trim().to_owned();

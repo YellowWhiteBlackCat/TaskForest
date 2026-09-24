@@ -48,12 +48,8 @@ impl RootView {
                 .as_ref()
                 .map(|items| items.as_slice()),
         );
-        let hidden_cols = processes_view::effective_process_hidden_cols(
-            &self.processes_state.hidden_cols,
-            page_metrics.swap_total_bytes,
-        );
-        let (sort_column, sort_direction) = self.process_sort();
-        let sort_col = processes_view::effective_process_sort_col(sort_column, &hidden_cols);
+        let hidden_cols = self.effective_process_hidden_cols();
+        let (sort_col, sort_direction) = self.effective_process_sort();
         let sort_asc = matches!(sort_direction, SortDir::Asc);
         let (rows, _pids, query) = self.processes_projection();
         let application_count = self.process_application_count();

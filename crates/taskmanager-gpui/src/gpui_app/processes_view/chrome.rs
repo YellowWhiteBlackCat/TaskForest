@@ -608,7 +608,7 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
             }
             let right = key == "right";
             ent_key.update(cx, |v, cx| {
-                let next = sort_col_step(v.process_sort().0, right, &visible_key);
+                let next = sort_col_step(v.effective_process_sort().0, right, &visible_key);
                 v.move_process_sort_column(next);
                 cx.notify();
             });
