@@ -9,7 +9,8 @@ use taskmanager_application::i18n::Language;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::CoreBreakdown;
 use taskmanager_core::core::metrics::{
-    CpuFrequencySource, ScalarObservation, ScalarObservationGroup,
+    CpuFrequencySource, PressureWindow, ResourcePressure, ScalarObservation,
+    ScalarObservationGroup, SystemPressureSnapshot,
 };
 
 use super::acceptance_support::frame_in_language;
@@ -135,6 +136,48 @@ fn right_rail_paints_the_full_live_and_spec_row_set_at_reference_size() {
     assert!(
         text.contains("CPU Utilization (%)"),
         "the rail must not displace the main graph:\n{text}"
+    );
+}
+
+#[test]
+fn stall_row_names_the_pressure_window_once() {
+    // The shared `pressure_summary` already prefixes every PSI window ("some …
+    // · full …"), so the rail label stays the plain stall term. Appending
+    // "(some)" printed the same token twice in one row.
+    let mut app = cpu_app();
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        snapshot.pressure = Some(SystemPressureSnapshot {
+            cpu: ScalarObservation::available(
+                ResourcePressure {
+                    some: PressureWindow {
+                        avg10: 5.6,
+                        avg60: 1.9,
+                        avg300: 0.8,
+                        total_us: 0,
+                    },
+                    full: Some(PressureWindow {
+                        avg10: 0.0,
+                        avg60: 0.0,
+                        avg300: 0.0,
+                        total_us: 0,
+                    }),
+                },
+                1,
+            ),
+            memory: ScalarObservation::default(),
+            io: ScalarObservation::default(),
+        });
+    });
+    let text = frame_text(&app, 120, 48);
+
+    assert!(
+        row_paints(&text, t("perf.stall"), "some "),
+        "the stall rail row must paint the shared pressure value beside the plain stall label:\n{text}"
+    );
+    assert!(
+        !text.contains("(some)"),
+        "the stall label must not repeat the window token the shared value already names:\n{text}"
     );
 }
 
