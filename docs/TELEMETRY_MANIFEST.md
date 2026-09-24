@@ -172,6 +172,22 @@ runtime catalog 对每个期望身份先发布 typed 缺席 descriptor（`Unsupp
 （[ADR-053](../adr/053-product-expected-capability-surface.md)）。本清单某平台没有合格
 来源的能力，运行时以该 typed 缺席作答；不在期望面内的 vendor/诊断身份不受此承诺约束。
 
+### 3.1 目标环境能力回执校验
+
+Linux 标准产物在 provider 注册时输出脱敏的 live-host capability receipt
+（`runtime_evidence.rs` schema v6，显式标记 `capability_only` 与
+`hardware_build_profile`）。运维可在目标机上落盘该回执并 fail-close 校验预期能力：
+
+```bash
+cargo run --quiet --locked -p taskmanager-platform-linux \
+  --example linux_provider_capability_receipt > target-environment.json
+python3 scripts/validate_target_environment_receipt.py target-environment.json \
+  --require nvidia_gpu=eligible
+```
+
+该回执只证明 capability eligibility，不证明 provider 实机调用成功；fixture 回执被拒绝，
+禁止用设备存在、backend 编译或静态图片替代目标机证据。
+
 ---
 
 ## 4. 维护与更新规范
