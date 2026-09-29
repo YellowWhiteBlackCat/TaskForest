@@ -14,7 +14,7 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::World;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
     Overflow, UiRect, Val, percent, px,
@@ -31,9 +31,10 @@ use taskmanager_shell::ShellApp;
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::input::PendingEffects;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12};
+use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
+use bevy::text::{LineBreak, TextLayout};
 
 // ---- pure view model -------------------------------------------------------
 
@@ -128,7 +129,7 @@ fn relation_section_scene(
                     }
                     BackgroundColor({ palette.content_bg })
                     Children [
-                        ( Text(target_id) TextRole(Role::Mono) template_value(no_wrap_text()) )
+                        ( Text(target_id) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } )
                     ]
                 )
             }) as Box<dyn Scene>
@@ -143,7 +144,7 @@ fn relation_section_scene(
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            ( Text(count_text) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+            ( Text(count_text) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
             (
                 Node {
                     width: percent(100.0),
@@ -183,7 +184,7 @@ fn chip_button(
             on(dependencies_panel_control_activated)
             ServiceDependenciesControlButton(action)
             Children [
-                ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
             ]
         )
     })
@@ -292,7 +293,7 @@ pub(crate) fn service_dependencies_panel_scene(
                     (
                         Text(title)
                         TextRole(Role::Body)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     ),
                     ( Node { flex_grow: 1.0 } ),
                     ( { chip_button(ServiceDependenciesControlAction::Close, t("common.close").to_owned(), false, palette) } ),

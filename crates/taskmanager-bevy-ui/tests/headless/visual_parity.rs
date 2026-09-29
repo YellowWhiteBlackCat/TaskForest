@@ -23,12 +23,13 @@ use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::system::RunSystemOnce;
-use bevy::scene::{Scene, ScenePlugin, WorldSceneExt, bsn, template_value};
+use bevy::scene::{Scene, ScenePlugin, WorldSceneExt, bsn};
 use std::path::{Path, PathBuf};
 
 use crate::icons::{IconPlates, PLATE_ICONS, icon_rgba, icon_scene};
-use crate::palette::{no_wrap_text, ui_palette};
+use crate::palette::ui_palette;
 use crate::window::{Role, TextRole};
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
@@ -243,7 +244,7 @@ fn bounded_fact_lines_carry_the_single_line_contract() {
     let value = Box::new(bsn! {
         Text({ long_value })
         TextRole(Role::Mono)
-        template_value(no_wrap_text())
+        TextLayout { linebreak: LineBreak::NoWrap }
     }) as Box<dyn Scene>;
     let row = crate::widgets::controls::stat_row_scene("label".to_owned(), value, &palette);
     let mut app = App::new();

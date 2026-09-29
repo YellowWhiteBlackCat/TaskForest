@@ -17,6 +17,12 @@
     伪造或篡改全局状态。
 - **100% `bsn!` 声明式场景树**：所有界面结构必须使用 `bsn!` 场景宏声明，
   并通过 `spawn_scene` 挂载，严禁使用命令式 `with_children` 另起游离树。
+  写法判据归 [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)：运行时值字段直写
+  （如 `TextLayout { linebreak: LineBreak::NoWrap }`），动态列表
+  `Children [ { scenes } ]`，EntityEvent 观察者 `on(...)`；`template_value`
+  硬零，创建链 `.insert(` 与直接 `spawn` 由
+  `scripts/quality/bevy_bsn_guard.py` 拒收（页面级全局事件观察者除外）。
+  异步就绪的表现补全（图标位图）用 `apply_scene(bsn! { ... })` 声明。
 
 ## 2. 交互与拾取机制（核心避坑守则）
 

@@ -1,6 +1,7 @@
 //! Inventory scene composition and table cell adapters.
 
 use super::*;
+use bevy::text::{LineBreak, TextLayout};
 
 pub(super) fn boot_timeline_scene(
     evidence: Option<&StartupBootEvidenceSnapshot>,
@@ -48,7 +49,7 @@ pub(super) fn boot_timeline_scene(
                             overflow: Overflow::clip_x(),
                         }
                         Children [
-                            ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
                         ]
                     ),
                     (
@@ -73,7 +74,7 @@ pub(super) fn boot_timeline_scene(
                     (
                         Text(duration_text)
                         TextRole(Role::Mono)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     ),
                 ]
             }) as Box<dyn Scene>)
@@ -129,7 +130,7 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
                     (
                         Text({ t("startup.enable").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -153,7 +154,7 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
                     (
                         Text({ t("startup.disable").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -250,7 +251,7 @@ pub(super) fn header_scene(
                 }
                 StartupSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                     { indicator },
                 ]
             }) as Box<dyn Scene>
@@ -343,7 +344,7 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
             overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(text) TextRole(role) template_value(no_wrap_text()) ),
+            ( Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap } ),
         ]
     }
 }
@@ -368,7 +369,7 @@ pub(super) fn chip_cell_scene(
                 BackgroundColor(fill)
                 Pickable::IGNORE
                 Children [
-                    ( Text(word) TextRole(Role::Caption) template_value(no_wrap_text()) Pickable::IGNORE ),
+                    ( Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
                 ]
             ),
         ]

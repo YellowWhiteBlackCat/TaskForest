@@ -51,8 +51,8 @@ use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, Singl
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
-use bevy::text::TextColor;
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -69,7 +69,7 @@ use taskmanager_ui_contract::IconId;
 
 use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
-use crate::palette::{UiPalette, no_wrap_text, space_8, space_12};
+use crate::palette::{UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
@@ -292,7 +292,7 @@ pub(crate) struct ContentSlot;
 /// instance exists while any page is mounted; route changes despawn it.
 /// The identity is consumed by the window capture/visibility adapter and by
 /// the headless remount tests.
-#[derive(Component)]
+#[derive(Component, Clone, Default)]
 pub(crate) struct PageContent {
     pub(crate) page: Page,
 }
@@ -597,13 +597,11 @@ fn mount_page_system(
         palette: &palette.inner,
         history: &history.0,
     };
-    let entity = commands
-        .spawn_scene(page_scene(route.page, &context))
-        .insert(PageContent { page: route.page })
-        .id();
-    // Relate the fresh content to the slot: `add_one_related::<ChildOf>`
-    // inserts ChildOf(slot) ON the given entity (the child side).
-    commands.entity(*slot).add_one_related::<ChildOf>(entity);
+    commands.spawn_scene(bsn! {
+        PageContent { page: {route.page} }
+        ChildOf({*slot})
+        {page_scene(route.page, &context)}
+    });
     mount.mounted = Some(route.page);
     mount.requested = false;
 }
@@ -735,7 +733,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
                 NavTabLabelNode
                 Pickable::IGNORE
                 Children [
-                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) template_value(no_wrap_text()) Pickable::IGNORE ),
+                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
                 ]
             ),
         ]

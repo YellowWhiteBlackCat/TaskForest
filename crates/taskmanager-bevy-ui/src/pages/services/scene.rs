@@ -1,6 +1,7 @@
 //! Inventory scene composition and table cell adapters.
 
 use super::*;
+use bevy::text::{LineBreak, TextLayout};
 
 pub(crate) fn on_services_search_input_activated(
     _activate: On<Activate>,
@@ -42,7 +43,7 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         Button
         on(on_services_search_input_activated)
         Children [
-            ( Text(text) TextRole(Role::Body) TextColor(ink) template_value(no_wrap_text()) ),
+            ( Text(text) TextRole(Role::Body) TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } ),
         ]
     }
 }
@@ -134,7 +135,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("svc.start").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -158,7 +159,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("svc.stop").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -182,7 +183,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("svc.restart").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -206,7 +207,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("common.details").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -230,7 +231,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("svc.dependencies").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -254,7 +255,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("svc.logs").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -288,7 +289,7 @@ pub(super) fn header_scene(
                     Button
                     on(on_services_sort_header_activated)
                     Children [
-                        ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) Pickable::IGNORE ),
+                        ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
                         { indicator },
                     ]
                 }) as Box<dyn Scene>
@@ -303,7 +304,7 @@ pub(super) fn header_scene(
                     }
                     ServicesSortHeader(sort_target)
                     Children [
-                        ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                        ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                         { indicator },
                     ]
                 }) as Box<dyn Scene>
@@ -398,7 +399,7 @@ pub(super) fn service_name_cell_scene(
             (
                 Text(name)
                 TextRole(Role::Body)
-                template_value(no_wrap_text())
+                TextLayout { linebreak: LineBreak::NoWrap }
                 Pickable::IGNORE
             ),
         ]
@@ -410,7 +411,7 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
         Node { width: px(width), align_items: AlignItems::FlexStart }
         Pickable::IGNORE
         Children [
-            ( Text(text) TextRole(role) template_value(no_wrap_text()) Pickable::IGNORE ),
+            ( Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
         ]
     }
 }
@@ -435,7 +436,7 @@ pub(super) fn chip_cell_scene(
                 BackgroundColor(fill)
                 Pickable::IGNORE
                 Children [
-                    ( Text(word) TextRole(Role::Caption) template_value(no_wrap_text()) Pickable::IGNORE ),
+                    ( Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
                 ]
             ),
         ]

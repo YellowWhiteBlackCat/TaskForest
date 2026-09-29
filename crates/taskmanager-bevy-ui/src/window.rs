@@ -218,11 +218,14 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         None
     };
 
-    // Production keeps the cold-start dark theme until the native appearance
-    // seam arrives. Capture uses the light reference skin so the visual gate
-    // compares the actual product structure and typography, not a fixture-only
-    // color inversion; the shared `TM_SKIN` testing override can select another
-    // skin/mode there (unset keeps the light reference skin byte-for-byte).
+    // Production keeps the cold-start dark theme here; the persisted
+    // appearance, locale, and cadence/capacity restore in the `Startup`
+    // restore system (before the first frame renders) from the same config
+    // tokens the settings page writes. Capture uses the light reference skin
+    // so the visual gate compares the actual product structure and
+    // typography, not a fixture-only color inversion; the shared `TM_SKIN`
+    // testing override can select another skin/mode there (unset keeps the
+    // light reference skin byte-for-byte).
     let theme = if demo {
         demo_theme_from_env()
     } else {
@@ -253,6 +256,10 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         palette,
     });
     if !demo {
+        app.add_systems(
+            Startup,
+            crate::pages::settings::restore_persisted_preferences,
+        );
         app.insert_non_send(production_history_runtime());
         app.add_systems(
             PreUpdate,
@@ -729,7 +736,7 @@ fn spawn_app_shell(
     demo: Option<Res<DemoMode>>,
     mut commands: Commands,
 ) {
-    commands.spawn(Camera2d);
+    commands.spawn_scene(bsn! { Camera2d });
     let summary = if demo.is_some() {
         t("status.demo_snapshot").to_owned()
     } else {

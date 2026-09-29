@@ -4,6 +4,7 @@ use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
+use bevy::text::{LineBreak, TextLayout};
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
     bsn! {
@@ -125,7 +126,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
                 ]
             ),
             (
@@ -162,7 +163,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
                         Text(cpu_field_text(shell, field))
                         TextRole(Role::Mono)
                         DynText(DynField::Cpu(field))
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     )
                 ]
             ),

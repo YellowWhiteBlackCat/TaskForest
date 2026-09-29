@@ -36,6 +36,7 @@
 //! observation reaches this frontend; the selected-process details panel is
 //! the first completed F13 slice.
 
+use bevy::a11y::AccessibilityNode;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::{EntityEvent, Event};
@@ -45,7 +46,7 @@ use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Val, percent, px,
 };
@@ -640,7 +641,7 @@ fn row_wrapper_scene(
     let fill = row_fill(row.selected, palette);
     let index = row.index;
     let cells = row.cells.clone();
-    let accessibility = crate::semantic::process_row_node(&row.name, &row.semantic_id);
+    let accessibility_node = crate::semantic::process_row_node(&row.name, &row.semantic_id);
     let semantic = crate::input_contract::SemanticAddress(
         crate::input_contract::stable_semantic_address("process-row", &row.semantic_id),
     );
@@ -657,7 +658,7 @@ fn row_wrapper_scene(
         Button
         on(input::on_row_activated)
         SemanticAddress({ semantic.0.clone() })
-        template_value(accessibility)
+        AccessibilityNode({ accessibility_node })
         Children [
             ( { inner } ),
         ]

@@ -11,7 +11,8 @@ use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::system::{Res, ResMut};
-use bevy::scene::{Scene, bsn, template_value};
+use bevy::scene::{Scene, bsn};
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent,
     px,
@@ -26,7 +27,7 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::app::{Page, PageContext, PageMount, Route};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_8, space_24};
+use crate::palette::{UiPalette, space_2, space_8, space_24};
 use crate::window::{Role, TextRole};
 
 pub(crate) fn containers_fold_observer(
@@ -214,31 +215,31 @@ fn header_scene(palette: &UiPalette) -> impl Scene + use<> {
             (
                 Node { width: px(200.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text("ID") TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text("ID") TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 ]
             ),
             (
                 Node { width: px(220.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.name")) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(t("containers.name")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 ]
             ),
             (
                 Node { width: px(90.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.cpu")) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(t("containers.cpu")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 ]
             ),
             (
                 Node { width: px(110.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.memory")) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(t("containers.memory")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 ]
             ),
             (
                 Node { width: px(90.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.processes")) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(t("containers.processes")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 ]
             ),
         ]

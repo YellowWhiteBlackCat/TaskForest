@@ -30,7 +30,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::image::Image;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::scene::{Scene, bsn};
+use bevy::scene::{EntityCommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{Node, px};
 use bevy::ui::widget::ImageNode;
 use taskmanager_assets::UI_ICON_RGBA_SIZE;
@@ -152,9 +152,10 @@ pub(crate) struct IconInk(pub(crate) Color);
 
 /// Observer: stamp the bitmap handle and tint as a plate lands. The icon
 /// counterpart of `style_text_role` — pages never touch image assets. The
-/// `ImageNode` widget itself is inserted here rather than in the `bsn!`
-/// scene: its template plumbing is renderer-side, while the scene declares
-/// only the sized node and the two semantic markers.
+/// bitmap handle resolves only when the plate store is ready, so the
+/// `ImageNode` surface is declared here as a deferred `apply_scene(bsn!)`
+/// patch; the spawning scene declares the sized node and the two semantic
+/// markers.
 pub(crate) fn stamp_icon_plate(
     trigger: On<Add, IconPlate>,
     plates: Option<Res<IconPlates>>,
@@ -169,11 +170,11 @@ pub(crate) fn stamp_icon_plate(
     }
     let ink = inks.get(entity).map(|ink| ink.0).unwrap_or_default();
     let icon = marks.get(entity).ok().map(|mark| mark.0);
-    let image = icon.and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)));
-    commands.entity(entity).insert(ImageNode {
-        color: ink,
-        image: image.unwrap_or_default(),
-        ..ImageNode::default()
+    let image = icon
+        .and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)))
+        .unwrap_or_default();
+    commands.entity(entity).apply_scene(bsn! {
+        ImageNode { color: {ink}, image: {image} }
     });
 }
 

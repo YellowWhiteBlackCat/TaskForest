@@ -5,6 +5,7 @@ use crate::pages::performance::metrics::{
     batteries, battery_fact_line, disk_partition_view_models, disks, gpu_vram_view_model,
 };
 use crate::palette::space_2;
+use bevy::text::{LineBreak, TextLayout};
 use taskmanager_core::core::power::BatteryInfo;
 
 pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
@@ -57,7 +58,7 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                 padding: UiRect::vertical(Val::Px(space_2())),
             }
             Children [
-                ( Text({ vram.label }) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                ( Text({ vram.label }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                 (
                     Node {
                         width: percent(100),
@@ -100,7 +101,7 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                         width: px(80.0),
                         overflow: Overflow::clip_x(),
                     }
-                    Children [ ( Text(name) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                    Children [ ( Text(name) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
                 ),
                 (
                     Node {
@@ -128,7 +129,7 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                         flex_direction: FlexDirection::Row,
                         justify_content: JustifyContent::FlexEnd,
                     }
-                    Children [ ( Text(usage) TextRole(Role::Mono) template_value(no_wrap_text()) ) ]
+                    Children [ ( Text(usage) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } ) ]
                 ),
             ]
         }) as Box<dyn Scene>);
@@ -167,19 +168,19 @@ fn nic_block_scene(nic: &NetworkMetrics, palette: &UiPalette) -> impl Scene + us
     if let Some(ipv4) = &nic.ipv4_addr {
         let val = format!("IPv4: {ipv4}");
         details.push(Box::new(bsn! {
-            Text(val) TextRole(Role::Caption) template_value(no_wrap_text())
+            Text(val) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
         }) as Box<dyn Scene>);
     }
     if let Some(mac) = &nic.mac_addr {
         let val = format!("MAC: {mac}");
         details.push(Box::new(bsn! {
-            Text(val) TextRole(Role::Caption) template_value(no_wrap_text())
+            Text(val) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
         }) as Box<dyn Scene>);
     }
     if let Some(driver) = &nic.driver {
         let val = format!("{}: {driver}", t("common.driver"));
         details.push(Box::new(bsn! {
-            Text(val) TextRole(Role::Caption) template_value(no_wrap_text())
+            Text(val) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
         }) as Box<dyn Scene>);
     }
 
@@ -232,8 +233,8 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
                         align_items: AlignItems::Center,
                     }
                     Children [
-                        ( Text({ part.name }) TextRole(Role::Caption) template_value(no_wrap_text()) ),
-                        ( Text({ part.usage_text }) TextRole(Role::Mono) template_value(no_wrap_text()) ),
+                        ( Text({ part.name }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                        ( Text({ part.usage_text }) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } ),
                     ]
                 ),
                 (

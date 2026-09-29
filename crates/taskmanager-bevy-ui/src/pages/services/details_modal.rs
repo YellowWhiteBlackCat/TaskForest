@@ -12,7 +12,7 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::World;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
     UiRect, Val, percent, px,
@@ -23,9 +23,10 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::services::ServiceItem;
 
 use crate::app::FrontendTrack;
-use crate::palette::{UiPalette, no_wrap_text, space_4, space_8, space_24};
+use crate::palette::{UiPalette, space_4, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use bevy::text::{LineBreak, TextLayout};
 use taskmanager_shell::presentation::service_diagnostics_rows;
 
 #[derive(Resource, Default)]
@@ -63,7 +64,7 @@ fn fact_row_scene(label: &str, value: &str, _palette: &UiPalette) -> Box<dyn Sce
             (
                 Node { width: px(120.0), flex_shrink: 0.0 }
                 Children [
-                    ( Text({ label.to_owned() }) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                    ( Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
                 ]
             ),
             (

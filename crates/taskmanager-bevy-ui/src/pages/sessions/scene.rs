@@ -1,6 +1,7 @@
 //! Inventory scene composition and table cell adapters.
 
 use super::*;
+use bevy::text::{LineBreak, TextLayout};
 
 pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
@@ -31,7 +32,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("users.disconnect").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -55,7 +56,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                     (
                         Text({ t("users.lock").to_owned() })
                         TextRole(Role::Caption)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
                     )
                 ]
@@ -151,7 +152,7 @@ pub(super) fn header_scene(
                 }
                 SessionsSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
                     { indicator },
                 ]
             }) as Box<dyn Scene>

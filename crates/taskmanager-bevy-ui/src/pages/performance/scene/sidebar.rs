@@ -8,6 +8,7 @@ pub(super) mod cpu;
 
 use super::blocks::gpu_block_title;
 use super::chart::chart_grid_scene;
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui_widgets::ScrollArea;
 use cpu::device_button_scene;
 use taskmanager_ui_contract::IconId;
@@ -32,7 +33,7 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
                     flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
@@ -40,7 +41,7 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::FlexEnd,
                 }
-                Children [ ( Text(value) TextRole(Role::Mono) DynText(field) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(value) TextRole(Role::Mono) DynText(field) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
         ]
     }
@@ -51,7 +52,7 @@ fn marked_text_scene(value: String, role: Role, field: DynField) -> Box<dyn Scen
         Text(value)
         TextRole(role)
         DynText(field)
-        template_value(no_wrap_text())
+        TextLayout { linebreak: LineBreak::NoWrap }
     })
 }
 
@@ -77,7 +78,7 @@ fn cpu_metric_cell_scene(
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
@@ -91,7 +92,7 @@ fn cpu_metric_cell_scene(
                         Text(value)
                         TextRole(Role::Mono)
                         DynText(DynField::Cpu(field))
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     )
                 ]
             ),
@@ -120,7 +121,7 @@ fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> i
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
@@ -154,14 +155,14 @@ fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
                 Text(cpu_field_text(shell, CpuField::Usage))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Usage))
-                template_value(no_wrap_text())
+                TextLayout { linebreak: LineBreak::NoWrap }
             ),
             ( Text(" · ") TextRole(Role::Caption) ),
             (
                 Text(cpu_field_text(shell, CpuField::Frequency))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Frequency))
-                template_value(no_wrap_text())
+                TextLayout { linebreak: LineBreak::NoWrap }
             ),
         ]
     })

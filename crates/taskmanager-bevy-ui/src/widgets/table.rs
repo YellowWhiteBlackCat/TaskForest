@@ -15,7 +15,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, NonSendMut, Query};
 use bevy::picking::Pickable;
-use bevy::scene::{Scene, bsn, on, template_value};
+use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -27,7 +27,7 @@ use taskmanager_shell::SortCol;
 use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::app::FrontendTrack;
-use crate::palette::{UiPalette, no_wrap_text, space_4, space_8};
+use crate::palette::{UiPalette, space_4, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole};
 
@@ -294,10 +294,6 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
     } else {
         JustifyContent::FlexStart
     };
-    let no_wrap = TextLayout {
-        linebreak: LineBreak::NoWrap,
-        ..TextLayout::default()
-    };
     let role = if label { Role::Caption } else { Role::Body };
     bsn! {
         Node {
@@ -309,7 +305,7 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
             overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(cell) TextRole({ role }) template_value(no_wrap) ),
+            ( Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap } ),
         ]
     }
 }
@@ -373,7 +369,7 @@ fn header_cell_scene(
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
         Children [
-            ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) Pickable::IGNORE ),
+            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
             { indicator },
         ]
     }

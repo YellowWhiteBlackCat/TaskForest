@@ -10,8 +10,9 @@
 ## 定位
 
 - 与 GPUI/Iced/TUI 同级的产品表面：只消费中立层投影，不读 OS 数据源，不拥有
-  独立业务事实。成熟度低于 GPUI；页面功能覆盖、性能页深度、系统页和托盘仍
-  是公开的已知边界，不在文档中虚构。
+  独立业务事实。页面功能覆盖与托盘（ADR-032）已落地；性能页深度、系统页
+  深度与多窗口/layer-shell 仍是公开的已知边界，不在文档中虚构。偏好（外观/
+  语言/节奏/容量）经共享 config 协调器跨会话持久并在启动组合恢复。
 - 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，现已完全纳入官方发布流水线矩阵，享有同等的领域语义、配置持久化与安装包分发地位（提供 DEB、RPM、MSI 官方安装包）。
 - 产品组件（进程表、图表、确认面）由自有 theme tokens + `ui-contract` 定义
   语义；Bevy 官方 Feathers 皮肤体系不采用——theme tokens 是唯一皮肤权威。
@@ -32,7 +33,26 @@
   loading/empty/error 变体）全部由 `bsn!` 场景组合并经 `spawn_scene` 挂载；
   禁止命令式 `Node`/`Children`/`with_children` 另起 UI 树。ECS 系统只更新
   场景实体的 typed 组件、接线事件/焦点，或以新场景替换有界子树。
-  `scripts/quality/bevy_bsn_guard.py` 机械强制。
+- **100% `bsn!` 场景法——判据**（2026-09-29 对齐相邻仓库的 BSN 红线）：
+  - 能声明的应用尽用。运行时值用字段表达式直写（`TextLayout { linebreak:
+    LineBreak::NoWrap }`、`UiTransform { rotation: Rot2::radians(r) }`）、
+    元组组件带 payload 直写（`AccessibilityNode({ node })`）、动态列表用
+    `Children [ { scenes } ]`、EntityEvent 目标观察者用 `on(...)` 写进场景；
+    补丁语义下未写字段自动取 `Default`（`bsn!` 结构体里不可写 `..`）。
+  - **`template_value` / `TemplateValue` 硬零**：场景能表达的值禁止套壳；
+    场景表达不了的整值不存在"运行期值"豁免——标记、样式、层级、可见性、
+    页面身份（如 `PageContent`）一律声明在 `bsn!` 里，不进 `insert`。
+  - **整值窄出口**：仅限已有实体的异步表现补全（位图句柄就绪后的
+    `ImageNode`），用 `apply_scene(bsn! { ... })` 声明式补丁；这不是第二
+    语义路径。创建链上的 `.insert(`（`spawn_scene` 后紧链）被门禁禁止。
+  - **相机与观察者归属**：Camera2d 走 `spawn_scene(bsn! { Camera2d })`；
+    页面级全局事件观察者（非 EntityEvent，如 `ShellProjectionFolded`）不是
+    场景结构——`Observer::new` + `ChildOf` 生命周期绑定是唯一豁免的行为
+    接线，不得用它搬运可声明组件。
+  - 完成口径：生产代码零命令式 spawn、零 `template_value`、零创建链
+    `insert`；反向封死即正向保证。`scripts/quality/bevy_bsn_guard.py`
+    机械强制（001 UI 构造出景 / 002 手动挂子 / 003 直接 spawn / 004 括号
+    失衡 / 005 template_value 硬零 / 006 创建链 insert）。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
 - Linux 窗口仅支持 Wayland；X11 已被全面废弃，非 Wayland 或纯终端环境由 TaskForest-T 承载。

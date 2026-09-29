@@ -20,7 +20,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::Commands;
-use bevy::scene::template_value;
 use bevy::scene::{Scene, WorldSceneExt, bsn};
 use bevy::ui::prelude::{
     BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent,
@@ -34,8 +33,9 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12};
+use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::window::{Role, TextRole, WindowPalette};
+use bevy::text::{LineBreak, TextLayout};
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::npu::NpuEngineKind;
@@ -355,7 +355,7 @@ fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<
     let value_scene = Box::new(bsn! {
         Text(value)
         TextRole(Role::Body)
-        template_value(no_wrap_text())
+        TextLayout { linebreak: LineBreak::NoWrap }
     }) as Box<dyn bevy::scene::Scene>;
     crate::widgets::controls::stat_row_scene(row.label.clone(), value_scene, palette)
 }
@@ -384,14 +384,14 @@ fn kpi_tile_scene(
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(value) TextRole(Role::Heading) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(value) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(note) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
         ]
     }
