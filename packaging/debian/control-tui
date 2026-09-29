@@ -3,7 +3,6 @@ Version: __VERSION__
 Section: admin
 Priority: optional
 Architecture: __ARCH__
-Depends: libc6
 Suggests: smartmontools, nvme-cli, xfsprogs, iw
 Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
 Installed-Size: __INSTALLED_SIZE__
