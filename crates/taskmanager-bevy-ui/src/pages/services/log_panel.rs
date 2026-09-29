@@ -281,9 +281,19 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         });
     };
     let feed = &open.feed;
+    // The header names the service the way the inventory rows do (the
+    // provider-issued display name); an id absent from the inventory degrades
+    // honestly to the raw authority target instead of a fabricated name.
     let service = open
         .service_id()
-        .map(|id| id.to_string())
+        .map(|id| {
+            shell
+                .sorted_services()
+                .into_iter()
+                .find(|item| &item.id == id)
+                .map(|item| item.name.clone())
+                .unwrap_or_else(|| id.to_string())
+        })
         .unwrap_or_default();
     let title = format!("{} — {service}", t("svc.logs"));
     let visible = shell

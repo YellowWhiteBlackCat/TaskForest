@@ -281,8 +281,8 @@ fn settings_page_projects_the_live_authorities_into_rows() {
     assert!(
         texts
             .iter()
-            .any(|text| text.contains("apply live") && text.contains("persistence")),
-        "the placeholder is honest: choices apply live, persistence is incubating"
+            .any(|text| text.contains("apply live") && text.contains("persist across sessions")),
+        "the footer is honest: choices apply live and persist across sessions"
     );
     // The default selections mirror the authorities: 1 s cadence checked,
     // the other steps unchecked; the store default capacity (64) selects no

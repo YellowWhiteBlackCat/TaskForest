@@ -8,8 +8,8 @@
 //!   `WindowPalette` resource (+ the camera clear color); a choice
 //!   re-resolves it from the theme tokens and the remount restyles the page
 //!   through the `TextRole` observer and the nav rail through the route
-//!   observer. Full-chrome text retheming (header/summary ink stamped once
-//!   at startup) lands with the persisted skin/mode restoration milestone.
+//!   observer. The persisted skin/mode/contrast restore runs in the startup
+//!   composition (`restore_persisted_preferences`).
 //! - language — the process-global i18n bundle (`i18n::current_language` /
 //!   `i18n::set_language`), the same entry the TUI/GPUI language pills use.
 //! - refresh cadence — [`ShellApp::telemetry_interval`] /
@@ -164,9 +164,11 @@ impl ThemePreferences {
 /// other combination (a future skin picker, a high-contrast variant) —
 /// rendered as no fabricated selection.
 pub(crate) fn palette_mode(palette: &UiPalette) -> Option<LightDark> {
-    [LightDark::Light, LightDark::Dark]
-        .into_iter()
-        .find(|&mode| ui_palette(&theme_for_mode(mode)).content_bg == palette.content_bg)
+    // The palette carries the theme's mode identity, so the read-back is
+    // exact for every skin. A mode the switch does not own (EyeForest, from
+    // another frontend's config) is never claimed: the row renders no
+    // fabricated selection.
+    matches!(palette.mode, LightDark::Light | LightDark::Dark).then_some(palette.mode)
 }
 
 /// One discrete choice on the page: display label, the typed choice it owns,
@@ -224,6 +226,113 @@ where
     patch(&mut updated);
 
     Some(client.try_submit(updated))
+}
+
+// ---- persisted-preference restore (composition wiring) ----------------------
+
+/// Apply one persisted config snapshot to the live authorities: the theme
+/// preferences (mode/skin/contrast) re-resolve the window palette and clear
+/// color, the locale reaches the process-global i18n bundle, and the saved
+/// telemetry cadence and history capacity reach the shared shell. An absent
+/// preferences resource (headless compositions without the settings plugin)
+/// restores only the shell-facing state.
+pub(crate) fn apply_persisted_config(
+    config: &Config,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    if let Some(prefs) = prefs {
+        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+            prefs.mode = None;
+        } else if config.mode.eq_ignore_ascii_case("Light") {
+            prefs.mode = Some(LightDark::Light);
+        } else if config.mode.eq_ignore_ascii_case("Dark") {
+            prefs.mode = Some(LightDark::Dark);
+        } else if config.mode.eq_ignore_ascii_case("EyeForest") {
+            prefs.mode = Some(LightDark::EyeForest);
+        }
+
+        if !config.skin.is_empty() {
+            prefs.skin = match config.skin.to_ascii_lowercase().as_str() {
+                "kde" => Some(Skin::Kde),
+                "windows" => Some(Skin::Windows),
+                "macos" => Some(Skin::Macos),
+                _ => Some(Skin::Gnome),
+            };
+        }
+
+        prefs.hc = config.hc;
+        apply_preferences(prefs, palette, clear);
+    }
+
+    if let Some(lang) = config.language.as_deref().and_then(Language::from_code) {
+        set_language(lang);
+    }
+
+    if config.refresh_ms > 0 {
+        track
+            .shell
+            .set_telemetry_interval(TelemetryInterval::clamped(Duration::from_millis(
+                config.refresh_ms,
+            )));
+    }
+
+    if config.graph_data_points > 0 {
+        track
+            .shell
+            .set_history_capacity(usize::try_from(config.graph_data_points).unwrap_or(60));
+    }
+}
+
+/// Synchronize preferences from the coordinator via [`SharedRuntimeHandle`]:
+/// the bounded initial wait (first call) or an in-memory drain (afterwards),
+/// then one snapshot application. Absent runtime or client resolves nothing.
+pub(crate) fn sync_preferences_from_config(
+    runtime: Option<&SharedRuntimeHandle>,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    let Some(runtime) = runtime else {
+        return;
+    };
+    let mut config_guard = runtime.shared.lock_config();
+    let Some(client) = config_guard.as_mut() else {
+        return;
+    };
+
+    if client.snapshot().is_none() {
+        let _ = client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT);
+    } else {
+        let _ = client.drain();
+    }
+
+    if let Some(snapshot) = client.snapshot().cloned() {
+        apply_persisted_config(&snapshot, prefs, palette, clear, track);
+    }
+}
+
+/// The one-shot composition restore: the persisted appearance, locale, and
+/// telemetry cadence/capacity reach their authorities before the first frame
+/// renders. A cold-start-unknown or absent client keeps the defaults —
+/// unavailable state is never fabricated.
+pub(crate) fn restore_persisted_preferences(
+    runtime: Option<Res<SharedRuntimeHandle>>,
+    mut prefs: Option<ResMut<ThemePreferences>>,
+    mut palette: ResMut<WindowPalette>,
+    mut clear: Option<ResMut<ClearColor>>,
+    mut track: NonSendMut<FrontendTrack>,
+) {
+    sync_preferences_from_config(
+        runtime.as_deref(),
+        prefs.as_deref_mut(),
+        &mut palette,
+        clear.as_deref_mut(),
+        &mut track,
+    );
 }
 
 /// The appearance authorities a settings choice writes through: the optional
@@ -499,7 +608,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             ( Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ),
             { rows },
             (
-                Text("Choices apply live through the shared shell seams; cross-session persistence is incubating until the config write-back seam lands")
+                Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
                 TextRole(Role::Caption)
             ),
             { EntityScene(page_observer(request_projection_refresh)) },

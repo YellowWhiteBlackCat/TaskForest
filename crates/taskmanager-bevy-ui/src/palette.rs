@@ -12,10 +12,10 @@
 //! Feathers skin system, which this frontend does not adopt.
 
 use bevy::text::{FontSize, FontWeight, TextFont};
-use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::Weight;
 use taskmanager_theme::tokens::{self, UiSize};
+use taskmanager_theme::{Color, LightDark};
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
@@ -89,6 +89,10 @@ pub(crate) struct UiPalette {
     pub(crate) mono: TextFont,
     /// High-contrast theme active flag.
     pub(crate) high_contrast: bool,
+    /// The theme's mode identity, carried so read-back projections (the
+    /// settings page's current-selection display) stay honest for every skin
+    /// instead of inferring the mode from surface colors.
+    pub(crate) mode: LightDark,
     /// Panel and card border color.
     pub(crate) border_color: bevy::color::Color,
 }
@@ -101,6 +105,7 @@ pub(crate) struct UiPalette {
 pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
     let standard = UiSize::Standard;
     UiPalette {
+        mode: theme.mode,
         window_clear: theme_color(theme.window_bg),
         panel_fill: theme_color(theme.card_surface()),
         content_bg: theme_color(theme.view_bg),
