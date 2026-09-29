@@ -39,7 +39,8 @@ DEB/RPM 版本比较）。本次候选即下方 `0.2.0` 最终目标的预发布
   失败时如实告警，不再写出未脱敏内容。
 - **`taskforest-common` 共享数据包**：Linux 共享图标资产改由公共数据包独占承载，
   GPUI/Iced/Bevy 图形包依赖它，消除多包共装同一路径的 dpkg/rpm 归属冲突；
-  发布产物矩阵扩展为 28 项（新增 `TaskForest-Common` 的 DEB 与 RPM，含 amd64/arm64）。
+  发布产物矩阵扩展为 28 项构建产物（新增 `TaskForest-Common` 的 DEB 与 RPM，含
+  amd64/arm64），另附 4 份 sha256 校验清单，发布附件共 32 个。
 - **诚实的能力状态词汇**：新增能力级 `CapabilityStatus::RequiresEscalation`，
   "可提权" 与 "需授权/硬拒绝" 不再折叠为同一状态，四端据此呈现可操作的一次性授权入口。
 
