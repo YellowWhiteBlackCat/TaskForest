@@ -45,7 +45,7 @@ concurrency:
 jobs:
   precheck:
     name: Release prechecks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     outputs:
       tag: ${{ steps.resolve-tag.outputs.tag }}
