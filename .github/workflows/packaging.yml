@@ -97,11 +97,13 @@ jobs:
       matrix:
         include:
           - arch: x64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
+            musl_target: x86_64-unknown-linux-musl
             deb_arch: amd64
             rpm_arch: x86_64
           - arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
+            musl_target: aarch64-unknown-linux-musl
             deb_arch: arm64
             rpm_arch: aarch64
     env:
@@ -128,6 +130,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libxkbcommon-dev rpm file mold
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.musl_target }}
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -138,7 +142,6 @@ jobs:
           cargo build --locked --release -j 4 \
             -p taskmanager-gpui \
             -p taskmanager-iced \
-            -p taskmanager-tui \
             -p taskmanager-bevy-ui \
             -p taskmanager-setup-helper \
             -p taskmanager-privilege-helper \
@@ -389,9 +392,6 @@ jobs:
     name: Publish release artifacts
     if: inputs.publish
     needs: [linux, windows]
-    # The packaging matrix stays on the pinned 24.04 package base (DEB/RPM
-    # dependency floors follow the build distro); only the publish step rides
-    # the newest runner image.
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:

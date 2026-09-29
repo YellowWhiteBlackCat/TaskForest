@@ -140,7 +140,9 @@ fn ioctl(file: &File, request: u32) -> io::Result<()> {
     // argument is 0 and matches libc::ioctl's variadic contract for these
     // `_IO`-shaped requests. The raw fd obtained via as_raw_fd is read-only and
     // never escapes this function.
-    let result = unsafe { libc::ioctl(file.as_raw_fd(), request as libc::c_ulong, 0) };
+    // glibc declares the ioctl request as c_ulong, musl as c_int — let the
+    // call infer each target's type; perf-event command words fit both.
+    let result = unsafe { libc::ioctl(file.as_raw_fd(), request as _, 0) };
     if result < 0 {
         Err(io::Error::last_os_error())
     } else {

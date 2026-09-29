@@ -3,9 +3,10 @@
 #
 # Unlike graphical desktop packages, the TUI package (taskforest-t)
 # requires zero graphical stack dependencies (no Wayland, Vulkan, or
-# fontconfig; X11 is not supported across TaskForest) and depends only on libc6.
-# It ships the terminal system monitor binary /usr/bin/taskforest-t alongside its
-# license notices and documentation.
+# fontconfig; X11 is not supported across TaskForest) and is statically
+# linked against musl libc: zero runtime library dependencies on any host
+# distro. It ships the terminal system monitor binary /usr/bin/taskforest-t
+# alongside its license notices and documentation.
 #
 # Zero X11 packages, zero X11 dependencies.
 #
@@ -98,6 +99,15 @@ case "$deb_arch" in
     *) echo "build-deb-tui: unsupported Debian architecture '$deb_arch'" >&2; exit 1 ;;
 esac
 
+# The TUI is pure Rust and ships as a static musl binary: zero runtime library
+# dependencies on any host distro (a gnu build would couple the package to the
+# build machine's glibc version).
+case "$(uname -m)" in
+    x86_64) musl_target="x86_64-unknown-linux-musl" ;;
+    aarch64) musl_target="aarch64-unknown-linux-musl" ;;
+    *) echo "build-deb-tui: unsupported musl host '$(uname -m)'" >&2; exit 1 ;;
+esac
+
 arch_label="x64"
 [[ "$deb_arch" == "arm64" ]] && arch_label="arm64"
 
@@ -132,20 +142,22 @@ else
         bin="$target_src"
     elif [[ -n "${TASKFOREST_T_BIN:-}" && -f "$TASKFOREST_T_BIN" ]]; then
         bin="$TASKFOREST_T_BIN"
-    elif [[ -f "$repo/target/release/taskforest-t" ]]; then
-        bin="$repo/target/release/taskforest-t"
-    elif [[ -f "$repo/target/release/taskmanager-tui" ]]; then
-        bin="$repo/target/release/taskmanager-tui"
-    elif [[ -f "$repo/target/debug/taskmanager-tui" ]]; then
-        bin="$repo/target/debug/taskmanager-tui"
+    elif [[ -f "$repo/target/$musl_target/release/taskforest-t" ]]; then
+        bin="$repo/target/$musl_target/release/taskforest-t"
     fi
 
     if [[ -z "$bin" || ! -f "$bin" ]]; then
-        echo "build-deb-tui: release binary not found; building taskmanager-tui..."
-        cargo build --locked --release -p taskmanager-tui -j "${CARGO_BUILD_JOBS:-4}" 2>/dev/null || \
-        cargo build --release -p taskmanager-tui -j "${CARGO_BUILD_JOBS:-4}"
-        bin="$repo/target/release/taskforest-t"
-        [[ -f "$bin" ]] || bin="$repo/target/release/taskmanager-tui"
+        echo "build-deb-tui: release binary not found; building taskforest-t (musl static)..."
+        rustup target add "$musl_target"
+        # mold's static-pie support is not a release gate; the musl link uses
+        # the default linker instead of betting the artifact on it.
+        RUSTFLAGS="${RUSTFLAGS/-C link-arg=-fuse-ld=mold/}" \
+            cargo build --locked --release -p taskmanager-tui --target "$musl_target" \
+            -j "${CARGO_BUILD_JOBS:-4}" 2>/dev/null || \
+        RUSTFLAGS="${RUSTFLAGS/-C link-arg=-fuse-ld=mold/}" \
+            cargo build --release -p taskmanager-tui --target "$musl_target" \
+            -j "${CARGO_BUILD_JOBS:-4}"
+        bin="$repo/target/$musl_target/release/taskforest-t"
     fi
 
     if [[ ! -f "$bin" ]]; then

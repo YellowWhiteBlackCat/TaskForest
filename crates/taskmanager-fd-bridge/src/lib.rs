@@ -168,7 +168,7 @@ pub fn send_fd(channel: &impl AsFd, fd: &impl AsFd) -> io::Result<()> {
     // its capacity; the kernel and CMSG_* macros may deref `struct cmsghdr*`
     // into it.
     msg.msg_control = cmsg_buf.control_ptr();
-    msg.msg_controllen = cmsg_space;
+    msg.msg_controllen = cmsg_space as _;
     // SAFETY: `msg` is fully initialized; `cmsg_buf` (cmsg_space bytes, sized by
     // CMSG_SPACE for one c_int) outlives the block and is the control buffer.
     // CMSG_FIRSTHDR returns a writable pointer to the first cmsghdr slot inside
@@ -179,7 +179,7 @@ pub fn send_fd(channel: &impl AsFd, fd: &impl AsFd) -> io::Result<()> {
         let cmsg = libc::CMSG_FIRSTHDR(&msg);
         (*cmsg).cmsg_level = libc::SOL_SOCKET;
         (*cmsg).cmsg_type = libc::SCM_RIGHTS;
-        (*cmsg).cmsg_len = libc::CMSG_LEN(std::mem::size_of::<libc::c_int>() as u32) as usize;
+        (*cmsg).cmsg_len = libc::CMSG_LEN(std::mem::size_of::<libc::c_int>() as u32) as _;
         let data: *mut u8 = libc::CMSG_DATA(cmsg);
         let raw: libc::c_int = fd.as_fd().as_raw_fd();
         let raw_ptr: *const libc::c_int = &raw;
@@ -239,7 +239,7 @@ pub fn recv_fd(channel: &impl AsFd) -> io::Result<OwnedFd> {
     // SAFETY: `CmsgBuffer` is cmsghdr-aligned and `cmsg_space` bytes fit in
     // its capacity; recvmsg fills it and CMSG_FIRSTHDR/NXTHDR deref it.
     msg.msg_control = cmsg_buf.control_ptr();
-    msg.msg_controllen = cmsg_space;
+    msg.msg_controllen = cmsg_space as _;
     // SAFETY: `channel` is a valid OwnedFd; `msg` + iov + cmsg_buf are valid
     // writable buffers outliving the call. MSG_CMSG_CLOEXEC sets close-on-exec
     // on any received fd. recvmsg writes at most iov_len into carrier and fills
@@ -271,7 +271,7 @@ pub fn recv_fd(channel: &impl AsFd) -> io::Result<OwnedFd> {
     // case.
     // SAFETY: `msg` is the kernel-filled msghdr from recvmsg; the walk inside
     // stays within the cmsghdr-aligned `cmsg_buf` slab (see find_scm_rights).
-    let mut fds = find_scm_rights(&cmsg_buf, msg.msg_controllen).unwrap_or_default();
+    let mut fds = find_scm_rights(&cmsg_buf, msg.msg_controllen as _).unwrap_or_default();
     if (msg.msg_flags & libc::MSG_CTRUNC) != 0 {
         // The kernel installed the fds that fit before truncating; close them
         // so the violation leaves no residue.
@@ -343,7 +343,7 @@ fn find_scm_rights<const N: usize>(
     // subslice of its slab, so the same alignment proof covers it. The bytes
     // are kernel- or test-filled cmsghdr data.
     msg.msg_control = data.as_ptr().cast_mut().cast();
-    msg.msg_controllen = data.len();
+    msg.msg_controllen = data.len() as _;
     // SAFETY: `msg` is zeroed-then-filled exactly like the send/recv paths;
     // CMSG_FIRSTHDR/NXTHDR walk within `data`'s bounds (cmsg_controllen).
     let mut cmsg = unsafe { libc::CMSG_FIRSTHDR(&msg) };
@@ -362,6 +362,14 @@ fn find_scm_rights<const N: usize>(
             // it — checking against data.len() alone let that read cross the
             // window end (fuzz-found 2026-08-26; the byte distance below is
             // computed, never dereferenced).
+            // glibc sizes cmsghdr::cmsg_len as size_t (usize), musl as
+            // socklen_t (u32); both widen losslessly to usize on 64-bit. Each
+            // target keeps its natural form — a conversion is the identity on
+            // one side and trips the useless-conversion lint there, so the
+            // walk branches on the libc environment instead of casting.
+            #[cfg(target_env = "musl")]
+            let cmsg_len = usize::try_from((*cmsg).cmsg_len).unwrap_or_default();
+            #[cfg(not(target_env = "musl"))]
             let cmsg_len = (*cmsg).cmsg_len;
             let offset = cmsg
                 .cast::<u8>()

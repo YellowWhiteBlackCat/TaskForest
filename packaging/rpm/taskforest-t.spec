@@ -10,7 +10,6 @@ Summary:    Keyboard-centric terminal system monitor built with Ratatui
 License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
 Source0:     taskforest-tree.tar.gz
-Requires:   glibc
 Suggests:   taskforest, smartmontools, nvme-cli, xfsprogs, iw
 ExclusiveArch: x86_64 aarch64
 
