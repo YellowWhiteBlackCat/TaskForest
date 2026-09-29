@@ -97,7 +97,7 @@ permissions:
 jobs:
   policy:
     name: Linux (fast policy gates + dependency audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -119,7 +119,7 @@ jobs:
   lint:
     name: Linux (clippy)
     needs: policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -171,7 +171,7 @@ jobs:
   test:
     name: Linux (workspace tests + doctests)
     needs: policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -207,7 +207,7 @@ jobs:
   docs:
     name: Linux (rustdoc)
     needs: policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -231,7 +231,7 @@ jobs:
   linux:
     name: Linux (release build + packaging smoke)
     needs: policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7

@@ -389,7 +389,10 @@ jobs:
     name: Publish release artifacts
     if: inputs.publish
     needs: [linux, windows]
-    runs-on: ubuntu-latest
+    # The packaging matrix stays on the pinned 24.04 package base (DEB/RPM
+    # dependency floors follow the build distro); only the publish step rides
+    # the newest runner image.
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Download all validated artifacts
