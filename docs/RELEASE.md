@@ -32,8 +32,8 @@ catalog 为每个平台未注册的期望身份发布 typed 缺席 descriptor（
 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 
 只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应
-Release（预发布 tag 自动标记为 GitHub prerelease）并生成以下 28 项产物：四端各 4 个
-DEB/RPM 包，加共享数据包 `taskforest-common` 的两架构 DEB/RPM。
+Release（预发布 tag 自动标记为 GitHub prerelease）并生成 28 项构建产物（四端各 4 个
+DEB/RPM 与 2 架构 MSI、`taskforest-common` 两架构 DEB/RPM）加 4 份 sha256 校验清单，共 32 个发布附件。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为 `G`、`I`、`T`、`B`，
 共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
 包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
