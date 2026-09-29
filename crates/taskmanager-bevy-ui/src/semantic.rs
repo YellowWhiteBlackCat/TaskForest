@@ -19,7 +19,6 @@
 //! feedback line. A quiet frame costs one key comparison — never polling
 //! work, never a stale announcement.
 
-use bevy::a11y::AccessibilityNode;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{NonSend, ResMut};
@@ -183,11 +182,11 @@ fn sync_semantic_snapshot(
 /// with the row scene so the required-component default from `Button` never
 /// reduces a data row to an unnamed button.
 #[must_use]
-pub(crate) fn process_row_node(name: &str, semantic_id: &str) -> AccessibilityNode {
+pub(crate) fn process_row_node(name: &str, semantic_id: &str) -> accesskit::Node {
     let mut node = accesskit::Node::new(accesskit::Role::Row);
     node.set_label(name);
     node.set_description(semantic_id);
-    AccessibilityNode(node)
+    node
 }
 
 /// Register the semantic projection. Called by the window plugin.

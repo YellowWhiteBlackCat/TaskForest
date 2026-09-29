@@ -21,7 +21,7 @@ use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, percent,
     px,
@@ -42,7 +42,7 @@ use taskmanager_shell::presentation::MISSING_VALUE;
 use super::super::processes;
 use crate::app::{FrontendTrack, PageContext, SharedRuntimeHandle, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
+use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
 
 const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
@@ -280,6 +280,7 @@ fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
 }
 
 mod formatting;
+use bevy::text::{LineBreak, TextLayout};
 pub(crate) use formatting::*;
 use taskmanager_application::ProjectedProcessInsights;
 use taskmanager_core::core::units::UnitPreferences;
@@ -524,7 +525,7 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
                     min_width: px(130.0),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
@@ -532,7 +533,7 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
                     flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(value) TextRole(Role::Body) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(value) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
         ]
     }

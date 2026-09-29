@@ -11,7 +11,7 @@ use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{Scene, bsn, template_value};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     UiRect, Val, percent, px,
@@ -19,9 +19,9 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 
-use crate::palette::no_wrap_text;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
 use crate::window::{Role, TextRole};
+use bevy::text::{LineBreak, TextLayout};
 
 /// The sortable-header indicator: a semantic direction plate (arrow-up /
 /// arrow-down) tinted with the dim ink, or empty when the sort rests
@@ -144,7 +144,7 @@ pub(crate) fn stat_row_scene(
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
             ),
             (
                 Node {
@@ -222,7 +222,7 @@ pub(crate) fn device_row_with_accessory_scene(
                 }
                 Pickable::IGNORE
                 Children [
-                    ( Text(title) TextRole(Role::Body) template_value(no_wrap_text()) Pickable::IGNORE ),
+                    ( Text(title) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
                     ( { caption } Pickable::IGNORE ),
                 ]
             ),
@@ -267,7 +267,7 @@ pub(crate) fn graph_card_scene(
         }
         BackgroundColor({ surface_fill(SurfaceTone::Content, palette) })
         Children [
-            ( Text(title) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+            ( Text(title) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
             ( Text(subtitle) TextRole(Role::Caption) ),
             ( { graph } ),
         ]

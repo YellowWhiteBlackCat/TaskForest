@@ -729,7 +729,7 @@ fn spawn_app_shell(
     demo: Option<Res<DemoMode>>,
     mut commands: Commands,
 ) {
-    commands.spawn(Camera2d);
+    commands.spawn_scene(bsn! { Camera2d });
     let summary = if demo.is_some() {
         t("status.demo_snapshot").to_owned()
     } else {

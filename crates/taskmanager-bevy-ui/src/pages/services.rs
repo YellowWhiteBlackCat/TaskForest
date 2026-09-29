@@ -39,7 +39,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
 use bevy::picking::Pickable;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::TextColor;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -59,7 +59,7 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12, space_24};
+use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
 use taskmanager_ui_contract::IconId;

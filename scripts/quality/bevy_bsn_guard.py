@@ -8,8 +8,15 @@ binding. It rejects the older or parallel hierarchy routes instead:
 * UI primitives such as ``Node { ... }``, ``Children [ ... ]`` and ``Text(...)``
   outside a ``bsn!`` scene;
 * ``with_children``/manual child-link APIs and legacy UI bundles;
-* direct ``commands.spawn``/``world.spawn`` calls, except the camera and
-  observer infrastructure that is not a UI tree.
+* direct ``commands.spawn``/``world.spawn`` calls, except observer
+  infrastructure that is not a UI tree;
+* ``template_value``/``TemplateValue`` in any position (hard zero): values a
+  scene can express are declared structurally, foreign whole values that a
+  scene cannot express go through the registered deferred ``apply_scene``
+  patch exit, never through the value wrapper;
+* a ``.insert(`` chained directly onto ``spawn_scene``/``spawn_scene_list``:
+  markers, styles and hierarchy components belong in the declared scene, and
+  deferred representation is stamped with ``apply_scene`` of a ``bsn!`` patch.
 
 It scans only ``crates/taskmanager-bevy-ui/src`` by default. Tests and Bevy's
 own plugin internals are outside the production authoring contract. The
@@ -29,7 +36,7 @@ from pathlib import Path
 
 BSN_START = re.compile(r"\bbsn!\s*\{")
 UI_CONSTRUCTION = re.compile(
-    r"\b(?:Node|Children|Text)\s*(?:\{|\[|\()"
+    r"\b(?:Node|Children|Text|ImageNode)\s*(?:\{|\[|\()"
     r"|\b(?:NodeBundle|TextBundle|ButtonBundle|ImageBundle|ChildBuilder|"
     r"ChildSpawnerCommands)\b"
 )
@@ -39,7 +46,12 @@ MANUAL_CHILD_API = re.compile(
 DIRECT_SPAWN = re.compile(
     r"\b(?:commands|world|world_mut)\s*\.\s*spawn(?:_batch)?\s*\("
 )
-ALLOWED_SPAWN_PREFIXES = ("Observer::new", "Camera2d")
+ALLOWED_SPAWN_PREFIXES = ("Observer::new",)
+TEMPLATE_VALUE = re.compile(r"\btemplate_value\b|\bTemplateValue\b")
+SCENE_MOUNT = re.compile(
+    r"\.\s*(?:spawn_scene|spawn_scene_list|queue_spawn_scene)\s*\("
+)
+INSERT_CHAIN = re.compile(r"\s*\.\s*insert\s*\(")
 
 
 @dataclass(frozen=True)
@@ -179,6 +191,18 @@ def inside_scene(offset: int, spans: list[tuple[int, int]]) -> bool:
     return any(start <= offset < end for start, end in spans)
 
 
+def in_return_position(masked: str, start: int) -> bool:
+    """A ``Type {`` match right after ``->`` is a signature, not construction.
+
+    The type may be path-qualified (``accesskit::Node {``), so walk the
+    ``::``-separated prefix back before looking for the return arrow.
+    """
+
+    prefix = re.search(r"[\w:]+$", masked[:start])
+    before = masked[: prefix.start()] if prefix else masked[:start]
+    return before.rstrip().endswith("->")
+
+
 def matching_paren(masked: str, opening: int) -> int | None:
     depth = 0
     for index in range(opening, len(masked)):
@@ -215,7 +239,9 @@ def scan_file(path: Path, repository: Path) -> list[Violation]:
         )
 
     for match in UI_CONSTRUCTION.finditer(masked):
-        if not inside_scene(match.start(), spans):
+        if not inside_scene(match.start(), spans) and not in_return_position(
+            masked, match.start()
+        ):
             violations.append(
                 Violation(
                     relative,
@@ -249,6 +275,35 @@ def scan_file(path: Path, repository: Path) -> list[Violation]:
                 "direct entity spawn is forbidden; mount UI through spawn_scene",
             )
         )
+
+    for match in TEMPLATE_VALUE.finditer(masked):
+        violations.append(
+            Violation(
+                relative,
+                line_number(original, match.start()),
+                "BEVY-BSN-005",
+                "template_value is hard-zero; declare the fields or patch with "
+                "apply_scene(bsn! { ... })",
+            )
+        )
+
+    for match in SCENE_MOUNT.finditer(masked):
+        opening = masked.find("(", match.start(), match.end())
+        closing = matching_paren(masked, opening)
+        if closing is None:
+            continue
+        chained = INSERT_CHAIN.match(masked, closing + 1)
+        if chained:
+            insert_at = masked.find(".", chained.start())
+            violations.append(
+                Violation(
+                    relative,
+                    line_number(original, insert_at),
+                    "BEVY-BSN-006",
+                    "creation-chain insert bypasses the declared scene; move the "
+                    "component into bsn! or stamp it with apply_scene",
+                )
+            )
     return violations
 
 
@@ -268,9 +323,9 @@ def self_test() -> int:
             """
             fn scene() {
                 bsn! { Node { } Children [ ( Text(value) ) ] }
+                commands.spawn_scene(bsn! { Camera2d });
             }
             fn infra(mut commands: Commands) {
-                commands.spawn(Camera2d);
                 commands.spawn(Observer::new(bind));
             }
             // Node { } Children [ ] Text(value) commands.spawn(Button);
@@ -284,9 +339,15 @@ def self_test() -> int:
                 let node = Node { width: px(1.0) };
                 let children = Children [];
                 let text = Text(value);
+                let plate = ImageNode { image };
                 commands.spawn(Button);
                 commands.entity(root).with_children(|_| {});
+                commands
+                    .spawn_scene(bsn! { Node { } })
+                    .insert(PageContent { page });
+                let wrapped = template_value(transform);
             }
+            use bevy::scene::template_value;
             """,
             encoding="utf-8",
         )
@@ -297,8 +358,12 @@ def self_test() -> int:
             "BEVY-BSN-001",
             "BEVY-BSN-001",
             "BEVY-BSN-001",
+            "BEVY-BSN-001",
             "BEVY-BSN-002",
             "BEVY-BSN-003",
+            "BEVY-BSN-005",
+            "BEVY-BSN-005",
+            "BEVY-BSN-006",
             "BEVY-BSN-004",
         ]
         if sorted(codes) != sorted(expected):

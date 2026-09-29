@@ -7,7 +7,7 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::math::Rot2;
-use bevy::scene::{Scene, bsn, template_value};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
 
 /// Hard upper bound used by the performance chart surface.
@@ -184,7 +184,6 @@ pub(crate) fn segment_scene(
     color: bevy::color::Color,
 ) -> impl Scene + use<> {
     let layout = segment_layout(segment);
-    let transform = UiTransform::from_rotation(Rot2::radians(layout.rotation));
     bsn! {
         Node {
             width: px(layout.length),
@@ -194,7 +193,7 @@ pub(crate) fn segment_scene(
             top: px(layout.top),
         }
         BackgroundColor(color)
-        template_value(transform)
+        UiTransform { rotation: Rot2::radians(layout.rotation) }
     }
 }
 

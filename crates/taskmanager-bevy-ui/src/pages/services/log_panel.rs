@@ -19,8 +19,8 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::World;
 use bevy::input::keyboard::KeyCode;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
-use bevy::text::TextColor;
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
     Overflow, UiRect, Val, percent, px,
@@ -38,7 +38,7 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, She
 use crate::app::FrontendTrack;
 use crate::drain::{ShellProjectionFolded, unix_now_ms};
 use crate::input::PendingEffects;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12};
+use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
 use taskmanager_core::core::services::ServiceLogLevel;
@@ -228,7 +228,7 @@ fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene +
                         Text(entry_stamp(entry))
                         TextColor(ink)
                         TextRole(Role::Mono)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     )
                 ]
             ),
@@ -236,7 +236,7 @@ fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene +
                 Text({ entry.message.clone() })
                 TextColor(ink)
                 TextRole(Role::Mono)
-                template_value(no_wrap_text())
+                TextLayout { linebreak: LineBreak::NoWrap }
             ),
         ]
     }
@@ -265,7 +265,7 @@ fn chip_button(
             on(log_panel_control_activated)
             ServiceLogControlButton(action)
             Children [
-                ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
             ]
         )
     })
@@ -304,7 +304,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                     Text(status)
                     ServicesLogStatusLine
                     TextRole(Role::Caption)
-                    template_value(no_wrap_text())
+                    TextLayout { linebreak: LineBreak::NoWrap }
                 )
             ]
         }) as Box<dyn Scene>]
@@ -352,7 +352,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                     (
                         Text(title)
                         TextRole(Role::Body)
-                        template_value(no_wrap_text())
+                        TextLayout { linebreak: LineBreak::NoWrap }
                     ),
                     ( Node { flex_grow: 1.0 } ),
                     ( { chip_button(ServiceLogControlAction::Close, t("common.close").to_owned(), false, palette) } ),

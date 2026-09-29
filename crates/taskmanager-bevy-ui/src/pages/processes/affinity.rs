@@ -14,7 +14,7 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::ecs::world::World;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     PositionType, UiRect, Val, percent, px,
@@ -29,9 +29,10 @@ use taskmanager_shell::ShellApp;
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::input::PendingEffects;
-use crate::palette::{UiPalette, no_wrap_text, space_8, space_12, space_24};
+use crate::palette::{UiPalette, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use bevy::text::{LineBreak, TextLayout};
 use taskmanager_application::ProcessAffinityRequest;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -156,7 +157,7 @@ pub(crate) fn affinity_modal_scene(
                 on(on_cpu_button_activated)
                 AffinityCpuButton(cpu)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
                 ]
             )
         }) as Box<dyn Scene>);
