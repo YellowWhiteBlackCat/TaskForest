@@ -30,15 +30,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (ContextMenu, Ported),
         // The column-visibility selection menu over the Applications table.
         (DropdownMenu, Ported),
-        // No pointer-hover explanation surface is mounted; hint copy is
-        // rendered as inline captions (e.g. the insights scroll hint).
-        (
-            Tooltip,
-            Unsupported {
-                reason: "no pointer-hover explanation surface is mounted; hint text \
-                         renders as inline captions",
-            },
-        ),
+        // The pointer-hover explanation tooltip overlay surface.
+        (Tooltip, Ported),
         (
             Toast,
             Divergent {

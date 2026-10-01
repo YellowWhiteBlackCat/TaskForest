@@ -253,8 +253,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (ContextMenu, Kind::Ported),
         // The column-visibility selection menu over the Applications table.
         (DropdownMenu, Kind::Ported),
-        // No hover/focus explanation surface; hints render as inline captions.
-        (Tooltip, Kind::Unsupported),
+        // The pointer-hover explanation tooltip overlay surface.
+        (Tooltip, Kind::Ported),
         (Toast, Kind::Divergent),
         (TextInput, Kind::Divergent),
         (SearchInput, Kind::Ported),

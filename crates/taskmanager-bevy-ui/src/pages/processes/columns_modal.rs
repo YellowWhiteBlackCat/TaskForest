@@ -93,6 +93,7 @@ pub(crate) fn choose_columns_button_scene(palette: &UiPalette) -> impl Scene + u
         BackgroundColor({ palette.nav_active_bg })
         Button
         ControlVisual(ControlTone::Surface, false)
+        crate::tooltip::TooltipText({ label.to_string() })
         on(on_open_columns_modal_activated)
         Children [
             ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
