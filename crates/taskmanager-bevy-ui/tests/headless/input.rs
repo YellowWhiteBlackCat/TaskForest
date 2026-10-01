@@ -795,18 +795,9 @@ fn search_editor_binds_no_clipboard_chords() {
 }
 
 #[test]
-fn selectable_readout_copy_has_no_path_in_this_shape() {
-    // TextSelection is declared `Unsupported`: read-out text nodes are not
-    // selectable, and Ctrl+C has no row/summary clipboard route. The shared
-    // row-summary seam itself is available (other shapes write it to the OS
-    // clipboard); this shape leaves it untouched.
+fn ctrl_c_copies_selected_row_summary_to_clipboard() {
     let shell = shell_with_selection();
-    assert!(
-        shell.selected_row_summary().is_some(),
-        "the shared row-summary seam is available to shapes that wire a clipboard"
-    );
-    let selection_before = shell.selected_process_identity();
-    let feedback_before = shell.feedback_text().to_owned();
+    let expected_summary = shell.selected_row_summary().expect("summary exists");
 
     let mut app = input_app(shell);
     app.update();
@@ -814,21 +805,14 @@ fn selectable_readout_copy_has_no_path_in_this_shape() {
 
     press_ctrl(&mut app, KeyCode::KeyC, None);
 
-    let shell = &app.world().non_send::<FrontendTrack>().shell;
-    assert_eq!(
-        shell.selected_process_identity(),
-        selection_before,
-        "Ctrl+C must not move the row selection"
-    );
-    assert!(
-        shell.feedback_notice().is_none(),
-        "no copy receipt may appear: this shape wires no row-copy path"
-    );
-    assert_eq!(
-        shell.feedback_text(),
-        feedback_before,
-        "Ctrl+C must not repaint the feedback line"
-    );
+    let world = app.world();
+    let clipboard = world.resource::<crate::text_selection::ClipboardPort>();
+    assert_eq!(clipboard.get_text(), Some(expected_summary.as_str()));
+
+    let shell = &world.non_send::<FrontendTrack>().shell;
+    let notice = shell.feedback_notice().expect("copy notice recorded");
+    assert_eq!(notice.source(), FeedbackSource::Clipboard);
+    assert!(notice.text().contains("Selected Row"));
 }
 
 #[test]

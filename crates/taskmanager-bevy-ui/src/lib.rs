@@ -72,6 +72,7 @@ pub mod palette;
 pub mod runtime;
 pub mod semantic;
 pub mod snapshot_export;
+pub(crate) mod text_selection;
 pub(crate) mod tooltip;
 pub(crate) mod tray;
 pub mod widgets;

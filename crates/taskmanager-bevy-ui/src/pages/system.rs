@@ -352,10 +352,13 @@ fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<
     // contract (NoWrap + clip) as the performance rail — one row grammar
     // across pages, never a page-local spelling.
     let value = row.value.clone();
+    let text_val = row.value.clone();
+    let label = row.label.clone();
     let value_scene = Box::new(bsn! {
-        Text(value)
+        Text(text_val)
         TextRole(Role::Body)
         TextLayout { linebreak: LineBreak::NoWrap }
+        crate::text_selection::SelectableText(label, value)
     }) as Box<dyn bevy::scene::Scene>;
     crate::widgets::controls::stat_row_scene(row.label.clone(), value_scene, palette)
 }

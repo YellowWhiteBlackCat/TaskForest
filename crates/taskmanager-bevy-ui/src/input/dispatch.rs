@@ -89,6 +89,10 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     selections: &'a InventorySelections<'n>,
     /// Search text-editing state (absent before the page resources mount).
     text_state: &'a mut Option<ResMut<'t, TextInputState>>,
+    /// Read-only text selection state.
+    text_selection: Option<&'a mut crate::text_selection::TextSelectionState>,
+    /// Clipboard port resource.
+    clipboard: Option<&'a mut crate::text_selection::ClipboardPort>,
     /// Service-log export directory (absent outside the window shell).
     export_dir: Option<&'a ServiceLogExportDir>,
     /// Performance page device focus (absent outside the window shell).
@@ -132,6 +136,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if self.frontend_menus(press)
             || self.service_log_panel(press)
             || self.dismiss_shared_surface(press)
+            || self.dismiss_text_selection(press)
             || self.dismiss_feedback(press)
             || self.route_chord(press)
             || self.confirm_gate(press)
@@ -142,6 +147,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             || self.snapshot_export(press)
             || self.search_editing(press)
             || self.shell_char(press)
+            || self.copy_chord(press)
         {
             return;
         }
@@ -262,6 +268,24 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             self.shell.dismiss_overlay();
             self.applied = true;
             return true;
+        }
+        false
+    }
+
+    /// Arm 0b3 — read-only text selection dismissal: Escape clears active selection.
+    fn dismiss_text_selection(&mut self, press: KeyPress) -> bool {
+        if matches!(press.context, KeyboardOwner::Free)
+            && press.key_code == KeyCode::Escape
+            && press.modifiers == Modifiers::NONE
+        {
+            if let Some(ref mut sel) = self.text_selection {
+                if sel.is_active() {
+                    sel.clear();
+                    self.commands.trigger(crate::text_selection::TextSelectionChanged);
+                    self.applied = true;
+                    return true;
+                }
+            }
         }
         false
     }
@@ -402,16 +426,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .svc
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| {
-                self.shell
-                    .sorted_services()
-                    .first()
-                    .map(|service| service.id.clone())
-            });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &target)
+            .or_else(|| self.shell.sorted_services().first().map(|s| s.id.clone()));
+        target.is_some_and(|t| crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &t))
     }
 
     /// The Startup open-attempt: the table selection, else the first sorted
@@ -422,16 +438,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .stu
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| {
-                self.shell
-                    .sorted_startup_entries()
-                    .first()
-                    .map(|entry| entry.id.clone())
-            });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &target)
+            .or_else(|| self.shell.sorted_startup_entries().first().map(|e| e.id.clone()));
+        target.is_some_and(|t| crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &t))
     }
 
     /// The Sessions open-attempt: the table selection, else the first sorted
@@ -442,16 +450,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .ses
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| {
-                self.shell
-                    .sorted_sessions()
-                    .first()
-                    .map(|session| session.id.clone())
-            });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &target)
+            .or_else(|| self.shell.sorted_sessions().first().map(|s| s.id.clone()));
+        target.is_some_and(|t| crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t))
     }
 
     /// Arm 2c — Performance page: 't' chord triggers SMART self-test for the
@@ -539,6 +539,23 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         }
         self.applied = true;
         true
+    }
+
+    /// Arm 3b — copy chord: Ctrl+C copies active text selection or selected row summary.
+    fn copy_chord(&mut self, press: KeyPress) -> bool {
+        if matches!(press.context, KeyboardOwner::Free)
+            && press.key_code == KeyCode::KeyC
+            && press.modifiers.control
+        {
+            if let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard) {
+                if crate::text_selection::copy_selection_or_row(sel, clip, self.shell) {
+                    self.commands.trigger(crate::text_selection::TextSelectionChanged);
+                    self.applied = true;
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Arm 3a — table row selection motion for non-process inventory tables.
@@ -696,6 +713,10 @@ pub(crate) struct KeyboardDispatchOutputs<'w, 's> {
     feedback_cache: Option<ResMut<'w, FeedbackCache>>,
     /// Search text-editing state, absent before the page resources mount.
     text_state: Option<ResMut<'w, TextInputState>>,
+    /// Read-only text selection state.
+    text_selection: Option<ResMut<'w, crate::text_selection::TextSelectionState>>,
+    /// Clipboard port.
+    clipboard: Option<ResMut<'w, crate::text_selection::ClipboardPort>>,
     /// Deferred commands (observer triggers).
     commands: Commands<'w, 's>,
 }
@@ -729,6 +750,8 @@ pub(crate) fn keyboard_dispatch_system(
             modals: &mut modals,
             selections: &selections,
             text_state: &mut outputs.text_state,
+            text_selection: outputs.text_selection.as_deref_mut(),
+            clipboard: outputs.clipboard.as_deref_mut(),
             export_dir: inputs.export_dir.as_deref(),
             perf_device_focus: inputs.perf_device_focus.as_deref(),
             applied: false,

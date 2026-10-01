@@ -496,6 +496,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::menu_modal::register::<crate::pages::sessions::menu::SessionMenuCtx>(app);
         crate::semantic::register(app);
         crate::tooltip::register(app);
+        crate::text_selection::register(app);
         app.add_systems(
             Startup,
             (

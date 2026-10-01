@@ -11,11 +11,9 @@ use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration,
 
 /// Shared commands deliberately not offered by the current Bevy surface.
 ///
-/// Bevy has no system-about surface or clipboard adapter in
-/// this milestone. The entries remain explicit rather than being dropped from
-/// the declaration.
-const DELIBERATELY_UNBOUND: [CommandId; 2] =
-    [CommandId::ShowSystemAbout, CommandId::CopySelectedRow];
+/// Bevy has no system-about surface in this milestone. The entries remain
+/// explicit rather than being dropped from the declaration.
+const DELIBERATELY_UNBOUND: [CommandId; 1] = [CommandId::ShowSystemAbout];
 
 /// Whether a shared command is intentionally absent from the Bevy shape.
 #[must_use]

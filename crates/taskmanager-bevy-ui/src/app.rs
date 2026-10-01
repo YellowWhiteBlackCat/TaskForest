@@ -636,6 +636,8 @@ impl Plugin for AppShellPlugin {
             .init_resource::<crate::pages::processes::columns_modal::ProcessColumnsModalState>()
             .init_resource::<crate::pages::processes::columns_modal::ProcessHiddenColumns>()
             .init_resource::<crate::tooltip::TooltipState>()
+            .init_resource::<crate::text_selection::TextSelectionState>()
+            .init_resource::<crate::text_selection::ClipboardPort>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
             .add_observer(crate::widgets::table::on_process_sort_header_activated)

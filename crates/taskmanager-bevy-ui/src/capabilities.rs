@@ -18,7 +18,7 @@ use taskmanager_ui_contract::{
 /// Declare the Bevy shape's complete component capability surface.
 #[must_use]
 pub fn capability_declaration() -> FrontendCapabilityDeclaration {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Divergent, Ported};
     use ComponentCapability::{
         Checkbox, ColumnDragResize, ContextMenu, DropdownMenu, FocusVisible, ModalOverlay,
         Scrollbar, SearchInput, SegmentedControl, Select, Slider, Switch, Table, TextInput,
@@ -45,18 +45,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
             },
         ),
         (SearchInput, Ported),
-        // The shape offers no selection surface at all: read-out text nodes
-        // are not selectable, no system-clipboard read/write is wired, and the
-        // search editor binds no clipboard chords (Ctrl+C/X/V are not
-        // intercepted).
-        (
-            TextSelection,
-            Unsupported {
-                reason: "read-out text is not selectable and no system-clipboard export is \
-                         wired; the search editor offers character editing only and binds no \
-                         Ctrl+C/X/V clipboard chords",
-            },
-        ),
+        // Read-only text selection and clipboard export surface.
+        (TextSelection, Ported),
         // Boolean rows use the official `bevy_ui_widgets::Checkbox`; no
         // switch-specific control is authored.
         (
