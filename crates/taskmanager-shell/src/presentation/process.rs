@@ -3,7 +3,6 @@
 use taskmanager_application::i18n;
 use taskmanager_core::LimitValue;
 use taskmanager_core::ProcessItem;
-pub use taskmanager_core::core::process::ProcessAncestorNode;
 use taskmanager_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
 
 /// Retrieve and format the ancestor lineage for a target PID from a process inventory.
