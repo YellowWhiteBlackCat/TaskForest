@@ -113,8 +113,27 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
     assert_eq!(rows.len(), 2, "one row per projected descriptor");
     assert!(rows[0].contains("/dev/null") && rows[0].starts_with("fd 0"));
     assert!(
+        rows[0].contains("[file]"),
+        "descriptor classifies handle type"
+    );
+    assert!(
         rows[1].contains(t("proc_insights.unreadable")) && rows[1].starts_with("fd 9"),
         "the unreadable descriptor's own row carries its marker: {rows:?}"
+    );
+    let deleted_entry = OpenFileEntry {
+        fd: 3,
+        kind: OpenFileKind::File,
+        target: Some("/tmp/deleted.log".to_string()),
+        deleted: true,
+    };
+    let deleted_rows = open_file_rows(&[deleted_entry], MAX_FACET_ROWS);
+    assert!(
+        deleted_rows[0].contains("[deleted]"),
+        "deleted descriptor is marked"
+    );
+    assert!(
+        deleted_rows[0].contains("[file]"),
+        "deleted descriptor classifies handle type"
     );
     let many: Vec<OpenFileEntry> = (0..MAX_FACET_ROWS + 3)
         .map(|index| OpenFileEntry {

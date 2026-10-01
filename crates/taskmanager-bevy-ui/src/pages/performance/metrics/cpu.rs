@@ -11,7 +11,40 @@ use taskmanager_shell::presentation::load_average_values_summary;
 use taskmanager_shell::presentation::msr_thermal_status_summary;
 use taskmanager_shell::presentation::pressure_summary;
 
-pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CpuField {
+    Brand,
+    Usage,
+    Frequency,
+    Temperature,
+    Power,
+    Pressure,
+    Load,
+    Topology,
+    IdleStates,
+    PowerLimits,
+    ThermalThrottle,
+    ThermalStatus,
+    Interrupts,
+    Core(usize),
+    L1dCache,
+    L1iCache,
+    L2Cache,
+    L3Cache,
+    PerformanceCores,
+    EfficiencyCores,
+    LowPowerCores,
+}
+
+impl Default for CpuField {
+    /// Template seed only — the bsn! paren form requires a `Default` value
+    /// that every spawned scene immediately patches with a real field.
+    fn default() -> Self {
+        Self::Usage
+    }
+}
+
+pub(crate) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
     if let CpuField::Load = field {
         return shell
             .projection()
@@ -80,6 +113,56 @@ pub(in super::super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> Str
         // `telemetry.cpu.msr` lane is handled before the snapshot gate above.
         CpuField::ThermalStatus => missing_value(),
         CpuField::Load => missing_value(),
-        CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),
+        CpuField::Core(index) => {
+            let usage = observed_percentage(core_usage_pct(shell, index));
+            let freq = cpu.current_core_frequency_mhz(index).map(|mhz| {
+                if mhz >= 1000 {
+                    format!("{:.1} GHz", mhz as f64 / 1000.0)
+                } else {
+                    format!("{mhz} MHz")
+                }
+            });
+            match freq {
+                Some(freq_str) => format!("{usage} · {freq_str}"),
+                None => usage,
+            }
+        }
+        CpuField::L1dCache => format_cache_kb(cpu.l1d_cache_kb),
+        CpuField::L1iCache => format_cache_kb(cpu.l1i_cache_kb),
+        CpuField::L2Cache => format_cache_kb(cpu.l2_cache_kb),
+        CpuField::L3Cache => format_cache_kb(cpu.l3_cache_kb),
+        CpuField::PerformanceCores => shell
+            .projection()
+            .hardware
+            .as_ref()
+            .and_then(|h| (h.core_breakdown.p_cores > 0).then_some(h.core_breakdown.p_cores))
+            .map_or_else(missing_value, |c| c.to_string()),
+        CpuField::EfficiencyCores => shell
+            .projection()
+            .hardware
+            .as_ref()
+            .and_then(|h| (h.core_breakdown.e_cores > 0).then_some(h.core_breakdown.e_cores))
+            .map_or_else(missing_value, |c| c.to_string()),
+        CpuField::LowPowerCores => shell
+            .projection()
+            .hardware
+            .as_ref()
+            .and_then(|h| (h.core_breakdown.lp_cores > 0).then_some(h.core_breakdown.lp_cores))
+            .map_or_else(missing_value, |c| c.to_string()),
     }
+}
+
+fn format_cache_kb(kb: Option<u64>) -> String {
+    kb.map_or_else(missing_value, |kb| {
+        if kb >= 1024 {
+            let mib = kb as f64 / 1024.0;
+            if (mib.fract()).abs() < 0.05 {
+                format!("{mib:.0} MiB")
+            } else {
+                format!("{mib:.2} MiB")
+            }
+        } else {
+            format!("{kb} KiB")
+        }
+    })
 }

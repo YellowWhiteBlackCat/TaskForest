@@ -495,7 +495,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
                 fd: 0,
                 kind: OpenFileKind::File,
                 target: Some("/dev/null".into()),
-                deleted: false,
+                deleted: true,
             },
             OpenFileEntry {
                 fd: 1,
@@ -522,7 +522,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
     let summary = super::open_files_summary(&files);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], format!("4 · 1 {}", t("proc_insights.unreadable")));
-    assert_eq!(lines[1], "0 [file] -> /dev/null");
+    assert_eq!(lines[1], "0 [file] -> /dev/null [deleted]");
     assert_eq!(
         lines[2],
         format!("1 [socket] -> {}", t("proc_insights.unreadable"))

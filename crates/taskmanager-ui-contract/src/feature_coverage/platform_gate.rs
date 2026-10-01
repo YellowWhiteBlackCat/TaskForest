@@ -786,9 +786,9 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
 pub static PLATFORM_GATE_BASELINE: PlatformGateBaseline<'static> = PlatformGateBaseline {
     missing_by_frontend: &[
         (FrontendShape::Gpui, 75),
-        (FrontendShape::Iced, 84),
+        (FrontendShape::Iced, 75),
         (FrontendShape::Tui, 75),
-        (FrontendShape::Bevy, 93),
+        (FrontendShape::Bevy, 75),
     ],
     unregistered_per_frontend: 3,
     unbound_expected_capabilities: UNBOUND_EXPECTED_CAPABILITIES,

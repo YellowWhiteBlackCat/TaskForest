@@ -170,7 +170,16 @@ pub(crate) fn format_open_file_row(entry: &OpenFileEntry) -> String {
         .target
         .clone()
         .unwrap_or_else(|| t("proc_insights.unreadable").to_string());
-    format!("fd {} → {}", entry.fd, target)
+    if entry.deleted {
+        format!(
+            "fd {} [{}] → {} [deleted]",
+            entry.fd,
+            entry.resolved_kind(),
+            target
+        )
+    } else {
+        format!("fd {} [{}] → {}", entry.fd, entry.resolved_kind(), target)
+    }
 }
 
 pub(crate) fn format_engine_usage(

@@ -54,6 +54,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryPageFaults
         | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration
+        | FeatureId::HandleTypeClassification
+        | FeatureId::DeletedFileHandleWatch
         | FeatureId::ThreadTopologyEnumeration
         | FeatureId::ThreadRunqueueLatency
         | FeatureId::ThreadUninterruptibleSleepDiagnosis
@@ -67,6 +69,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::DiskSmartHealth
         | FeatureId::SwapThroughputRate
         | FeatureId::HardwareTopologyTree
+        | FeatureId::CpuCoreFrequency
         | FeatureId::CpuCacheTopology
         | FeatureId::CpuHeterogeneousCoreClass
         | FeatureId::GpuAdapterEnumeration
@@ -95,14 +98,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MultiFormatExport => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleTypeClassification => Unsupported {
-            reason: "the Iced open-file facet renders fd and target only, with \
-                     no descriptor type classifier",
-        },
-        FeatureId::DeletedFileHandleWatch => Unsupported {
-            reason: "the Iced open-file facet does not surface deleted-but-held \
-                     descriptors",
-        },
         FeatureId::HandleFdLimitSaturation => Unsupported {
             reason: "the Iced open-file facet renders descriptors without the \
                      RLIMIT_NOFILE saturation context",
@@ -113,10 +108,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::SocketQueueBacklog => Unsupported {
             reason: "the Iced connection rows render addresses and state without \
                      send/receive queue depth",
-        },
-        FeatureId::CpuCoreFrequency => Unsupported {
-            reason: "the Iced CPU surface renders the package-level frequency \
-                     without the per-core readout",
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Iced process \

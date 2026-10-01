@@ -82,11 +82,11 @@ pub(crate) fn open_files_summary(files: &ProcessOpenFiles) -> String {
             .target
             .as_deref()
             .unwrap_or_else(|| t("proc_insights.unreadable"));
+        let deleted = if entry.deleted { " [deleted]" } else { "" };
         lines.push(format!(
-            "{} [{}] -> {}",
+            "{} [{}] -> {target}{deleted}",
             entry.fd,
             entry.resolved_kind(),
-            target
         ));
     }
     if files.entries.len() > 3 {

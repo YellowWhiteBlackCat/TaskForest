@@ -5,6 +5,7 @@ use super::super::chart::curve_card_scene;
 use super::*;
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 use bevy::text::{LineBreak, TextLayout};
+use taskmanager_core::core::hardware::CpuType;
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
     bsn! {
@@ -66,6 +67,13 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         (t("cpu.interrupts"), CpuField::Interrupts),
         (t("cpu.thermal_throttle"), CpuField::ThermalThrottle),
         (t("cpu.thermal_status"), CpuField::ThermalStatus),
+        (t("common.l1_data_cache"), CpuField::L1dCache),
+        (t("common.l1_instruction_cache"), CpuField::L1iCache),
+        (t("common.l2_cache"), CpuField::L2Cache),
+        (t("common.l3_cache"), CpuField::L3Cache),
+        (t("cpu.performance_cores"), CpuField::PerformanceCores),
+        (t("cpu.efficiency_cores"), CpuField::EfficiencyCores),
+        (t("cpu.low_power_cores"), CpuField::LowPowerCores),
     ]
     .into_iter()
     .map(|(label, field)| {
@@ -104,7 +112,18 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
 /// neither.
 fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl Scene + use<> {
     let field = CpuField::Core(index);
-    let label = format!("Core {:02}", index + 1);
+    let type_suffix = shell
+        .projection()
+        .hardware
+        .as_ref()
+        .and_then(|h| h.cpu_types.get(index).copied())
+        .map_or("", |t| match t {
+            CpuType::Performance => " (P)",
+            CpuType::Efficient => " (E)",
+            CpuType::LowPower => " (LP)",
+            _ => "",
+        });
+    let label = format!("Core {:02}{type_suffix}", index + 1);
     // The fill's FIRST paint comes from the same folded observation the
     // number renders — a page without a pending fold still shows bars that
     // agree with their numeric facts (capture and cold start included).
@@ -121,7 +140,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
         Children [
             (
                 Node {
-                    width: px(56.0),
+                    width: px(84.0),
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
@@ -152,7 +171,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
             ),
             (
                 Node {
-                    width: px(52.0),
+                    width: px(120.0),
                     flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::FlexEnd,
@@ -199,9 +218,31 @@ fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + us
             { rows },
         ]
     };
+    let hw = shell.projection().hardware.as_ref();
+    let breakdown_label = hw.and_then(|h| {
+        if h.core_breakdown.total() > 0 {
+            let mut parts = Vec::new();
+            if h.core_breakdown.p_cores > 0 {
+                parts.push(format!("{} P-Cores", h.core_breakdown.p_cores));
+            }
+            if h.core_breakdown.e_cores > 0 {
+                parts.push(format!("{} E-Cores", h.core_breakdown.e_cores));
+            }
+            if h.core_breakdown.lp_cores > 0 {
+                parts.push(format!("{} LP-Cores", h.core_breakdown.lp_cores));
+            }
+            Some(parts.join(" · "))
+        } else {
+            None
+        }
+    });
+    let subtitle = match breakdown_label {
+        Some(breakdown) => format!("{} · {breakdown}", t("cpu.utilization_by_core")),
+        None => t("cpu.utilization_by_core").to_owned(),
+    };
     let graph = graph_card_scene(
         t("common.cores").to_owned(),
-        t("cpu.utilization_by_core").to_owned(),
+        subtitle,
         Box::new(body),
         palette,
     );

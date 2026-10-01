@@ -1,43 +1,34 @@
-# Crate 细节索引
+# TaskForest 的 crate 结构
 
-这是第三层的入口。每个 crate README 只描述该 crate 的职责、拥有的事实、禁止拥有的边界、
-公共合同和验证方式；跨 crate 当前规则仍以 `docs/` 总纲为准。
+TaskForest 是一个 Rust workspace：它把「从操作系统采集事实 → 领域规则 → 应用编排 → 平台
+I/O → 前端渲染」拆成一条单向依赖链。这样拆的目的很实际——平台差异、渲染技术、权限边界互不
+污染，任何一处换实现都不牵动整条链。本页说明这条链分成哪几层、每层在解决什么问题；某个 crate
+具体负责什么，看它自己的 `README.md`。
 
-## Shared core
+## 依赖方向
 
-- [core](taskmanager-core/README.md) · [application](taskmanager-application/README.md) · [shell](taskmanager-shell/README.md)
-- [UI contract](taskmanager-ui-contract/README.md) · [platform contract](taskmanager-platform-contract/README.md)
-- [provider SPI](taskmanager-platform-provider/README.md) · [portable providers](taskmanager-platform-portable/README.md) · [runtime](taskmanager-platform-runtime/README.md)
-- [telemetry store](taskmanager-telemetry-store/README.md) · [history store](taskmanager-history-store/README.md)
+```text
+frontend → application → core / shell → platform runtime → app-host / native composition → OS
+```
 
-## Platform and composition
+返回方向只携带类型化的事件、快照和失败。一条事实只有一个权威来源；下层可以展开上层，不能重新
+定义上层。
 
-- [app host](taskmanager-app-host/README.md) · [native selection](taskmanager-platform-native/README.md)
-- [Linux](taskmanager-platform-linux/README.md) · [macOS](taskmanager-platform-macos/README.md) · [Windows](taskmanager-platform-windows/README.md) · [Android (feature-gated)](taskmanager-platform-android/README.md) · [OpenHarmony](taskmanager-platform-ohos/README.md)
-- [conformance](taskmanager-platform-conformance/README.md) · [accessibility](taskmanager-accessibility-linux/README.md)
+## 各层在解决什么
 
-## Product surfaces
+- **core / application / shell**：所有前端共享的领域事实、命令与投影。`core` 拥有类型化事实与
+  纯规则，`application` 拥有命令、reducer 与端口，`shell` 拥有前端中立的投影、缓存与交互词汇。
+- **contract**：`taskmanager-ui-contract` 与 `taskmanager-platform-contract` 规定前端和平台
+  「必须提供什么」，本身不含实现。
+- **platform**：provider SPI 与各平台适配器负责真实 I/O，runtime 负责调度、并发、背压与事件
+  投递，app-host 负责挑选并组合平台实现。
+- **frontend**：GPUI、Iced、TUI、Bevy 是四个独立产品 crate，共享同一套应用投影，区别只在渲染
+  与交互；共享的 CLI harness 提供它们共同的启动骨架。
+- **受审边界与工具**：只有少数受审 crate 允许 `unsafe` 或直接触碰内核/系统接口，能力按需授权、
+  可单独撤销；`test-support` 与 fuzz workspace 只服务测试，不属于产品依赖。
 
-- Four frontend products (ADR-051): [GPUI / taskforest-g](taskmanager-gpui/README.md) · [Iced / taskforest-i](taskmanager-iced/README.md) · [TUI / taskmanager-tui](taskmanager-tui/README.md) · [Bevy / taskforest-b](taskmanager-bevy-ui/README.md)
-- [Shared CLI harness](taskmanager-cli/README.md) — every product bin hands its capabilities to `taskmanager_cli::run`; the root package (`taskmanager-gates`) hosts the cross-crate conformance suites and ships no binary
-- [UI components](taskmanager-ui/README.md) · [theme](taskmanager-theme/README.md)
-- [icons](taskmanager-icons/README.md) · [assets](taskmanager-assets/README.md) · [tray](taskmanager-tray-muda/README.md)
+## 怎么找到某个 crate
 
-## Audited boundaries and helpers
-
-- [perf ioctl](taskmanager-perf-ioctl/README.md) · [AF_PACKET](taskmanager-afpacket/README.md)
-- [fd bridge](taskmanager-fd-bridge/README.md) · [Windows API](taskmanager-windows-api/README.md)
-- [escalation](taskmanager-escalation/README.md) · [net launcher](taskmanager-net-launcher/README.md)
-- [privilege helper](taskmanager-privilege-helper/README.md) · [process-control helper](taskmanager-process-control-helper/README.md)
-- [setup helper](taskmanager-setup-helper/README.md)
-- [smbios tables](taskmanager-smbios-tables/README.md) — the ONE pure parser for SMBIOS records, shared by the unprivileged DMI probe and the helper
-- [smbios helper](taskmanager-smbios-helper/README.md) · [rapl helper](taskmanager-rapl-helper/README.md) · [msr helper](taskmanager-msr-helper/README.md)
-
-## Test support
-
-- [test support](taskmanager-test-support/README.md) — dev-only typed fixture
-  builders for behavior tests; consumed only through dev-dependencies, never a
-  product dependency.
-
-The fuzz workspaces have their own manifests and remain test-only; they do not define product
-architecture or a runtime capability.
+- 按任务查 [docs/README.md](../docs/README.md) 的任务路由表，它会指向受影响的 crate README。
+- crate 的完整分母由 Cargo metadata 决定，不在文档里手工维护；每个 crate 的职责、边界与合同
+  见它自己的 `README.md`（Role / Boundary / Module map / Contract and verification）。
