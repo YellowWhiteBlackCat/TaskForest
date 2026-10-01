@@ -28,15 +28,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        // No control-anchored popover is mounted anywhere: this shape ships
-        // no column-visibility or preset-picker surface to anchor one to.
-        (
-            DropdownMenu,
-            Unsupported {
-                reason: "no control-anchored popover is offered; no column-visibility \
-                         or preset-picker surface exists",
-            },
-        ),
+        // The column-visibility selection menu over the Applications table.
+        (DropdownMenu, Ported),
         // No pointer-hover explanation surface is mounted; hint copy is
         // rendered as inline captions (e.g. the insights scroll hint).
         (

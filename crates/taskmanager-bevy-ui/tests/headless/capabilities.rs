@@ -251,8 +251,8 @@ fn capability_declaration_is_complete_and_pinned() {
     let expected: [(ComponentCapability, Kind); 19] = [
         (ModalOverlay, Kind::Ported),
         (ContextMenu, Kind::Ported),
-        // No control-anchored popover mechanism is offered.
-        (DropdownMenu, Kind::Unsupported),
+        // The column-visibility selection menu over the Applications table.
+        (DropdownMenu, Kind::Ported),
         // No hover/focus explanation surface; hints render as inline captions.
         (Tooltip, Kind::Unsupported),
         (Toast, Kind::Divergent),

@@ -488,6 +488,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::confirmation::register(app);
         crate::pages::processes::affinity::register(app);
         crate::pages::processes::properties_modal::register(app);
+        crate::pages::processes::columns_modal::register(app);
         crate::pages::services::details_modal::register(app);
         crate::menu_modal::register::<crate::pages::processes::menu::ProcessMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::services::menu::ServiceMenuCtx>(app);

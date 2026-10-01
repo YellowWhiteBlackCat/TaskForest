@@ -11,7 +11,7 @@ use bevy::asset::{AssetPlugin, Assets};
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::HardwareInfo;
 
@@ -107,6 +107,7 @@ fn a_missing_inventory_states_waiting_and_states_no_facts() {
 
 #[test]
 fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
+    set_language(Language::En);
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
@@ -194,7 +195,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     assert!(
         all_texts
             .iter()
-            .any(|s| s == t("dashboard.active_alerts") || s == "Active Alerts" || s == "活动警报"),
+            .any(|s| s == t("dashboard.active_alerts") || s == "Active alerts" || s == "Active Alerts" || s == "活动告警" || s == "活动警报"),
         "Active Alerts summary card is mounted"
     );
 }

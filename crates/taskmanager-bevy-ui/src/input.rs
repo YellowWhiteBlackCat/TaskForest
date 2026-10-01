@@ -48,6 +48,7 @@ use taskmanager_shell::ShellApp;
 
 use crate::app::{Page, modifier_state};
 use crate::menu_modal::{MenuModal, ModalDriver};
+use crate::pages::processes::columns_modal::ProcessColumnsModalState;
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
@@ -126,18 +127,19 @@ enum FrontendMenuKind {
     Startup,
     Session,
     Process,
+    Columns,
 }
 
 /// The frontend-local action menus that owned the keyboard when a press
-/// landed, in drive order (Services, Startup, Sessions, Process).
+/// landed, in drive order (Services, Startup, Sessions, Process, Columns).
 ///
-/// The four menus are independent resources, so the snapshot keeps one
+/// The five menus are independent resources, so the snapshot keeps one
 /// presence slot per resource: `Some(kind)` is the typed surface that was
 /// present, `None` an absent one. A press captured before the first arm runs
 /// therefore keeps every surface it belonged to, and no later mutation can
 /// change the decision.
 #[derive(Clone, Copy)]
-struct FrontendMenus([Option<FrontendMenuKind>; 4]);
+struct FrontendMenus([Option<FrontendMenuKind>; 5]);
 
 impl FrontendMenus {
     /// Whether no frontend-local surface owned the keyboard.
@@ -158,6 +160,7 @@ pub(crate) struct InventoryActionModals<'w> {
     pub(crate) stu: ResMut<'w, MenuModal<StartupMenuCtx>>,
     pub(crate) ses: ResMut<'w, MenuModal<SessionMenuCtx>>,
     pub(crate) proc: ResMut<'w, MenuModal<ProcessMenuCtx>>,
+    pub(crate) cols: ResMut<'w, ProcessColumnsModalState>,
 }
 
 impl InventoryActionModals<'_> {
@@ -168,6 +171,7 @@ impl InventoryActionModals<'_> {
             self.stu.is_open().then_some(FrontendMenuKind::Startup),
             self.ses.is_open().then_some(FrontendMenuKind::Session),
             self.proc.is_open().then_some(FrontendMenuKind::Process),
+            self.cols.is_open().then_some(FrontendMenuKind::Columns),
         ])
     }
 }

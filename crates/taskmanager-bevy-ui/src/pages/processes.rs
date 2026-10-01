@@ -52,13 +52,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
-use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
 
-use taskmanager_shell::process_semantic_key;
-use taskmanager_shell::{ShellApp, SortCol, SortDir};
-use taskmanager_ui_contract::ProcessColumnSpec;
+use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
@@ -66,19 +63,23 @@ use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::table::{
-    RowWindow, SortProjection, header_scene, row_scene, row_window, rows_in_viewport,
-    visible_columns,
+    header_scene, row_scene, rows_in_viewport, visible_columns,
 };
 use crate::window::{Role, TextRole, WindowPalette};
-use taskmanager_shell::presentation::process_anomaly_summary;
-use taskmanager_shell::presentation::uninterruptible_process_summary;
 
 pub(crate) mod affinity;
+pub(crate) mod columns_modal;
 pub(crate) mod details;
 pub(crate) mod input;
 pub(crate) mod menu;
 pub(crate) mod projection;
 pub(crate) mod properties_modal;
+
+pub(crate) use projection::*;
+
+use columns_modal::{
+    ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene,
+};
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes
@@ -89,156 +90,6 @@ pub(crate) mod properties_modal;
 const TABLE_VIEWPORT_HEIGHT_PX: f32 = 512.0;
 
 // ---- pure view model ----------------------------------------------------
-
-/// Map the shell's sort slot onto the ui-contract column token. All 16 sort axes
-/// map onto their exact contract tokens (including PSS mapping to MemoryPss).
-fn contract_token(column: SortCol) -> Option<&'static str> {
-    match column {
-        SortCol::Pid => Some("PID"),
-        SortCol::Name => Some("Name"),
-        SortCol::Cpu => Some("CPU"),
-        SortCol::Memory => Some("Memory"),
-        SortCol::Pss => Some("MemoryPss"),
-        SortCol::Swap => Some("Swap"),
-        SortCol::User => Some("User"),
-        SortCol::State => Some("Status"),
-        SortCol::Threads => Some("Threads"),
-        SortCol::CpuTime => Some("CPUTime"),
-        SortCol::DiskRead => Some("DiskRead"),
-        SortCol::DiskWrite => Some("DiskWrite"),
-        SortCol::Network => Some("Network"),
-        SortCol::StartTime => Some("StartTime"),
-        SortCol::Fds => Some("FDs"),
-        SortCol::Nice => Some("Nice"),
-    }
-}
-
-/// The shell sort as the widgets' header projection input.
-pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> Option<SortProjection> {
-    let (column, direction) = sort;
-    contract_token(column).map(|column| SortProjection {
-        column,
-        descending: direction == SortDir::Desc,
-    })
-}
-
-/// The rendered rows of one virtual window: pure over (shell, viewport,
-/// scroll intent), so every observer and the headless tests share one
-/// materialization rule.
-/// One rendered row: its visible-set index, identity for the accessibility
-/// node and the details seam, its cells, and the selected flag.
-pub(crate) struct ProcessRowView {
-    /// Visible-set index of the row (the shell cursor's coordinate space).
-    pub(crate) index: usize,
-    /// Core-backed incarnation key for semantic and accessibility identity.
-    pub(crate) semantic_id: String,
-    pub(crate) name: String,
-    pub(crate) cells: Vec<String>,
-    pub(crate) selected: bool,
-}
-
-/// Full window projection: the total behind the filter plus the visible slice.
-pub(crate) struct ProcessRowsProjection {
-    pub(crate) total: usize,
-    pub(crate) window: RowWindow,
-    pub(crate) rows: Vec<ProcessRowView>,
-}
-
-/// Build the window projection. The selected flag clamps the shell cursor to
-/// the row space first (the same defensive clamp as the TUI `table_window`),
-/// so a stale cursor after a shrinking fold can never index out of range or
-/// silently select nothing.
-pub(crate) fn rows_projection(
-    shell: &ShellApp,
-    viewport_rows: usize,
-    scroll_top: usize,
-) -> ProcessRowsProjection {
-    let visible = shell.visible_processes();
-    let total = visible.len();
-    let window = row_window(total, viewport_rows, scroll_top);
-    let selected = total.checked_sub(1).map(|last| shell.selected.min(last));
-    let columns = visible_columns(&[]);
-    let rows = visible[window.first..window.last]
-        .iter()
-        .enumerate()
-        .map(|(offset, process)| {
-            let index = window.first + offset;
-            let is_selected = Some(index) == selected || shell.is_process_selected(process);
-            ProcessRowView {
-                index,
-                semantic_id: process_semantic_key(process),
-                name: process.name.clone(),
-                cells: projection::row_cells(process, &columns, is_selected),
-                selected: is_selected,
-            }
-        })
-        .collect();
-    ProcessRowsProjection {
-        total,
-        window,
-        rows,
-    }
-}
-
-/// Scroll top that keeps `selected` centered in the window — the TUI
-/// `table_window` follow formula, verbatim: half a viewport above the cursor,
-/// pinned to the last full page, never past either end.
-pub(crate) fn centered_scroll_top(total: usize, viewport_rows: usize, selected: usize) -> usize {
-    if total == 0 || viewport_rows == 0 {
-        return 0;
-    }
-    let visible = viewport_rows.min(total);
-    let selected = selected.min(total - 1);
-    selected
-        .saturating_sub(visible / 2)
-        .min(total.saturating_sub(visible))
-}
-
-/// The status line under the search box: the shared running-count copy, plus
-/// the shared match-counter copy while a query is active (the same catalog
-/// strings the TUI panels use — never a frontend-local word, so the line
-/// localizes with the rest of the surface).
-pub(crate) fn count_line_text(visible: usize, query: &str) -> String {
-    let base = t("proc.processes_running_subtitle").replacen("{count}", &visible.to_string(), 1);
-    if query.trim().is_empty() {
-        return base;
-    }
-    let key = if visible == 1 {
-        "tui.search_matches_one"
-    } else {
-        "tui.search_matches_many"
-    };
-    format!(
-        "{base}{}",
-        t(key).replacen("{count}", &visible.to_string(), 1)
-    )
-}
-
-fn count_line_text_for_shell(shell: &ShellApp, visible: usize, query: &str) -> String {
-    let base = count_line_text(visible, query);
-    let processes = shell
-        .projection()
-        .processes
-        .as_ref()
-        .map(|items| items.as_slice());
-    [
-        uninterruptible_process_summary(processes),
-        process_anomaly_summary(processes),
-    ]
-    .into_iter()
-    .flatten()
-    .fold(base, |line, summary| format!("{line} · {summary}"))
-}
-
-/// Honest empty-table copy: a quiet platform (no processes reported yet) is a
-/// different state from an over-narrow query — shared `empty.*` strings.
-pub(crate) fn empty_state_text(query: &str) -> String {
-    if query.trim().is_empty() {
-        t("empty.no_processes_reported").to_owned()
-    } else {
-        t("empty.no_processes_match_query").to_owned()
-    }
-}
 
 fn selected_identity(shell: &ShellApp) -> Option<ProcessLiveKey> {
     let process = shell.visible_process_at(shell.selected)?;
@@ -417,6 +268,14 @@ pub(crate) fn on_search_input_activated(
     commands.trigger(crate::input::ShellInteractionApplied);
 }
 
+/// Marker for the table header slot node.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct ProcessTableHeaderSlot;
+
+/// Marker for the mounted table header artifact scene.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct ProcessTableHeaderArtifact;
+
 /// Shared observer parameters for the table surface, bundled to keep every
 /// observer under the argument budget.
 #[derive(SystemParam)]
@@ -425,7 +284,10 @@ pub(crate) struct TableSurface<'w, 's> {
     scroll: ResMut<'w, ProcessScrollState>,
     roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
     artifacts: Query<'w, 's, Entity, With<ProcessTableArtifact>>,
+    header_slots: Query<'w, 's, Entity, With<ProcessTableHeaderSlot>>,
+    headers: Query<'w, 's, Entity, With<ProcessTableHeaderArtifact>>,
     count: Query<'w, 's, &'static mut Text, With<ProcessCountLine>>,
+    hidden_cols: Option<Res<'w, ProcessHiddenColumns>>,
 }
 
 // ---- observers -----------------------------------------------------------
@@ -464,6 +326,8 @@ fn bootstrap_processes_page(
     let root = trigger.event().entity;
     commands.init_resource::<ProcessColumnWidthConfig>();
     commands.init_resource::<crate::input::TextInputState>();
+    commands.init_resource::<ProcessHiddenColumns>();
+    commands.init_resource::<ProcessColumnsModalState>();
     let Some(palette) = palette else {
         return;
     };
@@ -687,11 +551,12 @@ fn window_scenes(
     projection: &ProcessRowsProjection,
     palette: &UiPalette,
     query: &str,
+    hidden_cols: &[&str],
 ) -> Vec<Box<dyn Scene>> {
     if projection.total == 0 {
         return vec![empty_state_scene(empty_state_text(query))];
     }
-    let columns = visible_columns(&[]);
+    let columns = visible_columns(hidden_cols);
     let row_height = palette.control_height_px;
     projection
         .rows
@@ -709,17 +574,46 @@ fn rebuild_table(
     shell: &ShellApp,
     surface: &mut TableSurface,
 ) {
-    let projection = rows_projection(shell, surface.scroll.viewport_rows, surface.scroll.top);
+    let hidden_ids: Vec<&str> = surface
+        .hidden_cols
+        .as_ref()
+        .map_or_else(Vec::new, |h| h.0.iter().map(String::as_str).collect());
+    let projection = rows_projection_with_hidden(
+        shell,
+        surface.scroll.viewport_rows,
+        surface.scroll.top,
+        &hidden_ids,
+    );
     surface.scroll.top = projection.window.first;
     for artifact in surface.artifacts.iter() {
         commands.entity(artifact).despawn();
     }
-    for scene in window_scenes(&projection, &surface.palette.inner, &shell.query) {
+    for scene in window_scenes(&projection, &surface.palette.inner, &shell.query, &hidden_ids) {
         let child = commands.spawn_scene(scene).id();
         commands.entity(root).add_one_related::<ChildOf>(child);
     }
     if let Ok(mut line) = surface.count.single_mut() {
         line.0 = count_line_text_for_shell(shell, projection.total, &shell.query);
+    }
+
+    for header in surface.headers.iter() {
+        commands.entity(header).despawn();
+    }
+    if let Ok(slot) = surface.header_slots.single() {
+        let columns = visible_columns(&hidden_ids);
+        let sort_proj = sort_projection(shell.process_sort);
+        let header = header_scene(&columns, sort_proj, &surface.palette.inner);
+        let header_node = bsn! {
+            Node {
+                width: percent(100),
+            }
+            ProcessTableHeaderArtifact
+            Children [
+                ( { header } ),
+            ]
+        };
+        let child = commands.spawn_scene(header_node).id();
+        commands.entity(slot).add_one_related::<ChildOf>(child);
     }
 }
 
@@ -758,8 +652,9 @@ fn rows_root_scene(
     projection: &ProcessRowsProjection,
     palette: &UiPalette,
     query: &str,
+    hidden_cols: &[&str],
 ) -> impl Scene + use<> {
-    let rows = window_scenes(projection, palette, query);
+    let rows = window_scenes(projection, palette, query, hidden_cols);
     bsn! {
         Node {
             width: percent(100),
@@ -799,8 +694,38 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         sort_projection(context.shell.process_sort),
         palette,
     );
-    let rows_root = rows_root_scene(&projection, palette, &context.shell.query);
+    let header_slot = bsn! {
+        Node {
+            width: percent(100),
+        }
+        ProcessTableHeaderSlot
+        Children [
+            (
+                Node {
+                    width: percent(100),
+                }
+                ProcessTableHeaderArtifact
+                Children [
+                    ( { header } ),
+                ]
+            ),
+        ]
+    };
+    let rows_root = rows_root_scene(&projection, palette, &context.shell.query, &[]);
     let search = search_input_scene(palette, &context.shell.query);
+    let choose_columns_btn = choose_columns_button_scene(palette);
+    let toolbar = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
+        }
+        Children [
+            ( { search } ),
+            ( { choose_columns_btn } ),
+        ]
+    };
     let table = bsn! {
         Node {
             width: percent(68),
@@ -811,7 +736,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ProcessTableContainer
         Children [
-            ( { header } ),
+            ( { header_slot } ),
             ( { rows_root } ),
         ]
     };
@@ -829,7 +754,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             ( Text(title) TextRole(Role::Heading) ),
             ( crate::pages::process_tree::panel_scene(context) ),
             ( Text(note) TextRole(Role::Caption) ),
-            ( { search } ),
+            ( { toolbar } ),
             (
                 Text(count)
                 ProcessCountLine

@@ -620,7 +620,7 @@ impl Plugin for AppShellPlugin {
             .init_resource::<crate::pages::performance::PerformanceSidebarVisible>()
             .add_observer(crate::pages::performance::toggle_sidebar_observer)
             // The input adapter drives every inventory modal on every key;
-            // all four exist whether or not their pages ever mounted.
+            // all five exist whether or not their pages ever mounted.
             .init_resource::<crate::menu_modal::MenuModal<
                 crate::pages::processes::menu::ProcessMenuCtx,
             >>()
@@ -633,6 +633,8 @@ impl Plugin for AppShellPlugin {
             .init_resource::<crate::menu_modal::MenuModal<
                 crate::pages::sessions::menu::SessionMenuCtx,
             >>()
+            .init_resource::<crate::pages::processes::columns_modal::ProcessColumnsModalState>()
+            .init_resource::<crate::pages::processes::columns_modal::ProcessHiddenColumns>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
             .add_observer(crate::widgets::table::on_process_sort_header_activated)

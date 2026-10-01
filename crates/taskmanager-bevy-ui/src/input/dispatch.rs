@@ -26,6 +26,7 @@ use crate::drain::FeedbackCache;
 use crate::input_contract::shared_key;
 use crate::menu_modal::{MenuModalChanged, ModalDriver};
 use crate::pages::performance::{PerformanceDeviceFocus, PerformanceDeviceTarget};
+use crate::pages::processes::columns_modal::ProcessColumnsModalChanged;
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::log_panel::{ServiceLogControlAction, ServiceLogExportDir};
 use crate::pages::services::menu::ServiceMenuCtx;
@@ -128,40 +129,20 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     /// table-row arrow or a shared fixed binding — so they run in sequence
     /// once the chain above them falls through.
     fn dispatch(&mut self, press: KeyPress) {
-        if self.frontend_menus(press) {
-            return;
-        }
-        if self.service_log_panel(press) {
-            return;
-        }
-        if self.dismiss_shared_surface(press) {
-            return;
-        }
-        if self.dismiss_feedback(press) {
-            return;
-        }
-        if self.route_chord(press) {
-            return;
-        }
-        if self.confirm_gate(press) {
-            return;
-        }
-        if self.process_action_chord(press) {
-            return;
-        }
-        if self.open_inventory_menu(press) {
-            return;
-        }
-        if self.smart_self_test(press) {
-            return;
-        }
-        if self.snapshot_export(press) {
-            return;
-        }
-        if self.search_editing(press) {
-            return;
-        }
-        if self.shell_char(press) {
+        if self.frontend_menus(press)
+            || self.service_log_panel(press)
+            || self.dismiss_shared_surface(press)
+            || self.dismiss_feedback(press)
+            || self.route_chord(press)
+            || self.confirm_gate(press)
+            || self.process_action_chord(press)
+            || self.process_columns_chord(press)
+            || self.open_inventory_menu(press)
+            || self.smart_self_test(press)
+            || self.snapshot_export(press)
+            || self.search_editing(press)
+            || self.shell_char(press)
+        {
             return;
         }
         self.table_motion(press);
@@ -203,6 +184,11 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
                 .modals
                 .proc
                 .drive(self.shell, press.key_code, self.pending);
+        }
+        if menus.holds(FrontendMenuKind::Columns) && press.key_code == KeyCode::Escape {
+            self.modals.cols.close();
+            self.commands.trigger(ProcessColumnsModalChanged);
+            self.applied = true;
         }
         if menus.holds(FrontendMenuKind::Service) && !self.modals.svc.is_open() {
             self.commands.trigger(MenuModalChanged::<ServiceMenuCtx>(
@@ -352,6 +338,22 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         }
         self.commands
             .trigger(MenuModalChanged::<ProcessMenuCtx>(true, Default::default()));
+        self.applied = true;
+        true
+    }
+
+    /// Arm 2a2 — Applications column-visibility menu: 'c' opens the column picker modal
+    /// (TUI and GPUI parity).
+    fn process_columns_chord(&mut self, press: KeyPress) -> bool {
+        if !matches!(press.context, KeyboardOwner::Free)
+            || press.page != Page::Processes
+            || press.key_code != KeyCode::KeyC
+            || press.modifiers != Modifiers::NONE
+        {
+            return false;
+        }
+        self.modals.cols.open();
+        self.commands.trigger(ProcessColumnsModalChanged);
         self.applied = true;
         true
     }
