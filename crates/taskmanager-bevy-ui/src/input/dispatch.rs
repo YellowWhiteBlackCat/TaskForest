@@ -134,6 +134,9 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if self.service_log_panel(press) {
             return;
         }
+        if self.dismiss_shared_surface(press) {
+            return;
+        }
         if self.dismiss_feedback(press) {
             return;
         }
@@ -259,6 +262,22 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .trigger(crate::pages::services::log_panel::LogPanelRepaintRequired);
         self.applied = true;
         true
+    }
+
+    /// Arm 0b2 — shared surface dismissal: when a shared surface or modal
+    /// overlay (e.g. process properties) is open, bare Escape dismisses it.
+    fn dismiss_shared_surface(&mut self, press: KeyPress) -> bool {
+        if press.key_code != KeyCode::Escape || press.modifiers != Modifiers::NONE {
+            return false;
+        }
+        if self.shell.process_properties_target().is_some()
+            || self.shell.interaction_surface().is_some()
+        {
+            self.shell.dismiss_overlay();
+            self.applied = true;
+            return true;
+        }
+        false
     }
 
     /// Arm 0c — active feedback notice dismissal: when no confirmation or modal

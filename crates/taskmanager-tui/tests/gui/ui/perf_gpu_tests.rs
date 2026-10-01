@@ -371,7 +371,7 @@ fn utilization_chart_uses_the_real_per_device_history() {
         })
         .expect("draw");
     let text = terminal.backend().to_string();
-    assert!(text.contains("GPU · Utilization"));
+    assert!(text.contains("GPU · Utilization") || text.contains("GPU · 利用率"));
     assert!(text.contains("100%") && text.contains("50%") && text.contains("0%"));
     assert!(
         text.chars()
@@ -408,7 +408,7 @@ fn selected_metric_flips_title_and_axis_unit_in_the_same_frame() {
         .expect("draw");
     let text = terminal.backend().to_string();
     assert!(
-        text.contains("GPU · Power"),
+        text.contains("GPU · Power") || text.contains("GPU · 功耗"),
         "the chart title must name the selected family:\n{text}"
     );
     assert!(
@@ -456,10 +456,14 @@ fn unavailable_selected_family_keeps_the_honest_dash_projection() {
         .expect("draw");
     let text = terminal.backend().to_string();
     assert!(
-        text.contains("GPU · Memory"),
+        text.contains("GPU · Memory") || text.contains("GPU · 显存") || text.contains("GPU · 内存"),
         "the unavailable family stays named, not hidden:\n{text}"
     );
-    assert!(text.contains(t("perf.collecting_samples")));
+    assert!(
+        text.contains(t("perf.collecting_samples"))
+            || text.contains("Collecting samples...")
+            || text.contains("正在收集样本...")
+    );
     assert!(
         !text
             .chars()

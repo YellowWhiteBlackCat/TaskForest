@@ -43,6 +43,7 @@ struct CountingAllocator;
 
 static ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
+static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -246,6 +247,7 @@ fn measure_steady_state_frame(app: &TuiApp) -> AllocSnapshot {
 
 #[test]
 fn per_frame_allocation_budget_10k_and_50k() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     // ── Measured steady-state 120x40 frames (debug build, dev workstation,
     //    2026-08-29, allocator = System + atomic counters), AFTER the
     //    per-frame visible-pointer vector was eliminated (the Applications
@@ -338,6 +340,7 @@ fn per_frame_allocation_budget_10k_and_50k() {
 
 #[test]
 fn repeated_identical_frames_allocate_identically() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let app = seeded_app(&tree_fixture(FIXTURE_10K.0));
     render_frame(&app); // warm-up
 

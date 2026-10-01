@@ -58,10 +58,12 @@ adopted — theme tokens are the only skin authority.
   projection and `history.rs` connector adapter: the M1
   process table, performance summary/curves/device blocks, the three
   read-only inventory tables (services/startup/sessions), settings, and the
-  alert center.
+  alert center. Includes `pages/processes/properties_modal.rs` delivering full
+  multi-field process inspection (identity, paths, memory, IO, parent/threads)
+  with scrim dismiss and escape handling.
 - `src/widgets.rs` + `src/widgets/` — the owned component layer: table/chart
-  projection cores, bsn! render adapters, controls, and the keyboard-first
-  action menu.
+  projection cores, bsn! render adapters, controls, and the action menu supporting
+  both pointer click and keyboard navigation.
 - `src/input_contract.rs` — Bevy-key normalization through the shared command
   router and stable semantic addresses for rendered rows.
 - `src/runtime.rs` — the process-wide platform client via the app-host

@@ -504,5 +504,8 @@ pub fn peer_credentials(stream: &impl AsFd) -> io::Result<Ucred> {
 }
 
 #[cfg(test)]
+pub(crate) static TEST_FD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
 #[path = "../tests/headless/fd_bridge.rs"]
 mod tests;

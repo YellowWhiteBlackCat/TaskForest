@@ -117,7 +117,7 @@ fn a_stranded_claim_from_this_process_is_retaken_by_a_winning_try_lock() {
     let root = fixture_root("same-process-stranded-claim");
     std::fs::create_dir_all(&root).expect("create history root");
     let lock = root.join("history.lock");
-    let stranded = format!("{}:1", std::process::id());
+    let stranded = format!("{}:{}", std::process::id(), u64::MAX);
     std::fs::write(&lock, &stranded).expect("write stranded same-process claim");
 
     // ALIVE insists every holder lives, so the claim text alone can never

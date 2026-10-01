@@ -187,7 +187,11 @@ fn keyboard_owner(shell: &ShellApp, frontend_menus: FrontendMenus, page: Page) -
         KeyboardOwner::FrontendMenu
     } else if shell.service_log.is_some() && page == Page::Services {
         KeyboardOwner::ServiceLogPanel
-    } else if shell.help_open() || shell.suggestions_open() {
+    } else if shell.help_open()
+        || shell.suggestions_open()
+        || shell.interaction_surface().is_some()
+        || shell.process_properties_target().is_some()
+    {
         KeyboardOwner::SharedSurface
     } else if shell.search_active() {
         KeyboardOwner::Search

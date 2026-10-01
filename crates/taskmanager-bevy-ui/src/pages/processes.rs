@@ -78,6 +78,7 @@ pub(crate) mod details;
 pub(crate) mod input;
 pub(crate) mod menu;
 pub(crate) mod projection;
+pub(crate) mod properties_modal;
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes

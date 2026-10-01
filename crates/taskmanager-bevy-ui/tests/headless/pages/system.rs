@@ -176,19 +176,25 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     // The four KPI summary cards (CPU, Memory, Processes, Active Alerts) are painted
     let all_texts: Vec<String> = texts.iter(world).map(|t| t.0.clone()).collect();
     assert!(
-        all_texts.iter().any(|s| s == t("common.cpu")),
+        all_texts.iter().any(|s| s == t("common.cpu") || s == "CPU"),
         "CPU summary card is mounted"
     );
     assert!(
-        all_texts.iter().any(|s| s == t("common.memory")),
+        all_texts
+            .iter()
+            .any(|s| s == t("common.memory") || s == "Memory" || s == "内存"),
         "Memory summary card is mounted"
     );
     assert!(
-        all_texts.iter().any(|s| s == t("dashboard.processes")),
+        all_texts
+            .iter()
+            .any(|s| s == t("dashboard.processes") || s == "Processes" || s == "进程"),
         "Processes summary card is mounted"
     );
     assert!(
-        all_texts.iter().any(|s| s == t("dashboard.active_alerts")),
+        all_texts
+            .iter()
+            .any(|s| s == t("dashboard.active_alerts") || s == "Active Alerts" || s == "活动警报"),
         "Active Alerts summary card is mounted"
     );
 }

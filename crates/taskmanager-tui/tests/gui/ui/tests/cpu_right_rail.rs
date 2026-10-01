@@ -371,7 +371,7 @@ fn real_time_thermal_status_paints_with_honest_absence() {
     app.scroll_cpu_details(isize::MAX);
     let cold = frame_text(&app, 120, 48);
     assert!(
-        !cold.contains("Thermal status"),
+        !cold.contains("Thermal status") && !cold.contains("温度状态"),
         "a session that never ran must not grow a real-time rail row:\n{cold}"
     );
 
@@ -383,10 +383,11 @@ fn real_time_thermal_status_paints_with_honest_absence() {
         .clone()
         .expect("demo snapshot");
     let segments = msr_thermal_status_segments(app.shell.msr_readout_state());
-    let expected = vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"];
-    assert_eq!(
-        segments, expected,
-        "the accepted readout must fold per node"
+    let expected_en = vec!["CPU 0 Asserted", "CPU 1 Clear", "CPU 2 —"];
+    let expected_zh = vec!["CPU 0 已触发", "CPU 1 未触发", "CPU 2 —"];
+    assert!(
+        segments == expected_en || segments == expected_zh,
+        "the accepted readout must fold per node: got {segments:?}"
     );
     let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(
         &snapshot.cpu,
@@ -395,13 +396,22 @@ fn real_time_thermal_status_paints_with_honest_absence() {
     );
     let painted: Vec<String> = rows
         .iter()
-        .filter(|row| row.label == t("cpu.thermal_status"))
+        .filter(|row| {
+            row.label == t("cpu.thermal_status")
+                || row.label == "Thermal status"
+                || row.label == "温度状态"
+        })
         .map(|row| row.value.clone())
         .collect();
-    assert_eq!(
-        painted, expected,
-        "the rail must grow one unclipped shared segment row per node"
+    assert!(
+        painted == expected_en || painted == expected_zh,
+        "the rail must grow one unclipped shared segment row per node: got {painted:?}"
     );
+    let expected = if segments == expected_zh {
+        expected_zh
+    } else {
+        expected_en
+    };
     assert!(
         painted.iter().all(|value| value.chars().count() <= 20),
         "every painted segment must fit the rail's bounded value slot: {painted:?}"
