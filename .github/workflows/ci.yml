@@ -50,8 +50,8 @@
 #     pushes, dispatches, and tags still build the shipping profile
 #     (packaging.yml release artifacts always use the manifest profile).
 #
-# Toolchain policy: all workflows follow the repository's moving `stable`
-# channel. `Cargo.toml::rust-version` remains the compatibility floor and must
+# Toolchain policy: all workflows pin the repository's 1.99.0 toolchain.
+# `Cargo.toml::rust-version` remains the compatibility floor and must
 # not be used as a stale CI pin.
 #
 # Architecture context (unchanged):
@@ -101,7 +101,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt
       # This is the same cheap fail-fast entry point developers run locally.
@@ -132,7 +132,7 @@ jobs:
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -186,7 +186,7 @@ jobs:
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
@@ -216,7 +216,7 @@ jobs:
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -248,7 +248,7 @@ jobs:
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:

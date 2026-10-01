@@ -21,7 +21,7 @@
 | CORE-04 functional matrix | 验证每个产品意图在 GPUI/Iced/TUI/Bevy 都有显式 surface decision |
 | capability delivery registry | 拒绝参考层把语义合同能力声明为已挂载组件（`Reference`）；语义合同须声明 `Ported`，集合只按挂载证据增长 |
 
-CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 stable 最新版；
+CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 1.99.0；
 `Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
 Windows 原生边界以及 macOS 编译/库测试在每次 PR 与 main push 的 portability workflow 中阻塞运行；
 macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能替代原生 API 或设备证据。

@@ -86,7 +86,7 @@ jobs:
           python3 scripts/quality/public_repo_guard.py --history
       # `cargo metadata --locked` fails the moment the committed Cargo.lock
       # does not satisfy the manifest, proving the tag builds reproducibly.
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
       - run: cargo metadata --locked --format-version 1 >/dev/null
       # Every host-installed path must stay allowlisted before a release
       # ships new package layouts (same guard as the CI blocking gate).

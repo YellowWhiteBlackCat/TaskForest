@@ -2,7 +2,7 @@
 name = "taskmanager-platform-runtime"
 version = "0.2.0-rc3"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "OS-neutral bounded capability runtime for TaskForest native adapters"
 

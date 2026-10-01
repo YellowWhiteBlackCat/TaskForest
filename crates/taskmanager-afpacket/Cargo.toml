@@ -2,7 +2,7 @@
 name = "taskmanager-afpacket"
 version = "0.2.0-rc3"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "Audited AF_PACKET boundary crate — the second unsafe trust root for TaskForest (per-process network accounting)"
 
