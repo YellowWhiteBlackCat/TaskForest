@@ -277,15 +277,13 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if matches!(press.context, KeyboardOwner::Free)
             && press.key_code == KeyCode::Escape
             && press.modifiers == Modifiers::NONE
+            && let Some(ref mut sel) = self.text_selection
+            && sel.is_active()
         {
-            if let Some(ref mut sel) = self.text_selection {
-                if sel.is_active() {
-                    sel.clear();
-                    self.commands.trigger(crate::text_selection::TextSelectionChanged);
-                    self.applied = true;
-                    return true;
-                }
-            }
+            sel.clear();
+            self.commands.trigger(crate::text_selection::TextSelectionChanged);
+            self.applied = true;
+            return true;
         }
         false
     }
@@ -546,14 +544,12 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if matches!(press.context, KeyboardOwner::Free)
             && press.key_code == KeyCode::KeyC
             && press.modifiers.control
+            && let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard)
+            && crate::text_selection::copy_selection_or_row(sel, clip, self.shell)
         {
-            if let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard) {
-                if crate::text_selection::copy_selection_or_row(sel, clip, self.shell) {
-                    self.commands.trigger(crate::text_selection::TextSelectionChanged);
-                    self.applied = true;
-                    return true;
-                }
-            }
+            self.commands.trigger(crate::text_selection::TextSelectionChanged);
+            self.applied = true;
+            return true;
         }
         false
     }

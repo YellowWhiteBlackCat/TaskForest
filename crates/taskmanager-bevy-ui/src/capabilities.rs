@@ -82,12 +82,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 reason: "page scrolling rides the official bevy_ui_widgets ScrollArea",
             },
         ),
-        (
-            FocusVisible,
-            Divergent {
-                reason: "Bevy uses its current control visuals; a dedicated modality-aware focus ring is not wired",
-            },
-        ),
+        // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
+        (FocusVisible, Ported),
     ];
 
     FrontendCapabilityDeclaration {

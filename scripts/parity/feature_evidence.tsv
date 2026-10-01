@@ -256,6 +256,7 @@ storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_r
 storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-	-
 power.battery-inventory	iced	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	anchored	-	-
 power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_renders_capacity_status_rate_and_voltage	anchored	-	-
+power.battery-inventory	bevy	pages::performance::device_rows_tests::battery_block_renders_voltage_health_and_cycles	anchored	-	-
 services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-	-
 storage.smart-health	gpui	gpui_app::perf_views::disk_stats::tests::disk_stats_render_the_smart_health_evidence_families	anchored	-	-
 storage.swap-throughput	gpui	gpui_app::perf_views::memory_stats::tests::swap_throughput_rows_render_the_observed_system_rates	anchored	-	-

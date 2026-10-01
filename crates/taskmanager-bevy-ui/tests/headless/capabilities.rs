@@ -273,7 +273,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (Tree, Kind::Ported),
         // Scrolling rides the official ScrollArea.
         (Scrollbar, Kind::Divergent),
-        (FocusVisible, Kind::Divergent),
+        // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
+        (FocusVisible, Kind::Ported),
     ];
 
     for (capability, expected_kind) in expected {

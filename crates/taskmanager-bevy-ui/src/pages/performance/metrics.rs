@@ -8,7 +8,9 @@ use taskmanager_shell::presentation::has_smart_fields;
 use taskmanager_shell::presentation::smart_section_visible;
 use taskmanager_shell::presentation::trend::window;
 
+pub(super) mod battery;
 pub(super) mod cpu;
+pub(super) use battery::battery_fact_line;
 
 /// Percent readout. There is no shared percent formatter in
 /// `shell::presentation` (the TUI keeps its own in `ui/units.rs`), so this
@@ -506,21 +508,6 @@ pub(crate) fn section_keys(shell: &ShellApp, section: Section) -> Vec<String> {
             devices.iter().map(|b| b.id.clone()).collect()
         }),
     }
-}
-
-pub(super) fn battery_fact_line(battery: &BatteryInfo) -> String {
-    let charge = battery
-        .current_capacity_pct()
-        .map_or_else(missing_value, |pct| format!("{pct}%"));
-    let watts = battery
-        .current_power_w()
-        .filter(|w| w.is_finite())
-        .map_or_else(missing_value, |w| format!("{w:.1} W"));
-    format!(
-        "{}: {charge} · {}: {watts}",
-        t("battery.capacity"),
-        t("battery.power")
-    )
 }
 
 /// One GPU block's joined fact line; each fact keeps its own dash-on-missing

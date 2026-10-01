@@ -148,17 +148,17 @@ pub(crate) fn copy_selection_or_row(
     clipboard: &mut ClipboardPort,
     shell: &mut ShellApp,
 ) -> bool {
-    if let Some(text) = selection.selected_text().map(ToOwned::to_owned) {
-        if !text.is_empty() {
-            clipboard.set_text(text);
-            shell.report_notice(
-                FeedbackSource::Clipboard,
-                FeedbackSeverity::Success,
-                FeedbackLifecycle::SHORT,
-                format!("Selected Text {}", t("common.copied")),
-            );
-            return true;
-        }
+    if let Some(text) = selection.selected_text().map(ToOwned::to_owned)
+        && !text.is_empty()
+    {
+        clipboard.set_text(text);
+        shell.report_notice(
+            FeedbackSource::Clipboard,
+            FeedbackSeverity::Success,
+            FeedbackLifecycle::SHORT,
+            format!("Selected Text {}", t("common.copied")),
+        );
+        return true;
     }
     if let Some(summary) = shell.selected_row_summary() {
         clipboard.set_text(summary);

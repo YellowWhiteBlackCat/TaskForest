@@ -335,3 +335,78 @@ fn disk_block_renders_the_projected_partition_rows() {
     }
     assert!(world.despawn(root), "the seeded page despawns cleanly");
 }
+
+#[test]
+fn battery_block_renders_voltage_health_and_cycles() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+
+    let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(1_000));
+    battery.model_name = "Primary Battery".to_owned();
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(85, 1),
+        voltage_uv: ScalarObservation::available(11_400_000, 1), // 11.40 V
+        power_w: ScalarObservation::available(15.5, 1),          // 15.5 W
+        cycle_count: ScalarObservation::available(128, 1),
+        energy_full_uwh: ScalarObservation::available(48_000_000.0, 1),
+        energy_full_design_uwh: ScalarObservation::available(50_000_000.0, 1), // 96.0% health
+        time_to_empty_secs: ScalarObservation::available(7200.0, 1),          // 2h 00m
+        ..BatteryScalarObservations::default()
+    });
+
+    let mut shell = ShellApp::new();
+    let snapshot = PowerSupplySnapshot {
+        batteries: vec![battery.clone()],
+        ..PowerSupplySnapshot::default()
+    };
+    seed_projection_fact(
+        &mut shell,
+        ProjectionSeedFact::PowerSupplies(Some(snapshot)),
+    );
+    assert_eq!(section_keys(&shell, Section::Battery), vec!["BAT0".to_owned()]);
+
+    let fact_line = super::metrics::battery_fact_line(&battery);
+    assert!(fact_line.contains("85%"));
+    assert!(fact_line.contains("15.5 W"));
+    assert!(fact_line.contains("11.40 V"));
+    assert!(fact_line.contains("128"));
+    assert!(fact_line.contains("96.0%"));
+    assert!(fact_line.contains(&taskmanager_shell::presentation::duration(7200)));
+
+    let mut app = headless_scene_app();
+    let palette = ui_palette(&Theme::dark());
+    let history = crate::pages::history::HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
+    let context = PageContext {
+        shell: &shell,
+        process_tree_expansion: &process_tree_expansion,
+        palette: &palette,
+        history: &history.0,
+    };
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(content(&context))
+        .expect("the seeded performance page resolves")
+        .id();
+
+    assert_eq!(
+        block_keys(world, Section::Battery),
+        vec!["BAT0".to_owned()]
+    );
+    let field = DynField::Device {
+        section: Section::Battery,
+        device: "BAT0".to_owned(),
+    };
+    let line = dyn_text_value(world, &field).expect("battery has dynamic fact line");
+    assert_eq!(line, fact_line);
+
+    let texts: Vec<String> = world
+        .query::<&Text>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .collect();
+    assert!(texts.iter().any(|t| t == "Primary Battery"));
+
+    assert!(world.despawn(root), "the seeded page despawns cleanly");
+}

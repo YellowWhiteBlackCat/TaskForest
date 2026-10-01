@@ -94,16 +94,13 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
+        | FeatureId::MultiFormatExport
+        | FeatureId::BatteryPowerInventory => Ported,
 
         // -- deliberate scene reduction -----------------------------------
         FeatureId::ThermalZoneSensors => Divergent {
             reason: "Bevy surfaces the CPU temperature readout without the \
                      thermal-zone source distinction",
-        },
-        FeatureId::BatteryPowerInventory => Divergent {
-            reason: "the Bevy battery block renders charge and power without \
-                     the voltage/health/cycle detail",
         },
 
         // -- typed absences -----------------------------------------------
