@@ -260,3 +260,22 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
         "a real pointer drag in the dedicated gutter must resize the sidebar"
     );
 }
+
+#[test]
+fn gpu_sidebar_enumerates_every_projected_adapter() {
+    use crate::gpui_app::formatting::gpu_identity_text;
+    use crate::gpui_app::sidebar::SelectedDevice;
+
+    let mut g1 = GpuMetrics::new("card0", "Intel Arc Graphics");
+    g1.marketing_name = Some("Arc B390".into());
+    let mut g2 = GpuMetrics::new("card1", "Intel UHD Graphics");
+    g2.marketing_name = Some("UHD 770".into());
+
+    let (heading1, _) = gpu_identity_text(&g1, 0);
+    let (heading2, _) = gpu_identity_text(&g2, 1);
+    assert_eq!(heading1, "Arc B390");
+    assert_eq!(heading2, "UHD 770");
+    assert_ne!(heading1, heading2);
+    assert_eq!(SelectedDevice::Gpu(0), SelectedDevice::Gpu(0));
+    assert_ne!(SelectedDevice::Gpu(0), SelectedDevice::Gpu(1));
+}

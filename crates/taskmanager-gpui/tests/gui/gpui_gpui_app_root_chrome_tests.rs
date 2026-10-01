@@ -266,3 +266,37 @@ fn process_ancestor_lineage_renders_in_overview_and_handles_root() {
         "root process without ancestors renders the honest dash"
     );
 }
+
+#[test]
+fn observed_fault_and_huge_page_counters_reach_the_overview_rows() {
+    use taskmanager_core::core::metrics::ScalarObservation;
+
+    let mut process = ProcessItem::new(77, "faulty");
+    process.minor_page_faults = Some(1_234);
+    process.major_page_faults = Some(7);
+    let mut scalars = *process.scalar_observations();
+    scalars.memory_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
+    scalars.memory_anon_huge_pages_bytes = ScalarObservation::available(64 * 1024 * 1024, 1);
+    process.apply_scalar_observations(scalars);
+
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+    let overview = vm_rows(&process, &OVERVIEW_FIELDS, &utc);
+
+    let fault_row = OVERVIEW_FIELDS
+        .iter()
+        .position(|(field, _)| *field == ProcessDetailsField::PageFaults)
+        .expect("overview carries page faults");
+    assert_eq!(
+        overview[fault_row].1, "1234 (I/O: 7)",
+        "the overview row must carry the observed fault counters"
+    );
+
+    let huge_row = OVERVIEW_FIELDS
+        .iter()
+        .position(|(field, _)| *field == ProcessDetailsField::AnonHugePages)
+        .expect("overview carries anonymous huge pages");
+    assert_eq!(
+        overview[huge_row].1, "64.0 MiB (25.0% RSS)",
+        "the overview row must carry the observed huge-page charge"
+    );
+}

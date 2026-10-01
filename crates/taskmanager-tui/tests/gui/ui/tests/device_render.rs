@@ -1069,3 +1069,28 @@ fn gpu_panel_names_proven_graphics_apis_and_pci_slot() {
         "the PCI slot must render in the GPU panel:\n{text}"
     );
 }
+
+#[test]
+fn gpu_selector_enumerates_every_projected_adapter() {
+    use taskmanager_core::core::metrics::GpuMetrics;
+    let mut app = crate::demo_app();
+    app.perf_device = crate::PerfDevice::Gpu;
+    let mut g1 = GpuMetrics::new("card0", "Intel");
+    g1.marketing_name = Some("Discrete Arc GPU".into());
+    let mut g2 = GpuMetrics::new("card1", "Intel");
+    g2.marketing_name = Some("Integrated UHD Graphics".into());
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        snapshot.gpu = vec![g1, g2];
+    });
+
+    let text = frame_text(&app, 120, 36);
+    assert!(
+        text.contains("Discrete Arc GPU") || text.contains("Arc"),
+        "the first projected GPU adapter must render in selector instances: {text}"
+    );
+    assert!(
+        text.contains("Integrated UHD Graphics") || text.contains("UHD"),
+        "the second projected GPU adapter must render in selector instances: {text}"
+    );
+}

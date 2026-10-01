@@ -414,3 +414,94 @@ fn open_files_section_renders_fd_limit_saturation() {
 
     let _section = open_files_section(&theme, Some(&pending));
 }
+
+#[test]
+fn isolation_section_renders_sandbox_detection() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        kind: Some(IsolationKind::Docker),
+        container_id: Some("c-docker123".into()),
+        sandboxed: Some(true),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_posix_capabilities() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        capabilities: Some(ProcessCapabilities::from_masks(
+            DeviceState::healthy(1),
+            Some(0),
+            Some(1 << 21),
+            Some(1 << 21),
+            Some(0),
+            Some(0),
+        )),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_namespace_audit() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{
+        LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry, NamespaceAuditStatus,
+        ProcessIsolation,
+    };
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    let audit = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(1),
+        vec![NamespaceAuditEntry {
+            kind: LinuxNamespaceKind::Pid,
+            status: NamespaceAuditStatus::Isolated {
+                inode: 4026533000,
+                host_inode: 4026531836,
+            },
+        }],
+    );
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        namespaces: Some(audit),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}

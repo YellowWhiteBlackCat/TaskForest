@@ -353,3 +353,27 @@ handles.fd-limit-saturation	iced	ui::insights::tests::open_files_section_renders
 handles.fd-limit-saturation	tui	ui::process_details::insights::tests::open_files_preview_renders_fd_limit_saturation	anchored	-	-
 handles.fd-limit-saturation	bevy	pages::processes::details::tests::open_files_summary_renders_fd_limit_saturation	anchored	-	-
 
+# v0.2.0-rc4 four-frontend parity batch: closes all asymmetric entries across
+# Iced, TUI, Bevy, and GPUI for services.inventory, hardware.heterogeneous-cores,
+# hardware.core-frequency, gpu.adapter-enumeration, memory.page-faults,
+# memory.transparent-huge-pages, security.posix-capabilities,
+# security.sandbox-detection, and security.namespace-audit.
+services.inventory	bevy	pages::services::tests::folded_rows_render_then_refresh_and_idle_frames_redraw_nothing	anchored	-	-
+hardware.heterogeneous-cores	iced	app::tests::phase4_gaps::test_heterogeneous_cpu_core_breakdown_and_tags	anchored	-	-
+hardware.heterogeneous-cores	bevy	pages::performance::cpu_details_tests::cpu_cache_topology_heterogeneous_cores_and_core_frequency_render_correctly	anchored	-	-
+hardware.core-frequency	gpui	gpui_app::cpu_view::per_core::projection_tests::per_core_cell_label_keeps_every_available_current_fact	anchored	-	-
+hardware.core-frequency	iced	ui::core_grid::tests::format_core_readout_surfaces_clock_frequency	anchored	-	-
+hardware.core-frequency	bevy	pages::performance::cpu_details_tests::cpu_cache_topology_heterogeneous_cores_and_core_frequency_render_correctly	anchored	-	-
+gpu.adapter-enumeration	gpui	gpui_app::sidebar::tests::gpu_sidebar_enumerates_every_projected_adapter	anchored	-	-
+gpu.adapter-enumeration	tui	ui::tests::device_render::gpu_selector_enumerates_every_projected_adapter	anchored	-	-
+memory.page-faults	gpui	gpui_app::root::chrome::tests::observed_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-	-
+memory.transparent-huge-pages	gpui	gpui_app::root::chrome::tests::observed_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-	-
+security.posix-capabilities	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_posix_capabilities	anchored	-	-
+security.posix-capabilities	iced	ui::insights::tests::isolation_section_renders_posix_capabilities	anchored	-	-
+security.posix-capabilities	bevy	pages::processes::details::tests::isolation_summary_renders_posix_capabilities	anchored	-	-
+security.sandbox-detection	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_sandbox_detection	anchored	-	-
+security.sandbox-detection	iced	ui::insights::tests::isolation_section_renders_sandbox_detection	anchored	-	-
+security.sandbox-detection	tui	ui::process_details::insights::tests::insights_lines_renders_sandbox_detection	anchored	-	-
+security.namespace-audit	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_namespace_audit	anchored	-	-
+security.namespace-audit	iced	ui::insights::tests::isolation_section_renders_namespace_audit	anchored	-	-
+security.namespace-audit	tui	ui::process_details::insights::tests::insights_lines_renders_namespace_audit	anchored	-	-

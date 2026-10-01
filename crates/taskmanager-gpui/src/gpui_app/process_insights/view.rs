@@ -630,3 +630,7 @@ mod cap_tests;
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_environment_tests.rs"]
 mod environment_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_isolation_tests.rs"]
+mod isolation_tests;

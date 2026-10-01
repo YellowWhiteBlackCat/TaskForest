@@ -450,6 +450,36 @@ fn isolation_summary_renders_the_linux_namespace_audit() {
 }
 
 #[test]
+fn isolation_summary_renders_posix_capabilities() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        capabilities: Some(ProcessCapabilities::from_masks(
+            DeviceState::healthy(1),
+            Some(0),
+            Some(1 << 21),
+            Some(1 << 21),
+            Some(0),
+            Some(0),
+        )),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    assert!(
+        summary.contains(t("proc_insights.capabilities")),
+        "the security summary must contain capabilities label: {summary}"
+    );
+    assert!(
+        summary.contains("CAP_SYS_ADMIN")
+            || summary.contains("critical")
+            || summary.contains("elevated"),
+        "the security summary must reflect effective capabilities: {summary}"
+    );
+}
+
+#[test]
 fn threads_summary_empty_and_populated_with_gap_honesty() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{
