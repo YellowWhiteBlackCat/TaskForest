@@ -657,7 +657,7 @@ impl super::Context {
 
             let properties = gpu_alloc::DeviceProperties {
                 max_memory_allocation_count: limits.max_memory_allocation_count,
-                max_memory_allocation_size: u64::max_value(), // TODO
+                max_memory_allocation_size: u64::MAX, // TODO
                 non_coherent_atom_size: limits.non_coherent_atom_size,
                 memory_types: memory_types
                     .iter()

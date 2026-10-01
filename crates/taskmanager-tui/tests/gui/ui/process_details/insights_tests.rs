@@ -9,7 +9,7 @@ use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
-    ProcessInsightsRevision,
+    ProcessInsightsRevision, project_process_resources,
 };
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::failure::FailureKind;
@@ -36,7 +36,7 @@ fn open_files_preview_lines(
     open_files: &ProcessOpenFiles,
     theme: TuiTheme,
 ) -> Vec<ratatui::text::Line<'static>> {
-    open_files_preview_lines_with_limit(open_files, theme, OPEN_FILES_PREVIEW)
+    open_files_preview_lines_with_limit(open_files, None, theme, OPEN_FILES_PREVIEW)
 }
 
 fn environment_preview_lines(
@@ -388,6 +388,56 @@ fn open_files_preview_renders_empty_state_for_no_descriptors() {
         !text.contains("Open files 0"),
         "an empty list must not fabricate a count"
     );
+}
+
+#[test]
+fn open_files_preview_renders_fd_limit_saturation() {
+    use taskmanager_core::core::process_telemetry::{
+        ProcessResourceObservations, ResourceObservation,
+    };
+    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+
+    let _guard = en();
+    let open_files = ProcessOpenFiles {
+        state: DeviceState::healthy(1),
+        unreadable_count: 0,
+        entries: vec![
+            OpenFileEntry {
+                fd: 0,
+                kind: OpenFileKind::File,
+                target: Some("/dev/null".into()),
+                deleted: false,
+            },
+            OpenFileEntry {
+                fd: 1,
+                kind: OpenFileKind::Socket,
+                target: Some("socket:[1234]".into()),
+                deleted: false,
+            },
+        ],
+    };
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
+    let res = ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
+    let proj = project_process_resources(&res);
+    let lines = open_files_preview_lines_with_limit(
+        &open_files,
+        Some(&proj),
+        TuiTheme::default(),
+        OPEN_FILES_PREVIEW,
+    );
+    let text = render_text(lines);
+    assert!(text.contains("Open files 2 / 1024 (0%) [max 4096]"));
 }
 
 /// An empty environment renders the explicit empty state.

@@ -97,13 +97,13 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Reference,
+        | FeatureId::MultiFormatExport
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Reference,
 
         // -- roadmap items the reference surface has not delivered yet -----
-        FeatureId::ProcessAncestorLineage
-        | FeatureId::MemoryVmaMap
+        FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend
-        | FeatureId::HandleFdLimitSaturation
         | FeatureId::HandleReversePathSearch
         | FeatureId::ThreadContextSwitchRates
         | FeatureId::ListeningPortTopology

@@ -251,16 +251,15 @@ fn capability_declaration_is_complete_and_pinned() {
     let expected: [(ComponentCapability, Kind); 19] = [
         (ModalOverlay, Kind::Ported),
         (ContextMenu, Kind::Ported),
-        // No control-anchored popover mechanism is offered.
-        (DropdownMenu, Kind::Unsupported),
-        // No hover/focus explanation surface; hints render as inline captions.
-        (Tooltip, Kind::Unsupported),
+        // The column-visibility selection menu over the Applications table.
+        (DropdownMenu, Kind::Ported),
+        // The pointer-hover explanation tooltip overlay surface.
+        (Tooltip, Kind::Ported),
         (Toast, Kind::Divergent),
         (TextInput, Kind::Divergent),
         (SearchInput, Kind::Ported),
-        // No selection surface at all; no system-clipboard read/write is
-        // wired and the search editor binds no clipboard chords.
-        (TextSelection, Kind::Unsupported),
+        // Read-only text selection and clipboard export surface.
+        (TextSelection, Kind::Ported),
         // Boolean rows ride the official Checkbox.
         (Switch, Kind::Divergent),
         // Bounded settings are discrete radio choices.
@@ -274,7 +273,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (Tree, Kind::Ported),
         // Scrolling rides the official ScrollArea.
         (Scrollbar, Kind::Divergent),
-        (FocusVisible, Kind::Divergent),
+        // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
+        (FocusVisible, Kind::Ported),
     ];
 
     for (capability, expected_kind) in expected {

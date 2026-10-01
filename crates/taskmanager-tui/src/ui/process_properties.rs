@@ -150,7 +150,9 @@ pub(super) fn render_process_properties_at(
 
     let lines = match target.section {
         ProcessDetailsSection::Overview => {
-            overview_lines(&target.item, &app.local_time_rules, theme)
+            let mut item = target.item.clone();
+            item.populate_ancestor_lineage(app.shell.projection().processes_slice());
+            overview_lines(&item, &app.local_time_rules, theme)
         }
         ProcessDetailsSection::Performance => {
             performance_lines(&target.item, &app.local_time_rules, theme)
@@ -218,6 +220,10 @@ fn overview_pairs(
         (t("common.name"), text(ProcessDetailsField::Name)),
         (t("proc.pid"), text(ProcessDetailsField::Pid)),
         (t("prop.parent_pid"), text(ProcessDetailsField::ParentPid)),
+        (
+            t("proc.ancestor_lineage"),
+            text(ProcessDetailsField::AncestorLineage),
+        ),
         (t("common.user"), text(ProcessDetailsField::User)),
         (t("common.status"), text(ProcessDetailsField::Status)),
         (t("common.threads"), text(ProcessDetailsField::Threads)),

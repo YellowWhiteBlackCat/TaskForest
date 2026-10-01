@@ -95,6 +95,8 @@ pub(crate) struct UiPalette {
     pub(crate) mode: LightDark,
     /// Panel and card border color.
     pub(crate) border_color: bevy::color::Color,
+    /// High-contrast modality-aware focus ring color (derived from theme palette ring).
+    pub(crate) focus_ring: bevy::color::Color,
 }
 
 /// Resolve the window palette from a theme snapshot.
@@ -126,6 +128,7 @@ pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
         warning_color: theme_color(theme.warning),
         high_contrast: theme.hc,
         border_color: theme_color(theme.border),
+        focus_ring: theme_color(theme.with_focus_visible(true).palette().ring),
         heading: TextFont {
             font_size: FontSize::Px(standard.page_title_font_size().0),
             weight: theme_weight(tokens::FONT_WEIGHT_HEADER),

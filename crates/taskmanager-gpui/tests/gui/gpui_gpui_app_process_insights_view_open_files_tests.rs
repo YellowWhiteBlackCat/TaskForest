@@ -2,8 +2,11 @@ use super::*;
 use gpui::{
     AppContext, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window, px,
 };
+use taskmanager_core::ProcessResourceSnapshot;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process_telemetry::{OpenFileEntry, OpenFileKind, ProcessOpenFiles};
+use taskmanager_core::core::process_telemetry::{
+    OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations, ResourceObservation,
+};
 
 fn labels() -> ProcessInsightsLabels {
     ProcessInsightsLabels::capture_fixture()
@@ -161,4 +164,30 @@ fn populated_open_files_render_with_unreadable_marker(cx: &mut TestAppContext) {
             .is_none(),
         "a readable descriptor must not carry the unreadable token"
     );
+}
+
+#[gpui::test]
+fn open_files_card_renders_fd_limit_saturation(cx: &mut TestAppContext) {
+    use taskmanager_core::{LimitValue, ResourceLimit, ResourceLimitKind};
+
+    let mut snapshot = snapshot_with(populated_open_files());
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
+    snapshot.resources =
+        ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
+
+    let win = draw_frame(cx, snapshot);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    let sel = selector("tm-insight-open-file:0:readable".to_string());
+    assert!(vcx.debug_bounds(sel).is_some());
 }

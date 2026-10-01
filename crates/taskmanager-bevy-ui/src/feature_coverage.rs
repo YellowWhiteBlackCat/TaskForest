@@ -43,7 +43,7 @@ pub fn feature_coverage_declaration() -> FeatureCoverageDeclaration {
 /// shape states its position. Features with no Bevy surface yet stay reasoned
 /// `Unsupported` gaps; they are never silently absent.
 const fn support(feature: FeatureId) -> CapabilitySupport {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Ported, Unsupported};
     match feature {
         // -- surfaces this shape really renders ---------------------------
         FeatureId::ProcessSchedulerPolicy
@@ -94,23 +94,13 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
-
-        // -- deliberate scene reduction -----------------------------------
-        FeatureId::ThermalZoneSensors => Divergent {
-            reason: "Bevy surfaces the CPU temperature readout without the \
-                     thermal-zone source distinction",
-        },
-        FeatureId::BatteryPowerInventory => Divergent {
-            reason: "the Bevy battery block renders charge and power without \
-                     the voltage/health/cycle detail",
-        },
+        | FeatureId::MultiFormatExport
+        | FeatureId::BatteryPowerInventory
+        | FeatureId::ThermalZoneSensors
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleFdLimitSaturation => Unsupported {
-            reason: "the Bevy open-file summary renders descriptors without the \
-                     RLIMIT_NOFILE saturation context",
-        },
         FeatureId::HandleReversePathSearch => Unsupported {
             reason: "no system-wide handle search surface is wired in the Bevy \
                      shape",
@@ -121,10 +111,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Bevy shape",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the Bevy process surface renders the tree without an \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

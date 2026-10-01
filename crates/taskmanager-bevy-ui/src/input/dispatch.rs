@@ -26,6 +26,7 @@ use crate::drain::FeedbackCache;
 use crate::input_contract::shared_key;
 use crate::menu_modal::{MenuModalChanged, ModalDriver};
 use crate::pages::performance::{PerformanceDeviceFocus, PerformanceDeviceTarget};
+use crate::pages::processes::columns_modal::ProcessColumnsModalChanged;
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::log_panel::{ServiceLogControlAction, ServiceLogExportDir};
 use crate::pages::services::menu::ServiceMenuCtx;
@@ -88,6 +89,10 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     selections: &'a InventorySelections<'n>,
     /// Search text-editing state (absent before the page resources mount).
     text_state: &'a mut Option<ResMut<'t, TextInputState>>,
+    /// Read-only text selection state.
+    text_selection: Option<&'a mut crate::text_selection::TextSelectionState>,
+    /// Clipboard port resource.
+    clipboard: Option<&'a mut crate::text_selection::ClipboardPort>,
     /// Service-log export directory (absent outside the window shell).
     export_dir: Option<&'a ServiceLogExportDir>,
     /// Performance page device focus (absent outside the window shell).
@@ -128,37 +133,22 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     /// table-row arrow or a shared fixed binding — so they run in sequence
     /// once the chain above them falls through.
     fn dispatch(&mut self, press: KeyPress) {
-        if self.frontend_menus(press) {
-            return;
-        }
-        if self.service_log_panel(press) {
-            return;
-        }
-        if self.dismiss_feedback(press) {
-            return;
-        }
-        if self.route_chord(press) {
-            return;
-        }
-        if self.confirm_gate(press) {
-            return;
-        }
-        if self.process_action_chord(press) {
-            return;
-        }
-        if self.open_inventory_menu(press) {
-            return;
-        }
-        if self.smart_self_test(press) {
-            return;
-        }
-        if self.snapshot_export(press) {
-            return;
-        }
-        if self.search_editing(press) {
-            return;
-        }
-        if self.shell_char(press) {
+        if self.frontend_menus(press)
+            || self.service_log_panel(press)
+            || self.dismiss_shared_surface(press)
+            || self.dismiss_text_selection(press)
+            || self.dismiss_feedback(press)
+            || self.route_chord(press)
+            || self.confirm_gate(press)
+            || self.process_action_chord(press)
+            || self.process_columns_chord(press)
+            || self.open_inventory_menu(press)
+            || self.smart_self_test(press)
+            || self.snapshot_export(press)
+            || self.search_editing(press)
+            || self.shell_char(press)
+            || self.copy_chord(press)
+        {
             return;
         }
         self.table_motion(press);
@@ -200,6 +190,11 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
                 .modals
                 .proc
                 .drive(self.shell, press.key_code, self.pending);
+        }
+        if menus.holds(FrontendMenuKind::Columns) && press.key_code == KeyCode::Escape {
+            self.modals.cols.close();
+            self.commands.trigger(ProcessColumnsModalChanged);
+            self.applied = true;
         }
         if menus.holds(FrontendMenuKind::Service) && !self.modals.svc.is_open() {
             self.commands.trigger(MenuModalChanged::<ServiceMenuCtx>(
@@ -259,6 +254,39 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .trigger(crate::pages::services::log_panel::LogPanelRepaintRequired);
         self.applied = true;
         true
+    }
+
+    /// Arm 0b2 — shared surface dismissal: when a shared surface or modal
+    /// overlay (e.g. process properties) is open, bare Escape dismisses it.
+    fn dismiss_shared_surface(&mut self, press: KeyPress) -> bool {
+        if press.key_code != KeyCode::Escape || press.modifiers != Modifiers::NONE {
+            return false;
+        }
+        if self.shell.process_properties_target().is_some()
+            || self.shell.interaction_surface().is_some()
+        {
+            self.shell.dismiss_overlay();
+            self.applied = true;
+            return true;
+        }
+        false
+    }
+
+    /// Arm 0b3 — read-only text selection dismissal: Escape clears active selection.
+    fn dismiss_text_selection(&mut self, press: KeyPress) -> bool {
+        if matches!(press.context, KeyboardOwner::Free)
+            && press.key_code == KeyCode::Escape
+            && press.modifiers == Modifiers::NONE
+            && let Some(ref mut sel) = self.text_selection
+            && sel.is_active()
+        {
+            sel.clear();
+            self.commands
+                .trigger(crate::text_selection::TextSelectionChanged);
+            self.applied = true;
+            return true;
+        }
+        false
     }
 
     /// Arm 0c — active feedback notice dismissal: when no confirmation or modal
@@ -337,6 +365,22 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         true
     }
 
+    /// Arm 2a2 — Applications column-visibility menu: 'c' opens the column picker modal
+    /// (TUI and GPUI parity).
+    fn process_columns_chord(&mut self, press: KeyPress) -> bool {
+        if !matches!(press.context, KeyboardOwner::Free)
+            || press.page != Page::Processes
+            || press.key_code != KeyCode::KeyC
+            || press.modifiers != Modifiers::NONE
+        {
+            return false;
+        }
+        self.modals.cols.open();
+        self.commands.trigger(ProcessColumnsModalChanged);
+        self.applied = true;
+        true
+    }
+
     /// Arm 2b — closed-menu Enter / 'a' attempt: bare Enter or 'a' over a selected
     /// row on an inventory page opens that page's action menu (TUI
     /// Enter-actions parity, one open-attempt per inventory).
@@ -381,16 +425,10 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .svc
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| {
-                self.shell
-                    .sorted_services()
-                    .first()
-                    .map(|service| service.id.clone())
-            });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &target)
+            .or_else(|| self.shell.sorted_services().first().map(|s| s.id.clone()));
+        target.is_some_and(|t| {
+            crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &t)
+        })
     }
 
     /// The Startup open-attempt: the table selection, else the first sorted
@@ -405,12 +443,11 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
                 self.shell
                     .sorted_startup_entries()
                     .first()
-                    .map(|entry| entry.id.clone())
+                    .map(|e| e.id.clone())
             });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &target)
+        target.is_some_and(|t| {
+            crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &t)
+        })
     }
 
     /// The Sessions open-attempt: the table selection, else the first sorted
@@ -421,16 +458,10 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .ses
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| {
-                self.shell
-                    .sorted_sessions()
-                    .first()
-                    .map(|session| session.id.clone())
-            });
-        let Some(target) = target else {
-            return false;
-        };
-        crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &target)
+            .or_else(|| self.shell.sorted_sessions().first().map(|s| s.id.clone()));
+        target.is_some_and(|t| {
+            crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t)
+        })
     }
 
     /// Arm 2c — Performance page: 't' chord triggers SMART self-test for the
@@ -518,6 +549,22 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         }
         self.applied = true;
         true
+    }
+
+    /// Arm 3b — copy chord: Ctrl+C copies active text selection or selected row summary.
+    fn copy_chord(&mut self, press: KeyPress) -> bool {
+        if matches!(press.context, KeyboardOwner::Free)
+            && press.key_code == KeyCode::KeyC
+            && press.modifiers.control
+            && let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard)
+            && crate::text_selection::copy_selection_or_row(sel, clip, self.shell)
+        {
+            self.commands
+                .trigger(crate::text_selection::TextSelectionChanged);
+            self.applied = true;
+            return true;
+        }
+        false
     }
 
     /// Arm 3a — table row selection motion for non-process inventory tables.
@@ -675,6 +722,10 @@ pub(crate) struct KeyboardDispatchOutputs<'w, 's> {
     feedback_cache: Option<ResMut<'w, FeedbackCache>>,
     /// Search text-editing state, absent before the page resources mount.
     text_state: Option<ResMut<'w, TextInputState>>,
+    /// Read-only text selection state.
+    text_selection: Option<ResMut<'w, crate::text_selection::TextSelectionState>>,
+    /// Clipboard port.
+    clipboard: Option<ResMut<'w, crate::text_selection::ClipboardPort>>,
     /// Deferred commands (observer triggers).
     commands: Commands<'w, 's>,
 }
@@ -708,6 +759,8 @@ pub(crate) fn keyboard_dispatch_system(
             modals: &mut modals,
             selections: &selections,
             text_state: &mut outputs.text_state,
+            text_selection: outputs.text_selection.as_deref_mut(),
+            clipboard: outputs.clipboard.as_deref_mut(),
             export_dir: inputs.export_dir.as_deref(),
             perf_device_focus: inputs.perf_device_focus.as_deref(),
             applied: false,

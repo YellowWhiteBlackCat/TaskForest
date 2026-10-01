@@ -14,6 +14,7 @@ use taskmanager_application::process_details_vm::process_details_rows_with_local
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessMetadataObservations;
 use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::process::process_ancestor_lineage;
 use taskmanager_core::core::time::LocalTimeRules;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::start_clock_local;
@@ -229,4 +230,39 @@ fn legend_pairs_join_through_the_locale_catalog() {
         "must render the localized {{label}}: {{value}} shape"
     );
     assert!(joined.contains(i18n::t("prop.current")));
+}
+
+/// The delivered `process.ancestor-lineage` capability: the dialog overview
+/// paints the top-down parent lineage (root down to immediate parent) from
+/// the shared process tree projection. An empty/root process keeps the honest
+/// dash instead of a fabricated ancestry.
+#[test]
+fn process_ancestor_lineage_renders_in_overview_and_handles_root() {
+    let mut procs = vec![
+        ProcessItem::new(1, "systemd"),
+        ProcessItem::new(800, "sway"),
+        ProcessItem::new(1000, "alacritty"),
+    ];
+    procs[1].parent_pid = Some(1);
+    procs[2].parent_pid = Some(800);
+    let lineage = process_ancestor_lineage(&procs, 1000);
+    procs[2].set_ancestor_lineage(lineage);
+
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
+    let overview = vm_rows(&procs[2], &OVERVIEW_FIELDS, &utc);
+    let lineage_row = OVERVIEW_FIELDS
+        .iter()
+        .position(|(field, _)| *field == ProcessDetailsField::AncestorLineage)
+        .expect("overview carries ancestor lineage");
+    assert_eq!(
+        overview[lineage_row].1, "systemd (1) > sway (800)",
+        "descendant process must display full top-down ancestor lineage"
+    );
+
+    let root_overview = vm_rows(&procs[0], &OVERVIEW_FIELDS, &utc);
+    assert_eq!(
+        root_overview[lineage_row].1,
+        missing_value(),
+        "root process without ancestors renders the honest dash"
+    );
 }

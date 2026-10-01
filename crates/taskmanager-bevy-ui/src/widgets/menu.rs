@@ -138,15 +138,24 @@ pub(crate) fn menu_scene_at(
     }
 }
 
-fn menu_rows(spec: &MenuSpec, selection: usize, palette: &UiPalette) -> Vec<impl Scene + use<>> {
+/// Marker on a rendered menu item row, holding its index in the menu spec.
+#[derive(bevy::ecs::component::Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct MenuItemIndex(pub(crate) usize);
+
+fn menu_rows(spec: &MenuSpec, selection: usize, palette: &UiPalette) -> Vec<Box<dyn Scene>> {
     spec.items
         .iter()
         .enumerate()
-        .map(|(index, item)| menu_row_scene(item, index == selection, palette))
+        .map(|(index, item)| menu_row_scene(index, item, index == selection, palette))
         .collect()
 }
 
-fn menu_row_scene(item: &MenuItem, highlighted: bool, palette: &UiPalette) -> impl Scene + use<> {
+fn menu_row_scene(
+    index: usize,
+    item: &MenuItem,
+    highlighted: bool,
+    palette: &UiPalette,
+) -> Box<dyn Scene> {
     let label = item.label.clone();
     let height = palette.control_height_px;
     let radius = palette.control_radius_px;
@@ -158,18 +167,36 @@ fn menu_row_scene(item: &MenuItem, highlighted: bool, palette: &UiPalette) -> im
     } else {
         Role::Caption
     };
-    bsn! {
-        Node {
-            width: percent(100),
-            height: px(height),
-            align_items: AlignItems::Center,
-            padding: UiRect::left(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor(fill)
-        Children [
-            ( Text(label) TextRole(role) ),
-        ]
+    if item.enabled {
+        Box::new(bsn! {
+            Node {
+                width: percent(100),
+                height: px(height),
+                align_items: AlignItems::Center,
+                padding: UiRect::left(Val::Px(space_8())),
+                border_radius: BorderRadius::all(Val::Px(radius)),
+            }
+            BackgroundColor(fill)
+            bevy::ui_widgets::Button
+            MenuItemIndex(index)
+            Children [
+                ( Text(label) TextRole(role) ),
+            ]
+        }) as Box<dyn Scene>
+    } else {
+        Box::new(bsn! {
+            Node {
+                width: percent(100),
+                height: px(height),
+                align_items: AlignItems::Center,
+                padding: UiRect::left(Val::Px(space_8())),
+                border_radius: BorderRadius::all(Val::Px(radius)),
+            }
+            BackgroundColor(fill)
+            Children [
+                ( Text(label) TextRole(role) ),
+            ]
+        }) as Box<dyn Scene>
     }
 }
 

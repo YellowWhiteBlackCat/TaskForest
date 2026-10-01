@@ -938,3 +938,163 @@ fn process_sort_header_mounts_and_routes_sort_activation() {
         "process table header mounts interactive sort headers"
     );
 }
+
+#[test]
+fn process_properties_modal_opens_and_dismisses_via_button_and_escape() {
+    use super::properties_modal::{
+        ProcessPropertiesDismissButton, ProcessPropertiesOverlay, republish,
+    };
+    use crate::window::FrontendWindowPlugin;
+    use bevy::ecs::message::MessageWriter;
+    use bevy::ecs::system::{Commands, NonSendMut, RunSystemOnce};
+    use bevy::input::InputPlugin;
+    use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
+    use bevy::input_focus::InputFocusPlugin;
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark()),
+    });
+
+    let target_proc = test_proc(4242, "cargo");
+    let mut shell = ShellApp::new();
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![target_proc]);
+    });
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+    assert!(shell.select_row(0));
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = shell;
+
+    // Pump frames to initialize window chrome, AppShellRoot and page mount
+    app.update();
+    app.update();
+
+    // 1. Trigger open properties action on the shell and republish
+    app.world_mut()
+        .run_system_once(
+            |mut track: NonSendMut<FrontendTrack>, mut commands: Commands| {
+                let _ = track.shell.apply_action(AppAction::OpenProperties);
+                assert!(track.shell.process_properties_target().is_some());
+                republish(&track.shell, &mut commands);
+            },
+        )
+        .expect("open properties");
+    app.update();
+
+    // Verify modal overlay is mounted
+    let world = app.world_mut();
+    let overlay_count = world
+        .query_filtered::<Entity, With<ProcessPropertiesOverlay>>()
+        .iter(world)
+        .count();
+    assert_eq!(overlay_count, 1, "properties modal overlay is mounted");
+
+    // Verify content reflects target process
+    let texts: Vec<String> = world
+        .query::<&Text>()
+        .iter(world)
+        .map(|t| t.0.clone())
+        .collect();
+    assert!(texts.iter().any(|t| t.contains("cargo")));
+    assert!(texts.iter().any(|t| t.contains("4242")));
+
+    // 2. Dismiss via Close button
+    let dismiss_btn = world
+        .query_filtered::<Entity, With<ProcessPropertiesDismissButton>>()
+        .iter(world)
+        .next()
+        .expect("dismiss button entity exists");
+    world.commands().trigger(bevy::ui_widgets::Activate {
+        entity: dismiss_btn,
+    });
+    app.update();
+
+    // Verify modal is despawned and shell target cleared
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<ProcessPropertiesOverlay>>()
+            .iter(world)
+            .count(),
+        0,
+        "properties modal is despawned after button activation"
+    );
+    assert!(
+        world
+            .non_send::<FrontendTrack>()
+            .shell
+            .process_properties_target()
+            .is_none()
+    );
+
+    // 3. Re-open and dismiss via Escape key
+    app.world_mut()
+        .run_system_once(
+            |mut track: NonSendMut<FrontendTrack>, mut commands: Commands| {
+                let _ = track.shell.apply_action(AppAction::OpenProperties);
+                republish(&track.shell, &mut commands);
+            },
+        )
+        .expect("re-open properties");
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<ProcessPropertiesOverlay>>()
+            .iter(world)
+            .count(),
+        1,
+        "re-opened modal is mounted"
+    );
+
+    // Send Escape
+    let event = KeyboardInput {
+        key_code: KeyCode::Escape,
+        logical_key: Key::Escape,
+        state: bevy::input::ButtonState::Pressed,
+        text: None,
+        repeat: false,
+        window: Entity::PLACEHOLDER,
+    };
+    let mut event = Some(event);
+    app.world_mut()
+        .run_system_once(move |mut writer: MessageWriter<KeyboardInput>| {
+            if let Some(event) = event.take() {
+                writer.write(event);
+            }
+        })
+        .expect("injection runs");
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<ProcessPropertiesOverlay>>()
+            .iter(world)
+            .count(),
+        0,
+        "properties modal is despawned after Escape"
+    );
+    assert!(
+        world
+            .non_send::<FrontendTrack>()
+            .shell
+            .process_properties_target()
+            .is_none()
+    );
+}

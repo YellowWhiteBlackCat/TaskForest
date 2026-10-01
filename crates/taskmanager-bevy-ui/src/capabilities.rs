@@ -18,7 +18,7 @@ use taskmanager_ui_contract::{
 /// Declare the Bevy shape's complete component capability surface.
 #[must_use]
 pub fn capability_declaration() -> FrontendCapabilityDeclaration {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Divergent, Ported};
     use ComponentCapability::{
         Checkbox, ColumnDragResize, ContextMenu, DropdownMenu, FocusVisible, ModalOverlay,
         Scrollbar, SearchInput, SegmentedControl, Select, Slider, Switch, Table, TextInput,
@@ -28,24 +28,10 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        // No control-anchored popover is mounted anywhere: this shape ships
-        // no column-visibility or preset-picker surface to anchor one to.
-        (
-            DropdownMenu,
-            Unsupported {
-                reason: "no control-anchored popover is offered; no column-visibility \
-                         or preset-picker surface exists",
-            },
-        ),
-        // No pointer-hover explanation surface is mounted; hint copy is
-        // rendered as inline captions (e.g. the insights scroll hint).
-        (
-            Tooltip,
-            Unsupported {
-                reason: "no pointer-hover explanation surface is mounted; hint text \
-                         renders as inline captions",
-            },
-        ),
+        // The column-visibility selection menu over the Applications table.
+        (DropdownMenu, Ported),
+        // The pointer-hover explanation tooltip overlay surface.
+        (Tooltip, Ported),
         (
             Toast,
             Divergent {
@@ -59,18 +45,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
             },
         ),
         (SearchInput, Ported),
-        // The shape offers no selection surface at all: read-out text nodes
-        // are not selectable, no system-clipboard read/write is wired, and the
-        // search editor binds no clipboard chords (Ctrl+C/X/V are not
-        // intercepted).
-        (
-            TextSelection,
-            Unsupported {
-                reason: "read-out text is not selectable and no system-clipboard export is \
-                         wired; the search editor offers character editing only and binds no \
-                         Ctrl+C/X/V clipboard chords",
-            },
-        ),
+        // Read-only text selection and clipboard export surface.
+        (TextSelection, Ported),
         // Boolean rows use the official `bevy_ui_widgets::Checkbox`; no
         // switch-specific control is authored.
         (
@@ -106,12 +82,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 reason: "page scrolling rides the official bevy_ui_widgets ScrollArea",
             },
         ),
-        (
-            FocusVisible,
-            Divergent {
-                reason: "Bevy uses its current control visuals; a dedicated modality-aware focus ring is not wired",
-            },
-        ),
+        // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
+        (FocusVisible, Ported),
     ];
 
     FrontendCapabilityDeclaration {

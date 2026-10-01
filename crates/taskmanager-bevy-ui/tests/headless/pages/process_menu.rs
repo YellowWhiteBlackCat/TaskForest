@@ -318,3 +318,172 @@ fn multi_select_kill_arms_batch_gate_with_multiple_targets() {
     assert_eq!(intent.action, ProcessBatchAction::Kill);
     assert_eq!(intent.targets.len(), 2);
 }
+
+#[test]
+fn test_process_menu_mouse_activation_and_scrim_dismiss() {
+    use bevy::MinimalPlugins;
+    use bevy::app::App;
+    use bevy::asset::{AssetPlugin, Assets};
+    use bevy::ecs::entity::Entity;
+    use bevy::ecs::query::With;
+    use bevy::ecs::system::{Commands, NonSend, NonSendMut, ResMut, RunSystemOnce};
+    use bevy::input::InputPlugin;
+    use bevy::input_focus::InputFocusPlugin;
+    use bevy::scene::ScenePlugin;
+    use bevy::text::Font;
+    use taskmanager_theme::Theme;
+
+    use crate::app::FrontendTrack;
+    use crate::menu_modal::{MenuModalChanged, MenuModalOverlay, MenuModalScrim};
+    use crate::palette::ui_palette;
+    use crate::widgets::menu::MenuItemIndex;
+    use crate::window::FrontendWindowPlugin;
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark()),
+    });
+
+    let mut shell = ShellApp::new();
+    let proc = token_process(100, "alpha");
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![proc]);
+    });
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+    assert!(shell.select_row(0));
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = shell;
+
+    app.update();
+    app.update();
+
+    // 1. Open the process context menu
+    app.world_mut()
+        .run_system_once(
+            |mut modal: ResMut<ProcessMenuModal>,
+             track: NonSend<FrontendTrack>,
+             mut commands: Commands| {
+                assert!(open_for_selected(&mut modal, &track.shell));
+                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
+                    true,
+                    std::marker::PhantomData,
+                ));
+            },
+        )
+        .expect("open menu");
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .iter(world)
+            .count(),
+        1,
+        "menu modal overlay is mounted"
+    );
+
+    // 2. Click the Kill menu item (index 4)
+    let kill_item_entity = world
+        .query_filtered::<(Entity, &MenuItemIndex), ()>()
+        .iter(world)
+        .find(|(_, item)| item.0 == 4)
+        .map(|(entity, _)| entity)
+        .expect("kill menu item exists");
+
+    world.commands().trigger(bevy::ui_widgets::Activate {
+        entity: kill_item_entity,
+    });
+    app.update();
+
+    // Verify menu closed and confirmation gate armed for Kill
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .iter(world)
+            .count(),
+        0,
+        "menu is closed after clicking menu item"
+    );
+    let track = world.non_send::<FrontendTrack>();
+    let Some(PendingConfirmation::ProcessBatch(intent)) = track.shell.pending_confirmation() else {
+        panic!("clicking Kill item must arm batch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Kill);
+
+    // Dismiss the confirmation gate
+    app.world_mut()
+        .run_system_once(|mut track: NonSendMut<FrontendTrack>| {
+            track.shell.dismiss_overlay();
+        })
+        .expect("dismiss confirmation");
+    app.update();
+
+    // 3. Re-open menu and click scrim to cancel/dismiss
+    app.world_mut()
+        .run_system_once(
+            |mut modal: ResMut<ProcessMenuModal>,
+             track: NonSend<FrontendTrack>,
+             mut commands: Commands| {
+                assert!(open_for_selected(&mut modal, &track.shell));
+                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
+                    true,
+                    std::marker::PhantomData,
+                ));
+            },
+        )
+        .expect("reopen menu");
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .iter(world)
+            .count(),
+        1,
+        "menu modal is mounted again"
+    );
+
+    let scrim_entity = world
+        .query_filtered::<Entity, With<MenuModalScrim>>()
+        .iter(world)
+        .next()
+        .expect("scrim entity exists");
+
+    world.commands().trigger(bevy::ui_widgets::Activate {
+        entity: scrim_entity,
+    });
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .iter(world)
+            .count(),
+        0,
+        "menu modal is closed after clicking scrim"
+    );
+    assert!(
+        world
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_confirmation()
+            .is_none()
+    );
+}

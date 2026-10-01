@@ -293,6 +293,49 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
 }
 
 #[test]
+fn process_ancestor_lineage_renders_in_projection_and_handles_root() {
+    let mut procs = vec![
+        ProcessItem::new(1, "systemd"),
+        ProcessItem::new(800, "sway"),
+        ProcessItem::new(1000, "alacritty"),
+    ];
+    procs[1].parent_pid = Some(1);
+    procs[2].parent_pid = Some(800);
+
+    let mut shell = ShellApp::new();
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(procs.clone());
+    });
+    // Select the descendant (alacritty at index 2)
+    shell.selected = 2;
+    let view = projection(&shell);
+    let lineage_val = view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc.ancestor_lineage"))
+        .map(|row| row.value.as_str());
+    assert_eq!(
+        lineage_val,
+        Some("systemd (1) > sway (800)"),
+        "descendant process must display full top-down ancestor lineage"
+    );
+
+    // Select the root (systemd at index 0)
+    shell.selected = 0;
+    let root_view = projection(&shell);
+    let root_lineage_val = root_view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc.ancestor_lineage"))
+        .map(|row| row.value.as_str());
+    assert_eq!(
+        root_lineage_val,
+        Some(MISSING_VALUE),
+        "root process without ancestors renders the honest dash"
+    );
+}
+
+#[test]
 fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
     let mut process = ProcessItem::new(77, "faulty");
     process.minor_page_faults = Some(1_234);
@@ -484,7 +527,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
 
     let empty = ProcessOpenFiles::default();
     assert_eq!(
-        super::open_files_summary(&empty),
+        super::open_files_summary(&empty, None),
         t("proc_insights.no_open_files")
     );
 
@@ -519,7 +562,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
         unreadable_count: 1,
     };
 
-    let summary = super::open_files_summary(&files);
+    let summary = super::open_files_summary(&files, None);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], format!("4 · 1 {}", t("proc_insights.unreadable")));
     assert_eq!(lines[1], "0 [file] -> /dev/null [deleted]");
@@ -530,6 +573,56 @@ fn open_files_summary_empty_unreadable_and_populated() {
     assert_eq!(lines[3], "2 [pipe] -> pipe:[12345]");
     assert_eq!(lines[4], "…");
     assert_eq!(lines.len(), 5);
+}
+
+#[test]
+fn open_files_summary_renders_fd_limit_saturation() {
+    use taskmanager_application::project_process_resources;
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{
+        OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations,
+        ResourceObservation,
+    };
+    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+
+    let files = ProcessOpenFiles {
+        state: DeviceState::healthy(1000),
+        entries: vec![
+            OpenFileEntry {
+                fd: 0,
+                kind: OpenFileKind::File,
+                target: Some("/dev/null".into()),
+                deleted: false,
+            },
+            OpenFileEntry {
+                fd: 1,
+                kind: OpenFileKind::File,
+                target: Some("/dev/zero".into()),
+                deleted: false,
+            },
+        ],
+        unreadable_count: 0,
+    };
+
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
+    let snapshot =
+        ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
+    let proj = project_process_resources(&snapshot);
+
+    let summary = super::open_files_summary(&files, Some(&proj));
+    let first_line = summary.lines().next().unwrap();
+    assert_eq!(first_line, "2 / 1024 (0%) [max 4096]");
 }
 
 #[test]

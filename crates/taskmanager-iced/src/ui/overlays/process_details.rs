@@ -575,7 +575,9 @@ fn property_rows_with_local_time(
         );
         return rows;
     };
-    property_pairs(process, local_time_rules)
+    let mut process = process.clone();
+    process.populate_ancestor_lineage(shell.projection().processes_slice());
+    property_pairs(&process, local_time_rules)
         .into_iter()
         .map(|(_, label, value)| (label, value))
         .collect()
@@ -632,6 +634,10 @@ fn property_pairs(
     if let DetailValue::Text(_) = detail_value(&vm, ProcessDetailsField::ParentPid) {
         pairs.push(row(ProcessDetailsField::ParentPid, t("prop.parent_pid")));
     }
+    pairs.push(row(
+        ProcessDetailsField::AncestorLineage,
+        t("proc.ancestor_lineage"),
+    ));
     pairs.extend([
         row(ProcessDetailsField::StartTime, t("prop.start_time")),
         row(ProcessDetailsField::CpuTime, t("proc.cpu_time")),

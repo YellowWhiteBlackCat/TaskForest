@@ -865,6 +865,7 @@
   "users.inventory_waiting": "Users · waiting for inventory…",
   "users.reported": "{count} reported",
   "proc.pid": "PID",
+  "proc.ancestor_lineage": "Ancestor lineage",
   "proc.pss": "PSS",
   "proc.uss": "USS",
   "proc.shared": "Shared",

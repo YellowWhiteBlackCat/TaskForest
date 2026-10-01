@@ -95,13 +95,11 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
+        | FeatureId::MultiFormatExport
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleFdLimitSaturation => Unsupported {
-            reason: "the Iced open-file facet renders descriptors without the \
-                     RLIMIT_NOFILE saturation context",
-        },
         FeatureId::HandleReversePathSearch => Unsupported {
             reason: "no system-wide handle search surface is wired in Iced",
         },
@@ -112,10 +110,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Iced process \
                      surface",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the Iced process surface renders the row table without the \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

@@ -18,6 +18,7 @@ mod control;
 pub mod group_aggregate;
 mod history;
 pub mod identity;
+pub mod lineage;
 mod metadata;
 mod scalars;
 pub mod scheduling;
@@ -38,6 +39,7 @@ pub use control::{
 };
 pub use history::{ProcessHistorySample, ProcessHistorySnapshot, ProcessHistoryStore};
 pub use identity::ProcessLiveKey;
+pub use lineage::{ProcessAncestorNode, format_ancestor_lineage, process_ancestor_lineage};
 pub use metadata::{
     ProcessMetadataAvailability, ProcessMetadataFailure, ProcessMetadataObservation,
     ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
@@ -105,6 +107,8 @@ pub struct ProcessItem {
     /// Cumulative writes discarded by the kernel after an overwrite or
     /// truncation (`/proc/<pid>/io:cancelled_write_bytes`).
     pub cancelled_write_bytes: Option<u64>,
+    /// Ancestor process lineage up to root, ordered top-down.
+    pub ancestor_lineage: Option<Vec<ProcessAncestorNode>>,
     metadata_observations: ProcessMetadataObservations,
     /// Typed desktop-entry identity for a process that is known to belong to
     /// an application. Older payloads remain `Unknown`; confirmed absence is
@@ -135,6 +139,36 @@ impl ProcessItem {
     #[must_use]
     pub fn status_kind(&self) -> ProcessStatusKind {
         ProcessStatusKind::from_provider_status(&self.status)
+    }
+
+    /// Return the ancestor lineage if one has been populated.
+    #[must_use]
+    pub fn current_ancestor_lineage(&self) -> Option<&[ProcessAncestorNode]> {
+        self.ancestor_lineage.as_deref()
+    }
+
+    /// Return the formatted ancestor lineage string (e.g. `systemd (1) > sway (800)`),
+    /// or None if no lineage is populated.
+    #[must_use]
+    pub fn current_ancestor_lineage_formatted(&self) -> Option<String> {
+        self.current_ancestor_lineage().map(format_ancestor_lineage)
+    }
+
+    /// Attach a pre-computed ancestor lineage chain.
+    pub fn set_ancestor_lineage(&mut self, lineage: Vec<ProcessAncestorNode>) {
+        self.ancestor_lineage = Some(lineage);
+    }
+
+    /// Builder method attaching a pre-computed ancestor lineage chain.
+    #[must_use]
+    pub fn with_ancestor_lineage(mut self, lineage: Vec<ProcessAncestorNode>) -> Self {
+        self.set_ancestor_lineage(lineage);
+        self
+    }
+
+    /// Populate the ancestor lineage from a slice of processes.
+    pub fn populate_ancestor_lineage(&mut self, processes: &[ProcessItem]) {
+        self.ancestor_lineage = Some(process_ancestor_lineage(processes, self.pid));
     }
 
     /// Replace the typed metadata group. Legacy fields are projected only by

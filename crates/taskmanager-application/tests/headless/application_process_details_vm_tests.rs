@@ -4,8 +4,8 @@ use taskmanager_core::DeviceState;
 use taskmanager_core::ProcessSchedulingPolicy;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
-    ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
-    ProcessOwnerIdentity, ProcessScalarObservations,
+    ProcessAncestorNode, ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations,
+    ProcessOwner, ProcessOwnerIdentity, ProcessScalarObservations,
 };
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_core::core::units::UnitPreferences;
@@ -23,6 +23,10 @@ fn process_details_rows(item: &ProcessItem, units: &UnitPreferences) -> Vec<Proc
 fn fully_observed_item() -> ProcessItem {
     let mut item = ProcessItem::new(4242, "sample");
     item.parent_pid = Some(1);
+    item.ancestor_lineage = Some(vec![ProcessAncestorNode {
+        pid: 1,
+        name: "systemd".to_string(),
+    }]);
     item.cmdline = "sample --flag value".to_owned();
     item.status = "S".to_owned();
     item.scheduling_policy = Some(ProcessSchedulingPolicy::Other);
@@ -85,6 +89,10 @@ fn fully_observed_row_folds_every_field_to_text() {
     assert_eq!(
         value(&rows, ProcessDetailsField::ParentPid),
         &DetailValue::Text("1".to_owned())
+    );
+    assert_eq!(
+        value(&rows, ProcessDetailsField::AncestorLineage),
+        &DetailValue::Text("systemd (1)".to_owned())
     );
     assert_eq!(
         value(&rows, ProcessDetailsField::User),

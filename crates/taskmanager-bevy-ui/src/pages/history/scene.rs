@@ -260,6 +260,7 @@ pub(super) fn bind_history_page(mut world: DeferredWorld<'_>, _context: HookCont
     commands.insert_resource(HistoryPageBound);
     commands.add_observer(on_history_body_added);
     commands.add_observer(on_history_changed);
+    commands.queue(paint_history);
 }
 
 fn on_history_body_added(_added: On<Add, HistoryBody>, mut commands: Commands) {

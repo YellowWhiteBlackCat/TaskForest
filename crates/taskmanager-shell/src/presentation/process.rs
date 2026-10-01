@@ -1,7 +1,21 @@
 //! Process-list presentation summaries shared by all frontends.
 
 use taskmanager_application::i18n;
+use taskmanager_core::LimitValue;
 use taskmanager_core::ProcessItem;
+use taskmanager_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
+
+/// Retrieve and format the ancestor lineage for a target PID from a process inventory.
+#[must_use]
+pub fn process_ancestor_lineage_summary(
+    processes: Option<&[ProcessItem]>,
+    target_pid: u32,
+) -> String {
+    processes.map_or_else(
+        || "—".to_string(),
+        |items| format_ancestor_lineage(&process_ancestor_lineage(items, target_pid)),
+    )
+}
 
 /// Count live processes in Linux's uninterruptible `D` state. The count is
 /// derived from the shared process projection so a missing snapshot remains
@@ -24,3 +38,50 @@ pub fn uninterruptible_process_summary(processes: Option<&[ProcessItem]>) -> Opt
         .filter(|count| *count > 0)
         .map(|count| format!("{} {count}", i18n::t("proc.d_state")))
 }
+
+/// Format the open-file descriptor count against the process's soft/hard limits
+/// from the shared resource projection.
+///
+/// When limits are available, formats:
+/// - Both finite & differing: `"{count} / {soft} ({pct:.0}%) [max {hard}]"`
+/// - Both finite & equal: `"{count} / {soft} ({pct:.0}%)"`
+/// - Soft finite, hard unlimited: `"{count} / {soft} ({pct:.0}%) [max {unlimited_label}]"`
+/// - Soft unlimited: `"{count} / {unlimited_label}"`
+///
+/// Returns `None` if neither soft nor hard limit is available.
+#[must_use]
+pub fn format_open_files_saturation(
+    count: u64,
+    soft: Option<LimitValue>,
+    hard: Option<LimitValue>,
+    unlimited_label: &str,
+) -> Option<String> {
+    match (soft, hard) {
+        (None, None) => None,
+        (Some(LimitValue::Unlimited), _) => Some(format!("{count} / {unlimited_label}")),
+        (Some(LimitValue::Value(soft_val)), Some(LimitValue::Value(hard_val))) => {
+            let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
+            if soft_val == hard_val {
+                Some(format!("{count} / {soft_val} ({pct:.0}%)"))
+            } else {
+                Some(format!("{count} / {soft_val} ({pct:.0}%) [max {hard_val}]"))
+            }
+        }
+        (Some(LimitValue::Value(soft_val)), Some(LimitValue::Unlimited)) => {
+            let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
+            Some(format!(
+                "{count} / {soft_val} ({pct:.0}%) [max {unlimited_label}]"
+            ))
+        }
+        (Some(LimitValue::Value(soft_val)), None) => {
+            let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
+            Some(format!("{count} / {soft_val} ({pct:.0}%)"))
+        }
+        (None, Some(LimitValue::Value(hard_val))) => Some(format!("{count} [max {hard_val}]")),
+        (None, Some(LimitValue::Unlimited)) => Some(format!("{count} [max {unlimited_label}]")),
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/headless/presentation_process_tests.rs"]
+mod tests;

@@ -16,7 +16,9 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
+use taskmanager_application::project_process_resources;
 use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessTelemetrySnapshot};
+use taskmanager_shell::presentation::format_open_files_saturation;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
@@ -73,21 +75,35 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                 .child(labels.no_open_files.to_string()),
         );
     }
+    let projected_resources = project_process_resources(&snapshot.resources);
+    let count = open_files.entries.len() as u64;
+    let saturation = format_open_files_saturation(
+        count,
+        projected_resources.open_files_soft_limit,
+        projected_resources.open_files_hard_limit,
+        labels.unlimited,
+    );
+    let count_label = saturation.unwrap_or_else(|| open_files.entries.len().to_string());
     let header = if open_files.unreadable_count > 0 {
         format!(
             "{} · {} · {} {}",
-            labels.open_files,
-            open_files.entries.len(),
-            open_files.unreadable_count,
-            labels.unreadable,
+            labels.open_files, count_label, open_files.unreadable_count, labels.unreadable,
         )
     } else {
-        format!("{} · {}", labels.open_files, open_files.entries.len())
+        format!("{} · {}", labels.open_files, count_label)
+    };
+    let header_color = if projected_resources
+        .is_near_soft_open_files_limit(count, 90.0)
+        .unwrap_or(false)
+    {
+        theme.warning
+    } else {
+        theme.fg_dim
     };
     content = content.child(
         div()
             .text_size(font_size(tokens::FONT_11))
-            .text_color(hsla(theme.fg_dim))
+            .text_color(hsla(header_color))
             .child(header),
     );
     let (shown, hidden) = super::capped_card_rows(open_files.entries.len());

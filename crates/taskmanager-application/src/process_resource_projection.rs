@@ -1,6 +1,6 @@
 //! Canonical current-value fold for process resource-limit observations.
 
-use taskmanager_core::{LimitValue, ProcessResourceSnapshot};
+use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimitKind};
 
 /// Borrowed renderer input for one process's resource limits.
 ///
@@ -16,6 +16,8 @@ pub struct ProjectedProcessResources<'a> {
     pub process_count: Option<u64>,
     pub process_limit: Option<LimitValue>,
     pub resource_group: Option<&'a str>,
+    pub open_files_soft_limit: Option<LimitValue>,
+    pub open_files_hard_limit: Option<LimitValue>,
 }
 
 impl ProjectedProcessResources<'_> {
@@ -34,6 +36,29 @@ impl ProjectedProcessResources<'_> {
         self.process_limit
             .and_then(|limit| limit.usage_percent(self.process_count))
     }
+
+    /// Current open-files descriptor consumption as a percentage of the finite
+    /// soft limit.
+    #[must_use]
+    pub fn open_files_soft_usage_percent(&self, count: u64) -> Option<f32> {
+        self.open_files_soft_limit
+            .and_then(|limit| limit.usage_percent(Some(count)))
+    }
+
+    /// Return whether the descriptor count has reached or exceeded a caller-supplied
+    /// warning band (such as `90.0` for 90%) of the finite soft limit.
+    #[must_use]
+    pub fn is_near_soft_open_files_limit(
+        &self,
+        count: u64,
+        threshold_percent: f32,
+    ) -> Option<bool> {
+        if !threshold_percent.is_finite() || threshold_percent < 0.0 {
+            return None;
+        }
+        self.open_files_soft_usage_percent(count)
+            .map(|percent| percent >= threshold_percent)
+    }
 }
 
 /// Fold typed resource observations into the immutable facts renderers need.
@@ -41,6 +66,13 @@ impl ProjectedProcessResources<'_> {
 pub fn project_process_resources(
     resources: &ProcessResourceSnapshot,
 ) -> ProjectedProcessResources<'_> {
+    let (open_files_soft_limit, open_files_hard_limit) = resources
+        .current_limits()
+        .into_iter()
+        .flatten()
+        .find(|limit| limit.kind == ResourceLimitKind::OpenFiles)
+        .map_or((None, None), |limit| (Some(limit.soft), Some(limit.hard)));
+
     ProjectedProcessResources {
         memory_usage_bytes: resources.current_memory_usage_bytes(),
         memory_limit: resources.current_memory_limit(),
@@ -54,5 +86,7 @@ pub fn project_process_resources(
             .flatten()
             .map(|membership| membership.native_locator.as_str())
             .find(|locator| !locator.is_empty()),
+        open_files_soft_limit,
+        open_files_hard_limit,
     }
 }

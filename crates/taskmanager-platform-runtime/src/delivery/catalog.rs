@@ -61,12 +61,12 @@ impl ProviderPanicLedger {
     /// Retain one panic. The monotone counter advances even when the note
     /// lock is poisoned, so the visible count never under-reports panics.
     pub(crate) fn record(&self, context: ProviderPanicContext, message: String) {
-        // `fetch_update` yields the value *before* the increment (and the
+        // `try_update` yields the value *before* the increment (and the
         // un-incremented current value when the saturating bound is hit), so
         // the 1-based sequence is derived from it, saturating at the bound.
         let sequence = self
             .total
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
                 (value < u64::MAX).then_some(value + 1)
             })
             .map_or(u64::MAX, |previous| previous.saturating_add(1));

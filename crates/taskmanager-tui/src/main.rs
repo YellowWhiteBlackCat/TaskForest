@@ -1,4 +1,4 @@
-//! `taskmanager-tui` — the Ratatui terminal product binary (ADR-051).
+//! `taskforest-t` — the Ratatui terminal product binary (ADR-051).
 //!
 //! Thin by law: it hands this product's capability set to the shared CLI
 //! harness (`taskmanager_cli::run`). The TUI product owns the headless
@@ -7,28 +7,8 @@
 
 #![forbid(unsafe_code)]
 
-use taskmanager_cli::{FrontendHandlers, run};
-use taskmanager_tui::{run_demo, run_live, snapshot_text};
-
-/// Launch the TUI. The desktop `app_id` is a graphical-product concept; the
-/// TUI accepts and ignores it so the CLI surface stays uniform (the unified
-/// CLI now lives in the shared harness).
-fn run_gui(app_id: Option<String>, demo: bool) {
-    let _ = app_id;
-    let result = if demo { run_demo() } else { run_live() };
-    if let Err(error) = result {
-        eprintln!("taskmanager-tui: {error}");
-        std::process::exit(1);
-    }
-}
+use taskmanager_tui::run_cli;
 
 fn main() {
-    run(
-        "taskmanager-tui",
-        FrontendHandlers {
-            run_gui,
-            snapshot_text: Some(snapshot_text),
-            capture_window: None,
-        },
-    );
+    run_cli("taskforest-t");
 }

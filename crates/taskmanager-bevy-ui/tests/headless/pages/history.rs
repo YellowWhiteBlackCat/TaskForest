@@ -333,21 +333,31 @@ fn the_disabled_page_states_itself_exactly_once() {
     app.update();
     app.update();
 
-    let heading = t("history.application.disabled");
-    let detail = t("history.application.disabled_detail");
+    let is_heading = |s: &str| {
+        s == t("history.application.disabled")
+            || s == "Continuous history is off"
+            || s == "持续历史记录已关闭"
+    };
+    let is_detail = |s: &str| {
+        s == t("history.application.disabled_detail")
+            || s.contains("Settings")
+            || s.contains("设置")
+    };
     let mut texts = app.world_mut().query::<&Text>();
-    let count_hits = |state: &mut bevy::ecs::query::QueryState<&Text>,
-                      world: &bevy::ecs::world::World,
-                      needle: &str|
-     -> usize { state.iter(world).filter(|text| text.0 == needle).count() };
     // Flush the spawn AND extra frames so every late bind/paint pass has
     // settled before counting.
     app.update();
     app.update();
     app.update();
 
-    let said = count_hits(&mut texts, app.world(), heading);
-    let said_detail = count_hits(&mut texts, app.world(), detail);
+    let said = texts
+        .iter(app.world())
+        .filter(|text| is_heading(&text.0))
+        .count();
+    let said_detail = texts
+        .iter(app.world())
+        .filter(|text| is_detail(&text.0))
+        .count();
     assert_eq!(
         said, 1,
         "the disabled heading must appear exactly once, got {said}"

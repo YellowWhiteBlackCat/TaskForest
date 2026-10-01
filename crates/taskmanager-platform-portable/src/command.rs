@@ -329,7 +329,7 @@ fn retain_chunk(
 ) -> Result<(), DrainFailure> {
     if chunk.len() > MAX_CAPTURED_STREAM_BYTES.saturating_sub(buffer.len())
         || total
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                 current
                     .checked_add(chunk.len())
                     .filter(|next| *next <= MAX_CAPTURED_TOTAL_BYTES)

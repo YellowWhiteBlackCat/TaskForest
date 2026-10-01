@@ -487,12 +487,17 @@ impl Plugin for FrontendWindowPlugin {
         crate::icons::register(app);
         crate::confirmation::register(app);
         crate::pages::processes::affinity::register(app);
+        crate::pages::processes::properties_modal::register(app);
+        crate::pages::processes::columns_modal::register(app);
         crate::pages::services::details_modal::register(app);
         crate::menu_modal::register::<crate::pages::processes::menu::ProcessMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::services::menu::ServiceMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::startup::menu::StartupMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::sessions::menu::SessionMenuCtx>(app);
         crate::semantic::register(app);
+        crate::tooltip::register(app);
+        crate::text_selection::register(app);
+        crate::focus_visible::register(app);
         app.add_systems(
             Startup,
             (

@@ -154,6 +154,8 @@ fn render_process_properties(
         );
         return root;
     };
+    let mut item = (*item).clone();
+    item.populate_ancestor_lineage(view.processes());
     let close_entity = cx.entity();
     let close = close_entity.clone();
     let on_close = move |_window: &mut Window, cx: &mut App| {

@@ -366,3 +366,51 @@ fn insights_sections_render_all_states_without_panic() {
     let _ = isolation_section(&theme, Some(&unavailable));
     let _ = gpu_devices_section(&theme, Some(&unavailable));
 }
+
+#[test]
+fn open_files_section_renders_fd_limit_saturation() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{
+        OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations,
+        ResourceObservation,
+    };
+    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+
+    let theme = Theme::dark();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut pending = tracker.snapshot().unwrap();
+
+    let open_files = ProcessOpenFiles {
+        state: DeviceState::healthy(1000),
+        entries: vec![OpenFileEntry {
+            fd: 0,
+            kind: OpenFileKind::File,
+            target: Some("/dev/null".into()),
+            deleted: false,
+        }],
+        unreadable_count: 0,
+    };
+    pending.open_files = ProcessInsightFacetState::Current(open_files);
+
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
+    let res = ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
+    pending.resources = ProcessInsightFacetState::Current(res);
+
+    let _section = open_files_section(&theme, Some(&pending));
+}

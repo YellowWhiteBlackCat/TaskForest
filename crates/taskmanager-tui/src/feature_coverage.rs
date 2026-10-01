@@ -96,13 +96,11 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
+        | FeatureId::MultiFormatExport
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleFdLimitSaturation => Unsupported {
-            reason: "the terminal open-file panel renders descriptors without \
-                     the RLIMIT_NOFILE saturation context",
-        },
         FeatureId::HandleReversePathSearch => Unsupported {
             reason: "no system-wide handle search surface is wired in the \
                      terminal",
@@ -113,10 +111,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the terminal",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the terminal process surface renders the tree without an \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

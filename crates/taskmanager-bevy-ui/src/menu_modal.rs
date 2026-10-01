@@ -34,7 +34,7 @@ use bevy::ui::prelude::{
 use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
 
-use crate::widgets::menu::{MenuInput, MenuSpec, MenuState, menu_scene_at};
+use crate::widgets::menu::{MenuInput, MenuItemIndex, MenuSpec, MenuState, menu_scene_at};
 use crate::window::{AppShellRoot, WindowPalette};
 
 /// The per-page contract a modal menu instantiates: what the menu shows and
@@ -189,6 +189,10 @@ impl<Ctx: ActionMenuContext> ModalDriver for bevy::ecs::system::ResMut<'_, MenuM
 #[derive(Component, Clone, Default)]
 pub(crate) struct MenuModalOverlay;
 
+/// Marker on the scrim background button for dismissing an open menu.
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct MenuModalScrim;
+
 /// Observer: mount/despawn the overlay under the app shell root. One
 /// registration per context (see [`register`]).
 fn on_menu_modal_changed<Ctx: ActionMenuContext>(
@@ -220,10 +224,62 @@ fn on_menu_modal_changed<Ctx: ActionMenuContext>(
     commands.entity(root).add_one_related::<ChildOf>(overlay);
 }
 
+/// Observer: handle click activation on a menu item.
+fn on_menu_item_activated<Ctx: ActionMenuContext>(
+    activate: On<bevy::ui_widgets::Activate>,
+    items: Query<&MenuItemIndex>,
+    mut modal: ResMut<MenuModal<Ctx>>,
+    track: Option<bevy::ecs::system::NonSendMut<crate::app::FrontendTrack>>,
+    pending: Option<ResMut<crate::input::PendingEffects>>,
+    mut commands: Commands,
+) {
+    let Ok(item) = items.get(activate.event().entity) else {
+        return;
+    };
+    let Some(session) = modal.session.as_mut() else {
+        return;
+    };
+    let index = item.0;
+    let spec = session.frozen.spec();
+    if index >= spec.items.len() || !spec.items[index].enabled {
+        return;
+    }
+    let frozen = session.frozen.clone();
+    modal.session = None;
+    if let Some(mut track) = track {
+        let effects = frozen.commit(index, &mut track.shell);
+        if let Some(mut pending) = pending {
+            pending.0.extend(effects);
+        }
+    }
+    commands.trigger(MenuModalChanged::<Ctx>(false, std::marker::PhantomData));
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
+
+/// Observer: handle click activation on the scrim to dismiss the menu.
+fn on_menu_scrim_dismiss_activated<Ctx: ActionMenuContext>(
+    activate: On<bevy::ui_widgets::Activate>,
+    scrims: Query<&MenuModalScrim>,
+    mut modal: ResMut<MenuModal<Ctx>>,
+    mut commands: Commands,
+) {
+    if !scrims.contains(activate.event().entity) {
+        return;
+    }
+    if modal.session.is_none() {
+        return;
+    }
+    modal.session = None;
+    commands.trigger(MenuModalChanged::<Ctx>(false, std::marker::PhantomData));
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
+
 /// Register one modal's resource and observers on the app composition.
 pub(crate) fn register<Ctx: ActionMenuContext>(app: &mut bevy::app::App) {
     app.init_resource::<MenuModal<Ctx>>();
     app.add_observer(on_menu_modal_changed::<Ctx>);
+    app.add_observer(on_menu_item_activated::<Ctx>);
+    app.add_observer(on_menu_scrim_dismiss_activated::<Ctx>);
 }
 
 /// Centered modal card over a dim scrim — the same staging every
@@ -250,6 +306,8 @@ fn menu_overlay_scene<Ctx: ActionMenuContext>(
             align_items: AlignItems::Center,
         }
         BackgroundColor({ scrim })
+        bevy::ui_widgets::Button
+        MenuModalScrim
         MenuModalOverlay
         Children [
             (

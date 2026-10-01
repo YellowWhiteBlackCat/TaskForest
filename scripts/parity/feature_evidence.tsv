@@ -256,6 +256,7 @@ storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_r
 storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-	-
 power.battery-inventory	iced	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	anchored	-	-
 power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_renders_capacity_status_rate_and_voltage	anchored	-	-
+power.battery-inventory	bevy	pages::performance::device_rows_tests::battery_block_renders_voltage_health_and_cycles	anchored	-	-
 services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-	-
 storage.smart-health	gpui	gpui_app::perf_views::disk_stats::tests::disk_stats_render_the_smart_health_evidence_families	anchored	-	-
 storage.swap-throughput	gpui	gpui_app::perf_views::memory_stats::tests::swap_throughput_rows_render_the_observed_system_rates	anchored	-	-
@@ -284,6 +285,7 @@ services.log-stream	tui	runtime::tests::service_control::service_log_panel_paint
 services.log-stream	bevy	pages::services::service_logs_tests::painted_rows_follow_the_level_filter	anchored	-	-
 security.namespace-audit	bevy	pages::processes::details::tests::isolation_summary_renders_the_linux_namespace_audit	anchored	-	-
 power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-	-
+power.thermal-zones	bevy	pages::system::tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-	-
 # W25-A batch (2026-09-23): the `power.thermal-throttle-events` sweep.  The
 # W23-A definition had already been narrowed to the cumulative trigger
 # counters (`package_throttle_count`/`core_throttle_count` of the shared CPU
@@ -338,3 +340,16 @@ memory.process-swap-charge	iced	ui::tests::pages::apps_resource_projection_prese
 memory.process-swap-charge	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-	-
 memory.process-swap-charge	gpui	gpui_app::processes_view::tests::projection::canonical_category::swap_cell_renders_the_observed_per_process_charge_without_a_zero_fallback	anchored	-	-
 memory.process-swap-charge	bevy	pages::processes::tests::row_view_renders_the_observed_per_process_swap_charge	anchored	-	-
+# Process ancestor lineage delivery: the top-down parent lineage chain rendered on
+# the process properties / overview surface across all four frontends.
+process.ancestor-lineage	gpui	gpui_app::root::chrome::tests::process_ancestor_lineage_renders_in_overview_and_handles_root	anchored	-	-
+process.ancestor-lineage	iced	ui::overlays::process_details::vm_parity_tests::process_ancestor_lineage_renders_in_property_pairs_and_handles_root	anchored	-	-
+process.ancestor-lineage	tui	ui::process_properties::vm_parity_tests::process_ancestor_lineage_renders_in_overview_and_handles_root	anchored	-	-
+process.ancestor-lineage	bevy	pages::processes::details::tests::process_ancestor_lineage_renders_in_projection_and_handles_root	anchored	-	-
+# Open file descriptor limit saturation delivery: renders process descriptor
+# count against soft/hard open-file limits from the shared projection across all four frontends.
+handles.fd-limit-saturation	gpui	gpui_app::process_insights::view::open_files::tests::open_files_card_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	iced	ui::insights::tests::open_files_section_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	tui	ui::process_details::insights::tests::open_files_preview_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	bevy	pages::processes::details::tests::open_files_summary_renders_fd_limit_saturation	anchored	-	-
+
