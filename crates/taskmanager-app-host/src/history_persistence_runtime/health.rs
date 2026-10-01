@@ -143,7 +143,7 @@ pub(super) fn map_persistence_failure_kind(
 }
 
 pub(super) fn saturating_increment(value: &AtomicU64) {
-    let _ = value.fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+    let _ = value.try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
         Some(current.saturating_add(1))
     });
 }

@@ -80,7 +80,7 @@ impl QueuePressure {
     }
 
     fn decrement(pending: &AtomicUsize) {
-        let _ = pending.fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+        let _ = pending.try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
             Some(current.saturating_sub(1))
         });
     }

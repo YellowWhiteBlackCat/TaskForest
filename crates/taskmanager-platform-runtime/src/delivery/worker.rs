@@ -65,7 +65,7 @@ impl WorkerQuota {
     fn acquire(self: &Arc<Self>) -> Option<WorkerPermit> {
         let acquired = self
             .live
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |live| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |live| {
                 (live < self.limit).then_some(live + 1)
             })
             .is_ok();
