@@ -285,6 +285,7 @@ services.log-stream	tui	runtime::tests::service_control::service_log_panel_paint
 services.log-stream	bevy	pages::services::service_logs_tests::painted_rows_follow_the_level_filter	anchored	-	-
 security.namespace-audit	bevy	pages::processes::details::tests::isolation_summary_renders_the_linux_namespace_audit	anchored	-	-
 power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-	-
+power.thermal-zones	bevy	pages::system::tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-	-
 # W25-A batch (2026-09-23): the `power.thermal-throttle-events` sweep.  The
 # W23-A definition had already been narrowed to the cumulative trigger
 # counters (`package_throttle_count`/`core_throttle_count` of the shared CPU

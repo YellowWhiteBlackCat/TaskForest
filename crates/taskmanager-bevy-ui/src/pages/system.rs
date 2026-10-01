@@ -28,8 +28,13 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
+
+pub(crate) mod thermal;
+#[allow(unused_imports)]
+pub(crate) use thermal::{ThermalZoneRow, thermal_zone_rows};
 
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
@@ -336,18 +341,21 @@ fn status_line_text(
     hardware: Option<&HardwareInfo>,
     smbios: Option<&SmbiosMemorySnapshot>,
     npu: Option<&NpuInventorySnapshot>,
+    sensors: Option<&SensorCenterSnapshot>,
 ) -> String {
-    if hardware.is_none() && smbios.is_none() && npu.is_none() {
+    if hardware.is_none() && smbios.is_none() && npu.is_none() && sensors.is_none() {
         t("common.waiting_inventory").to_owned()
     } else {
-        let count = system_fact_rows(hardware, smbios, npu).len();
+        let base_count = system_fact_rows(hardware, smbios, npu).len();
+        let thermal_count = sensors.map(|s| thermal_zone_rows(s).len()).unwrap_or(0);
+        let count = base_count + thermal_count;
         t("system.facts_ready").replacen("{count}", &count.to_string(), 1)
     }
 }
 
 // ---- render adapters ------------------------------------------------------
 
-fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<> {
+pub(crate) fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<> {
     // Delegates to the shared bounded key/value row: same single-line
     // contract (NoWrap + clip) as the performance rail — one row grammar
     // across pages, never a page-local spelling.
@@ -400,7 +408,7 @@ fn kpi_tile_scene(
     }
 }
 
-fn section_card_scene(
+pub(crate) fn section_card_scene(
     title: String,
     rows: Vec<Box<dyn bevy::scene::Scene>>,
     palette: &UiPalette,
@@ -427,11 +435,13 @@ fn system_body_scene(
     hardware: Option<&HardwareInfo>,
     smbios: Option<&SmbiosMemorySnapshot>,
     npu: Option<&NpuInventorySnapshot>,
+    sensors: Option<&SensorCenterSnapshot>,
     summary: &SystemSummaryModel,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let rows = system_fact_rows(hardware, smbios, npu);
-    if rows.is_empty() {
+    let thermal_rows = sensors.map(thermal_zone_rows).unwrap_or_default();
+    if rows.is_empty() && thermal_rows.is_empty() {
         return Box::new(bsn! {
             Node {
                 width: percent(100),
@@ -537,7 +547,7 @@ fn system_body_scene(
         }
     }
 
-    let cards = vec![
+    let mut cards = vec![
         Box::new(section_card_scene(
             t("common.operating_system").to_owned(),
             os_rows,
@@ -559,6 +569,10 @@ fn system_body_scene(
             palette,
         )) as Box<dyn bevy::scene::Scene>,
     ];
+
+    if let Some(thermal_card) = thermal::thermal_zone_card_scene(&thermal_rows, palette) {
+        cards.push(thermal_card);
+    }
 
     let cards_grid = bsn! {
         Node {
@@ -624,7 +638,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
 
 pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
     let palette = world.resource::<WindowPalette>().inner.clone();
-    let (hardware, smbios, npu, summary, status) = {
+    let (hardware, smbios, npu, sensors, summary, status) = {
         let shell = &world.non_send::<FrontendTrack>().shell;
         let smbios = match shell.smbios_memory_state() {
             SmbiosMemoryState::Ready(ready) => Some(ready.snapshot.clone()),
@@ -633,14 +647,21 @@ pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
         let projection = shell.projection();
         let npu = projection.npu_inventory.clone();
         let hardware = projection.hardware.clone();
+        let sensors = projection.sensors.clone();
         let summary = system_summary_model(projection);
-        let status = status_line_text(hardware.as_ref(), smbios.as_ref(), npu.as_ref());
-        (hardware, smbios, npu, summary, status)
+        let status = status_line_text(
+            hardware.as_ref(),
+            smbios.as_ref(),
+            npu.as_ref(),
+            sensors.as_ref(),
+        );
+        (hardware, smbios, npu, sensors, summary, status)
     };
     let scene = system_body_scene(
         hardware.as_ref(),
         smbios.as_ref(),
         npu.as_ref(),
+        sensors.as_ref(),
         &summary,
         &palette,
     );

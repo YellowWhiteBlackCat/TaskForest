@@ -43,7 +43,7 @@ pub fn feature_coverage_declaration() -> FeatureCoverageDeclaration {
 /// shape states its position. Features with no Bevy surface yet stay reasoned
 /// `Unsupported` gaps; they are never silently absent.
 const fn support(feature: FeatureId) -> CapabilitySupport {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Ported, Unsupported};
     match feature {
         // -- surfaces this shape really renders ---------------------------
         FeatureId::ProcessSchedulerPolicy
@@ -95,13 +95,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
         | FeatureId::MultiFormatExport
-        | FeatureId::BatteryPowerInventory => Ported,
-
-        // -- deliberate scene reduction -----------------------------------
-        FeatureId::ThermalZoneSensors => Divergent {
-            reason: "Bevy surfaces the CPU temperature readout without the \
-                     thermal-zone source distinction",
-        },
+        | FeatureId::BatteryPowerInventory
+        | FeatureId::ThermalZoneSensors => Ported,
 
         // -- typed absences -----------------------------------------------
         FeatureId::HandleFdLimitSaturation => Unsupported {

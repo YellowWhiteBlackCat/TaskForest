@@ -274,3 +274,221 @@ fn system_summary_model_mirrors_gpui_and_iced_parity() {
         "demo shell provides observed memory percentage"
     );
 }
+
+fn zone_reading(
+    id: &str,
+    label: &str,
+    temperature_c: Option<f64>,
+) -> taskmanager_core::core::sensors::SensorReading {
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskmanager_core::core::sensors::{
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading,
+        SensorScale,
+    };
+
+    let descriptor = SensorDescriptor::temperature(SensorScale::IDENTITY);
+    let observation = match temperature_c {
+        Some(value) => SensorMeasurementObservation::available(
+            descriptor,
+            SensorMagnitude::Decimal(value),
+            1_000,
+        )
+        .expect("valid thermal-zone fixture"),
+        None => {
+            SensorMeasurementObservation::unavailable(descriptor, FailureKind::PermissionDenied)
+        }
+    };
+    SensorReading::from_measurement_observation(
+        "thermal:x86_pkg_temp".into(),
+        id.into(),
+        label.into(),
+        observation,
+    )
+    .with_device_generation(DeviceGeneration::new(2))
+}
+
+fn fan_reading() -> taskmanager_core::core::sensors::SensorReading {
+    use taskmanager_core::core::sensors::{
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading,
+        SensorScale,
+    };
+
+    SensorReading::from_measurement_observation(
+        "hwmon:cpu".into(),
+        "fan1".into(),
+        "cpu_fan".into(),
+        SensorMeasurementObservation::available(
+            SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+            SensorMagnitude::Unsigned(2_400),
+            1_000,
+        )
+        .expect("valid fan fixture"),
+    )
+}
+
+#[test]
+fn thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source() {
+    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskmanager_shell::presentation::missing_value;
+
+    let sensors = SensorCenterSnapshot {
+        readings: vec![
+            zone_reading("thermal:acpitz:zone:0:temperature", "acpitz", Some(54.5)),
+            zone_reading(
+                "thermal:x86_pkg_temp:zone:0:temperature",
+                "x86_pkg_temp",
+                Some(71.0),
+            ),
+            fan_reading(),
+            zone_reading(
+                "thermal:acpitz:zone:1:temperature",
+                "thermal_zone_unreadable",
+                None,
+            ),
+        ],
+        ..Default::default()
+    };
+
+    let rows = super::thermal_zone_rows(&sensors);
+    assert_eq!(
+        rows.len(),
+        3,
+        "one row per temperature reading; the fan channel must not leak in"
+    );
+    let labels: Vec<&str> = rows.iter().map(|row| row.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        ["acpitz", "x86_pkg_temp", "thermal_zone_unreadable"],
+        "each row names the reading's own source label, in projection order"
+    );
+    assert_eq!(rows[0].value, "54.5 °C");
+    assert!(rows[0].present);
+    assert_eq!(rows[1].value, "71.0 °C");
+    assert!(rows[1].present);
+    assert_eq!(rows[2].value, missing_value());
+    assert!(
+        !rows[2].present,
+        "an unread thermal zone must not fabricate a value"
+    );
+    assert!(
+        rows.iter().all(|row| !row.value.contains("0.0 °C")),
+        "a failed read must stay a typed absence: {rows:?}"
+    );
+}
+
+#[test]
+fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
+    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+
+    set_language(Language::En);
+
+    // 1. Snapshot with only a fan: thermal zone card must NOT be mounted
+    let mut fan_shell = ShellApp::new();
+    seed_projection_fact(
+        &mut fan_shell,
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+            readings: vec![fan_reading()],
+            ..Default::default()
+        })),
+    );
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    let palette = crate::palette::ui_palette(&Theme::dark());
+    app.insert_resource(WindowPalette {
+        inner: palette.clone(),
+    });
+    app.insert_non_send(FrontendTrack {
+        shell: fan_shell.clone(),
+        initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
+    });
+    app.init_resource::<HistoryProjectionResource>();
+
+    let history = HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
+    let context = crate::app::PageContext {
+        shell: &fan_shell,
+        process_tree_expansion: &process_tree_expansion,
+        palette: &palette,
+        history: &history.0,
+    };
+    let world = app.world_mut();
+    world
+        .spawn_scene(content(&context))
+        .expect("scene resolves");
+    app.update();
+
+    let texts: Vec<String> = app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .map(|t| t.0.clone())
+        .collect();
+    assert!(
+        !texts.iter().any(|t| t == "Thermal zones" || t == "温度区"),
+        "a snapshot without temperature readings must not render the thermal-zone card"
+    );
+
+    // 2. Snapshot with temperature readings: thermal zone card paints label and values
+    let mut thermal_shell = ShellApp::new();
+    seed_projection_fact(
+        &mut thermal_shell,
+        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+            readings: vec![
+                zone_reading("thermal:acpitz:zone:0:temperature", "acpitz", Some(54.5)),
+                fan_reading(),
+            ],
+            ..Default::default()
+        })),
+    );
+
+    let mut thermal_app = App::new();
+    thermal_app.add_plugins(MinimalPlugins);
+    thermal_app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    thermal_app.init_resource::<Assets<Font>>();
+    thermal_app.insert_resource(WindowPalette {
+        inner: palette.clone(),
+    });
+    thermal_app.insert_non_send(FrontendTrack {
+        shell: thermal_shell.clone(),
+        initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
+    });
+    thermal_app.init_resource::<HistoryProjectionResource>();
+
+    let context2 = crate::app::PageContext {
+        shell: &thermal_shell,
+        process_tree_expansion: &process_tree_expansion,
+        palette: &palette,
+        history: &history.0,
+    };
+    thermal_app
+        .world_mut()
+        .spawn_scene(content(&context2))
+        .expect("scene resolves");
+    thermal_app.update();
+
+    let texts2: Vec<String> = thermal_app
+        .world_mut()
+        .query::<&Text>()
+        .iter(thermal_app.world())
+        .map(|t| t.0.clone())
+        .collect();
+    assert!(
+        texts2.iter().any(|t| t == "Thermal zones" || t == "温度区"),
+        "thermal zone card must be mounted when temperature readings are present: {texts2:?}"
+    );
+    assert!(
+        texts2.iter().any(|t| t == "acpitz"),
+        "sensor label must be rendered in thermal-zone card: {texts2:?}"
+    );
+    assert!(
+        texts2.iter().any(|t| t == "54.5 °C"),
+        "temperature value must be rendered in thermal-zone card: {texts2:?}"
+    );
+}
