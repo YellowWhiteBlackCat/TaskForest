@@ -89,9 +89,9 @@ fn run_gui(app_id: Option<String>, demo: bool) {
 
 /// Entry point helper for the TUI product binaries (`taskforest-t` and `taskmanager-tui`).
 pub fn run_cli(binary_name: &'static str) {
-    taskmanager_cli::run(
+    run(
         binary_name,
-        taskmanager_cli::FrontendHandlers {
+        FrontendHandlers {
             run_gui,
             snapshot_text: Some(snapshot_text),
             capture_window: None,
@@ -112,6 +112,7 @@ use taskmanager_application::{
     AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
     RefreshRequest, i18n::t,
 };
+use taskmanager_cli::{FrontendHandlers, run};
 use taskmanager_core::core::alerts::{
     AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
     import_alert_rules_json,

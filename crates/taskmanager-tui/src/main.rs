@@ -7,6 +7,8 @@
 
 #![forbid(unsafe_code)]
 
+use taskmanager_tui::run_cli;
+
 fn main() {
-    taskmanager_tui::run_cli("taskforest-t");
+    run_cli("taskforest-t");
 }

@@ -14,6 +14,7 @@ use bevy::ui::widget::Text;
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::sensors::SensorReading;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -277,15 +278,11 @@ fn system_summary_model_mirrors_gpui_and_iced_parity() {
     );
 }
 
-fn zone_reading(
-    id: &str,
-    label: &str,
-    temperature_c: Option<f64>,
-) -> taskmanager_core::core::sensors::SensorReading {
+fn zone_reading(id: &str, label: &str, temperature_c: Option<f64>) -> SensorReading {
     use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_core::core::sensors::{
-        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
     let descriptor = SensorDescriptor::temperature(SensorScale::IDENTITY);
@@ -309,9 +306,9 @@ fn zone_reading(
     .with_device_generation(DeviceGeneration::new(2))
 }
 
-fn fan_reading() -> taskmanager_core::core::sensors::SensorReading {
+fn fan_reading() -> SensorReading {
     use taskmanager_core::core::sensors::{
-        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
     SensorReading::from_measurement_observation(

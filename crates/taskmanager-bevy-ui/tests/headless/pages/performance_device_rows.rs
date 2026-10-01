@@ -22,6 +22,7 @@ use super::{DynField, Section, section_keys};
 use crate::app::PageContext;
 use crate::palette::ui_palette;
 use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::effective_smart_status;
 
 /// A bare scene world for the page-assembly tests (the same minimal
@@ -377,7 +378,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
     assert!(fact_line.contains("11.40 V"));
     assert!(fact_line.contains("128"));
     assert!(fact_line.contains("96.0%"));
-    assert!(fact_line.contains(&taskmanager_shell::presentation::duration(7200)));
+    assert!(fact_line.contains(&duration(7200)));
 
     let mut app = headless_scene_app();
     let palette = ui_palette(&Theme::dark());

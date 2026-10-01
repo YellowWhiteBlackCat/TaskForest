@@ -23,6 +23,7 @@ use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{ProcessDetailsField, process_details_rows};
 use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
 
@@ -103,7 +104,7 @@ pub(crate) fn republish(shell: &ShellApp, commands: &mut Commands) {
         let rows = if let Some(process) = process {
             let mut process_clone = process.clone();
             process_clone.populate_ancestor_lineage(shell.projection().processes_slice());
-            let units = taskmanager_core::core::units::UnitPreferences::default();
+            let units = UnitPreferences::default();
             let vms = process_details_rows(&process_clone, &units);
             vms.into_iter()
                 .map(|vm| {

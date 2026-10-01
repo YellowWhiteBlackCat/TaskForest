@@ -1,7 +1,7 @@
 //! Formatter helpers for Bevy Process Insights cards.
 
 use taskmanager_application::process_details_vm::render_environment_variable;
-use taskmanager_application::{i18n::t, project_process_resources};
+use taskmanager_application::{ProjectedProcessResources, i18n::t, project_process_resources};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_core::core::process_telemetry::{
@@ -61,7 +61,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
 
 pub(crate) fn open_files_summary(
     files: &ProcessOpenFiles,
-    resources: Option<&taskmanager_application::ProjectedProcessResources>,
+    resources: Option<&ProjectedProcessResources>,
 ) -> String {
     if files.entries.is_empty() && files.unreadable_count == 0 {
         return t("proc_insights.no_open_files").to_owned();

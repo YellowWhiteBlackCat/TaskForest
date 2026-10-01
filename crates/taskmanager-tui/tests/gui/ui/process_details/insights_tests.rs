@@ -9,7 +9,7 @@ use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
-    ProcessInsightsRevision,
+    ProcessInsightsRevision, project_process_resources,
 };
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::failure::FailureKind;
@@ -416,18 +416,20 @@ fn open_files_preview_renders_fd_limit_saturation() {
             },
         ],
     };
-    let mut obs = ProcessResourceObservations::default();
-    obs.limits = ResourceObservation::current(
-        vec![ResourceLimit {
-            kind: ResourceLimitKind::OpenFiles,
-            soft: LimitValue::Value(1024),
-            hard: LimitValue::Value(4096),
-            unit: None,
-        }],
-        1000,
-    );
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
     let res = ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
-    let proj = taskmanager_application::project_process_resources(&res);
+    let proj = project_process_resources(&res);
     let lines = open_files_preview_lines_with_limit(
         &open_files,
         Some(&proj),

@@ -1,6 +1,7 @@
 //! Process-list presentation summaries shared by all frontends.
 
 use taskmanager_application::i18n;
+use taskmanager_core::LimitValue;
 use taskmanager_core::ProcessItem;
 pub use taskmanager_core::core::process::ProcessAncestorNode;
 use taskmanager_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
@@ -52,12 +53,10 @@ pub fn uninterruptible_process_summary(processes: Option<&[ProcessItem]>) -> Opt
 #[must_use]
 pub fn format_open_files_saturation(
     count: u64,
-    soft: Option<taskmanager_core::LimitValue>,
-    hard: Option<taskmanager_core::LimitValue>,
+    soft: Option<LimitValue>,
+    hard: Option<LimitValue>,
     unlimited_label: &str,
 ) -> Option<String> {
-    use taskmanager_core::LimitValue;
-
     match (soft, hard) {
         (None, None) => None,
         (Some(LimitValue::Unlimited), _) => Some(format!("{count} / {unlimited_label}")),
@@ -85,48 +84,5 @@ pub fn format_open_files_saturation(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use taskmanager_core::LimitValue;
-
-    #[test]
-    fn format_open_files_saturation_variants() {
-        assert_eq!(
-            format_open_files_saturation(
-                42,
-                Some(LimitValue::Value(1024)),
-                Some(LimitValue::Value(4096)),
-                "∞",
-            ),
-            Some("42 / 1024 (4%) [max 4096]".to_string())
-        );
-        assert_eq!(
-            format_open_files_saturation(
-                512,
-                Some(LimitValue::Value(1024)),
-                Some(LimitValue::Value(1024)),
-                "∞",
-            ),
-            Some("512 / 1024 (50%)".to_string())
-        );
-        assert_eq!(
-            format_open_files_saturation(
-                10,
-                Some(LimitValue::Value(100)),
-                Some(LimitValue::Unlimited),
-                "Unlimited",
-            ),
-            Some("10 / 100 (10%) [max Unlimited]".to_string())
-        );
-        assert_eq!(
-            format_open_files_saturation(
-                10,
-                Some(LimitValue::Unlimited),
-                Some(LimitValue::Unlimited),
-                "∞",
-            ),
-            Some("10 / ∞".to_string())
-        );
-        assert_eq!(format_open_files_saturation(10, None, None, "∞"), None);
-    }
-}
+#[path = "../../tests/headless/presentation_process_tests.rs"]
+mod tests;

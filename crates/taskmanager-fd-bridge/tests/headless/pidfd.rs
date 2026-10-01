@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn pidfd_open_targets_a_live_pid_and_signal_zero_probes_it() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // The one process guaranteed alive: this test's own. Signal 0 performs
@@ -14,7 +14,7 @@ fn pidfd_open_targets_a_live_pid_and_signal_zero_probes_it() {
 
 #[test]
 fn pidfd_send_signal_rejects_an_invalid_signal_number() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // -1 is not a valid signal number: the kernel rejects it with EINVAL
@@ -27,7 +27,7 @@ fn pidfd_send_signal_rejects_an_invalid_signal_number() {
 
 #[test]
 fn pidfd_open_on_an_impossible_pid_is_a_typed_esrch() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // 4_194_305 exceeds the kernel pid_max ceiling (2^22), so it can never
@@ -39,7 +39,7 @@ fn pidfd_open_on_an_impossible_pid_is_a_typed_esrch() {
 
 #[test]
 fn enosys_is_reported_as_unsupported_for_caller_fallback() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // The typed-fallback predicate: exactly ENOSYS means "kernel without

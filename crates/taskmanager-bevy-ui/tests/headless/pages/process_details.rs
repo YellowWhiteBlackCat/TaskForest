@@ -604,16 +604,18 @@ fn open_files_summary_renders_fd_limit_saturation() {
         unreadable_count: 0,
     };
 
-    let mut obs = ProcessResourceObservations::default();
-    obs.limits = ResourceObservation::current(
-        vec![ResourceLimit {
-            kind: ResourceLimitKind::OpenFiles,
-            soft: LimitValue::Value(1024),
-            hard: LimitValue::Value(4096),
-            unit: None,
-        }],
-        1000,
-    );
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
     let snapshot =
         ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
     let proj = project_process_resources(&snapshot);

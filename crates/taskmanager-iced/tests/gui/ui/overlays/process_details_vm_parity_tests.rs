@@ -8,6 +8,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessMetadataObservations;
 use taskmanager_core::core::process::ProcessOwner;
+use taskmanager_core::core::process::process_ancestor_lineage;
 use taskmanager_core::core::time::LocalTimeRules;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
@@ -212,7 +213,7 @@ fn process_ancestor_lineage_renders_in_property_pairs_and_handles_root() {
     ];
     procs[1].parent_pid = Some(1);
     procs[2].parent_pid = Some(800);
-    let lineage = taskmanager_core::core::process::process_ancestor_lineage(&procs, 1000);
+    let lineage = process_ancestor_lineage(&procs, 1000);
     procs[2].set_ancestor_lineage(lineage);
 
     let pairs = property_pairs(&procs[2], &local_time_rules());

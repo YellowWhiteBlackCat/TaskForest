@@ -64,7 +64,7 @@ impl InputModalityState {
         self.modality
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     #[must_use]
     pub(crate) fn shows_focus_ring(&self) -> bool {
         self.modality.shows_focus_ring()
@@ -100,21 +100,25 @@ pub(crate) struct FocusedControl;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FocusRingVisible;
 
+/// Query of focus-ring participants consumed by the observer below.
+type FocusRingQuery<'world, 'state> = Query<
+    'world,
+    'state,
+    (
+        Entity,
+        Has<FocusedControl>,
+        Option<&'static FocusRingVisible>,
+        Option<&'static mut BorderColor>,
+    ),
+    With<FocusRing>,
+>;
+
 /// Observer responding to input modality transitions: updates active [`FocusRingVisible`] components
 /// and syncs border colors on controls with [`FocusRing`].
-#[allow(clippy::type_complexity)]
 pub(crate) fn on_input_modality_changed(
     event: On<InputModalityChanged>,
     palette: Option<Res<WindowPalette>>,
-    mut query: Query<
-        (
-            Entity,
-            Has<FocusedControl>,
-            Option<&FocusRingVisible>,
-            Option<&mut BorderColor>,
-        ),
-        With<FocusRing>,
-    >,
+    mut query: FocusRingQuery,
     mut commands: Commands,
 ) {
     let shows_ring = event.event().current.shows_focus_ring();

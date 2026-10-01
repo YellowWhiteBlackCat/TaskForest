@@ -7,7 +7,7 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
-use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
+use taskmanager_application::{ProcessInsightUnavailable, i18n::t, project_process_resources};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::{
     ConnectionEndpoint, ConnectionTransport, LimitValue, ProcessThreadInfo, ProcessThreads,
@@ -378,9 +378,7 @@ pub(crate) fn insights_lines_with_limit(
         }
         ProcessInsightFacetState::Current(open_files) => {
             let res = match &projection.resources {
-                ProcessInsightFacetState::Current(r) => {
-                    Some(taskmanager_application::project_process_resources(r))
-                }
+                ProcessInsightFacetState::Current(r) => Some(project_process_resources(r)),
                 _ => None,
             };
             lines.extend(open_files_preview_lines_with_limit(

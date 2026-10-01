@@ -2,6 +2,12 @@ use super::*;
 use std::fs::File;
 use std::io::{Read, Write};
 
+/// Serializes tests that assert on the process-wide descriptor table.
+///
+/// Shared with `pidfd::tests`, so a descriptor observed by one test is never
+/// another test's concurrently open fd.
+pub(crate) static TEST_FD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Create a connected `AF_UNIX` `SOCK_STREAM` socketpair as owned fds (test
 /// helper; the unsafe lives in tests, which the boundary contract does not
 /// scan).
@@ -86,7 +92,7 @@ fn send_fds_raw(channel: &OwnedFd, fds: &[libc::c_int]) {
 
 #[test]
 fn send_fd_and_recv_fd_round_trip() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let (chan_a, chan_b) = unix_pair();
@@ -107,7 +113,7 @@ fn send_fd_and_recv_fd_round_trip() {
 
 #[test]
 fn send_fd_keeps_the_original_fd_open() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // Ownership is not transferred: prove payload_a is still a LIVE open file
@@ -330,7 +336,7 @@ fn find_scm_rights_accumulates_multi_fd_and_multi_cmsg_violations() {
 
 #[test]
 fn recv_fd_distinguishes_orderly_close_from_no_fd() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // The peer closing its half returns n == 0: recv_fd must surface
@@ -344,7 +350,7 @@ fn recv_fd_distinguishes_orderly_close_from_no_fd() {
 
 #[test]
 fn recv_fd_rejects_a_two_fd_message_and_closes_both_descriptors() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let (chan_a, chan_b) = unix_pair();
@@ -369,7 +375,7 @@ fn recv_fd_rejects_a_two_fd_message_and_closes_both_descriptors() {
 
 #[test]
 fn recv_fd_rejects_a_truncated_control_message_and_closes_what_installed() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // Three fds cannot fit the product slab (two visible + MSG_CTRUNC):
@@ -424,7 +430,7 @@ fn retry_on_eintr_resumes_after_interrupted_and_propagates_other_errors() {
 
 #[test]
 fn peer_credentials_reports_the_kernel_side_of_the_socket() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // On a self-connected pair SO_PEERCRED must describe THIS process — the
@@ -443,7 +449,7 @@ fn peer_credentials_reports_the_kernel_side_of_the_socket() {
 
 #[test]
 fn peer_credentials_surfaces_the_os_error_for_non_socket_fds() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // The documented contract: "other descriptors surface the OS error
@@ -456,7 +462,7 @@ fn peer_credentials_surfaces_the_os_error_for_non_socket_fds() {
 
 #[test]
 fn send_fd_surfaces_the_os_error_for_a_non_socket_channel() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // The documented failure mode ("the socket is not connected") with the
@@ -470,7 +476,7 @@ fn send_fd_surfaces_the_os_error_for_a_non_socket_channel() {
 
 #[test]
 fn recv_fd_rejects_a_payload_only_message_with_no_fd() {
-    let _guard = crate::TEST_FD_LOCK
+    let _guard = crate::tests::TEST_FD_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     // A carrier byte WITHOUT ancillary data is not a handoff: the receiver

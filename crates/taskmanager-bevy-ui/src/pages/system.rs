@@ -33,8 +33,7 @@ use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 pub(crate) mod thermal;
-#[allow(unused_imports)]
-pub(crate) use thermal::{ThermalZoneRow, thermal_zone_rows};
+pub(crate) use thermal::thermal_zone_rows;
 
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;

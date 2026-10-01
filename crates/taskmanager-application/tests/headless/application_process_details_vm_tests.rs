@@ -4,8 +4,8 @@ use taskmanager_core::DeviceState;
 use taskmanager_core::ProcessSchedulingPolicy;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
-    ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
-    ProcessOwnerIdentity, ProcessScalarObservations,
+    ProcessAncestorNode, ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations,
+    ProcessOwner, ProcessOwnerIdentity, ProcessScalarObservations,
 };
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_core::core::units::UnitPreferences;
@@ -23,7 +23,7 @@ fn process_details_rows(item: &ProcessItem, units: &UnitPreferences) -> Vec<Proc
 fn fully_observed_item() -> ProcessItem {
     let mut item = ProcessItem::new(4242, "sample");
     item.parent_pid = Some(1);
-    item.ancestor_lineage = Some(vec![taskmanager_core::core::process::ProcessAncestorNode {
+    item.ancestor_lineage = Some(vec![ProcessAncestorNode {
         pid: 1,
         name: "systemd".to_string(),
     }]);

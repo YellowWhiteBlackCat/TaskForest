@@ -397,16 +397,18 @@ fn open_files_section_renders_fd_limit_saturation() {
     };
     pending.open_files = ProcessInsightFacetState::Current(open_files);
 
-    let mut obs = ProcessResourceObservations::default();
-    obs.limits = ResourceObservation::current(
-        vec![ResourceLimit {
-            kind: ResourceLimitKind::OpenFiles,
-            soft: LimitValue::Value(1024),
-            hard: LimitValue::Value(4096),
-            unit: None,
-        }],
-        1000,
-    );
+    let obs = ProcessResourceObservations {
+        limits: ResourceObservation::current(
+            vec![ResourceLimit {
+                kind: ResourceLimitKind::OpenFiles,
+                soft: LimitValue::Value(1024),
+                hard: LimitValue::Value(4096),
+                unit: None,
+            }],
+            1000,
+        ),
+        ..ProcessResourceObservations::default()
+    };
     let res = ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
     pending.resources = ProcessInsightFacetState::Current(res);
 

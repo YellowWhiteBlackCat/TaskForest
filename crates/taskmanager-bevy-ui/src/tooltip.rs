@@ -45,7 +45,7 @@ pub(crate) struct TooltipState {
 }
 
 impl TooltipState {
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     #[must_use]
     pub(crate) fn is_visible(&self) -> bool {
         self.session.is_some()

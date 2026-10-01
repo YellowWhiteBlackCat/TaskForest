@@ -93,15 +93,10 @@ impl ClipboardPort {
         self.contents = Some(text.into());
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     #[must_use]
     pub(crate) fn get_text(&self) -> Option<&str> {
         self.contents.as_deref()
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn clear(&mut self) {
-        self.contents = None;
     }
 }
 
@@ -114,22 +109,10 @@ pub(crate) struct TextSelectionChanged;
 pub(crate) struct SelectableText(pub(crate) String, pub(crate) String);
 
 impl SelectableText {
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     #[must_use]
     pub(crate) fn new(id: impl Into<String>, content: impl Into<String>) -> Self {
         Self(id.into(), content.into())
-    }
-
-    #[allow(dead_code)]
-    #[must_use]
-    pub(crate) fn id(&self) -> &str {
-        &self.0
-    }
-
-    #[allow(dead_code)]
-    #[must_use]
-    pub(crate) fn content(&self) -> &str {
-        &self.1
     }
 }
 
