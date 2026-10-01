@@ -97,13 +97,10 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MultiFormatExport
         | FeatureId::BatteryPowerInventory
         | FeatureId::ThermalZoneSensors
-        | FeatureId::ProcessAncestorLineage => Ported,
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleFdLimitSaturation => Unsupported {
-            reason: "the Bevy open-file summary renders descriptors without the \
-                     RLIMIT_NOFILE saturation context",
-        },
         FeatureId::HandleReversePathSearch => Unsupported {
             reason: "no system-wide handle search surface is wired in the Bevy \
                      shape",

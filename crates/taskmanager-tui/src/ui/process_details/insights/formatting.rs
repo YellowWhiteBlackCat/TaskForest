@@ -168,6 +168,7 @@ pub(crate) fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> S
 /// `limit` `fd → target` rows and an honest "…" when more remain.
 pub(crate) fn open_files_preview_lines_with_limit(
     open_files: &ProcessOpenFiles,
+    resources: Option<&taskmanager_application::ProjectedProcessResources>,
     theme: TuiTheme,
     limit: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
@@ -180,20 +181,26 @@ pub(crate) fn open_files_preview_lines_with_limit(
         )));
         return out;
     }
+    let count = open_files.entries.len() as u64;
+    let sat = resources.and_then(|r| {
+        taskmanager_shell::presentation::format_open_files_saturation(
+            count,
+            r.open_files_soft_limit,
+            r.open_files_hard_limit,
+            "∞",
+        )
+    });
+    let count_text = sat.unwrap_or_else(|| open_files.entries.len().to_string());
     let header = if open_files.unreadable_count > 0 {
         format!(
             "  {} {} · {} {}",
             t("proc_insights.open_files"),
-            open_files.entries.len(),
+            count_text,
             open_files.unreadable_count,
             unreadable_label,
         )
     } else {
-        format!(
-            "  {} {}",
-            t("proc_insights.open_files"),
-            open_files.entries.len()
-        )
+        format!("  {} {}", t("proc_insights.open_files"), count_text)
     };
     out.push(ratatui::text::Line::from(header));
     for entry in open_files.entries.iter().take(limit) {

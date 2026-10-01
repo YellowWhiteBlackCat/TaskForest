@@ -33,7 +33,9 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::{IsolationKind, LimitValue};
 
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
+use taskmanager_shell::presentation::{
+    MISSING_VALUE, bytes, format_open_files_saturation, missing_value,
+};
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
@@ -603,20 +605,29 @@ fn open_files_section<'a>(
             vec![muted_text(theme_snapshot, facet_unavailable_text(reason))],
         ),
         Some(ProcessInsightFacetState::Current(open_files)) => {
+            let sat = projection.and_then(|p| match &p.resources {
+                ProcessInsightFacetState::Current(r) => {
+                    let pr = project_process_resources(r);
+                    format_open_files_saturation(
+                        open_files.entries.len() as u64,
+                        pr.open_files_soft_limit,
+                        pr.open_files_hard_limit,
+                        "∞",
+                    )
+                }
+                _ => None,
+            });
+            let count_label = sat.unwrap_or_else(|| open_files.entries.len().to_string());
             let heading = if open_files.unreadable_count > 0 {
                 format!(
                     "{} · {} · {} {}",
                     t("proc_insights.open_files"),
-                    open_files.entries.len(),
+                    count_label,
                     open_files.unreadable_count,
                     t("proc_insights.unreadable"),
                 )
             } else {
-                format!(
-                    "{} · {}",
-                    t("proc_insights.open_files"),
-                    open_files.entries.len()
-                )
+                format!("{} · {}", t("proc_insights.open_files"), count_label)
             };
             if open_files.entries.is_empty() {
                 (

@@ -97,13 +97,10 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
         | FeatureId::MultiFormatExport
-        | FeatureId::ProcessAncestorLineage => Ported,
+        | FeatureId::ProcessAncestorLineage
+        | FeatureId::HandleFdLimitSaturation => Ported,
 
         // -- typed absences -----------------------------------------------
-        FeatureId::HandleFdLimitSaturation => Unsupported {
-            reason: "the terminal open-file panel renders descriptors without \
-                     the RLIMIT_NOFILE saturation context",
-        },
         FeatureId::HandleReversePathSearch => Unsupported {
             reason: "no system-wide handle search surface is wired in the \
                      terminal",

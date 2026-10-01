@@ -13,7 +13,7 @@ use taskmanager_shell::presentation::capabilities_summary;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
+use taskmanager_shell::presentation::{MISSING_VALUE, bytes, format_open_files_saturation};
 
 pub(crate) fn threads_summary(threads: &ProcessThreads) -> String {
     if threads.threads.is_empty() {
@@ -59,16 +59,24 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
     line
 }
 
-pub(crate) fn open_files_summary(files: &ProcessOpenFiles) -> String {
+pub(crate) fn open_files_summary(
+    files: &ProcessOpenFiles,
+    resources: Option<&taskmanager_application::ProjectedProcessResources>,
+) -> String {
     if files.entries.is_empty() && files.unreadable_count == 0 {
         return t("proc_insights.no_open_files").to_owned();
     }
+    let count = files.entries.len() as u64;
+    let sat = resources.and_then(|r| {
+        format_open_files_saturation(count, r.open_files_soft_limit, r.open_files_hard_limit, "∞")
+    });
+    let count_text = sat.unwrap_or_else(|| files.entries.len().to_string());
     let header = if files.unreadable_count == 0 {
-        files.entries.len().to_string()
+        count_text
     } else {
         format!(
             "{} · {} {}",
-            files.entries.len(),
+            count_text,
             files.unreadable_count,
             t("proc_insights.unreadable")
         )

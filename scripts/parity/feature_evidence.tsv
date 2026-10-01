@@ -346,4 +346,10 @@ process.ancestor-lineage	gpui	gpui_app::root::chrome::tests::process_ancestor_li
 process.ancestor-lineage	iced	ui::overlays::process_details::vm_parity_tests::process_ancestor_lineage_renders_in_property_pairs_and_handles_root	anchored	-	-
 process.ancestor-lineage	tui	ui::process_properties::vm_parity_tests::process_ancestor_lineage_renders_in_overview_and_handles_root	anchored	-	-
 process.ancestor-lineage	bevy	pages::processes::details::tests::process_ancestor_lineage_renders_in_projection_and_handles_root	anchored	-	-
+# Open file descriptor limit saturation delivery: renders process descriptor
+# count against soft/hard open-file limits from the shared projection across all four frontends.
+handles.fd-limit-saturation	gpui	gpui_app::process_insights::view::open_files::tests::open_files_card_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	iced	ui::insights::tests::open_files_section_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	tui	ui::process_details::insights::tests::open_files_preview_renders_fd_limit_saturation	anchored	-	-
+handles.fd-limit-saturation	bevy	pages::processes::details::tests::open_files_summary_renders_fd_limit_saturation	anchored	-	-
 

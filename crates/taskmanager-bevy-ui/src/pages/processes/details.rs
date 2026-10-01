@@ -31,7 +31,9 @@ use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
-use taskmanager_application::{ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t};
+use taskmanager_application::{
+    ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t, project_process_resources,
+};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_platform_contract::SubmissionErrorKind;
@@ -205,6 +207,27 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
             }
         }
     };
+    let projected_resources = projection.and_then(|value| match &value.resources {
+        ProcessInsightFacetState::Current(snapshot) => Some(project_process_resources(snapshot)),
+        _ => None,
+    });
+    let open_files_card = match projection.map(|value| &value.open_files) {
+        None | Some(ProcessInsightFacetState::Pending) => InsightCard {
+            title: t("proc_insights.open_files").to_owned(),
+            value: collecting.clone(),
+            action: None,
+        },
+        Some(ProcessInsightFacetState::Unavailable(reason)) => InsightCard {
+            title: t("proc_insights.open_files").to_owned(),
+            value: unavailable_text(reason),
+            action: None,
+        },
+        Some(ProcessInsightFacetState::Current(files)) => InsightCard {
+            title: t("proc_insights.open_files").to_owned(),
+            value: open_files_summary(files, projected_resources.as_ref()),
+            action: None,
+        },
+    };
     vec![
         InsightCard {
             title: t("proc_insights.threads").to_owned(),
@@ -215,15 +238,7 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
             ),
             action: None,
         },
-        InsightCard {
-            title: t("proc_insights.open_files").to_owned(),
-            value: facet_value(
-                projection.map(|value| &value.open_files),
-                open_files_summary,
-                &collecting,
-            ),
-            action: None,
-        },
+        open_files_card,
         network_card,
         InsightCard {
             title: t("common.gpu").to_owned(),

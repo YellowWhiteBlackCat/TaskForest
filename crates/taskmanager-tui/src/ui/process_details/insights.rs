@@ -376,9 +376,20 @@ pub(crate) fn insights_lines_with_limit(
         ProcessInsightFacetState::Unavailable(reason) => {
             lines.push(insight_unavailable(theme, reason))
         }
-        ProcessInsightFacetState::Current(open_files) => lines.extend(
-            open_files_preview_lines_with_limit(open_files, theme, limit),
-        ),
+        ProcessInsightFacetState::Current(open_files) => {
+            let res = match &projection.resources {
+                ProcessInsightFacetState::Current(r) => {
+                    Some(taskmanager_application::project_process_resources(r))
+                }
+                _ => None,
+            };
+            lines.extend(open_files_preview_lines_with_limit(
+                open_files,
+                res.as_ref(),
+                theme,
+                limit,
+            ));
+        }
     }
     // Environment: entry count plus the first N bounded key=value entries.
     match &projection.environment {

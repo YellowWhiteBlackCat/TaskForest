@@ -53,7 +53,6 @@ fn the_unsupported_feature_set_is_pinned() {
         [
             "memory.vma-map",
             "memory.leak-trend",
-            "handles.fd-limit-saturation",
             "handles.reverse-path-search",
             "threads.context-switch-rates",
             "network.listening-port-topology",
@@ -197,7 +196,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        20,
+        21,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger
