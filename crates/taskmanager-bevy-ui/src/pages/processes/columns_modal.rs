@@ -26,7 +26,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::PROCESS_COLUMNS;
 
 use crate::input::ShellInteractionApplied;
-use crate::palette::{UiPalette, space_16, space_4, space_8};
+use crate::palette::{UiPalette, space_4, space_8, space_16};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 

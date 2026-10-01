@@ -62,9 +62,7 @@ use crate::drain::ShellProjectionFolded;
 use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
-use crate::widgets::table::{
-    header_scene, row_scene, rows_in_viewport, visible_columns,
-};
+use crate::widgets::table::{header_scene, row_scene, rows_in_viewport, visible_columns};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod affinity;
@@ -77,9 +75,7 @@ pub(crate) mod properties_modal;
 
 pub(crate) use projection::*;
 
-use columns_modal::{
-    ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene,
-};
+use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene};
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes
@@ -588,7 +584,12 @@ fn rebuild_table(
     for artifact in surface.artifacts.iter() {
         commands.entity(artifact).despawn();
     }
-    for scene in window_scenes(&projection, &surface.palette.inner, &shell.query, &hidden_ids) {
+    for scene in window_scenes(
+        &projection,
+        &surface.palette.inner,
+        &shell.query,
+        &hidden_ids,
+    ) {
         let child = commands.spawn_scene(scene).id();
         commands.entity(root).add_one_related::<ChildOf>(child);
     }

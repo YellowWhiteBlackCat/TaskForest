@@ -1,4 +1,4 @@
-//! `taskforest-t` — the Ratatui terminal product binary (ADR-051).
+//! `taskmanager-tui` — compatibility binary entry point (ADR-051).
 //!
 //! Thin by law: it hands this product's capability set to the shared CLI
 //! harness (`taskmanager_cli::run`). The TUI product owns the headless
@@ -8,5 +8,5 @@
 #![forbid(unsafe_code)]
 
 fn main() {
-    taskmanager_tui::run_cli("taskforest-t");
+    taskmanager_tui::run_cli("taskmanager-tui");
 }

@@ -8,8 +8,8 @@ use bevy::app::App;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::picking::hover::PickingInteraction;
-use taskmanager_application::{AppAction, AppPage};
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
@@ -66,11 +66,7 @@ fn text_selection_state_transitions_are_explicit_and_discrete() {
     );
     assert_eq!(state.selected_text(), Some("Ryzen"));
 
-    state.select_all(
-        target,
-        "sys-cpu-model".into(),
-        "AMD Ryzen 9 7950X".into(),
-    );
+    state.select_all(target, "sys-cpu-model".into(), "AMD Ryzen 9 7950X".into());
     assert_eq!(state.selected_text(), Some("AMD Ryzen 9 7950X"));
 
     state.clear();
@@ -108,7 +104,10 @@ fn copy_selection_or_row_prioritizes_text_selection_over_row_summary() {
     state.clear();
     let copied_row = copy_selection_or_row(&mut state, &mut clipboard, &mut shell);
     assert!(copied_row);
-    assert_eq!(clipboard.get_text(), shell.selected_row_summary().as_deref());
+    assert_eq!(
+        clipboard.get_text(),
+        shell.selected_row_summary().as_deref()
+    );
     let notice = shell.feedback_notice().expect("feedback recorded");
     assert_eq!(notice.source(), FeedbackSource::Clipboard);
     assert!(notice.text().contains("Selected Row"));
@@ -146,8 +145,9 @@ fn text_selection_picking_mounts_and_despawns_highlight() {
     assert_eq!(highlighted, 0, "initially unhighlighted");
 
     // 1. Pointer press establishes selection and triggers highlight observer
-    *app.world_mut().get_mut::<PickingInteraction>(entity).unwrap() =
-        PickingInteraction::Pressed;
+    *app.world_mut()
+        .get_mut::<PickingInteraction>(entity)
+        .unwrap() = PickingInteraction::Pressed;
     app.update();
 
     assert!(app.world().resource::<TextSelectionState>().is_active());

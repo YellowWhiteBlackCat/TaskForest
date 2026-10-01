@@ -293,6 +293,49 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
 }
 
 #[test]
+fn process_ancestor_lineage_renders_in_projection_and_handles_root() {
+    let mut procs = vec![
+        ProcessItem::new(1, "systemd"),
+        ProcessItem::new(800, "sway"),
+        ProcessItem::new(1000, "alacritty"),
+    ];
+    procs[1].parent_pid = Some(1);
+    procs[2].parent_pid = Some(800);
+
+    let mut shell = ShellApp::new();
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(procs.clone());
+    });
+    // Select the descendant (alacritty at index 2)
+    shell.selected = 2;
+    let view = projection(&shell);
+    let lineage_val = view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc.ancestor_lineage"))
+        .map(|row| row.value.as_str());
+    assert_eq!(
+        lineage_val,
+        Some("systemd (1) > sway (800)"),
+        "descendant process must display full top-down ancestor lineage"
+    );
+
+    // Select the root (systemd at index 0)
+    shell.selected = 0;
+    let root_view = projection(&shell);
+    let root_lineage_val = root_view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc.ancestor_lineage"))
+        .map(|row| row.value.as_str());
+    assert_eq!(
+        root_lineage_val,
+        Some(MISSING_VALUE),
+        "root process without ancestors renders the honest dash"
+    );
+}
+
+#[test]
 fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
     let mut process = ProcessItem::new(77, "faulty");
     process.minor_page_faults = Some(1_234);

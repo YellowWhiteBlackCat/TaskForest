@@ -82,7 +82,9 @@ fn tooltip_overlay_mounts_on_hover_and_despawns_on_leave() {
     assert_eq!(overlays, 0, "no tooltip mounted before hover");
 
     // 1. Hover the entity
-    *app.world_mut().get_mut::<PickingInteraction>(target).unwrap() = PickingInteraction::Hovered;
+    *app.world_mut()
+        .get_mut::<PickingInteraction>(target)
+        .unwrap() = PickingInteraction::Hovered;
     app.update();
 
     // Verify TooltipOverlay is mounted
@@ -94,7 +96,9 @@ fn tooltip_overlay_mounts_on_hover_and_despawns_on_leave() {
     assert_eq!(overlays, 1, "tooltip overlay mounts on hover");
 
     // 2. Unhover the entity
-    *app.world_mut().get_mut::<PickingInteraction>(target).unwrap() = PickingInteraction::None;
+    *app.world_mut()
+        .get_mut::<PickingInteraction>(target)
+        .unwrap() = PickingInteraction::None;
     app.update();
 
     // Verify TooltipOverlay is despawned

@@ -9,8 +9,8 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::{
-    MISSING_VALUE, bytes, optional_cpu_time_seconds, optional_nice,
-    process_anomaly_summary, start_clock_local, uninterruptible_process_summary,
+    MISSING_VALUE, bytes, optional_cpu_time_seconds, optional_nice, process_anomaly_summary,
+    start_clock_local, uninterruptible_process_summary,
 };
 use taskmanager_shell::{ShellApp, SortCol, SortDir, process_semantic_key};
 pub(crate) use taskmanager_ui_contract::ProcessColumnSpec;

@@ -339,7 +339,9 @@ fn disk_block_renders_the_projected_partition_rows() {
 #[test]
 fn battery_block_renders_voltage_health_and_cycles() {
     use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+    use taskmanager_core::core::power::{
+        BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot,
+    };
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
     let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(1_000));
@@ -351,7 +353,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
         cycle_count: ScalarObservation::available(128, 1),
         energy_full_uwh: ScalarObservation::available(48_000_000.0, 1),
         energy_full_design_uwh: ScalarObservation::available(50_000_000.0, 1), // 96.0% health
-        time_to_empty_secs: ScalarObservation::available(7200.0, 1),          // 2h 00m
+        time_to_empty_secs: ScalarObservation::available(7200.0, 1),           // 2h 00m
         ..BatteryScalarObservations::default()
     });
 
@@ -364,7 +366,10 @@ fn battery_block_renders_voltage_health_and_cycles() {
         &mut shell,
         ProjectionSeedFact::PowerSupplies(Some(snapshot)),
     );
-    assert_eq!(section_keys(&shell, Section::Battery), vec!["BAT0".to_owned()]);
+    assert_eq!(
+        section_keys(&shell, Section::Battery),
+        vec!["BAT0".to_owned()]
+    );
 
     let fact_line = super::metrics::battery_fact_line(&battery);
     assert!(fact_line.contains("85%"));
@@ -390,10 +395,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
         .expect("the seeded performance page resolves")
         .id();
 
-    assert_eq!(
-        block_keys(world, Section::Battery),
-        vec!["BAT0".to_owned()]
-    );
+    assert_eq!(block_keys(world, Section::Battery), vec!["BAT0".to_owned()]);
     let field = DynField::Device {
         section: Section::Battery,
         device: "BAT0".to_owned(),

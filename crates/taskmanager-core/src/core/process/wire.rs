@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    ProcessApplicationIdentity, ProcessItem, ProcessMetadataAvailability,
+    ProcessAncestorNode, ProcessApplicationIdentity, ProcessItem, ProcessMetadataAvailability,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
     ProcessScalarObservations, ProcessSchedulingPolicy,
 };
@@ -58,6 +58,8 @@ struct ProcessItemWire {
     major_page_faults: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cancelled_write_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ancestor_lineage: Option<Vec<ProcessAncestorNode>>,
     #[serde(default)]
     scalar_observations: ProcessScalarObservations,
     #[serde(
@@ -148,6 +150,7 @@ impl Serialize for ProcessItem {
             minor_page_faults: self.minor_page_faults,
             major_page_faults: self.major_page_faults,
             cancelled_write_bytes: self.cancelled_write_bytes,
+            ancestor_lineage: self.ancestor_lineage.clone(),
             scalar_observations: self.scalar_observations,
             cpu_history: self.cpu_history.clone(),
             mem_history: self.mem_history.clone(),
@@ -203,6 +206,7 @@ impl<'de> Deserialize<'de> for ProcessItem {
             minor_page_faults: wire.minor_page_faults,
             major_page_faults: wire.major_page_faults,
             cancelled_write_bytes: wire.cancelled_write_bytes,
+            ancestor_lineage: wire.ancestor_lineage,
             metadata_observations,
             application_identity: wire.application_identity,
             scalar_observations,

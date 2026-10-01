@@ -48,6 +48,10 @@ use crate::window::{Role, TextRole, WindowPalette};
 const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
     (ProcessDetailsField::Pid, "proc.pid"),
     (ProcessDetailsField::User, "common.user"),
+    (
+        ProcessDetailsField::AncestorLineage,
+        "proc.ancestor_lineage",
+    ),
     (ProcessDetailsField::Status, "common.status"),
     (ProcessDetailsField::Cpu, "common.cpu"),
     (ProcessDetailsField::Memory, "common.memory"),
@@ -128,7 +132,9 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
         };
     };
 
-    let vm = process_details_rows(process, &UnitPreferences::default());
+    let mut process_clone = process.clone();
+    process_clone.populate_ancestor_lineage(shell.projection().processes_slice());
+    let vm = process_details_rows(&process_clone, &UnitPreferences::default());
     let mut overview: Vec<DetailRow> = OVERVIEW_FIELDS
         .iter()
         .map(|(field, label)| DetailRow {

@@ -340,3 +340,10 @@ memory.process-swap-charge	iced	ui::tests::pages::apps_resource_projection_prese
 memory.process-swap-charge	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-	-
 memory.process-swap-charge	gpui	gpui_app::processes_view::tests::projection::canonical_category::swap_cell_renders_the_observed_per_process_charge_without_a_zero_fallback	anchored	-	-
 memory.process-swap-charge	bevy	pages::processes::tests::row_view_renders_the_observed_per_process_swap_charge	anchored	-	-
+# Process ancestor lineage delivery: the top-down parent lineage chain rendered on
+# the process properties / overview surface across all four frontends.
+process.ancestor-lineage	gpui	gpui_app::root::chrome::tests::process_ancestor_lineage_renders_in_overview_and_handles_root	anchored	-	-
+process.ancestor-lineage	iced	ui::overlays::process_details::vm_parity_tests::process_ancestor_lineage_renders_in_property_pairs_and_handles_root	anchored	-	-
+process.ancestor-lineage	tui	ui::process_properties::vm_parity_tests::process_ancestor_lineage_renders_in_overview_and_handles_root	anchored	-	-
+process.ancestor-lineage	bevy	pages::processes::details::tests::process_ancestor_lineage_renders_in_projection_and_handles_root	anchored	-	-
+

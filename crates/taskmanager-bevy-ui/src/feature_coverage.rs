@@ -96,7 +96,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MultiResolutionRingBuffer
         | FeatureId::MultiFormatExport
         | FeatureId::BatteryPowerInventory
-        | FeatureId::ThermalZoneSensors => Ported,
+        | FeatureId::ThermalZoneSensors
+        | FeatureId::ProcessAncestorLineage => Ported,
 
         // -- typed absences -----------------------------------------------
         FeatureId::HandleFdLimitSaturation => Unsupported {
@@ -113,10 +114,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Bevy shape",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the Bevy process surface renders the tree without an \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

@@ -96,7 +96,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
+        | FeatureId::MultiFormatExport
+        | FeatureId::ProcessAncestorLineage => Ported,
 
         // -- typed absences -----------------------------------------------
         FeatureId::HandleFdLimitSaturation => Unsupported {
@@ -113,10 +114,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the terminal",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the terminal process surface renders the tree without an \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

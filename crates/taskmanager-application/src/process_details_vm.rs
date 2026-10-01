@@ -128,6 +128,8 @@ pub enum ProcessDetailsField {
     Pid,
     /// Parent process id. TUI/GPUI/Iced overview.
     ParentPid,
+    /// Ancestor process lineage up to root (`systemd (1) > sway (800)`). All ends.
+    AncestorLineage,
     /// Owner label. All ends.
     User,
     /// Process state string. All ends.
@@ -187,10 +189,11 @@ pub enum ProcessDetailsField {
 impl ProcessDetailsField {
     /// Every field in the canonical row order — the single variant list
     /// ([`process_details_rows`] emits exactly this sequence).
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 29] = [
         Self::Name,
         Self::Pid,
         Self::ParentPid,
+        Self::AncestorLineage,
         Self::User,
         Self::Status,
         Self::Cpu,
@@ -226,6 +229,7 @@ impl ProcessDetailsField {
             Self::Name => "name",
             Self::Pid => "pid",
             Self::ParentPid => "parent_pid",
+            Self::AncestorLineage => "ancestor_lineage",
             Self::User => "user",
             Self::Status => "status",
             Self::Cpu => "cpu",
@@ -305,6 +309,26 @@ pub fn process_details_rows(
     process_details_rows_with_local_time(item, units, &LocalTimeRulesObservation::unsupported(0))
 }
 
+/// Fold process details with an explicit slice of all current processes for
+/// ancestor lineage resolution.
+#[must_use]
+pub fn process_details_rows_with_process_list(
+    item: &ProcessItem,
+    all_processes: Option<&[ProcessItem]>,
+    units: &UnitPreferences,
+    local_time_rules: &LocalTimeRulesObservation,
+) -> Vec<ProcessDetailsRowVm> {
+    if let Some(processes) = all_processes {
+        let mut cloned = item.clone();
+        if cloned.ancestor_lineage.is_none() {
+            cloned.populate_ancestor_lineage(processes);
+        }
+        process_details_rows_with_local_time(&cloned, units, local_time_rules)
+    } else {
+        process_details_rows_with_local_time(item, units, local_time_rules)
+    }
+}
+
 /// Fold process details with a composition-injected local-time snapshot.
 #[must_use]
 pub fn process_details_rows_with_local_time(
@@ -325,6 +349,10 @@ pub fn process_details_rows_with_local_time(
         ProcessDetailsRowVm {
             field: ProcessDetailsField::ParentPid,
             value: text(item.parent_pid.map(|pid| pid.to_string())),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::AncestorLineage,
+            value: text(item.current_ancestor_lineage_formatted()),
         },
         ProcessDetailsRowVm {
             field: ProcessDetailsField::User,

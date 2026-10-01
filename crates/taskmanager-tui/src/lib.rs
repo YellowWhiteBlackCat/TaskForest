@@ -78,6 +78,27 @@ pub use ui::session_menu::SessionMenuTarget;
 pub use ui::settings::SettingsForm;
 pub use ui::startup_menu::StartupMenuTarget;
 
+fn run_gui(app_id: Option<String>, demo: bool) {
+    let _ = app_id;
+    let result = if demo { run_demo() } else { run_live() };
+    if let Err(error) = result {
+        eprintln!("taskmanager-tui: {error}");
+        std::process::exit(1);
+    }
+}
+
+/// Entry point helper for the TUI product binaries (`taskforest-t` and `taskmanager-tui`).
+pub fn run_cli(binary_name: &'static str) {
+    taskmanager_cli::run(
+        binary_name,
+        taskmanager_cli::FrontendHandlers {
+            run_gui,
+            snapshot_text: Some(snapshot_text),
+            capture_window: None,
+        },
+    );
+}
+
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;

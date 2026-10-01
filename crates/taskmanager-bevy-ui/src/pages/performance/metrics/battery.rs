@@ -34,10 +34,18 @@ pub(crate) fn battery_fact_line(battery: &BatteryInfo) -> String {
         parts.push(format!("{}: {health:.1}%", t("battery.health")));
     }
     if let Some(secs) = battery.current_time_to_full_secs() {
-        parts.push(format!("{}: {}", t("battery.time_to_full"), duration(secs as u64)));
+        parts.push(format!(
+            "{}: {}",
+            t("battery.time_to_full"),
+            duration(secs as u64)
+        ));
     }
     if let Some(secs) = battery.current_time_to_empty_secs() {
-        parts.push(format!("{}: {}", t("battery.time_to_empty"), duration(secs as u64)));
+        parts.push(format!(
+            "{}: {}",
+            t("battery.time_to_empty"),
+            duration(secs as u64)
+        ));
     }
     parts.join(" · ")
 }

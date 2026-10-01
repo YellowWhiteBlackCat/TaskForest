@@ -2,6 +2,20 @@
 
 use taskmanager_application::i18n;
 use taskmanager_core::ProcessItem;
+pub use taskmanager_core::core::process::ProcessAncestorNode;
+use taskmanager_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
+
+/// Retrieve and format the ancestor lineage for a target PID from a process inventory.
+#[must_use]
+pub fn process_ancestor_lineage_summary(
+    processes: Option<&[ProcessItem]>,
+    target_pid: u32,
+) -> String {
+    processes.map_or_else(
+        || "—".to_string(),
+        |items| format_ancestor_lineage(&process_ancestor_lineage(items, target_pid)),
+    )
+}
 
 /// Count live processes in Linux's uninterruptible `D` state. The count is
 /// derived from the shared process projection so a missing snapshot remains

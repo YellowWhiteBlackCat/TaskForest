@@ -866,6 +866,7 @@
   "users.inventory_waiting": "用户 · 等待会话清单…",
   "users.reported": "已报告 {count} 个",
   "proc.pid": "PID",
+  "proc.ancestor_lineage": "祖先链路",
   "proc.pss": "PSS",
   "proc.uss": "USS",
   "proc.shared": "共享",

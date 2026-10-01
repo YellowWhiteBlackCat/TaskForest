@@ -193,9 +193,11 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         "Processes summary card is mounted"
     );
     assert!(
-        all_texts
-            .iter()
-            .any(|s| s == t("dashboard.active_alerts") || s == "Active alerts" || s == "Active Alerts" || s == "活动告警" || s == "活动警报"),
+        all_texts.iter().any(|s| s == t("dashboard.active_alerts")
+            || s == "Active alerts"
+            || s == "Active Alerts"
+            || s == "活动告警"
+            || s == "活动警报"),
         "Active Alerts summary card is mounted"
     );
 }
@@ -283,8 +285,7 @@ fn zone_reading(
     use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_core::core::sensors::{
-        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading,
-        SensorScale,
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
     };
 
     let descriptor = SensorDescriptor::temperature(SensorScale::IDENTITY);
@@ -310,8 +311,7 @@ fn zone_reading(
 
 fn fan_reading() -> taskmanager_core::core::sensors::SensorReading {
     use taskmanager_core::core::sensors::{
-        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading,
-        SensorScale,
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
     };
 
     SensorReading::from_measurement_observation(

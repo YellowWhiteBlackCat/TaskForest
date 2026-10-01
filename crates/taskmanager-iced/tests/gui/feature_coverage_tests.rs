@@ -51,7 +51,6 @@ fn the_unsupported_feature_set_is_pinned() {
     assert_eq!(
         unsupported,
         [
-            "process.ancestor-lineage",
             "memory.vma-map",
             "memory.leak-trend",
             "handles.fd-limit-saturation",
@@ -198,7 +197,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        19,
+        20,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

@@ -654,6 +654,7 @@ fn the_first_anchor_batch_is_a_conscious_census() {
         FeatureId::ThreadTopologyEnumeration,
         FeatureId::ServiceLifecycleControl,
         FeatureId::SystemdDependencyDag,
+        FeatureId::ProcessAncestorLineage,
     ] {
         for frontend in FrontendShape::ALL {
             assert!(
@@ -666,14 +667,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        77,
+        81,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 17usize),
-        (FrontendShape::Iced, 19),
-        (FrontendShape::Tui, 21),
-        (FrontendShape::Bevy, 20),
+        (FrontendShape::Gpui, 18usize),
+        (FrontendShape::Iced, 20),
+        (FrontendShape::Tui, 22),
+        (FrontendShape::Bevy, 21),
     ] {
         assert_eq!(
             table

@@ -281,7 +281,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             && sel.is_active()
         {
             sel.clear();
-            self.commands.trigger(crate::text_selection::TextSelectionChanged);
+            self.commands
+                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }
@@ -425,7 +426,9 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .as_ref()
             .and_then(|state| state.target.clone())
             .or_else(|| self.shell.sorted_services().first().map(|s| s.id.clone()));
-        target.is_some_and(|t| crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &t))
+        target.is_some_and(|t| {
+            crate::pages::services::menu::open_for(&mut self.modals.svc, self.shell, &t)
+        })
     }
 
     /// The Startup open-attempt: the table selection, else the first sorted
@@ -436,8 +439,15 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .stu
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| self.shell.sorted_startup_entries().first().map(|e| e.id.clone()));
-        target.is_some_and(|t| crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &t))
+            .or_else(|| {
+                self.shell
+                    .sorted_startup_entries()
+                    .first()
+                    .map(|e| e.id.clone())
+            });
+        target.is_some_and(|t| {
+            crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &t)
+        })
     }
 
     /// The Sessions open-attempt: the table selection, else the first sorted
@@ -449,7 +459,9 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .as_ref()
             .and_then(|state| state.target.clone())
             .or_else(|| self.shell.sorted_sessions().first().map(|s| s.id.clone()));
-        target.is_some_and(|t| crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t))
+        target.is_some_and(|t| {
+            crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t)
+        })
     }
 
     /// Arm 2c — Performance page: 't' chord triggers SMART self-test for the
@@ -547,7 +559,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             && let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard)
             && crate::text_selection::copy_selection_or_row(sel, clip, self.shell)
         {
-            self.commands.trigger(crate::text_selection::TextSelectionChanged);
+            self.commands
+                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }

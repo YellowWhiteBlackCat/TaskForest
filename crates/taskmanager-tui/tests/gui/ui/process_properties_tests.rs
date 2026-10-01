@@ -77,11 +77,12 @@ fn overview_rows_mirror_the_neutral_vm() {
         &fixture(),
         &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
-    assert_eq!(pairs.len(), 16);
+    assert_eq!(pairs.len(), 17);
     let fields = [
         ProcessDetailsField::Name,
         ProcessDetailsField::Pid,
         ProcessDetailsField::ParentPid,
+        ProcessDetailsField::AncestorLineage,
         ProcessDetailsField::User,
         ProcessDetailsField::Status,
         ProcessDetailsField::Threads,
@@ -99,6 +100,47 @@ fn overview_rows_mirror_the_neutral_vm() {
     for (row, field) in pairs.iter().zip(fields) {
         assert_eq!(row.1, vm(field), "{field:?} value must come from the VM");
     }
+}
+
+#[test]
+fn process_ancestor_lineage_renders_in_overview_and_handles_root() {
+    let mut procs = vec![
+        ProcessItem::new(1, "systemd"),
+        ProcessItem::new(800, "sway"),
+        ProcessItem::new(1000, "alacritty"),
+    ];
+    procs[1].parent_pid = Some(1);
+    procs[2].parent_pid = Some(800);
+    let lineage = taskmanager_core::core::process::process_ancestor_lineage(&procs, 1000);
+    procs[2].set_ancestor_lineage(lineage);
+
+    let pairs = overview_pairs(
+        &procs[2],
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
+    );
+    let lineage_val = pairs
+        .iter()
+        .find(|(label, _)| *label == t("proc.ancestor_lineage"))
+        .map(|(_, v)| v.as_str());
+    assert_eq!(
+        lineage_val,
+        Some("systemd (1) > sway (800)"),
+        "descendant process must display full top-down ancestor lineage"
+    );
+
+    let root_pairs = overview_pairs(
+        &procs[0],
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
+    );
+    let root_lineage_val = root_pairs
+        .iter()
+        .find(|(label, _)| *label == t("proc.ancestor_lineage"))
+        .map(|(_, v)| v.as_str());
+    assert_eq!(
+        root_lineage_val,
+        Some("—"),
+        "root process without ancestors renders the honest dash"
+    );
 }
 
 #[test]

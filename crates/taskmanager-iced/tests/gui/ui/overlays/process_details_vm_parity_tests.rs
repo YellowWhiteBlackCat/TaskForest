@@ -104,7 +104,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
 #[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
-    assert_eq!(pairs.len(), 25);
+    assert_eq!(pairs.len(), 26);
     let value = |field: ProcessDetailsField| {
         pairs
             .iter()
@@ -129,6 +129,7 @@ fn property_pairs_mirror_the_neutral_vm() {
         ProcessDetailsField::OomScore,
         ProcessDetailsField::PageFaults,
         ProcessDetailsField::ParentPid,
+        ProcessDetailsField::AncestorLineage,
         ProcessDetailsField::StartTime,
         ProcessDetailsField::CpuTime,
         ProcessDetailsField::DiskReadTotal,
@@ -181,6 +182,7 @@ fn missing_observations_follow_the_drop_and_dash_policy() {
         ProcessDetailsField::Memory,
         ProcessDetailsField::Threads,
         ProcessDetailsField::Nice,
+        ProcessDetailsField::AncestorLineage,
         ProcessDetailsField::StartTime,
         ProcessDetailsField::CpuTime,
         ProcessDetailsField::Cmdline,
@@ -197,6 +199,41 @@ fn overview_exactly_the_property_rows_minus_command_and_exe() {
         .map(|(f, _, _)| *f)
         .filter(|f| !matches!(f, ProcessDetailsField::Cmdline | ProcessDetailsField::Exe))
         .collect();
-    assert_eq!(overview.len(), 23);
+    assert_eq!(overview.len(), 24);
     assert_eq!(overview.first(), Some(&ProcessDetailsField::Name));
+}
+
+#[test]
+fn process_ancestor_lineage_renders_in_property_pairs_and_handles_root() {
+    let mut procs = vec![
+        ProcessItem::new(1, "systemd"),
+        ProcessItem::new(800, "sway"),
+        ProcessItem::new(1000, "alacritty"),
+    ];
+    procs[1].parent_pid = Some(1);
+    procs[2].parent_pid = Some(800);
+    let lineage = taskmanager_core::core::process::process_ancestor_lineage(&procs, 1000);
+    procs[2].set_ancestor_lineage(lineage);
+
+    let pairs = property_pairs(&procs[2], &local_time_rules());
+    let lineage_val = pairs
+        .iter()
+        .find(|(f, _, _)| *f == ProcessDetailsField::AncestorLineage)
+        .map(|(_, _, v)| v.as_str());
+    assert_eq!(
+        lineage_val,
+        Some("systemd (1) > sway (800)"),
+        "descendant process must display full top-down ancestor lineage"
+    );
+
+    let root_pairs = property_pairs(&procs[0], &local_time_rules());
+    let root_lineage_val = root_pairs
+        .iter()
+        .find(|(f, _, _)| *f == ProcessDetailsField::AncestorLineage)
+        .map(|(_, _, v)| v.as_str());
+    assert_eq!(
+        root_lineage_val,
+        Some(MISSING_VALUE),
+        "root process without ancestors renders the honest dash"
+    );
 }

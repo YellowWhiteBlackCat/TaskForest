@@ -58,6 +58,7 @@ fn field_label(field: ProcessDetailsField) -> &'static str {
         ProcessDetailsField::Name => t("common.name"),
         ProcessDetailsField::Pid => "PID",
         ProcessDetailsField::ParentPid => t("prop.parent_pid"),
+        ProcessDetailsField::AncestorLineage => t("proc.ancestor_lineage"),
         ProcessDetailsField::User => t("common.user"),
         ProcessDetailsField::Status => t("common.status"),
         ProcessDetailsField::Cpu => t("common.cpu"),
@@ -100,8 +101,10 @@ pub(crate) fn republish(shell: &ShellApp, commands: &mut Commands) {
                     .find(|p| p.pid == target.pid)
             });
         let rows = if let Some(process) = process {
+            let mut process_clone = process.clone();
+            process_clone.populate_ancestor_lineage(shell.projection().processes_slice());
             let units = taskmanager_core::core::units::UnitPreferences::default();
-            let vms = process_details_rows(process, &units);
+            let vms = process_details_rows(&process_clone, &units);
             vms.into_iter()
                 .map(|vm| {
                     let label = field_label(vm.field);

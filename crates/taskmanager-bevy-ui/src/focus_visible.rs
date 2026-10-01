@@ -106,12 +106,15 @@ pub(crate) struct FocusRingVisible;
 pub(crate) fn on_input_modality_changed(
     event: On<InputModalityChanged>,
     palette: Option<Res<WindowPalette>>,
-    mut query: Query<(
-        Entity,
-        Has<FocusedControl>,
-        Option<&FocusRingVisible>,
-        Option<&mut BorderColor>,
-    ), With<FocusRing>>,
+    mut query: Query<
+        (
+            Entity,
+            Has<FocusedControl>,
+            Option<&FocusRingVisible>,
+            Option<&mut BorderColor>,
+        ),
+        With<FocusRing>,
+    >,
     mut commands: Commands,
 ) {
     let shows_ring = event.event().current.shows_focus_ring();

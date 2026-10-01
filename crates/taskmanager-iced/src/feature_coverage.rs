@@ -95,7 +95,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
-        | FeatureId::MultiFormatExport => Ported,
+        | FeatureId::MultiFormatExport
+        | FeatureId::ProcessAncestorLineage => Ported,
 
         // -- typed absences -----------------------------------------------
         FeatureId::HandleFdLimitSaturation => Unsupported {
@@ -112,10 +113,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Iced process \
                      surface",
-        },
-        FeatureId::ProcessAncestorLineage => Unsupported {
-            reason: "the Iced process surface renders the row table without the \
-                     ancestor lineage chain",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

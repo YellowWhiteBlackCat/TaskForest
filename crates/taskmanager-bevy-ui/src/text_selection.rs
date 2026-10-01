@@ -62,11 +62,7 @@ impl TextSelectionState {
     ) {
         let start = range.start.min(content.len());
         let end = range.end.min(content.len());
-        let valid_range = if start <= end {
-            start..end
-        } else {
-            end..start
-        };
+        let valid_range = if start <= end { start..end } else { end..start };
         self.session = Some(TextSelectionSession {
             target,
             id,
