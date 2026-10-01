@@ -103,3 +103,10 @@ fn core_cell_program_fingerprint_tracks_history_not_color() {
         CoreCellChart::new(Rc::from([10.0, 20.0, 40.0].as_slice()), green).fingerprint()
     );
 }
+
+#[test]
+fn format_core_readout_surfaces_clock_frequency() {
+    assert_eq!(format_core_readout(35.2, None), " 35%");
+    assert_eq!(format_core_readout(50.0, Some(800)), " 50% · 800 MHz");
+    assert_eq!(format_core_readout(75.8, Some(3600)), " 76% · 3.6 GHz");
+}

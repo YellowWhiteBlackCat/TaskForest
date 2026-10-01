@@ -83,7 +83,7 @@ mod metrics;
 
 use bevy::math::Rot2;
 use bevy::ui::UiTransform;
-use metrics::cpu::cpu_field_text;
+pub(crate) use metrics::cpu::{CpuField, cpu_field_text};
 use metrics::{
     core_usage_count, core_usage_fill_pct, cpu_metrics, curve_caption, curve_samples, curve_wanted,
     curve_warm, disk_spare_warning_for, dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics,
@@ -321,32 +321,6 @@ pub(crate) enum DynField {
         device: String,
     },
     Segment(MemSegmentKind),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum CpuField {
-    Brand,
-    Usage,
-    Frequency,
-    Temperature,
-    Power,
-    Pressure,
-    Load,
-    Topology,
-    IdleStates,
-    PowerLimits,
-    ThermalThrottle,
-    ThermalStatus,
-    Interrupts,
-    Core(usize),
-}
-
-impl Default for CpuField {
-    /// Template seed only — the bsn! paren form requires a `Default` value
-    /// that every spawned scene immediately patches with a real field.
-    fn default() -> Self {
-        Self::Usage
-    }
 }
 
 impl Default for DynField {
@@ -864,6 +838,10 @@ fn sync_blocks(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_cpu.rs"]
+mod cpu_details_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_device_rows.rs"]

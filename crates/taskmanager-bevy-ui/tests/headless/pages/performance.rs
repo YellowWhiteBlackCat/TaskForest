@@ -81,7 +81,7 @@ use taskmanager_platform_contract::RequestEnvelope;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::presentation::trend::window;
 
-const GIB: u64 = 1024 * 1024 * 1024;
+pub(super) const GIB: u64 = 1024 * 1024 * 1024;
 
 /// The strip's polyline projection over the shell's series — the same
 /// bounded, gap-aware call the render path makes (design strip geometry).
@@ -110,7 +110,7 @@ fn cpu_metrics(usage_pct: f32, cores: &[f32], at_ms: u64) -> CpuMetrics {
     CpuMetrics::from_observations(observations)
 }
 
-fn memory_metrics(
+pub(super) fn memory_metrics(
     at_ms: u64,
     used: u64,
     total: u64,
@@ -162,7 +162,11 @@ fn correlated(
     }
 }
 
-fn cpu_outcome(sequence: u64, at_ms: u64, metrics: CpuMetrics) -> CorrelatedSystemTelemetryOutcome {
+pub(super) fn cpu_outcome(
+    sequence: u64,
+    at_ms: u64,
+    metrics: CpuMetrics,
+) -> CorrelatedSystemTelemetryOutcome {
     correlated(
         sequence,
         at_ms,
@@ -198,7 +202,7 @@ fn network_outcome(
 
 /// One projection revision: the resolved domains carry current observations,
 /// the rest stay pending (the merge policy accepts that shape).
-fn projection(
+pub(super) fn projection(
     revision: u64,
     cpu: CpuMetrics,
     memory: MemoryMetrics,
@@ -230,20 +234,20 @@ fn projection(
 }
 
 /// A shell plus a monotonically advancing sequence stamp for real folds.
-struct Folded {
-    shell: ShellApp,
-    sequence: u64,
+pub(super) struct Folded {
+    pub(super) shell: ShellApp,
+    pub(super) sequence: u64,
 }
 
 impl Folded {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             shell: ShellApp::new(),
             sequence: 0,
         }
     }
 
-    fn apply(
+    pub(super) fn apply(
         &mut self,
         outcomes: Vec<CorrelatedSystemTelemetryOutcome>,
         projection: ProjectedSystemTelemetry,

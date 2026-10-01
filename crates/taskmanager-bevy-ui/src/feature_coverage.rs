@@ -56,6 +56,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration
         | FeatureId::HandleTypeClassification
+        | FeatureId::DeletedFileHandleWatch
         | FeatureId::ThreadTopologyEnumeration
         | FeatureId::ThreadRunqueueLatency
         | FeatureId::ThreadUninterruptibleSleepDiagnosis
@@ -69,10 +70,14 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::DiskSmartHealth
         | FeatureId::SwapThroughputRate
         | FeatureId::HardwareTopologyTree
+        | FeatureId::CpuCacheTopology
+        | FeatureId::CpuHeterogeneousCoreClass
+        | FeatureId::CpuCoreFrequency
         | FeatureId::GpuAdapterEnumeration
         | FeatureId::NpuTelemetry
         | FeatureId::GpuEngineUtilization
         | FeatureId::GpuMemoryReadout
+        | FeatureId::RaplPowerDraw
         | FeatureId::ThermalThrottleEvents
         | FeatureId::CpuCStateAnalysis
         | FeatureId::LinuxNamespaceAudit
@@ -88,7 +93,8 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::PsiMultiWindowTelemetry
         | FeatureId::MemoryThrashingHealthScore
         | FeatureId::PressureLoadAverageNormalized
-        | FeatureId::MultiResolutionRingBuffer => Ported,
+        | FeatureId::MultiResolutionRingBuffer
+        | FeatureId::MultiFormatExport => Ported,
 
         // -- deliberate scene reduction -----------------------------------
         FeatureId::ThermalZoneSensors => Divergent {
@@ -101,10 +107,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
 
         // -- typed absences -----------------------------------------------
-        FeatureId::DeletedFileHandleWatch => Unsupported {
-            reason: "the Bevy open-file summary renders fd/kind/target but does \
-                     not surface deleted-but-held descriptors",
-        },
         FeatureId::HandleFdLimitSaturation => Unsupported {
             reason: "the Bevy open-file summary renders descriptors without the \
                      RLIMIT_NOFILE saturation context",
@@ -117,32 +119,12 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
             reason: "the Bevy connection summary renders state without \
                      send/receive queue depth",
         },
-        FeatureId::CpuHeterogeneousCoreClass => Unsupported {
-            reason: "no heterogeneous core-class breakdown is wired in the Bevy \
-                     performance surface",
-        },
-        FeatureId::CpuCoreFrequency => Unsupported {
-            reason: "no per-core clock frequency readout is wired in the Bevy \
-                     performance surface",
-        },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Bevy shape",
-        },
-        FeatureId::RaplPowerDraw => Unsupported {
-            reason: "no RAPL package-power readout is wired in the Bevy \
-                     performance surface",
         },
         FeatureId::ProcessAncestorLineage => Unsupported {
             reason: "the Bevy process surface renders the tree without an \
                      ancestor lineage chain",
-        },
-        FeatureId::MultiFormatExport => Unsupported {
-            reason: "no structured multi-format export engine is wired in the \
-                     Bevy shape",
-        },
-        FeatureId::CpuCacheTopology => Unsupported {
-            reason: "no multi-level cache capacity readout is wired in the Bevy \
-                     performance surface",
         },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend

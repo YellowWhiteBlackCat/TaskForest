@@ -90,6 +90,8 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
 
     let cpu_types = hw.map(|h| &h.cpu_types);
 
+    let cpu_metrics = app.shell.projection().snapshot.as_ref().map(|s| &s.cpu);
+
     // The app cache owns one contiguous snapshot per core for this history
     // revision. Group the shared handles directly so idle frames allocate no
     // fresh VecDeque copies (and no per-cell sample buffers).
@@ -112,7 +114,9 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
                 .into_iter()
                 .map(|(index, samples)| {
                     let core_type = cpu_types.and_then(|types| types.get(index)).copied();
-                    core_grid_cell(index, samples, theme_snapshot, core_type)
+                    let core_freq =
+                        cpu_metrics.and_then(|cpu| cpu.current_core_frequency_mhz(index));
+                    core_grid_cell(index, samples, theme_snapshot, core_type, core_freq)
                 })
                 .collect();
             row(cells).spacing(8).width(Length::Fill).into()
@@ -154,9 +158,24 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
     .into()
 }
 
+/// Format the per-core utilization and observed clock frequency readout.
+#[must_use]
+pub(crate) fn format_core_readout(usage_pct: f32, freq_mhz: Option<u64>) -> String {
+    let clamped = usage_pct.clamp(0.0, 100.0);
+    match freq_mhz {
+        Some(mhz) if mhz >= 1000 => {
+            format!("{clamped:>3.0}% · {:.1} GHz", mhz as f64 / 1000.0)
+        }
+        Some(mhz) if mhz > 0 => {
+            format!("{clamped:>3.0}% · {mhz} MHz")
+        }
+        _ => format!("{clamped:>3.0}%"),
+    }
+}
+
 /// One per-core grid cell: a label, a tier-tinted rolling mini-history sparkline
-/// of the core's whole window, and the latest "XX%" readout. A core with no
-/// finite sample renders an honest dash — never a fabricated 0%. A core with a
+/// of the core's whole window, and the latest "XX%" (plus observed clock frequency) readout.
+/// A core with no finite sample renders an honest dash — never a fabricated 0%. A core with a
 /// single sample draws no polyline yet (the readout carries the value) until a
 /// second snapshot arrives. The theme borrow is consumed up front (resolved into
 /// `Copy` colors + an owned sample `Vec`), so the returned element is `'static`.
@@ -165,6 +184,7 @@ fn core_grid_cell(
     samples: Rc<[f32]>,
     theme_snapshot: &Theme,
     core_type: Option<CpuType>,
+    freq_mhz: Option<u64>,
 ) -> Elem<'static> {
     let type_suffix = match core_type {
         Some(CpuType::Performance) => " (P)",
@@ -181,11 +201,10 @@ fn core_grid_cell(
             let chart = canvas::Canvas::new(CoreCellChart::new(samples, stroke_color))
                 .width(Length::Fill)
                 .height(Length::Fixed(CELL_CHART_HEIGHT));
+            let readout = format_core_readout(clamped, freq_mhz);
             column(vec![
                 chart.into(),
-                text(format!("{clamped:>3.0}%"))
-                    .size(f32::from(tokens::FONT_10))
-                    .into(),
+                text(readout).size(f32::from(tokens::FONT_10)).into(),
             ])
             .spacing(2)
             .into()

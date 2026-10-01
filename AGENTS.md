@@ -6,9 +6,9 @@ the lower document layers.
 
 ## Public documentation contract
 
-- `README.md` is the product introduction: identity, capabilities, status, usage,
-  platforms, releases, and license.
-- `AGENTS.md` defines the global mission, boundaries, invariants, and document route.
+- `README.md` is the human-facing product introduction (identity, capabilities, status,
+  usage, platforms, releases, license); it is never navigation, index, or a route.
+- `AGENTS.md` defines the mission, boundaries, invariants, and the project-map top, refined downward through `docs/`.
 - `docs/` contains concise current-state charters; every living document is ≤200 lines.
 - `crates/*/README.md` owns crate responsibilities, contracts, dependencies, and checks.
 - `adr/` records current irreversible decisions.

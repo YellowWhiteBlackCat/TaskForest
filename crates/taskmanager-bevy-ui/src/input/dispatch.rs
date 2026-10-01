@@ -152,6 +152,9 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if self.smart_self_test(press) {
             return;
         }
+        if self.snapshot_export(press) {
+            return;
+        }
         if self.search_editing(press) {
             return;
         }
@@ -462,6 +465,21 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         ) {
             return false;
         }
+        self.applied = true;
+        true
+    }
+
+    /// Arm 2c2 — snapshot export: unmodified 'x' triggers multi-format snapshot
+    /// export (TUI and Iced parity).
+    fn snapshot_export(&mut self, press: KeyPress) -> bool {
+        if !matches!(press.context, KeyboardOwner::Free)
+            || press.key_code != KeyCode::KeyX
+            || press.modifiers != Modifiers::NONE
+        {
+            return false;
+        }
+        let mut runtime = crate::snapshot_export::BevySnapshotExportRuntime::default();
+        runtime.request_snapshot_export(self.shell);
         self.applied = true;
         true
     }

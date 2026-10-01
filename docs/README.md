@@ -88,13 +88,17 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 1. 从根 [README.md](../README.md) 了解产品定位和公开成熟度。
 2. 接到任务先查上方"任务路由"表，读对应最小集合；不确定时从
    [ARCH.md](ARCH.md) 出发顺依赖找。
-3. 改 crate 前读 [crates/README.md](../crates/README.md) 索引与受影响 crate 的
+3. 改 crate 前读 [crates/README.md](../crates/README.md) 总览与受影响 crate 的
    README（含 Module map）。
 4. 需要理解设计取舍时查 [adr/README.md](../adr/README.md) 索引定位 ADR；不要从
    提交历史或内部材料反推当前契约。
 
 ## 写作规则
 
+- `README.md`（根与各 crate）面向人类，只描述产品/模块本身：它是什么、有什么能力、
+  怎么用、当前状态与限制。README 不是项目地图、全局导航、索引或任务路由。
+- 项目地图的唯一最高入口是顶层 [AGENTS.md](../AGENTS.md)，并逐层细化到本页与 `docs/`
+  内的地图、任务路由文档；README 不参与地图层级。
 - 一项事实只有一个权威来源，其他文件只链接；术语进 [GLOSSARY.md](GLOSSARY.md)，
   不在各文档重复定义。
 - 规则变化直接重写当前文档，不追加"本轮""增补""历史回顾"。
