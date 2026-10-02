@@ -264,9 +264,11 @@ def main() -> int:
 
         receipt = png_receipt(image)
         visual = visual_content_receipt(image)
-        if receipt.width < 900 or receipt.height < 500:
-            raise EvidenceError(f"TUI image is too small: {receipt.width}x{receipt.height}")
         values = metadata(metadata_path)
+        min_width = 500 if int(values.get("terminal_columns", "120")) < 80 else 900
+        min_height = 400 if int(values.get("terminal_lines", "36")) < 24 else 500
+        if receipt.width < min_width or receipt.height < min_height:
+            raise EvidenceError(f"TUI image is too small: {receipt.width}x{receipt.height}")
         try:
             validate_supervised_metadata(values, root, metadata_path, "tui")
         except SupervisorError as error:

@@ -162,6 +162,24 @@ def validate(root: Path) -> dict[str, object]:
         raise CoverageError(f"Bevy pages lack Wayland coverage: {missing_bevy_pages}")
     require_compact(bevy_matrix, "page", required_bevy_pages, "Bevy pages")
 
+    tui_matrix = read_tsv(root / "scripts/capture_tui_scenarios.tsv")
+    tui_pages = {row["page"] for row in tui_matrix}
+    required_tui_pages = {
+        "applications", "performance", "services", "system", "startup", "users", "app-history"
+    }
+    missing_tui_pages = sorted(required_tui_pages - tui_pages)
+    if missing_tui_pages:
+        raise CoverageError(f"TUI pages lack coverage: {missing_tui_pages}")
+    required_tui_devices = {"cpu", "memory", "disk", "network", "gpu", "battery", "fan"}
+    tui_devices = {row["device"] for row in tui_matrix if row["page"] == "performance"}
+    missing_tui_devices = sorted(required_tui_devices - tui_devices)
+    if missing_tui_devices:
+        raise CoverageError(f"TUI Performance devices lack coverage: {missing_tui_devices}")
+    compact_tui = {row["page"] for row in tui_matrix if row.get("lines") == "16"}
+    missing_tui_compact = sorted(required_tui_pages - compact_tui)
+    if missing_tui_compact:
+        raise CoverageError(f"TUI pages lack compact 54x16 coverage: {missing_tui_compact}")
+
     return {
         "gpui_rows": len(gpui_matrix),
         "gpui_capture_scenarios": len(required_scenarios),
@@ -170,6 +188,8 @@ def validate(root: Path) -> dict[str, object]:
         "iced_devices": sorted(required_iced_devices),
         "bevy_rows": len(bevy_matrix),
         "bevy_pages": sorted(required_bevy_pages),
+        "tui_rows": len(tui_matrix),
+        "tui_devices": sorted(required_tui_devices),
     }
 
 
@@ -187,7 +207,8 @@ def main() -> int:
         f"(GPUI {summary['gpui_rows']} rows/{summary['gpui_capture_scenarios']} scenarios/"
         f"{len(summary['gpui_devices'])} performance devices; "
         f"Iced {summary['iced_rows']} rows/{len(summary['iced_devices'])} performance devices; "
-        f"Bevy {summary['bevy_rows']} rows/{len(summary['bevy_pages'])} pages)"
+        f"Bevy {summary['bevy_rows']} rows/{len(summary['bevy_pages'])} pages; "
+        f"TUI {summary['tui_rows']} rows/{len(summary['tui_devices'])} performance devices)"
     )
     return 0
 
