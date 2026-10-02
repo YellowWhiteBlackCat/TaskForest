@@ -111,3 +111,15 @@ process-resource-limits	process-resource-limits	1180x780	gnome-dark
 process-resource-limits-compact	process-resource-limits	720x480	gnome-dark
 process-isolation	process-isolation	1180x780	gnome-dark
 process-isolation-compact	process-isolation	720x480	gnome-dark
+system-about	system-about	1180x780	gnome-dark
+system-about-compact	system-about	720x480	gnome-dark
+system-dashboard	system-dashboard	1180x780	gnome-dark
+system-dashboard-compact	system-dashboard	720x480	gnome-dark
+system-hardware	system-hardware	1180x780	gnome-dark
+system-hardware-compact	system-hardware	720x480	gnome-dark
+sensor-center	sensor-center	1180x780	gnome-dark
+sensor-center-compact	sensor-center	720x480	gnome-dark
+active-alert	active-alert	1180x780	gnome-dark
+active-alert-compact	active-alert	720x480	gnome-dark
+alert-rules-manager	alert-rules-manager	1180x780	gnome-dark
+alert-rules-manager-compact	alert-rules-manager	720x480	gnome-dark

@@ -92,7 +92,7 @@ case "$CAPTURE_SCENE" in
   "") ;;
   system-npu) CAPTURE_PAGE=system ;;
   process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation) CAPTURE_PAGE=applications ;;
-  smart-self-test-confirm) CAPTURE_PAGE=performance ;;
+  smart-self-test-confirm|about|system-about|system-hardware|storage-health|sensor-center|system-dashboard|active-alert|alert-rules-manager) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2

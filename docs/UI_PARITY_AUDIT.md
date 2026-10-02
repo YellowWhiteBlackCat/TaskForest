@@ -8,11 +8,11 @@
 
 | 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI |
 |---|---|---|:---:|:---:|:---:|
-| 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Pending | Pending |
-| | `system-about` | 系统关于面板展开 | Aligned | Pending | Pending |
+| 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Pending | Aligned |
+| | `system-about` | 系统关于面板展开 | Aligned | Pending | Aligned |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Pending | Pending |
-| | `system-dashboard` | 多硬件总览仪表盘 | Pending | Pending | Pending |
-| | `system-hardware` | SMBIOS 硬件拓扑明细 | Pending | Pending | Pending |
+| | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Pending | Aligned |
+| | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Pending | Aligned |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Pending | Aligned |
 | 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
 | | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Aligned | Aligned |
@@ -25,13 +25,13 @@
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
 | | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Aligned | Aligned | Aligned |
-| 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Aligned | Pending | Pending |
+| 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Aligned | Pending | Aligned |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Pending | Pending | Pending |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Pending | Pending | Pending |
 | | `partition-disk-usage` | 分区挂载点与磁盘空间图 | Pending | Pending | Pending |
 | | `partition-live-usage` | 磁盘动态吞吐与 IOPS 视图 | Pending | Pending | Pending |
 | | `device-hotplug` | 设备热插拔事件触发与重排 | Pending | Pending | Pending |
-| | `sensor-center` | 主板温控传感器与各 Thermal Zone | Pending | Pending | Pending |
+| | `sensor-center` | 主板温控传感器与各 Thermal Zone | Aligned | Pending | Aligned |
 | | `battery-fan-performance` | 电池状态与风扇转速联动卡 | Pending | Pending | Pending |
 | | `battery-live-performance` | 电池实时放电速率与电压曲线 | Pending | Pending | Pending |
 | | `gpu-engine-inventory` | 多 GPU 引擎枚举与负载图表 | Pending | Pending | Pending |
@@ -43,8 +43,8 @@
 | 开机启动项分析 | `startup-impact` | 启动项引导耗时影响等级分析 | Pending | Pending | Pending |
 | | `startup-failure-evidence` | 启动服务崩溃/异常退出取证 | Pending | Pending | Pending |
 | | `startup-boot-markers` | systemd-analyze 开机关键链时间轴 | Pending | Pending | Pending |
-| 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Pending | Pending | Pending |
-| | `alert-rules-manager` | 自定义告警规则配置中心 | Pending | Pending | Pending |
+| 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Aligned | Pending | Aligned |
+| | `alert-rules-manager` | 自定义告警规则配置中心 | Aligned | Pending | Aligned |
 | | `event-center` | 系统安全与审计事件追踪中心 | Pending | Pending | Pending |
 | | `saved-view-presets` | 自定义列宽与视图预设切换 | Pending | Pending | Pending |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Pending | Pending | Pending |

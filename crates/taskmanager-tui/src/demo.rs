@@ -327,6 +327,20 @@ fn apply_capture_overrides(app: &mut TuiApp) {
             };
             app.shell.arm_smart_self_test(intent);
         }
+        Some("about" | "system-about" | "system-hardware") => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_about();
+        }
+        Some(
+            "storage-health"
+            | "sensor-center"
+            | "system-dashboard"
+            | "active-alert"
+            | "alert-rules-manager",
+        ) => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_health();
+        }
         Some("process-properties-performance") => {
             app.shell.application.active_page = AppPage::Applications;
             if let Some(item) = app

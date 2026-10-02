@@ -42,15 +42,18 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     if target == "service-details" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
-    } else if target == crate::capture::HEALTH_TARGET {
+    } else if target == crate::capture::HEALTH_TARGET
+        || target == "system-dashboard"
+        || target == "sensor-center"
+    {
         let _ = app.update(Message::OpenHealth);
-    } else if target == "about" {
+    } else if target == "about" || target == "system-about" || target == "system-hardware" {
         app.open_local_surface(LocalSurface::About);
     } else if target == "settings" {
         app.open_local_surface(LocalSurface::Settings);
     } else if target == "containers" {
         app.open_local_surface(LocalSurface::Containers);
-    } else if target == "alerts" {
+    } else if target == "alerts" || target == "active-alert" || target == "alert-rules-manager" {
         app.open_local_surface(LocalSurface::AlertCenter);
     } else if target == "first-run" {
         app.open_local_surface(LocalSurface::FirstRun);
