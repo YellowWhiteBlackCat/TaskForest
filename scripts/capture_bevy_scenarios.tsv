@@ -22,3 +22,13 @@ settings-compact	settings	720x480	gnome-light
 app-history-compact	app-history	720x480	gnome-light
 containers-compact	containers	720x480	gnome-light
 performance-dark	performance	1180x780	gnome-dark
+perf-memory	perf-memory	1180x780	gnome-light
+perf-memory-compact	perf-memory	720x480	gnome-light
+perf-disk	perf-disk	1180x780	gnome-light
+perf-disk-compact	perf-disk	720x480	gnome-light
+perf-network	perf-network	1180x780	gnome-light
+perf-network-compact	perf-network	720x480	gnome-light
+perf-gpu	perf-gpu	1180x780	gnome-light
+perf-gpu-compact	perf-gpu	720x480	gnome-light
+perf-battery	perf-battery	1180x780	gnome-light
+perf-battery-compact	perf-battery	720x480	gnome-light

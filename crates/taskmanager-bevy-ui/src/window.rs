@@ -298,8 +298,8 @@ fn emit_capture_marker(
 }
 
 fn capture_page_name(page: crate::app::Page) -> &'static str {
-    if capture_wants_service_logs() {
-        return "service-logs";
+    if let Some(target) = capture_scenario_target() {
+        return target;
     }
     match page {
         crate::app::Page::Processes => "applications",
@@ -312,6 +312,35 @@ fn capture_page_name(page: crate::app::Page) -> &'static str {
         crate::app::Page::Settings => "settings",
         crate::app::Page::AppHistory => "app-history",
         crate::app::Page::Containers => "containers",
+    }
+}
+
+fn capture_scenario_target() -> Option<&'static str> {
+    let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "service-logs" => Some("service-logs"),
+        "perf-memory" => Some("perf-memory"),
+        "perf-disk" => Some("perf-disk"),
+        "perf-network" => Some("perf-network"),
+        "perf-gpu" => Some("perf-gpu"),
+        "perf-battery" => Some("perf-battery"),
+        _ => None,
+    }
+}
+
+fn capture_perf_device_target() -> Option<crate::pages::performance::PerformanceDeviceTarget> {
+    use crate::pages::performance::PerformanceDeviceTarget;
+
+    let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "perf-memory" => Some(PerformanceDeviceTarget::Memory),
+        "perf-disk" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
+        "perf-network" => Some(PerformanceDeviceTarget::Network(
+            "network:demo:wlan0".into(),
+        )),
+        "perf-gpu" => Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into())),
+        "perf-battery" => Some(PerformanceDeviceTarget::Battery("battery:demo:0".into())),
+        _ => None,
     }
 }
 
@@ -411,9 +440,9 @@ fn capture_page() -> Option<crate::app::Page> {
     let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match value.trim().to_ascii_lowercase().as_str() {
         "applications" | "processes" => Some(crate::app::Page::Processes),
-        "performance" => Some(crate::app::Page::Performance),
-        "services" => Some(crate::app::Page::Services),
-        "service-logs" => Some(crate::app::Page::Services),
+        "performance" | "perf-memory" | "perf-disk" | "perf-network" | "perf-gpu"
+        | "perf-battery" => Some(crate::app::Page::Performance),
+        "services" | "service-logs" => Some(crate::app::Page::Services),
         "system" => Some(crate::app::Page::System),
         "startup" => Some(crate::app::Page::Startup),
         "users" | "sessions" => Some(crate::app::Page::Sessions),
@@ -462,6 +491,9 @@ impl Plugin for FrontendWindowPlugin {
         app.insert_resource(WindowPalette {
             inner: self.palette.clone(),
         });
+        if let Some(target) = capture_perf_device_target() {
+            app.insert_resource(crate::pages::performance::PerformanceDeviceFocus(target));
+        }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while
         // headless compositions remain honestly Disabled.
