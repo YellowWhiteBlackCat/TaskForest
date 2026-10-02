@@ -2,7 +2,10 @@
 
 use std::path::PathBuf;
 
-use taskmanager_application::{AppPage, ProcessInsightsProjection, ProcessInsightsRevision};
+use taskmanager_application::{
+    AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
+    ProcessInsightsRevision,
+};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -54,6 +57,34 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     } else if target == "process-insights" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Insights);
+    } else if target == "process-command" {
+        app.shell.application.active_page = AppPage::Applications;
+        seed_capture_process_details(app, DetailsSection::Command);
+    } else if target == "process-end-confirm" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(target_proc) = seed_capture_process_target(app) {
+            app.shell.application.selected_process = Some(target_proc.clone());
+            let _ = app
+                .shell
+                .application
+                .interaction
+                .reduce(InteractionEvent::ArmConfirmation(
+                    PendingConfirmation::EndTask(target_proc),
+                ));
+        }
+    } else if target == "apps-search-highlight" {
+        app.shell.application.active_page = AppPage::Applications;
+        app.shell.query = "zed".into();
+    } else if target == "services-search-highlight" {
+        app.shell.application.active_page = AppPage::Services;
+        let _ = app.update(Message::ServicesSearchChanged("Network".into()));
+    } else if target == "run-task" {
+        app.open_local_surface(LocalSurface::RunTask);
+    } else if target == "disk-smart" {
+        app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
+    } else if target == "service-details-logs" {
+        app.shell.application.active_page = AppPage::Services;
+        let _ = app.open_service_details_for_effect(0);
     } else if target == "process-affinity" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {

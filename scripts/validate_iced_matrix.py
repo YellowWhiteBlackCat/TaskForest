@@ -149,9 +149,12 @@ def validate_markers(path: Path, device: str) -> None:
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
     page = (
         "services"
-        if device == "service-details"
+        if device in {"service-details", "service-details-logs", "services-search-highlight"}
         else "applications"
-        if device in {"process-details", "process-properties-performance", "process-insights", "process-affinity"}
+        if device in {
+            "process-details", "process-properties-performance", "process-insights",
+            "process-command", "process-affinity", "process-end-confirm", "apps-search-highlight"
+        }
         else device
         if device in {"applications", "services", "startup", "users", "system", "app-history"}
         else "performance"

@@ -180,6 +180,20 @@ def validate(root: Path) -> dict[str, object]:
     if missing_tui_compact:
         raise CoverageError(f"TUI pages lack compact 54x16 coverage: {missing_tui_compact}")
 
+    parity_floor = 80
+    if len(iced_matrix) < parity_floor:
+        raise CoverageError(
+            f"Iced matrix has {len(iced_matrix)} rows, below parity floor of {parity_floor}"
+        )
+    if len(bevy_matrix) < parity_floor:
+        raise CoverageError(
+            f"Bevy matrix has {len(bevy_matrix)} rows, below parity floor of {parity_floor}"
+        )
+    if len(tui_matrix) < parity_floor:
+        raise CoverageError(
+            f"TUI matrix has {len(tui_matrix)} rows, below parity floor of {parity_floor}"
+        )
+
     return {
         "gpui_rows": len(gpui_matrix),
         "gpui_capture_scenarios": len(required_scenarios),

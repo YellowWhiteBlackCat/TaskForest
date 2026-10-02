@@ -265,8 +265,10 @@ def main() -> int:
         receipt = png_receipt(image)
         visual = visual_content_receipt(image)
         values = metadata(metadata_path)
-        min_width = 500 if int(values.get("terminal_columns", "120")) < 80 else 900
-        min_height = 400 if int(values.get("terminal_lines", "36")) < 24 else 500
+        cols = int(values.get("terminal_columns", "120"))
+        lines_cnt = int(values.get("terminal_lines", "36"))
+        min_width = 500 if cols <= 80 else 900
+        min_height = 400 if lines_cnt <= 24 else 500
         if receipt.width < min_width or receipt.height < min_height:
             raise EvidenceError(f"TUI image is too small: {receipt.width}x{receipt.height}")
         try:
