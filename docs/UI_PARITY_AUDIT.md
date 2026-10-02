@@ -15,12 +15,12 @@
 | | `system-hardware` | SMBIOS 硬件拓扑明细 | Pending | Pending | Pending |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Pending | Aligned |
 | 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
-| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Pending | Pending |
-| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Pending | Pending | Pending |
-| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Pending | Pending | Pending |
-| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Pending | Pending | Pending |
-| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Pending | Pending | Pending |
-| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Pending | Pending | Pending |
+| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Aligned | Aligned |
+| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Aligned | Aligned | Aligned |
+| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Aligned | Aligned | Aligned |
+| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Aligned | Aligned | Aligned |
+| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Aligned | Aligned | Aligned |
+| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Aligned | Aligned | Aligned |
 | 危险操作确认 | `process-force-kill` | 强制终止（SIGKILL）警示弹窗 | Aligned | Aligned | Aligned |
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |

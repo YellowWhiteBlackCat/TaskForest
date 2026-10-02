@@ -11,7 +11,9 @@
 //! `demo_app` starts with one honest sample and the sequence below is
 //! appended only inside the capture composition.
 
-use taskmanager_application::{InteractionEvent, PendingConfirmation};
+use taskmanager_application::{
+    InteractionEvent, PendingConfirmation, ProcessInsightsProjection, ProcessInsightsRevision,
+};
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::identity::DeviceId;
@@ -27,7 +29,9 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
-use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
 
 /// Build the capture-only shell with a warm, deterministic graph window.
 pub(crate) fn demo_shell() -> ShellApp {
@@ -217,6 +221,33 @@ pub(crate) fn seed_capture_confirmation_fixture(shell: &mut ShellApp) {
                 kind: SmartSelfTestKind::Short,
             };
             shell.arm_smart_self_test(intent);
+        }
+        "process-network-details"
+        | "process-gpu-details"
+        | "process-resource-limits"
+        | "process-isolation"
+        | "process-properties-performance"
+        | "process-memory-pss-swap" => {
+            let process = shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned();
+            if let Some(process) = process {
+                if let Some(target) = FrozenProcessIdentity::from_process(&process) {
+                    shell.application.selected_process = Some(target.clone());
+                    let revision = ProcessInsightsRevision::new(1);
+                    let mut tracker = ProcessInsightsProjection::default();
+                    tracker.begin(target, revision);
+                    if let Some(projection) = tracker.snapshot() {
+                        seed_projection_fact(
+                            shell,
+                            ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+                        );
+                    }
+                }
+            }
         }
         _ => {}
     }

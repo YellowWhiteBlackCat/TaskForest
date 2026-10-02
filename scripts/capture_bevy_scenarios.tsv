@@ -99,3 +99,15 @@ process-batch-confirm	process-batch-confirm	1180x780	gnome-light
 process-batch-confirm-compact	process-batch-confirm	720x480	gnome-light
 smart-self-test-confirm	smart-self-test-confirm	1180x780	gnome-light
 smart-self-test-confirm-compact	smart-self-test-confirm	720x480	gnome-light
+process-properties-performance	process-properties-performance	1180x780	gnome-light
+process-properties-performance-compact	process-properties-performance	720x480	gnome-light
+process-memory-pss-swap	process-memory-pss-swap	1180x780	gnome-light
+process-memory-pss-swap-compact	process-memory-pss-swap	720x480	gnome-light
+process-network-details	process-network-details	1180x780	gnome-light
+process-network-details-compact	process-network-details	720x480	gnome-light
+process-gpu-details	process-gpu-details	1180x780	gnome-light
+process-gpu-details-compact	process-gpu-details	720x480	gnome-light
+process-resource-limits	process-resource-limits	1180x780	gnome-light
+process-resource-limits-compact	process-resource-limits	720x480	gnome-light
+process-isolation	process-isolation	1180x780	gnome-light
+process-isolation-compact	process-isolation	720x480	gnome-light

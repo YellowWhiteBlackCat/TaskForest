@@ -498,7 +498,7 @@ capture_one() {
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
   service-details|service-details-logs|services-search-highlight) page=services ;;
-  process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight) page=applications ;;
+  process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation) page=applications ;;
   about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm) page=performance ;;
   esac
   mkdir -p "$scenario_dir" "$config_home" "$data_home" "$cache_home" "$state_home"

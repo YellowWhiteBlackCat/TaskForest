@@ -330,6 +330,12 @@ fn capture_scenario_target() -> Option<&'static str> {
         "process-tree-confirm" => Some("process-tree-confirm"),
         "process-batch-confirm" => Some("process-batch-confirm"),
         "smart-self-test-confirm" => Some("smart-self-test-confirm"),
+        "process-properties-performance" => Some("process-properties-performance"),
+        "process-memory-pss-swap" => Some("process-memory-pss-swap"),
+        "process-network-details" => Some("process-network-details"),
+        "process-gpu-details" => Some("process-gpu-details"),
+        "process-resource-limits" => Some("process-resource-limits"),
+        "process-isolation" => Some("process-isolation"),
         _ => None,
     }
 }

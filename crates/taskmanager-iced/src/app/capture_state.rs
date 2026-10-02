@@ -60,9 +60,17 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     } else if target == "process-properties-performance" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Performance);
-    } else if target == "process-insights" {
+    } else if target == "process-insights"
+        || target == "process-network-details"
+        || target == "process-gpu-details"
+        || target == "process-resource-limits"
+        || target == "process-isolation"
+    {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Insights);
+    } else if target == "process-memory-pss-swap" {
+        app.shell.application.active_page = AppPage::Applications;
+        seed_capture_process_details(app, DetailsSection::Overview);
     } else if target == "process-command" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Command);

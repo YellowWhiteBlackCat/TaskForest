@@ -92,3 +92,15 @@ process-batch-confirm	applications	default	120	36	gnome-dark
 process-batch-confirm-compact	applications	default	54	16	gnome-dark
 smart-self-test-confirm	performance	disk	120	36	gnome-dark
 smart-self-test-confirm-compact	performance	disk	54	16	gnome-dark
+process-properties-performance	applications	default	120	36	gnome-dark
+process-properties-performance-compact	applications	default	54	16	gnome-dark
+process-memory-pss-swap	applications	default	120	36	gnome-dark
+process-memory-pss-swap-compact	applications	default	54	16	gnome-dark
+process-network-details	applications	default	120	36	gnome-dark
+process-network-details-compact	applications	default	54	16	gnome-dark
+process-gpu-details	applications	default	120	36	gnome-dark
+process-gpu-details-compact	applications	default	54	16	gnome-dark
+process-resource-limits	applications	default	120	36	gnome-dark
+process-resource-limits-compact	applications	default	54	16	gnome-dark
+process-isolation	applications	default	120	36	gnome-dark
+process-isolation-compact	applications	default	54	16	gnome-dark
