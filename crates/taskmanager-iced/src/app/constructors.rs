@@ -20,11 +20,6 @@ use taskmanager_core::core::metrics::CpuScalarObservations;
 use taskmanager_core::core::metrics::GpuEngine;
 use taskmanager_core::core::metrics::GpuScalarObservations;
 use taskmanager_core::core::metrics::ScalarObservationGroup;
-use taskmanager_core::core::npu::NpuDevice;
-use taskmanager_core::core::npu::NpuEngineKind;
-use taskmanager_core::core::npu::NpuEngineUsage;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::npu::NpuMemoryReport;
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::power::BatteryScalarObservations;
 use taskmanager_core::core::power::PowerSupplySnapshot;
@@ -256,58 +251,7 @@ impl IcedApp {
     }
 }
 
-/// Apply one fixed capture target and its page-local facts. System and NPU
-/// captures receive a deterministic NPU inventory; other targets preserve
-/// the unobserved state.
-fn apply_capture_target(app: &mut IcedApp, target: &str) {
-    if target == "service-details" {
-        app.shell.application.active_page = AppPage::Services;
-        let _ = app.open_service_details_for_effect(0);
-    } else if target == crate::capture::HEALTH_TARGET {
-        // The health modal is a renderer-local surface. Ride the same reducer
-        // the toolbar trigger dispatches (`Message::OpenHealth`) so the
-        // capture target cannot invent a second opening path, and leave the
-        // active page on Performance: the surface is the target, not a page.
-        let _ = app.update(Message::OpenHealth);
-    } else if let Some(page) = capture_page_from_name(target) {
-        app.shell.application.active_page = page;
-        if page == AppPage::System {
-            seed_capture_npu_fixture(app);
-        }
-    } else if let Some(device) = capture_device_from_name(target) {
-        if matches!(device, PerfDevice::Npu(_)) {
-            seed_capture_npu_fixture(app);
-        }
-        app.performance.selected_device = device;
-    }
-}
-
-fn seed_capture_npu_fixture(app: &mut IcedApp) {
-    let observed_at_ms = 7_000;
-    let inventory = NpuInventorySnapshot::discovered(
-        vec![NpuDevice {
-            device_id: DeviceId::new("accel0"),
-            brand: Some("Intel AI Boost".into()),
-            driver: Some("intel_vpu".into()),
-            utilization_pct: ScalarObservation::available(38.0, observed_at_ms),
-            engines: vec![NpuEngineUsage {
-                kind: NpuEngineKind::Matrix,
-                utilization_pct: ScalarObservation::available(61.0, observed_at_ms),
-            }],
-            memory: NpuMemoryReport {
-                dedicated_total_bytes: ScalarObservation::available(0, observed_at_ms),
-                shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
-                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, observed_at_ms),
-            },
-            ..Default::default()
-        }],
-        observed_at_ms,
-    );
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::NpuInventory(Some(inventory)),
-    );
-}
+pub(super) use super::capture_state::{apply_capture_target, capture_page_from_name};
 
 /// Enrich the no-I/O demo only for real pixel capture. The ordinary
 /// `IcedApp::demo()` fixture remains intentionally small for loading-state
@@ -647,32 +591,6 @@ fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
                 duration_ms: Some(2_500),
             },
         ],
-    }
-}
-
-fn capture_device_from_name(name: &str) -> Option<PerfDevice> {
-    match name {
-        "cpu" => Some(PerfDevice::Cpu),
-        "memory" => Some(PerfDevice::Memory),
-        "disk" => Some(PerfDevice::Disk(0)),
-        "network" => Some(PerfDevice::Network(0)),
-        "gpu" => Some(PerfDevice::Gpu(0)),
-        "npu" => Some(PerfDevice::Npu(0)),
-        "battery" => Some(PerfDevice::Battery(0)),
-        "fan" => Some(PerfDevice::Fan(0)),
-        _ => None,
-    }
-}
-
-fn capture_page_from_name(name: &str) -> Option<AppPage> {
-    match name {
-        "applications" => Some(AppPage::Applications),
-        "services" => Some(AppPage::Services),
-        "startup" => Some(AppPage::Startup),
-        "users" => Some(AppPage::Users),
-        "system" => Some(AppPage::System),
-        "app-history" => Some(AppPage::AppHistory),
-        _ => None,
     }
 }
 

@@ -51,7 +51,9 @@ impl IcedApp {
                         );
                         if self.is_demo() {
                             let page = crate::capture::page_name(self.shell.page());
-                            if self.local_surface_kind() == Some(LocalSurfaceKind::Health) {
+                            if let Ok(target) = std::env::var("TM_ICED_CAPTURE_DEVICE") {
+                                crate::capture::append_target_marker(path, page, &target);
+                            } else if self.local_surface_kind() == Some(LocalSurfaceKind::Health) {
                                 // The health modal rides the Performance page:
                                 // its target token names the local surface, the
                                 // same shape `service-details` uses on Services.
@@ -66,11 +68,7 @@ impl IcedApp {
                                     self.performance.selected_device,
                                 );
                             } else {
-                                let target = std::env::var("TM_ICED_CAPTURE_DEVICE")
-                                    .ok()
-                                    .filter(|target| target == "service-details")
-                                    .unwrap_or_else(|| page.to_owned());
-                                crate::capture::append_target_marker(path, page, &target);
+                                crate::capture::append_target_marker(path, page, page);
                             }
                         }
                     }

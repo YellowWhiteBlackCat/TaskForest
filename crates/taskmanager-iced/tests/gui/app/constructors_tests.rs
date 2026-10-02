@@ -1,4 +1,6 @@
-use super::{IcedApp, apply_capture_target, capture_device_from_name, capture_page_from_name};
+use super::super::capture_state::capture_device_from_name;
+use super::{IcedApp, apply_capture_target, capture_page_from_name};
+use crate::app::DetailsSection;
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
 use taskmanager_application::AppPage;
@@ -214,6 +216,55 @@ fn health_capture_target_opens_the_local_surface_through_the_message_reducer() {
     let mut toolbar = IcedApp::demo();
     let _ = toolbar.update(Message::OpenHealth);
     assert_eq!(toolbar.local_surface_kind(), app.local_surface_kind());
+}
+
+#[test]
+fn additional_capture_targets_open_expected_surfaces() {
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "about");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "settings");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Settings));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "containers");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Containers));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "alerts");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::AlertCenter)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "first-run");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::FirstRun));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-details");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Overview);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-properties-performance");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-insights");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Insights);
+    assert!(app.shell.projection().process_insights.is_some());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-affinity");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::ProcessAffinity)
+    );
 }
 
 impl IcedApp {

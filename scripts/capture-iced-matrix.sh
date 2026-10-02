@@ -498,6 +498,8 @@ capture_one() {
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
   service-details) page=services ;;
+  process-details|process-properties-performance|process-insights|process-affinity) page=applications ;;
+  about|settings|containers|alerts|first-run) page=performance ;;
   esac
   mkdir -p "$scenario_dir" "$config_home" "$data_home" "$cache_home" "$state_home"
 

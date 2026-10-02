@@ -150,6 +150,8 @@ def validate_markers(path: Path, device: str) -> None:
     page = (
         "services"
         if device == "service-details"
+        else "applications"
+        if device in {"process-details", "process-properties-performance", "process-insights", "process-affinity"}
         else device
         if device in {"applications", "services", "startup", "users", "system", "app-history"}
         else "performance"
