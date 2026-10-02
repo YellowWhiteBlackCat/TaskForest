@@ -344,13 +344,6 @@ fn capture_scenario_target() -> Option<&'static str> {
         "apps-group-expanded" => Some("apps-group-expanded"),
         "telemetry-paused" => Some("telemetry-paused"),
         "sidebar-hidden" => Some("sidebar-hidden"),
-        "system-dashboard" => Some("system-dashboard"),
-        "system-hardware" => Some("system-hardware"),
-        "system-npu" => Some("system-npu"),
-        "sensor-center" => Some("sensor-center"),
-        "storage-health" => Some("storage-health"),
-        "active-alert" => Some("active-alert"),
-        "alert-rules-manager" => Some("alert-rules-manager"),
         _ => None,
     }
 }
@@ -367,7 +360,6 @@ fn capture_perf_device_target() -> Option<crate::pages::performance::Performance
         )),
         "perf-gpu" => Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into())),
         "perf-battery" => Some(PerformanceDeviceTarget::Battery("battery:demo:0".into())),
-        "storage-health" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
         _ => None,
     }
 }
@@ -426,19 +418,15 @@ fn capture_page() -> Option<crate::app::Page> {
         | "perf-battery"
         | "smart-self-test-confirm"
         | "telemetry-paused"
-        | "sidebar-hidden"
-        | "sensor-center"
-        | "storage-health" => Some(crate::app::Page::Performance),
+        | "sidebar-hidden" => Some(crate::app::Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => {
             Some(crate::app::Page::Services)
         }
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(crate::app::Page::Startup)
         }
-        "system" | "system-dashboard" | "system-hardware" | "system-npu" => {
-            Some(crate::app::Page::System)
-        }
-        "alerts" | "active-alert" | "alert-rules-manager" => Some(crate::app::Page::Alerts),
+        "system" => Some(crate::app::Page::System),
+        "alerts" => Some(crate::app::Page::Alerts),
         "users" | "sessions" => Some(crate::app::Page::Sessions),
         "settings" => Some(crate::app::Page::Settings),
         "app-history" | "history" => Some(crate::app::Page::AppHistory),

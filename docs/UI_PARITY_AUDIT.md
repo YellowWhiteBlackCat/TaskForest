@@ -11,16 +11,16 @@
 | 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Pending | Aligned |
 | | `system-about` | 系统关于面板展开 | Aligned | Pending | Aligned |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Pending | Pending |
-| | `system-dashboard` | 多硬件总览仪表盘 | Pending | Pending | Pending |
-| | `system-hardware` | SMBIOS 硬件拓扑明细 | Pending | Pending | Pending |
+| | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Pending | Aligned |
+| | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Pending | Aligned |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Pending | Aligned |
 | 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
-| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Pending | Aligned |
-| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Pending | Pending | Pending |
-| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Pending | Pending | Pending |
-| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Pending | Pending | Pending |
-| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Pending | Pending | Pending |
-| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Pending | Pending | Pending |
+| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Aligned | Aligned |
+| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Aligned | Aligned | Aligned |
+| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Aligned | Aligned | Aligned |
+| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Aligned | Aligned | Aligned |
+| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Aligned | Aligned | Aligned |
+| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Aligned | Aligned | Aligned |
 | 危险操作确认 | `process-force-kill` | 强制终止（SIGKILL）警示弹窗 | Aligned | Aligned | Aligned |
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
@@ -31,7 +31,7 @@
 | | `partition-disk-usage` | 分区挂载点与磁盘空间图 | Pending | Pending | Pending |
 | | `partition-live-usage` | 磁盘动态吞吐与 IOPS 视图 | Pending | Pending | Pending |
 | | `device-hotplug` | 设备热插拔事件触发与重排 | Pending | Pending | Pending |
-| | `sensor-center` | 主板温控传感器与各 Thermal Zone | Pending | Pending | Pending |
+| | `sensor-center` | 主板温控传感器与各 Thermal Zone | Aligned | Pending | Aligned |
 | | `battery-fan-performance` | 电池状态与风扇转速联动卡 | Pending | Pending | Pending |
 | | `battery-live-performance` | 电池实时放电速率与电压曲线 | Pending | Pending | Pending |
 | | `gpu-engine-inventory` | 多 GPU 引擎枚举与负载图表 | Pending | Pending | Pending |
@@ -43,8 +43,8 @@
 | 开机启动项分析 | `startup-impact` | 启动项引导耗时影响等级分析 | Aligned | Aligned | Aligned |
 | | `startup-failure-evidence` | 启动服务崩溃/异常退出取证 | Aligned | Aligned | Aligned |
 | | `startup-boot-markers` | systemd-analyze 开机关键链时间轴 | Aligned | Aligned | Aligned |
-| 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Pending | Pending | Pending |
-| | `alert-rules-manager` | 自定义告警规则配置中心 | Pending | Pending | Pending |
+| 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Aligned | Pending | Aligned |
+| | `alert-rules-manager` | 自定义告警规则配置中心 | Aligned | Pending | Aligned |
 | | `event-center` | 系统安全与审计事件追踪中心 | Pending | Pending | Pending |
 | | `saved-view-presets` | 自定义列宽与视图预设切换 | Pending | Pending | Pending |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
@@ -61,7 +61,6 @@
 | | `keyboard-focus` | 全键盘无障碍导航焦点环形态 | Pending | Pending | Pending |
 | | `vertical-nav` | 垂直导航栏折叠与图标态 | Pending | Pending | Pending |
 | | `sidebar-hidden` | 性能页左侧设备导航栏收起态 | Aligned | Aligned | Aligned |
-| | `sidebar-edit` | 性能页设备显示/隐藏列编辑态 | Pending | Pending | Pending |
 | | `sidebar-edit` | 性能页设备显示/隐藏列编辑态 | Pending | Pending | Pending |
 
 ## 平权推进与收敛机制
