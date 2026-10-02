@@ -91,3 +91,11 @@ settings-macos-light	settings	1180x780	macos-light
 settings-kde-dark	settings	1180x780	kde-dark
 alerts-windows-dark	alerts	1180x780	windows-dark
 containers-windows-dark	containers	1180x780	windows-dark
+process-force-kill	process-force-kill	1180x780	gnome-light
+process-force-kill-compact	process-force-kill	720x480	gnome-light
+process-tree-confirm	process-tree-confirm	1180x780	gnome-light
+process-tree-confirm-compact	process-tree-confirm	720x480	gnome-light
+process-batch-confirm	process-batch-confirm	1180x780	gnome-light
+process-batch-confirm-compact	process-batch-confirm	720x480	gnome-light
+smart-self-test-confirm	smart-self-test-confirm	1180x780	gnome-light
+smart-self-test-confirm-compact	smart-self-test-confirm	720x480	gnome-light

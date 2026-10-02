@@ -84,3 +84,11 @@ battery-80x24	performance	battery	80	24	gnome-dark
 fan-80x24	performance	fan	80	24	gnome-dark
 cpu-wide	performance	cpu	160	45	gnome-dark
 applications-wide	applications	default	160	45	gnome-dark
+process-force-kill	applications	default	120	36	gnome-dark
+process-force-kill-compact	applications	default	54	16	gnome-dark
+process-tree-confirm	applications	default	120	36	gnome-dark
+process-tree-confirm-compact	applications	default	54	16	gnome-dark
+process-batch-confirm	applications	default	120	36	gnome-dark
+process-batch-confirm-compact	applications	default	54	16	gnome-dark
+smart-self-test-confirm	performance	disk	120	36	gnome-dark
+smart-self-test-confirm-compact	performance	disk	54	16	gnome-dark

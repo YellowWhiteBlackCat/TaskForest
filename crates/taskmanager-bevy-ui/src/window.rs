@@ -38,7 +38,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, Has, Or, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
@@ -54,8 +54,10 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_assets::product;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
-use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
-use crate::demo_fixture::demo_shell;
+use crate::app::{AppShellPlugin, ContentSlot, FrontendTrack, Page, Route, nav_strip_scene};
+use crate::demo_fixture::{
+    demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
+};
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
@@ -324,6 +326,10 @@ fn capture_scenario_target() -> Option<&'static str> {
         "perf-network" => Some("perf-network"),
         "perf-gpu" => Some("perf-gpu"),
         "perf-battery" => Some("perf-battery"),
+        "process-force-kill" => Some("process-force-kill"),
+        "process-tree-confirm" => Some("process-tree-confirm"),
+        "process-batch-confirm" => Some("process-batch-confirm"),
+        "smart-self-test-confirm" => Some("smart-self-test-confirm"),
         _ => None,
     }
 }
@@ -349,68 +355,6 @@ fn capture_perf_device_target() -> Option<crate::pages::performance::Performance
 /// env var exists only inside the demo capture composition.
 fn capture_wants_service_logs() -> bool {
     std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|value| value.trim() == "service-logs")
-}
-
-/// Capture fixture: open the log stream for the first demo service and
-/// pre-fill the feed with a bounded, deterministic journal excerpt. The
-/// scenario renders the real panel over this state; production never runs it.
-fn seed_service_log_fixture(shell: &mut ShellApp) {
-    use taskmanager_core::core::services::{
-        ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
-        ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
-    };
-    let Some(service) = shell.sorted_services().first().cloned() else {
-        return;
-    };
-    let service_id = service.id.clone();
-    let _ = shell.open_service_log_for(service_id.clone());
-    let lines: &[&str] = &[
-        "Started Network Manager.",
-        "Reached target Network.",
-        "wlan0: link becomes ready",
-        "Starting Network Manager Script Dispatcher Service...",
-        "Started Network Manager Script Dispatcher Service.",
-        "dhcp: lease renewed (3600s)",
-        "wlan0: Gained IPv6LL",
-        "device (wlan0): state change: activated -> deactivating",
-        "device (wlan0): state change: deactivating -> disconnected",
-        "wlan0: link is not ready",
-        "device (wlan0): state change: disconnected -> prepare",
-        "device (wlan0): supplicant interface state: scanning -> authenticating",
-        "device (wlan0): supplicant interface state: authenticating -> associating",
-        "device (wlan0): supplicant interface state: associating -> 4way_handshake",
-        "device (wlan0): supplicant interface state: 4way_handshake -> completed",
-        "wlan0: link becomes ready",
-        "device (wlan0): state change: config -> activated",
-        "dhcp: request granted",
-        "address added: 192.168.1.42/24",
-        "route added: default via 192.168.1.1",
-    ];
-    let base_micros = crate::drain::unix_now_ms().saturating_sub(60_000) * 1_000;
-    let entries: Vec<ServiceLogEntry> = lines
-        .iter()
-        .enumerate()
-        .map(|(index, message)| ServiceLogEntry {
-            cursor: format!("demo:{index:04}"),
-            realtime_timestamp_micros: Some(base_micros + index as u64 * 1_500_000),
-            priority: Some(6),
-            level: ServiceLogLevel::Unknown,
-            message: (*message).to_owned(),
-        })
-        .collect();
-    let query = ServiceLogQuery {
-        service_id: service_id.clone(),
-        level: ServiceLogLevelFilter::All,
-        time: ServiceLogTimeFilter::All,
-        after_cursor: None,
-    };
-    let snapshot = ServiceLogStreamSnapshot {
-        query: query.clone(),
-        state: ServiceLogStreamState::from_query_entries(&query, entries),
-    };
-    if let Some(open) = shell.service_log.as_mut() {
-        open.feed.apply_at(snapshot, crate::drain::unix_now_ms());
-    }
 }
 
 /// Compose the history connector at the native edge. The config preference is
@@ -439,9 +383,18 @@ fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
 fn capture_page() -> Option<crate::app::Page> {
     let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match value.trim().to_ascii_lowercase().as_str() {
-        "applications" | "processes" => Some(crate::app::Page::Processes),
-        "performance" | "perf-memory" | "perf-disk" | "perf-network" | "perf-gpu"
-        | "perf-battery" => Some(crate::app::Page::Performance),
+        "applications"
+        | "processes"
+        | "process-force-kill"
+        | "process-tree-confirm"
+        | "process-batch-confirm" => Some(crate::app::Page::Processes),
+        "performance"
+        | "perf-memory"
+        | "perf-disk"
+        | "perf-network"
+        | "perf-gpu"
+        | "perf-battery"
+        | "smart-self-test-confirm" => Some(crate::app::Page::Performance),
         "services" | "service-logs" => Some(crate::app::Page::Services),
         "system" => Some(crate::app::Page::System),
         "startup" => Some(crate::app::Page::Startup),
@@ -481,6 +434,7 @@ impl Plugin for FrontendWindowPlugin {
                 if capture_wants_service_logs() {
                     seed_service_log_fixture(&mut shell);
                 }
+                seed_capture_confirmation_fixture(&mut shell);
                 shell
             } else {
                 ShellApp::new()
@@ -504,6 +458,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
+        app.add_systems(Startup, init_capture_confirmation);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);
@@ -542,6 +497,17 @@ impl Plugin for FrontendWindowPlugin {
         if !app.world().contains_resource::<DemoMode>() {
             app.add_systems(PreUpdate, drain::drain_system);
         }
+    }
+}
+
+fn init_capture_confirmation(track: Option<NonSend<FrontendTrack>>, mut commands: Commands) {
+    let Some(track) = track else { return };
+    if let Some(view) = track
+        .shell
+        .pending_confirmation()
+        .and_then(crate::confirmation::PendingConfirmationView::from_pending)
+    {
+        commands.trigger(crate::confirmation::ConfirmationChanged(Some(view)));
     }
 }
 

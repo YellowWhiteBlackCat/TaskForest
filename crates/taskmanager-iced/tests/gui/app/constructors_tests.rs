@@ -299,6 +299,32 @@ fn additional_capture_targets_open_expected_surfaces() {
     apply_capture_target(&mut app, "service-details-logs");
     assert!(app.shell.service_log.is_some());
     assert_eq!(app.shell.page(), AppPage::Services);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-force-kill");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-tree-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-batch-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "smart-self-test-confirm");
+    assert!(app.shell.pending_smart_self_test().is_some());
+    assert_eq!(app.shell.page(), AppPage::Performance);
 }
 
 impl IcedApp {

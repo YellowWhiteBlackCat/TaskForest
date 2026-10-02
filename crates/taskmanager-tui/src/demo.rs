@@ -6,8 +6,10 @@
 
 use crate::{PerfDevice, TuiApp};
 use taskmanager_application::{
-    AppPage, CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
+    AppPage, CorrelatedEvent, InteractionEvent, NpuInventoryEvent, PendingConfirmation,
+    PlatformEventBatch, PlatformEventContext,
 };
+use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::failure::FailureKind;
@@ -17,9 +19,14 @@ use taskmanager_core::core::metrics::ScalarObservationGroup;
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
 use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
+use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{
@@ -217,6 +224,13 @@ fn apply_capture_overrides(app: &mut TuiApp) {
     let failure_name = std::env::var("TM_TUI_CAPTURE_SOURCE_FAILURE").ok();
     let page = if scene_name.as_deref() == Some("system-npu") {
         Some(AppPage::System)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("process-force-kill" | "process-tree-confirm" | "process-batch-confirm")
+    ) {
+        Some(AppPage::Applications)
+    } else if matches!(scene_name.as_deref(), Some("smart-self-test-confirm")) {
+        Some(AppPage::Performance)
     } else {
         page_name
             .as_deref()
@@ -237,10 +251,77 @@ fn apply_capture_overrides(app: &mut TuiApp) {
             _ => {}
         }
     }
-    if scene_name.as_deref() == Some("system-npu") {
-        // Paint clamps this intent to the last legal viewport, exercising the
-        // same path a user reaches with PageDown.
-        app.system_scroll = usize::MAX;
+    match scene_name.as_deref() {
+        Some("process-force-kill") => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        Some("process-tree-confirm") => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::EndProcessTree,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        Some("process-batch-confirm") => {
+            app.shell.application.active_page = AppPage::Applications;
+            let targets = seed_capture_multiple_process_targets(app);
+            if !targets.is_empty() {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets,
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        Some("smart-self-test-confirm") => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+            let intent = SmartSelfTestIntent {
+                device_id: "disk:demo:nvme0".into(),
+                device_generation: DeviceGeneration::new(1),
+                device_key: StorageDeviceKey::new("nvme0n1"),
+                display_name: "TiPro9000 2TB".into(),
+                kind: SmartSelfTestKind::Short,
+            };
+            app.shell.arm_smart_self_test(intent);
+        }
+        Some("system-npu") => {
+            // Paint clamps this intent to the last legal viewport, exercising the
+            // same path a user reaches with PageDown.
+            app.system_scroll = usize::MAX;
+        }
+        _ => {}
     }
     let Some(failure_page) = failure_name.as_deref().and_then(capture_page) else {
         return;
@@ -278,6 +359,31 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         ),
         _ => {}
     }
+}
+
+fn seed_capture_process_target(app: &TuiApp) -> Option<FrozenProcessIdentity> {
+    let first = app
+        .shell
+        .projection()
+        .processes
+        .as_ref()
+        .and_then(|p| p.first())
+        .cloned()?;
+    FrozenProcessIdentity::from_process(&first)
+}
+
+fn seed_capture_multiple_process_targets(app: &TuiApp) -> Vec<FrozenProcessIdentity> {
+    app.shell
+        .projection()
+        .processes
+        .as_ref()
+        .map(|p| {
+            p.iter()
+                .take(3)
+                .filter_map(FrozenProcessIdentity::from_process)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn capture_page(name: &str) -> Option<AppPage> {

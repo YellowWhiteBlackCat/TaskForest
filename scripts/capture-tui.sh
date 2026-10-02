@@ -91,6 +91,8 @@ esac
 case "$CAPTURE_SCENE" in
   "") ;;
   system-npu) CAPTURE_PAGE=system ;;
+  process-force-kill|process-tree-confirm|process-batch-confirm) CAPTURE_PAGE=applications ;;
+  smart-self-test-confirm) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2

@@ -21,10 +21,10 @@
 | | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Pending | Pending | Pending |
 | | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Pending | Pending | Pending |
 | | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Pending | Pending | Pending |
-| 危险操作确认 | `process-force-kill` | 强制终止（SIGKILL）警示弹窗 | Pending | Pending | Pending |
-| | `process-tree-confirm` | 结束完整进程树连带确认框 | Pending | Pending | Pending |
-| | `process-batch-confirm` | 批量终止多个选中进程确认框 | Pending | Pending | Pending |
-| | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Pending | Pending | Pending |
+| 危险操作确认 | `process-force-kill` | 强制终止（SIGKILL）警示弹窗 | Aligned | Aligned | Aligned |
+| | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
+| | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
+| | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Aligned | Aligned | Aligned |
 | 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Aligned | Pending | Pending |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Pending | Pending | Pending |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Pending | Pending | Pending |

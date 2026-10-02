@@ -6,13 +6,18 @@ use taskmanager_application::{
     AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
 };
+use taskmanager_core::core::SmartSelfTestKind;
+use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -73,6 +78,80 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
                     PendingConfirmation::EndTask(target_proc),
                 ));
         }
+    } else if target == "process-force-kill" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(target_proc) = seed_capture_process_target(app) {
+            app.shell.application.selected_process = Some(target_proc.clone());
+            let intent = ProcessBatchIntent {
+                action: ProcessBatchAction::Kill,
+                scope: ProcessGroupScope::PidAdjacency,
+                targets: vec![target_proc],
+            };
+            let _ = app
+                .shell
+                .application
+                .interaction
+                .reduce(InteractionEvent::ArmConfirmation(
+                    PendingConfirmation::ProcessBatch(intent),
+                ));
+        }
+    } else if target == "process-tree-confirm" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(target_proc) = seed_capture_process_target(app) {
+            app.shell.application.selected_process = Some(target_proc.clone());
+            let intent = ProcessBatchIntent {
+                action: ProcessBatchAction::EndProcessTree,
+                scope: ProcessGroupScope::PidAdjacency,
+                targets: vec![target_proc],
+            };
+            let _ = app
+                .shell
+                .application
+                .interaction
+                .reduce(InteractionEvent::ArmConfirmation(
+                    PendingConfirmation::ProcessBatch(intent),
+                ));
+        }
+    } else if target == "process-batch-confirm" {
+        app.shell.application.active_page = AppPage::Applications;
+        let targets = seed_capture_multiple_process_targets(app);
+        if !targets.is_empty() {
+            let intent = ProcessBatchIntent {
+                action: ProcessBatchAction::Kill,
+                scope: ProcessGroupScope::PidAdjacency,
+                targets,
+            };
+            let _ = app
+                .shell
+                .application
+                .interaction
+                .reduce(InteractionEvent::ArmConfirmation(
+                    PendingConfirmation::ProcessBatch(intent),
+                ));
+        }
+    } else if target == "smart-self-test-confirm" {
+        app.shell.application.active_page = AppPage::Performance;
+        app.performance.selected_device = PerfDevice::Disk(0);
+        if let Some(disk) = app
+            .shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.disks.first())
+        {
+            let intent = SmartSelfTestIntent {
+                device_id: DeviceId::new(disk.device_id.clone()),
+                device_generation: disk.device_generation,
+                device_key: StorageDeviceKey::new(disk.name.clone()),
+                display_name: if disk.model.is_empty() {
+                    disk.name.clone()
+                } else {
+                    disk.model.clone()
+                },
+                kind: SmartSelfTestKind::Short,
+            };
+            app.shell.arm_smart_self_test(intent);
+        }
     } else if target == "apps-search-highlight" {
         app.shell.application.active_page = AppPage::Applications;
         app.shell.query = "zed".into();
@@ -115,6 +194,21 @@ pub(super) fn seed_capture_process_target(app: &IcedApp) -> Option<FrozenProcess
         .and_then(|processes| processes.first())
         .cloned()?;
     FrozenProcessIdentity::from_process(&first)
+}
+
+fn seed_capture_multiple_process_targets(app: &IcedApp) -> Vec<FrozenProcessIdentity> {
+    app.shell
+        .projection()
+        .processes
+        .as_ref()
+        .map(|processes| {
+            processes
+                .iter()
+                .take(3)
+                .filter_map(FrozenProcessIdentity::from_process)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSection) {

@@ -93,3 +93,11 @@ users-zh	users	1180x780	gnome-dark
 system-zh	system	1180x780	gnome-dark
 settings-zh	settings	1180x780	gnome-dark
 app-history-zh	app-history	1180x780	gnome-dark
+process-force-kill	process-force-kill	1180x780	gnome-dark
+process-force-kill-compact	process-force-kill	720x480	gnome-dark
+process-tree-confirm	process-tree-confirm	1180x780	gnome-dark
+process-tree-confirm-compact	process-tree-confirm	720x480	gnome-dark
+process-batch-confirm	process-batch-confirm	1180x780	gnome-dark
+process-batch-confirm-compact	process-batch-confirm	720x480	gnome-dark
+smart-self-test-confirm	smart-self-test-confirm	1180x780	gnome-dark
+smart-self-test-confirm-compact	smart-self-test-confirm	720x480	gnome-dark
