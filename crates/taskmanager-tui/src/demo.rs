@@ -32,6 +32,7 @@ mod fixtures;
 pub(crate) use fixtures::seed_fan_capture_sensors;
 use fixtures::{
     demo_boot_evidence, demo_directory_usage, seed_demo_npu_inventory, seed_gpu_capture_history,
+    seed_service_log_fixture,
 };
 
 impl TuiApp {
@@ -247,8 +248,18 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers")
     ) {
         Some(AppPage::Startup)
-    } else if matches!(scene_name.as_deref(), Some("services-search-highlight")) {
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("service-details-logs" | "services-search-highlight")
+    ) {
         Some(AppPage::Services)
+    } else if matches!(scene_name.as_deref(), Some("application-history-replay")) {
+        Some(AppPage::AppHistory)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("diagnostic-preview" | "diagnostic-failure")
+    ) {
+        Some(AppPage::System)
     } else if matches!(
         scene_name.as_deref(),
         Some(
@@ -263,6 +274,8 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "system-dashboard"
                 | "active-alert"
                 | "alert-rules-manager"
+                | "history-replay"
+                | "history-60m"
         )
     ) {
         Some(AppPage::Performance)
@@ -442,6 +455,10 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers") => {
             app.shell.application.active_page = AppPage::Startup;
         }
+        Some("service-details-logs") => {
+            app.shell.application.active_page = AppPage::Services;
+            seed_service_log_fixture(&mut app.shell);
+        }
         Some("services-search-highlight") => {
             app.shell.application.active_page = AppPage::Services;
             app.shell.query = "Network".into();
@@ -459,6 +476,15 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         }
         Some("sidebar-hidden") => {
             app.shell.application.active_page = AppPage::Performance;
+        }
+        Some("history-replay" | "history-60m") => {
+            app.shell.application.active_page = AppPage::Performance;
+        }
+        Some("application-history-replay") => {
+            app.shell.application.active_page = AppPage::AppHistory;
+        }
+        Some("diagnostic-preview" | "diagnostic-failure") => {
+            app.shell.application.active_page = AppPage::System;
         }
         Some("system-npu") => {
             // Paint clamps this intent to the last legal viewport, exercising the

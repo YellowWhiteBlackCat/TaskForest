@@ -21,6 +21,7 @@ use taskmanager_core::core::sensors::{
 };
 use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
@@ -236,5 +237,51 @@ pub(super) fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
                 duration_ms: Some(2_500),
             },
         ],
+    }
+}
+
+pub(super) fn seed_service_log_fixture(shell: &mut ShellApp) {
+    use taskmanager_core::core::services::{
+        ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
+        ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
+    };
+    let Some(service) = shell.sorted_services().first().cloned() else {
+        return;
+    };
+    let service_id = service.id.clone();
+    let _ = shell.open_service_log_for(service_id.clone());
+    let lines: &[&str] = &[
+        "Started Network Manager.",
+        "Reached target Network.",
+        "wlan0: link becomes ready",
+        "Starting Network Manager Script Dispatcher Service...",
+        "Started Network Manager Script Dispatcher Service.",
+        "dhcp: lease renewed (3600s)",
+        "wlan0: Gained IPv6LL",
+    ];
+    let base_micros = 1_700_000_000_000_000;
+    let entries: Vec<ServiceLogEntry> = lines
+        .iter()
+        .enumerate()
+        .map(|(index, message)| ServiceLogEntry {
+            cursor: format!("demo:{index:04}"),
+            realtime_timestamp_micros: Some(base_micros + index as u64 * 1_500_000),
+            priority: Some(6),
+            level: ServiceLogLevel::Unknown,
+            message: (*message).to_owned(),
+        })
+        .collect();
+    let query = ServiceLogQuery {
+        service_id: service_id.clone(),
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    let snapshot = ServiceLogStreamSnapshot {
+        query: query.clone(),
+        state: ServiceLogStreamState::from_query_entries(&query, entries),
+    };
+    if let Some(open) = shell.service_log.as_mut() {
+        open.feed.apply_at(snapshot, 1_700_000_000_000);
     }
 }

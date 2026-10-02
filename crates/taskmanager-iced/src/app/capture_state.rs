@@ -196,6 +196,12 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     } else if target == "sidebar-hidden" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.sidebar_visible = false;
+    } else if target == "history-replay" || target == "history-60m" {
+        app.shell.application.active_page = AppPage::Performance;
+    } else if target == "application-history-replay" {
+        app.shell.application.active_page = AppPage::AppHistory;
+    } else if target == "diagnostic-preview" || target == "diagnostic-failure" {
+        app.shell.application.active_page = AppPage::System;
     } else if let Some(page) = capture_page_from_name(target) {
         app.shell.application.active_page = page;
         if page == AppPage::System {
