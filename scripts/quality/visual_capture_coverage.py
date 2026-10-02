@@ -45,6 +45,14 @@ def gpui_capture_tokens(path: Path) -> set[str]:
     return tokens
 
 
+def audit_doc_scenario_tokens(path: Path) -> set[str]:
+    source = path.read_text(encoding="utf-8")
+    tokens = set(re.findall(r"\|\s*`([a-z0-9-]+)`\s*\|", source))
+    if not tokens:
+        raise CoverageError(f"UI parity audit doc has no scenario tokens: {path}")
+    return tokens
+
+
 def gpui_device_names(path: Path) -> set[str]:
     source = path.read_text(encoding="utf-8")
     names = set(re.findall(r'Some\("([^"]+)"\).*=> SelectedDevice::', source))
@@ -116,6 +124,18 @@ def validate(root: Path) -> dict[str, object]:
     missing_scenarios = sorted(required_scenarios - gpui_scenarios)
     if missing_scenarios:
         raise CoverageError(f"GPUI capture scenarios lack matrix rows: {missing_scenarios}")
+
+    audit_tokens = audit_doc_scenario_tokens(root / "docs/UI_PARITY_AUDIT.md")
+    missing_from_audit = sorted(required_scenarios - audit_tokens)
+    if missing_from_audit:
+        raise CoverageError(
+            f"docs/UI_PARITY_AUDIT.md lacks GPUI scenarios: {missing_from_audit}"
+        )
+    extra_in_audit = sorted(audit_tokens - required_scenarios)
+    if extra_in_audit:
+        raise CoverageError(
+            f"docs/UI_PARITY_AUDIT.md contains unrecognized scenario tokens: {extra_in_audit}"
+        )
     require_compact(gpui_matrix, "page", required_gpui_pages, "GPUI top pages")
     required_gpui_devices = gpui_device_names(
         root / "crates/taskmanager-gpui/src/gpui_app/root/dispatch.rs"
