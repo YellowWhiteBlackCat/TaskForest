@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use taskmanager_application::{
-    AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
+    AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
 };
 use taskmanager_core::core::SmartSelfTestKind;
@@ -183,6 +183,19 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
                 target: target_proc,
             });
         }
+    } else if target == "startup-impact"
+        || target == "startup-failure-evidence"
+        || target == "startup-boot-markers"
+    {
+        app.shell.application.active_page = AppPage::Startup;
+    } else if target == "telemetry-paused" {
+        app.shell.application.active_page = AppPage::Performance;
+        let _ = app.shell.apply_action(AppAction::TogglePause);
+    } else if target == "apps-group-expanded" {
+        app.shell.application.active_page = AppPage::Applications;
+    } else if target == "sidebar-hidden" {
+        app.shell.application.active_page = AppPage::Performance;
+        app.performance.sidebar_visible = false;
     } else if let Some(page) = capture_page_from_name(target) {
         app.shell.application.active_page = page;
         if page == AppPage::System {

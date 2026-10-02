@@ -12,7 +12,8 @@
 //! appended only inside the capture composition.
 
 use taskmanager_application::{
-    InteractionEvent, PendingConfirmation, ProcessInsightsProjection, ProcessInsightsRevision,
+    AppAction, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
+    ProcessInsightsRevision,
 };
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
@@ -248,6 +249,15 @@ pub(crate) fn seed_capture_confirmation_fixture(shell: &mut ShellApp) {
                     }
                 }
             }
+        }
+        "services-search-highlight" => {
+            shell.query = "Network".into();
+        }
+        "apps-search-highlight" => {
+            shell.query = "zed".into();
+        }
+        "telemetry-paused" => {
+            let _ = shell.apply_action(AppAction::TogglePause);
         }
         _ => {}
     }

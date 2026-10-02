@@ -336,6 +336,14 @@ fn capture_scenario_target() -> Option<&'static str> {
         "process-gpu-details" => Some("process-gpu-details"),
         "process-resource-limits" => Some("process-resource-limits"),
         "process-isolation" => Some("process-isolation"),
+        "startup-impact" => Some("startup-impact"),
+        "startup-failure-evidence" => Some("startup-failure-evidence"),
+        "startup-boot-markers" => Some("startup-boot-markers"),
+        "services-search-highlight" => Some("services-search-highlight"),
+        "apps-search-highlight" => Some("apps-search-highlight"),
+        "apps-group-expanded" => Some("apps-group-expanded"),
+        "telemetry-paused" => Some("telemetry-paused"),
+        "sidebar-hidden" => Some("sidebar-hidden"),
         _ => None,
     }
 }
@@ -393,17 +401,30 @@ fn capture_page() -> Option<crate::app::Page> {
         | "processes"
         | "process-force-kill"
         | "process-tree-confirm"
-        | "process-batch-confirm" => Some(crate::app::Page::Processes),
+        | "process-batch-confirm"
+        | "process-properties-performance"
+        | "process-memory-pss-swap"
+        | "process-network-details"
+        | "process-gpu-details"
+        | "process-resource-limits"
+        | "process-isolation"
+        | "apps-search-highlight"
+        | "apps-group-expanded" => Some(crate::app::Page::Processes),
         "performance"
         | "perf-memory"
         | "perf-disk"
         | "perf-network"
         | "perf-gpu"
         | "perf-battery"
-        | "smart-self-test-confirm" => Some(crate::app::Page::Performance),
-        "services" | "service-logs" => Some(crate::app::Page::Services),
-        "system" => Some(crate::app::Page::System),
-        "startup" => Some(crate::app::Page::Startup),
+        | "smart-self-test-confirm"
+        | "telemetry-paused"
+        | "sidebar-hidden" => Some(crate::app::Page::Performance),
+        "services" | "service-logs" | "services-search-highlight" => {
+            Some(crate::app::Page::Services)
+        }
+        "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
+            Some(crate::app::Page::Startup)
+        }
         "users" | "sessions" => Some(crate::app::Page::Sessions),
         "alerts" => Some(crate::app::Page::Alerts),
         "settings" => Some(crate::app::Page::Settings),
@@ -453,6 +474,9 @@ impl Plugin for FrontendWindowPlugin {
         });
         if let Some(target) = capture_perf_device_target() {
             app.insert_resource(crate::pages::performance::PerformanceDeviceFocus(target));
+        }
+        if std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|v| v.trim() == "sidebar-hidden") {
+            app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
         }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while

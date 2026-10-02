@@ -7,7 +7,7 @@
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp};
 use taskmanager_application::{
-    AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
+    AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
 };
 use taskmanager_core::core::StorageDeviceKey;
@@ -237,10 +237,34 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "process-gpu-details"
                 | "process-resource-limits"
                 | "process-isolation"
+                | "apps-search-highlight"
+                | "apps-group-expanded"
         )
     ) {
         Some(AppPage::Applications)
-    } else if matches!(scene_name.as_deref(), Some("smart-self-test-confirm")) {
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers")
+    ) {
+        Some(AppPage::Startup)
+    } else if matches!(scene_name.as_deref(), Some("services-search-highlight")) {
+        Some(AppPage::Services)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some(
+            "smart-self-test-confirm"
+                | "telemetry-paused"
+                | "sidebar-hidden"
+                | "about"
+                | "system-about"
+                | "system-hardware"
+                | "storage-health"
+                | "sensor-center"
+                | "system-dashboard"
+                | "active-alert"
+                | "alert-rules-manager"
+        )
+    ) {
         Some(AppPage::Performance)
     } else {
         page_name
@@ -414,6 +438,27 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                     }
                 }
             }
+        }
+        Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers") => {
+            app.shell.application.active_page = AppPage::Startup;
+        }
+        Some("services-search-highlight") => {
+            app.shell.application.active_page = AppPage::Services;
+            app.shell.query = "Network".into();
+        }
+        Some("apps-search-highlight") => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.shell.query = "zed".into();
+        }
+        Some("apps-group-expanded") => {
+            app.shell.application.active_page = AppPage::Applications;
+        }
+        Some("telemetry-paused") => {
+            app.shell.application.active_page = AppPage::Performance;
+            let _ = app.shell.apply_action(AppAction::TogglePause);
+        }
+        Some("sidebar-hidden") => {
+            app.shell.application.active_page = AppPage::Performance;
         }
         Some("system-npu") => {
             // Paint clamps this intent to the last legal viewport, exercising the

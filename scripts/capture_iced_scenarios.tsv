@@ -123,3 +123,15 @@ active-alert	active-alert	1180x780	gnome-dark
 active-alert-compact	active-alert	720x480	gnome-dark
 alert-rules-manager	alert-rules-manager	1180x780	gnome-dark
 alert-rules-manager-compact	alert-rules-manager	720x480	gnome-dark
+startup-impact	startup-impact	1180x780	gnome-dark
+startup-impact-compact	startup-impact	720x480	gnome-dark
+startup-failure-evidence	startup-failure-evidence	1180x780	gnome-dark
+startup-failure-evidence-compact	startup-failure-evidence	720x480	gnome-dark
+startup-boot-markers	startup-boot-markers	1180x780	gnome-dark
+startup-boot-markers-compact	startup-boot-markers	720x480	gnome-dark
+telemetry-paused	telemetry-paused	1180x780	gnome-dark
+telemetry-paused-compact	telemetry-paused	720x480	gnome-dark
+apps-group-expanded	apps-group-expanded	1180x780	gnome-dark
+apps-group-expanded-compact	apps-group-expanded	720x480	gnome-dark
+sidebar-hidden	sidebar-hidden	1180x780	gnome-dark
+sidebar-hidden-compact	sidebar-hidden	720x480	gnome-dark
