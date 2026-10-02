@@ -54,3 +54,36 @@ fn about_overlay_renders_dashes_when_telemetry_is_missing() {
     assert!(text.contains("Hostname"));
     assert!(text.contains('—'));
 }
+
+#[test]
+fn capture_scene_overrides_activate_expected_state() {
+    use crate::demo::apply_capture_scene_override;
+    use taskmanager_application::ConfirmationKind;
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "process-force-kill");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "smart-self-test-confirm");
+    assert!(app.shell.pending_smart_self_test().is_some());
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "service-details-logs");
+    assert!(app.shell.service_log.is_some());
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "about");
+    assert!(app.about_open());
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "storage-health");
+    assert!(app.health_open());
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "telemetry-paused");
+    assert!(app.shell.paused());
+}

@@ -325,6 +325,28 @@ fn additional_capture_targets_open_expected_surfaces() {
     apply_capture_target(&mut app, "smart-self-test-confirm");
     assert!(app.shell.pending_smart_self_test().is_some());
     assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-impact");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-failure-evidence");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-boot-markers");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "telemetry-paused");
+    assert!(app.shell.paused());
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "sidebar-hidden");
+    assert!(!app.performance.sidebar_visible);
+    assert_eq!(app.shell.page(), AppPage::Performance);
 }
 
 impl IcedApp {

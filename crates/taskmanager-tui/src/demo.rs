@@ -253,13 +253,6 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         Some("service-details-logs" | "services-search-highlight")
     ) {
         Some(AppPage::Services)
-    } else if matches!(scene_name.as_deref(), Some("application-history-replay")) {
-        Some(AppPage::AppHistory)
-    } else if matches!(
-        scene_name.as_deref(),
-        Some("diagnostic-preview" | "diagnostic-failure")
-    ) {
-        Some(AppPage::System)
     } else if matches!(
         scene_name.as_deref(),
         Some(
@@ -274,8 +267,6 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "system-dashboard"
                 | "active-alert"
                 | "alert-rules-manager"
-                | "history-replay"
-                | "history-60m"
         )
     ) {
         Some(AppPage::Performance)
@@ -299,199 +290,8 @@ fn apply_capture_overrides(app: &mut TuiApp) {
             _ => {}
         }
     }
-    match scene_name.as_deref() {
-        Some("process-force-kill") => {
-            app.shell.application.active_page = AppPage::Applications;
-            if let Some(target) = seed_capture_process_target(app) {
-                let intent = ProcessBatchIntent {
-                    action: ProcessBatchAction::Kill,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets: vec![target],
-                };
-                let _ =
-                    app.shell
-                        .application
-                        .interaction
-                        .reduce(InteractionEvent::ArmConfirmation(
-                            PendingConfirmation::ProcessBatch(intent),
-                        ));
-            }
-        }
-        Some("process-tree-confirm") => {
-            app.shell.application.active_page = AppPage::Applications;
-            if let Some(target) = seed_capture_process_target(app) {
-                let intent = ProcessBatchIntent {
-                    action: ProcessBatchAction::EndProcessTree,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets: vec![target],
-                };
-                let _ =
-                    app.shell
-                        .application
-                        .interaction
-                        .reduce(InteractionEvent::ArmConfirmation(
-                            PendingConfirmation::ProcessBatch(intent),
-                        ));
-            }
-        }
-        Some("process-batch-confirm") => {
-            app.shell.application.active_page = AppPage::Applications;
-            let targets = seed_capture_multiple_process_targets(app);
-            if !targets.is_empty() {
-                let intent = ProcessBatchIntent {
-                    action: ProcessBatchAction::Kill,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets,
-                };
-                let _ =
-                    app.shell
-                        .application
-                        .interaction
-                        .reduce(InteractionEvent::ArmConfirmation(
-                            PendingConfirmation::ProcessBatch(intent),
-                        ));
-            }
-        }
-        Some("smart-self-test-confirm") => {
-            app.shell.application.active_page = AppPage::Performance;
-            app.select_perf_device(PerfDevice::Disk);
-            let intent = SmartSelfTestIntent {
-                device_id: "disk:demo:nvme0".into(),
-                device_generation: DeviceGeneration::new(1),
-                device_key: StorageDeviceKey::new("nvme0n1"),
-                display_name: "TiPro9000 2TB".into(),
-                kind: SmartSelfTestKind::Short,
-            };
-            app.shell.arm_smart_self_test(intent);
-        }
-        Some("about" | "system-about" | "system-hardware") => {
-            app.shell.application.active_page = AppPage::Performance;
-            app.toggle_about();
-        }
-        Some(
-            "storage-health"
-            | "sensor-center"
-            | "system-dashboard"
-            | "active-alert"
-            | "alert-rules-manager",
-        ) => {
-            app.shell.application.active_page = AppPage::Performance;
-            app.toggle_health();
-        }
-        Some("process-properties-performance") => {
-            app.shell.application.active_page = AppPage::Applications;
-            if let Some(item) = app
-                .shell
-                .projection()
-                .processes
-                .as_ref()
-                .and_then(|p| p.first())
-                .cloned()
-            {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Performance,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity);
-                }
-            }
-        }
-        Some("process-memory-pss-swap") => {
-            app.shell.application.active_page = AppPage::Applications;
-            if let Some(item) = app
-                .shell
-                .projection()
-                .processes
-                .as_ref()
-                .and_then(|p| p.first())
-                .cloned()
-            {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Overview,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity);
-                }
-            }
-        }
-        Some(
-            "process-network-details"
-            | "process-gpu-details"
-            | "process-resource-limits"
-            | "process-isolation",
-        ) => {
-            app.shell.application.active_page = AppPage::Applications;
-            if let Some(item) = app
-                .shell
-                .projection()
-                .processes
-                .as_ref()
-                .and_then(|p| p.first())
-                .cloned()
-            {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Insights,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity.clone());
-                    let revision = ProcessInsightsRevision::new(1);
-                    let mut tracker = ProcessInsightsProjection::default();
-                    tracker.begin(identity, revision);
-                    if let Some(projection) = tracker.snapshot() {
-                        seed_projection_fact(
-                            &mut app.shell,
-                            ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
-                        );
-                    }
-                }
-            }
-        }
-        Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers") => {
-            app.shell.application.active_page = AppPage::Startup;
-        }
-        Some("service-details-logs") => {
-            app.shell.application.active_page = AppPage::Services;
-            seed_service_log_fixture(&mut app.shell);
-        }
-        Some("services-search-highlight") => {
-            app.shell.application.active_page = AppPage::Services;
-            app.shell.query = "Network".into();
-        }
-        Some("apps-search-highlight") => {
-            app.shell.application.active_page = AppPage::Applications;
-            app.shell.query = "zed".into();
-        }
-        Some("apps-group-expanded") => {
-            app.shell.application.active_page = AppPage::Applications;
-        }
-        Some("telemetry-paused") => {
-            app.shell.application.active_page = AppPage::Performance;
-            let _ = app.shell.apply_action(AppAction::TogglePause);
-        }
-        Some("sidebar-hidden") => {
-            app.shell.application.active_page = AppPage::Performance;
-        }
-        Some("history-replay" | "history-60m") => {
-            app.shell.application.active_page = AppPage::Performance;
-        }
-        Some("application-history-replay") => {
-            app.shell.application.active_page = AppPage::AppHistory;
-        }
-        Some("diagnostic-preview" | "diagnostic-failure") => {
-            app.shell.application.active_page = AppPage::System;
-        }
-        Some("system-npu") => {
-            // Paint clamps this intent to the last legal viewport, exercising the
-            // same path a user reaches with PageDown.
-            app.system_scroll = usize::MAX;
-        }
-        _ => {}
+    if let Some(scene) = scene_name.as_deref() {
+        apply_capture_scene_override(app, scene);
     }
     let Some(failure_page) = failure_name.as_deref().and_then(capture_page) else {
         return;
@@ -587,4 +387,190 @@ fn capture_device(name: &str) -> Option<PerfDevice> {
 #[must_use]
 pub fn demo_app() -> TuiApp {
     TuiApp::demo()
+}
+
+pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
+    match scene {
+        "process-force-kill" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "process-tree-confirm" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::EndProcessTree,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "process-batch-confirm" => {
+            app.shell.application.active_page = AppPage::Applications;
+            let targets = seed_capture_multiple_process_targets(app);
+            if !targets.is_empty() {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets,
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "smart-self-test-confirm" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+            let intent = SmartSelfTestIntent {
+                device_id: "disk:demo:nvme0".into(),
+                device_generation: DeviceGeneration::new(1),
+                device_key: StorageDeviceKey::new("nvme0n1"),
+                display_name: "TiPro9000 2TB".into(),
+                kind: SmartSelfTestKind::Short,
+            };
+            app.shell.arm_smart_self_test(intent);
+        }
+        "about" | "system-about" | "system-hardware" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_about();
+        }
+
+        "storage-health"
+        | "sensor-center"
+        | "system-dashboard"
+        | "active-alert"
+        | "alert-rules-manager" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_health();
+        }
+        "process-properties-performance" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+            {
+                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
+                    app.process_properties_view = Some(ProcessPropertiesTarget {
+                        item,
+                        section: ProcessDetailsSection::Performance,
+                        scroll: 0,
+                    });
+                    let _ = app.shell.open_process_properties_for(identity);
+                }
+            }
+        }
+        "process-memory-pss-swap" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+            {
+                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
+                    app.process_properties_view = Some(ProcessPropertiesTarget {
+                        item,
+                        section: ProcessDetailsSection::Overview,
+                        scroll: 0,
+                    });
+                    let _ = app.shell.open_process_properties_for(identity);
+                }
+            }
+        }
+
+        "process-network-details"
+        | "process-gpu-details"
+        | "process-resource-limits"
+        | "process-isolation" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+            {
+                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
+                    app.process_properties_view = Some(ProcessPropertiesTarget {
+                        item,
+                        section: ProcessDetailsSection::Insights,
+                        scroll: 0,
+                    });
+                    let _ = app.shell.open_process_properties_for(identity.clone());
+                    let revision = ProcessInsightsRevision::new(1);
+                    let mut tracker = ProcessInsightsProjection::default();
+                    tracker.begin(identity, revision);
+                    if let Some(projection) = tracker.snapshot() {
+                        seed_projection_fact(
+                            &mut app.shell,
+                            ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+                        );
+                    }
+                }
+            }
+        }
+        "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
+            app.shell.application.active_page = AppPage::Startup;
+        }
+        "service-details-logs" => {
+            app.shell.application.active_page = AppPage::Services;
+            seed_service_log_fixture(&mut app.shell);
+        }
+        "services-search-highlight" => {
+            app.shell.application.active_page = AppPage::Services;
+            app.shell.query = "Network".into();
+        }
+        "apps-search-highlight" => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.shell.query = "zed".into();
+        }
+        "apps-group-expanded" => {
+            app.shell.application.active_page = AppPage::Applications;
+        }
+        "telemetry-paused" => {
+            app.shell.application.active_page = AppPage::Performance;
+            let _ = app.shell.apply_action(AppAction::TogglePause);
+        }
+        "sidebar-hidden" => {
+            app.shell.application.active_page = AppPage::Performance;
+        }
+        "system-npu" => {
+            // Paint clamps this intent to the last legal viewport, exercising the
+            // same path a user reaches with PageDown.
+            app.system_scroll = usize::MAX;
+        }
+        _ => {}
+    }
 }

@@ -351,11 +351,6 @@ fn capture_scenario_target() -> Option<&'static str> {
         "storage-health" => Some("storage-health"),
         "active-alert" => Some("active-alert"),
         "alert-rules-manager" => Some("alert-rules-manager"),
-        "history-replay" => Some("history-replay"),
-        "history-60m" => Some("history-60m"),
-        "application-history-replay" => Some("application-history-replay"),
-        "diagnostic-preview" => Some("diagnostic-preview"),
-        "diagnostic-failure" => Some("diagnostic-failure"),
         _ => None,
     }
 }
@@ -433,23 +428,20 @@ fn capture_page() -> Option<crate::app::Page> {
         | "telemetry-paused"
         | "sidebar-hidden"
         | "sensor-center"
-        | "storage-health"
-        | "history-replay"
-        | "history-60m" => Some(crate::app::Page::Performance),
+        | "storage-health" => Some(crate::app::Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => {
             Some(crate::app::Page::Services)
         }
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(crate::app::Page::Startup)
         }
-        "system" | "system-dashboard" | "system-hardware" | "system-npu" | "diagnostic-preview"
-        | "diagnostic-failure" => Some(crate::app::Page::System),
+        "system" | "system-dashboard" | "system-hardware" | "system-npu" => {
+            Some(crate::app::Page::System)
+        }
         "alerts" | "active-alert" | "alert-rules-manager" => Some(crate::app::Page::Alerts),
         "users" | "sessions" => Some(crate::app::Page::Sessions),
         "settings" => Some(crate::app::Page::Settings),
-        "app-history" | "history" | "application-history-replay" => {
-            Some(crate::app::Page::AppHistory)
-        }
+        "app-history" | "history" => Some(crate::app::Page::AppHistory),
         "containers" => Some(crate::app::Page::Containers),
         _ => None,
     }

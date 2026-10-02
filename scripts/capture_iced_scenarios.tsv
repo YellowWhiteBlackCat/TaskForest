@@ -135,13 +135,3 @@ apps-group-expanded	apps-group-expanded	1180x780	gnome-dark
 apps-group-expanded-compact	apps-group-expanded	720x480	gnome-dark
 sidebar-hidden	sidebar-hidden	1180x780	gnome-dark
 sidebar-hidden-compact	sidebar-hidden	720x480	gnome-dark
-history-replay	history-replay	1180x780	gnome-dark
-history-replay-compact	history-replay	720x480	gnome-dark
-history-60m	history-60m	1180x780	gnome-dark
-history-60m-compact	history-60m	720x480	gnome-dark
-application-history-replay	application-history-replay	1180x780	gnome-dark
-application-history-replay-compact	application-history-replay	720x480	gnome-dark
-diagnostic-preview	diagnostic-preview	1180x780	gnome-dark
-diagnostic-preview-compact	diagnostic-preview	720x480	gnome-dark
-diagnostic-failure	diagnostic-failure	1180x780	gnome-dark
-diagnostic-failure-compact	diagnostic-failure	720x480	gnome-dark

@@ -138,7 +138,11 @@ pub(crate) fn seed_service_log_fixture(shell: &mut ShellApp) {
 
 pub(crate) fn seed_capture_confirmation_fixture(shell: &mut ShellApp) {
     let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").unwrap_or_default();
-    match raw.trim().to_ascii_lowercase().as_str() {
+    seed_capture_confirmation_scenario(shell, raw.trim());
+}
+
+pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario: &str) {
+    match scenario.to_ascii_lowercase().as_str() {
         "process-force-kill" => {
             let process = shell
                 .projection()

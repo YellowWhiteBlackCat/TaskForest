@@ -329,6 +329,24 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
 }
 
 #[test]
+fn capture_confirmation_scenarios_arm_expected_gates() {
+    for (scenario, expected_kind) in [
+        ("process-force-kill", ConfirmationKind::ProcessBatch),
+        ("process-tree-confirm", ConfirmationKind::ProcessBatch),
+        ("process-batch-confirm", ConfirmationKind::ProcessBatch),
+        ("smart-self-test-confirm", ConfirmationKind::SmartSelfTest),
+    ] {
+        let mut shell = crate::demo_fixture::demo_shell();
+        crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, scenario);
+        assert_eq!(
+            shell.application.interaction.confirmation_kind(),
+            Some(expected_kind),
+            "scenario {scenario} must arm {expected_kind:?}"
+        );
+    }
+}
+
+#[test]
 fn smart_self_test_confirmation_view_and_confirm_armed() {
     let intent = SmartSelfTestIntent {
         device_id: DeviceId::new("disk-0"),

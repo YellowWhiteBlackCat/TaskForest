@@ -152,10 +152,6 @@ def validate_markers(path: Path, device: str) -> None:
         if device in {"service-details", "service-details-logs", "services-search-highlight"}
         else "startup"
         if device in {"startup-impact", "startup-failure-evidence", "startup-boot-markers"}
-        else "app-history"
-        if device == "application-history-replay"
-        else "system"
-        if device in {"diagnostic-preview", "diagnostic-failure"}
         else "applications"
         if device in {
             "process-details", "process-properties-performance", "process-insights",

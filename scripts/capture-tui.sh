@@ -94,9 +94,7 @@ case "$CAPTURE_SCENE" in
   process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-search-highlight|apps-group-expanded) CAPTURE_PAGE=applications ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;
   services-search-highlight|service-details-logs) CAPTURE_PAGE=services ;;
-  application-history-replay) CAPTURE_PAGE=app-history ;;
-  diagnostic-preview|diagnostic-failure) CAPTURE_PAGE=system ;;
-  smart-self-test-confirm|about|system-about|system-hardware|storage-health|sensor-center|system-dashboard|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|history-replay|history-60m) CAPTURE_PAGE=performance ;;
+  smart-self-test-confirm|about|system-about|system-hardware|storage-health|sensor-center|system-dashboard|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2

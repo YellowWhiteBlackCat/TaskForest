@@ -138,13 +138,3 @@ sidebar-hidden	performance	default	120	36	gnome-dark
 sidebar-hidden-compact	performance	default	54	16	gnome-dark
 service-details-logs	services	default	120	36	gnome-dark
 service-details-logs-compact	services	default	54	16	gnome-dark
-history-replay	performance	default	120	36	gnome-dark
-history-replay-compact	performance	default	54	16	gnome-dark
-history-60m	performance	default	120	36	gnome-dark
-history-60m-compact	performance	default	54	16	gnome-dark
-application-history-replay	app-history	default	120	36	gnome-dark
-application-history-replay-compact	app-history	default	54	16	gnome-dark
-diagnostic-preview	system	default	120	36	gnome-dark
-diagnostic-preview-compact	system	default	54	16	gnome-dark
-diagnostic-failure	system	default	120	36	gnome-dark
-diagnostic-failure-compact	system	default	54	16	gnome-dark

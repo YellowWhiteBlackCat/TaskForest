@@ -141,13 +141,3 @@ active-alert	active-alert	1180x780	gnome-light
 active-alert-compact	active-alert	720x480	gnome-light
 alert-rules-manager	alert-rules-manager	1180x780	gnome-light
 alert-rules-manager-compact	alert-rules-manager	720x480	gnome-light
-history-replay	history-replay	1180x780	gnome-light
-history-replay-compact	history-replay	720x480	gnome-light
-history-60m	history-60m	1180x780	gnome-light
-history-60m-compact	history-60m	720x480	gnome-light
-application-history-replay	application-history-replay	1180x780	gnome-light
-application-history-replay-compact	application-history-replay	720x480	gnome-light
-diagnostic-preview	diagnostic-preview	1180x780	gnome-light
-diagnostic-preview-compact	diagnostic-preview	720x480	gnome-light
-diagnostic-failure	diagnostic-failure	1180x780	gnome-light
-diagnostic-failure-compact	diagnostic-failure	720x480	gnome-light
