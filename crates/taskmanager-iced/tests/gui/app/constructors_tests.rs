@@ -3,10 +3,10 @@ use super::{IcedApp, apply_capture_target, capture_page_from_name};
 use crate::app::DetailsSection;
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
-use taskmanager_application::AppPage;
 use taskmanager_application::ConfigClient;
 use taskmanager_application::ConfigCoordinator;
 use taskmanager_application::ConfigDrain;
+use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
@@ -265,6 +265,40 @@ fn additional_capture_targets_open_expected_surfaces() {
         app.local_surface_kind(),
         Some(LocalSurfaceKind::ProcessAffinity)
     );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-command");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Command);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-end-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::EndTask)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-search-highlight");
+    assert_eq!(app.shell.query, "zed");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "services-search-highlight");
+    assert_eq!(app.shell.page(), AppPage::Services);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "run-task");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::RunTask));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "disk-smart");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::DiskSmart));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "service-details-logs");
+    assert!(app.shell.service_log.is_some());
+    assert_eq!(app.shell.page(), AppPage::Services);
 }
 
 impl IcedApp {

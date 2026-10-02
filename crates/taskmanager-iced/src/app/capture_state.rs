@@ -13,6 +13,7 @@ use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
 use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 use super::{DetailsSection, IcedApp, LocalSurface, Message, PerfDevice};
@@ -84,7 +85,7 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
     } else if target == "service-details-logs" {
         app.shell.application.active_page = AppPage::Services;
-        let _ = app.open_service_details_for_effect(0);
+        seed_service_log_fixture(&mut app.shell);
     } else if target == "process-affinity" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
@@ -136,6 +137,52 @@ fn seed_capture_insights_fixture(app: &mut IcedApp, target: &FrozenProcessIdenti
             &mut app.shell,
             ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
         );
+    }
+}
+
+fn seed_service_log_fixture(shell: &mut ShellApp) {
+    use taskmanager_core::core::services::{
+        ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
+        ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
+    };
+    let Some(service) = shell.sorted_services().first().cloned() else {
+        return;
+    };
+    let service_id = service.id.clone();
+    let _ = shell.open_service_log_for(service_id.clone());
+    let lines: &[&str] = &[
+        "Started Network Manager.",
+        "Reached target Network.",
+        "wlan0: link becomes ready",
+        "Starting Network Manager Script Dispatcher Service...",
+        "Started Network Manager Script Dispatcher Service.",
+        "dhcp: lease renewed (3600s)",
+        "wlan0: Gained IPv6LL",
+    ];
+    let base_micros = 1_700_000_000_000_000;
+    let entries: Vec<ServiceLogEntry> = lines
+        .iter()
+        .enumerate()
+        .map(|(index, message)| ServiceLogEntry {
+            cursor: format!("demo:{index:04}"),
+            realtime_timestamp_micros: Some(base_micros + index as u64 * 1_500_000),
+            priority: Some(6),
+            level: ServiceLogLevel::Unknown,
+            message: (*message).to_owned(),
+        })
+        .collect();
+    let query = ServiceLogQuery {
+        service_id: service_id.clone(),
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    let snapshot = ServiceLogStreamSnapshot {
+        query: query.clone(),
+        state: ServiceLogStreamState::from_query_entries(&query, entries),
+    };
+    if let Some(open) = shell.service_log.as_mut() {
+        open.feed.apply_at(snapshot, 1_700_000_000_000);
     }
 }
 
