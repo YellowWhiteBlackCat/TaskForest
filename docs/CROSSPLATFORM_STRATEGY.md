@@ -6,19 +6,34 @@ OS 特性留在 adapter；没有合格来源的能力保持 typed `Unsupported`�
 
 ## 平权口径
 
-**平权的两根轴是分开的。** 前端轴：GPUI、Iced、TUI、Bevy 必须对同一 intent/feature 提供
-同一语义入口。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，
-或 `Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
-`TemporarilyUnavailable`（`platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied`
-属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。**平台 typed 降级是产品
-承诺的一部分，不是平权缺口**：平台 `Unsupported` 不算 parity 失败，前端缺入口才是。「四端全量
-一碗水端平」仅指**发行物与前端语义**，不表示三个平台具备相同的系统级能力，更不是「跨平台功能
-对等」。
+**平权的两根轴是分开的。** 前端轴与平台轴独立演进。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` / `TemporarilyUnavailable`（`platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。**平台 typed 降级是产品承诺的一部分**：平台 `Unsupported` 属于合规状态，前端缺入口属于 parity 缺陷。
+
+### 「一碗水端平」的三层递进结构
+
+对等前端（GPUI、Iced、TUI、Bevy）的「一碗水端平」必须同时在以下三个不可替代的层级上完全建立：
+
+1. **第一层：数据契约平权（Contract Parity）**
+   - 共享纯数据投影与命令模型。
+   - `scripts/parity/feature_evidence.tsv` 中四端均拥有 50 项完整 feature 锚点，由 Headless 单测与 Nextest 机械保障。
+   - 数据契约平权属于最底层基石。
+
+2. **第二层：场景交互深度平权（Scenario Depth Parity）**
+   - 四端对同一业务能力提供完整同等的交互分支与状态机覆盖。
+   - 进程详情各诊断标签页（线程通道与状态、句柄与 FD 饱和度、套接字与 RTT、显存与引擎、资源配额限制、安全命名空间与沙箱审计、PSS/USS/Swap 内存切片）。
+   - 危险操作二次确认模态（杀进程树确认、批量操作确认、强制终止确认）。
+   - 异常处理与权限提权导流（SMART 依赖缺失提示、提权引导、系统诊断报告生成与失败预览）。
+   - 动态交互反馈（搜索关键字高亮、树结构节点展开折叠、告警规则管理器、历史时间轴回溯）。
+
+3. **第三层：视觉像素实证平权（Visual Capture Parity）**
+   - 坚持「UI 开发有图为证」。
+   - 四端必须接入后台无感截屏流水线（私有虚拟 Wayland 合成器与终端渲染器），在 `scripts/capture_*_scenarios.tsv` 中维持对等覆盖的场景矩阵。
+   - 必须包含标准尺寸（1180x780）与紧凑尺寸（720x480）的双重弹性布局实证，输出具备哈希与几何特征签名的像素回执。
+   - Headless 单测仅能证明数据契约层，不能作为视觉与场景深度已端平的依据。当视觉场景矩阵存在缺口或非对称时，该前端仍处于推进阶段。
 
 承诺边界（不得越过）：
 
-- 可以说：四端发行物同权；四端对同一 feature 的语义入口一致；平台缺口一律 typed 且可见。
-- 不可以说：四端「功能对等」；某 Linux-only 能力「跨平台可用」；缺口以 `0`/空值/占位按钮表示。
+- 允许表述：四端发行物同权；四端对同一 feature 提供一致的语义入口与交互深度；平台缺口一律 typed 且可见。
+- 禁止表述：四端「跨平台功能完全对等」；某 Linux-only 能力「跨平台可用」；仅凭 Headless 单测宣称全量端平；缺口以 `0`/空值/静态占位表示。
 
 ## 安全选择顺序
 
