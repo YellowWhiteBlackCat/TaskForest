@@ -668,14 +668,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        104,
+        200,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 26usize),
-        (FrontendShape::Iced, 26),
-        (FrontendShape::Tui, 26),
-        (FrontendShape::Bevy, 26),
+        (FrontendShape::Gpui, 50usize),
+        (FrontendShape::Iced, 50),
+        (FrontendShape::Tui, 50),
+        (FrontendShape::Bevy, 50),
     ] {
         assert_eq!(
             table

@@ -238,3 +238,17 @@ fn process_ancestor_lineage_renders_in_property_pairs_and_handles_root() {
         "root process without ancestors renders the honest dash"
     );
 }
+
+#[test]
+fn command_identity_mismatch_renders_masquerading_warning() {
+    use taskmanager_shell::presentation::command_identity_summary;
+
+    let mut item = fixture();
+    item.cmdline = "fake_argv0 --arg".to_string();
+    let summary = command_identity_summary(&item);
+    assert!(
+        summary.is_some(),
+        "must generate command identity mismatch summary"
+    );
+    assert!(summary.unwrap().contains("sample"));
+}

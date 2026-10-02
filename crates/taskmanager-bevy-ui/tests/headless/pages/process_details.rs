@@ -480,6 +480,67 @@ fn isolation_summary_renders_posix_capabilities() {
 }
 
 #[test]
+fn format_thread_line_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{
+        ProcessThreadInfo, ProcessThreads, ThreadState, ThreadWaitKind,
+    };
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let threads = ProcessThreads {
+        state: DeviceState::healthy(1),
+        threads: vec![thread],
+    };
+    let text = super::threads_summary(&threads);
+    assert!(text.contains("2.5ms"));
+    assert!(text.contains(" D "));
+}
+
+#[test]
+fn isolation_summary_renders_seccomp_filter() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        seccomp_mode: Some(2),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    assert!(summary.contains(t("proc_insights.seccomp")));
+}
+
+#[test]
+fn process_details_renders_command_identity_mismatch() {
+    use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+
+    let mut item = ProcessItem::new(42, "worker");
+    item.apply_metadata_observations(ProcessMetadataObservations::current(
+        ProcessOwner::opaque("root"),
+        Some(std::path::PathBuf::from("/usr/bin/real_binary")),
+        100,
+    ));
+    item.cmdline = "fake_cmdline --arg".to_string();
+
+    let view = projection(&shell_with(item));
+    let mismatch = view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc_insights.command_identity"));
+    assert!(mismatch.is_some(), "must render command identity mismatch");
+    assert!(mismatch.unwrap().value.contains("real_binary"));
+}
+
+#[test]
 fn threads_summary_empty_and_populated_with_gap_honesty() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{

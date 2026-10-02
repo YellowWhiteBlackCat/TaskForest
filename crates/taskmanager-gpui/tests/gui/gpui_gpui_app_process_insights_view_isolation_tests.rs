@@ -96,3 +96,43 @@ fn isolation_card_renders_namespace_audit(cx: &mut TestAppContext) {
         },
     );
 }
+
+#[gpui::test]
+fn isolation_card_renders_seccomp_filter(cx: &mut TestAppContext) {
+    draw_isolation_frame(
+        cx,
+        ProcessIsolation {
+            state: DeviceState::healthy(1),
+            seccomp_mode: Some(2),
+            ..ProcessIsolation::default()
+        },
+    );
+}
+
+#[test]
+fn format_connection_renders_socket_inventory_and_rtt() {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use taskmanager_core::core::process_telemetry::{
+        ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
+        ProcessConnection,
+    };
+
+    let connection = ProcessConnection {
+        transport: ConnectionTransport::Tcp,
+        family: ConnectionAddressFamily::Ipv4,
+        local: ConnectionEndpoint::Ip(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            8080,
+        )),
+        remote: ConnectionEndpoint::Ip(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            45678,
+        )),
+        state: ConnectionState::Established,
+        provider_key: None,
+        rtt_ms: Some(14.8),
+    };
+    let line = formatting::format_connection(&connection);
+    assert!(line.contains("TCP"), "must render TCP transport");
+    assert!(line.contains("14.8 ms"), "must render observed RTT");
+}

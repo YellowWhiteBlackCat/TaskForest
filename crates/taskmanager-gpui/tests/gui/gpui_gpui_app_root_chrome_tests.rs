@@ -300,3 +300,25 @@ fn observed_fault_and_huge_page_counters_reach_the_overview_rows() {
         "the overview row must carry the observed huge-page charge"
     );
 }
+
+#[test]
+fn command_identity_mismatch_renders_masquerading_warning() {
+    use taskmanager_shell::presentation::command_identity_summary;
+
+    let item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
+        .pid(9999)
+        .name("hidden".to_owned())
+        .cmdline("systemd --user".to_owned())
+        .metadata_observations(ProcessMetadataObservations::current(
+            ProcessOwner::opaque("root"),
+            Some(std::path::PathBuf::from("/tmp/malware")),
+            42,
+        ))
+        .build();
+    let summary = command_identity_summary(&item);
+    assert!(
+        summary.is_some(),
+        "must generate command identity mismatch summary"
+    );
+    assert!(summary.unwrap().contains("malware"));
+}

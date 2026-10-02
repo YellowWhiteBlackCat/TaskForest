@@ -116,6 +116,24 @@ fn format_thread_row_keeps_missing_cpu_honest() {
     assert!(gap_line.contains("R"));
 }
 
+#[test]
+fn format_thread_row_renders_runqueue_and_wait_diagnostics() {
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let line = format_thread_row(&thread);
+    assert!(line.contains("[futex_wait_queue_me]"));
+    assert!(line.contains("2.5ms"));
+    assert!(line.contains(" D "));
+}
+
 /// Honesty: a descriptor whose readlink failed keeps its row with the typed
 /// unreadable marker, never a blank target or a fabricated path.
 #[test]
@@ -133,11 +151,25 @@ fn format_open_file_row_keeps_unreadable_target_honest() {
         deleted: false,
     };
     assert!(format_open_file_row(&readable, "unreadable").contains("/dev/null"),);
+    assert!(
+        format_open_file_row(&readable, "unreadable").contains("[file]"),
+        "must classify handle type"
+    );
     let denied = format_open_file_row(&unreadable, "unreadable");
     assert!(
         denied.ends_with("unreadable"),
         "an unreadable fd must surface the typed marker, got: {denied}"
     );
+
+    let deleted = OpenFileEntry {
+        fd: 3,
+        kind: OpenFileKind::File,
+        target: Some("/tmp/deleted.txt".into()),
+        deleted: true,
+    };
+    let del_line = format_open_file_row(&deleted, "unreadable");
+    assert!(del_line.contains("[file]"), "must classify handle type");
+    assert!(del_line.contains("[deleted]"), "must mark deleted fd");
 }
 
 /// Honesty: a cold-start engine (no current usage) must render an explicit
@@ -1054,5 +1086,36 @@ fn insights_lines_renders_namespace_audit() {
     assert!(
         text.contains("Namespaces"),
         "must render namespaces label: {text}"
+    );
+}
+
+#[test]
+fn insights_lines_renders_seccomp_filter() {
+    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+
+    let _guard = en();
+    let target = FrozenProcessIdentity::from_authoritative_parts(303, "sec-proc", 1000, 1000)
+        .expect("valid target");
+    let revision = ProcessInsightsRevision::new(1);
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, revision);
+    let mut projection = tracker.snapshot().expect("snapshot exists");
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        seccomp_mode: Some(2),
+        ..ProcessIsolation::default()
+    });
+
+    let mut app = crate::demo_app();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+
+    let text = render_text(insights_lines(&app, TuiTheme::default(), 303));
+    assert!(
+        text.contains("Seccomp"),
+        "must render Seccomp label: {text}"
     );
 }

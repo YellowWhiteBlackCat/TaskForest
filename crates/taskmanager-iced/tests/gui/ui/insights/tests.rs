@@ -83,6 +83,25 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     );
 }
 
+#[test]
+fn thread_rows_vm_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::process_telemetry;
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(process_telemetry::ThreadWaitKind::KernelLock),
+    };
+    let rows = thread_rows_vm(&[thread], MAX_FACET_ROWS);
+    assert_eq!(rows[0].wait, "lock 2.5ms");
+    assert_eq!(rows[0].state, "D");
+}
+
 /// Honesty: an unreadable descriptor (None target) must surface the typed
 /// "unreadable" marker, never a blank target or a fabricated path.
 #[test]
@@ -275,6 +294,22 @@ mod connection_tests {
         assert!(
             format_connection(&local).contains("/run/user/1000/x"),
             "unix-socket path must not be dropped"
+        );
+    }
+
+    #[test]
+    fn connection_readout_surfaces_rtt_metrics() {
+        let mut conn = connection(
+            ConnectionTransport::Tcp,
+            ConnectionAddressFamily::Ipv4,
+            ConnectionEndpoint::Ip("127.0.0.1:80".parse().unwrap()),
+            ConnectionEndpoint::Ip("10.0.0.2:443".parse().unwrap()),
+        );
+        conn.rtt_ms = Some(16.5);
+        let text = format_connection(&conn);
+        assert!(
+            text.contains("16.5 ms"),
+            "must surface RTT in connection readout: {text}"
         );
     }
 }
@@ -500,6 +535,29 @@ fn isolation_section_renders_namespace_audit() {
     projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
         state: DeviceState::healthy(1),
         namespaces: Some(audit),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_seccomp_filter() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        seccomp_mode: Some(2),
         ..ProcessIsolation::default()
     });
 
