@@ -67,6 +67,7 @@ use taskmanager_application::{
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
+use crate::capture::capture_scenario_target;
 use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, space_8, space_12};
@@ -272,7 +273,8 @@ pub(crate) fn sync_nav_strip_layout(
     mut label_nodes: Query<&mut Node, With<NavTabLabelNode>>,
 ) {
     let width = windows.iter().next().map_or(1180.0, Window::width);
-    let display = if width < 800.0 {
+    let is_vertical_nav = capture_scenario_target() == Some("vertical-nav");
+    let display = if width < 800.0 || is_vertical_nav {
         bevy::ui::Display::None
     } else {
         bevy::ui::Display::Flex
@@ -480,7 +482,7 @@ fn highlight_nav_items(_changed: On<RouteChanged>, mut targets: NavRestyleTarget
     }
 }
 
-/// Bevy 0.19 button activation for both wide and compact route items. Route
+/// Bevy 0.20 button activation for both wide and compact route items. Route
 /// changes still follow the same resource-plus-event protocol as keyboard and
 /// programmatic transitions.
 ///
@@ -600,7 +602,7 @@ fn mount_page_system(
     commands.spawn_scene(bsn! {
         PageContent { page: {route.page} }
         ChildOf({*slot})
-        {page_scene(route.page, &context)}
+        @{page_scene(route.page, &context)}
     });
     mount.mounted = Some(route.page);
     mount.requested = false;
@@ -727,8 +729,8 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
-            (
+             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE --
+
                 Node {
                     min_width: px(0.0),
                     flex_shrink: 1.0,
@@ -738,9 +740,9 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
                 NavTabLabelNode
                 Pickable::IGNORE
                 Children [
-                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
+                     Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
                 ]
-            ),
+
         ]
     }
 }
@@ -769,7 +771,7 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
+             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE
         ]
     }
 }
@@ -795,9 +797,9 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
         }
         BackgroundColor({ palette.nav_bg })
         Children [
-            { tabs },
-            ( Node { flex_grow: 1.0 } ),
-            { trailing },
+            { tabs }--
+             Node { flex_grow: 1.0 } --
+            { trailing }
         ]
     }
 }

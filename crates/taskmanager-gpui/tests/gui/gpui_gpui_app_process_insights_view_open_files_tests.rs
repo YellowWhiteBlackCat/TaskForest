@@ -57,10 +57,24 @@ fn format_keeps_unreadable_target_honest() {
     let ok_line = format_open_file(&populated_open_files().entries[0], unreadable);
     let denied_line = format_open_file(&populated_open_files().entries[2], unreadable);
     assert!(ok_line.contains("/dev/null"));
+    assert!(ok_line.contains("[file]"), "must classify handle type");
     assert!(
         denied_line.ends_with(unreadable),
         "an unreadable fd must surface the typed marker, got: {denied_line}"
     );
+
+    let deleted_entry = OpenFileEntry {
+        fd: 5,
+        kind: OpenFileKind::File,
+        target: Some("/tmp/deleted.log".into()),
+        deleted: true,
+    };
+    let deleted_line = format_open_file(&deleted_entry, unreadable);
+    assert!(
+        deleted_line.contains("[file]"),
+        "must classify type on deleted fd"
+    );
+    assert!(deleted_line.contains("[deleted]"), "must mark deleted fd");
 }
 
 /// Minimal root view that renders one card frame per draw, so the open-files

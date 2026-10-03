@@ -360,13 +360,13 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         }
         StartupPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Text(waiting)
                 StartupStatusLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -374,7 +374,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 StartupBody
-            ),
+
         ]
     }
 }
@@ -429,7 +429,7 @@ fn paint_startup(world: &mut World) {
 
 /// Initial/mount paint: the body container just came to exist, so the first
 /// (and every remount) row projection can bind to it.
-fn on_startup_body_added(_added: On<Add, StartupBody>, mut commands: Commands) {
+fn on_startup_body_added(_added: On<Add<StartupBody>>, mut commands: Commands) {
     commands.queue(paint_startup);
 }
 

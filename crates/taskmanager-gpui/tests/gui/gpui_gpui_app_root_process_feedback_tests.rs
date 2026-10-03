@@ -26,3 +26,15 @@ fn typed_failures_render_their_semantic_reason() {
         );
     }
 }
+
+#[test]
+fn priority_tier_actions_render_localized_feedback() {
+    use super::priority_tier_label;
+    use taskmanager_core::core::process::PriorityTier;
+
+    for tier in [PriorityTier::High, PriorityTier::Normal, PriorityTier::Low] {
+        let feedback =
+            process_control_feedback(ProcessControlAction::SetPriority(tier), 42, Ok(()));
+        assert!(feedback.contains(priority_tier_label(tier)));
+    }
+}

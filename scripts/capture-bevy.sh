@@ -338,10 +338,17 @@ capture_one() {
     done
     grep 'BEVY_CAPTURE_MARKER' "$log" >"$markers" 2>/dev/null || true
     sleep "${TM_BEVY_CAPTURE_SETTLE_SECONDS:-0.5}"
-    NIRI_SOCKET="$IPC" timeout 5s niri msg -j windows >"$windows" 2>/dev/null || true
-    window_id="$(jq -r --arg app "$APP_ID" --arg pid "$app_pid" \
-        '[.[] | select(.app_id == $app and ((.pid|tostring) == $pid))] | if length == 1 then .[0].id else empty end' \
-        "$windows" 2>/dev/null || true)"
+    window_id=""
+    for _ in $(seq 1 60); do
+        NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows" 2>/dev/null || true
+        window_id="$(jq -r --arg app "$APP_ID" --arg pid "$app_pid" \
+            '[.[] | select(.app_id == $app and ((.pid|tostring) == $pid))] | if length >= 1 then .[0].id else empty end' \
+            "$windows" 2>/dev/null || true)"
+        if [ -n "$window_id" ]; then
+            break
+        fi
+        sleep 0.2
+    done
     if [ -n "$window_id" ]; then
         printf 'window_id=%s\n' "$window_id" >"$action"
         printf 'action=screenshot-window --id %s --write-to-disk true --path %s\n' \

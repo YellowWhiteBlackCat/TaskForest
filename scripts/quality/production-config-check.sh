@@ -48,7 +48,7 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
 
 # Same warning policy as CI (portability.yml / packaging.yml env) and as the
 # parent gate: append `-D warnings` unless it is already there.

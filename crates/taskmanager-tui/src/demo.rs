@@ -4,26 +4,37 @@
 //! unchanged — `demo_app()` stays reachable at `crate::demo_app` via a
 //! `pub use` in `lib.rs`.
 
-use crate::{PerfDevice, TuiApp};
+use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
+use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskmanager_application::{
-    AppPage, CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
+    AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
+    ProcessInsightsRevision,
 };
+use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
+use taskmanager_core::core::history::HistoryWindow;
+use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::ScalarObservationGroup;
-use taskmanager_core::core::npu::{
-    NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
 };
 use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
+use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
+
+mod fixtures;
+pub(crate) use fixtures::seed_fan_capture_sensors;
+use fixtures::{
+    demo_boot_evidence, demo_directory_usage, seed_alert_event_history_fixture,
+    seed_capture_identity_matrix, seed_capture_storage_scenario, seed_demo_npu_inventory,
+    seed_gpu_capture_history, seed_service_log_fixture,
 };
 
 impl TuiApp {
@@ -217,6 +228,64 @@ fn apply_capture_overrides(app: &mut TuiApp) {
     let failure_name = std::env::var("TM_TUI_CAPTURE_SOURCE_FAILURE").ok();
     let page = if scene_name.as_deref() == Some("system-npu") {
         Some(AppPage::System)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some(
+            "process-force-kill"
+                | "process-tree-confirm"
+                | "process-batch-confirm"
+                | "process-properties-performance"
+                | "process-memory-pss-swap"
+                | "process-network-details"
+                | "process-gpu-details"
+                | "process-resource-limits"
+                | "process-isolation"
+                | "apps-search-highlight"
+                | "apps-group-expanded"
+                | "apps-zero-gray"
+                | "apps-identity-matrix"
+                | "keyboard-focus"
+                | "vertical-nav"
+        )
+    ) {
+        Some(AppPage::Applications)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("startup-impact" | "startup-failure-evidence" | "startup-boot-markers")
+    ) {
+        Some(AppPage::Startup)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some("service-details-logs" | "services-search-highlight")
+    ) {
+        Some(AppPage::Services)
+    } else if matches!(
+        scene_name.as_deref(),
+        Some(
+            "smart-self-test-confirm"
+                | "telemetry-paused"
+                | "sidebar-hidden"
+                | "about"
+                | "system-about"
+                | "system-hardware"
+                | "storage-health"
+                | "sensor-center"
+                | "system-dashboard"
+                | "active-alert"
+                | "alert-rules-manager"
+                | "saved-view-presets"
+                | "first-run"
+                | "settings-permission-center"
+                | "battery-fan-performance"
+                | "battery-live-performance"
+                | "device-hotplug"
+                | "sidebar-edit"
+                | "history-replay"
+                | "history-60m"
+                | "event-center"
+        )
+    ) {
+        Some(AppPage::Performance)
     } else {
         page_name
             .as_deref()
@@ -237,10 +306,8 @@ fn apply_capture_overrides(app: &mut TuiApp) {
             _ => {}
         }
     }
-    if scene_name.as_deref() == Some("system-npu") {
-        // Paint clamps this intent to the last legal viewport, exercising the
-        // same path a user reaches with PageDown.
-        app.system_scroll = usize::MAX;
+    if let Some(scene) = scene_name.as_deref() {
+        apply_capture_scene_override(app, scene);
     }
     let Some(failure_page) = failure_name.as_deref().and_then(capture_page) else {
         return;
@@ -280,6 +347,31 @@ fn apply_capture_overrides(app: &mut TuiApp) {
     }
 }
 
+fn seed_capture_process_target(app: &TuiApp) -> Option<FrozenProcessIdentity> {
+    let first = app
+        .shell
+        .projection()
+        .processes
+        .as_ref()
+        .and_then(|p| p.first())
+        .cloned()?;
+    FrozenProcessIdentity::from_process(&first)
+}
+
+fn seed_capture_multiple_process_targets(app: &TuiApp) -> Vec<FrozenProcessIdentity> {
+    app.shell
+        .projection()
+        .processes
+        .as_ref()
+        .map(|p| {
+            p.iter()
+                .take(3)
+                .filter_map(FrozenProcessIdentity::from_process)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn capture_page(name: &str) -> Option<AppPage> {
     match name {
         "performance" => Some(AppPage::Performance),
@@ -307,265 +399,281 @@ fn capture_device(name: &str) -> Option<PerfDevice> {
     }
 }
 
-fn seed_demo_npu_inventory(app: &mut TuiApp) {
-    const OBSERVED_AT_MS: u64 = 1_785_292_800_000;
-    let engines = NpuEngineKind::ALL
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(index, kind)| NpuEngineUsage {
-            kind,
-            utilization_pct: ScalarObservation::available(
-                11.0 + (index as f32 * 7.0),
-                OBSERVED_AT_MS,
-            ),
-        })
-        .collect();
-    let inventory = NpuInventorySnapshot::discovered(
-        vec![NpuDevice {
-            device_id: DeviceId::new("accel0"),
-            device_generation: DeviceGeneration::new(1),
-            brand: Some("Intel AI Boost".into()),
-            driver: Some("intel_vpu".into()),
-            utilization_pct: ScalarObservation::available(44.0, OBSERVED_AT_MS),
-            engines,
-            memory: NpuMemoryReport {
-                dedicated_total_bytes: ScalarObservation::available(
-                    512 * 1024 * 1024,
-                    OBSERVED_AT_MS,
-                ),
-                shared_total_bytes: ScalarObservation::available(
-                    4 * 1024 * 1024 * 1024,
-                    OBSERVED_AT_MS,
-                ),
-                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, OBSERVED_AT_MS),
-            },
-        }],
-        OBSERVED_AT_MS,
-    );
-    let context = PlatformEventContext {
-        request_id: RequestId::MIN,
-        capability: CapabilityId::ACCELERATOR_NPU,
-        provider: Some(ProviderId::borrowed("fixture.npu")),
-        sequence: EventSequence::new(1),
-        observed_at_ms: OBSERVED_AT_MS,
-    };
-    let mut batch = PlatformEventBatch::default();
-    batch.npu_inventory_events.push(CorrelatedEvent::new(
-        context,
-        NpuInventoryEvent::Update(inventory),
-    ));
-    app.apply_platform_batch(batch);
-}
-
-/// Capture-only measured GPU sequence. Normal demo construction keeps its
-/// single cold-start sample; the explicit GPU evidence scene adds five typed
-/// frames and two real engine series so pixel review sees chart/viewport
-/// behavior rather than a collecting placeholder.
-fn seed_gpu_capture_history(app: &mut TuiApp) {
-    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind};
-
-    let Some(mut snapshot) = app.projection().snapshot.clone() else {
-        return;
-    };
-    let Some(gpu) = snapshot.gpu.first_mut() else {
-        return;
-    };
-    gpu.engines = vec![
-        GpuEngine {
-            name: "Render/3D".into(),
-            kind: GpuEngineKind::Render,
-            usage_pct: 0.0,
-        },
-        GpuEngine {
-            name: "Video Decode".into(),
-            kind: GpuEngineKind::VideoDecode,
-            usage_pct: 0.0,
-        },
-    ];
-    for (index, (utilization, render, video)) in [
-        (12.0, 9.0, 3.0),
-        (27.0, 21.0, 8.0),
-        (46.0, 39.0, 12.0),
-        (34.0, 28.0, 7.0),
-        (61.0, 52.0, 18.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let observed_at_ms = 1_785_292_800_100_u64.saturating_add(index as u64 * 1_000);
-        snapshot.timestamp_ms = observed_at_ms;
-        let gpu = &mut snapshot.gpu[0];
-        let mut observations = *gpu.scalar_observations();
-        observations.utilization_pct = ScalarObservation::available(utilization, observed_at_ms);
-        gpu.apply_scalar_observations(observations);
-        gpu.engines[0].usage_pct = render;
-        gpu.engines[1].usage_pct = video;
-        record_demo_history_frame(&mut app.shell, &snapshot, None, None);
-    }
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
-    );
-}
-
-/// Capture-only fan/thermal scene for `TM_TUI_CAPTURE_DEVICE=fan`: one readable
-/// fan channel with its own same-device `Package` temperature, plus two system
-/// thermal zones (`acpitz` readable, `nvme0` unread). The named zones prove the
-/// system thermal-zone traversal in a real terminal frame, the unread zone
-/// keeps its named row with the shared dash, and the same-device `Package` row
-/// keeps the device-level fan context visible beside the system group. This is
-/// deterministic fixture data (the same zone families iced's capture fixture
-/// seeds), never a host read; an invalid fixture magnitude seeds nothing rather
-/// than panicking.
-pub(crate) fn seed_fan_capture_sensors(app: &mut TuiApp) {
-    use taskmanager_core::core::sensors::{
-        SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
-        SensorReading, SensorScale,
-    };
-
-    const OBSERVED_AT_MS: u64 = 1_785_292_800_000;
-    let fan = SensorMeasurementObservation::available(
-        SensorDescriptor::fan_speed(SensorScale::IDENTITY),
-        SensorMagnitude::Unsigned(2_400),
-        OBSERVED_AT_MS,
-    );
-    let package = SensorMeasurementObservation::available(
-        SensorDescriptor::temperature(SensorScale::IDENTITY),
-        SensorMagnitude::Decimal(51.0),
-        OBSERVED_AT_MS,
-    );
-    let acpitz = SensorMeasurementObservation::available(
-        SensorDescriptor::temperature(SensorScale::IDENTITY),
-        SensorMagnitude::Decimal(61.0),
-        OBSERVED_AT_MS,
-    );
-    let (Ok(fan), Ok(package), Ok(acpitz)) = (fan, package, acpitz) else {
-        return;
-    };
-    let reading =
-        |device: &str, id: &str, label: &str, observation: SensorMeasurementObservation| {
-            SensorReading::from_measurement_observation(
-                device.into(),
-                id.into(),
-                label.into(),
-                observation,
-            )
-            .with_device_generation(DeviceGeneration::new(1))
-        };
-    let readings = vec![
-        reading("hwmon:cpu", "cpu_fan", "cpu_fan", fan),
-        reading("hwmon:cpu", "cpu_package", "Package", package),
-        reading("thermal:acpitz", "acpitz", "acpitz", acpitz),
-        reading(
-            "thermal:nvme0",
-            "nvme0",
-            "nvme0",
-            SensorMeasurementObservation::unavailable(
-                SensorDescriptor::temperature(SensorScale::IDENTITY),
-                FailureKind::PermissionDenied,
-            ),
-        ),
-    ];
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
-            state: DeviceState::healthy(OBSERVED_AT_MS),
-            timestamp_ms: OBSERVED_AT_MS,
-            readings,
-            ..Default::default()
-        })),
-    );
-}
-
 /// Deterministic full-surface demo frame (containers included).
 #[must_use]
 pub fn demo_app() -> TuiApp {
     TuiApp::demo()
 }
 
-/// Deterministic directory-usage fixture for the demo frame: a `Completed`
-/// scan of `/var` with one readable subtree (measured size + file count) and
-/// one unreadable subtree (`PermissionDenied`, so the renderer must show a
-/// danger dash — never a fabricated 0 B or the untrustworthy number), plus
-/// capped totals carrying one unreadable directory. This is honest fixture
-/// data, not a fabricated provider answer; it exercises the same
-/// `SystemProjectionStore::directory_usage` slot the live platform-batch fold fills (the
-/// snapshot types come directly from their owner modules in
-/// `taskmanager-core`.
-fn demo_directory_usage() -> DirectoryUsageSnapshot {
-    use taskmanager_core::core::directory_usage::{
-        DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
-    };
-    let observed_at_ms = 1_785_292_800_000;
-    let readable = DirectoryUsageEntry {
-        path: "lib/postgres".into(),
-        depth: 1,
-        size_bytes: ScalarObservation::available(2 * 1024 * 1024 * 1024, observed_at_ms),
-        file_count: ScalarObservation::available(4200, observed_at_ms),
-        unreadable: None,
-    };
-    let unreadable = DirectoryUsageEntry {
-        path: "cache/private".into(),
-        depth: 1,
-        // A measured value the renderer must NOT print: the unreadable flag
-        // forces a danger dash, proving the panel never fabricates this size
-        // as a "0 B" stand-in or leaks the untrustworthy number.
-        size_bytes: ScalarObservation::available(7 * 1024 * 1024 * 1024, observed_at_ms),
-        file_count: ScalarObservation::available(900, observed_at_ms),
-        unreadable: Some(FailureKind::PermissionDenied),
-    };
-    DirectoryUsageSnapshot {
-        scan_id: DirectoryScanId::new(1),
-        root: "/var".into(),
-        status: DirectoryScanStatus::Completed,
-        entries: vec![readable, unreadable],
-        totals: DirectoryScanTotals {
-            directories_visited: 7,
-            files_counted: 42,
-            unreadable_directories: 1,
-            bytes_counted: ScalarObservation::available(2 * 1024 * 1024 * 1024, observed_at_ms),
-            depth_reached: 1,
-            capped: true,
-        },
-    }
-}
+pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
+    match scene {
+        "process-force-kill" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "process-tree-confirm" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(target) = seed_capture_process_target(app) {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::EndProcessTree,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "process-batch-confirm" => {
+            app.shell.application.active_page = AppPage::Applications;
+            let targets = seed_capture_multiple_process_targets(app);
+            if !targets.is_empty() {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets,
+                };
+                let _ =
+                    app.shell
+                        .application
+                        .interaction
+                        .reduce(InteractionEvent::ArmConfirmation(
+                            PendingConfirmation::ProcessBatch(intent),
+                        ));
+            }
+        }
+        "smart-self-test-confirm" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+            let intent = SmartSelfTestIntent {
+                device_id: "disk:demo:nvme0".into(),
+                device_generation: DeviceGeneration::new(1),
+                device_key: StorageDeviceKey::new("nvme0n1"),
+                display_name: "TiPro9000 2TB".into(),
+                kind: SmartSelfTestKind::Short,
+            };
+            app.shell.arm_smart_self_test(intent);
+        }
+        "about" | "system-about" | "system-hardware" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_about();
+        }
 
-/// Deterministic boot-evidence fixture for the demo frame: a measured
-/// systemd-user critical chain (three timed units, one untimed node) so the
-/// Startup-page waterfall renders in demo mode exactly like a measured boot.
-/// This is honest fixture data, not a fabricated provider answer.
-fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
-    use taskmanager_core::core::startup::StartupCriticalChainNode;
-    let healthy = DeviceState::healthy(1_785_292_800_000);
-    StartupBootEvidenceSnapshot {
-        state: healthy,
-        failed_units_state: healthy,
-        critical_chain_state: healthy,
-        failed_units_failure: None,
-        critical_chain_failure: None,
-        failed_units: Vec::new(),
-        critical_chain: vec![
-            StartupCriticalChainNode {
-                unit: "dbus.service".into(),
-                activated_at_ms: Some(500),
-                duration_ms: Some(1_200),
-            },
-            StartupCriticalChainNode {
-                unit: "network-online.target".into(),
-                activated_at_ms: Some(1_700),
-                duration_ms: Some(900),
-            },
-            StartupCriticalChainNode {
-                unit: "graphical.target".into(),
-                activated_at_ms: None,
-                duration_ms: None,
-            },
-            StartupCriticalChainNode {
-                unit: "multi-user.target".into(),
-                activated_at_ms: Some(2_600),
-                duration_ms: Some(2_500),
-            },
-        ],
+        "storage-health"
+        | "sensor-center"
+        | "system-dashboard"
+        | "active-alert"
+        | "alert-rules-manager" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.toggle_health();
+        }
+        "diagnostic-preview" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.open_local_surface(crate::TuiSurface::DiagnosticPreview);
+        }
+        "diagnostic-failure" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.open_local_surface(crate::TuiSurface::DiagnosticFailure);
+        }
+        "smart-missing-tool"
+        | "smart-permission"
+        | "partition-disk-usage"
+        | "partition-live-usage" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+            if let Some(snapshot) = app.shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                seed_capture_storage_scenario(&mut s, scene);
+                seed_projection_fact(
+                    &mut app.shell,
+                    ProjectionSeedFact::Snapshot(Box::new(Some(s))),
+                );
+            }
+        }
+        "gpu-engine-inventory" | "intel-gpu-telemetry" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Gpu);
+            if let Some(snapshot) = app.shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                seed_capture_storage_scenario(&mut s, scene);
+                seed_projection_fact(
+                    &mut app.shell,
+                    ProjectionSeedFact::Snapshot(Box::new(Some(s))),
+                );
+            }
+        }
+        "process-properties-performance" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
+            {
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Performance,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity);
+            }
+        }
+        "process-memory-pss-swap" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
+            {
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Overview,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity);
+            }
+        }
+
+        "process-network-details"
+        | "process-gpu-details"
+        | "process-resource-limits"
+        | "process-isolation" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(item) = app
+                .shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|p| p.first())
+                .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
+            {
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Insights,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity.clone());
+                let revision = ProcessInsightsRevision::new(1);
+                let mut tracker = ProcessInsightsProjection::default();
+                tracker.begin(identity, revision);
+                if let Some(projection) = tracker.snapshot() {
+                    seed_projection_fact(
+                        &mut app.shell,
+                        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+                    );
+                }
+            }
+        }
+        "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
+            app.shell.application.active_page = AppPage::Startup;
+        }
+        "service-details-logs" => {
+            app.shell.application.active_page = AppPage::Services;
+            seed_service_log_fixture(&mut app.shell);
+        }
+        "services-search-highlight" => {
+            app.shell.application.active_page = AppPage::Services;
+            app.shell.query = "Network".into();
+        }
+        "apps-search-highlight" => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.shell.query = "zed".into();
+        }
+        "apps-group-expanded" => {
+            app.shell.application.active_page = AppPage::Applications;
+        }
+        "apps-zero-gray" => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.prefs.gray_zero = true;
+        }
+        "settings-zero-gray" | "settings-switch-focus" => {
+            app.open_local_surface(crate::TuiSurface::Settings);
+            app.prefs.gray_zero = true;
+        }
+        "apps-identity-matrix" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(processes) = app.shell.projection().processes.as_ref() {
+                let mut procs = (**processes).clone();
+                seed_capture_identity_matrix(&mut procs);
+                seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
+            }
+        }
+        "telemetry-paused" => {
+            app.shell.application.active_page = AppPage::Performance;
+            let _ = app.shell.apply_action(AppAction::TogglePause);
+        }
+        "sidebar-hidden" => {
+            app.shell.application.active_page = AppPage::Performance;
+        }
+        "system-npu" => {
+            // Paint clamps this intent to the last legal viewport, exercising the
+            // same path a user reaches with PageDown.
+            app.system_scroll = usize::MAX;
+        }
+        "history-replay" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+            app.open_history_replay();
+        }
+        "history-60m" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+            app.open_history_replay();
+            let _ = app.select_history_replay_window(HistoryWindow::OneHour);
+        }
+        "event-center" => {
+            seed_alert_event_history_fixture(&mut app.shell);
+            app.open_local_surface(TuiSurface::Health);
+        }
+        "settings-permission-center" => {
+            app.open_local_surface(TuiSurface::Settings);
+        }
+        "first-run" => {
+            app.open_local_surface(TuiSurface::FirstRun);
+        }
+        "saved-view-presets" => {
+            app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });
+        }
+        "sidebar-edit" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+        }
+        "keyboard-focus" | "vertical-nav" => {
+            app.shell.application.active_page = AppPage::Applications;
+        }
+        "battery-fan-performance" | "battery-live-performance" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Battery);
+        }
+        "device-hotplug" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+        }
+        _ => {}
     }
 }

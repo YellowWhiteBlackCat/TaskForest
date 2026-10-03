@@ -5,7 +5,7 @@ use bevy::scene::WorldSceneExt;
 use super::*;
 use crate::window::WindowPalette;
 
-// ---- Bevy 0.19 scene adapter ----
+// ---- Bevy 0.20 scene adapter ----
 
 #[derive(Resource)]
 struct HistoryPageBound;
@@ -38,20 +38,20 @@ pub(crate) fn content(
         }
         HistoryPageRoot
         Children [
-            (
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                 }
                 Children [
-                    ( Text(title) TextRole(Role::Heading) ),
-                    ( Node { flex_grow: 1.0 } ),
-                    ( Text({ window_label(model.selected_window).to_owned() }) TextRole(Role::Caption) ),
+                     Text(title) TextRole(Role::Heading) --
+                     Node { flex_grow: 1.0 } --
+                     Text({ window_label(model.selected_window).to_owned() }) TextRole(Role::Caption)
                 ]
-            ),
-            ( Text(line) HistoryStatusLine TextRole(Role::Caption) ),
-            (
+            --
+             Text(line) HistoryStatusLine TextRole(Role::Caption) --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -60,7 +60,7 @@ pub(crate) fn content(
                 }
                 HistoryBody
                 Children []
-            ),
+
         ]
     }
 }
@@ -83,7 +83,7 @@ fn history_body_scene(model: &HistoryPageModel, palette: &UiPalette) -> impl Sce
             row_gap: Val::Px(space_2()),
         }
         Children [
-            { children },
+            { children }
         ]
     }
 }
@@ -108,7 +108,7 @@ fn history_notice_scene(model: &HistoryPageModel, palette: &UiPalette) -> Box<dy
         }
         BackgroundColor({ palette.nav_active_bg })
         Children [
-            ( Text(detail) TextRole(Role::Caption) ),
+             Text(detail) TextRole(Role::Caption)
         ]
     })
 }
@@ -136,8 +136,8 @@ fn history_empty_scene(model: &HistoryPageModel) -> Box<dyn Scene> {
             row_gap: Val::Px(space_2()),
         }
         Children [
-            ( Text({ heading.to_owned() }) TextRole(Role::Body) ),
-            ( Text(detail) TextRole(Role::Caption) ),
+             Text({ heading.to_owned() }) TextRole(Role::Body) --
+             Text(detail) TextRole(Role::Caption)
         ]
     })
 }
@@ -157,11 +157,11 @@ fn history_header_scene() -> Box<dyn Scene> {
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Text({ labels[0].to_owned() }) TextRole(Role::Caption) ),
-            ( Node { width: px(90.0) } Children [( Text({ labels[1].to_owned() }) TextRole(Role::Caption) )] ),
-            ( Node { width: px(110.0) } Children [( Text({ labels[2].to_owned() }) TextRole(Role::Caption) )] ),
-            ( Node { width: px(110.0) } Children [( Text({ labels[3].to_owned() }) TextRole(Role::Caption) )] ),
-            ( Node { width: px(150.0) } Children [( Text({ labels[4].to_owned() }) TextRole(Role::Caption) )] ),
+             Text({ labels[0].to_owned() }) TextRole(Role::Caption) --
+             Node { width: px(90.0) } Children [ Text({ labels[1].to_owned() }) TextRole(Role::Caption) ] --
+             Node { width: px(110.0) } Children [ Text({ labels[2].to_owned() }) TextRole(Role::Caption) ] --
+             Node { width: px(110.0) } Children [ Text({ labels[3].to_owned() }) TextRole(Role::Caption) ] --
+             Node { width: px(150.0) } Children [ Text({ labels[4].to_owned() }) TextRole(Role::Caption) ]
         ]
     })
 }
@@ -182,11 +182,11 @@ fn history_row_scene(row: &HistoryRowModel, palette: &UiPalette) -> Box<dyn Scen
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(name) TextRole(Role::Body) ),
-            ( Node { width: px(90.0) } Children [( Text({ scalar_text(row.cpu_peak(), "%") }) TextRole(Role::Body) )] ),
-            ( Node { width: px(110.0) } Children [( Text({ memory_text(row.memory_peak()) }) TextRole(Role::Body) )] ),
-            ( Node { width: px(110.0) } Children [( Text({ process_count_text(row.process_count_peak()) }) TextRole(Role::Body) )] ),
-            ( Node { width: px(150.0) } Children [( { chart } )] ),
+             Text(name) TextRole(Role::Body) --
+             Node { width: px(90.0) } Children [ Text({ scalar_text(row.cpu_peak(), "%") }) TextRole(Role::Body) ] --
+             Node { width: px(110.0) } Children [ Text({ memory_text(row.memory_peak()) }) TextRole(Role::Body) ] --
+             Node { width: px(110.0) } Children [ Text({ process_count_text(row.process_count_peak()) }) TextRole(Role::Body) ] --
+             Node { width: px(150.0) } Children [ @{ chart } ]
         ]
     })
 }
@@ -194,7 +194,7 @@ fn history_row_scene(row: &HistoryRowModel, palette: &UiPalette) -> Box<dyn Scen
 fn empty_trend_scene() -> Box<dyn Scene> {
     Box::new(bsn! {
         Node { width: percent(100), height: px(20.0) }
-        Children [( Text({ missing_value() }) TextRole(Role::Caption) )]
+        Children [ Text({ missing_value() }) TextRole(Role::Caption) ]
     })
 }
 
@@ -263,7 +263,7 @@ pub(super) fn bind_history_page(mut world: DeferredWorld<'_>, _context: HookCont
     commands.queue(paint_history);
 }
 
-fn on_history_body_added(_added: On<Add, HistoryBody>, mut commands: Commands) {
+fn on_history_body_added(_added: On<Add<HistoryBody>>, mut commands: Commands) {
     commands.queue(paint_history);
 }
 

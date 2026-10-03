@@ -68,8 +68,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
             reason: "the terminal product shape does not expose a compositor current-window PNG capture control",
         },
-        ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
-            reason: "first-run setup is owned by graphical composition and has no terminal surface",
+        ProductIntent::FirstRunSetup => SurfaceDecision::Local {
+            route: "first-run.wizard",
         },
         ProductIntent::GpuMetricInspection => SurfaceDecision::AcceptedDifference {
             route: "performance.gpu.metric-cycle",

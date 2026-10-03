@@ -150,6 +150,9 @@ pub(crate) enum TuiSurfaceKind {
     CommandPalette,
     ServiceDependencies,
     ProcessAffinity,
+    DiagnosticPreview,
+    DiagnosticFailure,
+    FirstRun,
 }
 
 #[derive(Clone, Debug)]
@@ -167,6 +170,9 @@ pub(crate) enum TuiSurface {
     CommandPalette(CommandPalette),
     ServiceDependencies(ServiceDependenciesTarget),
     ProcessAffinity(AffinityModalState),
+    DiagnosticPreview,
+    DiagnosticFailure,
+    FirstRun,
 }
 
 impl TuiSurface {
@@ -185,6 +191,9 @@ impl TuiSurface {
             Self::CommandPalette(_) => TuiSurfaceKind::CommandPalette,
             Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
             Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
+            Self::DiagnosticPreview => TuiSurfaceKind::DiagnosticPreview,
+            Self::DiagnosticFailure => TuiSurfaceKind::DiagnosticFailure,
+            Self::FirstRun => TuiSurfaceKind::FirstRun,
         }
     }
 }

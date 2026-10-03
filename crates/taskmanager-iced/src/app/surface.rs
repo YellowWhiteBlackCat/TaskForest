@@ -26,6 +26,8 @@ pub(crate) enum LocalSurfaceKind {
     ServiceDetails,
     RunTask,
     AlertCenter,
+    DiagnosticPreview,
+    DiagnosticFailure,
     /// The optional-setup first-run dialog. Visibility is decided by the
     /// `ui::first_run` fold's transitions (the boot observation's answer),
     /// never opened directly by a user trigger.
@@ -50,6 +52,8 @@ pub(crate) enum LocalSurface {
     },
     RunTask,
     AlertCenter,
+    DiagnosticPreview,
+    DiagnosticFailure,
     /// Carries no payload: the dialog's state lives in
     /// [`crate::ui::first_run::FirstRunUiState`].
     FirstRun,
@@ -67,6 +71,8 @@ impl LocalSurface {
             Self::ServiceDetails { .. } => LocalSurfaceKind::ServiceDetails,
             Self::RunTask => LocalSurfaceKind::RunTask,
             Self::AlertCenter => LocalSurfaceKind::AlertCenter,
+            Self::DiagnosticPreview => LocalSurfaceKind::DiagnosticPreview,
+            Self::DiagnosticFailure => LocalSurfaceKind::DiagnosticFailure,
             Self::FirstRun => LocalSurfaceKind::FirstRun,
         }
     }

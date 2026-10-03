@@ -10,7 +10,8 @@ mod boot_timeline;
 pub(crate) mod chart_cursor;
 mod column_menu;
 mod confirmations;
-mod containers;
+pub(crate) mod containers;
+mod first_run;
 mod footer;
 mod frame_plan;
 mod header;
@@ -238,6 +239,15 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             }
             Some(crate::TuiSurface::ProcessAffinity(state)) => {
                 affinity_modal::render_affinity_modal_at(frame, app, state, theme, popup);
+            }
+            Some(crate::TuiSurface::DiagnosticPreview) => {
+                crate::diagnostic_report::render_preview_overlay_at(frame, app, theme, popup);
+            }
+            Some(crate::TuiSurface::DiagnosticFailure) => {
+                crate::diagnostic_report::render_failure_overlay_at(frame, app, theme, popup);
+            }
+            Some(crate::TuiSurface::FirstRun) => {
+                first_run::render_first_run_overlay_at(frame, theme, popup);
             }
             None => {}
         },

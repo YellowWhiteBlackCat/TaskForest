@@ -59,6 +59,10 @@ impl IcedConfiguration {
         &self.preferences
     }
 
+    pub(super) fn preferences_mut(&mut self) -> &mut PresentationPreferences {
+        &mut self.preferences
+    }
+
     pub(super) const fn language(&self) -> Language {
         self.language
     }

@@ -15,7 +15,7 @@ Wayland/X11、安装方式。TaskForest 是跨平台系统监视器，环境差�
 
 ## 开发环境
 
-- 工具链由 `rust-toolchain.toml` 锁定为 stable 最新版；
+- 工具链由 `rust-toolchain.toml` 锁定为 1.99.0；
 - Cargo 验证一律带锁文件（`--locked`），并行度不超过四；
 - 测试一律使用 `cargo nextest ... -j 4`（doctest 仅可使用
   `cargo test --doc ... -j 4`）；quick 门禁会机械拒绝其他形式。

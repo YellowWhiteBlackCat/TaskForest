@@ -2,7 +2,7 @@
 
 > **Role**: Implementation guide — widget patterns, rendering, interaction. For architecture decisions see [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md).
 
-本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.19 的数据驱动 ECS 架构范式与交互纪律。
+本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.20 的数据驱动 ECS 架构范式与交互纪律。
 跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
 
 ## 1. 核心思维：纯数据驱动的 ECS 哲学
@@ -27,7 +27,7 @@
 ## 2. 交互与拾取机制（核心避坑守则）
 
 - **拾取穿透铁律（`Pickable::IGNORE`）**：
-  - 在 Bevy 0.19 中，`bevy_picking` 默认对所有 UI 节点生效；
+  - 在 Bevy 0.20 中，`bevy_picking` 默认对所有 UI 节点生效；
   - 当一个实体携带 `Button` 组件且其内部拥有子节点（如 `Text` 标签或 `ImageNode`
     图标）时，指针点击会默认命中子实体。由于子实体没有 `Button` 组件，
     `button_on_pointer_click` 会忽略该点击，导致**“点击按钮毫无反应”**；

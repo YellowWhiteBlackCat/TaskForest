@@ -603,7 +603,7 @@ fn partition_row<'a>(
         Some(value) => {
             let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);
             let remainder_portion = 1000_u16.saturating_sub(fill_portion);
-            let fill = iced::widget::container(iced::widget::text("").size(0))
+            let fill = iced::widget::container(iced::widget::row![])
                 .width(iced::Length::FillPortion(fill_portion))
                 .height(iced::Length::Fixed(6.0))
                 .style(move |_| iced::widget::container::Style {
@@ -614,7 +614,7 @@ fn partition_row<'a>(
                     },
                     ..Default::default()
                 });
-            let remainder = iced::widget::container(iced::widget::text("").size(0))
+            let remainder = iced::widget::container(iced::widget::row![])
                 .width(if remainder_portion > 0 {
                     iced::Length::FillPortion(remainder_portion)
                 } else {

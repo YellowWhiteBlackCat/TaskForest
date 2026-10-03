@@ -2,7 +2,7 @@
 
 > **Role**: Architecture — decisions, constraints, layer boundaries. For widget/rendering patterns see [UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md).
 
-`taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.19 的官方两件套 `bevy_ui` +
+`taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.20 的官方两件套 `bevy_ui` +
 `bevy_ui_widgets` 渲染同一份中立 shell 投影。本文是它当前的公开事实权威；
 跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)，
 行为与像素门禁归 [QUALITY_GATES.md](QUALITY_GATES.md)。
@@ -19,7 +19,7 @@
 
 ## 基座与边界铁律
 
-- Bevy 锁定 `=0.19.1`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
+- Bevy 锁定 `=0.20.0-rc.2`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
   保持单一 workspace 解析；升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
@@ -130,4 +130,4 @@ feature 让 winit 的 AccessKit 桥把组件树发布到 AT-SPI；无窗口的 h
 - `bash scripts/accept-bevy-interactions.sh`：交互矩阵先 discovery 后全量，
   见 [QUALITY_GATES.md](QUALITY_GATES.md) 前端证据表。
 - `bash scripts/capture-bevy.sh`：真实像素，fail-closed 验证器。
-- `cargo tree -p taskmanager-bevy-ui -d`：bevy 栈单一 0.19 解析。
+- `cargo tree -p taskmanager-bevy-ui -d`：bevy 栈单一 0.20 解析。

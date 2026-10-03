@@ -724,3 +724,80 @@ fn e_on_the_applications_page_fires_only_for_the_escalation_facet() {
         "the inline panel's `e` must produce the shared escalation effect"
     );
 }
+
+#[test]
+fn command_identity_mismatch_renders_masquerading_warning() {
+    use std::path::PathBuf;
+    use taskmanager_core::core::process::{ProcessItem, ProcessMetadataObservations, ProcessOwner};
+    use taskmanager_shell::presentation::command_identity_summary;
+
+    let mut item = ProcessItem::new(100, "fake");
+    item.apply_metadata_observations(ProcessMetadataObservations::current(
+        ProcessOwner::opaque("root"),
+        Some(PathBuf::from("/usr/bin/real_binary")),
+        42,
+    ));
+    item.cmdline = "masquerade --flag".into();
+    let summary = command_identity_summary(&item);
+    assert!(summary.is_some(), "must generate command identity mismatch");
+    assert!(summary.unwrap().contains("real_binary"));
+}
+
+#[test]
+fn network_connections_surface_renders_socket_inventory_and_rtt() {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use taskmanager_application::{
+        ProcessInsightFacetState, ProcessInsightsProjection, ProcessInsightsRevision,
+    };
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{
+        ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
+        ProcessConnection, ProcessNetworkSnapshot,
+    };
+
+    let mut app = app_on_processes();
+    let target = app.application.selected_process.clone().unwrap();
+    let revision = ProcessInsightsRevision::new(1);
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target.clone(), revision);
+    let mut projection = tracker.snapshot().unwrap();
+
+    let conn = ProcessConnection {
+        transport: ConnectionTransport::Tcp,
+        family: ConnectionAddressFamily::Ipv4,
+        local: ConnectionEndpoint::Ip(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            8080,
+        )),
+        remote: ConnectionEndpoint::Ip(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            45678,
+        )),
+        state: ConnectionState::Established,
+        provider_key: None,
+        rtt_ms: Some(15.4),
+    };
+    projection.network = ProcessInsightFacetState::Current(ProcessNetworkSnapshot {
+        state: DeviceState::healthy(1),
+        connections: vec![conn],
+        rx_bytes_per_sec: Some(1024),
+        tx_bytes_per_sec: Some(2048),
+        traffic_state: DeviceState::healthy(1),
+        traffic_failure: None,
+        traffic_provider: None,
+        connection_counters: None,
+    });
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+
+    let lines = crate::ui::process_details::insights_lines(&app, TuiTheme::default(), target.pid);
+    let text = lines
+        .iter()
+        .map(|l| l.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(text.contains("TCP"), "must render TCP transport: {text}");
+    assert!(text.contains("15.4 ms"), "must render RTT: {text}");
+}

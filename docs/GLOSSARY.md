@@ -62,15 +62,11 @@
 
 - **四端 / 对等前端（peer frontends）**：GPUI（当前发布形态）、Iced、TUI、Bevy 共享
   同一应用投影，互不拥有业务事实（[ARCH](ARCH.md)）。
-- **平权 / 对等（parity）**：两根互不替代的轴。**前端轴**：GPUI、Iced、TUI、Bevy 必须对
-  同一 intent/feature 提供同一语义入口，某端缺入口（`Missing`）才算 parity 缺陷。**平台轴**：
-  Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported`、
-  `PermissionRequired`、`RequiresEscalation`、`MissingDependency`、`TemporarilyUnavailable`
-  （均为 `platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴
-  `FailureKind`，与能力级 `PermissionRequired` 分属两轴。平台按 typed 原因诚实降级是 parity 的
-  达成形态，不是失败。不得表述为四端「功能对等」或 Linux-only 能力「跨平台可用」，缺口不得用
-  `0`、空值或静态占位表示
-  （[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[ARCH §8](ARCH.md)）。
+- **平权 / 对等（parity）**：包含前端轴与平台轴两根独立维度。**平台轴**：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency`、`TemporarilyUnavailable`（均为 `platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。平台按 typed 原因诚实降级是 parity 的达成形态。**前端轴（一碗水端平）**：包含三个不可替代的递进层级：
+  1. *数据契约平权*：共享数据模型，由 `feature_evidence.tsv` 的 50 项 headless 锚点验证；
+  2. *场景交互深度平权*：完整提供同等的交互分支（进程详情诊断 Tab、二次确认弹窗、错误与提权态、搜索高亮）；
+  3. *视觉像素实证平权*：四端接入自动化无感截屏流水线，在 `capture_*_scenarios.tsv` 矩阵中输出经过哈希与几何校验的真实像素回执。
+  Headless 单测仅证明数据契约层，不能作为全量端平的依据。当视觉场景矩阵存在非对称时，前端仍处于对齐推进中。不得表述为四端「跨平台功能完全对等」或 Linux-only 能力「跨平台可用」，缺口不得用 `0`、空值或静态占位表示（[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[ARCH §8](ARCH.md)）。
 - **Ready（静态来源承诺）**：对等/覆盖账本中"平台 × 前端"格子的就绪状态，表示该组合声明
   的来源与前端语义入口均已具备；这是**静态来源承诺**，不是运行时实测 `Available`——运行时
   可用性由 catalog 的 typed 状态（真实观测、typed 缺席或 typed 降级）承载，并在真机

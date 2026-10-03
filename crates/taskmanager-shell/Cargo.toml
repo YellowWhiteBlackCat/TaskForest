@@ -2,7 +2,7 @@
 name = "taskmanager-shell"
 version = "0.2.0-rc3"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "Frontend-shared shell state machine for TaskForest renderer frontends (ADR-027)"
 readme = "README.md"

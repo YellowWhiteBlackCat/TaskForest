@@ -7,7 +7,7 @@
 //! through observers — never polling:
 //!
 //! - **Data refresh**: `bootstrap_processes_page` runs when the rows root
-//!   lands (an `on(On<Add, ProcessRowsRoot>)` entity observer) and spawns the
+//!   lands (an `on(On<Add<ProcessRowsRoot>>)` entity observer) and spawns the
 //!   page's global `ShellProjectionFolded` observer as a child of the root,
 //!   so it lives and dies with the mounted page (a route change despawns the
 //!   page recursively). Idle frames — no folded batches — redraw nothing.
@@ -315,7 +315,7 @@ fn ensure_applications_row_context(shell: &mut ShellApp) {
 /// page without a resolved palette cannot initialize its live surface, so it
 /// stays static there instead of failing the observer.
 fn bootstrap_processes_page(
-    trigger: On<Add, ProcessRowsRoot>,
+    trigger: On<Add<ProcessRowsRoot>>,
     palette: Option<Res<WindowPalette>>,
     mut commands: Commands,
 ) {
@@ -521,7 +521,7 @@ fn row_wrapper_scene(
         SemanticAddress({ semantic.0.clone() })
         AccessibilityNode({ accessibility_node })
         Children [
-            ( { inner } ),
+             @{ inner }
         ]
     })
 }
@@ -535,7 +535,7 @@ fn empty_state_scene(message: String) -> Box<dyn Scene> {
         }
         ProcessTableArtifact
         Children [
-            ( Text({ message }) TextRole(Role::Body) ),
+             Text({ message }) TextRole(Role::Body)
         ]
     })
 }
@@ -610,7 +610,7 @@ fn rebuild_table(
             }
             ProcessTableHeaderArtifact
             Children [
-                ( { header } ),
+                 @{ header }
             ]
         };
         let child = commands.spawn_scene(header_node).id();
@@ -641,7 +641,7 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
         Button
         on(on_search_input_activated)
         Children [
-            ( Text(text) TextRole(Role::Body) ),
+             Text(text) TextRole(Role::Body)
         ]
     }
 }
@@ -671,7 +671,7 @@ fn rows_root_scene(
         on(on_process_column_resize)
         ProcessRowsRoot
         Children [
-            { rows },
+            { rows }
         ]
     }
 }
@@ -701,15 +701,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ProcessTableHeaderSlot
         Children [
-            (
+
                 Node {
                     width: percent(100),
                 }
                 ProcessTableHeaderArtifact
                 Children [
-                    ( { header } ),
+                     @{ header }
                 ]
-            ),
+
         ]
     };
     let rows_root = rows_root_scene(&projection, palette, &context.shell.query, &[]);
@@ -723,8 +723,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( { search } ),
-            ( { choose_columns_btn } ),
+             @{ search } --
+             @{ choose_columns_btn }
         ]
     };
     let table = bsn! {
@@ -737,8 +737,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ProcessTableContainer
         Children [
-            ( { header_slot } ),
-            ( { rows_root } ),
+             @{ header_slot } --
+             @{ rows_root }
         ]
     };
     let details = details::panel_scene(context);
@@ -752,16 +752,16 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( crate::pages::process_tree::panel_scene(context) ),
-            ( Text(note) TextRole(Role::Caption) ),
-            ( { toolbar } ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             @{ crate::pages::process_tree::panel_scene(context) } --
+             Text(note) TextRole(Role::Caption) --
+             @{ toolbar } --
+
                 Text(count)
                 ProcessCountLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: px(TABLE_VIEWPORT_HEIGHT_PX),
@@ -769,10 +769,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
-                    ( { table } ),
-                    ( { details } ),
+                     @{ table } --
+                     @{ details }
                 ]
-            ),
+
         ]
     }
 }

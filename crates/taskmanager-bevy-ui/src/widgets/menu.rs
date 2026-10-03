@@ -132,7 +132,7 @@ pub(crate) fn menu_scene_at(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Caption) ),
+             Text(title) TextRole(Role::Caption) --
             { rows }
         ]
     }
@@ -180,7 +180,7 @@ fn menu_row_scene(
             bevy::ui_widgets::Button
             MenuItemIndex(index)
             Children [
-                ( Text(label) TextRole(role) ),
+                 Text(label) TextRole(role)
             ]
         }) as Box<dyn Scene>
     } else {
@@ -194,7 +194,7 @@ fn menu_row_scene(
             }
             BackgroundColor(fill)
             Children [
-                ( Text(label) TextRole(role) ),
+                 Text(label) TextRole(role)
             ]
         }) as Box<dyn Scene>
     }

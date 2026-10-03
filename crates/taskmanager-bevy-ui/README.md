@@ -3,7 +3,7 @@
 ## Role
 
 Fourth product frontend: renders the shared neutral shell projections with
-Bevy 0.19's official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` —
+Bevy 0.20's official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` —
 with a hard 100% `bsn!` (Bevy Scene Notation) authoring contract: every
 production UI tree, including dynamic children and state surfaces, is composed
 as a `Scene` and mounted with `spawn_scene`; observers and required components
@@ -74,7 +74,7 @@ adopted — theme tokens are the only skin authority.
 Dependency whitelist is charter law: `taskmanager-application`,
 `taskmanager-app-host`, `taskmanager-core`, `taskmanager-platform-contract`,
 `taskmanager-shell`, `taskmanager-theme`, `taskmanager-ui-contract`,
-`taskmanager-assets` and exactly-locked `bevy =0.19.1` (features `bevy_ui`,
+`taskmanager-assets` and exactly-locked `bevy =0.20.0-rc.2` (features `bevy_ui`,
 `bevy_ui_widgets`, `bevy_scene` — the bsn! macro — plus the
 render/asset/window closure; Linux adds `wayland` only) — never
 `platform-runtime` or a platform crate. Bevy types never cross this crate's
@@ -95,7 +95,7 @@ spawning is forbidden in production code. ECS systems may update typed
 components on scene-owned entities, wire events/focus, or despawn and replace
 a bounded subtree with another `bsn!` scene. Headless fixtures and Bevy's own
 plugin internals are not production UI authoring routes.
-For scene polymorphism, follow Bevy 0.19's boundary: fixed composition uses
+For scene polymorphism, follow Bevy 0.20's boundary: fixed composition uses
 `impl Scene`, homogeneous lists use `Vec<S>`, and `Vec<Box<dyn Scene>>` is
 reserved for runtime-filtered or heterogeneous children. Every boxed value
 still comes from a `bsn!` Scene adapter; boxing is a type-erasure tool, not a
@@ -132,6 +132,6 @@ highlight, virtual-table-window and chart math, page/widget scene assembly
 on `MinimalPlugins`, plus the drain→summary-line wiring without a
 compositor); real-window pixel evidence belongs to the capture flow defined
 in [`docs/QUALITY_GATES.md`](../../docs/QUALITY_GATES.md). Check the shared
-workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.19 version across
+workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.20 version across
 this crate and `taskmanager-platform-runtime`
 (`cargo tree -p taskmanager-bevy-ui -d`).

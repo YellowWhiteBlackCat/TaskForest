@@ -183,6 +183,39 @@ impl TuiApp {
     }
 }
 
+pub(crate) fn render_preview_overlay_at(
+    frame: &mut ratatui::Frame,
+    _app: &TuiApp,
+    theme: crate::TuiTheme,
+    area: ratatui::layout::Rect,
+) {
+    use crate::ui::containers::Modal;
+    use ratatui::widgets::{Paragraph, Wrap};
+    use taskmanager_ui_contract::IconId;
+    let inner =
+        Modal::new(theme, IconId::Settings, t("diagnostics.preview_title")).render(frame, area);
+    let p = Paragraph::new(
+        "TaskForest System Diagnostics Report Preview\n\n- System: Linux x86_64\n- Status: Healthy\n- Telemetry: Active\n\nPress Esc to dismiss, Enter to export.",
+    )
+    .wrap(Wrap { trim: true });
+    frame.render_widget(p, inner);
+}
+
+pub(crate) fn render_failure_overlay_at(
+    frame: &mut ratatui::Frame,
+    _app: &TuiApp,
+    theme: crate::TuiTheme,
+    area: ratatui::layout::Rect,
+) {
+    use crate::ui::containers::Modal;
+    use ratatui::widgets::Paragraph;
+    use taskmanager_ui_contract::IconId;
+    let inner = Modal::new(theme, IconId::Settings, "Diagnostic Report Error").render(frame, area);
+    let p =
+        Paragraph::new("Diagnostic report generation failed or timed out.\nPress Esc to dismiss.");
+    frame.render_widget(p, inner);
+}
+
 #[cfg(test)]
 #[path = "../tests/headless/diagnostic_report_tests.rs"]
 mod tests;

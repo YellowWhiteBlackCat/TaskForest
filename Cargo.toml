@@ -24,7 +24,7 @@ license = "Apache-2.0"
 repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
 homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 publish = false
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 # The `tests/gui.rs` suite's product target is declared by
 # `taskmanager-gpui` (ADR-051); this host registers only its own suites.
 autotests = false

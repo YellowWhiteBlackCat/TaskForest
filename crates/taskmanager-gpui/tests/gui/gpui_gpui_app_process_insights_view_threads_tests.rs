@@ -63,6 +63,26 @@ fn format_keeps_missing_cpu_time_honest() {
     );
 }
 
+#[test]
+fn format_thread_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::process_telemetry::ThreadWaitKind;
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let line = format_thread(&thread);
+    assert!(line.contains("[futex_wait_queue_me]"));
+    assert!(line.contains("2.5ms"));
+    assert!(line.contains(" D "));
+}
+
 /// Minimal root view that renders one card frame per draw, so the threads card
 /// can be exercised through the same window-draw path the rest of the
 /// process-insights tests use. The card is rebuilt from the typed snapshot on

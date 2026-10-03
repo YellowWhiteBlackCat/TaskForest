@@ -78,9 +78,9 @@ CI runs `cargo geiger` as defense-in-depth (`.github/workflows/ci.yml`). The
 authoritative gate is the architecture test above (ripgrep-based, fast,
 deterministic, runs on every build via the nextest step); geiger is a
 cross-check of the dependency tree and is kept non-blocking because geiger
-releases can lag the repository's compatibility floor (1.97.1) and the current
-stable developer channel. If geiger stabilises across both toolchain lanes it
-can be promoted to blocking; the architecture test holds the line regardless.
+releases can lag the repository's pinned toolchain (1.99.0). If geiger
+stabilises on that toolchain it can be promoted to blocking; the architecture
+test holds the line regardless.
 
 ## Consequences
 

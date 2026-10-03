@@ -42,6 +42,9 @@ pub(crate) use run_task::*;
 pub(crate) mod service_log;
 pub(crate) use service_log::*;
 
+pub(crate) mod diagnostic_preview;
+pub(crate) use diagnostic_preview::*;
+
 /// Select the shell's highest-priority informational overlay.
 pub(super) fn render<'a>(
     app: &'a crate::IcedApp,

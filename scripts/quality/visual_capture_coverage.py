@@ -45,6 +45,14 @@ def gpui_capture_tokens(path: Path) -> set[str]:
     return tokens
 
 
+def audit_doc_scenario_tokens(path: Path) -> set[str]:
+    source = path.read_text(encoding="utf-8")
+    tokens = set(re.findall(r"\|\s*`([a-z0-9-]+)`\s*\|", source))
+    if not tokens:
+        raise CoverageError(f"UI parity audit doc has no scenario tokens: {path}")
+    return tokens
+
+
 def gpui_device_names(path: Path) -> set[str]:
     source = path.read_text(encoding="utf-8")
     names = set(re.findall(r'Some\("([^"]+)"\).*=> SelectedDevice::', source))
@@ -116,6 +124,18 @@ def validate(root: Path) -> dict[str, object]:
     missing_scenarios = sorted(required_scenarios - gpui_scenarios)
     if missing_scenarios:
         raise CoverageError(f"GPUI capture scenarios lack matrix rows: {missing_scenarios}")
+
+    audit_tokens = audit_doc_scenario_tokens(root / "docs/UI_PARITY_AUDIT.md")
+    missing_from_audit = sorted(required_scenarios - audit_tokens)
+    if missing_from_audit:
+        raise CoverageError(
+            f"docs/UI_PARITY_AUDIT.md lacks GPUI scenarios: {missing_from_audit}"
+        )
+    extra_in_audit = sorted(audit_tokens - required_scenarios)
+    if extra_in_audit:
+        raise CoverageError(
+            f"docs/UI_PARITY_AUDIT.md contains unrecognized scenario tokens: {extra_in_audit}"
+        )
     require_compact(gpui_matrix, "page", required_gpui_pages, "GPUI top pages")
     required_gpui_devices = gpui_device_names(
         root / "crates/taskmanager-gpui/src/gpui_app/root/dispatch.rs"
@@ -162,6 +182,38 @@ def validate(root: Path) -> dict[str, object]:
         raise CoverageError(f"Bevy pages lack Wayland coverage: {missing_bevy_pages}")
     require_compact(bevy_matrix, "page", required_bevy_pages, "Bevy pages")
 
+    tui_matrix = read_tsv(root / "scripts/capture_tui_scenarios.tsv")
+    tui_pages = {row["page"] for row in tui_matrix}
+    required_tui_pages = {
+        "applications", "performance", "services", "system", "startup", "users", "app-history"
+    }
+    missing_tui_pages = sorted(required_tui_pages - tui_pages)
+    if missing_tui_pages:
+        raise CoverageError(f"TUI pages lack coverage: {missing_tui_pages}")
+    required_tui_devices = {"cpu", "memory", "disk", "network", "gpu", "battery", "fan"}
+    tui_devices = {row["device"] for row in tui_matrix if row["page"] == "performance"}
+    missing_tui_devices = sorted(required_tui_devices - tui_devices)
+    if missing_tui_devices:
+        raise CoverageError(f"TUI Performance devices lack coverage: {missing_tui_devices}")
+    compact_tui = {row["page"] for row in tui_matrix if row.get("lines") == "16"}
+    missing_tui_compact = sorted(required_tui_pages - compact_tui)
+    if missing_tui_compact:
+        raise CoverageError(f"TUI pages lack compact 54x16 coverage: {missing_tui_compact}")
+
+    parity_floor = 80
+    if len(iced_matrix) < parity_floor:
+        raise CoverageError(
+            f"Iced matrix has {len(iced_matrix)} rows, below parity floor of {parity_floor}"
+        )
+    if len(bevy_matrix) < parity_floor:
+        raise CoverageError(
+            f"Bevy matrix has {len(bevy_matrix)} rows, below parity floor of {parity_floor}"
+        )
+    if len(tui_matrix) < parity_floor:
+        raise CoverageError(
+            f"TUI matrix has {len(tui_matrix)} rows, below parity floor of {parity_floor}"
+        )
+
     return {
         "gpui_rows": len(gpui_matrix),
         "gpui_capture_scenarios": len(required_scenarios),
@@ -170,6 +222,8 @@ def validate(root: Path) -> dict[str, object]:
         "iced_devices": sorted(required_iced_devices),
         "bevy_rows": len(bevy_matrix),
         "bevy_pages": sorted(required_bevy_pages),
+        "tui_rows": len(tui_matrix),
+        "tui_devices": sorted(required_tui_devices),
     }
 
 
@@ -187,7 +241,8 @@ def main() -> int:
         f"(GPUI {summary['gpui_rows']} rows/{summary['gpui_capture_scenarios']} scenarios/"
         f"{len(summary['gpui_devices'])} performance devices; "
         f"Iced {summary['iced_rows']} rows/{len(summary['iced_devices'])} performance devices; "
-        f"Bevy {summary['bevy_rows']} rows/{len(summary['bevy_pages'])} pages)"
+        f"Bevy {summary['bevy_rows']} rows/{len(summary['bevy_pages'])} pages; "
+        f"TUI {summary['tui_rows']} rows/{len(summary['tui_devices'])} performance devices)"
     )
     return 0
 

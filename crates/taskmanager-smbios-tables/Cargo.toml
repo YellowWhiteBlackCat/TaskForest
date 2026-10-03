@@ -2,7 +2,7 @@
 name = "taskmanager-smbios-tables"
 version = "0.2.0-rc3"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 authors = ["TaskForest"]
 license = "Apache-2.0"
 description = "Pure safe SMBIOS record parser — the one authority for Memory Device (type 17) decoding shared by the Linux adapter and the privileged SMBIOS helper (TaskForest, ADR-023)."

@@ -1,13 +1,16 @@
-use super::{IcedApp, apply_capture_target, capture_device_from_name, capture_page_from_name};
+use super::super::capture_state::capture_device_from_name;
+use super::{IcedApp, apply_capture_target, capture_page_from_name};
+use crate::app::DetailsSection;
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
-use taskmanager_application::AppPage;
 use taskmanager_application::ConfigClient;
 use taskmanager_application::ConfigCoordinator;
 use taskmanager_application::ConfigDrain;
+use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
@@ -214,6 +217,211 @@ fn health_capture_target_opens_the_local_surface_through_the_message_reducer() {
     let mut toolbar = IcedApp::demo();
     let _ = toolbar.update(Message::OpenHealth);
     assert_eq!(toolbar.local_surface_kind(), app.local_surface_kind());
+}
+
+#[test]
+fn additional_capture_targets_open_expected_surfaces() {
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "about");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "settings");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Settings));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "containers");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Containers));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "alerts");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::AlertCenter)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "first-run");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::FirstRun));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-details");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Overview);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-properties-performance");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-insights");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Insights);
+    assert!(app.shell.projection().process_insights.is_some());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-affinity");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::ProcessAffinity)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-command");
+    assert!(app.shell.process_properties_target().is_some());
+    assert_eq!(app.details_section(), DetailsSection::Command);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-end-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::EndTask)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-search-highlight");
+    assert_eq!(app.shell.query, "zed");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "services-search-highlight");
+    assert_eq!(app.shell.page(), AppPage::Services);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "run-task");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::RunTask));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "disk-smart");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::DiskSmart));
+}
+
+#[test]
+fn additional_capture_targets_open_expected_surfaces_part2() {
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "service-details-logs");
+    assert!(app.shell.service_log.is_some());
+    assert_eq!(app.shell.page(), AppPage::Services);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-force-kill");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-tree-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "process-batch-confirm");
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::ProcessBatch)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "smart-self-test-confirm");
+    assert!(app.shell.pending_smart_self_test().is_some());
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-impact");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-failure-evidence");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "startup-boot-markers");
+    assert_eq!(app.shell.page(), AppPage::Startup);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "telemetry-paused");
+    assert!(app.shell.paused());
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "sidebar-hidden");
+    assert!(!app.performance.sidebar_visible);
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "diagnostic-preview");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::DiagnosticPreview)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "diagnostic-failure");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::DiagnosticFailure)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "history-replay");
+    assert!(app.history_replay_state().is_open());
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "history-60m");
+    assert!(app.history_replay_state().is_open());
+    assert_eq!(app.history_replay_state().window(), HistoryWindow::OneHour);
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "event-center");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::AlertCenter)
+    );
+    assert!(
+        !app.shell
+            .projection()
+            .alert_center
+            .event_history()
+            .is_empty()
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "settings-permission-center");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Settings));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-zero-gray");
+    assert!(app.preferences().gray_zero_values);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-identity-matrix");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "saved-view-presets");
+    assert!(app.process_columns_menu_open());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "battery-fan-performance");
+    assert!(app.shell.projection().power_supplies.is_some());
+    assert!(app.shell.projection().sensors.is_some());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "device-hotplug");
+    assert!(app.performance.sidebar_visible);
+    assert!(
+        app.shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .is_some_and(|s| s.disks.iter().any(|d| d.name.contains("sdb")))
+    );
 }
 
 impl IcedApp {

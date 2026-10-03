@@ -294,7 +294,12 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
     } else {
         JustifyContent::FlexStart
     };
-    let role = if label { Role::Caption } else { Role::Body };
+    let is_zero = cell == "0" || cell == "0.0%" || cell == "0 B" || cell == "0 B/s";
+    let role = if label || is_zero {
+        Role::Caption
+    } else {
+        Role::Body
+    };
     bsn! {
         Node {
             width: px(width),
@@ -305,7 +310,7 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
             overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }
@@ -369,8 +374,8 @@ fn header_cell_scene(
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
         Children [
-            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
-            { indicator },
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
+            { indicator }
         ]
     }
 }

@@ -378,7 +378,7 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
         ConfirmationOverlay
         ArmedConfirmation({ Some(armed) })
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -402,9 +402,9 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(body) TextRole(Role::Body) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Text(body) TextRole(Role::Body) --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -414,24 +414,24 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text(confirm)
                         TextRole(Role::Body)
                         ConfirmChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_confirm_activated)
-                    ),
-                    (
+                    --
+
                         Text(cancel)
                         TextRole(Role::Caption)
                         DismissChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_dismiss_activated)
-                    ),
+
                 ]
-            ),
+
         ]
     }
 }
@@ -440,6 +440,36 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
 /// window plugin; the input seam triggers [`ConfirmationChanged`].
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_confirmation_changed);
+    app.add_systems(bevy::app::Startup, init_capture_confirmation);
+}
+
+pub(crate) fn init_capture_confirmation(
+    track: Option<bevy::ecs::system::NonSend<crate::app::FrontendTrack>>,
+    mut commands: Commands,
+) {
+    let Some(track) = track else { return };
+    if let Some(view) = track
+        .shell
+        .pending_confirmation()
+        .and_then(PendingConfirmationView::from_pending)
+    {
+        commands.trigger(ConfirmationChanged(Some(view)));
+    }
+    if let Some(target) = crate::capture::capture_scenario_target() {
+        if target == "about" || target == "system-about" {
+            commands.trigger(crate::about_modal::AboutModalChanged(true));
+        } else if target == "first-run" {
+            commands.trigger(crate::first_run_modal::FirstRunModalChanged(true));
+        } else if target == "diagnostic-preview" {
+            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
+                crate::pages::system::DiagnosticModalKind::Preview,
+            )));
+        } else if target == "diagnostic-failure" {
+            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
+                crate::pages::system::DiagnosticModalKind::Failure,
+            )));
+        }
+    }
 }
 
 #[cfg(test)]

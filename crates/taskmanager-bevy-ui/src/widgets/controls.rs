@@ -58,7 +58,7 @@ pub(crate) enum ControlTone {
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ControlVisual(pub(crate) ControlTone, pub(crate) bool);
 
-/// Resolve one control fill from the theme tokens and Bevy 0.19 interaction
+/// Resolve one control fill from the theme tokens and Bevy 0.20 interaction
 /// state. Hover and pressed are transient; selected is the page-owned state.
 pub(crate) fn control_background(
     visual: &ControlVisual,
@@ -115,7 +115,7 @@ pub(crate) fn surface_scene(
         }
         BackgroundColor({ surface_fill(tone, palette) })
         Children [
-            { children },
+            { children }
         ]
     }
 }
@@ -139,14 +139,14 @@ pub(crate) fn stat_row_scene(
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            (
+
                 Node {
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     min_width: px(0.0),
                     flex_shrink: 1.0,
@@ -154,8 +154,8 @@ pub(crate) fn stat_row_scene(
                     justify_content: JustifyContent::FlexEnd,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( { value } ) ]
-            ),
+                Children [  @{ value }  ]
+
         ]
     }
 }
@@ -178,7 +178,7 @@ pub(crate) fn pill_scene(label: String, active: bool, palette: &UiPalette) -> im
         ControlVisual(ControlTone::Surface, active)
         Button
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -210,8 +210,8 @@ pub(crate) fn device_row_with_accessory_scene(
         ControlVisual(ControlTone::Surface, selected)
         Button
         Children [
-            ( { accessory } Pickable::IGNORE ),
-            (
+             @{ accessory } Pickable::IGNORE --
+
                 Node {
                     flex_grow: 1.0,
                     min_width: px(0.0),
@@ -222,10 +222,10 @@ pub(crate) fn device_row_with_accessory_scene(
                 }
                 Pickable::IGNORE
                 Children [
-                    ( Text(title) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
-                    ( { caption } Pickable::IGNORE ),
+                     Text(title) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
+                     @{ caption } Pickable::IGNORE
                 ]
-            ),
+
         ]
     }
 }
@@ -267,9 +267,9 @@ pub(crate) fn graph_card_scene(
         }
         BackgroundColor({ surface_fill(SurfaceTone::Content, palette) })
         Children [
-            ( Text(title) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-            ( Text(subtitle) TextRole(Role::Caption) ),
-            ( { graph } ),
+             Text(title) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+             Text(subtitle) TextRole(Role::Caption) --
+             @{ graph }
         ]
     }
 }
