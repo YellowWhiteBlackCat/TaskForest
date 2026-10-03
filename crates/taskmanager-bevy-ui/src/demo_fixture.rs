@@ -17,7 +17,9 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
@@ -29,7 +31,7 @@ use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
 use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessItem,
 };
 use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
@@ -409,6 +411,59 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 seed_projection_fact(shell, ProjectionSeedFact::Snapshot(Box::new(Some(s))));
             }
         }
+        "apps-identity-matrix" => {
+            let mut procs = shell
+                .projection()
+                .processes
+                .as_ref()
+                .map(|p| (**p).clone())
+                .unwrap_or_default();
+            let mut p1 = ProcessItem::new(93401, "chrome-mail");
+            p1.cmdline =
+                "/opt/google/chrome/chrome --profile-directory=Default --app-id=abc123".into();
+            let mut p2 = ProcessItem::new(93402, "snap-core");
+            p2.cmdline = "/snap/core/current/usr/lib/snapd/snapd".into();
+            procs.insert(0, p1);
+            procs.insert(1, p2);
+            seed_projection_fact(shell, ProjectionSeedFact::Processes(Some(procs)));
+        }
+        "event-center" => {
+            shell.replace_alert_event_history(capture_event_fixture());
+        }
         _ => {}
     }
+}
+
+pub(crate) fn capture_event_fixture() -> Vec<AlertEvent> {
+    let warning = Alert {
+        instance_id: "capture-cpu:system".into(),
+        rule_id: "capture-cpu".into(),
+        target: "CPU".into(),
+        metric: AlertMetric::CpuUsagePercent,
+        severity: AlertSeverity::Warning,
+        value: 93.0,
+        threshold: 90.0,
+        active_since_ms: 3_590_000,
+    };
+    let activated = AlertEvent {
+        id: 1,
+        kind: AlertEventKind::Activated,
+        alert: warning.clone(),
+        observed_at_ms: 3_590_000,
+    };
+    let mut cleared = warning;
+    cleared.instance_id = "capture-memory:system".into();
+    cleared.rule_id = "capture-memory".into();
+    cleared.metric = AlertMetric::MemoryUsagePercent;
+    cleared.target = "Memory".into();
+    cleared.value = 74.0;
+    vec![
+        activated,
+        AlertEvent {
+            id: 2,
+            kind: AlertEventKind::Cleared,
+            alert: cleared,
+            observed_at_ms: 3_560_000,
+        },
+    ]
 }

@@ -34,6 +34,7 @@ use taskmanager_theme::Theme;
 
 use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
 use crate::app::FrontendTrack;
+use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
 use crate::input::PendingEffects;
 use crate::window::{FeedbackLine, FrontendWindowPlugin};
 use taskmanager_application::PendingConfirmation;
@@ -336,8 +337,8 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
         ("process-batch-confirm", ConfirmationKind::ProcessBatch),
         ("smart-self-test-confirm", ConfirmationKind::SmartSelfTest),
     ] {
-        let mut shell = crate::demo_fixture::demo_shell();
-        crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, scenario);
+        let mut shell = demo_shell();
+        seed_capture_confirmation_scenario(&mut shell, scenario);
         assert_eq!(
             shell.application.interaction.confirmation_kind(),
             Some(expected_kind),
@@ -348,17 +349,31 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
 
 #[test]
 fn capture_system_sensor_alert_scenarios_seed_fixtures() {
-    let mut shell = crate::demo_fixture::demo_shell();
-    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "system-npu");
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "system-npu");
     assert!(shell.projection().npu_inventory.is_some());
 
-    let mut shell = crate::demo_fixture::demo_shell();
-    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "sensor-center");
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "sensor-center");
     assert!(shell.projection().sensors.is_some());
 
-    let mut shell = crate::demo_fixture::demo_shell();
-    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "active-alert");
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "active-alert");
     assert!(!shell.projection().alert_active.is_empty());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "event-center");
+    assert!(!shell.projection().alert_center.event_history().is_empty());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "apps-identity-matrix");
+    assert!(
+        shell
+            .projection()
+            .processes
+            .as_ref()
+            .is_some_and(|p| p.iter().any(|proc| proc.cmdline.contains("chrome")))
+    );
 }
 
 #[test]

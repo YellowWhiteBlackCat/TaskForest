@@ -77,9 +77,12 @@ use crate::widgets::controls::ControlVisual;
 use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod replay;
 pub(crate) mod scene;
 
 mod metrics;
+
+pub(crate) use replay::{PerformanceHistoryReplay, PerformanceHistoryReplayStrip};
 
 use bevy::math::Rot2;
 use bevy::ui::UiTransform;
@@ -241,6 +244,7 @@ type WideNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceWideNav>
 type CompactNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactNav>>;
 type CompactPillsQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactDevicePills>>;
 type OptionalCoreGridQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceOptionalCoreGrid>>;
+type ReplayStripQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceHistoryReplayStrip>>;
 
 /// Once-per-`World` guard so remounts never stack duplicate observers (two
 /// observers on one trigger would run before either's spawn commands apply
@@ -561,6 +565,7 @@ fn sync_device_focus_changed(
 pub(crate) fn sync_performance_layout(
     windows: Query<&Window, bevy::ecs::query::With<PrimaryWindow>>,
     sidebar: Option<Res<PerformanceSidebarVisible>>,
+    replay: Option<Res<PerformanceHistoryReplay>>,
     mut state: ResMut<PerformanceLayoutState>,
     mut rails: ParamSet<(
         DeviceRailQuery<'_, '_>,
@@ -569,6 +574,7 @@ pub(crate) fn sync_performance_layout(
         CompactNavQuery<'_, '_>,
         CompactPillsQuery<'_, '_>,
         OptionalCoreGridQuery<'_, '_>,
+        ReplayStripQuery<'_, '_>,
     )>,
 ) {
     let width = windows.iter().next().map_or(1180.0, Window::width);
@@ -609,6 +615,14 @@ pub(crate) fn sync_performance_layout(
             PerformanceLayoutMode::Wide if cpu_core_grid_visible(height) => Display::Flex,
             PerformanceLayoutMode::Compact => Display::None,
             PerformanceLayoutMode::Wide => Display::None,
+        };
+    }
+    let replay_on = replay.as_deref().is_some_and(|r| r.open);
+    for mut node in &mut rails.p6() {
+        node.display = if replay_on {
+            Display::Flex
+        } else {
+            Display::None
         };
     }
 }

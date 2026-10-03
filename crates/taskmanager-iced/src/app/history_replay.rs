@@ -6,7 +6,7 @@ use taskmanager_application::{
     HistoryReplayCompletionDisposition, HistoryReplayController, HistoryReplayRequest,
     HistoryReplayRequestId,
 };
-use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 use super::IcedApp;
 use taskmanager_app_host::HistoryFrontendConnectRequestId;
@@ -348,7 +348,23 @@ impl IcedApp {
     }
 
     pub(crate) fn history_replay_entry_available(&self) -> bool {
-        self.history_runtime.is_active()
+        self.history_runtime.is_active() || self.is_demo()
+    }
+
+    pub(crate) fn seed_capture_history_replay(&mut self) {
+        let replay = self.history_runtime.replay_mut();
+        replay.presentation = IcedHistoryPresentation::Replay;
+        let series_key = HistorySeriesKey::system(HistoryMetric::CpuUsagePct);
+        let samples: Rc<[f32]> = vec![24.0, 35.0, 42.0, 38.0, 55.0, 62.0, 48.0, 39.0].into();
+        replay.rows = vec![HistoryReplayRow {
+            key: series_key,
+            samples,
+            peak_value: Some(62.0),
+            peak_measured_at_ms: Some(1_700_000_000_000),
+            observed: 8,
+            gaps: 0,
+            clock_jumps: 0,
+        }];
     }
 
     /// Whether persistence was requested for this run but the replay runtime

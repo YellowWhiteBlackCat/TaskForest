@@ -10,6 +10,7 @@ use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
@@ -361,6 +362,37 @@ fn additional_capture_targets_open_expected_surfaces() {
         app.local_surface_kind(),
         Some(LocalSurfaceKind::DiagnosticFailure)
     );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "history-replay");
+    assert!(app.history_replay_state().is_open());
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "history-60m");
+    assert!(app.history_replay_state().is_open());
+    assert_eq!(app.history_replay_state().window(), HistoryWindow::OneHour);
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "event-center");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::AlertCenter)
+    );
+    assert!(!app.shell.projection().alert_center.event_history().is_empty());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "settings-permission-center");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Settings));
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-zero-gray");
+    assert!(app.preferences().gray_zero_values);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "apps-identity-matrix");
+    assert_eq!(app.shell.page(), AppPage::Applications);
 }
 
 impl IcedApp {

@@ -79,6 +79,24 @@ impl TuiHistoryRuntime {
             .application_history_projection(self.capability())
     }
 
+    pub(crate) const fn is_open(&self) -> bool {
+        self.controller.is_open()
+    }
+
+    pub(crate) fn open(&mut self) -> Option<HistoryReplayRequest> {
+        let request = self.controller.open().ok();
+        self.submit_new_request(request);
+        request
+    }
+
+    pub(crate) fn close(&mut self) {
+        self.controller.close();
+    }
+
+    pub(crate) const fn window(&self) -> HistoryWindow {
+        self.controller.selected_window()
+    }
+
     pub(crate) fn select_window(&mut self, window: HistoryWindow) -> bool {
         let request = self.controller.select_window(window).ok();
         let changed = request.is_some();
@@ -185,6 +203,26 @@ impl TuiApp {
 
     pub(crate) fn select_application_history_window(&mut self, window: HistoryWindow) -> bool {
         self.history_runtime.select_window(window)
+    }
+
+    pub fn history_replay_open(&self) -> bool {
+        self.history_runtime.is_open()
+    }
+
+    pub fn open_history_replay(&mut self) {
+        let _ = self.history_runtime.open();
+    }
+
+    pub fn close_history_replay(&mut self) {
+        self.history_runtime.close();
+    }
+
+    pub fn select_history_replay_window(&mut self, window: HistoryWindow) -> bool {
+        self.history_runtime.select_window(window)
+    }
+
+    pub fn history_replay_window(&self) -> HistoryWindow {
+        self.history_runtime.window()
     }
 
     pub(crate) fn drain_history_replay_completions(&mut self) -> bool {

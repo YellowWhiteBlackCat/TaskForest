@@ -5,7 +5,7 @@
 //! `pub use` in `lib.rs`.
 
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
-use crate::{PerfDevice, TuiApp};
+use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
@@ -13,6 +13,7 @@ use taskmanager_application::{
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::ScalarObservationGroup;
@@ -31,9 +32,9 @@ use taskmanager_shell::fixture::{
 mod fixtures;
 pub(crate) use fixtures::seed_fan_capture_sensors;
 use fixtures::{
-    demo_boot_evidence, demo_directory_usage, seed_capture_identity_matrix,
-    seed_capture_storage_scenario, seed_demo_npu_inventory, seed_gpu_capture_history,
-    seed_service_log_fixture,
+    demo_boot_evidence, demo_directory_usage, seed_alert_event_history_fixture,
+    seed_capture_identity_matrix, seed_capture_storage_scenario, seed_demo_npu_inventory,
+    seed_gpu_capture_history, seed_service_log_fixture,
 };
 
 impl TuiApp {
@@ -624,6 +625,24 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             // Paint clamps this intent to the last legal viewport, exercising the
             // same path a user reaches with PageDown.
             app.system_scroll = usize::MAX;
+        }
+        "history-replay" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+            app.open_history_replay();
+        }
+        "history-60m" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+            app.open_history_replay();
+            let _ = app.select_history_replay_window(HistoryWindow::OneHour);
+        }
+        "event-center" => {
+            seed_alert_event_history_fixture(&mut app.shell);
+            app.open_local_surface(TuiSurface::Health);
+        }
+        "settings-permission-center" => {
+            app.open_local_surface(TuiSurface::Settings);
         }
         _ => {}
     }

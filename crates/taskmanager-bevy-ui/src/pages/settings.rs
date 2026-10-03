@@ -65,6 +65,9 @@ use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::appearance::PreferredColorScheme;
 
+mod privilege_center;
+use privilege_center::privileges_section_scene;
+
 /// The telemetry refresh-cadence choices (ms), in display order — the same
 /// four steps the TUI settings form exposes.
 pub(crate) const REFRESH_CHOICES_MS: [u64; 4] = [500, 1000, 2000, 5000];
@@ -595,6 +598,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             if paused { "paused" } else { "live" },
         ),
     ];
+    let mut rows = rows;
+    rows.push(privileges_section_scene(context.palette));
     bsn! {
         Node {
             width: percent(100),

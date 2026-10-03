@@ -58,6 +58,7 @@ pub(crate) mod about_modal;
 pub mod app;
 pub mod bindings;
 pub mod capabilities;
+pub(crate) mod capture;
 pub mod confirmation;
 pub mod demo_fixture;
 pub mod drain;

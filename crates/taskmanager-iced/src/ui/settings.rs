@@ -29,9 +29,11 @@ use super::overlays::modal_overlay;
 use taskmanager_application::i18n::t;
 
 mod controls;
+mod privilege_center;
 mod shortcuts;
 
 use controls::*;
+use privilege_center::privileges_group;
 use shortcuts::shortcut_section;
 
 /// The scrollable body height (px contract): the grouped page needs more
@@ -71,6 +73,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         appearance_group(theme_snapshot, language, app, prefs),
         fonts_group(theme_snapshot, language, app, prefs),
         system_group(theme_snapshot, language, prefs),
+        privileges_group(theme_snapshot),
         notifications_group(theme_snapshot, prefs),
         units_group(theme_snapshot, language, prefs),
     ];

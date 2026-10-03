@@ -4,6 +4,9 @@ use taskmanager_application::{
     CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
 };
 use taskmanager_core::SystemSnapshot;
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+};
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::directory_usage::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
@@ -386,4 +389,38 @@ pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
     processes.insert(0, p1);
     processes.insert(1, p2);
     processes.insert(2, p3);
+}
+
+pub(super) fn seed_alert_event_history_fixture(shell: &mut ShellApp) {
+    let warning = Alert {
+        instance_id: "capture-cpu:system".into(),
+        rule_id: "capture-cpu".into(),
+        target: "CPU".into(),
+        metric: AlertMetric::CpuUsagePercent,
+        severity: AlertSeverity::Warning,
+        value: 93.0,
+        threshold: 90.0,
+        active_since_ms: 3_590_000,
+    };
+    let activated = AlertEvent {
+        id: 1,
+        kind: AlertEventKind::Activated,
+        alert: warning.clone(),
+        observed_at_ms: 3_590_000,
+    };
+    let mut cleared = warning;
+    cleared.instance_id = "capture-memory:system".into();
+    cleared.rule_id = "capture-memory".into();
+    cleared.metric = AlertMetric::MemoryUsagePercent;
+    cleared.target = "Memory".into();
+    cleared.value = 74.0;
+    shell.replace_alert_event_history(vec![
+        activated,
+        AlertEvent {
+            id: 2,
+            kind: AlertEventKind::Cleared,
+            alert: cleared,
+            observed_at_ms: 3_560_000,
+        },
+    ]);
 }

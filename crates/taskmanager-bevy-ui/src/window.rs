@@ -48,19 +48,25 @@ use bevy::ui::prelude::{
     percent,
 };
 use bevy::ui::widget::Text;
-use bevy::window::{Window, WindowPlugin, WindowResolution};
+use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
 use taskmanager_assets::product;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
+use crate::capture::{
+    capture_page, capture_page_name, capture_perf_device_target, capture_scenario_target,
+    capture_wants_service_logs, capture_window_resolution,
+};
 use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
 };
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
-use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
+use crate::pages::performance::{
+    PerformanceHistoryReplay, PerformanceLayoutState, sync_performance_layout,
+};
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
@@ -68,6 +74,7 @@ use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::ShellApp;
 
@@ -299,102 +306,6 @@ fn emit_capture_marker(
     marker.0 = true;
 }
 
-fn capture_page_name(page: crate::app::Page) -> &'static str {
-    if let Some(target) = capture_scenario_target() {
-        return target;
-    }
-    match page {
-        crate::app::Page::Processes => "applications",
-        crate::app::Page::Performance => "performance",
-        crate::app::Page::Services => "services",
-        crate::app::Page::System => "system",
-        crate::app::Page::Startup => "startup",
-        crate::app::Page::Sessions => "users",
-        crate::app::Page::Alerts => "alerts",
-        crate::app::Page::Settings => "settings",
-        crate::app::Page::AppHistory => "app-history",
-        crate::app::Page::Containers => "containers",
-    }
-}
-
-fn capture_scenario_target() -> Option<&'static str> {
-    let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "service-logs" => Some("service-logs"),
-        "perf-memory" => Some("perf-memory"),
-        "perf-disk" => Some("perf-disk"),
-        "perf-network" => Some("perf-network"),
-        "perf-gpu" => Some("perf-gpu"),
-        "perf-battery" => Some("perf-battery"),
-        "process-force-kill" => Some("process-force-kill"),
-        "process-tree-confirm" => Some("process-tree-confirm"),
-        "process-batch-confirm" => Some("process-batch-confirm"),
-        "smart-self-test-confirm" => Some("smart-self-test-confirm"),
-        "process-properties-performance" => Some("process-properties-performance"),
-        "process-memory-pss-swap" => Some("process-memory-pss-swap"),
-        "process-network-details" => Some("process-network-details"),
-        "process-gpu-details" => Some("process-gpu-details"),
-        "process-resource-limits" => Some("process-resource-limits"),
-        "process-isolation" => Some("process-isolation"),
-        "startup-impact" => Some("startup-impact"),
-        "startup-failure-evidence" => Some("startup-failure-evidence"),
-        "startup-boot-markers" => Some("startup-boot-markers"),
-        "services-search-highlight" => Some("services-search-highlight"),
-        "apps-search-highlight" => Some("apps-search-highlight"),
-        "apps-group-expanded" => Some("apps-group-expanded"),
-        "telemetry-paused" => Some("telemetry-paused"),
-        "sidebar-hidden" => Some("sidebar-hidden"),
-        "about" => Some("about"),
-        "system-about" => Some("system-about"),
-        "system-dashboard" => Some("system-dashboard"),
-        "system-hardware" => Some("system-hardware"),
-        "system-npu" => Some("system-npu"),
-        "sensor-center" => Some("sensor-center"),
-        "storage-health" => Some("storage-health"),
-        "active-alert" => Some("active-alert"),
-        "alert-rules-manager" => Some("alert-rules-manager"),
-        "smart-missing-tool" => Some("smart-missing-tool"),
-        "smart-permission" => Some("smart-permission"),
-        "partition-disk-usage" => Some("partition-disk-usage"),
-        "partition-live-usage" => Some("partition-live-usage"),
-        "gpu-engine-inventory" => Some("gpu-engine-inventory"),
-        "intel-gpu-telemetry" => Some("intel-gpu-telemetry"),
-        _ => None,
-    }
-}
-
-fn capture_perf_device_target() -> Option<crate::pages::performance::PerformanceDeviceTarget> {
-    use crate::pages::performance::PerformanceDeviceTarget;
-
-    let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "perf-memory" => Some(PerformanceDeviceTarget::Memory),
-        "perf-disk"
-        | "storage-health"
-        | "smart-missing-tool"
-        | "smart-permission"
-        | "partition-disk-usage"
-        | "partition-live-usage" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
-        "perf-network" => Some(PerformanceDeviceTarget::Network(
-            "network:demo:wlan0".into(),
-        )),
-        "perf-gpu" | "gpu-engine-inventory" | "intel-gpu-telemetry" => {
-            Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into()))
-        }
-        "perf-battery" | "sensor-center" => {
-            Some(PerformanceDeviceTarget::Battery("battery:demo:0".into()))
-        }
-        _ => None,
-    }
-}
-
-/// The capture scenario that renders the Services page with the log panel
-/// open over a seeded fixture feed. Production routing is untouched: the
-/// env var exists only inside the demo capture composition.
-fn capture_wants_service_logs() -> bool {
-    std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|value| value.trim() == "service-logs")
-}
-
 /// Compose the history connector at the native edge. The config preference is
 /// read once at startup through the bounded app-host client; disabled history
 /// does not launch a writer, replay worker, or frontend connector.
@@ -416,66 +327,6 @@ fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
         runtime.install_connector(host.history_frontend_connector());
     }
     runtime
-}
-
-fn capture_page() -> Option<crate::app::Page> {
-    let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
-    match value.trim().to_ascii_lowercase().as_str() {
-        "applications"
-        | "processes"
-        | "process-force-kill"
-        | "process-tree-confirm"
-        | "process-batch-confirm"
-        | "process-properties-performance"
-        | "process-memory-pss-swap"
-        | "process-network-details"
-        | "process-gpu-details"
-        | "process-resource-limits"
-        | "process-isolation"
-        | "apps-search-highlight"
-        | "apps-group-expanded" => Some(crate::app::Page::Processes),
-        "performance"
-        | "perf-memory"
-        | "perf-disk"
-        | "perf-network"
-        | "perf-gpu"
-        | "perf-battery"
-        | "smart-self-test-confirm"
-        | "telemetry-paused"
-        | "sidebar-hidden"
-        | "sensor-center"
-        | "storage-health"
-        | "smart-missing-tool"
-        | "smart-permission"
-        | "partition-disk-usage"
-        | "partition-live-usage"
-        | "gpu-engine-inventory"
-        | "intel-gpu-telemetry" => Some(crate::app::Page::Performance),
-        "services" | "service-logs" | "services-search-highlight" => {
-            Some(crate::app::Page::Services)
-        }
-        "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
-            Some(crate::app::Page::Startup)
-        }
-        "system" | "system-dashboard" | "system-hardware" | "system-npu" | "about"
-        | "system-about" => Some(crate::app::Page::System),
-        "alerts" | "active-alert" | "alert-rules-manager" => Some(crate::app::Page::Alerts),
-        "users" | "sessions" => Some(crate::app::Page::Sessions),
-        "settings" => Some(crate::app::Page::Settings),
-        "app-history" | "history" => Some(crate::app::Page::AppHistory),
-        "containers" => Some(crate::app::Page::Containers),
-        _ => None,
-    }
-}
-
-fn capture_window_resolution() -> WindowResolution {
-    let raw = std::env::var("TM_BEVY_WINDOW_SIZE").unwrap_or_default();
-    let (width, height) = raw
-        .split_once('x')
-        .and_then(|(width, height)| Some((width.parse::<u32>().ok()?, height.parse::<u32>().ok()?)))
-        .filter(|(width, height)| *width >= 720 && *height >= 480)
-        .unwrap_or((1180, 780));
-    WindowResolution::new(width, height)
 }
 
 /// Wires the frontend-owned seams and app shell into one bevy `App`.
@@ -511,6 +362,16 @@ impl Plugin for FrontendWindowPlugin {
         }
         if std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|v| v.trim() == "sidebar-hidden") {
             app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
+        }
+        app.init_resource::<PerformanceHistoryReplay>();
+        if let Some(target) = capture_scenario_target() {
+            if target == "history-replay" || target == "history-60m" {
+                app.insert_resource(PerformanceHistoryReplay {
+                    open: true,
+                    playing: false,
+                    window: HistoryWindow::OneHour,
+                });
+            }
         }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while

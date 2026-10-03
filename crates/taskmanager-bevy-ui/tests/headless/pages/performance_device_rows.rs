@@ -10,12 +10,14 @@ use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
+use bevy::ui::prelude::{Display, Node};
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
+use super::replay::PerformanceHistoryReplayStrip;
 use super::scene::content;
 use super::tests::{block_keys, dyn_text_value};
 use super::{DynField, Section, section_keys};
@@ -412,4 +414,29 @@ fn battery_block_renders_voltage_health_and_cycles() {
     assert!(texts.iter().any(|t| t == "Primary Battery"));
 
     assert!(world.despawn(root), "the seeded page despawns cleanly");
+}
+
+#[test]
+fn performance_history_replay_strip_visibility_tracks_resource() {
+    let mut app = headless_scene_app();
+    let shell = ShellApp::new();
+    let palette = ui_palette(&Theme::dark());
+    let history = crate::pages::history::HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
+    let context = PageContext {
+        shell: &shell,
+        process_tree_expansion: &process_tree_expansion,
+        palette: &palette,
+        history: &history.0,
+    };
+    let world = app.world_mut();
+    let root = world.spawn_scene(content(&context)).expect("scene mounts").id();
+
+    let display = {
+        let mut query = world.query::<(&PerformanceHistoryReplayStrip, &Node)>();
+        query.iter(world).next().map(|(_, node)| node.display).unwrap_or(Display::None)
+    };
+
+    assert_eq!(display, Display::None);
+    assert!(world.despawn(root));
 }

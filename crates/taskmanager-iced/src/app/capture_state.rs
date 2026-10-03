@@ -9,7 +9,11 @@ use taskmanager_application::{
 use taskmanager_core::SystemSnapshot;
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+};
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::npu::{
@@ -240,6 +244,18 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
             seed_capture_identity_matrix(&mut procs);
             seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
         }
+    } else if target == "history-replay" || target == "history-60m" {
+        app.shell.application.active_page = AppPage::Performance;
+        app.seed_capture_history_replay();
+        if target == "history-60m" {
+            app.select_history_replay_window(HistoryWindow::OneHour);
+        }
+    } else if target == "event-center" {
+        app.shell
+            .replace_alert_event_history(capture_event_fixture());
+        app.open_local_surface(LocalSurface::AlertCenter);
+    } else if target == "settings-permission-center" {
+        app.open_local_surface(LocalSurface::Settings);
     } else if let Some(page) = capture_page_from_name(target) {
         app.shell.application.active_page = page;
         if page == AppPage::System {
@@ -499,4 +515,38 @@ pub(super) fn capture_page_from_name(name: &str) -> Option<AppPage> {
         "app-history" => Some(AppPage::AppHistory),
         _ => None,
     }
+}
+
+fn capture_event_fixture() -> Vec<AlertEvent> {
+    let warning = Alert {
+        instance_id: "capture-cpu:system".into(),
+        rule_id: "capture-cpu".into(),
+        target: "CPU".into(),
+        metric: AlertMetric::CpuUsagePercent,
+        severity: AlertSeverity::Warning,
+        value: 93.0,
+        threshold: 90.0,
+        active_since_ms: 3_590_000,
+    };
+    let activated = AlertEvent {
+        id: 1,
+        kind: AlertEventKind::Activated,
+        alert: warning.clone(),
+        observed_at_ms: 3_590_000,
+    };
+    let mut cleared = warning;
+    cleared.instance_id = "capture-memory:system".into();
+    cleared.rule_id = "capture-memory".into();
+    cleared.metric = AlertMetric::MemoryUsagePercent;
+    cleared.target = "Memory".into();
+    cleared.value = 74.0;
+    vec![
+        activated,
+        AlertEvent {
+            id: 2,
+            kind: AlertEventKind::Cleared,
+            alert: cleared,
+            observed_at_ms: 3_560_000,
+        },
+    ]
 }
