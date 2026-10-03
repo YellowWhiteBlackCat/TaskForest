@@ -115,7 +115,7 @@ pub(crate) fn history_replay_strip_scene(
                     column_gap: Val::Px(space_4()),
                 }
                 Children [
-                    @{ window_pills }
+                    { window_pills }
                 ]
             ] --
             Node {

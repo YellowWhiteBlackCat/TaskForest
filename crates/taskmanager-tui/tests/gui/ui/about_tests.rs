@@ -110,16 +110,19 @@ fn capture_scene_overrides_activate_expected_state() {
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "history-60m");
     assert!(app.history_replay_open());
-    assert_eq!(
-        app.history_replay_window(),
-        HistoryWindow::OneHour
-    );
+    assert_eq!(app.history_replay_window(), HistoryWindow::OneHour);
     assert_eq!(app.shell.page(), AppPage::Performance);
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "event-center");
     assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::Health));
-    assert!(!app.shell.projection().alert_center.event_history().is_empty());
+    assert!(
+        !app.shell
+            .projection()
+            .alert_center
+            .event_history()
+            .is_empty()
+    );
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "settings-permission-center");

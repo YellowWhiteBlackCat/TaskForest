@@ -380,7 +380,13 @@ fn additional_capture_targets_open_expected_surfaces() {
         app.local_surface_kind(),
         Some(LocalSurfaceKind::AlertCenter)
     );
-    assert!(!app.shell.projection().alert_center.event_history().is_empty());
+    assert!(
+        !app.shell
+            .projection()
+            .alert_center
+            .event_history()
+            .is_empty()
+    );
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "settings-permission-center");

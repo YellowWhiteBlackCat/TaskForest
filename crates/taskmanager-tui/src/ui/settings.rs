@@ -600,19 +600,34 @@ pub(super) fn render_settings_overlay_at(
     )]));
     lines.push(Line::from(vec![
         Span::styled(format!("  {}: ", t("gpu.per_engine_title")), Style::new()),
-        Span::styled(t("settings.privileges_enabled"), Style::new().fg(theme.accent)),
+        Span::styled(
+            t("settings.privileges_enabled"),
+            Style::new().fg(theme.accent),
+        ),
     ]));
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}: ", t("system.memory_inventory")), Style::new()),
-        Span::styled(t("settings.privileges_enabled"), Style::new().fg(theme.accent)),
+        Span::styled(
+            format!("  {}: ", t("system.memory_inventory")),
+            Style::new(),
+        ),
+        Span::styled(
+            t("settings.privileges_enabled"),
+            Style::new().fg(theme.accent),
+        ),
     ]));
     lines.push(Line::from(vec![
         Span::styled(format!("  {}: ", t("cpu.package_power")), Style::new()),
-        Span::styled(t("settings.privileges_authorize_hint"), Style::new().fg(theme.dim)),
+        Span::styled(
+            t("settings.privileges_authorize_hint"),
+            Style::new().fg(theme.dim),
+        ),
     ]));
     lines.push(Line::from(vec![
         Span::styled(format!("  {}: ", t("cpu.msr_readouts")), Style::new()),
-        Span::styled(t("settings.privileges_authorize_hint"), Style::new().fg(theme.dim)),
+        Span::styled(
+            t("settings.privileges_authorize_hint"),
+            Style::new().fg(theme.dim),
+        ),
     ]));
     // Scroll the focused field into view on short terminals (the body shows
     // roughly `body.height - 1` rows; a focused field past that window is

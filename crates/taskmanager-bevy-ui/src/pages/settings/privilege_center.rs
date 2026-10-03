@@ -45,7 +45,7 @@ pub(crate) fn privileges_section_scene(palette: &UiPalette) -> Box<dyn Scene> {
         Children [
             Text(t("settings.privileges")) TextRole(Role::Heading) --
             Text(t("settings.privileges_hint")) TextRole(Role::Caption) --
-            @{ rows }
+            { rows }
         ]
     })
 }

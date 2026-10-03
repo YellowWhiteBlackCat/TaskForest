@@ -430,11 +430,18 @@ fn performance_history_replay_strip_visibility_tracks_resource() {
         history: &history.0,
     };
     let world = app.world_mut();
-    let root = world.spawn_scene(content(&context)).expect("scene mounts").id();
+    let root = world
+        .spawn_scene(content(&context))
+        .expect("scene mounts")
+        .id();
 
     let display = {
         let mut query = world.query::<(&PerformanceHistoryReplayStrip, &Node)>();
-        query.iter(world).next().map(|(_, node)| node.display).unwrap_or(Display::None)
+        query
+            .iter(world)
+            .next()
+            .map(|(_, node)| node.display)
+            .unwrap_or(Display::None)
     };
 
     assert_eq!(display, Display::None);
