@@ -364,14 +364,14 @@ impl Plugin for FrontendWindowPlugin {
             app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
         }
         app.init_resource::<PerformanceHistoryReplay>();
-        if let Some(target) = capture_scenario_target() {
-            if target == "history-replay" || target == "history-60m" {
-                app.insert_resource(PerformanceHistoryReplay {
-                    open: true,
-                    playing: false,
-                    window: HistoryWindow::OneHour,
-                });
-            }
+        if let Some(target) = capture_scenario_target()
+            && (target == "history-replay" || target == "history-60m")
+        {
+            app.insert_resource(PerformanceHistoryReplay {
+                open: true,
+                playing: false,
+                window: HistoryWindow::OneHour,
+            });
         }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while

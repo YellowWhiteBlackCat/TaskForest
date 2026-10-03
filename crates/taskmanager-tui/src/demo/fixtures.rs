@@ -331,27 +331,27 @@ pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, targe
             });
             disk.partitions = vec![p1, p2];
         }
-    } else if target == "gpu-engine-inventory" || target == "intel-gpu-telemetry" {
-        if let Some(gpu) = snapshot.gpu.first_mut() {
-            gpu.brand = "Intel(R) Arc(TM) Graphics".into();
-            gpu.engines = vec![
-                GpuEngine {
-                    name: "Render/3D".into(),
-                    kind: GpuEngineKind::Render,
-                    usage_pct: 42.0,
-                },
-                GpuEngine {
-                    name: "Video Decode".into(),
-                    kind: GpuEngineKind::VideoDecode,
-                    usage_pct: 18.0,
-                },
-                GpuEngine {
-                    name: "Compute".into(),
-                    kind: GpuEngineKind::Compute,
-                    usage_pct: 35.0,
-                },
-            ];
-        }
+    } else if (target == "gpu-engine-inventory" || target == "intel-gpu-telemetry")
+        && let Some(gpu) = snapshot.gpu.first_mut()
+    {
+        gpu.brand = "Intel(R) Arc(TM) Graphics".into();
+        gpu.engines = vec![
+            GpuEngine {
+                name: "Render/3D".into(),
+                kind: GpuEngineKind::Render,
+                usage_pct: 42.0,
+            },
+            GpuEngine {
+                name: "Video Decode".into(),
+                kind: GpuEngineKind::VideoDecode,
+                usage_pct: 18.0,
+            },
+            GpuEngine {
+                name: "Compute".into(),
+                kind: GpuEngineKind::Compute,
+                usage_pct: 35.0,
+            },
+        ];
     }
 }
 

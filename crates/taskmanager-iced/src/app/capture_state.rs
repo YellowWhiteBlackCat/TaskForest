@@ -44,6 +44,26 @@ impl CaptureState {
 
 /// Apply one fixed capture target and its page-local facts.
 pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
+    if apply_capture_surface_and_process(app, target) {
+        return;
+    }
+    if apply_capture_hardware_and_perf(app, target) {
+        return;
+    }
+    if let Some(page) = capture_page_from_name(target) {
+        app.shell.application.active_page = page;
+        if page == AppPage::System {
+            seed_capture_npu_fixture(app);
+        }
+    } else if let Some(device) = capture_device_from_name(target) {
+        if matches!(device, PerfDevice::Npu(_)) {
+            seed_capture_npu_fixture(app);
+        }
+        app.performance.selected_device = device;
+    }
+}
+
+fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     if target == "service-details" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
@@ -62,6 +82,14 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         app.open_local_surface(LocalSurface::AlertCenter);
     } else if target == "first-run" {
         app.open_local_surface(LocalSurface::FirstRun);
+    } else if target == "run-task" {
+        app.open_local_surface(LocalSurface::RunTask);
+    } else if target == "disk-smart" {
+        app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
+    } else if target == "diagnostic-preview" {
+        app.open_local_surface(LocalSurface::DiagnosticPreview);
+    } else if target == "diagnostic-failure" {
+        app.open_local_surface(LocalSurface::DiagnosticFailure);
     } else if target == "process-details" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Overview);
@@ -82,6 +110,13 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     } else if target == "process-command" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Command);
+    } else if target == "process-affinity" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(target_proc) = seed_capture_process_target(app) {
+            app.open_local_surface(LocalSurface::ProcessAffinity {
+                target: target_proc,
+            });
+        }
     } else if target == "process-end-confirm" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
@@ -145,7 +180,29 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
                     PendingConfirmation::ProcessBatch(intent),
                 ));
         }
-    } else if target == "smart-self-test-confirm" {
+    } else if target == "apps-search-highlight" {
+        app.shell.application.active_page = AppPage::Applications;
+        app.shell.query = "zed".into();
+    } else if target == "apps-group-expanded" {
+        app.shell.application.active_page = AppPage::Applications;
+    } else if target == "apps-zero-gray" {
+        app.shell.application.active_page = AppPage::Applications;
+        app.configuration.preferences_mut().gray_zero_values = true;
+    } else if target == "apps-identity-matrix" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(processes) = app.shell.projection().processes.as_ref() {
+            let mut procs = (**processes).clone();
+            seed_capture_identity_matrix(&mut procs);
+            seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
+        }
+    } else {
+        return false;
+    }
+    true
+}
+
+fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
+    if target == "smart-self-test-confirm" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.selected_device = PerfDevice::Disk(0);
         if let Some(disk) = app
@@ -168,26 +225,12 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
             };
             app.shell.arm_smart_self_test(intent);
         }
-    } else if target == "apps-search-highlight" {
-        app.shell.application.active_page = AppPage::Applications;
-        app.shell.query = "zed".into();
     } else if target == "services-search-highlight" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.update(Message::ServicesSearchChanged("Network".into()));
-    } else if target == "run-task" {
-        app.open_local_surface(LocalSurface::RunTask);
-    } else if target == "disk-smart" {
-        app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
     } else if target == "service-details-logs" {
         app.shell.application.active_page = AppPage::Services;
         seed_service_log_fixture(&mut app.shell);
-    } else if target == "process-affinity" {
-        app.shell.application.active_page = AppPage::Applications;
-        if let Some(target_proc) = seed_capture_process_target(app) {
-            app.open_local_surface(LocalSurface::ProcessAffinity {
-                target: target_proc,
-            });
-        }
     } else if target == "startup-impact"
         || target == "startup-failure-evidence"
         || target == "startup-boot-markers"
@@ -196,15 +239,9 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     } else if target == "telemetry-paused" {
         app.shell.application.active_page = AppPage::Performance;
         let _ = app.shell.apply_action(AppAction::TogglePause);
-    } else if target == "apps-group-expanded" {
-        app.shell.application.active_page = AppPage::Applications;
     } else if target == "sidebar-hidden" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.sidebar_visible = false;
-    } else if target == "diagnostic-preview" {
-        app.open_local_surface(LocalSurface::DiagnosticPreview);
-    } else if target == "diagnostic-failure" {
-        app.open_local_surface(LocalSurface::DiagnosticFailure);
     } else if target == "smart-missing-tool"
         || target == "smart-permission"
         || target == "partition-disk-usage"
@@ -231,19 +268,9 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
                 ProjectionSeedFact::Snapshot(Box::new(Some(s))),
             );
         }
-    } else if target == "apps-zero-gray" {
-        app.shell.application.active_page = AppPage::Applications;
-        app.configuration.preferences_mut().gray_zero_values = true;
     } else if target == "settings-zero-gray" || target == "settings-switch-focus" {
         app.open_local_surface(LocalSurface::Settings);
         app.configuration.preferences_mut().gray_zero_values = true;
-    } else if target == "apps-identity-matrix" {
-        app.shell.application.active_page = AppPage::Applications;
-        if let Some(processes) = app.shell.projection().processes.as_ref() {
-            let mut procs = (**processes).clone();
-            seed_capture_identity_matrix(&mut procs);
-            seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
-        }
     } else if target == "history-replay" || target == "history-60m" {
         app.shell.application.active_page = AppPage::Performance;
         app.seed_capture_history_replay();
@@ -256,17 +283,10 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         app.open_local_surface(LocalSurface::AlertCenter);
     } else if target == "settings-permission-center" {
         app.open_local_surface(LocalSurface::Settings);
-    } else if let Some(page) = capture_page_from_name(target) {
-        app.shell.application.active_page = page;
-        if page == AppPage::System {
-            seed_capture_npu_fixture(app);
-        }
-    } else if let Some(device) = capture_device_from_name(target) {
-        if matches!(device, PerfDevice::Npu(_)) {
-            seed_capture_npu_fixture(app);
-        }
-        app.performance.selected_device = device;
+    } else {
+        return false;
     }
+    true
 }
 
 fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
@@ -309,27 +329,27 @@ fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
             });
             disk.partitions = vec![p1, p2];
         }
-    } else if target == "gpu-engine-inventory" || target == "intel-gpu-telemetry" {
-        if let Some(gpu) = snapshot.gpu.first_mut() {
-            gpu.brand = "Intel(R) Arc(TM) Graphics".into();
-            gpu.engines = vec![
-                GpuEngine {
-                    name: "Render/3D".into(),
-                    kind: GpuEngineKind::Render,
-                    usage_pct: 42.0,
-                },
-                GpuEngine {
-                    name: "Video Decode".into(),
-                    kind: GpuEngineKind::VideoDecode,
-                    usage_pct: 18.0,
-                },
-                GpuEngine {
-                    name: "Compute".into(),
-                    kind: GpuEngineKind::Compute,
-                    usage_pct: 35.0,
-                },
-            ];
-        }
+    } else if (target == "gpu-engine-inventory" || target == "intel-gpu-telemetry")
+        && let Some(gpu) = snapshot.gpu.first_mut()
+    {
+        gpu.brand = "Intel(R) Arc(TM) Graphics".into();
+        gpu.engines = vec![
+            GpuEngine {
+                name: "Render/3D".into(),
+                kind: GpuEngineKind::Render,
+                usage_pct: 42.0,
+            },
+            GpuEngine {
+                name: "Video Decode".into(),
+                kind: GpuEngineKind::VideoDecode,
+                usage_pct: 18.0,
+            },
+            GpuEngine {
+                name: "Compute".into(),
+                kind: GpuEngineKind::Compute,
+                usage_pct: 35.0,
+            },
+        ];
     }
 }
 

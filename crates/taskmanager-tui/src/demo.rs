@@ -516,15 +516,14 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Performance,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity);
-                }
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Performance,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity);
             }
         }
         "process-memory-pss-swap" => {
@@ -536,15 +535,14 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Overview,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity);
-                }
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Overview,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity);
             }
         }
 
@@ -560,23 +558,22 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned()
+                && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
-                if let Some(identity) = FrozenProcessIdentity::from_process(&item) {
-                    app.process_properties_view = Some(ProcessPropertiesTarget {
-                        item,
-                        section: ProcessDetailsSection::Insights,
-                        scroll: 0,
-                    });
-                    let _ = app.shell.open_process_properties_for(identity.clone());
-                    let revision = ProcessInsightsRevision::new(1);
-                    let mut tracker = ProcessInsightsProjection::default();
-                    tracker.begin(identity, revision);
-                    if let Some(projection) = tracker.snapshot() {
-                        seed_projection_fact(
-                            &mut app.shell,
-                            ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
-                        );
-                    }
+                app.process_properties_view = Some(ProcessPropertiesTarget {
+                    item,
+                    section: ProcessDetailsSection::Insights,
+                    scroll: 0,
+                });
+                let _ = app.shell.open_process_properties_for(identity.clone());
+                let revision = ProcessInsightsRevision::new(1);
+                let mut tracker = ProcessInsightsProjection::default();
+                tracker.begin(identity, revision);
+                if let Some(projection) = tracker.snapshot() {
+                    seed_projection_fact(
+                        &mut app.shell,
+                        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+                    );
                 }
             }
         }

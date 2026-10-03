@@ -295,7 +295,10 @@ fn additional_capture_targets_open_expected_surfaces() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "disk-smart");
     assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::DiskSmart));
+}
 
+#[test]
+fn additional_capture_targets_open_expected_surfaces_part2() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "service-details-logs");
     assert!(app.shell.service_log.is_some());
