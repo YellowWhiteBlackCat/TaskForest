@@ -159,6 +159,7 @@ def validate_markers(path: Path, device: str) -> None:
             "process-force-kill", "process-tree-confirm", "process-batch-confirm",
             "process-memory-pss-swap", "process-network-details", "process-gpu-details",
             "process-resource-limits", "process-isolation", "apps-group-expanded",
+            "apps-zero-gray", "apps-identity-matrix",
         }
         else device
         if device in {"applications", "services", "startup", "users", "system", "app-history"}

@@ -31,7 +31,8 @@ use taskmanager_shell::fixture::{
 mod fixtures;
 pub(crate) use fixtures::seed_fan_capture_sensors;
 use fixtures::{
-    demo_boot_evidence, demo_directory_usage, seed_demo_npu_inventory, seed_gpu_capture_history,
+    demo_boot_evidence, demo_directory_usage, seed_capture_identity_matrix,
+    seed_capture_storage_scenario, seed_demo_npu_inventory, seed_gpu_capture_history,
     seed_service_log_fixture,
 };
 
@@ -240,6 +241,8 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "process-isolation"
                 | "apps-search-highlight"
                 | "apps-group-expanded"
+                | "apps-zero-gray"
+                | "apps-identity-matrix"
         )
     ) {
         Some(AppPage::Applications)
@@ -468,6 +471,41 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Performance;
             app.toggle_health();
         }
+        "diagnostic-preview" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.open_local_surface(crate::TuiSurface::DiagnosticPreview);
+        }
+        "diagnostic-failure" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.open_local_surface(crate::TuiSurface::DiagnosticFailure);
+        }
+        "smart-missing-tool"
+        | "smart-permission"
+        | "partition-disk-usage"
+        | "partition-live-usage" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
+            if let Some(snapshot) = app.shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                seed_capture_storage_scenario(&mut s, scene);
+                seed_projection_fact(
+                    &mut app.shell,
+                    ProjectionSeedFact::Snapshot(Box::new(Some(s))),
+                );
+            }
+        }
+        "gpu-engine-inventory" | "intel-gpu-telemetry" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Gpu);
+            if let Some(snapshot) = app.shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                seed_capture_storage_scenario(&mut s, scene);
+                seed_projection_fact(
+                    &mut app.shell,
+                    ProjectionSeedFact::Snapshot(Box::new(Some(s))),
+                );
+            }
+        }
         "process-properties-performance" => {
             app.shell.application.active_page = AppPage::Applications;
             if let Some(item) = app
@@ -558,6 +596,22 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "apps-group-expanded" => {
             app.shell.application.active_page = AppPage::Applications;
+        }
+        "apps-zero-gray" => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.prefs.gray_zero = true;
+        }
+        "settings-zero-gray" | "settings-switch-focus" => {
+            app.open_local_surface(crate::TuiSurface::Settings);
+            app.prefs.gray_zero = true;
+        }
+        "apps-identity-matrix" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(processes) = app.shell.projection().processes.as_ref() {
+                let mut procs = (**processes).clone();
+                seed_capture_identity_matrix(&mut procs);
+                seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
+            }
         }
         "telemetry-paused" => {
             app.shell.application.active_page = AppPage::Performance;

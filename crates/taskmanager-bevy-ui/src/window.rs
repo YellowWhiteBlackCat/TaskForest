@@ -38,7 +38,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, Has, Or, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
@@ -54,7 +54,7 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_assets::product;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
-use crate::app::{AppShellPlugin, ContentSlot, FrontendTrack, Page, Route, nav_strip_scene};
+use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
 use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
 };
@@ -344,6 +344,21 @@ fn capture_scenario_target() -> Option<&'static str> {
         "apps-group-expanded" => Some("apps-group-expanded"),
         "telemetry-paused" => Some("telemetry-paused"),
         "sidebar-hidden" => Some("sidebar-hidden"),
+        "about" => Some("about"),
+        "system-about" => Some("system-about"),
+        "system-dashboard" => Some("system-dashboard"),
+        "system-hardware" => Some("system-hardware"),
+        "system-npu" => Some("system-npu"),
+        "sensor-center" => Some("sensor-center"),
+        "storage-health" => Some("storage-health"),
+        "active-alert" => Some("active-alert"),
+        "alert-rules-manager" => Some("alert-rules-manager"),
+        "smart-missing-tool" => Some("smart-missing-tool"),
+        "smart-permission" => Some("smart-permission"),
+        "partition-disk-usage" => Some("partition-disk-usage"),
+        "partition-live-usage" => Some("partition-live-usage"),
+        "gpu-engine-inventory" => Some("gpu-engine-inventory"),
+        "intel-gpu-telemetry" => Some("intel-gpu-telemetry"),
         _ => None,
     }
 }
@@ -354,12 +369,21 @@ fn capture_perf_device_target() -> Option<crate::pages::performance::Performance
     let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match raw.trim().to_ascii_lowercase().as_str() {
         "perf-memory" => Some(PerformanceDeviceTarget::Memory),
-        "perf-disk" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
+        "perf-disk"
+        | "storage-health"
+        | "smart-missing-tool"
+        | "smart-permission"
+        | "partition-disk-usage"
+        | "partition-live-usage" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
         "perf-network" => Some(PerformanceDeviceTarget::Network(
             "network:demo:wlan0".into(),
         )),
-        "perf-gpu" => Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into())),
-        "perf-battery" => Some(PerformanceDeviceTarget::Battery("battery:demo:0".into())),
+        "perf-gpu" | "gpu-engine-inventory" | "intel-gpu-telemetry" => {
+            Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into()))
+        }
+        "perf-battery" | "sensor-center" => {
+            Some(PerformanceDeviceTarget::Battery("battery:demo:0".into()))
+        }
         _ => None,
     }
 }
@@ -418,15 +442,24 @@ fn capture_page() -> Option<crate::app::Page> {
         | "perf-battery"
         | "smart-self-test-confirm"
         | "telemetry-paused"
-        | "sidebar-hidden" => Some(crate::app::Page::Performance),
+        | "sidebar-hidden"
+        | "sensor-center"
+        | "storage-health"
+        | "smart-missing-tool"
+        | "smart-permission"
+        | "partition-disk-usage"
+        | "partition-live-usage"
+        | "gpu-engine-inventory"
+        | "intel-gpu-telemetry" => Some(crate::app::Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => {
             Some(crate::app::Page::Services)
         }
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(crate::app::Page::Startup)
         }
-        "system" => Some(crate::app::Page::System),
-        "alerts" => Some(crate::app::Page::Alerts),
+        "system" | "system-dashboard" | "system-hardware" | "system-npu" | "about"
+        | "system-about" => Some(crate::app::Page::System),
+        "alerts" | "active-alert" | "alert-rules-manager" => Some(crate::app::Page::Alerts),
         "users" | "sessions" => Some(crate::app::Page::Sessions),
         "settings" => Some(crate::app::Page::Settings),
         "app-history" | "history" => Some(crate::app::Page::AppHistory),
@@ -489,7 +522,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
-        app.add_systems(Startup, init_capture_confirmation);
+        crate::about_modal::register(app);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);
@@ -528,17 +561,6 @@ impl Plugin for FrontendWindowPlugin {
         if !app.world().contains_resource::<DemoMode>() {
             app.add_systems(PreUpdate, drain::drain_system);
         }
-    }
-}
-
-fn init_capture_confirmation(track: Option<NonSend<FrontendTrack>>, mut commands: Commands) {
-    let Some(track) = track else { return };
-    if let Some(view) = track
-        .shell
-        .pending_confirmation()
-        .and_then(crate::confirmation::PendingConfirmationView::from_pending)
-    {
-        commands.trigger(crate::confirmation::ConfirmationChanged(Some(view)));
     }
 }
 

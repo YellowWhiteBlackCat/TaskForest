@@ -422,6 +422,8 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
         LocalSurface::FirstRun => {
             first_run::render_first_run(app.theme(), &app.first_run, app.modal_appear_progress())
         }
+        LocalSurface::DiagnosticPreview => overlays::diagnostic_preview_overlay(app),
+        LocalSurface::DiagnosticFailure => overlays::diagnostic_failure_overlay(app),
     })
 }
 

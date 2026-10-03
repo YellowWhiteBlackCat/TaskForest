@@ -49,14 +49,14 @@ use taskmanager_shell::SortDir;
 /// Presentation only — the popup `Rect` arrives from the caller and the inner
 /// body/footer layout stays with each surface; the host owns the backdrop
 /// clear, the border tone, and the title row.
-pub(super) struct Modal {
+pub(crate) struct Modal {
     block: Block<'static>,
 }
 
 impl Modal {
     /// The standard surface modal: accent border, overlay backdrop, and an
     /// iconified title.
-    pub(super) fn new(theme: TuiTheme, icon: IconId, title: &str) -> Self {
+    pub(crate) fn new(theme: TuiTheme, icon: IconId, title: &str) -> Self {
         Self::titled(
             theme,
             theme.accent,
@@ -90,7 +90,7 @@ impl Modal {
 
     /// Paint `Clear` + the host block over `popup` and return the inner area
     /// the surface lays its own body and footer into.
-    pub(super) fn render(self, frame: &mut Frame<'_>, popup: Rect) -> Rect {
+    pub(crate) fn render(self, frame: &mut Frame<'_>, popup: Rect) -> Rect {
         frame.render_widget(Clear, popup);
         let inner = self.block.inner(popup);
         frame.render_widget(self.block, popup);

@@ -86,4 +86,18 @@ fn capture_scene_overrides_activate_expected_state() {
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "telemetry-paused");
     assert!(app.shell.paused());
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "diagnostic-preview");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(crate::TuiSurfaceKind::DiagnosticPreview)
+    );
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "diagnostic-failure");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(crate::TuiSurfaceKind::DiagnosticFailure)
+    );
 }

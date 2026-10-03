@@ -17,10 +17,23 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{CpuMetrics, ScalarObservation, ScalarObservationGroup};
+use taskmanager_core::core::metrics::{
+    CpuMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind,
+    ScalarObservation, ScalarObservationGroup, SmartAvailability,
+};
+use taskmanager_core::core::npu::{
+    NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
+};
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
+use taskmanager_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
 };
 use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
@@ -262,6 +275,139 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
         }
         "telemetry-paused" => {
             let _ = shell.apply_action(AppAction::TogglePause);
+        }
+        "system-npu" => {
+            let observed_at_ms = 7_000;
+            let inventory = NpuInventorySnapshot::discovered(
+                vec![NpuDevice {
+                    device_id: DeviceId::new("accel0"),
+                    brand: Some("Intel AI Boost".into()),
+                    driver: Some("intel_vpu".into()),
+                    utilization_pct: ScalarObservation::available(38.0, observed_at_ms),
+                    engines: vec![NpuEngineUsage {
+                        kind: NpuEngineKind::Matrix,
+                        utilization_pct: ScalarObservation::available(61.0, observed_at_ms),
+                    }],
+                    memory: NpuMemoryReport {
+                        dedicated_total_bytes: ScalarObservation::available(0, observed_at_ms),
+                        shared_total_bytes: ScalarObservation::unavailable(
+                            FailureKind::Unsupported,
+                        ),
+                        sram_total_bytes: ScalarObservation::available(
+                            32 * 1024 * 1024,
+                            observed_at_ms,
+                        ),
+                    },
+                    ..Default::default()
+                }],
+                observed_at_ms,
+            );
+            seed_projection_fact(shell, ProjectionSeedFact::NpuInventory(Some(inventory)));
+        }
+        "sensor-center" => {
+            const OBSERVED_AT_MS: u64 = 7_000;
+            let fan = SensorMeasurementObservation::available(
+                SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+                SensorMagnitude::Unsigned(2_400),
+                OBSERVED_AT_MS,
+            );
+            let package = SensorMeasurementObservation::available(
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                SensorMagnitude::Decimal(51.0),
+                OBSERVED_AT_MS,
+            );
+            let acpitz = SensorMeasurementObservation::available(
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                SensorMagnitude::Decimal(61.0),
+                OBSERVED_AT_MS,
+            );
+            if let (Ok(fan), Ok(package), Ok(acpitz)) = (fan, package, acpitz) {
+                let reading = |device: &str, id: &str, label: &str, obs| {
+                    SensorReading::from_measurement_observation(
+                        device.into(),
+                        id.into(),
+                        label.into(),
+                        obs,
+                    )
+                    .with_device_generation(DeviceGeneration::new(1))
+                };
+                let readings = vec![
+                    reading("hwmon:cpu", "cpu_fan", "cpu_fan", fan),
+                    reading("hwmon:cpu", "cpu_package", "Package", package),
+                    reading("thermal:acpitz", "acpitz", "acpitz", acpitz),
+                ];
+                seed_projection_fact(
+                    shell,
+                    ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+                        state: DeviceState::healthy(OBSERVED_AT_MS),
+                        timestamp_ms: OBSERVED_AT_MS,
+                        readings,
+                        ..Default::default()
+                    })),
+                );
+            }
+        }
+        "active-alert" | "alert-rules-manager" => {
+            let alert = Alert {
+                instance_id: "cpu-high:all".into(),
+                rule_id: "cpu-high".into(),
+                target: "all".into(),
+                metric: AlertMetric::CpuUsagePercent,
+                severity: AlertSeverity::Warning,
+                value: 94.0,
+                threshold: 90.0,
+                active_since_ms: 1_700_000_000_000,
+            };
+            seed_projection_fact(shell, ProjectionSeedFact::ActiveAlerts(vec![alert]));
+        }
+        "smart-missing-tool"
+        | "smart-permission"
+        | "partition-disk-usage"
+        | "partition-live-usage" => {
+            if let Some(snapshot) = shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                if scenario == "smart-missing-tool" {
+                    if let Some(disk) = s.disks.first_mut() {
+                        disk.smart_availability = SmartAvailability::MissingTool;
+                        disk.smart_state = disk
+                            .smart_state
+                            .transition(DeviceStatus::MissingTool, s.timestamp_ms);
+                    }
+                } else if scenario == "smart-permission" {
+                    if let Some(disk) = s.disks.first_mut() {
+                        disk.smart_availability = SmartAvailability::PermissionDenied;
+                        disk.smart_state = disk
+                            .smart_state
+                            .transition(DeviceStatus::PermissionDenied, s.timestamp_ms);
+                    }
+                } else if let Some(disk) = s.disks.first_mut() {
+                    let now = s.timestamp_ms;
+                    let mut p1 = DiskPartition::new("nvme0n1p1");
+                    p1.mount_point = "/".into();
+                    p1.fs_type = "ext4".into();
+                    p1.apply_scalar_observations(DiskPartitionScalarObservations {
+                        capacity_bytes: ScalarObservation::available(900 * 1024 * 1024 * 1024, now),
+                        used_bytes: ScalarObservation::available(600 * 1024 * 1024 * 1024, now),
+                        free_bytes: ScalarObservation::available(300 * 1024 * 1024 * 1024, now),
+                    });
+                    disk.partitions = vec![p1];
+                }
+                seed_projection_fact(shell, ProjectionSeedFact::Snapshot(Box::new(Some(s))));
+            }
+        }
+        "gpu-engine-inventory" | "intel-gpu-telemetry" => {
+            if let Some(snapshot) = shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                if let Some(gpu) = s.gpu.first_mut() {
+                    gpu.brand = "Intel(R) Arc(TM) Graphics".into();
+                    gpu.engines = vec![GpuEngine {
+                        name: "Render/3D".into(),
+                        kind: GpuEngineKind::Render,
+                        usage_pct: 42.0,
+                    }];
+                }
+                seed_projection_fact(shell, ProjectionSeedFact::Snapshot(Box::new(Some(s))));
+            }
         }
         _ => {}
     }

@@ -347,6 +347,21 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
 }
 
 #[test]
+fn capture_system_sensor_alert_scenarios_seed_fixtures() {
+    let mut shell = crate::demo_fixture::demo_shell();
+    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "system-npu");
+    assert!(shell.projection().npu_inventory.is_some());
+
+    let mut shell = crate::demo_fixture::demo_shell();
+    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "sensor-center");
+    assert!(shell.projection().sensors.is_some());
+
+    let mut shell = crate::demo_fixture::demo_shell();
+    crate::demo_fixture::seed_capture_confirmation_scenario(&mut shell, "active-alert");
+    assert!(!shell.projection().alert_active.is_empty());
+}
+
+#[test]
 fn smart_self_test_confirmation_view_and_confirm_armed() {
     let intent = SmartSelfTestIntent {
         device_id: DeviceId::new("disk-0"),

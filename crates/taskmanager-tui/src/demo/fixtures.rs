@@ -3,6 +3,7 @@
 use taskmanager_application::{
     CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
 };
+use taskmanager_core::SystemSnapshot;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::directory_usage::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
@@ -15,6 +16,7 @@ use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind};
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
@@ -284,4 +286,104 @@ pub(super) fn seed_service_log_fixture(shell: &mut ShellApp) {
     if let Some(open) = shell.service_log.as_mut() {
         open.feed.apply_at(snapshot, 1_700_000_000_000);
     }
+}
+
+pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
+    use taskmanager_core::core::device_state::DeviceStatus;
+    use taskmanager_core::core::metrics::{
+        DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, SmartAvailability,
+    };
+    if target == "smart-missing-tool" {
+        if let Some(disk) = snapshot.disks.first_mut() {
+            disk.smart_availability = SmartAvailability::MissingTool;
+            disk.smart_state = disk
+                .smart_state
+                .transition(DeviceStatus::MissingTool, snapshot.timestamp_ms);
+        }
+    } else if target == "smart-permission" {
+        if let Some(disk) = snapshot.disks.first_mut() {
+            disk.smart_availability = SmartAvailability::PermissionDenied;
+            disk.smart_state = disk
+                .smart_state
+                .transition(DeviceStatus::PermissionDenied, snapshot.timestamp_ms);
+        }
+    } else if target == "partition-disk-usage" || target == "partition-live-usage" {
+        if let Some(disk) = snapshot.disks.first_mut() {
+            let now = snapshot.timestamp_ms;
+            let mut p1 = DiskPartition::new("nvme0n1p1");
+            p1.mount_point = "/".into();
+            p1.fs_type = "ext4".into();
+            p1.apply_scalar_observations(DiskPartitionScalarObservations {
+                capacity_bytes: ScalarObservation::available(900 * 1024 * 1024 * 1024, now),
+                used_bytes: ScalarObservation::available(600 * 1024 * 1024 * 1024, now),
+                free_bytes: ScalarObservation::available(300 * 1024 * 1024 * 1024, now),
+            });
+            let mut p2 = DiskPartition::new("nvme0n1p2");
+            p2.mount_point = "/home".into();
+            p2.fs_type = "btrfs".into();
+            p2.apply_scalar_observations(DiskPartitionScalarObservations {
+                capacity_bytes: ScalarObservation::available(1000 * 1024 * 1024 * 1024, now),
+                used_bytes: ScalarObservation::available(420 * 1024 * 1024 * 1024, now),
+                free_bytes: ScalarObservation::available(580 * 1024 * 1024 * 1024, now),
+            });
+            disk.partitions = vec![p1, p2];
+        }
+    } else if target == "gpu-engine-inventory" || target == "intel-gpu-telemetry" {
+        if let Some(gpu) = snapshot.gpu.first_mut() {
+            gpu.brand = "Intel(R) Arc(TM) Graphics".into();
+            gpu.engines = vec![
+                GpuEngine {
+                    name: "Render/3D".into(),
+                    kind: GpuEngineKind::Render,
+                    usage_pct: 42.0,
+                },
+                GpuEngine {
+                    name: "Video Decode".into(),
+                    kind: GpuEngineKind::VideoDecode,
+                    usage_pct: 18.0,
+                },
+                GpuEngine {
+                    name: "Compute".into(),
+                    kind: GpuEngineKind::Compute,
+                    usage_pct: 35.0,
+                },
+            ];
+        }
+    }
+}
+
+pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
+    use taskmanager_core::core::process::{
+        ProcessMetadataObservation, ProcessMetadataObservations,
+    };
+    let mut p1 = ProcessItem::new(93401, "chrome-mail");
+    p1.cmdline = "/opt/google/chrome/chrome --profile-directory=Default --app-id=abc123".into();
+    p1.apply_metadata_observations(ProcessMetadataObservations {
+        executable_path: ProcessMetadataObservation::available(
+            "/opt/google/chrome/chrome".into(),
+            1,
+        ),
+        ..Default::default()
+    });
+    let mut p2 = ProcessItem::new(93402, "snap-core");
+    p2.cmdline = "/snap/core/current/usr/lib/snapd/snapd".into();
+    p2.apply_metadata_observations(ProcessMetadataObservations {
+        executable_path: ProcessMetadataObservation::available(
+            "/snap/core/current/usr/lib/snapd/snapd".into(),
+            1,
+        ),
+        ..Default::default()
+    });
+    let mut p3 = ProcessItem::new(93403, "appimage-zed");
+    p3.cmdline = "/tmp/.mount_zed123/usr/bin/zed".into();
+    p3.apply_metadata_observations(ProcessMetadataObservations {
+        executable_path: ProcessMetadataObservation::available(
+            "/tmp/.mount_zed123/usr/bin/zed".into(),
+            1,
+        ),
+        ..Default::default()
+    });
+    processes.insert(0, p1);
+    processes.insert(1, p2);
+    processes.insert(2, p3);
 }

@@ -440,6 +440,26 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
 /// window plugin; the input seam triggers [`ConfirmationChanged`].
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_confirmation_changed);
+    app.add_systems(bevy::app::Startup, init_capture_confirmation);
+}
+
+pub(crate) fn init_capture_confirmation(
+    track: Option<bevy::ecs::system::NonSend<crate::app::FrontendTrack>>,
+    mut commands: Commands,
+) {
+    let Some(track) = track else { return };
+    if let Some(view) = track
+        .shell
+        .pending_confirmation()
+        .and_then(PendingConfirmationView::from_pending)
+    {
+        commands.trigger(ConfirmationChanged(Some(view)));
+    }
+    if std::env::var("TM_BEVY_CAPTURE_PAGE")
+        .is_ok_and(|v| v.trim() == "about" || v.trim() == "system-about")
+    {
+        commands.trigger(crate::about_modal::AboutModalChanged(true));
+    }
 }
 
 #[cfg(test)]

@@ -54,6 +54,7 @@ compile_error!(
      vendor-specific TaskForest artifacts are not supported"
 );
 
+pub(crate) mod about_modal;
 pub mod app;
 pub mod bindings;
 pub mod capabilities;

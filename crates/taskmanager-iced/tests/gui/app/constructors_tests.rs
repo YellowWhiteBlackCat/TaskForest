@@ -347,6 +347,20 @@ fn additional_capture_targets_open_expected_surfaces() {
     apply_capture_target(&mut app, "sidebar-hidden");
     assert!(!app.performance.sidebar_visible);
     assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "diagnostic-preview");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::DiagnosticPreview)
+    );
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "diagnostic-failure");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::DiagnosticFailure)
+    );
 }
 
 impl IcedApp {
