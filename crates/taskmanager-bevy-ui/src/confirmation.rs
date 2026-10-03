@@ -378,7 +378,7 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
         ConfirmationOverlay
         ArmedConfirmation({ Some(armed) })
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -402,9 +402,9 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(body) TextRole(Role::Body) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Text(body) TextRole(Role::Body) --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -414,24 +414,24 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text(confirm)
                         TextRole(Role::Body)
                         ConfirmChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_confirm_activated)
-                    ),
-                    (
+                    --
+
                         Text(cancel)
                         TextRole(Role::Caption)
                         DismissChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_dismiss_activated)
-                    ),
+
                 ]
-            ),
+
         ]
     }
 }

@@ -21,7 +21,7 @@
 //! The frontend plugin below owns only the app shell, route, observers, and
 //! page scene. The window launcher owns Bevy's `DefaultPlugins`; headless
 //! tests add the explicit headless infrastructure composition. Keeping those two
-//! compositions separate is important in Bevy 0.19 because `AssetPlugin`,
+//! compositions separate is important in Bevy 0.20 because `AssetPlugin`,
 //! `ScenePlugin`, and input plugins are singleton infrastructure.
 
 use std::process::ExitCode;
@@ -467,7 +467,7 @@ fn role_font_source(fonts: &PlaceholderFonts, role: Role) -> FontSource {
 /// lands. Runs for the startup shell, every page remount, and every future
 /// widget insert — the single place typography becomes bevy values.
 fn style_text_role(
-    trigger: On<Add, TextRole>,
+    trigger: On<Add<TextRole>>,
     mut texts: Query<(&TextRole, &mut TextFont, &mut TextColor)>,
     palette: Res<WindowPalette>,
     fonts: Res<PlaceholderFonts>,
@@ -577,8 +577,8 @@ fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn
             BackgroundColor({ palette.window_clear })
             AppShellRoot
             Children [
-                ( { strip } ),
-                (
+                 @{ strip } --
+
                     Node {
                         width: percent(100),
                         height: percent(100),
@@ -589,7 +589,7 @@ fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn
                     }
                     BackgroundColor({ palette.content_bg })
                     ContentSlot
-                ),
+
             ]
         });
     }
@@ -611,8 +611,8 @@ fn standard_app_shell_scene(
         BackgroundColor({ palette.window_clear })
         AppShellRoot
         Children [
-            ( { strip } ),
-            (
+             @{ strip } --
+
                 // The shell's status band: capability summary and the drain's
                 // typed feedback, caption-sized so it informs without adding
                 // a second chrome layer.
@@ -623,11 +623,11 @@ fn standard_app_shell_scene(
                     padding: UiRect::horizontal(Val::Px(space_12())),
                 }
                 Children [
-                    ( Text(summary) SummaryLine TextRole(Role::Caption) ),
-                    ( Text("") FeedbackLine TextRole(Role::Caption) ),
+                     Text(summary) SummaryLine TextRole(Role::Caption) --
+                     Text("") FeedbackLine TextRole(Role::Caption)
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: percent(100),
@@ -639,7 +639,7 @@ fn standard_app_shell_scene(
                 }
                 BackgroundColor({ palette.content_bg })
                 ContentSlot
-            ),
+
         ]
     }
 }

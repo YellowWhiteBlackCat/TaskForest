@@ -27,9 +27,8 @@
 //!
 //! [`ShellApp::edit_alert_rules`]: taskmanager_shell::ShellApp::edit_alert_rules
 
-use bevy::ecs::bundle::Bundle;
 use bevy::ecs::component::Component;
-use bevy::ecs::event::Event;
+use bevy::ecs::event::EventPattern;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, Res};
@@ -81,11 +80,10 @@ impl Scene for PageObserver {
 
 /// Bind one observer system into the page scene. The system is stored
 /// behind the builder closure the scene template evaluates at spawn time.
-pub(crate) fn page_observer<E, B, M, S>(system: S) -> PageObserver
+pub(crate) fn page_observer<E, M, S>(system: S) -> PageObserver
 where
-    E: Event,
-    B: Bundle,
-    S: IntoObserverSystem<E, B, M> + Clone + Send + Sync + 'static,
+    E: EventPattern,
+    S: IntoObserverSystem<E, M> + Clone + Send + Sync + 'static,
 {
     PageObserver {
         build: std::sync::Arc::new(move || Observer::new(system.clone())),
@@ -287,7 +285,7 @@ fn rule_authoring_scene(palette: &UiPalette) -> impl Scene + use<> {
         AlertRuleAuthoringRoot
         AlertRuleAuthoringMarker
         Children [
-            ( Text(line) TextRole(Role::Body) ),
+             Text(line) TextRole(Role::Body)
         ]
     }
 }
@@ -363,18 +361,18 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            ( Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) ),
-            ( Text(summary) TextRole(Role::Caption) ),
-            ( Text("Active alerts") TextRole(Role::Caption) ),
-            { active_rows },
-            ( Text("Rules") TextRole(Role::Caption) ),
-            { rule_rows },
-            ( Text("Rule authoring") TextRole(Role::Caption) ),
-            { authoring_rows },
-            ( Text("Event history") TextRole(Role::Caption) ),
-            { event_rows },
-            { EntityScene(page_observer(alerts_fold_observer)) },
-            { EntityScene(page_observer(rule_toggle_observer)) },
+             Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) --
+             Text(summary) TextRole(Role::Caption) --
+             Text("Active alerts") TextRole(Role::Caption) --
+            { active_rows }--
+             Text("Rules") TextRole(Role::Caption) --
+            { rule_rows }--
+             Text("Rule authoring") TextRole(Role::Caption) --
+            { authoring_rows }--
+             Text("Event history") TextRole(Role::Caption) --
+            { event_rows }--
+            { EntityScene(page_observer(alerts_fold_observer)) }--
+            { EntityScene(page_observer(rule_toggle_observer)) }
         ]
     }
 }
@@ -383,7 +381,7 @@ fn empty_events_scene() -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100), height: Val::Auto }
         Children [
-            ( Text("No recent alert events") TextRole(Role::Body) ),
+             Text("No recent alert events") TextRole(Role::Body)
         ]
     }
 }
@@ -392,7 +390,7 @@ fn event_row_scene(line: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100), height: Val::Auto }
         Children [
-            ( Text(line) TextRole(Role::Mono) ),
+             Text(line) TextRole(Role::Mono)
         ]
     }
 }
@@ -401,7 +399,7 @@ fn empty_active_scene() -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100), height: Val::Auto }
         Children [
-            ( Text("No active alerts") TextRole(Role::Body) ),
+             Text("No active alerts") TextRole(Role::Body)
         ]
     }
 }
@@ -410,7 +408,7 @@ fn active_row_scene(line: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100), height: Val::Auto }
         Children [
-            ( Text(line) TextRole(Role::Body) ),
+             Text(line) TextRole(Role::Body)
         ]
     }
 }
@@ -445,7 +443,7 @@ fn checked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> impl 
             column_gap: Val::Px(space_8()),
         }
         Children [
-            (
+
                 Node {
                     width: px(24.0),
                     height: px(24.0),
@@ -454,8 +452,8 @@ fn checked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> impl 
                 Checkbox
                 Checked
                 AlertRuleToggleTarget(rule_id)
-            ),
-            ( Text(line) TextRole(Role::Body) ),
+            --
+             Text(line) TextRole(Role::Body)
         ]
     }
 }
@@ -471,7 +469,7 @@ fn unchecked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> imp
             column_gap: Val::Px(space_8()),
         }
         Children [
-            (
+
                 Node {
                     width: px(24.0),
                     height: px(24.0),
@@ -479,8 +477,8 @@ fn unchecked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> imp
                 }
                 Checkbox
                 AlertRuleToggleTarget(rule_id)
-            ),
-            ( Text(line) TextRole(Role::Body) ),
+            --
+             Text(line) TextRole(Role::Body)
         ]
     }
 }

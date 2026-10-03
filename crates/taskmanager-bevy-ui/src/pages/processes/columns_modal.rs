@@ -96,7 +96,7 @@ pub(crate) fn choose_columns_button_scene(palette: &UiPalette) -> impl Scene + u
         crate::tooltip::TooltipText({ label.to_string() })
         on(on_open_columns_modal_activated)
         Children [
-            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }
@@ -139,7 +139,7 @@ pub(crate) fn columns_modal_scene(
                 ProcessColumnToggleId({ col_id })
                 on(on_column_toggle_activated)
                 Children [
-                    ( Text(label) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text(label) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
             }) as Box<dyn Scene>
         })
@@ -157,7 +157,7 @@ pub(crate) fn columns_modal_scene(
         }
         ProcessColumnsModalOverlay
         Children [
-            (
+
                 Node {
                     position_type: PositionType::Absolute,
                     left: px(0.0),
@@ -169,8 +169,8 @@ pub(crate) fn columns_modal_scene(
                 Button
                 ProcessColumnsModalScrim
                 on(on_columns_scrim_dismiss_activated)
-            ),
-            (
+            --
+
                 Node {
                     width: px(380.0),
                     max_height: px(520.0),
@@ -181,9 +181,9 @@ pub(crate) fn columns_modal_scene(
                 }
                 BackgroundColor({ palette.panel_fill })
                 Children [
-                    ( Text(title) TextRole(Role::Heading) ),
-                    ( Text(subtitle) TextRole(Role::Caption) ),
-                    (
+                     Text(title) TextRole(Role::Heading) --
+                     Text(subtitle) TextRole(Role::Caption) --
+
                         Node {
                             width: percent(100),
                             max_height: px(340.0),
@@ -194,8 +194,8 @@ pub(crate) fn columns_modal_scene(
                         Children [
                             { items }
                         ]
-                    ),
-                    (
+                    --
+
                         Node {
                             width: percent(100),
                             flex_direction: FlexDirection::Row,
@@ -203,7 +203,7 @@ pub(crate) fn columns_modal_scene(
                             column_gap: Val::Px(space_8()),
                         }
                         Children [
-                            (
+
                                 Node {
                                     height: px(palette.control_height_px),
                                     padding: UiRect::axes(Val::Px(space_16()), Val::Px(space_4())),
@@ -215,10 +215,10 @@ pub(crate) fn columns_modal_scene(
                                 Button
                                 on(on_columns_reset_activated)
                                 Children [
-                                    ( Text(reset_label) TextRole(Role::Caption) ),
+                                     Text(reset_label) TextRole(Role::Caption)
                                 ]
-                            ),
-                            (
+                            --
+
                                 Node {
                                     height: px(palette.control_height_px),
                                     padding: UiRect::axes(Val::Px(space_16()), Val::Px(space_4())),
@@ -230,13 +230,13 @@ pub(crate) fn columns_modal_scene(
                                 Button
                                 on(on_columns_close_activated)
                                 Children [
-                                    ( Text(close_label) TextRole(Role::Caption) ),
+                                     Text(close_label) TextRole(Role::Caption)
                                 ]
-                            ),
+
                         ]
-                    ),
+
                 ]
-            ),
+
         ]
     }
 }

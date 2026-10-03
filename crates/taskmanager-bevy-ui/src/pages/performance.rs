@@ -460,7 +460,7 @@ fn bind_refresh_observer(mut world: DeferredWorld, _context: HookContext) {
     });
 }
 
-/// Bevy 0.19's official button widget emits `Activate` for pointer and
+/// Bevy 0.20's official button widget emits `Activate` for pointer and
 /// keyboard activation. Resolve the typed marker, update the local focus and
 /// publish one presentation event; no shell effect or telemetry request is
 /// involved.
@@ -480,7 +480,7 @@ fn focus_button_activated(
     commands.trigger(PerformanceFocusChanged(button.0));
 }
 
-/// Bevy 0.19's official button widget emits `Activate` for the compact
+/// Bevy 0.20's official button widget emits `Activate` for the compact
 /// device pills as well. Top-level device targets share the existing curve
 /// focus so the selector and hero card stay in one local presentation state;
 /// disk targets remain selectable without pretending a disk hero chart exists.

@@ -165,21 +165,20 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned();
-            if let Some(process) = process {
-                if let Some(target) = FrozenProcessIdentity::from_process(&process) {
-                    let intent = ProcessBatchIntent {
-                        action: ProcessBatchAction::Kill,
-                        scope: ProcessGroupScope::PidAdjacency,
-                        targets: vec![target],
-                    };
-                    let _ =
-                        shell
-                            .application
-                            .interaction
-                            .reduce(InteractionEvent::ArmConfirmation(
-                                PendingConfirmation::ProcessBatch(intent),
-                            ));
-                }
+            if let Some(process) = process
+                && let Some(target) = FrozenProcessIdentity::from_process(&process)
+            {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::Kill,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ = shell
+                    .application
+                    .interaction
+                    .reduce(InteractionEvent::ArmConfirmation(
+                        PendingConfirmation::ProcessBatch(intent),
+                    ));
             }
         }
         "process-tree-confirm" => {
@@ -189,21 +188,20 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned();
-            if let Some(process) = process {
-                if let Some(target) = FrozenProcessIdentity::from_process(&process) {
-                    let intent = ProcessBatchIntent {
-                        action: ProcessBatchAction::EndProcessTree,
-                        scope: ProcessGroupScope::PidAdjacency,
-                        targets: vec![target],
-                    };
-                    let _ =
-                        shell
-                            .application
-                            .interaction
-                            .reduce(InteractionEvent::ArmConfirmation(
-                                PendingConfirmation::ProcessBatch(intent),
-                            ));
-                }
+            if let Some(process) = process
+                && let Some(target) = FrozenProcessIdentity::from_process(&process)
+            {
+                let intent = ProcessBatchIntent {
+                    action: ProcessBatchAction::EndProcessTree,
+                    scope: ProcessGroupScope::PidAdjacency,
+                    targets: vec![target],
+                };
+                let _ = shell
+                    .application
+                    .interaction
+                    .reduce(InteractionEvent::ArmConfirmation(
+                        PendingConfirmation::ProcessBatch(intent),
+                    ));
             }
         }
         "process-batch-confirm" => {
@@ -254,18 +252,18 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 .as_ref()
                 .and_then(|p| p.first())
                 .cloned();
-            if let Some(process) = process {
-                if let Some(target) = FrozenProcessIdentity::from_process(&process) {
-                    shell.application.selected_process = Some(target.clone());
-                    let revision = ProcessInsightsRevision::new(1);
-                    let mut tracker = ProcessInsightsProjection::default();
-                    tracker.begin(target, revision);
-                    if let Some(projection) = tracker.snapshot() {
-                        seed_projection_fact(
-                            shell,
-                            ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
-                        );
-                    }
+            if let Some(process) = process
+                && let Some(target) = FrozenProcessIdentity::from_process(&process)
+            {
+                shell.application.selected_process = Some(target.clone());
+                let revision = ProcessInsightsRevision::new(1);
+                let mut tracker = ProcessInsightsProjection::default();
+                tracker.begin(target, revision);
+                if let Some(projection) = tracker.snapshot() {
+                    seed_projection_fact(
+                        shell,
+                        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+                    );
                 }
             }
         }

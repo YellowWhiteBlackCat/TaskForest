@@ -28,21 +28,21 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            (
+
                 Node {
                     flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::FlexEnd,
                 }
-                Children [ ( Text(value) TextRole(Role::Mono) DynText(field) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
+                Children [  Text(value) TextRole(Role::Mono) DynText(field) TextLayout { linebreak: LineBreak::NoWrap }  ]
+
         ]
     }
 }
@@ -73,14 +73,14 @@ fn cpu_metric_cell_scene(
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Node {
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     flex_grow: 1.0,
                     flex_shrink: 1.0,
@@ -88,14 +88,14 @@ fn cpu_metric_cell_scene(
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    (
+
                         Text(value)
                         TextRole(Role::Mono)
                         DynText(DynField::Cpu(field))
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    )
+
                 ]
-            ),
+
         ]
     }
 }
@@ -115,15 +115,15 @@ fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> i
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Node {
                     width: px(96.0),
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     flex_grow: 1.0,
                     flex_shrink: 1.0,
@@ -131,13 +131,13 @@ fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> i
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    (
+
                         Text(value)
                         TextRole(Role::Mono)
                         DynText(DynField::Cpu(field))
-                    )
+
                 ]
-            ),
+
         ]
     }
 }
@@ -151,19 +151,19 @@ fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Text(cpu_field_text(shell, CpuField::Usage))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Usage))
                 TextLayout { linebreak: LineBreak::NoWrap }
-            ),
-            ( Text(" · ") TextRole(Role::Caption) ),
-            (
+            --
+             Text(" · ") TextRole(Role::Caption) --
+
                 Text(cpu_field_text(shell, CpuField::Frequency))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Frequency))
                 TextLayout { linebreak: LineBreak::NoWrap }
-            ),
+
         ]
     })
 }
@@ -190,15 +190,15 @@ fn activity_graph_scene(
             position_type: PositionType::Relative,
         }
         Children [
-            (
+
                 Node {
                     width: percent(100),
                     height: px(height),
                     position_type: PositionType::Relative,
                 }
                 Children [
-                    ( chart_grid_scene(height, palette) ),
-                    (
+                     @chart_grid_scene(height, palette) --
+
                         Node {
                             width: percent(100),
                             height: percent(100),
@@ -208,11 +208,11 @@ fn activity_graph_scene(
                             overflow: Overflow::clip_x(),
                         }
                         Children [
-                            ( { polyline_scene(&segments, color) } ),
+                             @{ polyline_scene(&segments, color) }
                         ]
-                    ),
+
                 ]
-            )
+
         ]
     })
 }
@@ -234,16 +234,16 @@ fn sidebar_activity_scene(
             column_gap: Val::Px(space_2()),
         }
         Children [
-            ( { crate::icons::icon_scene(icon, 16.0, palette.dim_color) } ),
-            (
+             @{ crate::icons::icon_scene(icon, 16.0, palette.dim_color) } --
+
                 Node {
                     width: px(palette.control_height_px * 2.0),
                     height: px(height),
                 }
                 Children [
-                    ( { graph } ),
+                     @{ graph }
                 ]
-            ),
+
         ]
     })
 }
@@ -414,7 +414,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
         PerformanceDeviceSidebar
         ScrollArea
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -471,7 +471,7 @@ pub(super) fn stats_rail_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sc
         }
         PerformanceStatsRail
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -484,7 +484,7 @@ fn metric_selector_button_scene(curve: SystemCurve, palette: &UiPalette) -> impl
     let active = curve == SystemCurve::default();
     let pill = pill_scene(curve_selector_label(curve), active, palette);
     bsn! {
-        ( { pill } PerformanceFocusButton(curve) on(focus_button_activated) )
+         @{ pill } PerformanceFocusButton(curve) on(focus_button_activated)
     }
 }
 
@@ -505,7 +505,7 @@ fn metric_selector_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + 
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            { buttons },
+            { buttons }
         ]
     }
 }

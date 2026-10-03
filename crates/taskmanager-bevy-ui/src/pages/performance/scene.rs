@@ -55,7 +55,7 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Node {
                     width: px(14.0),
                     height: px(14.0),
@@ -65,13 +65,13 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
                 DynDiskSpareAlert({ key })
                 IconPlate({ IconId::Alert })
                 IconInk({ palette.warning_color })
-            ),
-            (
+            --
+
                 Text(disk_caption(disk))
                 TextRole(Role::Mono)
                 DynText({ field })
                 TextLayout { linebreak: LineBreak::NoWrap }
-            ),
+
         ]
     })
 }
@@ -95,8 +95,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         PerformancePageRoot
         Children [
-            ( { devices } ),
-            (
+             @{ devices } --
+
                 Node {
                     width: px(6.0),
                     min_width: px(6.0),
@@ -105,16 +105,14 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     align_items: AlignItems::Center,
                 }
                 Children [
-                    (
+
                         Node {
                             width: px(1.0),
                             height: percent(100),
                         }
                         BackgroundColor({ palette.border_color })
-                    )
-                ]
-            ),
-            (
+
+                ] --
                 Node {
                     flex_grow: 1.0,
                     height: percent(100),
@@ -122,11 +120,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    ( { replay_strip } ),
-                    ( { main } ),
-                ]
-            ),
-            ( { stats } ),
+                    @{ replay_strip } --
+                    @{ main }
+                ] --
+                @{ stats }
         ]
     }
 }

@@ -157,7 +157,7 @@ pub(crate) struct IconInk(pub(crate) Color);
 /// patch; the spawning scene declares the sized node and the two semantic
 /// markers.
 pub(crate) fn stamp_icon_plate(
-    trigger: On<Add, IconPlate>,
+    trigger: On<Add<IconPlate>>,
     plates: Option<Res<IconPlates>>,
     marks: Query<&IconPlate>,
     inks: Query<&IconInk>,

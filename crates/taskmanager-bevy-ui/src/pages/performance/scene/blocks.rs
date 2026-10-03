@@ -40,8 +40,8 @@ fn device_block(
         BackgroundColor({ palette.content_bg })
         DynBlock(section, key)
         Children [
-            ( Text(title) TextRole(Role::Body) ),
-            ( Text(value) TextRole(Role::Mono) DynText(field) ),
+             Text(title) TextRole(Role::Body) --
+             Text(value) TextRole(Role::Mono) DynText(field)
         ]
     }
 }
@@ -58,8 +58,8 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                 padding: UiRect::vertical(Val::Px(space_2())),
             }
             Children [
-                ( Text({ vram.label }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-                (
+                 Text({ vram.label }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+
                     Node {
                         width: percent(100),
                         height: px(6.0),
@@ -68,16 +68,16 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                     }
                     BackgroundColor({ palette.panel_fill })
                     Children [
-                        (
+
                             Node {
                                 width: percent(vram.pct),
                                 height: percent(100.0),
                                 border_radius: BorderRadius::all(Val::Px(space_2())),
                             }
                             BackgroundColor({ palette.accent })
-                        )
+
                     ]
-                ),
+
             ]
         }) as Box<dyn Scene>);
     }
@@ -96,14 +96,14 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                 padding: UiRect::vertical(Val::Px(space_2())),
             }
             Children [
-                (
+
                     Node {
                         width: px(80.0),
                         overflow: Overflow::clip_x(),
                     }
-                    Children [ ( Text(name) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-                ),
-                (
+                    Children [  Text(name) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+                --
+
                     Node {
                         flex_grow: 1.0,
                         min_width: px(60.0),
@@ -113,24 +113,24 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
                     }
                     BackgroundColor({ palette.panel_fill })
                     Children [
-                        (
+
                             Node {
                                 width: percent(pct),
                                 height: percent(100.0),
                                 border_radius: BorderRadius::all(Val::Px(space_2())),
                             }
                             BackgroundColor({ palette.nav_active_bg })
-                        )
+
                     ]
-                ),
-                (
+                --
+
                     Node {
                         width: px(50.0),
                         flex_direction: FlexDirection::Row,
                         justify_content: JustifyContent::FlexEnd,
                     }
-                    Children [ ( Text(usage) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-                ),
+                    Children [  Text(usage) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap }  ]
+
             ]
         }) as Box<dyn Scene>);
     }
@@ -151,9 +151,9 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
         BackgroundColor({ palette.content_bg })
         DynBlock(Section::Gpu, { gpu.device_id.clone() })
         Children [
-            ( Text({ gpu_block_title(gpu) }) TextRole(Role::Body) ),
-            ( Text({ gpu_fact_line(gpu) }) TextRole(Role::Mono) DynText(field) ),
-            { details },
+             Text({ gpu_block_title(gpu) }) TextRole(Role::Body) --
+             Text({ gpu_fact_line(gpu) }) TextRole(Role::Mono) DynText(field) --
+            { details }
         ]
     }
 }
@@ -200,9 +200,9 @@ fn nic_block_scene(nic: &NetworkMetrics, palette: &UiPalette) -> impl Scene + us
         BackgroundColor({ palette.content_bg })
         DynBlock(Section::Network, { (*nic.device_id).to_owned() })
         Children [
-            ( Text(title) TextRole(Role::Body) ),
-            ( Text(nic_fact_line(nic)) TextRole(Role::Mono) DynText(field) ),
-            { details },
+             Text(title) TextRole(Role::Body) --
+             Text(nic_fact_line(nic)) TextRole(Role::Mono) DynText(field) --
+            { details }
         ]
     }
 }
@@ -225,7 +225,7 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
                 padding: UiRect::vertical(Val::Px(space_2())),
             }
             Children [
-                (
+
                     Node {
                         width: percent(100),
                         flex_direction: FlexDirection::Row,
@@ -233,11 +233,11 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
                         align_items: AlignItems::Center,
                     }
                     Children [
-                        ( Text({ part.name }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-                        ( Text({ part.usage_text }) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } ),
+                         Text({ part.name }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+                         Text({ part.usage_text }) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap }
                     ]
-                ),
-                (
+                --
+
                     Node {
                         width: percent(100),
                         height: px(6.0),
@@ -246,16 +246,16 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
                     }
                     BackgroundColor({ palette.panel_fill })
                     Children [
-                        (
+
                             Node {
                                 width: percent(part.pct),
                                 height: percent(100.0),
                                 border_radius: BorderRadius::all(Val::Px(space_2())),
                             }
                             BackgroundColor({ palette.accent })
-                        )
+
                     ]
-                ),
+
             ]
         }) as Box<dyn Scene>);
     }
@@ -271,9 +271,9 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
         BackgroundColor({ palette.content_bg })
         DynBlock(Section::Disk, { disk.device_id.clone() })
         Children [
-            ( Text(title) TextRole(Role::Body) ),
-            ( { super::disk_caption_scene(disk, palette) } ),
-            { partition_rows },
+             Text(title) TextRole(Role::Body) --
+             @{ super::disk_caption_scene(disk, palette) } --
+            { partition_rows }
         ]
     }
 }
@@ -318,17 +318,17 @@ fn segment_row_scene(
         }
         DynBlock(Section::MemorySegments, key)
         Children [
-            (
+
                 Node {
                     width: px(10.0),
                     height: px(10.0),
                     border_radius: BorderRadius::all(Val::Px(space_2())),
                 }
                 BackgroundColor(color)
-            ),
-            ( Text(label) TextRole(Role::Caption) ),
-            ( Node { flex_grow: 1.0 } ),
-            ( Text(value) TextRole(Role::Mono) DynText(DynField::Segment(kind)) ),
+            --
+             Text(label) TextRole(Role::Caption) --
+             Node { flex_grow: 1.0 } --
+             Text(value) TextRole(Role::Mono) DynText(DynField::Segment(kind))
         ]
     }
 }
@@ -408,8 +408,8 @@ pub(super) fn section_scene(
         BackgroundColor({ palette.panel_fill })
         DynSection(section)
         Children [
-            ( Text(title) TextRole(Role::Caption) ),
-            { children },
+             Text(title) TextRole(Role::Caption) --
+            { children }
         ]
     }
 }
@@ -480,7 +480,7 @@ pub(crate) fn segment_bar_scene(memory: &MemoryMetrics, palette: &UiPalette) -> 
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            { spans },
+            { spans }
         ]
     }
 }

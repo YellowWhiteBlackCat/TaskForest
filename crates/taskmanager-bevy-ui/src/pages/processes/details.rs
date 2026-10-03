@@ -8,7 +8,7 @@
 //! The panel deliberately has two refresh paths:
 //!
 //! - a selection or shell-fold observer rebuilds the small, bounded surface;
-//! - an official Bevy 0.19 `Button` requests a fresh identity-safe insight
+//! - an official Bevy 0.20 `Button` requests a fresh identity-safe insight
 //!   sample through the existing app-host client seam.
 //!
 //! There is no per-frame polling and no native read here. Pending, mismatched,
@@ -311,7 +311,7 @@ use taskmanager_shell::queue_effect;
 // ---- observer bridge ----------------------------------------------------
 
 fn bootstrap_details_page(
-    trigger: On<Add, ProcessDetailsRoot>,
+    trigger: On<Add<ProcessDetailsRoot>>,
     mut commands: Commands,
     mut track: Option<NonSendMut<FrontendTrack>>,
     runtime: Option<Res<SharedRuntimeHandle>>,
@@ -453,7 +453,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
         ProcessDetailsRoot
         super::ProcessDetailsContainer
         Children [
-            ( { details_content_scene(&projection(context.shell), palette) } ),
+             @{ details_content_scene(&projection(context.shell), palette) }
         ]
     }
 }
@@ -495,7 +495,7 @@ fn details_content_scene(
         }
         ProcessDetailsArtifact
         Children [
-            (
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -503,28 +503,28 @@ fn details_content_scene(
                     column_gap: Val::Px(space_8()),
                 }
                     Children [
-                        ( Text(t("prop.process_details")) TextRole(Role::Caption) ),
-                        ( Text(heading) TextRole(Role::Body) ),
-                    ( { refresh } ),
+                         Text(t("prop.process_details")) TextRole(Role::Caption) --
+                         Text(heading) TextRole(Role::Body) --
+                     @{ refresh }
                 ]
-            ),
-            ( Text(t("proc_insights.scroll_hint")) TextRole(Role::Caption) ),
-            ( Text(overview_title) TextRole(Role::Caption) ),
-            { overview_rows },
-            (
+            --
+             Text(t("proc_insights.scroll_hint")) TextRole(Role::Caption) --
+             Text(overview_title) TextRole(Role::Caption) --
+            { overview_rows }--
+
                 Text(t("prop.insights"))
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    { insight_cards },
+                    { insight_cards }
                 ]
-            ),
+
         ]
     }
 }
@@ -540,22 +540,22 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
             column_gap: Val::Px(space_4()),
         }
         Children [
-            (
+
                 Node {
                     width: px(130.0),
                     min_width: px(130.0),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     min_width: px(0.0),
                     flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(value) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
+                Children [  Text(value) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }  ]
+
         ]
     }
 }
@@ -578,18 +578,18 @@ fn insight_card_scene(card: &InsightCard, palette: &UiPalette) -> impl Scene + u
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            ( Node { width: px(104.0), flex_shrink: 0.0 } Children [ ( Text(title) TextRole(Role::Caption) ) ] ),
-            (
+             Node { width: px(104.0), flex_shrink: 0.0 } Children [  Text(title) TextRole(Role::Caption)  ] --
+
                 Node {
                     flex_grow: 1.0,
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    ( Text(value) TextRole(Role::Body) ),
-                    ( { action_scene } ),
+                     Text(value) TextRole(Role::Body) --
+                     @{ action_scene }
                 ]
-            ),
+
         ]
     }
 }
@@ -606,7 +606,7 @@ fn network_escalate_button_scene(palette: &UiPalette) -> impl Scene + use<> {
         Button
         on(on_network_escalate_activated)
         Children [
-            ( Text(t("proc_insights.enable_network_capture")) TextRole(Role::Body) ),
+             Text(t("proc_insights.enable_network_capture")) TextRole(Role::Body)
         ]
     }
 }
@@ -637,7 +637,7 @@ fn refresh_button_scene(palette: &UiPalette) -> impl Scene + use<> {
         Button
         on(on_refresh_activated)
         Children [
-            ( Text(t("common.refresh")) TextRole(Role::Body) ),
+             Text(t("common.refresh")) TextRole(Role::Body)
         ]
     }
 }

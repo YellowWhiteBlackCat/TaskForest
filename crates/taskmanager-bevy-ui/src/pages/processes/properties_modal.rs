@@ -156,17 +156,17 @@ pub(crate) fn properties_modal_scene(
                     padding: UiRect::horizontal(Val::Px(space_4())),
                 }
                 Children [
-                    (
+
                         Node {
                             width: px(160.0),
                             align_items: AlignItems::Center,
                             overflow: Overflow::clip_x(),
                         }
                         Children [
-                            ( Text(l) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                             Text(l) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                         ]
-                    ),
-                    (
+                    --
+
                         Node {
                             flex_grow: 1.0,
                             align_items: AlignItems::Center,
@@ -174,9 +174,9 @@ pub(crate) fn properties_modal_scene(
                             overflow: Overflow::clip_x(),
                         }
                         Children [
-                            ( Text(v) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } )
+                             Text(v) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }
                         ]
-                    ),
+
                 ]
             }) as Box<dyn Scene>
         })
@@ -207,10 +207,10 @@ pub(crate) fn properties_modal_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(subtitle) TextRole(Role::Caption) ),
-            ( { list } ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Text(subtitle) TextRole(Role::Caption) --
+             @{ list } --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -218,16 +218,16 @@ pub(crate) fn properties_modal_scene(
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text({ t("common.close").to_owned() })
                         TextRole(Role::Body)
                         ControlVisual(ControlTone::Surface, true)
                         Button
                         on(on_properties_dismiss_activated)
                         ProcessPropertiesDismissButton
-                    ),
+
                 ]
-            ),
+
         ]
     }) as Box<dyn Scene>;
 
@@ -243,7 +243,7 @@ pub(crate) fn properties_modal_scene(
         BackgroundColor({ scrim })
         ProcessPropertiesOverlay
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }) as Box<dyn Scene>
 }

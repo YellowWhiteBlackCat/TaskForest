@@ -82,7 +82,7 @@ fn bind_system_page(
 }
 
 /// First paint: the body container just landed.
-fn on_body_added(_added: On<Add, SystemBody>, mut commands: Commands) {
+fn on_body_added(_added: On<Add<SystemBody>>, mut commands: Commands) {
     commands.queue(paint_system);
 }
 
@@ -388,21 +388,21 @@ fn kpi_tile_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Caption) ),
-            (
+             Text(title) TextRole(Role::Caption) --
+
                 Node {
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(value) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(value) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
+                Children [  Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+
         ]
     }
 }
@@ -424,8 +424,8 @@ pub(crate) fn section_card_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Body) ),
-            { rows },
+             Text(title) TextRole(Role::Body) --
+            { rows }
         ]
     }
 }
@@ -449,7 +449,7 @@ fn system_body_scene(
             }
             BackgroundColor({ palette.panel_fill })
             Children [
-                ( Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body) ),
+                 Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body)
             ]
         }) as Box<dyn bevy::scene::Scene>;
     }
@@ -527,7 +527,7 @@ fn system_body_scene(
             row_gap: Val::Px(space_8()),
         }
         Children [
-            { tiles },
+            { tiles }
         ]
     };
 
@@ -582,7 +582,7 @@ fn system_body_scene(
             row_gap: Val::Px(space_8()),
         }
         Children [
-            { cards },
+            { cards }
         ]
     };
 
@@ -593,8 +593,8 @@ fn system_body_scene(
             row_gap: Val::Px(space_12()),
         }
         Children [
-            ( { tiles_row } ),
-            ( { cards_grid } ),
+             @{ tiles_row } --
+             @{ cards_grid }
         ]
     })
 }
@@ -614,13 +614,13 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         }
         SystemPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Text(waiting)
                 SystemStatusLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -628,7 +628,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 SystemBody
-            ),
+
         ]
     }
 }

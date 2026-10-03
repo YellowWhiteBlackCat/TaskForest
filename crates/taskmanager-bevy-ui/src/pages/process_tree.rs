@@ -264,7 +264,7 @@ pub(crate) fn row_scene(row: &ProcessTreeRowView<'_>, palette: &UiPalette) -> im
         on(on_tree_row_activated)
         SemanticAddress({ semantic.0.clone() })
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -302,7 +302,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ProcessTreeSurface
         Children [
-            (
+
                 Node {
                     width: percent(100),
                     flex_direction: bevy::ui::prelude::FlexDirection::Row,
@@ -310,8 +310,8 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
                     align_items: bevy::ui::prelude::AlignItems::Center,
                 }
                 Children [
-                    ( Text(title) ProcessTreeCountLine TextRole(Role::Caption) ),
-                    (
+                     Text(title) ProcessTreeCountLine TextRole(Role::Caption) --
+
                         Node {
                             height: px(end_height),
                             padding: UiRect::horizontal(Val::Px(space_8())),
@@ -322,16 +322,16 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
                         Button
                         on(on_end_tree_activated)
                         Children [
-                            ( Text(end_label) TextRole(Role::Caption) ),
+                             Text(end_label) TextRole(Role::Caption)
                         ]
-                    ),
+
                 ]
-            ),
-            (
+            --
+
                 Node { flex_direction: bevy::ui::prelude::FlexDirection::Column }
                 ProcessTreeRows
                 Children [{ row_scenes }]
-            ),
+
         ]
     }
 }

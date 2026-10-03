@@ -102,54 +102,46 @@ pub(crate) fn history_replay_strip_scene(
         BackgroundColor({ palette.panel_fill })
         PerformanceHistoryReplayStrip
         Children [
-            (
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+            }
+            Children [
+                Text(t("perf.replay.title")) TextRole(Role::Heading) --
                 Node {
-                    width: percent(100),
                     flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(space_4()),
                 }
                 Children [
-                    ( Text(t("perf.replay.title")) TextRole(Role::Heading) ),
-                    (
-                        Node {
-                            flex_direction: FlexDirection::Row,
-                            column_gap: Val::Px(space_4()),
-                        }
-                        Children [
-                            { window_pills },
-                        ]
-                    ),
+                    @{ window_pills }
                 ]
-            ),
-            (
+            ] --
+            Node {
+                width: percent(100),
+                height: px(palette.control_height_px),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(space_8()),
+                padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
+                border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+            }
+            BackgroundColor({ palette.content_bg })
+            Children [
                 Node {
-                    width: percent(100),
-                    height: px(palette.control_height_px),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_8()),
                     padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
                     border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
                 }
-                BackgroundColor({ palette.content_bg })
+                BackgroundColor({ palette.accent })
+                Button
+                PerformanceReplayPlayButton
+                on(replay_play_button_observer)
                 Children [
-                    (
-                        Node {
-                            padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
-                            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                        }
-                        BackgroundColor({ palette.accent })
-                        Button
-                        PerformanceReplayPlayButton
-                        on(replay_play_button_observer)
-                        Children [
-                            ( Text(play_label) TextRole(Role::Caption) ),
-                        ]
-                    ),
-                    ( Text("Timeline: -60m ------------------------* 0s (Live Replay)") TextRole(Role::Mono) ),
-                ]
-            ),
+                    Text(play_label) TextRole(Role::Caption)
+                ] --
+                Text("Timeline: -60m ------------------------* 0s (Live Replay)") TextRole(Role::Mono)
+            ]
         ]
     }
 }
@@ -175,7 +167,7 @@ fn window_pill_scene(
         PerformanceReplayWindowButton({ window })
         on(replay_window_button_observer)
         Children [
-            ( Text(label) TextRole(Role::Caption) ),
+            Text(label) TextRole(Role::Caption)
         ]
     }
 }

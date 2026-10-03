@@ -610,14 +610,14 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            ( Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ),
-            { rows },
-            (
+             Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) --
+            { rows }--
+
                 Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
                 TextRole(Role::Caption)
-            ),
-            { EntityScene(page_observer(request_projection_refresh)) },
-            { EntityScene(page_observer(settings_choice_observer)) },
+            --
+            { EntityScene(page_observer(request_projection_refresh)) }--
+            { EntityScene(page_observer(settings_choice_observer)) }
         ]
     }
 }
@@ -635,10 +635,10 @@ fn radio_row(label: &str, entries: Vec<ChoiceEntry>, value: &str) -> Box<dyn Sce
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { width: px(160.0), height: Val::Auto } Children [
-                ( Text(label) TextRole(Role::Caption) ),
-            ] ),
-            (
+             Node { width: px(160.0), height: Val::Auto } Children [
+                 Text(label) TextRole(Role::Caption)
+            ] --
+
                 Node {
                     height: Val::Auto,
                     flex_direction: FlexDirection::Row,
@@ -647,8 +647,8 @@ fn radio_row(label: &str, entries: Vec<ChoiceEntry>, value: &str) -> Box<dyn Sce
                 }
                 RadioGroup
                 Children [ { choice_widgets(entries) } ]
-            ),
-            ( Text(value) TextRole(Role::Caption) ),
+            --
+             Text(value) TextRole(Role::Caption)
         ]
     })
 }
@@ -666,11 +666,11 @@ fn toggle_row(label: &str, entry: ChoiceEntry, value: &str) -> Box<dyn Scene> {
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { width: px(160.0), height: Val::Auto } Children [
-                ( Text(label) TextRole(Role::Caption) ),
-            ] ),
-            { choice_widgets(vec![entry]) },
-            ( Text(value) TextRole(Role::Caption) ),
+             Node { width: px(160.0), height: Val::Auto } Children [
+                 Text(label) TextRole(Role::Caption)
+            ] --
+            { choice_widgets(vec![entry]) }--
+             Text(value) TextRole(Role::Caption)
         ]
     })
 }
@@ -712,7 +712,7 @@ fn checked_radio_shape(label: String, field: SettingsField) -> impl Scene + use<
         Checked
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -727,7 +727,7 @@ fn unchecked_radio_shape(label: String, field: SettingsField) -> impl Scene + us
         RadioButton
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -743,7 +743,7 @@ fn checked_checkbox_shape(label: String, field: SettingsField) -> impl Scene + u
         Checked
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -758,7 +758,7 @@ fn unchecked_checkbox_shape(label: String, field: SettingsField) -> impl Scene +
         Checkbox
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }

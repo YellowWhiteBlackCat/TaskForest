@@ -89,7 +89,7 @@ pub(crate) fn tooltip_card_scene(text: &str, palette: &UiPalette) -> impl Scene 
         BackgroundColor({ palette.panel_fill })
         TooltipOverlay
         Children [
-            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }

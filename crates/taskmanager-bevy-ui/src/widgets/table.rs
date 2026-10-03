@@ -305,7 +305,7 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
             overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }
@@ -369,8 +369,8 @@ fn header_cell_scene(
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
         Children [
-            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
-            { indicator },
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
+            { indicator }
         ]
     }
 }

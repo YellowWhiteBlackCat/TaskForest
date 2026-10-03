@@ -43,16 +43,16 @@ pub(super) fn boot_timeline_scene(
                     padding: UiRect::vertical(Val::Px(space_2())),
                 }
                 Children [
-                    (
+
                         Node {
                             width: px(160.0),
                             overflow: Overflow::clip_x(),
                         }
                         Children [
-                            ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                         ]
-                    ),
-                    (
+                    --
+
                         Node {
                             width: px(200.0),
                             height: px(8.0),
@@ -61,21 +61,21 @@ pub(super) fn boot_timeline_scene(
                         }
                         BackgroundColor({ palette.panel_fill })
                         Children [
-                            (
+
                                 Node {
                                     width: percent(pct),
                                     height: percent(100.0),
                                     border_radius: BorderRadius::all(Val::Px(space_2())),
                                 }
                                 BackgroundColor(bar_color)
-                            )
+
                         ]
-                    ),
-                    (
+                    --
+
                         Text(duration_text)
                         TextRole(Role::Mono)
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    ),
+
                 ]
             }) as Box<dyn Scene>)
         })
@@ -95,8 +95,8 @@ pub(super) fn boot_timeline_scene(
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            ( Text({ t("startup.timeline").to_owned() }) TextRole(Role::Caption) ),
-            { bars },
+             Text({ t("startup.timeline").to_owned() }) TextRole(Role::Caption) --
+            { bars }
         ]
     }))
 }
@@ -110,8 +110,8 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { flex_grow: 1.0 } ),
-            (
+             Node { flex_grow: 1.0 } --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -127,15 +127,15 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
                 on(on_startup_enable_button_activated)
                 StartupEnableButton
                 Children [
-                    (
+
                         Text({ t("startup.enable").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -151,14 +151,14 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
                 on(on_startup_disable_button_activated)
                 StartupDisableButton
                 Children [
-                    (
+
                         Text({ t("startup.disable").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
+
         ]
     })
 }
@@ -190,9 +190,9 @@ pub(super) fn startup_body_scene(
             row_gap: Val::Px(space_2()),
         }
         Children [
-            ( toolbar ),
-            ( header ),
-            { children },
+             @toolbar --
+             @header --
+            { children }
         ]
     }
 }
@@ -251,8 +251,8 @@ pub(super) fn header_scene(
                 }
                 StartupSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-                    { indicator },
+                     Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+                    { indicator }
                 ]
             }) as Box<dyn Scene>
         })
@@ -319,19 +319,19 @@ pub(super) fn startup_row_scene(
         Button
         on(on_startup_row_activated)
         Children [
-            (
+
                 Node { width: px(state_width), align_items: AlignItems::Center }
                 Button
                 StartupToggleButton(index, target_toggle)
                 on(on_startup_toggle_button_activated)
                 Children [
-                    ( { chip_scene } ),
+                     @{ chip_scene }
                 ]
-            ),
-            ( text_cell_scene(name, name_width, Role::Body) ),
-            ( text_cell_scene(impact, impact_width, Role::Body) ),
-            ( text_cell_scene(source, source_width, Role::Body) ),
-            ( text_cell_scene(exec, exec_width, Role::Body) ),
+            --
+             @text_cell_scene(name, name_width, Role::Body) --
+             @text_cell_scene(impact, impact_width, Role::Body) --
+             @text_cell_scene(source, source_width, Role::Body) --
+             @text_cell_scene(exec, exec_width, Role::Body)
         ]
     })
 }
@@ -344,7 +344,7 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
             overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }
@@ -360,7 +360,7 @@ pub(super) fn chip_cell_scene(
         Node { width: px(width), align_items: AlignItems::Center }
         Pickable::IGNORE
         Children [
-            (
+
                 Node {
                     height: Val::Auto,
                     padding: UiRect::horizontal(Val::Px(space_8())),
@@ -369,9 +369,9 @@ pub(super) fn chip_cell_scene(
                 BackgroundColor(fill)
                 Pickable::IGNORE
                 Children [
-                    ( Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
+                     Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
                 ]
-            ),
+
         ]
     }
 }
@@ -380,7 +380,7 @@ pub(super) fn caption_line_scene(text: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100) }
         Children [
-            ( Text(text) TextRole(Role::Caption) ),
+             Text(text) TextRole(Role::Caption)
         ]
     }
 }
@@ -395,7 +395,7 @@ pub(super) fn empty_scene(message: String) -> impl Scene + use<> {
             padding: UiRect::all(Val::Px(space_24())),
         }
         Children [
-            ( Text(message) TextRole(Role::Body) ),
+             Text(message) TextRole(Role::Body)
         ]
     }
 }

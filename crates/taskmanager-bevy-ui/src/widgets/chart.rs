@@ -1,6 +1,6 @@
 //! Bounded, gap-aware chart projection for the Bevy performance surface.
 //!
-//! Bevy UI 0.19 lays out the surface; this module keeps the measurement math
+//! Bevy UI 0.20 lays out the surface; this module keeps the measurement math
 //! toolkit-neutral and makes the render seam a small `bsn!` scene. Non-finite
 //! observations create gaps rather than joining across missing data.
 
@@ -219,7 +219,7 @@ pub(crate) fn polyline_scene(
             overflow: bevy::ui::Overflow::clip(),
         }
         Children [
-            { parts },
+            { parts }
         ]
     }
 }

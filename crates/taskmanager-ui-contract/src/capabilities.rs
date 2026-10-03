@@ -79,7 +79,7 @@
 //!    - *Footer activity line*: Operation feedback routes to the window footer,
 //!      maintaining a calm, uncrowded interface.
 //! 4. **Bevy UI (TaskForest-B, pure data-driven ECS asset)**:
-//!    Bevy 0.19 entity-component-system graph with 100% `bsn!` declarative
+//!    Bevy 0.20 entity-component-system graph with 100% `bsn!` declarative
 //!    scene composition.
 //!    - *Pure declarative scene tree*: UI nodes are reactive entities governed by
 //!      components and observer systems (`commands.trigger(...)`).

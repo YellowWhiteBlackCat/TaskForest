@@ -60,7 +60,7 @@ fn token_colors_round_trip_channel_exact() {
 }
 
 fn px(size: FontSize) -> f32 {
-    size.eval(bevy::math::Vec2::ZERO, 16.0)
+    size.eval(bevy::math::Vec2::ZERO, bevy::text::RemSize(16.0))
 }
 
 #[test]

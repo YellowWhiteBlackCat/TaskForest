@@ -1,7 +1,7 @@
 //! Bevy UI fourth frontend — peer surface to the GPUI/Iced/TUI frontends
 //! ([docs/BEVY_UI_FRONTEND.md](../../docs/BEVY_UI_FRONTEND.md)).
 //!
-//! This crate renders the same neutral shell projections with Bevy 0.19's
+//! This crate renders the same neutral shell projections with Bevy 0.20's
 //! official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` — composing
 //! static structure declaratively with `bsn!` and binding dynamic state
 //! through observers and required components. It owns these seams:

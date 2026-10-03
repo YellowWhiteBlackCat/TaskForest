@@ -43,9 +43,9 @@ pub(crate) fn privileges_section_scene(palette: &UiPalette) -> Box<dyn Scene> {
             margin: UiRect::top(Val::Px(space_8())),
         }
         Children [
-            ( Text(t("settings.privileges")) TextRole(Role::Heading) ),
-            ( Text(t("settings.privileges_hint")) TextRole(Role::Caption) ),
-            { rows },
+            Text(t("settings.privileges")) TextRole(Role::Heading) --
+            Text(t("settings.privileges_hint")) TextRole(Role::Caption) --
+            @{ rows }
         ]
     })
 }
@@ -67,7 +67,7 @@ fn privilege_row_scene(
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            ( Text(line) TextRole(Role::Body) ),
+            Text(line) TextRole(Role::Body)
         ]
     }
 }

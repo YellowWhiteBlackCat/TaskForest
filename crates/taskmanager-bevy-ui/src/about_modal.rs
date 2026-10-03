@@ -71,7 +71,7 @@ fn about_overlay_scene(palette: &UiPalette) -> impl Scene + use<> {
         BackgroundColor({ scrim })
         AboutModalOverlay
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -92,9 +92,9 @@ fn panel_scene(palette: &UiPalette) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(version_str) TextRole(Role::Body) ),
-            ( Text(desc) TextRole(Role::Caption) ),
+             Text(title) TextRole(Role::Heading) --
+             Text(version_str) TextRole(Role::Body) --
+             Text(desc) TextRole(Role::Caption)
         ]
     }
 }

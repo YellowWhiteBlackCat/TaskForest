@@ -348,8 +348,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ServicesPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -357,15 +357,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     justify_content: JustifyContent::SpaceBetween,
                 }
                 Children [
-                    (
+
                         Text(waiting)
                         ServicesStatusLine
                         TextRole(Role::Caption)
-                    ),
-                    ( { search } ),
+                    --
+                     @{ search }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -373,16 +373,16 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 ServicesBody
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 dependencies_panel::ServicesDependenciesPanelSlot
-            ),
-            (
+            --
+
                 // The service-log panel's mount point. The panel is a
                 // page-local surface fed by the shell's log lifecycle; its
                 // painter is fingerprint-gated so idle folds never respawn.
@@ -392,7 +392,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 log_panel::ServicesLogPanelSlot
-            ),
+
         ]
     }
 }
@@ -604,7 +604,7 @@ fn paint_services(world: &mut World) {
 /// because the scene's children apply later in the same command queue.
 /// Initial/mount paint: the body container just came to exist, so the first
 /// (and every remount) row projection can bind to it.
-fn on_services_body_added(_added: On<Add, ServicesBody>, mut commands: Commands) {
+fn on_services_body_added(_added: On<Add<ServicesBody>>, mut commands: Commands) {
     commands.queue(paint_services);
 }
 

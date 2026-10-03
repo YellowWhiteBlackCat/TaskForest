@@ -61,18 +61,18 @@ fn fact_row_scene(label: &str, value: &str, _palette: &UiPalette) -> Box<dyn Sce
             padding: UiRect::vertical(Val::Px(space_4())),
         }
         Children [
-            (
+
                 Node { width: px(120.0), flex_shrink: 0.0 }
                 Children [
-                    ( Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                     Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { flex_grow: 1.0 }
                 Children [
-                    ( Text({ value.to_owned() }) TextRole(Role::Body) )
+                     Text({ value.to_owned() }) TextRole(Role::Body)
                 ]
-            ),
+
         ]
     })
 }
@@ -108,8 +108,8 @@ pub(crate) fn service_details_modal_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -117,10 +117,10 @@ pub(crate) fn service_details_modal_scene(
                     margin: UiRect::vertical(Val::Px(space_8())),
                 }
                 Children [
-                    { rows },
+                    { rows }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -128,16 +128,16 @@ pub(crate) fn service_details_modal_scene(
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text({ t("common.close").to_owned() })
                         TextRole(Role::Body)
                         ControlVisual(ControlTone::Surface, true)
                         Button
                         on(on_close_button_activated)
                         ServiceDetailsCloseButton
-                    ),
+
                 ]
-            ),
+
         ]
     }) as Box<dyn Scene>;
 
@@ -153,7 +153,7 @@ pub(crate) fn service_details_modal_scene(
         BackgroundColor({ scrim })
         ServiceDetailsOverlay
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }) as Box<dyn Scene>
 }

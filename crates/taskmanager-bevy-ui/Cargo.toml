@@ -9,7 +9,7 @@ readme = "README.md"
 publish = false
 
 # Fourth frontend (docs/BEVY_UI_FRONTEND.md): renders the shared neutral
-# projections with Bevy 0.19 `bevy_ui` (observer + required-components idioms),
+# projections with Bevy 0.20 `bevy_ui` (observer + required-components idioms),
 # peer to the GPUI/Iced/TUI frontends. Dependency whitelist is charter law:
 # application/app-host/shell/theme/ui-contract/assets/icons plus the direct
 # owner crates core/platform-contract and locked bevy only — no platform
@@ -46,10 +46,10 @@ accesskit = "0.24.1"
 # leaves them unresolved. The workspace root uses the identical
 # base-plus-target-tables split for gpui's platform-specific features; the
 # feature union across the tables is exactly the per-target closure below.
-bevy = { version = "=0.19.1", default-features = false }
+bevy = { version = "=0.20.0-rc.2", default-features = false }
 
 # Bevy is locked to the exact patch release and must stay in one workspace
-# resolution with platform-runtime's bevy_app/bevy_ecs 0.19. Upgrades require
+# resolution with platform-runtime's bevy_app/bevy_ecs 0.20. Upgrades require
 # the normal architecture and release review.
 #
 # Feature closure (minimal for a bevy_ui windowed desktop shell):
@@ -66,13 +66,13 @@ bevy = { version = "=0.19.1", default-features = false }
 # - bevy_ui_widgets: the official unstyled widget package — the second half
 #   of the charter's two-piece UI base (button/menu/scrollarea/scrollbar/
 #   slider/checkbox/radio/list/text_input/popover semantics; styling stays
-#   ours via theme tokens, Feathers is not adopted). Bevy 0.19 gates the
+#   ours via theme tokens, Feathers is not adopted). Bevy 0.20 gates the
 #   crate behind this facade feature; enabling it also wires
 #   `UiWidgetsPlugins` into `DefaultPlugins` and pulls `bevy_input_focus`.
 # - ui_picking: the official picking/message infrastructure required by the
-#   Bevy 0.19 widget observers (pointer release/IME queues); `DefaultPlugins`
+#   Bevy 0.20 widget observers (pointer release/IME queues); `DefaultPlugins`
 #   owns the corresponding runtime plugins, not this frontend composition.
-# - bevy_ui_render: the UiRenderPlugin draw pass. bevy 0.19 splits ui layout
+# - bevy_ui_render: the UiRenderPlugin draw pass. bevy 0.20 splits ui layout
 #   from ui rendering, so `bevy_ui` alone lays nodes out without ever painting
 #   them; a windowed app must close over the ui render node too.
 # - bevy_core_pipeline: the render-graph phase host the ui render node plugs
@@ -100,7 +100,7 @@ bevy = { version = "=0.19.1", default-features = false }
 #   render pass runs inline on the app thread, which the drain seam cannot
 #   observe.
 [target.'cfg(target_os = "linux")'.dependencies]
-bevy = { version = "=0.19.1", default-features = false, features = [
+bevy = { version = "=0.20.0-rc.2", default-features = false, features = [
     "bevy_ui",
     "bevy_ui_widgets",
     "bevy_scene",
@@ -118,7 +118,7 @@ bevy = { version = "=0.19.1", default-features = false, features = [
 # Non-Linux targets keep the same UI closure minus the windowing backend
 # toggles that only exist on Linux builds of winit.
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-bevy = { version = "=0.19.1", default-features = false, features = [
+bevy = { version = "=0.20.0-rc.2", default-features = false, features = [
     "bevy_ui",
     "bevy_ui_widgets",
     "bevy_scene",
