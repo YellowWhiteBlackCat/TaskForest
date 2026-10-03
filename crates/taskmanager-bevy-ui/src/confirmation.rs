@@ -455,10 +455,20 @@ pub(crate) fn init_capture_confirmation(
     {
         commands.trigger(ConfirmationChanged(Some(view)));
     }
-    if std::env::var("TM_BEVY_CAPTURE_PAGE")
-        .is_ok_and(|v| v.trim() == "about" || v.trim() == "system-about")
-    {
-        commands.trigger(crate::about_modal::AboutModalChanged(true));
+    if let Some(target) = crate::capture::capture_scenario_target() {
+        if target == "about" || target == "system-about" {
+            commands.trigger(crate::about_modal::AboutModalChanged(true));
+        } else if target == "first-run" {
+            commands.trigger(crate::first_run_modal::FirstRunModalChanged(true));
+        } else if target == "diagnostic-preview" {
+            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
+                crate::pages::system::DiagnosticModalKind::Preview,
+            )));
+        } else if target == "diagnostic-failure" {
+            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
+                crate::pages::system::DiagnosticModalKind::Failure,
+            )));
+        }
     }
 }
 

@@ -383,7 +383,8 @@ fn apply_overlay_control_click(
         | crate::TuiSurfaceKind::ServiceDependencies
         | crate::TuiSurfaceKind::ProcessAffinity
         | crate::TuiSurfaceKind::DiagnosticPreview
-        | crate::TuiSurfaceKind::DiagnosticFailure => EventReaction::default(),
+        | crate::TuiSurfaceKind::DiagnosticFailure
+        | crate::TuiSurfaceKind::FirstRun => EventReaction::default(),
     }
 }
 

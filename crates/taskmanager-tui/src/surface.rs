@@ -152,6 +152,7 @@ pub(crate) enum TuiSurfaceKind {
     ProcessAffinity,
     DiagnosticPreview,
     DiagnosticFailure,
+    FirstRun,
 }
 
 #[derive(Clone, Debug)]
@@ -171,6 +172,7 @@ pub(crate) enum TuiSurface {
     ProcessAffinity(AffinityModalState),
     DiagnosticPreview,
     DiagnosticFailure,
+    FirstRun,
 }
 
 impl TuiSurface {
@@ -191,6 +193,7 @@ impl TuiSurface {
             Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
             Self::DiagnosticPreview => TuiSurfaceKind::DiagnosticPreview,
             Self::DiagnosticFailure => TuiSurfaceKind::DiagnosticFailure,
+            Self::FirstRun => TuiSurfaceKind::FirstRun,
         }
     }
 }

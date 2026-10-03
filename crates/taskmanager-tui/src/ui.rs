@@ -11,6 +11,7 @@ pub(crate) mod chart_cursor;
 mod column_menu;
 mod confirmations;
 pub(crate) mod containers;
+mod first_run;
 mod footer;
 mod frame_plan;
 mod header;
@@ -244,6 +245,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             }
             Some(crate::TuiSurface::DiagnosticFailure) => {
                 crate::diagnostic_report::render_failure_overlay_at(frame, app, theme, popup);
+            }
+            Some(crate::TuiSurface::FirstRun) => {
+                first_run::render_first_run_overlay_at(frame, theme, popup);
             }
             None => {}
         },

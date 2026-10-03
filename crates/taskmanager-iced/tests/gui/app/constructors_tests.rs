@@ -402,6 +402,26 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "apps-identity-matrix");
     assert_eq!(app.shell.page(), AppPage::Applications);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "saved-view-presets");
+    assert!(app.process_columns_menu_open());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "battery-fan-performance");
+    assert!(app.shell.projection().power_supplies.is_some());
+    assert!(app.shell.projection().sensors.is_some());
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "device-hotplug");
+    assert!(app.performance.sidebar_visible);
+    assert!(
+        app.shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .is_some_and(|s| s.disks.iter().any(|d| d.name.contains("sdb")))
+    );
 }
 
 impl IcedApp {

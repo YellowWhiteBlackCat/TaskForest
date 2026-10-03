@@ -279,6 +279,7 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
 }
 
 fn battery_block_scene(
+    shell: &ShellApp,
     battery: &BatteryInfo,
     index: usize,
     palette: &UiPalette,
@@ -290,13 +291,17 @@ fn battery_block_scene(
     } else {
         format!("{} {index}", t("common.battery"))
     };
-    device_block(
-        Section::Battery,
-        battery.id.clone(),
-        title,
-        battery_fact_line(battery),
-        palette,
-    )
+    let fan_rpm = shell.projection().sensors.as_ref().and_then(|s| {
+        s.readings
+            .iter()
+            .find(|r| r.id().contains("fan") || r.label().to_lowercase().contains("fan"))
+            .and_then(|r| r.current_number().map(|n| n as u64))
+    });
+    let mut fact = battery_fact_line(battery);
+    if let Some(rpm) = fan_rpm {
+        fact.push_str(&format!(" · {}: {rpm} RPM", t("fan.rpm")));
+    }
+    device_block(Section::Battery, battery.id.clone(), title, fact, palette)
 }
 
 fn segment_row_scene(
@@ -367,7 +372,9 @@ pub(crate) fn block_scene(
             .iter()
             .enumerate()
             .find(|(_, b)| b.id == key)
-            .map(|(idx, b)| Box::new(battery_block_scene(b, idx, palette)) as Box<dyn Scene>),
+            .map(|(idx, b)| {
+                Box::new(battery_block_scene(shell, b, idx, palette)) as Box<dyn Scene>
+            }),
     }
 }
 

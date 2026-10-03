@@ -129,6 +129,14 @@ fn capture_scene_overrides_activate_expected_state() {
     assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::Settings));
 
     let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "first-run");
+    assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::FirstRun));
+
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "saved-view-presets");
+    assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::ColumnMenu));
+
+    let mut app = demo_app();
     apply_capture_scene_override(&mut app, "apps-identity-matrix");
     assert_eq!(app.shell.page(), AppPage::Applications);
     assert!(

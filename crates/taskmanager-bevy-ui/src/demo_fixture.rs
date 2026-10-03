@@ -24,12 +24,13 @@ use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{
-    CpuMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind,
-    ScalarObservation, ScalarObservationGroup, SmartAvailability,
+    CpuMetrics, DiskMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine,
+    GpuEngineKind, ScalarObservation, ScalarObservationGroup, SmartAvailability,
 };
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
+use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessItem,
 };
@@ -428,7 +429,98 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
         "event-center" => {
             shell.replace_alert_event_history(capture_event_fixture());
         }
+        "battery-fan-performance" => {
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::PowerSupplies(Some(dynamic_power_fixture())),
+            );
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::Sensors(Some(dynamic_sensor_fixture())),
+            );
+        }
+        "battery-live-performance" => {
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::PowerSupplies(Some(dynamic_power_fixture())),
+            );
+        }
+        "device-hotplug" => {
+            if let Some(snapshot) = shell.projection().snapshot.as_ref() {
+                let mut s = (*snapshot).clone();
+                let mut disk = DiskMetrics::new("/dev/sdb");
+                disk.device_id = "disk:hotplug:usb0".into();
+                disk.disk_type = "USB Drive".into();
+                disk.model = "TaskForest Flash".into();
+                disk.device_generation = DeviceGeneration::new(2);
+                s.disks.push(disk);
+                seed_projection_fact(shell, ProjectionSeedFact::Snapshot(Box::new(Some(s))));
+            }
+        }
         _ => {}
+    }
+}
+
+pub(crate) fn dynamic_power_fixture() -> PowerSupplySnapshot {
+    let mut battery = BatteryInfo::new("power-supply:capture-battery", DeviceState::healthy(1_000));
+    battery.display_name = "Internal battery".into();
+    battery.device_generation = DeviceGeneration::new(1);
+    battery.status = "Discharging".into();
+    battery.technology = "Li-ion".into();
+    battery.model_name = "Capture Battery".into();
+    battery.manufacturer = "TaskForest".into();
+    battery.apply_scalar_observations(BatteryScalarObservations {
+        capacity_pct: ScalarObservation::available(78, 1_000),
+        voltage_uv: ScalarObservation::available(12_100_000, 1_000),
+        power_w: ScalarObservation::available(14.2, 1_000),
+        cycle_count: ScalarObservation::available(142, 1_000),
+        ..Default::default()
+    });
+    PowerSupplySnapshot {
+        timestamp_ms: 1_000,
+        batteries: vec![battery],
+        ..Default::default()
+    }
+}
+
+fn sensor_reading(
+    device_id: DeviceId,
+    id: &str,
+    label: &str,
+    descriptor: SensorDescriptor,
+    magnitude: SensorMagnitude,
+) -> SensorReading {
+    let observation = SensorMeasurementObservation::available(descriptor.clone(), magnitude, 1_000)
+        .unwrap_or_else(|_| {
+            SensorMeasurementObservation::unavailable(descriptor, FailureKind::ProviderFault)
+        });
+    SensorReading::from_measurement_observation(device_id, id.into(), label.into(), observation)
+}
+
+pub(crate) fn dynamic_sensor_fixture() -> SensorCenterSnapshot {
+    let device_id = DeviceId::new("hwmon:capture-fan");
+    SensorCenterSnapshot {
+        state: DeviceState::healthy(1_000),
+        timestamp_ms: 1_000,
+        readings: vec![
+            sensor_reading(
+                device_id.clone(),
+                "hwmon:capture-fan:fan1_input",
+                "CPU fan",
+                SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+                SensorMagnitude::Unsigned(1_420),
+            )
+            .with_device_generation(DeviceGeneration::new(1)),
+            sensor_reading(
+                device_id,
+                "hwmon:capture-fan:temp1_input",
+                "CPU package",
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                SensorMagnitude::Decimal(48.5),
+            )
+            .with_device_generation(DeviceGeneration::new(1)),
+        ],
+        ..Default::default()
     }
 }
 

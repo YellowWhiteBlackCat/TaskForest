@@ -244,6 +244,8 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "apps-group-expanded"
                 | "apps-zero-gray"
                 | "apps-identity-matrix"
+                | "keyboard-focus"
+                | "vertical-nav"
         )
     ) {
         Some(AppPage::Applications)
@@ -271,6 +273,16 @@ fn apply_capture_overrides(app: &mut TuiApp) {
                 | "system-dashboard"
                 | "active-alert"
                 | "alert-rules-manager"
+                | "saved-view-presets"
+                | "first-run"
+                | "settings-permission-center"
+                | "battery-fan-performance"
+                | "battery-live-performance"
+                | "device-hotplug"
+                | "sidebar-edit"
+                | "history-replay"
+                | "history-60m"
+                | "event-center"
         )
     ) {
         Some(AppPage::Performance)
@@ -640,6 +652,27 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "settings-permission-center" => {
             app.open_local_surface(TuiSurface::Settings);
+        }
+        "first-run" => {
+            app.open_local_surface(TuiSurface::FirstRun);
+        }
+        "saved-view-presets" => {
+            app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });
+        }
+        "sidebar-edit" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Cpu);
+        }
+        "keyboard-focus" | "vertical-nav" => {
+            app.shell.application.active_page = AppPage::Applications;
+        }
+        "battery-fan-performance" | "battery-live-performance" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Battery);
+        }
+        "device-hotplug" => {
+            app.shell.application.active_page = AppPage::Performance;
+            app.select_perf_device(PerfDevice::Disk);
         }
         _ => {}
     }

@@ -48,6 +48,9 @@ use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::kernel_error_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
+pub(crate) mod diagnostic_modal;
+pub(crate) use diagnostic_modal::{DiagnosticModalChanged, DiagnosticModalKind};
+
 /// The page's single body container. Painted exclusively by
 /// [`paint_system`], which the root's on-insert hook binds.
 #[derive(Component, Clone, Default)]

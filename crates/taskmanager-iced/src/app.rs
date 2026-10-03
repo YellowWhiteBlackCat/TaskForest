@@ -39,6 +39,7 @@ mod accessors;
 mod affinity;
 pub(crate) mod alerts;
 pub(crate) mod appearance;
+mod capture_fixtures;
 mod capture_state;
 mod column_menu;
 mod config_sync;

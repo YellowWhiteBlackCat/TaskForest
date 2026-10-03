@@ -437,7 +437,8 @@ fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> 
         | crate::TuiSurfaceKind::ServiceDependencies
         | crate::TuiSurfaceKind::ProcessAffinity
         | crate::TuiSurfaceKind::DiagnosticPreview
-        | crate::TuiSurfaceKind::DiagnosticFailure => TuiFocusControl::Viewport,
+        | crate::TuiSurfaceKind::DiagnosticFailure
+        | crate::TuiSurfaceKind::FirstRun => TuiFocusControl::Viewport,
     }
 }
 
@@ -695,7 +696,8 @@ fn overlay_controls(
         | crate::TuiSurfaceKind::ServiceDependencies
         | crate::TuiSurfaceKind::ProcessAffinity
         | crate::TuiSurfaceKind::DiagnosticPreview
-        | crate::TuiSurfaceKind::DiagnosticFailure => return None,
+        | crate::TuiSurfaceKind::DiagnosticFailure
+        | crate::TuiSurfaceKind::FirstRun => return None,
     };
     let header_rows = u16::try_from(header_rows).unwrap_or(u16::MAX);
     let footer_rows = u16::try_from(footer_rows).unwrap_or(u16::MAX);
@@ -750,6 +752,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             crate::TuiSurfaceKind::ProcessAffinity => (64, 16),
             crate::TuiSurfaceKind::DiagnosticPreview => (78, 24),
             crate::TuiSurfaceKind::DiagnosticFailure => (52, 12),
+            crate::TuiSurfaceKind::FirstRun => (54, 14),
         },
         TuiInputScope::Help => (68, 24),
         TuiInputScope::Suggestions => (74, 22),

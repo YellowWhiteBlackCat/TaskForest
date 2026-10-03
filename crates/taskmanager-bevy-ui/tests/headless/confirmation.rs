@@ -374,6 +374,21 @@ fn capture_system_sensor_alert_scenarios_seed_fixtures() {
             .as_ref()
             .is_some_and(|p| p.iter().any(|proc| proc.cmdline.contains("chrome")))
     );
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "battery-fan-performance");
+    assert!(shell.projection().power_supplies.is_some());
+    assert!(shell.projection().sensors.is_some());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "device-hotplug");
+    assert!(
+        shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .is_some_and(|s| s.disks.iter().any(|d| d.name.contains("sdb")))
+    );
 }
 
 #[test]

@@ -59,15 +59,14 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::SmartSelfTest => SurfaceDecision::Local {
             route: "performance.disk.smart-self-test",
         },
-        ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
-            reason: "the Bevy UI shape exposes no diagnostic report surface; the shared CLI \
-                     harness can still export the bundle",
+        ProductIntent::DiagnosticBundle => SurfaceDecision::Local {
+            route: "system.diagnostic-preview",
         },
         ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
             route: "header.screenshot",
         },
-        ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
-            reason: "the Bevy product shape does not yet expose a first-run setup surface",
+        ProductIntent::FirstRunSetup => SurfaceDecision::Local {
+            route: "first-run.wizard",
         },
         ProductIntent::GpuMetricInspection => SurfaceDecision::AcceptedDifference {
             route: "performance.gpu.metric-summary",

@@ -67,6 +67,7 @@ use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{
     PerformanceHistoryReplay, PerformanceLayoutState, sync_performance_layout,
 };
+use crate::pages::processes::columns_modal::ProcessColumnsModalState;
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
@@ -364,14 +365,18 @@ impl Plugin for FrontendWindowPlugin {
             app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
         }
         app.init_resource::<PerformanceHistoryReplay>();
-        if let Some(target) = capture_scenario_target()
-            && (target == "history-replay" || target == "history-60m")
-        {
-            app.insert_resource(PerformanceHistoryReplay {
-                open: true,
-                playing: false,
-                window: HistoryWindow::OneHour,
-            });
+        if let Some(target) = capture_scenario_target() {
+            if target == "history-replay" || target == "history-60m" {
+                app.insert_resource(PerformanceHistoryReplay {
+                    open: true,
+                    playing: false,
+                    window: HistoryWindow::OneHour,
+                });
+            } else if target == "saved-view-presets" {
+                let mut col_state = ProcessColumnsModalState::default();
+                col_state.open();
+                app.insert_resource(col_state);
+            }
         }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while
@@ -384,6 +389,8 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
         crate::about_modal::register(app);
+        crate::first_run_modal::register(app);
+        crate::pages::system::diagnostic_modal::register(app);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);

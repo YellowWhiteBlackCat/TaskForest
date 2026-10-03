@@ -67,8 +67,21 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "history-replay" => Some("history-replay"),
         "history-60m" => Some("history-60m"),
         "apps-identity-matrix" => Some("apps-identity-matrix"),
+        "apps-zero-gray" => Some("apps-zero-gray"),
         "event-center" => Some("event-center"),
         "settings-permission-center" => Some("settings-permission-center"),
+        "settings-zero-gray" => Some("settings-zero-gray"),
+        "settings-switch-focus" => Some("settings-switch-focus"),
+        "battery-fan-performance" => Some("battery-fan-performance"),
+        "battery-live-performance" => Some("battery-live-performance"),
+        "device-hotplug" => Some("device-hotplug"),
+        "sidebar-edit" => Some("sidebar-edit"),
+        "saved-view-presets" => Some("saved-view-presets"),
+        "keyboard-focus" => Some("keyboard-focus"),
+        "vertical-nav" => Some("vertical-nav"),
+        "first-run" => Some("first-run"),
+        "diagnostic-preview" => Some("diagnostic-preview"),
+        "diagnostic-failure" => Some("diagnostic-failure"),
         _ => None,
     }
 }
@@ -89,7 +102,10 @@ pub(crate) fn capture_perf_device_target() -> Option<PerformanceDeviceTarget> {
         "perf-gpu" | "gpu-engine-inventory" | "intel-gpu-telemetry" => {
             Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into()))
         }
-        "perf-battery" | "sensor-center" => {
+        "perf-battery"
+        | "sensor-center"
+        | "battery-fan-performance"
+        | "battery-live-performance" => {
             Some(PerformanceDeviceTarget::Battery("battery:demo:0".into()))
         }
         _ => None,
@@ -116,7 +132,11 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "process-isolation"
         | "apps-search-highlight"
         | "apps-group-expanded"
-        | "apps-identity-matrix" => Some(Page::Processes),
+        | "apps-identity-matrix"
+        | "apps-zero-gray"
+        | "saved-view-presets"
+        | "keyboard-focus"
+        | "vertical-nav" => Some(Page::Processes),
         "performance"
         | "perf-memory"
         | "perf-disk"
@@ -135,16 +155,24 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "gpu-engine-inventory"
         | "intel-gpu-telemetry"
         | "history-replay"
-        | "history-60m" => Some(Page::Performance),
+        | "history-60m"
+        | "battery-fan-performance"
+        | "battery-live-performance"
+        | "device-hotplug"
+        | "sidebar-edit" => Some(Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => Some(Page::Services),
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(Page::Startup)
         }
         "system" | "system-dashboard" | "system-hardware" | "system-npu" | "about"
-        | "system-about" => Some(Page::System),
+        | "system-about" | "diagnostic-preview" | "diagnostic-failure" => Some(Page::System),
         "alerts" | "active-alert" | "alert-rules-manager" | "event-center" => Some(Page::Alerts),
         "users" | "sessions" => Some(Page::Sessions),
-        "settings" | "settings-permission-center" => Some(Page::Settings),
+        "settings"
+        | "settings-permission-center"
+        | "settings-zero-gray"
+        | "settings-switch-focus"
+        | "first-run" => Some(Page::Settings),
         "app-history" | "history" => Some(Page::AppHistory),
         "containers" => Some(Page::Containers),
         _ => None,

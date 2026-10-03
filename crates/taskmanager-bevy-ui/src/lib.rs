@@ -64,6 +64,7 @@ pub mod demo_fixture;
 pub mod drain;
 pub mod export;
 pub mod feature_coverage;
+pub(crate) mod first_run_modal;
 pub(crate) mod focus_visible;
 pub mod functional;
 pub mod icons;

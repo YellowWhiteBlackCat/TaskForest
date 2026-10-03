@@ -67,6 +67,7 @@ use taskmanager_application::{
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
+use crate::capture::capture_scenario_target;
 use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, space_8, space_12};
@@ -272,7 +273,8 @@ pub(crate) fn sync_nav_strip_layout(
     mut label_nodes: Query<&mut Node, With<NavTabLabelNode>>,
 ) {
     let width = windows.iter().next().map_or(1180.0, Window::width);
-    let display = if width < 800.0 {
+    let is_vertical_nav = capture_scenario_target() == Some("vertical-nav");
+    let display = if width < 800.0 || is_vertical_nav {
         bevy::ui::Display::None
     } else {
         bevy::ui::Display::Flex

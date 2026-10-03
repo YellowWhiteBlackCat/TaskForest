@@ -317,7 +317,8 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
             TuiSurfaceKind::About
             | TuiSurfaceKind::Containers
             | TuiSurfaceKind::DiagnosticPreview
-            | TuiSurfaceKind::DiagnosticFailure => {
+            | TuiSurfaceKind::DiagnosticFailure
+            | TuiSurfaceKind::FirstRun => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can
