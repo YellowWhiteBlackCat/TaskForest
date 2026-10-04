@@ -711,23 +711,36 @@ fn pending_payload_bytes_evict_old_unpersisted_series_without_leaking_guards() {
         PersistentHistoryStore::open(&root, RetentionPolicy::for_tests(u64::MAX, u64::MAX), ALIVE)
             .expect("open store");
     for index in 0..1_500usize {
-        let identity = format!("{index:04}-{}", "x".repeat(3_400));
-        let key = HistorySeriesKey::for_device(HistoryMetric::GpuUsagePct, DeviceId::new(identity));
-        let outcome = store.try_record_sample(key, sample(1, 0, Some(1.0)));
-        assert!(
-            matches!(
-                outcome,
-                RecordSampleOutcome::Accepted
-                    | RecordSampleOutcome::AcceptedWithBackpressure { .. }
-            ),
-            "retiring an unpersisted oldest series must reopen its tracking slot"
+        let prefix_bytes = HistorySeriesKey::for_device(
+            HistoryMetric::GpuUsagePct,
+            DeviceId::new(format!("{index:04}-")),
+        )
+        .file_stem()
+        .len();
+        let identity = format!(
+            "{index:04}-{}",
+            "x".repeat(MAX_SERIES_KEY_BYTES - prefix_bytes)
         );
+        let key = HistorySeriesKey::for_device(HistoryMetric::GpuUsagePct, DeviceId::new(identity));
+        for revision in (u64::MAX - 7)..=u64::MAX {
+            let outcome =
+                store.try_record_sample(key.clone(), sample(revision, u64::MAX, Some(-f64::MAX)));
+            assert!(
+                matches!(
+                    outcome,
+                    RecordSampleOutcome::Accepted
+                        | RecordSampleOutcome::AcceptedWithBackpressure { .. }
+                ),
+                "byte pressure must retire old unpersisted series and reopen tracking slots"
+            );
+        }
     }
 
     let status = store.status();
     assert!(status.pending_bytes <= MAX_PENDING_BYTES);
     assert!(status.pending_series <= MAX_PENDING_SERIES);
-    assert_eq!(status.pending_samples, status.pending_series);
+    assert!(status.pending_samples > status.pending_series);
+    assert!(status.pending_samples < MAX_PENDING_SAMPLES);
     assert_eq!(status.tracked_series, status.pending_series);
     assert!(status.samples_dropped_backpressure > 0);
     drop(store);
@@ -944,3 +957,6 @@ fn mixed_non_series_entry_flood_is_bounded_for_query_and_retention() {
     drop(store);
     cleanup(&root);
 }
+
+#[path = "portable_names.rs"]
+mod portable_names;

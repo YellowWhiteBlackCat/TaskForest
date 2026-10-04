@@ -36,6 +36,11 @@ the oldest complete series when minimum one-line files cannot fit, so
 `max_bytes` is an actual post-flush bound rather than a best-effort target.
 Single-writer claims fail closed on unreadable or malformed ownership and are
 released only while the stored token still matches the exact owner.
+Encoded stems reserve the ordinary-file suffix within the portable component
+limit; rewrite temporaries use independent short names. Read ingress privately
+indexes published external locations by the current typed key, combines segments
+under one byte ceiling and retains corruption evidence. Retiring one segment
+releases revision guards only when no segment or pending sample remains.
 The read-only claim probe distinguishes absent/live/stale/ambiguous without
 acquiring or replacing ownership; frontend startup uses it only for a bounded
 collector handshake.

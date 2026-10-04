@@ -167,3 +167,52 @@ fn backward_clock_steps_are_counted_and_forward_gaps_are_not() {
     );
     assert_eq!(count_clock_jumps(&[]), 0);
 }
+
+#[test]
+fn scope_filenames_are_portable_unambiguous_and_case_injective() {
+    let values = [
+        "App",
+        "app",
+        "_",
+        "a__b",
+        "_edge_",
+        "a%b:c/d\\e",
+        "桌面程序",
+    ];
+    let mut stems = std::collections::HashSet::new();
+    for value in values {
+        let key = HistorySeriesKey::for_application(
+            HistoryMetric::ApplicationCpuUsagePct,
+            ApplicationHistoryIdentity::verified_launcher(value).expect("identity"),
+        );
+        let stem = key.file_stem();
+        assert!(
+            stem.chars()
+                .all(|character| character.is_ascii_alphanumeric()
+                    || matches!(character, '.' | '-' | '_' | '%')),
+            "ordinary portable file component: {stem}"
+        );
+        assert!(
+            stems.insert(stem.to_ascii_lowercase()),
+            "distinct identities survive case-insensitive storage"
+        );
+        assert_eq!(HistorySeriesKey::from_file_stem(&stem), Some(key));
+        let device = HistorySeriesKey::for_device(HistoryMetric::GpuUsagePct, DeviceId::new(value));
+        assert_eq!(
+            HistorySeriesKey::from_file_stem(&device.file_stem()),
+            Some(device)
+        );
+    }
+}
+
+#[test]
+fn published_external_scope_tokens_decode_into_current_portable_identities() {
+    let parsed =
+        HistorySeriesKey::from_file_stem("application-cpu-usage-pct__-__-__launcher:io.Example")
+            .expect("published external identity");
+    assert_eq!(parsed.application().expect("scope").value(), "io.Example");
+    assert_eq!(
+        parsed.file_stem(),
+        "application-cpu-usage-pct__-__-__launcher%3Aio.%45xample"
+    );
+}

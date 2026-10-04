@@ -181,6 +181,18 @@ impl PersistentHistoryStore {
             &mut quota_trimmed_paths,
             corrupt_skipped,
         )?;
+        let retained_keys = descriptors
+            .iter()
+            .filter(|descriptor| descriptor.bytes > 0)
+            .filter_map(|descriptor| {
+                descriptor
+                    .path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .and_then(HistorySeriesKey::from_file_stem)
+            })
+            .collect::<HashSet<_>>();
+        retired_series.retain(|key| !retained_keys.contains(key));
         Ok((ttl_trimmed, quota_trimmed_paths.len(), retired_series))
     }
 
@@ -189,7 +201,10 @@ impl PersistentHistoryStore {
         path: &Path,
         samples: &[HistoricalSample],
     ) -> Result<(), HistoryStoreError> {
-        let temporary = path.with_extension(temporary_extension(SERIES_EXTENSION));
+        let temporary = self.root.join(format!(
+            "history-rewrite.{}",
+            temporary_extension(SERIES_EXTENSION)
+        ));
         let mut file = create_file(&temporary)?;
         let buffer = encode_samples(samples);
         if u64::try_from(buffer.len()).unwrap_or(u64::MAX) > MAX_SERIES_FILE_BYTES {
