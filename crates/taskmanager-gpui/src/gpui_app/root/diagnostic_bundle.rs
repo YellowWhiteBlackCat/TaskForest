@@ -4,8 +4,8 @@ use gpui::{
     AnyElement, App, Context, Div, Entity, IntoElement, ParentElement, ScrollHandle, Styled,
     Window, div, px,
 };
-use std::path::PathBuf;
 use taskmanager_app_host::DiagnosticBundleClient;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
@@ -18,24 +18,15 @@ use taskmanager_ui::theme_binding::length;
 use crate::gpui_app::elements;
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_application::i18n;
-use taskmanager_core::core::diagnostics::{
-    DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticPreview,
-    DiagnosticSource,
+use taskmanager_core::core::diagnostics::DiagnosticPreview;
+use taskmanager_shell::presentation::diagnostics::{
+    diagnostic_failure_message, diagnostic_redaction_summary,
 };
-use taskmanager_core::core::export::snapshot_to_json;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 
 use super::RootView;
-
-#[derive(Debug, Clone)]
-pub enum DiagnosticBundleUiState {
-    Preview(DiagnosticBundlePlan),
-    Writing(DiagnosticPreview),
-    Complete(PathBuf),
-    Failed(DiagnosticBundleError),
-}
 
 #[derive(Debug, Default)]
 pub(crate) enum DiagnosticBundleRuntime {
@@ -60,40 +51,26 @@ impl DiagnosticBundleRuntime {
 impl RootView {
     /// Build an immutable sanitized plan. The preview never stores raw sources.
     pub fn open_diagnostic_preview(&mut self) {
-        let snapshot = self.system_snapshot();
-        let processes = self.processes();
-        let sources = vec![
-            DiagnosticSource {
-                name: "snapshot.json".into(),
-                contents: snapshot_to_json(snapshot, processes),
-            },
-            DiagnosticSource {
-                name: "services.json".into(),
-                contents: serde_json::to_string_pretty(self.services())
-                    .unwrap_or_else(|error| format!("serialization error: {error}")),
-            },
-            DiagnosticSource {
-                name: "startup.json".into(),
-                contents: serde_json::to_string_pretty(self.startup_entries())
-                    .unwrap_or_else(|error| format!("serialization error: {error}")),
-            },
-        ];
-        let usernames = processes
-            .iter()
-            .filter_map(|process| process.current_user());
-        let state = match DiagnosticBundlePlan::prepare(sources, usernames) {
-            Ok(plan) => DiagnosticBundleUiState::Preview(plan),
-            Err(error) => diagnostic_failure_state(error),
-        };
+        if let Some(session) = self.diagnostic_bundle_runtime.active_mut() {
+            session.close();
+        }
+        let state = DiagnosticBundleUiState::prepared(
+            self.projection()
+                .prepare_diagnostic_bundle(Some(&super::persistence::config_from_view(self))),
+        );
         self.open_window_surface(super::window_surface::WindowSurface::DiagnosticBundle(
             state,
         ));
     }
 
-    pub fn close_diagnostic_bundle(&mut self) {
+    pub(super) fn close_diagnostic_session(&mut self) {
         if let Some(session) = self.diagnostic_bundle_runtime.active_mut() {
             session.close();
         }
+    }
+
+    pub fn close_diagnostic_bundle(&mut self) {
+        self.close_diagnostic_session();
         self.dismiss_window_surface(
             super::WindowSurfaceKind::DiagnosticBundle,
             super::WindowSurfaceDismissReason::Cancel,
@@ -101,34 +78,16 @@ impl RootView {
     }
 
     fn confirm_diagnostic_bundle(&mut self) {
-        let Some(DiagnosticBundleUiState::Preview(plan)) = self.diagnostic_bundle_state() else {
-            return;
-        };
-        let plan = plan.clone();
-        let preview = plan.preview().clone();
-        let file_name = format!(
+        let target = DiagnosticBundleTarget::current_directory(format!(
             "taskmanager-diagnostics-{}.json",
             self.system_snapshot().timestamp_ms
-        );
-        let Some(session) = self.diagnostic_bundle_runtime.active_mut() else {
-            if let Some(state) = self.diagnostic_bundle_state_mut() {
-                *state = diagnostic_failure_state(DiagnosticBundleError::new(
-                    DiagnosticBundleErrorKind::Unavailable,
-                ));
-            }
-            return;
-        };
-        match session.submit(plan, DiagnosticBundleTarget::current_directory(file_name)) {
-            Ok(_) => {
-                if let Some(state) = self.diagnostic_bundle_state_mut() {
-                    *state = DiagnosticBundleUiState::Writing(preview);
-                }
-            }
-            Err(error) => {
-                if let Some(state) = self.diagnostic_bundle_state_mut() {
-                    *state = diagnostic_failure_state(error);
-                }
-            }
+        ));
+        let mut state = self.diagnostic_bundle_state().cloned();
+        if let Some(state) = state.as_mut() {
+            state.confirm(self.diagnostic_bundle_runtime.active_mut(), target);
+        }
+        if let (Some(current), Some(state)) = (self.diagnostic_bundle_state_mut(), state) {
+            *current = state;
         }
     }
 
@@ -137,17 +96,10 @@ impl RootView {
             .diagnostic_bundle_runtime
             .active_mut()
             .and_then(|session| session.drain().into_iter().next());
-        if let Some(result) = result {
-            let next = match result.result {
-                Ok(()) => DiagnosticBundleUiState::Complete(result.destination),
-                Err(error) => diagnostic_failure_state(error),
-            };
-            // A completion belongs only to the still-visible diagnostic
-            // workflow. If the user replaced or dismissed it, the stale worker
-            // result must not steal the window's current input owner.
-            if let Some(state) = self.diagnostic_bundle_state_mut() {
-                *state = next;
-            }
+        if let Some(result) = result
+            && let Some(state) = self.diagnostic_bundle_state_mut()
+        {
+            state.complete(result);
         }
     }
 
@@ -158,42 +110,8 @@ impl RootView {
     }
 }
 
-fn diagnostic_failure_state(error: DiagnosticBundleError) -> DiagnosticBundleUiState {
-    tracing::warn!(
-        failure_kind = error.kind().stable_code(),
-        detail = error.detail().unwrap_or(""),
-        "diagnostic bundle operation failed"
-    );
-    DiagnosticBundleUiState::Failed(error)
-}
-
-const fn diagnostic_failure_feedback_key(kind: DiagnosticBundleErrorKind) -> &'static str {
-    match kind {
-        DiagnosticBundleErrorKind::InvalidSource => "diagnostics.failure_invalid_source",
-        DiagnosticBundleErrorKind::InvalidTarget => "diagnostics.failure_invalid_target",
-        DiagnosticBundleErrorKind::Encode => "diagnostics.failure_encode",
-        DiagnosticBundleErrorKind::Io => "diagnostics.failure_io",
-        DiagnosticBundleErrorKind::Busy => "diagnostics.failure_busy",
-        DiagnosticBundleErrorKind::Unavailable => "diagnostics.failure_unavailable",
-    }
-}
-
-fn diagnostic_failure_message(error: &DiagnosticBundleError) -> String {
-    i18n::t("diagnostics.failed_detail").replace(
-        "{reason}",
-        i18n::t(diagnostic_failure_feedback_key(error.kind())),
-    )
-}
-
 fn preview_panel(theme: &Theme, preview: &DiagnosticPreview, scroll: ScrollHandle) -> Div {
-    let summary = i18n::t("diagnostics.redaction_summary")
-        .replace("{total}", &preview.redactions.total().to_string())
-        .replace("{users}", &preview.redactions.usernames.to_string())
-        .replace("{paths}", &preview.redactions.paths.to_string())
-        .replace(
-            "{ips}",
-            &(preview.redactions.ipv4_addresses + preview.redactions.ipv6_addresses).to_string(),
-        );
+    let summary = diagnostic_redaction_summary(preview);
     div()
         .flex()
         .flex_col()
@@ -323,6 +241,27 @@ pub(super) fn render_diagnostic_bundle_dialog(
             },
             |_, _, _| {},
         ))
+    } else if matches!(state, DiagnosticBundleUiState::Failed(_)) {
+        let retry = entity;
+        actions.child(elements::pill(
+            theme,
+            "diagnostic-retry",
+            i18n::t("first_run.retry"),
+            true,
+            false,
+            move |_window, cx| {
+                retry.update(cx, |view, cx| {
+                    if matches!(
+                        view.diagnostic_bundle_state(),
+                        Some(DiagnosticBundleUiState::Failed(_))
+                    ) {
+                        view.open_diagnostic_preview();
+                        cx.notify();
+                    }
+                });
+            },
+            |_, _, _| {},
+        ))
     } else {
         actions
     };
@@ -338,7 +277,3 @@ pub(super) fn render_diagnostic_bundle_dialog(
     )
     .into_any_element()
 }
-
-#[cfg(test)]
-#[path = "../../../tests/gui/gpui_gpui_app_root_diagnostic_bundle_tests.rs"]
-mod tests;

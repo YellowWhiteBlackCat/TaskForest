@@ -157,6 +157,9 @@ pub fn run(demo: bool) -> iced::Result {
                         format!("Diagnostic bundle runtime unavailable: {error}"),
                     ),
                 }
+                if let Ok(client) = host.diagnostic_bundle_client() {
+                    app.install_diagnostic_bundle_client(client);
+                }
                 match host.window_capture_client() {
                     Ok(client) => app.install_window_capture_client(client),
                     Err(error) => app.shell.report_notice(

@@ -8,6 +8,7 @@
 
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::SurfaceKind;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::session::SessionItem;
@@ -26,8 +27,7 @@ pub(crate) enum LocalSurfaceKind {
     ServiceDetails,
     RunTask,
     AlertCenter,
-    DiagnosticPreview,
-    DiagnosticFailure,
+    DiagnosticBundle,
     /// The optional-setup first-run dialog. Visibility is decided by the
     /// `ui::first_run` fold's transitions (the boot observation's answer),
     /// never opened directly by a user trigger.
@@ -52,8 +52,7 @@ pub(crate) enum LocalSurface {
     },
     RunTask,
     AlertCenter,
-    DiagnosticPreview,
-    DiagnosticFailure,
+    DiagnosticBundle(DiagnosticBundleUiState),
     /// Carries no payload: the dialog's state lives in
     /// [`crate::ui::first_run::FirstRunUiState`].
     FirstRun,
@@ -71,8 +70,7 @@ impl LocalSurface {
             Self::ServiceDetails { .. } => LocalSurfaceKind::ServiceDetails,
             Self::RunTask => LocalSurfaceKind::RunTask,
             Self::AlertCenter => LocalSurfaceKind::AlertCenter,
-            Self::DiagnosticPreview => LocalSurfaceKind::DiagnosticPreview,
-            Self::DiagnosticFailure => LocalSurfaceKind::DiagnosticFailure,
+            Self::DiagnosticBundle(_) => LocalSurfaceKind::DiagnosticBundle,
             Self::FirstRun => LocalSurfaceKind::FirstRun,
         }
     }
@@ -103,6 +101,12 @@ pub(crate) struct LocalSurfaceState {
 }
 
 impl LocalSurfaceState {
+    pub(super) fn diagnostic_bundle_mut(&mut self) -> Option<&mut DiagnosticBundleUiState> {
+        match self.active.as_mut() {
+            Some(LocalSurface::DiagnosticBundle(state)) => Some(state),
+            _ => None,
+        }
+    }
     pub(crate) const fn active(&self) -> Option<&LocalSurface> {
         self.active.as_ref()
     }
@@ -445,6 +449,9 @@ impl IcedApp {
     }
 
     pub(super) fn open_local_surface(&mut self, surface: LocalSurface) {
+        if self.local_surface_kind() == Some(LocalSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         self.close_context_menus();
         self.close_shell_modals();
         if self.local_surface_kind() == Some(LocalSurfaceKind::ServiceDetails)
@@ -461,6 +468,9 @@ impl IcedApp {
 
     pub(super) fn dismiss_local_surface(&mut self) {
         let previous = self.local_surface_kind();
+        if previous == Some(LocalSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         let _ = self.local_surface.reduce(LocalSurfaceEvent::DismissCurrent);
         if previous == Some(LocalSurfaceKind::ServiceDetails) {
             self.shell.service_dependencies.close();
@@ -472,6 +482,11 @@ impl IcedApp {
     }
 
     pub(super) fn dismiss_local_surface_kind(&mut self, expected: LocalSurfaceKind) {
+        if expected == LocalSurfaceKind::DiagnosticBundle
+            && self.local_surface_kind() == Some(expected)
+        {
+            self.diagnostics.close();
+        }
         let transition = self
             .local_surface
             .reduce(LocalSurfaceEvent::Dismiss(expected));

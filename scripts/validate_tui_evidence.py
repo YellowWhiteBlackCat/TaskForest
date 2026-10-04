@@ -45,7 +45,9 @@ def _paeth(left: int, above: int, upper_left: int) -> int:
     return upper_left
 
 
-def visual_content_receipt(path: Path) -> VisualContentReceipt:
+def visual_content_receipt(
+    path: Path, sample_bounds: tuple[int, int, int, int] | None = None
+) -> VisualContentReceipt:
     """Decode Niri's 8-bit RGB(A) PNG and reject transparent or uniform frames."""
     data = path.read_bytes()
     offset = 8
@@ -67,6 +69,10 @@ def visual_content_receipt(path: Path) -> VisualContentReceipt:
 
     if bit_depth != 8 or color_type not in (2, 6) or interlace != 0:
         raise EvidenceError("TUI visual-content check requires non-interlaced 8-bit RGB(A)")
+    sample_left, sample_top, sample_right, sample_bottom = sample_bounds or (0, 0, width, height)
+    if not (0 <= sample_left < sample_right <= width and 0 <= sample_top < sample_bottom <= height):
+        raise EvidenceError("invalid visual-content sample bounds")
+    sample_pixels = (sample_right - sample_left) * (sample_bottom - sample_top)
     channels = 4 if color_type == 6 else 3
     row_bytes = width * channels
     raw = zlib.decompress(compressed)
@@ -79,7 +85,7 @@ def visual_content_receipt(path: Path) -> VisualContentReceipt:
     colors: set[tuple[int, int, int]] = set()
     minimum_luminance = 255
     maximum_luminance = 0
-    for _ in range(height):
+    for row_index in range(height):
         filter_kind = raw[position]
         position += 1
         encoded = raw[position : position + row_bytes]
@@ -104,7 +110,9 @@ def visual_content_receipt(path: Path) -> VisualContentReceipt:
             decoded[index] = (value + predictor) & 0xFF
         previous = decoded
 
-        for index in range(0, row_bytes, channels):
+        if not sample_top <= row_index < sample_bottom:
+            continue
+        for index in range(sample_left * channels, sample_right * channels, channels):
             red, green, blue = decoded[index : index + 3]
             alpha = decoded[index + 3] if channels == 4 else 255
             if alpha <= 16:
@@ -121,7 +129,7 @@ def visual_content_receipt(path: Path) -> VisualContentReceipt:
         unique_colors=len(colors),
         luminance_span=maximum_luminance - minimum_luminance,
     )
-    if visible < width * height // 4:
+    if visible < sample_pixels // 4:
         raise EvidenceError(f"TUI frame is mostly transparent: {visible} visible pixels")
     if receipt.unique_colors < 16 or receipt.luminance_span < 24:
         raise EvidenceError(

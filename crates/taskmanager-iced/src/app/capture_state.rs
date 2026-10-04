@@ -1,6 +1,8 @@
 //! Capture-only marker lifecycle and target preparation for the Iced frontend.
 
 use std::path::PathBuf;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -75,9 +77,13 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "disk-smart" {
         app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
     } else if target == "diagnostic-preview" {
-        app.open_local_surface(LocalSurface::DiagnosticPreview);
+        app.open_diagnostic_bundle();
     } else if target == "diagnostic-failure" {
-        app.open_local_surface(LocalSurface::DiagnosticFailure);
+        app.open_local_surface(LocalSurface::DiagnosticBundle(
+            DiagnosticBundleUiState::Failed(DiagnosticBundleError::new(
+                DiagnosticBundleErrorKind::Unavailable,
+            )),
+        ));
     } else if target == "process-details" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Overview);

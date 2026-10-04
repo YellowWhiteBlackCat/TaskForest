@@ -6,7 +6,7 @@
 //! accessibility cannot infer different active dialogs from parallel booleans.
 
 use crate::gpui_app::dashboard::DashboardPanel;
-use crate::gpui_app::root::diagnostic_bundle::DiagnosticBundleUiState;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionReduction, PendingConfirmation, PlatformEffect,
     ServiceControlTarget, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
@@ -385,12 +385,12 @@ impl super::RootView {
                 self.shell.service_dependencies.close();
                 self.service_details.close();
             }
+            WindowSurfaceKind::DiagnosticBundle => self.close_diagnostic_session(),
             WindowSurfaceKind::Settings
             | WindowSurfaceKind::Help
             | WindowSurfaceKind::SystemAbout
             | WindowSurfaceKind::About
             | WindowSurfaceKind::FirstRun
-            | WindowSurfaceKind::DiagnosticBundle
             | WindowSurfaceKind::DiskSmart
             | WindowSurfaceKind::DashboardPanel => {}
         }

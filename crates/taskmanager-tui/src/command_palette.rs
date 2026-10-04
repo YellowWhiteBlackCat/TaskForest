@@ -714,7 +714,7 @@ impl TuiApp {
             Some(PaletteLocalAction::ToggleContainers) => self.toggle_containers(),
             Some(PaletteLocalAction::ExportSnapshot) => self.export_snapshot(),
             Some(PaletteLocalAction::ExportDiagnosticReport) => {
-                let _ = self.export_diagnostic_report();
+                self.open_diagnostic_bundle();
             }
             Some(PaletteLocalAction::OpenProcessAffinity)
                 if self.page() == AppPage::Applications =>

@@ -234,11 +234,8 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             Some(crate::TuiSurface::ProcessAffinity(state)) => {
                 affinity_modal::render_affinity_modal_at(frame, app, state, theme, popup);
             }
-            Some(crate::TuiSurface::DiagnosticPreview) => {
-                crate::diagnostic_report::render_preview_overlay_at(frame, app, theme, popup);
-            }
-            Some(crate::TuiSurface::DiagnosticFailure) => {
-                crate::diagnostic_report::render_failure_overlay_at(frame, app, theme, popup);
+            Some(crate::TuiSurface::DiagnosticBundle(view)) => {
+                crate::diagnostic_bundle::render_diagnostic_bundle_at(frame, view, theme, popup);
             }
             Some(crate::TuiSurface::FirstRun) => {
                 first_run::render_first_run_overlay_at(frame, theme, popup);

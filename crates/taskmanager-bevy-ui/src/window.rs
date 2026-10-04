@@ -42,12 +42,12 @@ use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
-use bevy::ui::Pressed;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
     percent,
 };
 use bevy::ui::widget::Text;
+use bevy::ui::{Pressed, px};
 use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
@@ -68,6 +68,7 @@ use crate::pages::performance::{
     PerformanceHistoryReplay, PerformanceLayoutState, sync_performance_layout,
 };
 use crate::pages::processes::columns_modal::ProcessColumnsModalState;
+use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
@@ -271,6 +272,11 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
             crate::pages::settings::restore_persisted_preferences,
         );
         app.insert_non_send(production_history_runtime());
+        if let Ok(client) = NativeAppHost::production().diagnostic_bundle_client() {
+            app.world_mut()
+                .resource_mut::<DiagnosticRuntime>()
+                .install(client);
+        }
         app.add_systems(
             PreUpdate,
             crate::pages::history::drain_history_system.before(crate::drain::drain_system),
@@ -579,6 +585,8 @@ fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn
             Node {
                 width: percent(100),
                 height: percent(100),
+                min_width: px(0.0), min_height: px(0.0),
+                max_width: percent(100), max_height: percent(100),
                 flex_direction: FlexDirection::Column,
             }
             BackgroundColor({ palette.window_clear })
@@ -588,7 +596,8 @@ fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn
 
                     Node {
                         width: percent(100),
-                        height: percent(100),
+                        min_width: px(0.0), min_height: px(0.0),
+                        flex_basis: px(0.0),
                         flex_grow: 1.0,
                         justify_content: JustifyContent::FlexStart,
                         align_items: AlignItems::Stretch,
@@ -613,6 +622,8 @@ fn standard_app_shell_scene(
         Node {
             width: percent(100),
             height: percent(100),
+            min_width: px(0.0), min_height: px(0.0),
+            max_width: percent(100), max_height: percent(100),
             flex_direction: FlexDirection::Column,
         }
         BackgroundColor({ palette.window_clear })
@@ -637,7 +648,8 @@ fn standard_app_shell_scene(
 
                 Node {
                     width: percent(100),
-                    height: percent(100),
+                    min_width: px(0.0), min_height: px(0.0),
+                    flex_basis: px(0.0),
                     flex_grow: 1.0,
                     justify_content: JustifyContent::FlexStart,
                     align_items: AlignItems::Stretch,

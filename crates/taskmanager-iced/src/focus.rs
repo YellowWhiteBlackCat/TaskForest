@@ -30,6 +30,8 @@ pub(crate) const MODAL_CLOSE_ID: &str = "iced-modal-close";
 #[must_use]
 pub(crate) fn focus_id(target: FocusTarget) -> String {
     match target {
+        FocusTarget::DiagnosticConfirm => "iced-diagnostic-confirm".to_owned(),
+        FocusTarget::DiagnosticRetry => "iced-diagnostic-retry".to_owned(),
         FocusTarget::ModalClose => MODAL_CLOSE_ID.to_owned(),
         FocusTarget::TableRow { page, index } => {
             format!("iced-table-row-{}-{index}", page_key(page))

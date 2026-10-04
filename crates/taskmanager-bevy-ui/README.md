@@ -69,6 +69,11 @@ adopted — theme tokens are the only skin authority.
 - `src/runtime.rs` — the process-wide platform client via the app-host
   `OnceLock` cache pattern.
 
+Diagnostic commands open, confirm, retry and close the shared sanitized review lifecycle.
+The native window injects its diagnostic client; capture never creates a writer. The
+modal consumes all keyboard input, exposes scroll keys, and reserves title/actions
+around one bounded body viewport.
+
 ## Boundary
 
 Dependency whitelist is charter law: `taskmanager-application`,

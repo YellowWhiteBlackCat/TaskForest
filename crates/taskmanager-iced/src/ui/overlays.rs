@@ -318,6 +318,43 @@ pub(crate) fn modal_overlay<'a>(
         .into()
 }
 
+/// Dense reviews reserve the title/actions and scroll only their body. The
+/// outer margin and final padding protect every edge at the tracked viewport.
+pub(crate) fn bounded_modal_overlay<'a>(
+    app: &'a crate::IcedApp,
+    title: &'static str,
+    body: Element<'a, Message, iced::Theme, iced::Renderer>,
+    actions: Element<'a, Message, iced::Theme, iced::Renderer>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let theme = app.theme();
+    let margin = f32::from(tokens::SPACE_24);
+    let padding = f32::from(tokens::SPACE_16);
+    let viewport = app.viewport_size();
+    let width = (viewport.width - 2.0 * margin).clamp(0.0, 680.0);
+    let height = (viewport.height - 2.0 * margin).clamp(0.0, 600.0);
+    let panel = container(
+        column![
+            text(title).size(f32::from(tokens::FONT_18)),
+            body,
+            row![actions, focus::modal_close(theme)].spacing(f32::from(tokens::SPACE_8)),
+        ]
+        .spacing(f32::from(tokens::SPACE_12))
+        .height(Length::Fill)
+        .width(Length::Fill),
+    )
+    .style(move |_| theme::elevated_style_with(theme, app.modal_appear_progress()))
+    .padding(padding)
+    .width(Length::Fixed(width))
+    .height(Length::Fixed(height));
+    container(opaque(panel))
+        .style(move |_| theme::scrim_style_with(theme, app.modal_appear_progress()))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
+}
+
 fn suggestion_row<'a>(
     metric: AlertMetric,
     shell: &ShellApp,

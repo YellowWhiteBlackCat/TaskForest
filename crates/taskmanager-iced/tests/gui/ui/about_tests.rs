@@ -1,5 +1,4 @@
 use super::*;
-use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
@@ -103,53 +102,26 @@ fn copy_about_details_message_records_the_footer_feedback() {
     );
 }
 
-/// The diagnostic report / bundle export action from the About modal records
-/// clipboard success feedback in the shell footer.
+/// About's diagnostics action replaces About with a sanitized review.
 #[test]
-fn export_diagnostics_report_records_clipboard_feedback_notice() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
+fn about_diagnostics_requires_review_and_reports_an_unavailable_writer() {
+    use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+    use taskmanager_core::core::diagnostics::DiagnosticBundleErrorKind;
     let mut app = crate::IcedApp::demo();
+    app.shell.clear_feedback_notice();
     let _ = app.update(Message::OpenAbout);
-    assert!(app.about_open());
-
     let _ = app.update(Message::GenerateDiagnosticsReport);
-    let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
-    assert_eq!(feedback.severity(), FeedbackSeverity::Success);
+    assert!(!app.about_open());
+    assert!(matches!(
+        app.local_surface(),
+        Some(crate::app::LocalSurface::DiagnosticBundle(
+            DiagnosticBundleUiState::Preview(_)
+        ))
+    ));
+    drop(render(&app));
+    let _ = app.update(Message::ConfirmDiagnosticsExport);
     assert!(
-        feedback.text().contains("Copied"),
-        "feedback text must indicate copied status: {}",
-        feedback.text()
+        matches!(app.local_surface(), Some(crate::app::LocalSurface::DiagnosticBundle(DiagnosticBundleUiState::Failed(error))) if error.kind() == DiagnosticBundleErrorKind::Unavailable)
     );
-    assert!(
-        feedback.text().contains("Diagnostic bundle"),
-        "feedback text must name the diagnostic bundle artifact: {}",
-        feedback.text()
-    );
-}
-
-/// The system diagnostics markdown report generated for the About modal includes
-/// hardware facts, live telemetry summary, and strictly redacts host usernames.
-#[test]
-fn system_diagnostics_report_generates_markdown_and_redacts_process_usernames() {
-    let app = crate::IcedApp::demo();
-    let report = crate::export::system_diagnostics_markdown(
-        app.shell.projection().hardware.as_ref(),
-        app.shell.projection().snapshot.as_ref(),
-        vec!["taskforest-admin".to_string(), "alice".to_string()],
-    )
-    .expect("the diagnostic report generates cleanly");
-
-    assert!(report.contains("TaskForest System Diagnostics Report"));
-    assert!(report.contains("OS:"));
-    assert!(report.contains("Kernel:"));
-    assert!(report.contains("Hostname:"));
-    assert!(report.contains("CPU:"));
-    assert!(report.contains("Cores:"));
-    assert!(report.contains("Uptime:"));
-
-    // Host usernames and sensitive paths must be redacted
-    assert!(!report.contains("taskforest-admin"));
-    assert!(!report.contains("alice"));
+    let _view = render(&app);
 }

@@ -83,6 +83,8 @@ event-center	gnome-light	system	cpu	0	event-center	1180x780	1180x780
 saved-view-presets	gnome-light	apps	cpu	0	saved-view-presets	1180x780	1180x780
 diagnostic-preview	gnome-light	system	cpu	0	diagnostic-preview	1180x780	1180x780
 diagnostic-failure	gnome-light	system	cpu	0	diagnostic-failure	1180x780	1180x780
+diagnostic-preview-compact	gnome-light	system	cpu	0	diagnostic-preview	720x480	720x480
+diagnostic-failure-compact	gnome-light	system	cpu	0	diagnostic-failure	720x480	720x480
 storage-health	gnome-light	system	cpu	0	storage-health	1180x780	1180x780
 smart-self-test-confirm	gnome-light	system	cpu	0	smart-self-test-confirm	1180x780	1180x780
 sensor-center	gnome-light	system	cpu	0	sensor-center	1180x780	1180x780

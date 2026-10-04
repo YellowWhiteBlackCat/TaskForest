@@ -6,12 +6,14 @@
 
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp, TuiSurface};
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
 };
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
@@ -486,11 +488,13 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "diagnostic-preview" => {
             app.shell.application.active_page = AppPage::Performance;
-            app.open_local_surface(crate::TuiSurface::DiagnosticPreview);
+            app.open_diagnostic_bundle();
         }
         "diagnostic-failure" => {
             app.shell.application.active_page = AppPage::Performance;
-            app.open_local_surface(crate::TuiSurface::DiagnosticFailure);
+            app.show_diagnostic_bundle(DiagnosticBundleUiState::Failed(
+                DiagnosticBundleError::new(DiagnosticBundleErrorKind::Unavailable),
+            ));
         }
         "smart-missing-tool"
         | "smart-permission"

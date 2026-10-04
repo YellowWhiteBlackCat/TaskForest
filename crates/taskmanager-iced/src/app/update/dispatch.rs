@@ -194,7 +194,9 @@ fn route(message: Message) -> MessageDomain {
         | Message::DeleteSavedView(_)
         | Message::CopyProcessTsv
         | Message::CopyProcessJson
-        | Message::GenerateDiagnosticsReport) => MessageDomain::Transfer(message),
+        | Message::GenerateDiagnosticsReport
+        | Message::ConfirmDiagnosticsExport
+        | Message::RetryDiagnostics) => MessageDomain::Transfer(message),
 
         message @ (Message::ClearAlertEvents | Message::ExportAlertEvents | Message::Alerts(_)) => {
             MessageDomain::Alerts(message)

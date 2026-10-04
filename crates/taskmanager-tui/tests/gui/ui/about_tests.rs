@@ -92,14 +92,14 @@ fn capture_scene_overrides_activate_expected_state() {
     apply_capture_scene_override(&mut app, "diagnostic-preview");
     assert_eq!(
         app.local_surface_kind(),
-        Some(TuiSurfaceKind::DiagnosticPreview)
+        Some(TuiSurfaceKind::DiagnosticBundle)
     );
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "diagnostic-failure");
     assert_eq!(
         app.local_surface_kind(),
-        Some(TuiSurfaceKind::DiagnosticFailure)
+        Some(TuiSurfaceKind::DiagnosticBundle)
     );
 
     let mut app = demo_app();

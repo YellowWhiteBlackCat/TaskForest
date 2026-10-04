@@ -46,6 +46,7 @@ mod column_menu;
 mod config_sync;
 mod configuration_state;
 mod constructors;
+mod diagnostics;
 mod focus_state;
 mod focus_targets;
 pub(crate) mod history_replay;
@@ -171,7 +172,9 @@ pub enum Message {
     /// A process row was right-clicked. The message carries the exact live
     /// identity captured by the rendered row; a later refresh cannot retarget
     /// the menu or its actions to a PID-reuse impostor.
-    OpenProcessRowMenu { identity: ProcessLiveKey },
+    OpenProcessRowMenu {
+        identity: ProcessLiveKey,
+    },
     /// Close the Applications-row context menu.
     CloseProcessRowMenu,
     /// Apply one action from the Applications-row context menu.
@@ -190,7 +193,10 @@ pub enum Message {
     /// frontend-local drag session for that column at its current rendered
     /// width. The edge's `mouse_area` captures the press, so the sort click
     /// underneath never fires.
-    BeginProcessColumnDrag { column: SortCol, start_width: f32 },
+    BeginProcessColumnDrag {
+        column: SortCol,
+        start_width: f32,
+    },
     /// The pointer moved while a process-column drag session is open. Fed by
     /// the raw pointer subscription mounted only while a session exists; the
     /// reducer derives the live width from the session's anchor.
@@ -204,7 +210,10 @@ pub enum Message {
     /// widen/narrow controls) share this transition; each stepper step also
     /// commits the override set to the persisted configuration token. Purely
     /// frontend-local: no shell effect, clamped to the sizing domain on store.
-    ResizeProcessColumn { column: SortCol, width: f32 },
+    ResizeProcessColumn {
+        column: SortCol,
+        width: f32,
+    },
     /// A Services row was right-clicked. `visual_index` keeps the shared
     /// selection highlight aligned with the rendered table; `source_index`
     /// freezes the provider-order identity used by the action path.
@@ -220,10 +229,14 @@ pub enum Message {
     /// Select a service row and open its log stream. The row index is resolved
     /// against provider order by the Services page before this message is
     /// published.
-    OpenServiceLogFor { index: usize },
+    OpenServiceLogFor {
+        index: usize,
+    },
     /// Select a service row and open its dependency/lifecycle details modal.
     /// The dependency query is submitted through the shared typed effect lane.
-    OpenServiceDetailsFor { index: usize },
+    OpenServiceDetailsFor {
+        index: usize,
+    },
     /// Retry the dependency query for the open service-details modal.
     RefreshServiceDetails,
     /// Toggle paused/running for the details modal's merged log panel.
@@ -305,7 +318,9 @@ pub enum Message {
     CloseUserRowMenu,
     /// A Startup row was right-clicked. The visual index is resolved to the
     /// provider-issued entry identity before any menu action is submitted.
-    OpenStartupRowMenu { visual_index: usize },
+    OpenStartupRowMenu {
+        visual_index: usize,
+    },
     /// Close the Startup-row context menu.
     CloseStartupRowMenu,
     /// Request enable (true) / disable (false) of the currently selected
@@ -314,7 +329,10 @@ pub enum Message {
     RequestStartupControl(bool),
     /// Request Startup enable/disable for an exact provider-order entry from
     /// the row context menu. This keeps sorting from retargeting the action.
-    RequestStartupControlFor { index: usize, enabled: bool },
+    RequestStartupControlFor {
+        index: usize,
+        enabled: bool,
+    },
     /// Confirm a gated startup Enable/Disable (mirrors GPUI's confirm dialog).
     /// The shell's `request_startup_control` only sets the pending slot; this
     /// message emits the actual StartupControl effect.
@@ -344,7 +362,10 @@ pub enum Message {
     /// The Users/session inventory table viewport moved.
     UsersScrolled(iced::widget::scrollable::Viewport),
     /// A service row action was requested; opens the shared confirmation bar.
-    RequestServiceAction { index: usize, action: ServiceAction },
+    RequestServiceAction {
+        index: usize,
+        action: ServiceAction,
+    },
     /// The pending service-control confirmation was confirmed.
     ConfirmServiceControl,
     /// Reveal the selected process's executable in the platform file manager.
@@ -373,13 +394,20 @@ pub enum Message {
     CollapseAllProcessTree,
     /// Jump to an exact process incarnation in Applications view and
     /// highlight it.
-    JumpToProcess { identity: ProcessLiveKey },
+    JumpToProcess {
+        identity: ProcessLiveKey,
+    },
     /// Copy text to system clipboard with a status label.
-    CopyTextToClipboard { label: String, text: String },
+    CopyTextToClipboard {
+        label: String,
+        text: String,
+    },
     /// The process-properties environment table's key filter changed.
     EnvironmentFilterChanged(String),
     /// Open the startup entry executable or desktop file in file manager.
-    OpenStartupLocation { index: usize },
+    OpenStartupLocation {
+        index: usize,
+    },
     /// Switch performance graph history resolution data points.
     SelectPerformanceGraphPoints(u32),
     /// Accept the Insights network escalation pill: request the system-wide
@@ -413,7 +441,9 @@ pub enum Message {
     /// [`ShellApp::request_directory_usage`] effect lane.
     ToggleDirectoryUsageScan,
     /// Open the SMART detail dialog for one observed disk.
-    OpenDiskSmart { index: usize },
+    OpenDiskSmart {
+        index: usize,
+    },
     /// Request a SMART self-test on the observed disk at `index`.
     RequestSmartSelfTest {
         index: usize,
@@ -476,6 +506,8 @@ pub enum Message {
     CopyProcessJson,
     /// Generate and copy redacted system diagnostics report.
     GenerateDiagnosticsReport,
+    ConfirmDiagnosticsExport,
+    RetryDiagnostics,
     /// Open the Run New Task modal.
     OpenRunTask,
     /// Close the Run New Task modal.
@@ -543,6 +575,7 @@ pub struct IcedApp {
     pub(crate) process_column_sizing: update::columns::ProcessColumnSizing,
     /// Named client of the app-host's process-wide diagnostic writer.
     service_log_export: service_log::IcedServiceLogExportRuntime,
+    diagnostics: diagnostics::IcedDiagnosticRuntime,
     /// Renderer-local service-details data. Its open target is carried by the
     /// `LocalSurface::ServiceDetails` payload.
     pub(crate) service_details: service_details::ServiceDetailsState,

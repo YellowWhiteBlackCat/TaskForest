@@ -45,6 +45,7 @@ FRONTEND_SCRIPTS = {
         "scripts/capture_publish.py",
         "scripts/capture-reclaim.sh",
         "scripts/validate_tui_evidence.py",
+        "scripts/validate_capture_evidence.py",
     ),
     "iced": (
         "scripts/capture-iced.sh",
@@ -56,6 +57,8 @@ FRONTEND_SCRIPTS = {
         "scripts/capture-reclaim.sh",
         "scripts/capture_iced_scenarios.tsv",
         "scripts/validate_iced_matrix.py",
+        "scripts/validate_capture_evidence.py",
+        "scripts/validate_tui_evidence.py",
     ),
     "bevy": (
         "scripts/capture-bevy.sh",
@@ -66,6 +69,8 @@ FRONTEND_SCRIPTS = {
         "scripts/capture-reclaim.sh",
         "scripts/capture_bevy_scenarios.tsv",
         "scripts/validate_bevy_matrix.py",
+        "scripts/validate_capture_evidence.py",
+        "scripts/validate_tui_evidence.py",
         "scripts/accept-bevy-interactions.sh",
     ),
 }

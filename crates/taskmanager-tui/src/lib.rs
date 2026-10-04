@@ -28,7 +28,7 @@ mod clipboard;
 mod column_prefs;
 mod command_palette;
 mod demo;
-mod diagnostic_report;
+mod diagnostic_bundle;
 mod feature_coverage;
 mod functional;
 mod history_runtime;
@@ -59,10 +59,6 @@ pub use functional::functional_declaration;
 pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
 
 pub use demo::demo_app;
-pub use diagnostic_report::{
-    DEFAULT_DIAGNOSTIC_FILENAME, DiagnosticExportError, default_diagnostic_path,
-    render_diagnostic_report,
-};
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
@@ -176,6 +172,7 @@ pub struct TuiApp {
     pub export_dir: Option<PathBuf>,
     /// Typed lifecycle plus the app-host's non-blocking export client.
     snapshot_export: snapshot_export::TuiSnapshotExportRuntime,
+    diagnostics: diagnostic_bundle::TuiDiagnosticRuntime,
     /// Read-only durable-history lifecycle and replay capability.
     history_runtime: history_runtime::TuiHistoryRuntime,
     /// Frontend-local Performance resource selector (select-a-device detail
@@ -339,6 +336,7 @@ impl TuiApp {
             settings_draft: preferences::SettingsDraftLifecycle::default(),
             export_dir: None,
             snapshot_export: snapshot_export::TuiSnapshotExportRuntime::default(),
+            diagnostics: diagnostic_bundle::TuiDiagnosticRuntime::default(),
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
             detail_scroll: 0,

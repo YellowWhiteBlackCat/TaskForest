@@ -79,8 +79,9 @@ identity map.
   native one-shot implementation is Linux-only; other platforms keep a typed
   unsupported/unavailable result rather than claiming a capture they cannot provide.
 - `src/diagnostics.rs` prepares already-redacted diagnostic plans and owns the
-  request-correlated publication port. The app-host alone owns its worker and
-  file transaction; closing a frontend session makes a late completion inert.
+  shared Preview/Writing/Complete/Failed review state and request-correlated publication port.
+  The app-host owns its worker and file transaction; confirm submits the frozen plan once,
+  and closing a frontend session makes a late completion inert.
 - `src/interaction.rs` owns the single shared dangerous-confirmation machine: one frozen
   EndTask/ProcessBatch/Service/Startup/Session/SMART-self-test payload, explicit arm/replace/confirm/dismiss
   transitions, and the sole conversion from confirmed intent to platform effect.

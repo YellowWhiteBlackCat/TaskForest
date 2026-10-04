@@ -414,6 +414,9 @@ fi
 if maybe install-manifest; then
     run_stage install-manifest quick run_py scripts/quality/system_install_manifest_guard.py
 fi
+if maybe capture-content-self; then
+    run_stage capture-content-self quick run_py scripts/validate_bevy_matrix.py --self-test
+fi
 if maybe visual-capture-coverage; then
     run_stage visual-capture-coverage quick run_py scripts/quality/visual_capture_coverage.py --repo-root "$repo"
 fi

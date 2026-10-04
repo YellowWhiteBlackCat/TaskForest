@@ -21,6 +21,7 @@ use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, 
 
 mod constants;
 mod cpu;
+pub mod diagnostics;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
 mod network;

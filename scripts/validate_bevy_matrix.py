@@ -9,6 +9,10 @@ import hashlib
 import json
 import subprocess
 import sys
+import struct
+import zlib
+import tempfile
+from dataclasses import asdict
 from pathlib import Path
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
@@ -28,6 +32,47 @@ MANIFEST_FIELDS = {
     "scenario", "page", "requested_window", "image", "markers", "windows",
     "action", "app_pid", "window_id", "width", "height", "bytes", "sha256", "status",
 }
+
+
+def client_content_receipt(path: Path):
+    image = png_receipt(path)
+    return visual_content_receipt(path, (
+        image.width // 10, image.height // 4,
+        image.width * 9 // 10, image.height * 9 // 10,
+    ))
+
+
+def decorated_frame(blank: bool) -> bytes:
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
+    rows = []
+    for y in range(100):
+        row = bytearray()
+        for x in range(100):
+            value = (x * 3) % 256 if y < 24 or not blank else 0
+            row.extend((value, value, value))
+        rows.append(b"\x00" + row)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 100, 100, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
+
+
+def content_self_test() -> None:
+    scratch = Path(__file__).resolve().parent.parent / ".tmp"
+    scratch.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=scratch, prefix="capture-content-") as directory:
+        path = Path(directory) / "frame.png"
+        path.write_bytes(decorated_frame(True))
+        visual_content_receipt(path)  # Decorations fool the whole-frame check.
+        try:
+            client_content_receipt(path)
+        except EvidenceError:
+            pass
+        else:
+            raise EvidenceError("blank client with valid decorations was accepted")
+        path.write_bytes(decorated_frame(False))
+        receipt = client_content_receipt(path)
+        if receipt.visible_pixels != 80 * 65:
+            raise EvidenceError("client sampling read outside its owned bounds")
 
 
 def read_tsv(path: Path) -> list[dict[str, str]]:
@@ -161,8 +206,17 @@ def main() -> int:
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--current-worktree", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--probe-content", type=Path)
     args = parser.parse_args()
+    if args.probe_content:
+        try:
+            print(json.dumps(asdict(client_content_receipt(args.probe_content))))
+            return 0
+        except (EvidenceError, OSError, ValueError) as error:
+            print(f"Bevy client paint not ready: {error}", file=sys.stderr)
+            return 1
     if args.self_test:
+        content_self_test()
         assert parse_window("720x480") == (720, 480)
         try:
             parse_window("0x480")
@@ -222,10 +276,12 @@ def main() -> int:
                 if not path.is_file():
                     raise EvidenceError(f"missing {key}: {path}")
             image = png_receipt(paths["image"])
-            visual = visual_content_receipt(paths["image"])
+            # Decorations alone cannot prove that the app rendered. Sample
+            # the client interior, excluding the native titlebar and borders.
+            visual = client_content_receipt(paths["image"])
             if image.width < requested_width or image.height < requested_height:
                 raise EvidenceError(f"image is smaller than requested: {row['scenario']}")
-            if visual.visible_pixels < image.width * image.height // 4:
+            if visual.visible_pixels == 0:
                 raise EvidenceError(f"image is mostly transparent: {row['scenario']}")
             if str(image.width) != row["width"] or str(image.height) != row["height"]:
                 raise EvidenceError(f"image dimensions differ: {row['scenario']}")

@@ -391,7 +391,7 @@ fn execute_tui_local_direct(
             InputDispatch::Consumed
         }
         TuiDirectAction::ExportDiagnosticReport => {
-            let _ = app.export_diagnostic_report();
+            app.open_diagnostic_bundle();
             InputDispatch::Consumed
         }
         TuiDirectAction::SelectPerfResource => {

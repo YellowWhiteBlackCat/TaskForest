@@ -276,10 +276,10 @@ fn system_sections_include_smbios_memory_slots_when_provided() {
 
 #[test]
 fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
-    use crate::ui::pages::system_data::{
+    use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+    use taskmanager_shell::presentation::diagnostics::{
         diagnostic_failure_feedback_key, diagnostic_failure_message,
     };
-    use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
     let guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()

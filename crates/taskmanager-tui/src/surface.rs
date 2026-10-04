@@ -6,6 +6,7 @@
 //! and independent `Option` fields, making the modal precedence chain
 //! unrepresentable.
 
+use crate::diagnostic_bundle::DiagnosticBundleTargetView;
 use taskmanager_application::SurfaceKind;
 
 use crate::{
@@ -150,8 +151,7 @@ pub(crate) enum TuiSurfaceKind {
     CommandPalette,
     ServiceDependencies,
     ProcessAffinity,
-    DiagnosticPreview,
-    DiagnosticFailure,
+    DiagnosticBundle,
     FirstRun,
 }
 
@@ -170,8 +170,7 @@ pub(crate) enum TuiSurface {
     CommandPalette(CommandPalette),
     ServiceDependencies(ServiceDependenciesTarget),
     ProcessAffinity(AffinityModalState),
-    DiagnosticPreview,
-    DiagnosticFailure,
+    DiagnosticBundle(DiagnosticBundleTargetView),
     FirstRun,
 }
 
@@ -191,8 +190,7 @@ impl TuiSurface {
             Self::CommandPalette(_) => TuiSurfaceKind::CommandPalette,
             Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
             Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
-            Self::DiagnosticPreview => TuiSurfaceKind::DiagnosticPreview,
-            Self::DiagnosticFailure => TuiSurfaceKind::DiagnosticFailure,
+            Self::DiagnosticBundle(_) => TuiSurfaceKind::DiagnosticBundle,
             Self::FirstRun => TuiSurfaceKind::FirstRun,
         }
     }
@@ -430,6 +428,9 @@ impl TuiApp {
     }
 
     pub(crate) fn open_local_surface(&mut self, surface: TuiSurface) {
+        if self.local_surface_kind() == Some(TuiSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         self.shell.dismiss_overlay();
         self.shell.close_service_log();
         self.shell.dismiss_informational_overlay();
@@ -441,10 +442,18 @@ impl TuiApp {
     }
 
     pub(crate) fn dismiss_local_surface(&mut self) {
+        if self.local_surface_kind() == Some(TuiSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         let _ = self.local_surface.reduce(TuiSurfaceEvent::DismissCurrent);
     }
 
     pub(crate) fn dismiss_local_surface_kind(&mut self, expected: TuiSurfaceKind) {
+        if expected == TuiSurfaceKind::DiagnosticBundle
+            && self.local_surface_kind() == Some(expected)
+        {
+            self.diagnostics.close();
+        }
         let _ = self
             .local_surface
             .reduce(TuiSurfaceEvent::Dismiss(expected));

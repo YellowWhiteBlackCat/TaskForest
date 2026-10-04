@@ -150,7 +150,7 @@ fn semantic_addresses_are_stable_across_rebuilds() {
 
     // The accessibility snapshot carries the same stable row identity the
     // address names, so an AT user's join survives the refold too.
-    let snapshot = crate::semantic::build_snapshot(&shell).expect("valid semantic snapshot");
+    let snapshot = crate::semantic::build_snapshot(&shell, None).expect("valid semantic snapshot");
     let node_ids: Vec<_> = snapshot.nodes().map(|node| node.id().clone()).collect();
     for row in shell.visible_processes() {
         let expected = SemanticNodeId::owned(format!("row:{}", process_semantic_key(row)));

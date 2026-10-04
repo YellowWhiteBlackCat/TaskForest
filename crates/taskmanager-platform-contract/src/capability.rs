@@ -637,3 +637,9 @@ impl CapabilitySnapshot {
 pub trait CapabilityCatalog: Send + Sync {
     fn snapshot(&self) -> CapabilitySnapshot;
 }
+
+impl CapabilityCatalog for CapabilitySnapshot {
+    fn snapshot(&self) -> CapabilitySnapshot {
+        self.clone()
+    }
+}

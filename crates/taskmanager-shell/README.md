@@ -14,6 +14,11 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 
 ## Key modules
 
+- `src/app/diagnostics.rs` freezes observed snapshot/process inventory, services, startup
+  and diagnostic facts into one sanitized application plan. Missing required observations
+  fail as unavailable; unobserved optional inventories remain null. Shared presentation
+  owns the preview summary and privacy-safe typed failure text.
+
 - `src/app/batch_fold.rs` is a typestate batch scheduler. Its compile-time
   phases are failure seed → independent domain systems → revision advancement
   → alert watermark → failure feedback; a caller cannot skip or reorder them.

@@ -15,6 +15,7 @@
 
 use super::super::*;
 use ratatui::crossterm::event::KeyModifiers;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
 
@@ -199,33 +200,15 @@ fn x_reports_the_snapshot_export_feedback() {
 }
 
 #[test]
-fn capital_x_reports_the_diagnostic_report_export_feedback() {
-    let _guard = crate::ui::test_support::LANG_TEST_GUARD
-        .lock()
-        .expect("lang test guard");
-    set_language(Language::En);
+fn capital_x_opens_diagnostic_review_without_exporting() {
     let mut app = crate::demo_app();
     app.shell.clear_feedback_notice();
-    let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
-        "diag-matrix-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&scratch).expect("create scratch dir");
-    app.export_dir = Some(scratch.clone());
-
-    let effect = press_char(&mut app, 'X');
-    assert!(effect.is_none(), "export is a local persistence action");
-    let feedback = app.feedback_notice().expect("export feedback");
-    assert_eq!(
-        feedback.source(),
-        FeedbackSource::Persistence,
-        "the declared X chord must reach the diagnostic export path"
+    assert!(press_char(&mut app, 'X').is_none());
+    assert!(
+        matches!(app.local_surface(), Some(crate::surface::TuiSurface::DiagnosticBundle(view))
+        if matches!(view.state, DiagnosticBundleUiState::Preview(_)))
     );
-
-    let _ = std::fs::remove_dir_all(&scratch);
+    assert!(app.feedback_notice().is_none());
 }
 
 // ── the row-target Enter ─────────────────────────────────────────────────
@@ -622,19 +605,13 @@ fn palette_local_actions_respect_the_declared_scopes() {
 
     let mut app = crate::demo_app();
     app.shell.clear_feedback_notice();
-    let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
-        "diag-palette-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&scratch).expect("create scratch dir");
-    app.export_dir = Some(scratch.clone());
     app.run_palette_local_action(Some(PaletteLocalAction::ExportDiagnosticReport));
     assert!(
-        app.feedback_notice().is_some(),
-        "palette export diagnostic report must produce feedback notice"
+        matches!(app.local_surface(), Some(crate::TuiSurface::DiagnosticBundle(view))
+        if matches!(view.state, DiagnosticBundleUiState::Preview(_)))
     );
-    let _ = std::fs::remove_dir_all(&scratch);
+    assert!(
+        app.feedback_notice().is_none(),
+        "a preview cannot claim export success"
+    );
 }

@@ -125,6 +125,9 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
   `SettingsChange` channel and persisted tokens; the shortcut legend derives from the
   Iced binding declaration. Text rendering shows an honest unavailable state (no dead
   selector).
+- Diagnostic review consumes the shared frozen plan and publication lifecycle. The title
+  and Export/Retry/Close actions stay fixed around one bounded scroll body; only explicit
+  confirmation admits a writer, and replacing the surface invalidates late completions.
 - Iced-local surfaces: the first-run dialog (`ui/first_run.rs`, platform setup-script
   observe/action lane, dismiss is side-effect free), the Containers full page
   (`ui/containers.rs`, six honest branch states via `page_branch`), and the System-page

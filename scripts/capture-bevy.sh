@@ -353,6 +353,8 @@ capture_one() {
         printf 'window_id=%s\n' "$window_id" >"$action"
         printf 'action=screenshot-window --id %s --write-to-disk true --path %s\n' \
             "$window_id" "$image" >>"$action"
+        for paint_attempt in $(seq 1 20); do
+            rm -f "$image"
         if NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
             --id "$window_id" --write-to-disk true --path "$image" >>"$action" 2>&1; then
             # Niri acknowledges the action before the PNG writer has flushed
@@ -369,11 +371,16 @@ capture_one() {
                 bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
                 hash="$(sha256sum "$image" | cut -d' ' -f1)"
                 rendered="$(appearance_of "$image")"
-                if [ "${width:-0}" -ge "$expected_width" ] && [ "${height:-0}" -ge "$expected_height" ]; then
+                if [ "${width:-0}" -ge "$expected_width" ] && [ "${height:-0}" -ge "$expected_height" ] \
+                    && timeout --kill-after=2s 10s python3 "$REPO/scripts/validate_bevy_matrix.py" --probe-content "$image" >>"$action" 2>&1; then
                     status=ok
+                    break
                 fi
             fi
         fi
+            kill -0 "$app_pid" 2>/dev/null || break
+            sleep 0.5
+        done
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$name" "$page" "$window_size" "$name/image.png" "$name/markers.log" \

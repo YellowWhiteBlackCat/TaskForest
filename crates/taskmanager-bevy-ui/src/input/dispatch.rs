@@ -38,7 +38,11 @@ use super::{
     PendingEffects, QuitForwarded, ShellInteractionApplied, TextInputState, commit_query_to_shell,
     keyboard_owner, modifiers_from, text_char,
 };
+use crate::pages::system::diagnostic_modal::DiagnosticModalState;
 use taskmanager_core::core::smart::SmartSelfTestKind;
+
+#[path = "dispatch/diagnostics.rs"]
+mod diagnostics;
 
 /// One just-pressed key, normalized once for the whole arm chain: the facts
 /// every arm reads are captured here so each arm stays a predicate on
@@ -97,6 +101,7 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     export_dir: Option<&'a ServiceLogExportDir>,
     /// Performance page device focus (absent outside the window shell).
     perf_device_focus: Option<&'a PerformanceDeviceFocus>,
+    diagnostic: Option<&'a DiagnosticModalState>,
     /// Whether any press this frame mutated shell state.
     applied: bool,
 }
@@ -133,7 +138,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     /// table-row arrow or a shared fixed binding — so they run in sequence
     /// once the chain above them falls through.
     fn dispatch(&mut self, press: KeyPress) {
-        if self.frontend_menus(press)
+        if self.diagnostic_modal(press)
+            || self.frontend_menus(press)
             || self.service_log_panel(press)
             || self.dismiss_shared_surface(press)
             || self.dismiss_text_selection(press)
@@ -703,6 +709,7 @@ pub(crate) struct KeyboardDispatchInputs<'w, 's> {
     perf_device_focus: Option<Res<'w, PerformanceDeviceFocus>>,
     /// Service-log export directory (absent outside the window shell).
     export_dir: Option<Res<'w, ServiceLogExportDir>>,
+    diagnostic: Option<Res<'w, DiagnosticModalState>>,
 }
 
 /// Mutable sinks the keyboard adapter drives: the frame-tail effect queue, the
@@ -763,6 +770,7 @@ pub(crate) fn keyboard_dispatch_system(
             clipboard: outputs.clipboard.as_deref_mut(),
             export_dir: inputs.export_dir.as_deref(),
             perf_device_focus: inputs.perf_device_focus.as_deref(),
+            diagnostic: inputs.diagnostic.as_deref(),
             applied: false,
         };
         frame.run(&events, modifiers);

@@ -19,10 +19,17 @@
 //! feedback line. A quiet frame costs one key comparison — never polling
 //! work, never a stale announcement.
 
+use crate::pages::system::diagnostic_modal::DiagnosticModalState;
 use bevy::app::{App, PostUpdate};
+use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{NonSend, ResMut};
+use bevy::ecs::system::{NonSend, Res, ResMut};
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::diagnostics::{
+    diagnostic_failure_message, diagnostic_redaction_summary,
+};
 use taskmanager_ui_contract::{
     ModalInput, ProcessRowInput, SemanticSnapshot, SemanticSnapshotBuilder, SemanticSnapshotError,
 };
@@ -60,7 +67,10 @@ struct SnapshotKey {
 /// Build the shared snapshot from the folded shell. Pure; the system below is
 /// its only applier and headless tests call it directly. Validation errors
 /// surface typed — a broken tree must never be published.
-pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, SemanticSnapshotError> {
+pub(crate) fn build_snapshot(
+    shell: &ShellApp,
+    diagnostic: Option<&DiagnosticBundleUiState>,
+) -> Result<SemanticSnapshot, SemanticSnapshotError> {
     let revision = shell.projection().process_revision;
     let mut builder = SemanticSnapshotBuilder::new(revision).application_name("TaskForestB");
 
@@ -135,7 +145,21 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
     };
     builder = builder.status_announcement(status);
 
-    if let Some(view) = shell
+    if let Some(state) = diagnostic {
+        let description = match state {
+            DiagnosticBundleUiState::Preview(plan) => diagnostic_redaction_summary(plan.preview()),
+            DiagnosticBundleUiState::Writing(_) => t("diagnostics.writing").to_owned(),
+            DiagnosticBundleUiState::Complete(path) => {
+                t("diagnostics.complete").replace("{path}", &path.display().to_string())
+            }
+            DiagnosticBundleUiState::Failed(error) => diagnostic_failure_message(error),
+        };
+        builder = builder.modal(ModalInput {
+            id: "diagnostic-bundle".into(),
+            name: t("diagnostics.title").into(),
+            description: Some(description),
+        });
+    } else if let Some(view) = shell
         .pending_confirmation()
         .and_then(PendingConfirmationView::from_pending)
     {
@@ -152,6 +176,7 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
 fn sync_semantic_snapshot(
     track: NonSend<FrontendTrack>,
     mut state: ResMut<SemanticSnapshotResource>,
+    diagnostic: Option<Res<DiagnosticModalState>>,
 ) {
     let shell = &track.shell;
     let key = SnapshotKey {
@@ -163,10 +188,19 @@ fn sync_semantic_snapshot(
         selected: shell.selected,
         feedback: shell.feedback_text().to_owned(),
     };
-    if state.last_key.as_ref() == Some(&key) {
+    if state.last_key.as_ref() == Some(&key)
+        && !diagnostic
+            .as_ref()
+            .is_some_and(|diagnostic| diagnostic.is_changed())
+    {
         return;
     }
-    state.snapshot = match build_snapshot(shell) {
+    state.snapshot = match build_snapshot(
+        shell,
+        diagnostic
+            .as_ref()
+            .and_then(|diagnostic| diagnostic.0.as_ref()),
+    ) {
         Ok(snapshot) => Some(snapshot),
         // A validation error is a contract bug in this module: keep the last
         // good snapshot (stale last-good beats a broken publication).

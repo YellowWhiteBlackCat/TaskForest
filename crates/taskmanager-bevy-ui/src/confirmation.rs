@@ -18,6 +18,7 @@
 //! transition republishes `ConfirmationChanged` so the overlay mounts and
 //! despawns from one authority.
 
+use crate::pages::system::diagnostic_modal::DiagnosticCommand;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -34,6 +35,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
+use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::presentation::process_batch_action_label;
 
 use crate::app::FrontendTrack;
@@ -461,12 +463,10 @@ pub(crate) fn init_capture_confirmation(
         } else if target == "first-run" {
             commands.trigger(crate::first_run_modal::FirstRunModalChanged(true));
         } else if target == "diagnostic-preview" {
-            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
-                crate::pages::system::DiagnosticModalKind::Preview,
-            )));
+            commands.trigger(DiagnosticCommand::Open);
         } else if target == "diagnostic-failure" {
-            commands.trigger(crate::pages::system::DiagnosticModalChanged(Some(
-                crate::pages::system::DiagnosticModalKind::Failure,
+            commands.trigger(DiagnosticCommand::Failure(DiagnosticBundleError::new(
+                DiagnosticBundleErrorKind::Unavailable,
             )));
         }
     }

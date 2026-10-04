@@ -277,12 +277,15 @@ impl TuiApp {
                     ),
                     description: Some(String::from("Process CPU affinity editor")),
                 }),
-                crate::TuiSurface::DiagnosticPreview
-                | crate::TuiSurface::DiagnosticFailure
-                | crate::TuiSurface::FirstRun => Some(ModalInput {
+                crate::TuiSurface::DiagnosticBundle(_) => Some(ModalInput {
                     id: String::from("diagnostic-report-modal"),
                     name: String::from("Diagnostic Report"),
                     description: Some(String::from("System diagnostic summary")),
+                }),
+                crate::TuiSurface::FirstRun => Some(ModalInput {
+                    id: String::from("first-run-modal"),
+                    name: String::from(t("first_run.title")),
+                    description: Some(String::from(t("first_run.description"))),
                 }),
             },
             crate::TuiInputScope::SharedSurface(SurfaceKind::ProcessProperties) => {

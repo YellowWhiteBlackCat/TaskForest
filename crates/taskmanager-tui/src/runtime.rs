@@ -170,6 +170,15 @@ fn run_interactive(demo: bool) -> io::Result<()> {
                 format!("Snapshot export runtime unavailable: {error}"),
             ),
         }
+        match host.diagnostic_bundle_client() {
+            Ok(client) => app.install_diagnostic_bundle_client(client),
+            Err(error) => app.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                format!("Diagnostic bundle runtime unavailable: {error}"),
+            ),
+        }
     }
     let mut platform = if demo {
         None

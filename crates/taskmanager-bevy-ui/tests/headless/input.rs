@@ -854,3 +854,31 @@ fn text_input_word_navigation_and_deletion() {
 // path-mounted module so each test file stays inside the per-file budget.
 #[path = "input_arms.rs"]
 mod dispatch_arms;
+
+#[test]
+fn diagnostic_review_owns_keys_until_dismissed() {
+    use crate::pages::system::diagnostic_modal::{self, DiagnosticCommand, DiagnosticModalState};
+    use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+    let mut app = input_app(fixture::demo_app());
+    diagnostic_modal::register(&mut app);
+    app.update();
+    app.world_mut().trigger(DiagnosticCommand::Open);
+    app.update();
+    let page = app.world().resource::<Route>().page;
+    press(&mut app, KeyCode::KeyQ, Some("q"));
+    app.update();
+    assert!(!app.world().non_send::<FrontendTrack>().shell.should_quit());
+    press(&mut app, KeyCode::Digit2, Some("2"));
+    app.update();
+    assert_eq!(app.world().resource::<Route>().page, page);
+    press(&mut app, KeyCode::Enter, None);
+    app.update();
+    assert!(matches!(
+        app.world().resource::<DiagnosticModalState>().0,
+        Some(DiagnosticBundleUiState::Failed(_))
+    ));
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+    assert!(app.world().resource::<DiagnosticModalState>().0.is_none());
+    assert!(app.world().resource::<PendingEffects>().0.is_empty());
+}

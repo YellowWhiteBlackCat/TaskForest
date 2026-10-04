@@ -27,8 +27,43 @@ use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurfaceKind};
 
 use super::handle_settings_key;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
+
+fn handle_diagnostic_key(app: &mut TuiApp, key: KeyEvent) {
+    use ratatui::crossterm::event::KeyCode;
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => app.close_local_overlays(),
+        KeyCode::Enter => {
+            if matches!(app.local_surface(), Some(crate::TuiSurface::DiagnosticBundle(view)) if matches!(view.state, DiagnosticBundleUiState::Failed(_)))
+            {
+                app.open_diagnostic_bundle();
+            } else {
+                app.confirm_diagnostic_bundle();
+            }
+        }
+        KeyCode::Up
+        | KeyCode::Down
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::Home
+        | KeyCode::End => {
+            if let Some(crate::TuiSurface::DiagnosticBundle(view)) = app.local_surface_mut() {
+                view.scroll = match key.code {
+                    KeyCode::Up => view.scroll.saturating_sub(1),
+                    KeyCode::Down => view.scroll.saturating_add(1),
+                    KeyCode::PageUp => view.scroll.saturating_sub(5),
+                    KeyCode::PageDown => view.scroll.saturating_add(5),
+                    KeyCode::Home => 0,
+                    KeyCode::End => usize::MAX,
+                    _ => view.scroll,
+                };
+            }
+        }
+        _ => {}
+    }
+}
 
 /// Route one key through the open TUI-local modals, highest-precedence first.
 /// `Unhandled` means no modal was open. Every full modal consumes every key;
@@ -311,11 +346,11 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 _ => None,
             },
             TuiSurfaceKind::Settings => handle_settings_key(app, key),
-            TuiSurfaceKind::About
-            | TuiSurfaceKind::Containers
-            | TuiSurfaceKind::DiagnosticPreview
-            | TuiSurfaceKind::DiagnosticFailure
-            | TuiSurfaceKind::FirstRun => {
+            TuiSurfaceKind::DiagnosticBundle => {
+                handle_diagnostic_key(app, key);
+                None
+            }
+            TuiSurfaceKind::About | TuiSurfaceKind::Containers | TuiSurfaceKind::FirstRun => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can

@@ -356,14 +356,14 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
     apply_capture_target(&mut app, "diagnostic-preview");
     assert_eq!(
         app.local_surface_kind(),
-        Some(LocalSurfaceKind::DiagnosticPreview)
+        Some(LocalSurfaceKind::DiagnosticBundle)
     );
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "diagnostic-failure");
     assert_eq!(
         app.local_surface_kind(),
-        Some(LocalSurfaceKind::DiagnosticFailure)
+        Some(LocalSurfaceKind::DiagnosticBundle)
     );
 
     let mut app = IcedApp::demo();

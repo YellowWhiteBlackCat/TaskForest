@@ -2,6 +2,7 @@
 
 use gpui::Context;
 use taskmanager_application::TelemetryRefreshPolicyChange;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
 use taskmanager_core::core::DiagnosticBundleError;
 use taskmanager_core::core::DiagnosticBundleErrorKind;
@@ -13,8 +14,8 @@ use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 
 use super::super::{
-    CaptureEvidence, CaptureProcessAction, DiagnosticBundleUiState, ProcessDetailsSection,
-    RootView, SelectedDevice, TopPage, WindowSurfaceKind,
+    CaptureEvidence, CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice,
+    TopPage, WindowSurfaceKind,
 };
 use crate::gpui_app::dashboard::SystemSection;
 use crate::gpui_app::first_run::FirstRunPhase;

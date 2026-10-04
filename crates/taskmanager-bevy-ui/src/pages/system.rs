@@ -49,7 +49,6 @@ use taskmanager_shell::presentation::kernel_error_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
 pub(crate) mod diagnostic_modal;
-pub(crate) use diagnostic_modal::{DiagnosticModalChanged, DiagnosticModalKind};
 
 /// The page's single body container. Painted exclusively by
 /// [`paint_system`], which the root's on-insert hook binds.
@@ -607,6 +606,7 @@ fn system_body_scene(
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::System.title();
     let waiting = t("common.waiting_inventory").to_owned();
+    let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
     bsn! {
         Node {
             width: percent(100),
@@ -618,6 +618,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         SystemPageRoot
         Children [
              Text(title) TextRole(Role::Heading) --
+             @{ diagnostic } --
 
                 Text(waiting)
                 SystemStatusLine

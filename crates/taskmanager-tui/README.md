@@ -83,6 +83,9 @@ labeled read/write and rx/tx sparkline rows from the store's split-direction
 lanes under one shared normalization (the one deliberate exception to per-row
 scaling), with per-direction gap glyphs and independent warm-up gating; the
 summed throughput summary below them stays on the summed lane.
+Diagnostic export first opens a sanitized review. Enter confirms the displayed plan, Esc
+invalidates its session, and late completions cannot reopen it. Only the body scrolls;
+wrapped action hints and a bottom safety row remain reserved at compact sizes.
 Snapshot export follows the same ownership rule: the key path submits one
 typed request to the app-host worker, and the event loop drains its correlated
 completion into shell feedback. The terminal thread never serializes or writes
@@ -126,7 +129,7 @@ src/ui.rs                                     page rendering root
 src/command_palette/  (+ surface_protocol.rs) command palette
 src/bindings.rs  capabilities.rs  functional.rs  keys, capabilities, CORE-04
 src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs
-src/demo.rs  diagnostic_report.rs  snapshot_export.rs
+src/demo.rs  diagnostic_bundle.rs  snapshot_export.rs
 src/history_runtime.rs  menus.rs  process_view.rs
 src/service_log.rs  startup_control.rs  theme.rs
 ```

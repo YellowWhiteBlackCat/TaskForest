@@ -5,7 +5,6 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::super::{IcedApp, Message};
 use super::dispatch::UpdateDispatch;
-use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::SortDir;
 
 impl IcedApp {
@@ -116,46 +115,9 @@ impl IcedApp {
                     )));
                 }
             }
-            Message::GenerateDiagnosticsReport => {
-                // The account labels observed on this host join the paths and
-                // addresses core already redacts, matching the GPUI bundle's
-                // source preparation.
-                let usernames: Vec<String> = self
-                    .shell
-                    .projection()
-                    .processes
-                    .as_deref()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(ProcessItem::current_user)
-                    .collect();
-                // Fail closed: a report whose redaction could not be verified
-                // is never written to the clipboard, so no unredacted text can
-                // leak by way of a failure path.
-                match crate::export::system_diagnostics_markdown(
-                    self.shell.projection().hardware.as_ref(),
-                    self.shell.projection().snapshot.as_ref(),
-                    usernames,
-                ) {
-                    Ok(report) => {
-                        self.shell.report_notice(
-                            FeedbackSource::Clipboard,
-                            FeedbackSeverity::Success,
-                            FeedbackLifecycle::SHORT,
-                            format!("{} · {}", t("hint.copied"), t("diagnostics.action")),
-                        );
-                        task = Some(iced::clipboard::write(report));
-                    }
-                    Err(_) => {
-                        self.shell.report_notice(
-                            FeedbackSource::Clipboard,
-                            FeedbackSeverity::Warning,
-                            FeedbackLifecycle::SHORT,
-                            t("diagnostics.failure_encode"),
-                        );
-                    }
-                }
-            }
+            Message::GenerateDiagnosticsReport => self.open_diagnostic_bundle(),
+            Message::ConfirmDiagnosticsExport => self.confirm_diagnostic_bundle(),
+            Message::RetryDiagnostics => self.retry_diagnostic_bundle(),
             _ => return UpdateDispatch::none(),
         }
         task.map_or_else(UpdateDispatch::none, UpdateDispatch::task)

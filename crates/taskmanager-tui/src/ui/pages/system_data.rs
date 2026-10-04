@@ -4,7 +4,6 @@
 //! availability and NPU engine/memory folds live here instead of paint code.
 
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -428,27 +427,4 @@ fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
         None => return None,
     };
     Some(format!("{} {state}", t("system.hdr")))
-}
-
-/// Localized feedback key for a diagnostic failure reason.
-#[must_use]
-pub(crate) const fn diagnostic_failure_feedback_key(
-    kind: DiagnosticBundleErrorKind,
-) -> &'static str {
-    match kind {
-        DiagnosticBundleErrorKind::InvalidSource => "diagnostics.failure_invalid_source",
-        DiagnosticBundleErrorKind::InvalidTarget => "diagnostics.failure_invalid_target",
-        DiagnosticBundleErrorKind::Encode => "diagnostics.failure_encode",
-        DiagnosticBundleErrorKind::Io => "diagnostics.failure_io",
-        DiagnosticBundleErrorKind::Busy => "diagnostics.failure_busy",
-        DiagnosticBundleErrorKind::Unavailable => "diagnostics.failure_unavailable",
-    }
-}
-
-/// Format a failure message using the localized template and error kind.
-/// Private filesystem paths and sensitive host details are never interpolated into user feedback.
-#[must_use]
-pub(crate) fn diagnostic_failure_message(error: &DiagnosticBundleError) -> String {
-    t("diagnostics.failed_detail")
-        .replace("{reason}", t(diagnostic_failure_feedback_key(error.kind())))
 }

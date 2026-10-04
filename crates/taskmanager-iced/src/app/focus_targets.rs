@@ -19,6 +19,8 @@ use taskmanager_shell::ProcessStatusFilter;
 pub enum FocusTarget {
     /// The current modal close action.
     ModalClose,
+    DiagnosticConfirm,
+    DiagnosticRetry,
     /// A row in one of the renderer-local typed tables.
     TableRow {
         page: AppPage,
@@ -278,8 +280,10 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 165] = [
+    pub const ALL: [Self; 167] = [
         Self::ModalClose,
+        Self::DiagnosticConfirm,
+        Self::DiagnosticRetry,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
         Self::PageTab(AppPage::Services),

@@ -15,6 +15,7 @@
 | quit 与用户反馈 | shell `ShellLifecycleState` | typed lifecycle event | `should_quit` / immutable feedback | `taskmanager-shell/src/app/lifecycle.rs` |
 | 当前系统投影 | 每条前端轨私有的 `SystemProjectionStore` | platform batch 与命名 reducer | immutable `projection()` | `taskmanager-shell/src/app.rs` |
 | live graph 历史 | `taskmanager-telemetry-store` | composition-owned ingestor | revision-keyed immutable series；per-device 曲线是双侧纪律——写侧 ingest 事务换环、读时 generation 过滤（`requested != 0 && ring == requested`），任何 per-device 读边必须携带 generation，单侧防护不成立 | `taskmanager-telemetry-store/src/live_graph.rs`、`system_history/ingest.rs` |
+| 诊断审阅与导出 | application `DiagnosticBundleUiState` + correlated session | cached projection preparation / explicit confirm / matching completion | 四端单一 surface 保存同一脱敏 plan；关闭丢弃迟到结果；app-host worker 唯一写入 | `application/src/diagnostics.rs`、`shell/src/app/diagnostics.rs` |
 | 前端历史采集 generation | active frontend typed lifecycle | config Enable/Disable + bounded start/stop | app-host read-only replay client | `taskmanager-app-host/src/history_frontend.rs` |
 | 持久历史 writer/lock | active frontend history session | correlated system/process/sensor/power ingestion | history-store JSONL/query；其他 frontend 不可写 | `taskmanager-app-host/src/history_persistence_runtime.rs` |
 | runtime work | ECS `WorkState` | admission/renew/terminal/recovery system | scheduler snapshot 与 typed verdict | `taskmanager-platform-runtime/src/ecs.rs` |

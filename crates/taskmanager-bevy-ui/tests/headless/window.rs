@@ -147,6 +147,17 @@ fn headless_window_app(runtime: &'static SharedRuntime) -> App {
     app
 }
 
+/// The real frontend composition and bundled typography, with a quiet injected
+/// platform. Layout tests use this so text measurements match the product.
+pub(crate) fn scripted_frontend_app() -> App {
+    let (client, _) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime");
+    headless_window_app(runtime)
+}
+
 #[test]
 fn drain_reaches_the_summary_line_and_initial_refresh_is_one_shot() {
     // The bevy World holds a `'static` shared-runtime handle, exactly like the

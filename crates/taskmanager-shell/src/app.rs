@@ -31,6 +31,7 @@ use selection::VisibleProcessesMemo;
 
 mod batch_fold;
 mod confirmation_gates;
+mod diagnostics;
 mod direct_track;
 mod effect_dispatch;
 mod effects;

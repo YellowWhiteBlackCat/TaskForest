@@ -147,7 +147,6 @@ mod units;
 mod window_surface;
 use capture::{CaptureEvidence, CaptureProcessAction};
 pub use chrome::*;
-pub use diagnostic_bundle::DiagnosticBundleUiState;
 use dialog_scroll_state::DialogScrollState;
 pub use dispatch::*;
 pub use input_modality::InputModality;

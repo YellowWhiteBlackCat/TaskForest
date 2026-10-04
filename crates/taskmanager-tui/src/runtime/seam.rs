@@ -382,8 +382,7 @@ fn apply_overlay_control_click(
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies
         | crate::TuiSurfaceKind::ProcessAffinity
-        | crate::TuiSurfaceKind::DiagnosticPreview
-        | crate::TuiSurfaceKind::DiagnosticFailure
+        | crate::TuiSurfaceKind::DiagnosticBundle
         | crate::TuiSurfaceKind::FirstRun => EventReaction::default(),
     }
 }
@@ -473,6 +472,7 @@ where
         cycle.ancillary_effect |= app.drain_config_publications();
         cycle.ancillary_effect |= app.drain_history_replay_completions();
         cycle.ancillary_effect |= app.drain_snapshot_export_completions();
+        cycle.ancillary_effect |= app.drain_diagnostic_bundle_completions();
         if let Some(platform) = platform.as_deref_mut() {
             cycle.ancillary_effect |= app
                 .shell
