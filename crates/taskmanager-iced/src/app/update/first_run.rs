@@ -2,8 +2,9 @@
 
 use super::super::{FirstRunMessage, IcedApp, LocalSurface, LocalSurfaceKind, Message};
 use super::dispatch::UpdateDispatch;
-use taskmanager_application::first_run::{DOCUMENTATION_URL, FirstRunCompletion};
+use taskmanager_application::first_run::FirstRunCompletion;
 use taskmanager_application::{PlatformEffect, UrlOpenRequest};
+use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_shell::QuitReason;
 
 impl IcedApp {
@@ -43,7 +44,7 @@ impl IcedApp {
             }
             FirstRunMessage::OpenDocumentation => {
                 UpdateDispatch::effect(Some(PlatformEffect::OpenUrl(UrlOpenRequest {
-                    url: DOCUMENTATION_URL.into(),
+                    url: REPOSITORY_URL.into(),
                 })))
             }
         }

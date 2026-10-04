@@ -324,7 +324,7 @@ pub(crate) fn bounded_modal_overlay<'a>(
     app: &'a crate::IcedApp,
     title: &'static str,
     body: Element<'a, Message, iced::Theme, iced::Renderer>,
-    actions: Element<'a, Message, iced::Theme, iced::Renderer>,
+    mut actions: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let theme = app.theme();
     let margin = f32::from(tokens::SPACE_24);
@@ -332,11 +332,12 @@ pub(crate) fn bounded_modal_overlay<'a>(
     let viewport = app.viewport_size();
     let width = (viewport.width - 2.0 * margin).clamp(0.0, 680.0);
     let height = (viewport.height - 2.0 * margin).clamp(0.0, 600.0);
+    actions.push(focus::modal_close(theme));
     let panel = container(
         column![
             text(title).size(f32::from(tokens::FONT_18)),
             body,
-            row![actions, focus::modal_close(theme)].spacing(f32::from(tokens::SPACE_8)),
+            row(actions).spacing(f32::from(tokens::SPACE_8)).wrap(),
         ]
         .spacing(f32::from(tokens::SPACE_12))
         .height(Length::Fill)

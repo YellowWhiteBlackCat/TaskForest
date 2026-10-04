@@ -32,6 +32,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_redaction_summary,
 };
+use taskmanager_shell::presentation::system_information::copy_all_text;
 use taskmanager_ui_contract::{
     ModalInput, ProcessRowInput, SemanticSnapshot, SemanticSnapshotBuilder, SemanticSnapshotError,
 };
@@ -168,6 +169,11 @@ pub(crate) fn build_snapshot(
                 "about",
                 t("about.title"),
                 env!("CARGO_PKG_VERSION").to_owned(),
+            ),
+            WindowSurface::SystemInformation(facts) => (
+                "system-information",
+                t("system_about.title"),
+                copy_all_text(facts),
             ),
             WindowSurface::FirstRun => (
                 "first-run",

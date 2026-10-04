@@ -14,6 +14,11 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 
 ## Key modules
 
+- `src/presentation/about.rs` owns the common build-metadata projection and copied
+  details. Product identity, license and repository remain owned by neutral assets.
+- `src/presentation/system_information.rs` groups cached OS, kernel, desktop and
+  hardware facts, omits unavailable rows and preserves complete copied values.
+
 - `src/app/diagnostics.rs` freezes observed snapshot/process inventory, services, startup
   and diagnostic facts into one sanitized application plan. Missing required observations
   fail as unavailable; unobserved optional inventories remain null. Shared presentation

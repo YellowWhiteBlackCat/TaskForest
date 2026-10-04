@@ -2,9 +2,10 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use taskmanager_application::first_run::{DOCUMENTATION_URL, FirstRunCompletion, FirstRunPhase};
+use taskmanager_application::first_run::{FirstRunCompletion, FirstRunPhase};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformClient, PlatformEffect, SetupScriptRequest, UrlOpenRequest};
+use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, QuitReason};
 
@@ -76,7 +77,7 @@ pub(crate) fn handle_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffe
         }
         KeyCode::Char('d') => {
             return Some(PlatformEffect::OpenUrl(UrlOpenRequest {
-                url: DOCUMENTATION_URL.into(),
+                url: REPOSITORY_URL.into(),
             }));
         }
         KeyCode::Up

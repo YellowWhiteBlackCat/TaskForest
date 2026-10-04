@@ -14,12 +14,14 @@ use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::target::ServiceId;
+use taskmanager_shell::presentation::system_information::SystemInformationGroup;
 
 /// Stable identity of every Iced-owned primary surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum LocalSurfaceKind {
     Settings,
     About,
+    SystemInformation,
     Health,
     Containers,
     DiskSmart,
@@ -38,6 +40,7 @@ pub(crate) enum LocalSurfaceKind {
 pub(crate) enum LocalSurface {
     Settings,
     About,
+    SystemInformation(Vec<SystemInformationGroup>),
     Health,
     Containers,
     DiskSmart {
@@ -62,6 +65,7 @@ impl LocalSurface {
         match self {
             Self::Settings => LocalSurfaceKind::Settings,
             Self::About => LocalSurfaceKind::About,
+            Self::SystemInformation(_) => LocalSurfaceKind::SystemInformation,
             Self::Health => LocalSurfaceKind::Health,
             Self::Containers => LocalSurfaceKind::Containers,
             Self::DiskSmart { .. } => LocalSurfaceKind::DiskSmart,

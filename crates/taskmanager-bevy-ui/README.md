@@ -45,7 +45,10 @@ adopted — theme tokens are the only skin authority.
   stay fixed around one bounded, scrollable body.
 - `src/first_run_modal.rs` projects the application setup controller: silent
   startup discovery, explicit Settings entry, typed native actions and metadata copy.
-- `src/about_modal.rs` reviews cached identity facts and opens diagnostics.
+- `src/about_modal.rs` reviews shared application build metadata, opens the repository
+  and switches to independent system information or diagnostics.
+- `src/system_information_modal.rs` freezes shared groups from the cached projection,
+  scrolls complete values and copies exactly the displayed review.
 - `src/text_selection.rs` queues text output for Bevy's native clipboard;
   success feedback requires a completed system write. Linux uses the strict
   Wayland `bevy_clipboard` patch; Windows/macOS retain upstream native output.

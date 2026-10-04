@@ -50,9 +50,9 @@ pub(crate) fn render_first_run(app: &crate::IcedApp) -> IcedElement<'_> {
     .width(Length::Fill)
     .into();
     let actions = if state.info.is_some() {
-        action_row(theme, state, state.action_pending())
+        action_controls(theme, state, state.action_pending())
     } else {
-        row![].into()
+        Vec::new()
     };
     bounded_modal_overlay(app, t("first_run.title"), body, actions)
 }
@@ -162,12 +162,12 @@ fn info_row<'a>(
     .into()
 }
 
-fn action_row<'a>(
+fn action_controls<'a>(
     theme_snapshot: &'a Theme,
     state: &'a FirstRunUiState,
     pending: bool,
-) -> IcedElement<'a> {
-    let mut actions = row![].spacing(f32::from(tokens::SPACE_8));
+) -> Vec<IcedElement<'a>> {
+    let mut actions: Vec<IcedElement<'a>> = Vec::new();
     if pending {
         // In flight: the actions render as inert text (GPUI disables the
         // pills); no message can be submitted from this frame.
@@ -177,40 +177,41 @@ fn action_row<'a>(
             t("first_run.run_setup"),
             t("first_run.revert_setup"),
         ] {
-            actions = actions.push(
+            actions.push(
                 text(label)
                     .size(f32::from(tokens::FONT_12))
-                    .color(theme::muted_text_color(theme_snapshot)),
+                    .color(theme::muted_text_color(theme_snapshot))
+                    .into(),
             );
         }
-        return actions.wrap().into();
+        return actions;
     }
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(0),
         t("first_run.open_docs").to_owned(),
         Message::FirstRun(FirstRunMessage::OpenDocumentation),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(1),
         t("first_run.view_script").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::View)),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(2),
         t("first_run.run_setup").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::Run)),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(3),
         t("first_run.revert_setup").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::Revert)),
     ));
     if state.phase == FirstRunPhase::RestartRequired {
-        actions = actions.push(action_button(
+        actions.push(action_button(
             theme_snapshot,
             FocusSlot::action(4),
             t("first_run.restart").to_owned(),
@@ -221,14 +222,14 @@ fn action_row<'a>(
         && let Some(action @ (SetupScriptAction::Run | SetupScriptAction::Revert)) =
             state.last_action
     {
-        actions = actions.push(action_button(
+        actions.push(action_button(
             theme_snapshot,
             FocusSlot::action(5),
             t("first_run.retry").to_owned(),
             Message::FirstRun(FirstRunMessage::RequestAction(action)),
         ));
     }
-    actions.wrap().into()
+    actions
 }
 
 /// The dialog's dedicated focus-stop helper: every control maps onto the

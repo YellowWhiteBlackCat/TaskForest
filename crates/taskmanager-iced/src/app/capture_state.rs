@@ -64,8 +64,12 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         || target == "sensor-center"
     {
         let _ = app.update(Message::OpenHealth);
-    } else if target == "about" || target == "system-about" || target == "system-hardware" {
+    } else if target == "about" {
         app.open_local_surface(LocalSurface::About);
+    } else if target == "system-about" {
+        let _ = app.update(Message::OpenSystemInformation);
+    } else if target == "system-hardware" {
+        app.shell.application.active_page = AppPage::System;
     } else if target == "settings" {
         app.open_local_surface(LocalSurface::Settings);
     } else if target == "containers" {

@@ -432,6 +432,7 @@ fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> 
             _ => None,
         }),
         crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies
@@ -690,6 +691,7 @@ fn overlay_controls(
         crate::TuiSurfaceKind::CommandPalette => (3, 2, app.filtered_palette_rows().len()),
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies
@@ -732,7 +734,8 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
         },
         TuiInputScope::LocalSurface(surface) => match surface {
             crate::TuiSurfaceKind::Settings => (68, 32),
-            crate::TuiSurfaceKind::About => (72, 18),
+            crate::TuiSurfaceKind::About => (72, 20),
+            crate::TuiSurfaceKind::SystemInformation => (84, 30),
             crate::TuiSurfaceKind::Health => (84, 30),
             crate::TuiSurfaceKind::Containers => (84, 22),
             crate::TuiSurfaceKind::ServiceMenu => (52, 13),

@@ -33,6 +33,7 @@ mod feature_coverage;
 mod first_run;
 mod functional;
 mod history_runtime;
+mod information;
 mod menus;
 mod preferences;
 mod process_view;
@@ -585,7 +586,9 @@ impl TuiApp {
         if self.about_open() {
             self.dismiss_local_surface_kind(TuiSurfaceKind::About);
         } else {
-            self.open_local_surface(TuiSurface::About);
+            self.open_local_surface(TuiSurface::About(
+                crate::information::AboutTargetView::default(),
+            ));
         }
     }
 

@@ -96,6 +96,7 @@ impl IcedApp {
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),
             first_run: FirstRunController::default(),
+            observed_appearance: None,
             system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
@@ -163,6 +164,7 @@ impl IcedApp {
             // skipped: the dialog stays hidden (there is no asset answer to
             // wait for and none is fabricated).
             first_run: FirstRunController::default(),
+            observed_appearance: None,
             system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),

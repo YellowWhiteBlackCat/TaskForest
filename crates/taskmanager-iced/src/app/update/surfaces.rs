@@ -4,7 +4,10 @@
 //! primary surface. Payload editing remains in its domain state (affinity,
 //! run-task, first-run); visibility and input ownership never do.
 
-use taskmanager_application::{PlatformEffect, RefreshRequest};
+use taskmanager_application::{PlatformEffect, RefreshRequest, UrlOpenRequest};
+use taskmanager_assets::product::REPOSITORY_URL;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_shell::presentation::system_information::groups;
 
 use super::super::{IcedApp, LocalSurface, LocalSurfaceKind, Message};
 
@@ -32,6 +35,24 @@ impl IcedApp {
             }
             Message::CloseSettings => {
                 self.dismiss_local_surface_kind(LocalSurfaceKind::Settings);
+                None
+            }
+            Message::OpenRepository => (self.local_surface_kind() == Some(LocalSurfaceKind::About))
+                .then(|| {
+                    PlatformEffect::OpenUrl(UrlOpenRequest {
+                        url: REPOSITORY_URL.into(),
+                    })
+                }),
+            Message::OpenSystemInformation => {
+                let facts = groups(
+                    self.shell
+                        .projection()
+                        .hardware
+                        .as_ref()
+                        .unwrap_or(&HardwareInfo::default()),
+                    self.observed_appearance.unwrap_or_default(),
+                );
+                self.open_local_surface(LocalSurface::SystemInformation(facts));
                 None
             }
             Message::OpenAbout => {

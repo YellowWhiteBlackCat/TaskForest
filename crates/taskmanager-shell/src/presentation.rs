@@ -19,6 +19,7 @@ use taskmanager_core::core::services::{
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
+pub mod about;
 mod constants;
 mod cpu;
 pub mod diagnostics;
@@ -30,6 +31,7 @@ pub mod privilege_center;
 mod process;
 mod service_exit;
 mod storage;
+pub mod system_information;
 mod telemetry;
 pub mod trend;
 

@@ -1,127 +1,161 @@
+//! test-intent: behavior
+
 use super::*;
-use taskmanager_shell::FeedbackSource;
-use taskmanager_shell::ShellApp;
-use taskmanager_shell::demo_app;
+use crate::app::{LocalSurface, LocalSurfaceKind};
+use taskmanager_assets::embedded_fonts;
+use taskmanager_assets::product;
 
 #[test]
-fn about_modal_renders_fixture_hardware_and_snapshot_facts() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
-    let app = crate::IcedApp::demo();
-    let _view = render(&app);
-
-    let shell = demo_app();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
-    );
-    assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("system.hostname"))
-            .map(|row| row.value.as_str()),
-        Some("taskforest-workstation")
-    );
-    assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("common.logical_cores"))
-            .map(|row| row.value.as_str()),
-        Some("22")
-    );
-    assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("common.uptime"))
-            .map(|row| row.value.as_str()),
-        Some("06h 42m")
-    );
-}
-
-#[test]
-fn about_modal_renders_dashes_when_facts_are_absent() {
-    let shell = ShellApp::new();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
-    );
-    assert_eq!(rows.len(), 12);
-    assert!(rows.iter().all(|row| row.value == "—"));
-}
-
-/// The copy-details payload (G-16) carries the version line plus every
-/// rendered row — the same facts the modal shows, never a second source.
-#[test]
-fn copy_payload_carries_the_version_and_every_rendered_row() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
-    let shell = demo_app();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
-    );
-    let payload = about_copy_payload(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
-    );
-    assert!(
-        payload.starts_with("TaskForestI "),
-        "the version line leads the payload: {payload}"
-    );
-    for row in &rows {
-        assert!(
-            payload.contains(&format!("{}: {}", row.label, row.value)),
-            "row {row:?} must appear in the payload"
-        );
-    }
-    assert_eq!(payload.lines().count(), rows.len() + 1);
-
-    // Absent facts copy honestly as the same dash rows the modal renders.
-    let empty = about_copy_payload(None, None);
-    assert!(empty.contains("—"));
-}
-
-/// The copy action records the footer feedback through the real update
-/// path (the clipboard Task itself is runtime-side; the observable state
-/// and the payload seam carry the behavior, G-16).
-#[test]
-fn copy_about_details_message_records_the_footer_feedback() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
+fn about_and_system_information_have_independent_explicit_entries() {
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::OpenAbout);
-    assert!(app.about_open());
-    assert_ne!(
-        app.shell.feedback_notice().map(|notice| notice.source()),
-        Some(FeedbackSource::Clipboard)
-    );
-    let _ = app.update(Message::CopyAboutDetails);
-    let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
-    assert!(
-        feedback.text().contains("Copied"),
-        "feedback: {}",
-        feedback.text()
-    );
-}
-
-/// About's diagnostics action replaces About with a sanitized review.
-#[test]
-fn about_diagnostics_requires_review_and_reports_an_unavailable_writer() {
-    use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-    use taskmanager_core::core::diagnostics::DiagnosticBundleErrorKind;
-    let mut app = crate::IcedApp::demo();
-    app.shell.clear_feedback_notice();
-    let _ = app.update(Message::OpenAbout);
-    let _ = app.update(Message::GenerateDiagnosticsReport);
-    assert!(!app.about_open());
-    assert!(matches!(
-        app.local_surface(),
-        Some(crate::app::LocalSurface::DiagnosticBundle(
-            DiagnosticBundleUiState::Preview(_)
-        ))
-    ));
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
     drop(render(&app));
-    let _ = app.update(Message::ConfirmDiagnosticsExport);
+    let _ = app.update(Message::OpenRepository);
+    let _ = app.update(Message::OpenSystemInformation);
+    let Some(LocalSurface::SystemInformation(facts)) = app.local_surface() else {
+        panic!("independent system information");
+    };
     assert!(
-        matches!(app.local_surface(), Some(crate::app::LocalSurface::DiagnosticBundle(DiagnosticBundleUiState::Failed(error))) if error.kind() == DiagnosticBundleErrorKind::Unavailable)
+        facts.iter().any(|group| group
+            .rows
+            .iter()
+            .any(|row| row.label_key == "system_about.hostname"
+                && row.value == "taskforest-workstation"))
     );
-    let _view = render(&app);
+    let _ = app.update(Message::OpenRepository);
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::SystemInformation)
+    );
+    let _ = app.update(Message::OpenAbout);
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+    assert!(
+        metadata(
+            env!("CARGO_PKG_VERSION"),
+            product::LICENSE_SPDX,
+            product::REPOSITORY_URL
+        )
+        .details_text()
+        .contains(product::LICENSE_SPDX)
+    );
+}
+
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::operation::{Focusable, Scrollable};
+use iced::advanced::widget::{Id, Operation, Tree};
+use iced::{Pixels, Rectangle, Size, Vector};
+use taskmanager_shell::presentation::system_information::{
+    SystemInformationGroup, SystemInformationRow,
+};
+
+#[derive(Default)]
+struct Bounds {
+    controls: Vec<Rectangle>,
+    scrolls: Vec<(Rectangle, Rectangle)>,
+}
+impl Operation for Bounds {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+    fn focusable(&mut self, _id: Option<&Id>, bounds: Rectangle, _state: &mut dyn Focusable) {
+        self.controls.push(bounds);
+    }
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content: Rectangle,
+        _translation: Vector,
+        _state: &mut dyn Scrollable,
+    ) {
+        self.scrolls.push((bounds, content));
+    }
+}
+
+#[test]
+fn information_reviews_keep_all_actions_in_frame_and_scroll_only_the_body() {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer");
+    let facts = vec![SystemInformationGroup {
+        title_key: "system_about.hardware",
+        rows: (0..24)
+            .map(|index| SystemInformationRow {
+                label_key: "system_about.cpu",
+                value: format!(
+                    "Observed device {index}: {}",
+                    "long complete hardware description ".repeat(12)
+                ),
+            })
+            .collect(),
+    }];
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 400.0),
+        (720.0, 960.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        let size = Size::new(width, height);
+        let _ = app.update(Message::WindowResized(size));
+        for system_information in [false, true] {
+            let mut view = if system_information {
+                crate::ui::system_information::render(&app, &facts)
+            } else {
+                render(&app)
+            };
+            let mut tree = Tree::new(&view);
+            let node =
+                view.as_widget_mut()
+                    .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+            let mut bounds = Bounds::default();
+            view.as_widget_mut()
+                .operate(&mut tree, Layout::new(&node), &renderer, &mut bounds);
+            assert_eq!(
+                bounds.controls.len(),
+                if system_information { 2 } else { 5 }
+            );
+            let mut close = focus::modal_close(app.theme());
+            let mut close_tree = Tree::new(&close);
+            let natural_close = close
+                .as_widget_mut()
+                .layout(&mut close_tree, &renderer, &Limits::new(Size::ZERO, size))
+                .size();
+            assert!(
+                bounds.controls.last().expect("Close").width >= natural_close.width,
+                "Close must retain its full intrinsic label and padding"
+            );
+            for control in bounds.controls {
+                assert!(control.width > 0.0 && control.height > 0.0);
+                assert!(control.x >= 0.0 && control.y >= 0.0);
+                assert!(
+                    control.x + control.width <= width && control.y + control.height < height,
+                    "action {control:?} exceeds {size:?}"
+                );
+            }
+            assert_eq!(bounds.scrolls.len(), 1, "only review metadata scrolls");
+            if system_information {
+                let (viewport, content) = bounds.scrolls[0];
+                assert!(viewport.width > 0.0 && viewport.height > 0.0);
+                assert!(
+                    viewport.x + viewport.width <= width && viewport.y + viewport.height < height
+                );
+                assert!(content.width <= viewport.width && content.height > viewport.height);
+            }
+        }
+    }
 }

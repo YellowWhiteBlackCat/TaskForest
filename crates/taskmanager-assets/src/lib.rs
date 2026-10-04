@@ -10,6 +10,7 @@ use std::borrow::Cow;
 /// frontends additionally receive distinct names and reverse-DNS IDs so GPUI
 /// and Iced can be installed, captured, and debugged side by side.
 pub mod product {
+    pub const LICENSE_SPDX: &str = env!("CARGO_PKG_LICENSE");
     pub const NAME: &str = "TaskForest";
     pub const ZH_NAME: &str = "任务森林";
     pub const GPUI_NAME: &str = "TaskForestG";

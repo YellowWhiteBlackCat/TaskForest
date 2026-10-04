@@ -2,6 +2,7 @@
 
 use super::*;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_assets::embedded_fonts;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_shell::fixture::setup::setup_script_info;
 
@@ -25,7 +26,7 @@ use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::{Focusable, Scrollable};
 use iced::advanced::widget::{Id, Operation, Tree};
-use iced::{Font, Pixels, Rectangle, Size, Vector};
+use iced::{Pixels, Rectangle, Size, Vector};
 
 #[derive(Default)]
 struct Bounds {
@@ -54,8 +55,16 @@ impl Operation for Bounds {
 
 #[test]
 fn first_run_review_keeps_native_actions_fixed_around_bounded_metadata() {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
     let renderer = iced::futures::executor::block_on(iced::Renderer::new(
-        Font::DEFAULT,
+        crate::theme_binding::BUNDLED_UI_FONT,
         Pixels(16.0),
         Some("tiny-skia"),
     ))
@@ -107,6 +116,14 @@ fn first_run_review_keeps_native_actions_fixed_around_bounded_metadata() {
             5,
             "four native actions and Close are outside the metadata viewport"
         );
+        for (index, (_, first)) in fixed_actions.iter().enumerate() {
+            for (_, second) in &fixed_actions[index + 1..] {
+                assert!(
+                    first.intersection(second).is_none(),
+                    "fixed actions must not cover each other: {first:?}, {second:?}"
+                );
+            }
+        }
         for (_, control) in fixed_actions {
             assert!(control.width > 0.0 && control.height > 0.0);
             assert!(control.x >= 0.0 && control.y >= 0.0);

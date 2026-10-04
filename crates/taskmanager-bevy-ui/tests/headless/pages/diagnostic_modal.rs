@@ -118,6 +118,7 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
         WindowSurfaceKind::Diagnostic,
         WindowSurfaceKind::FirstRun,
         WindowSurfaceKind::About,
+        WindowSurfaceKind::SystemInformation,
     ] {
         for (width, height) in [(480, 360), (720, 480), (1280, 720), (1600, 400), (720, 960)] {
             let mut app = scripted_frontend_app();
@@ -166,6 +167,9 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
                     app.world_mut()
                         .trigger(crate::first_run_modal::FirstRunCommand::Open);
                 }
+                WindowSurfaceKind::SystemInformation => app
+                    .world_mut()
+                    .trigger(crate::system_information_modal::SystemInformationCommand::Open),
                 WindowSurfaceKind::About => app
                     .world_mut()
                     .trigger(crate::about_modal::AboutCommand::Open),
@@ -214,9 +218,9 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
             let children = world.get::<Children>(footers[0]).expect("action group");
             assert_eq!(
                 children.len(),
-                if kind == WindowSurfaceKind::FirstRun {
+                if matches!(kind, WindowSurfaceKind::FirstRun | WindowSurfaceKind::About) {
                     5
-                } else if kind == WindowSurfaceKind::About {
+                } else if kind == WindowSurfaceKind::SystemInformation {
                     3
                 } else {
                     2

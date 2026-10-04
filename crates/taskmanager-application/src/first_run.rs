@@ -7,8 +7,6 @@ use taskmanager_platform_contract::{
     CapabilityId, OperationFailure, RequestId, SubmissionErrorKind,
 };
 
-pub const DOCUMENTATION_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum FirstRunPhase {
     #[default]

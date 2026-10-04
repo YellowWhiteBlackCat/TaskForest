@@ -17,6 +17,7 @@ pub(crate) fn render_about_overlay(
     render_about_overlay_at(
         frame,
         app,
+        &crate::information::AboutTargetView::default(),
         theme,
         overlay_popup(
             area,

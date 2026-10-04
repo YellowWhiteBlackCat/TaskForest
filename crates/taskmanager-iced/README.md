@@ -128,6 +128,9 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
 - Diagnostic review consumes the shared frozen plan and publication lifecycle. The title
   and Export/Retry/Close actions stay fixed around one bounded scroll body; only explicit
   confirmation admits a writer, and replacing the surface invalidates late completions.
+- About (`ui/about.rs`) uses shared build metadata and typed repository opening.
+  System information (`ui/system_information.rs`) has an independent primary slot,
+  frozen shared groups and a bounded scroll owner with fixed Copy/Close actions.
 - Iced-local surfaces: the first-run dialog (`ui/first_run.rs`, platform setup-script
   application controller, quiet observation and explicit Settings entry,
   bounded metadata viewport with fixed actions; dismiss is side-effect free), the Containers full page

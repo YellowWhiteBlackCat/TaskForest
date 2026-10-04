@@ -249,10 +249,15 @@ impl TuiApp {
                     name: String::from("Settings"),
                     description: Some(String::from("Adjust application preferences")),
                 }),
-                crate::TuiSurface::About => Some(ModalInput {
+                crate::TuiSurface::About(_) => Some(ModalInput {
                     id: String::from("about"),
                     name: String::from("About"),
-                    description: Some(String::from("System and application information")),
+                    description: self.information_copy_payload(),
+                }),
+                crate::TuiSurface::SystemInformation(_) => Some(ModalInput {
+                    id: String::from("system-information"),
+                    name: String::from("System Information"),
+                    description: self.information_copy_payload(),
                 }),
                 crate::TuiSurface::Health => Some(ModalInput {
                     id: String::from("health"),

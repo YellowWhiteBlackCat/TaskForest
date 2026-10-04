@@ -6,7 +6,6 @@ use ratatui::backend::TestBackend;
 use crate::{TuiApp, TuiSurfaceKind, TuiTheme, demo_app};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::history::HistoryWindow;
-use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -25,35 +24,26 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
 }
 
 #[test]
-fn about_overlay_renders_hardware_facts_and_version() {
-    let app = demo_app();
+fn about_reviews_application_metadata_and_keeps_system_information_separate() {
+    let mut app = demo_app();
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("About TaskForest"));
     assert!(text.contains(VERSION));
-    assert!(text.contains("taskforest-workstation"));
-    assert!(text.contains("Arch Linux"));
-    assert!(text.contains("6.18.7-arch1-1"));
-    // The fixture ships the provider-verbatim brand string (Intel reports the
-    // trademark markers); the About overlay paints the fact verbatim, exactly
-    // like the System page — no normalization layer exists or is claimed.
-    assert!(text.contains("Intel(R) Core(TM) Ultra 7 358H"));
-    assert!(text.contains("22"));
-    assert!(text.contains("32.0 GiB"));
-    assert!(text.contains("06h 42m"));
-    assert!(text.contains("i / Esc"));
-}
-
-#[test]
-fn about_overlay_renders_dashes_when_telemetry_is_missing() {
-    let mut app = demo_app();
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::Hardware((None).map(Box::new)),
+    assert!(text.contains("Apache-2.0"));
+    app.toggle_about();
+    assert!(
+        app.information_copy_payload()
+            .expect("About details")
+            .contains("github.com/YellowWhiteBlackCat/TaskForest")
     );
-    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));
-    let text = frame_text(&app, 120, 36);
-    assert!(text.contains("Hostname"));
-    assert!(text.contains('—'));
+    app.open_system_information();
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(TuiSurfaceKind::SystemInformation)
+    );
+    let text = app.information_copy_payload().expect("system information");
+    assert!(text.contains("taskforest-workstation"));
+    assert!(text.contains("Intel(R) Core(TM) Ultra 7 358H"));
 }
 
 #[test]
@@ -145,5 +135,106 @@ fn capture_scene_overrides_activate_expected_state() {
             .processes
             .as_ref()
             .is_some_and(|p| p.iter().any(|proc| proc.cmdline.contains("chrome")))
+    );
+}
+
+fn review_frame(app: &TuiApp, width: u16, height: u16) -> String {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang guard");
+    set_language(Language::En);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+    terminal
+        .draw(|frame| crate::ui::render(frame, app, TuiTheme::default()))
+        .expect("draw review");
+    terminal.backend().to_string()
+}
+
+fn review_popup_text(app: &TuiApp, width: u16, height: u16) -> String {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang guard");
+    set_language(Language::En);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+    terminal
+        .draw(|frame| crate::ui::render(frame, app, TuiTheme::default()))
+        .expect("draw review");
+    let kind = app.local_surface_kind().expect("review surface");
+    let popup = crate::ui::frame_plan::overlay_popup(
+        ratatui::layout::Rect::new(0, 0, width, height),
+        crate::TuiInputScope::LocalSurface(kind),
+    )
+    .expect("popup");
+    let inner = popup.inner(ratatui::layout::Margin::new(1, 1));
+    (inner.y..inner.bottom())
+        .map(|y| {
+            (inner.x..inner.right())
+                .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
+        .collect::<String>()
+}
+
+#[test]
+fn compact_information_reviews_keep_actions_visible_and_complete_values_reachable() {
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use taskmanager_shell::fixture::edit_hardware;
+    let mut app = demo_app();
+    app.toggle_about();
+    for (width, height) in [(54, 16), (120, 36), (160, 20), (72, 60)] {
+        let text = review_frame(&app, width, height);
+        for action in [
+            "Open repository",
+            "System information",
+            "Copy details",
+            "Close",
+            "Up/Down",
+        ] {
+            assert!(
+                text.contains(action),
+                "{width}x{height} must keep {action} reachable: {text}"
+            );
+        }
+    }
+    let _ =
+        crate::information::handle_key(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    let text = review_popup_text(&app, 54, 16);
+    assert!(
+        text.contains("YellowWhiteBlackCat/TaskForest"),
+        "complete repository remains reachable: {text}"
+    );
+    edit_hardware(&mut app.shell, |hardware| {
+        hardware.as_mut().expect("fixture hardware").cpu_brand = Some("Observed CPU ".repeat(30));
+    });
+    app.open_system_information();
+    let frozen = app.information_copy_payload().expect("frozen facts");
+    edit_hardware(&mut app.shell, |hardware| {
+        hardware.as_mut().expect("fixture hardware").cpu_brand = Some("New observation".to_owned());
+    });
+    assert_eq!(
+        app.information_copy_payload().as_deref(),
+        Some(frozen.as_str())
+    );
+    let _ =
+        crate::information::handle_key(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    let text = review_frame(&app, 54, 16);
+    for action in ["Copy all", "Close", "Scroll for more details"] {
+        assert!(text.contains(action), "{action} fixed in frame: {text}");
+    }
+    assert!(
+        text.contains("Memory: 32.0 GiB"),
+        "last fact must be visible after End: {text}"
+    );
+    let mut copied = Vec::new();
+    app.copy_information_to(&mut copied);
+    assert_eq!(
+        copied,
+        format!(
+            "\x1b]52;c;{}\x07",
+            crate::clipboard::base64_encode(frozen.as_bytes())
+        )
+        .as_bytes()
     );
 }

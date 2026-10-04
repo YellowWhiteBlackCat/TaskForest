@@ -378,6 +378,7 @@ fn apply_overlay_control_click(
         // fail-closed no-op, not a modeled path.
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies

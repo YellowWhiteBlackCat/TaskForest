@@ -396,6 +396,7 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<crate::drain::FeedbackCache>();
         crate::window_surface::register(app);
         crate::about_modal::register(app);
+        crate::system_information_modal::register(app);
         crate::first_run_modal::register(app);
         crate::pages::system::diagnostic_modal::register(app);
         app.add_observer(rewrite_summary_line);

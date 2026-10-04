@@ -5,6 +5,7 @@ use taskmanager_application::first_run::FirstRunPhase;
 use taskmanager_application::{
     CorrelatedSetupScriptEvent, PlatformEventBatch, PlatformEventContext,
 };
+use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
 use taskmanager_platform_contract::{CapabilityId, EventSequence};
 use taskmanager_shell::fixture::setup::setup_script_info;
@@ -78,6 +79,6 @@ fn explicit_native_actions_stay_pending_once_and_docs_use_the_url_port() {
     let result =
         app.reduce_first_run_message(Message::FirstRun(FirstRunMessage::OpenDocumentation));
     assert!(
-        matches!(result.effect, Some(PlatformEffect::OpenUrl(request)) if request.url == DOCUMENTATION_URL)
+        matches!(result.effect, Some(PlatformEffect::OpenUrl(request)) if request.url == REPOSITORY_URL)
     );
 }

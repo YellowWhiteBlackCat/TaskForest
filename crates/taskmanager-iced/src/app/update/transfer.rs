@@ -1,11 +1,15 @@
 //! Clipboard, export and saved-view transfer message reducer.
 
 use taskmanager_application::i18n::t;
+use taskmanager_assets::product;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::super::{IcedApp, Message};
 use super::dispatch::UpdateDispatch;
+use crate::app::LocalSurface;
 use taskmanager_shell::SortDir;
+use taskmanager_shell::presentation::about::metadata;
+use taskmanager_shell::presentation::system_information::copy_all_text;
 
 impl IcedApp {
     pub(super) fn reduce_transfer_message(&mut self, message: Message) -> UpdateDispatch {
@@ -33,10 +37,12 @@ impl IcedApp {
                 }
             }
             Message::CopyAboutDetails => {
-                let payload = crate::ui::about_copy_payload(
-                    self.shell.projection().hardware.as_ref(),
-                    self.shell.projection().snapshot.as_ref(),
-                );
+                let payload = metadata(
+                    env!("CARGO_PKG_VERSION"),
+                    product::LICENSE_SPDX,
+                    product::REPOSITORY_URL,
+                )
+                .details_text();
                 self.shell.report_notice(
                     FeedbackSource::Clipboard,
                     FeedbackSeverity::Success,
@@ -44,6 +50,11 @@ impl IcedApp {
                     format!("{} · {}", t("hint.copied"), t("about.copy_details")),
                 );
                 task = Some(iced::clipboard::write(payload));
+            }
+            Message::CopySystemInformation => {
+                if let Some(LocalSurface::SystemInformation(facts)) = self.local_surface() {
+                    task = Some(iced::clipboard::write(copy_all_text(facts)));
+                }
             }
             Message::ExportSnapshot => self.request_snapshot_export(),
             Message::RequestCurrentWindowCapture => {

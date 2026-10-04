@@ -1,6 +1,6 @@
 //! About reads cached facts and uses the same primary surface owner as setup/export.
 
-use crate::app::FrontendTrack;
+use crate::input::PendingEffects;
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
 use crate::palette::{UiPalette, space_8};
 use crate::text_selection::ClipboardPort;
@@ -22,8 +22,10 @@ use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, Node, UiRect, Val, percent, px};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
+use taskmanager_application::{PlatformEffect, UrlOpenRequest};
 use taskmanager_assets::product;
-use taskmanager_shell::presentation::{duration, missing_value};
+use taskmanager_assets::product::REPOSITORY_URL;
+use taskmanager_shell::presentation::about::metadata;
 
 #[derive(Event, Clone, Copy, Default)]
 pub(crate) enum AboutCommand {
@@ -32,6 +34,8 @@ pub(crate) enum AboutCommand {
     Close,
     Copy,
     Diagnostics,
+    Repository,
+    SystemInformation,
 }
 #[derive(Component, Clone, Default)]
 pub(crate) struct AboutControl(pub(crate) AboutCommand);
@@ -51,11 +55,27 @@ fn on_command(command: On<AboutCommand>, mut commands: Commands) {
             ) {
                 return;
             }
-            let payload = about_text(world.non_send::<FrontendTrack>());
+            let payload = about_text();
             if let Some(mut clipboard) = world.get_resource_mut::<ClipboardPort>() {
                 clipboard.request_text(payload, t("about.title"));
             }
         }),
+        AboutCommand::Repository => commands.queue(|world: &mut World| {
+            if matches!(
+                world.resource::<WindowSurfaceState>().0,
+                Some(WindowSurface::About)
+            ) {
+                world
+                    .resource_mut::<PendingEffects>()
+                    .0
+                    .push(PlatformEffect::OpenUrl(UrlOpenRequest {
+                        url: REPOSITORY_URL.into(),
+                    }));
+            }
+        }),
+        AboutCommand::SystemInformation => {
+            commands.trigger(WindowSurfaceCommand::SystemInformation)
+        }
         AboutCommand::Diagnostics => commands.queue(|world: &mut World| {
             if matches!(
                 world.resource::<WindowSurfaceState>().0,
@@ -80,98 +100,33 @@ pub(crate) fn action_scene(
     BackgroundColor({ palette.content_bg }) Button AboutControl({ command }) on(activate)
     Children [ Text(label) TextRole(Role::Body) Pickable::IGNORE ] }
 }
-fn about_text(track: &FrontendTrack) -> String {
-    let projection = track.shell.projection();
-    let hardware = projection.hardware.as_ref();
-    let snapshot = projection.snapshot.as_ref();
-    let fact = |key, value: Option<&str>| {
-        format!(
-            "{}: {}",
-            t(key),
-            value.map_or_else(missing_value, str::to_owned)
-        )
-    };
-    let rows = [
-        fact(
-            "system.hostname",
-            hardware.and_then(|hardware| hardware.hostname.as_deref()),
-        ),
-        fact(
-            "system.field.os_name",
-            hardware.and_then(|hardware| hardware.os_name.as_deref()),
-        ),
-        fact(
-            "system.field.os_version",
-            hardware.and_then(|hardware| hardware.os_version.as_deref()),
-        ),
-        fact(
-            "system.kernel",
-            hardware.and_then(|hardware| hardware.kernel_version.as_deref()),
-        ),
-        fact(
-            "system.field.architecture",
-            hardware.and_then(|hardware| hardware.architecture.as_deref()),
-        ),
-        fact(
-            "system.field.motherboard_vendor",
-            hardware.and_then(|hardware| hardware.motherboard_vendor.as_deref()),
-        ),
-        fact(
-            "system.field.motherboard_model",
-            hardware.and_then(|hardware| hardware.motherboard_model.as_deref()),
-        ),
-        fact(
-            "system.field.firmware_release_date",
-            hardware.and_then(|hardware| hardware.firmware_release_date.as_deref()),
-        ),
-        fact(
-            "system.secure_boot",
-            hardware
-                .and_then(|hardware| hardware.secure_boot)
-                .map(|enabled| {
-                    if enabled {
-                        t("common.enabled")
-                    } else {
-                        t("common.disabled")
-                    }
-                }),
-        ),
-        fact(
-            "common.cpu",
-            hardware.and_then(|hardware| hardware.cpu_brand.as_deref()),
-        ),
-        format!(
-            "{}: {}",
-            t("common.logical_cores"),
-            hardware
-                .and_then(|hardware| hardware.cpu_cores)
-                .map_or_else(missing_value, |value| value.to_string())
-        ),
-        format!(
-            "{}: {}",
-            t("system.field.installed_memory"),
-            hardware
-                .and_then(|hardware| hardware.total_memory_mb)
-                .map_or_else(missing_value, |value| format!("{value} MiB"))
-        ),
-        format!(
-            "{}: {}",
-            t("common.uptime"),
-            snapshot.map_or_else(missing_value, |snapshot| duration(snapshot.uptime_secs))
-        ),
-    ];
-    format!(
-        "{} {}\n\n{}",
-        product::BEVY_NAME,
+fn about_text() -> String {
+    metadata(
         env!("CARGO_PKG_VERSION"),
-        rows.join("\n\n")
+        product::LICENSE_SPDX,
+        product::REPOSITORY_URL,
     )
+    .details_text()
 }
-pub(crate) fn surface_scene(track: &FrontendTrack, palette: &UiPalette) -> impl Scene + use<> {
-    let text = about_text(track);
+pub(crate) fn surface_scene(palette: &UiPalette) -> impl Scene + use<> {
+    let text = about_text();
     let body = bsn! { Text(text) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } Node { width: percent(100), min_width: px(0.0), max_width: percent(100) } };
     let actions: Vec<Box<dyn Scene>> = vec![
-        Box::new(action_scene(t("common.copy"), AboutCommand::Copy, palette)),
+        Box::new(action_scene(
+            t("about.open_repository"),
+            AboutCommand::Repository,
+            palette,
+        )),
+        Box::new(action_scene(
+            t("system_about.title"),
+            AboutCommand::SystemInformation,
+            palette,
+        )),
+        Box::new(action_scene(
+            t("about.copy_details"),
+            AboutCommand::Copy,
+            palette,
+        )),
         Box::new(action_scene(
             t("diagnostics.action"),
             AboutCommand::Diagnostics,

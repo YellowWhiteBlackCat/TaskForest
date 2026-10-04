@@ -42,6 +42,11 @@ Optional native setup is observed quietly at live startup. When a descriptor is 
 Settings exposes F2 to review it. View/Run/Revert/Restart use the shared application controller;
 only the descriptor body scrolls, and wrapped action hints keep Close reachable in compact terminals.
 
+About exposes build version, license, repository opening and a distinct System
+Information review. Both use shared shell projections; `information.rs` owns
+frozen system rows and clipboard payloads, while the modal protocol registry
+owns action keys and fixed footer hints. Only the information body scrolls.
+
 ## Boundary
 
 The TUI consumes `taskmanager-shell` projections and owns terminal geometry,

@@ -1,8 +1,8 @@
 //! Named tick systems for platform drain, scheduling and view-local finish.
 
 use super::*;
-use taskmanager_application::ServiceUpdate;
 use taskmanager_application::first_run::FirstRunCompletion;
+use taskmanager_application::{DesktopAppearanceEvent, ServiceUpdate};
 use taskmanager_core::core::identity::DeviceId;
 
 use taskmanager_application::GpuEngineRowsState;
@@ -111,6 +111,7 @@ impl IcedApp {
             runtime,
             shell,
             service_details,
+            observed_appearance,
             ..
         } = self;
         let Some(platform) = runtime.platform_mut() else {
@@ -153,6 +154,10 @@ impl IcedApp {
                 // shell consumes the batch; the fold itself runs after the
                 // platform borrow ends (see `tick`).
                 let first_run_events = self.first_run.fold_batch(&batch);
+                if let Some(event) = batch.desktop_appearance_events.last() {
+                    let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
+                    *observed_appearance = Some(snapshot.value);
+                }
                 shell.apply_platform_batch(batch);
                 for request in shell.drain_alert_notifications() {
                     queue_effect(

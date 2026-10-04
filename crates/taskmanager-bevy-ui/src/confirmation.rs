@@ -20,6 +20,7 @@
 
 use crate::first_run_modal::{FirstRunCommand, SetupState};
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
+use crate::system_information_modal::SystemInformationCommand;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -461,8 +462,10 @@ pub(crate) fn init_capture_confirmation(
         commands.trigger(ConfirmationChanged(Some(view)));
     }
     if let Some(target) = crate::capture::capture_scenario_target() {
-        if target == "about" || target == "system-about" {
+        if target == "about" {
             commands.trigger(crate::about_modal::AboutCommand::Open);
+        } else if target == "system-about" {
+            commands.trigger(SystemInformationCommand::Open);
         } else if target == "first-run" {
             commands.queue(|world: &mut bevy::ecs::world::World| {
                 world.resource_mut::<SetupState>().0 =

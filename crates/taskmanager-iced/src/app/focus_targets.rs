@@ -220,6 +220,9 @@ pub enum FocusTarget {
     DirectoryUsageCancel,
     /// The About modal's copy-details clipboard action (G-16).
     AboutCopyDetails,
+    AboutRepository,
+    AboutSystemInformation,
+    SystemInformationCopy,
     /// The per-engine GPU utilization session toggle on the GPU device panel
     /// (the typed `telemetry.gpu.engines` lane).
     GpuEngineRowsToggle,
@@ -281,7 +284,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 168] = [
+    pub const ALL: [Self; 171] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -407,6 +410,9 @@ impl FocusTarget {
         Self::GpuEnginesExpandToggle,
         Self::DirectoryUsageCancel,
         Self::AboutCopyDetails,
+        Self::AboutRepository,
+        Self::AboutSystemInformation,
+        Self::SystemInformationCopy,
         Self::GpuEngineRowsToggle,
         Self::ServiceLogFollow,
         Self::ServiceLogPause,

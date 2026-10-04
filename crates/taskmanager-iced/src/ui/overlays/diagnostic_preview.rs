@@ -1,6 +1,6 @@
 //! Review the frozen sanitized plan before explicit background publication.
 
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
@@ -48,9 +48,9 @@ pub(crate) fn diagnostic_bundle_overlay<'a>(
         )),
         DiagnosticBundleUiState::Writing(_) | DiagnosticBundleUiState::Complete(_) => None,
     };
-    let mut actions = row![];
+    let mut actions = Vec::new();
     if let Some((label, message, target)) = action {
-        actions = actions.push(focus::dynamic_button(
+        actions.push(focus::dynamic_button(
             theme,
             target,
             label.to_owned(),
@@ -58,7 +58,7 @@ pub(crate) fn diagnostic_bundle_overlay<'a>(
             false,
         ));
     }
-    bounded_modal_overlay(app, t("diagnostics.title"), body.into(), actions.into())
+    bounded_modal_overlay(app, t("diagnostics.title"), body.into(), actions)
 }
 
 #[cfg(test)]

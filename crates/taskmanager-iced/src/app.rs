@@ -15,6 +15,7 @@
 
 use std::time::{Duration, Instant};
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_core::core::appearance::DesktopAppearance;
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -429,6 +430,8 @@ pub enum Message {
     SystemThemeChanged(iced::theme::Mode),
     /// Open the frontend-local about/system-information modal.
     OpenAbout,
+    OpenSystemInformation,
+    OpenRepository,
     /// Open the frontend-local system-health modal.
     OpenHealth,
     /// Open the frontend-local containers modal.
@@ -461,6 +464,7 @@ pub enum Message {
     /// (G-16, GPUI about-parity). Served by the iced clipboard task; the
     /// footer feedback mirrors the export line's lifecycle.
     CopyAboutDetails,
+    CopySystemInformation,
     /// Export the current snapshot into the working directory.
     ExportSnapshot,
     /// Request a current-window PNG screenshot capture.
@@ -491,10 +495,8 @@ pub enum Message {
     ExportAlertEvents,
     /// Frontend-local Alerts page message (route open/close + rule toggle).
     Alerts(AlertsMessage),
-    /// Frontend-local first-run dialog intents (GPUI first-run parity). The
-    /// dialog's state machine and renderer live in `ui::first_run`; the
-    /// typed intents feed the surface wiring that owns the observation and
-    /// setup-script submission lane.
+    /// Optional setup intents delegate to the application controller; the
+    /// surface slot owns visibility and `ui::first_run` owns rendering.
     FirstRun(FirstRunMessage),
     /// Frontend-local System-page dashboard segment message (history-window
     /// selection; the segment renderer lives in `ui::system_dashboard`).
@@ -541,11 +543,10 @@ pub struct IcedApp {
     /// Frontend-local Alerts-page route (an Iced-local
     /// route outside the shared `AppPage` set, GPUI Containers-page style).
     pub(crate) alerts_page: alerts::AlertsPageState,
-    /// Frontend-local first-run dialog state (GPUI first-run parity). The
-    /// state machine and renderer live in `ui::first_run`; the composition
-    /// lane in `app::update::first_run` folds correlated platform answers
-    /// into it and drives the `LocalSurface::FirstRun` slot.
+    /// Application-owned optional-setup facts and correlated action state.
+    /// The independent local surface slot owns explicit review visibility.
     pub(crate) first_run: FirstRunController,
+    pub(crate) observed_appearance: Option<DesktopAppearance>,
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.

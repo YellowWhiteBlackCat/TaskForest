@@ -1,7 +1,6 @@
 //! Ratatui renderer for the live frontend state.
 
 mod about;
-mod about_data;
 pub(crate) mod affinity_modal;
 mod alerts;
 mod app_history;
@@ -19,6 +18,7 @@ mod health;
 mod health_data;
 pub(crate) mod help;
 mod highlight;
+mod information_review;
 pub(crate) mod pages;
 mod perf_battery;
 mod perf_core_grid;
@@ -43,6 +43,7 @@ pub(crate) mod session_menu;
 pub(crate) mod settings;
 mod sparkline;
 pub(crate) mod startup_menu;
+mod system_information;
 pub(crate) mod table_hit;
 mod text;
 mod units;
@@ -196,8 +197,11 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             Some(crate::TuiSurface::Settings) => {
                 settings::render_settings_overlay_at(frame, app, theme, plan.focus, popup);
             }
-            Some(crate::TuiSurface::About) => {
-                about::render_about_overlay_at(frame, app, theme, popup);
+            Some(crate::TuiSurface::About(view)) => {
+                about::render_about_overlay_at(frame, app, view, theme, popup);
+            }
+            Some(crate::TuiSurface::SystemInformation(view)) => {
+                system_information::render(frame, view, theme, popup);
             }
             Some(crate::TuiSurface::Health) => {
                 health::render_health_overlay_at(frame, app, theme, popup);

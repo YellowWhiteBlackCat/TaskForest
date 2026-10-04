@@ -50,7 +50,9 @@ fn local_surface_replaces_atomically_and_stale_close_is_rejected() {
         TuiSurfaceTransition::Opened(TuiSurfaceKind::Settings)
     );
     assert_eq!(
-        state.reduce(TuiSurfaceEvent::Open(Box::new(TuiSurface::About))),
+        state.reduce(TuiSurfaceEvent::Open(Box::new(TuiSurface::About(
+            crate::information::AboutTargetView::default()
+        )))),
         TuiSurfaceTransition::Replaced {
             previous: TuiSurfaceKind::Settings,
             current: TuiSurfaceKind::About,

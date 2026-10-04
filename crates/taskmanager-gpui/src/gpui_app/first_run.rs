@@ -8,6 +8,7 @@ use gpui::{
     App, ClipboardItem, Context, Div, Entity, InteractiveElement, ParentElement, Styled, Window,
     div, px,
 };
+use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_shell::presentation::first_run::first_run_failure_key;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -23,9 +24,7 @@ use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
-use taskmanager_application::first_run::{
-    DOCUMENTATION_URL, FirstRunCompletion, FirstRunPhase, FirstRunUiState,
-};
+use taskmanager_application::first_run::{FirstRunCompletion, FirstRunPhase, FirstRunUiState};
 fn empty_state_message_key(phase: &FirstRunPhase) -> &'static str {
     match phase {
         FirstRunPhase::Failed(kind) => first_run_failure_key(*kind),
@@ -226,7 +225,7 @@ pub fn render_first_run(
             pending,
             move |_window: &mut Window, cx: &mut App| {
                 docs_entity.update(cx, |view, cx| {
-                    let _ = view.request_open_url(DOCUMENTATION_URL.to_owned(), cx);
+                    let _ = view.request_open_url(REPOSITORY_URL.to_owned(), cx);
                 });
             },
             |_, _, _| {},

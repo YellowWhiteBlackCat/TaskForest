@@ -7,6 +7,7 @@ use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalChanged};
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
+use crate::pages::settings::ThemePreferences;
 use crate::pages::startup::menu::StartupMenuCtx;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{UiPalette, space_8, space_24};
@@ -34,10 +35,13 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
 use std::marker::PhantomData;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum WindowSurfaceKind {
     About,
+    SystemInformation,
     FirstRun,
     #[default]
     Diagnostic,
@@ -45,6 +49,7 @@ pub(crate) enum WindowSurfaceKind {
 #[derive(Clone, Debug)]
 pub(crate) enum WindowSurface {
     About,
+    SystemInformation(Vec<SystemInformationGroup>),
     FirstRun,
     Diagnostic(DiagnosticBundleUiState),
 }
@@ -52,6 +57,7 @@ impl WindowSurface {
     pub(crate) fn kind(&self) -> WindowSurfaceKind {
         match self {
             Self::About => WindowSurfaceKind::About,
+            Self::SystemInformation(_) => WindowSurfaceKind::SystemInformation,
             Self::FirstRun => WindowSurfaceKind::FirstRun,
             Self::Diagnostic(_) => WindowSurfaceKind::Diagnostic,
         }
@@ -78,6 +84,7 @@ pub(crate) struct WindowSurfaceChanged;
 #[derive(Event, Clone, Copy)]
 pub(crate) enum WindowSurfaceCommand {
     About,
+    SystemInformation,
     FirstRun,
     Close(WindowSurfaceKind),
 }
@@ -106,6 +113,27 @@ fn on_command(command: On<WindowSurfaceCommand>, mut commands: Commands) {
     let command = *command.event();
     commands.queue(move |world: &mut World| match command {
         WindowSurfaceCommand::About => show(world, WindowSurface::About),
+        WindowSurfaceCommand::SystemInformation => {
+            let appearance = world
+                .get_resource::<ThemePreferences>()
+                .and_then(|prefs| prefs.observed_appearance)
+                .unwrap_or_default();
+            let facts = world
+                .get_non_send::<FrontendTrack>()
+                .map(|track| {
+                    groups(
+                        track
+                            .shell
+                            .projection()
+                            .hardware
+                            .as_ref()
+                            .unwrap_or(&HardwareInfo::default()),
+                        appearance,
+                    )
+                })
+                .unwrap_or_default();
+            show(world, WindowSurface::SystemInformation(facts));
+        }
         WindowSurfaceCommand::FirstRun
             if world
                 .get_resource::<SetupState>()
@@ -187,9 +215,10 @@ fn paint_surface(world: &mut World) {
         return;
     };
     let scene: Option<Box<dyn Scene>> = match &surface {
-        Some(WindowSurface::About) => world.get_non_send::<FrontendTrack>().map(|track| {
-            Box::new(crate::about_modal::surface_scene(track, &palette)) as Box<dyn Scene>
-        }),
+        Some(WindowSurface::About) => Some(Box::new(crate::about_modal::surface_scene(&palette))),
+        Some(WindowSurface::SystemInformation(facts)) => Some(Box::new(
+            crate::system_information_modal::surface_scene(facts, &palette),
+        )),
         Some(WindowSurface::FirstRun) => world.get_resource::<SetupState>().map(|setup| {
             Box::new(crate::first_run_modal::surface_scene(
                 setup.0.view(),

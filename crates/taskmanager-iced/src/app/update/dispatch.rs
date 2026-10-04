@@ -151,6 +151,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::OpenSettings
         | Message::CloseSettings
         | Message::OpenAbout
+        | Message::OpenSystemInformation
+        | Message::OpenRepository
         | Message::OpenHealth
         | Message::OpenContainers
         | Message::OpenDiskSmart { .. }
@@ -185,6 +187,7 @@ fn route(message: Message) -> MessageDomain {
         message @ (Message::CopyTextToClipboard { .. }
         | Message::OpenStartupLocation { .. }
         | Message::CopyAboutDetails
+        | Message::CopySystemInformation
         | Message::ExportSnapshot
         | Message::RequestCurrentWindowCapture
         | Message::ApplySavedView(_)

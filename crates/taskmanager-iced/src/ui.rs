@@ -40,6 +40,7 @@ pub(crate) mod applications;
 mod column_menu;
 pub(crate) mod components;
 mod containers;
+mod system_information;
 // The first-run dialog is wired end-to-end (boot observation, correlated
 // platform answers and the `LocalSurface::FirstRun` slot live in
 // `app::update::first_run`). The System dashboard segment's page mount still
@@ -92,10 +93,6 @@ pub(crate) use device_chart::GraphPrefs;
 use perf_devices::*;
 use perf_overview::*;
 pub(crate) use performance::{UnitPrefs, chunked_rows, perf_device_label, performance_page};
-
-// The About modal's clipboard payload seam (G-16) — named re-export so the
-// update path builds the copy text through the same rows the modal renders.
-pub(crate) use about::about_copy_payload;
 
 /// The current-window capture trigger button in the top navigation strip.
 pub(crate) fn current_window_capture_btn<'a>(
@@ -405,6 +402,7 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
     Some(match app.local_surface()? {
         LocalSurface::Settings => settings::render(app),
         LocalSurface::About => about::render(app),
+        LocalSurface::SystemInformation(facts) => system_information::render(app, facts),
         LocalSurface::Health => health::render(app),
         LocalSurface::Containers => containers::render(app),
         LocalSurface::DiskSmart { index } => overlays::smart_overlay(app, *index),

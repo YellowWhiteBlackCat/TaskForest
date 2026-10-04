@@ -475,9 +475,16 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             };
             app.shell.arm_smart_self_test(intent);
         }
-        "about" | "system-about" | "system-hardware" => {
+        "about" => {
             app.shell.application.active_page = AppPage::Performance;
             app.toggle_about();
+        }
+
+        "system-about" => {
+            app.open_system_information();
+        }
+        "system-hardware" => {
+            app.shell.application.active_page = AppPage::System;
         }
 
         "storage-health"

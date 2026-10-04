@@ -8,7 +8,7 @@
 
 | 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI |
 |---|---|---|:---:|:---:|:---:|
-| 基础与系统 | `about` | 应用版本、许可证与仓库说明 | Pending | Pending | Pending |
+| 基础与系统 | `about` | 应用版本、许可证与仓库说明 | Aligned | Aligned | Aligned |
 | | `system-about` | 独立操作系统与桌面环境完整事实面 | Pending | Pending | Pending |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
 | | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
@@ -48,8 +48,8 @@
 | | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Aligned | Aligned |
 | | `saved-view-presets` | 自定义列宽与视图预设切换 | Aligned | Aligned | Aligned |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
-| 历史数据回放 | `history-replay` | 性能指标时间轴历史回放控制条 | Aligned | Pending | Pending |
-| | `history-60m` | 60 分钟跨度全局历史趋势图 | Aligned | Pending | Pending |
+| 历史数据回放 | `history-replay` | 性能指标持久化历史窗口与趋势图 | Aligned | Pending | Pending |
+| | `history-60m` | 系统仪表盘 60 分钟全局历史趋势图 | Pending | Pending | Pending |
 | | `application-history-replay` | 进程级 CPU/内存历史回溯展开 | Aligned | Pending | Aligned |
 | 交互与显示形态 | `apps-search-highlight` | 进程搜索关键字高亮与命中过滤 | Aligned | Aligned | Aligned |
 | | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Aligned | Aligned |

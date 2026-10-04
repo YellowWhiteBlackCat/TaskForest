@@ -51,7 +51,10 @@ fn overlay_open(app: &crate::TuiApp, action: TuiSurfaceAction) -> bool {
         TuiSurfaceAction::ToggleAbout => app.about_open(),
         TuiSurfaceAction::ToggleHealth => app.health_open(),
         TuiSurfaceAction::ToggleContainers => app.containers_open(),
-        TuiSurfaceAction::ToggleServiceLogFollow
+        TuiSurfaceAction::OpenRepository
+        | TuiSurfaceAction::OpenSystemInformation
+        | TuiSurfaceAction::CopyInformation
+        | TuiSurfaceAction::ToggleServiceLogFollow
         | TuiSurfaceAction::ToggleServiceLogPaused
         | TuiSurfaceAction::CycleServiceLogLevel
         | TuiSurfaceAction::CycleServiceLogTime => {
@@ -115,7 +118,9 @@ fn app_with_service_log() -> crate::TuiApp {
 /// A new protocol chord must extend this pin deliberately.
 #[test]
 fn protocol_declares_exactly_the_historical_chords_per_scope() {
-    let expected: [(TuiSurfaceScope, &[char]); 3] = [
+    let expected: [(TuiSurfaceScope, &[char]); 5] = [
+        (TuiSurfaceScope::About, &['a', 'c', 'i', 'r']),
+        (TuiSurfaceScope::SystemInformation, &['c']),
         (TuiSurfaceScope::Settings, &['c', 'h', 'i', 'p']),
         (TuiSurfaceScope::StatusOverlay, &['c', 'h', 'i']),
         (TuiSurfaceScope::ServiceLogPanel, &['f', 'l', 'p', 't']),
@@ -168,13 +173,14 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
         .collect();
     overlap.sort_unstable();
     overlap.dedup();
+    // About owns `a` to close; it masks the global affinity action.
     // `t` (TUI-013) is deliberate: the service-log panel consumes its `t`
     // (cycle time filter) first while it owns input, and the registry's `t`
     // arm is scoped to the Performance·Disk page — the two can never route
     // one press twice (same masking invariant the `c h i p` overlaps ride).
     assert_eq!(
         overlap,
-        ['c', 'h', 'i', 'p', 't'],
+        ['a', 'c', 'h', 'i', 'p', 't'],
         "every chord declared in both layers must be listed here on purpose"
     );
 }
@@ -213,7 +219,6 @@ fn every_settings_protocol_arm_runs_its_declared_toggle() {
 #[test]
 fn every_status_overlay_protocol_arm_toggles_from_every_overlay() {
     let openers = [
-        TuiSurfaceAction::ToggleAbout,
         TuiSurfaceAction::ToggleHealth,
         TuiSurfaceAction::ToggleContainers,
     ];
@@ -344,4 +349,35 @@ fn service_log_panel_masks_claimed_chords_and_falls_through_the_rest() {
         app.about_open(),
         "unclaimed chords must reach the command layer"
     );
+}
+
+#[test]
+fn about_protocol_routes_repository_and_independent_information_without_global_chords() {
+    use crate::TuiSurfaceKind;
+    use taskmanager_assets::product::REPOSITORY_URL;
+    let mut app = app_with_overlay(TuiSurfaceAction::ToggleAbout);
+    assert!(
+        matches!(press_char(&mut app, 'r'), Some(PlatformEffect::OpenUrl(request)) if request.url == REPOSITORY_URL)
+    );
+    assert!(app.about_open());
+    assert!(press_char(&mut app, 'i').is_none());
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(TuiSurfaceKind::SystemInformation)
+    );
+    let expected = app
+        .information_copy_payload()
+        .expect("frozen system information");
+    let mut output = Vec::new();
+    app.copy_information_to(&mut output);
+    assert!(
+        String::from_utf8(output)
+            .expect("OSC52")
+            .starts_with("\x1b]52;c;")
+    );
+    assert!(expected.contains("System Information") || expected.contains("系统"));
+    app.close_local_overlays();
+    app.toggle_about();
+    assert!(press_char(&mut app, 'a').is_none());
+    assert!(!app.about_open());
 }

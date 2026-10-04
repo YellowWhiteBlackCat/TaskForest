@@ -17,7 +17,7 @@
 //! 3. **Surface-modal protocol** — action-semantic character chords consumed
 //!    only while a modal surface owns input. [`TUI_SURFACE_PROTOCOL`] is
 //!    their single typed declaration source: the settings form's `p i h c`,
-//!    the About/Health/Containers overlays' `i h c`, and the open service-log
+//!    the Health/Containers overlays' `i h c`, About's `r i c a`, and the open service-log
 //!    panel's `f p l t`. They never appear in help/palette — they are input
 //!    protocol of the open surface, not commands.
 //!    *Hard boundary against layers 1-2:* this layer is consulted at the top
@@ -55,8 +55,10 @@
 //! stay reachable at `crate::CommandPalette` / `crate::CommandPaletteRow` /
 //! `crate::PaletteLocalAction` via `pub use`.
 
+use taskmanager_application::UrlOpenRequest;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage, CommandId, PlatformEffect};
+use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_shell::QuitReason;
 
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
@@ -657,8 +659,18 @@ impl TuiApp {
     /// twin; the service-log transitions stay owned by the shell. Mirrors
     /// [`Self::run_palette_local_action`] as the single execution site of
     /// its lane.
-    pub(crate) fn run_surface_protocol_action(&mut self, action: TuiSurfaceAction) {
+    pub(crate) fn run_surface_protocol_action(
+        &mut self,
+        action: TuiSurfaceAction,
+    ) -> Option<PlatformEffect> {
         match action {
+            TuiSurfaceAction::OpenRepository => {
+                return Some(PlatformEffect::OpenUrl(UrlOpenRequest {
+                    url: REPOSITORY_URL.into(),
+                }));
+            }
+            TuiSurfaceAction::OpenSystemInformation => self.open_system_information(),
+            TuiSurfaceAction::CopyInformation => self.copy_information_to(&mut std::io::stdout()),
             TuiSurfaceAction::ToggleSettings => self.toggle_settings(),
             TuiSurfaceAction::ToggleAbout => self.toggle_about(),
             TuiSurfaceAction::ToggleHealth => self.toggle_health(),
@@ -668,6 +680,7 @@ impl TuiApp {
             TuiSurfaceAction::CycleServiceLogLevel => self.shell.cycle_service_log_level(),
             TuiSurfaceAction::CycleServiceLogTime => self.shell.cycle_service_log_time(),
         }
+        None
     }
 
     /// Run one TUI-local palette action (the local row the user selected).

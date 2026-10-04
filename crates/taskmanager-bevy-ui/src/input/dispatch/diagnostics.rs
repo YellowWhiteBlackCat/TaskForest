@@ -3,6 +3,7 @@ use super::{DispatchFrame, KeyPress};
 use crate::about_modal::AboutCommand;
 use crate::first_run_modal::FirstRunCommand;
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
+use crate::system_information_modal::SystemInformationCommand;
 use crate::window_surface::WindowSurface;
 use bevy::input::keyboard::KeyCode;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
@@ -41,8 +42,26 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
                 KeyCode::Escape => self.commands.trigger(AboutCommand::Close),
                 KeyCode::KeyD => self.commands.trigger(AboutCommand::Diagnostics),
                 KeyCode::KeyC => self.commands.trigger(AboutCommand::Copy),
+                KeyCode::KeyR => self.commands.trigger(AboutCommand::Repository),
+                KeyCode::KeyI => self.commands.trigger(AboutCommand::SystemInformation),
                 _ => {}
             },
+            WindowSurface::SystemInformation(_) => {
+                let command = match press.key_code {
+                    KeyCode::Escape => Some(SystemInformationCommand::Close),
+                    KeyCode::KeyC => Some(SystemInformationCommand::Copy),
+                    KeyCode::ArrowUp => Some(SystemInformationCommand::Scroll(-32.0)),
+                    KeyCode::ArrowDown => Some(SystemInformationCommand::Scroll(32.0)),
+                    KeyCode::PageUp => Some(SystemInformationCommand::Scroll(-200.0)),
+                    KeyCode::PageDown => Some(SystemInformationCommand::Scroll(200.0)),
+                    KeyCode::Home => Some(SystemInformationCommand::Scroll(-f32::MAX)),
+                    KeyCode::End => Some(SystemInformationCommand::Scroll(f32::MAX)),
+                    _ => None,
+                };
+                if let Some(command) = command {
+                    self.commands.trigger(command);
+                }
+            }
             WindowSurface::FirstRun => {
                 let state = self.setup.map(|setup| setup.0.view());
                 let command = match press.key_code {

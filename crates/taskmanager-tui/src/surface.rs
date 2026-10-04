@@ -140,6 +140,7 @@ impl AffinityModalState {
 pub(crate) enum TuiSurfaceKind {
     Settings,
     About,
+    SystemInformation,
     Health,
     Containers,
     ServiceMenu,
@@ -158,7 +159,8 @@ pub(crate) enum TuiSurfaceKind {
 #[derive(Clone, Debug)]
 pub(crate) enum TuiSurface {
     Settings,
-    About,
+    About(crate::information::AboutTargetView),
+    SystemInformation(crate::information::SystemInformationTargetView),
     Health,
     Containers,
     ServiceMenu(Box<ServiceMenuTarget>),
@@ -178,7 +180,8 @@ impl TuiSurface {
     pub(crate) const fn kind(&self) -> TuiSurfaceKind {
         match self {
             Self::Settings => TuiSurfaceKind::Settings,
-            Self::About => TuiSurfaceKind::About,
+            Self::About(_) => TuiSurfaceKind::About,
+            Self::SystemInformation(_) => TuiSurfaceKind::SystemInformation,
             Self::Health => TuiSurfaceKind::Health,
             Self::Containers => TuiSurfaceKind::Containers,
             Self::ServiceMenu(_) => TuiSurfaceKind::ServiceMenu,
@@ -312,7 +315,7 @@ impl TuiApp {
 
     #[must_use]
     pub const fn about_open(&self) -> bool {
-        matches!(self.local_surface(), Some(TuiSurface::About))
+        matches!(self.local_surface(), Some(TuiSurface::About(_)))
     }
 
     #[must_use]

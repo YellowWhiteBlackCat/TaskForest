@@ -612,6 +612,11 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         crate::about_modal::AboutCommand::Open,
         _context.palette,
     );
+    let system_information = crate::about_modal::action_scene(
+        t("about.system_information"),
+        crate::about_modal::AboutCommand::SystemInformation,
+        _context.palette,
+    );
     bsn! {
         Node {
             width: percent(100),
@@ -625,6 +630,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
              Text(title) TextRole(Role::Heading) --
              @{ diagnostic } --
             @{ about } --
+            @{ system_information } --
 
                 Text(waiting)
                 SystemStatusLine
