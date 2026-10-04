@@ -84,9 +84,9 @@ fn diagnostic_overlay_scene(kind: DiagnosticModalKind, palette: &UiPalette) -> i
 }
 
 fn preview_panel_scene(palette: &UiPalette) -> Box<dyn Scene> {
-    let title = t("diag.preview_title").to_owned();
+    let title = t("diagnostics.title").to_owned();
     let summary = "# TaskForest Diagnostic Report\n\n- System telemetry: OK\n- Hardware topology: Verified\n- Kernel version: Linux 6.18 LTS".to_owned();
-    let hint = t("diag.preview_hint").to_owned();
+    let hint = t("diagnostics.action").to_owned();
     let radius = palette.panel_radius_px;
     Box::new(bsn! {
         Node {
@@ -107,8 +107,8 @@ fn preview_panel_scene(palette: &UiPalette) -> Box<dyn Scene> {
 }
 
 fn failure_panel_scene(palette: &UiPalette) -> Box<dyn Scene> {
-    let title = t("diag.failure_title").to_owned();
-    let desc = t("diag.failure_desc").to_owned();
+    let title = t("diagnostics.failed").to_owned();
+    let desc = t("diagnostics.failed_detail").to_owned();
     let reason =
         "Error: Diagnostic collector timed out waiting for platform provider response.".to_owned();
     let radius = palette.panel_radius_px;

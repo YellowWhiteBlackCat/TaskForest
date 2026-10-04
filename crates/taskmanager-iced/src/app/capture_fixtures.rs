@@ -27,8 +27,8 @@ use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::{ProcessRowId, ShellApp};
 
 use super::{DetailsSection, IcedApp, PerfDevice};
 
@@ -125,7 +125,7 @@ pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
     processes.insert(2, p3);
 }
 
-pub(super) fn seed_capture_process_target(app: &IcedApp) -> Option<FrozenProcessIdentity> {
+pub(super) fn seed_capture_process_target(app: &mut IcedApp) -> Option<FrozenProcessIdentity> {
     let first = app
         .shell
         .projection()
@@ -133,7 +133,10 @@ pub(super) fn seed_capture_process_target(app: &IcedApp) -> Option<FrozenProcess
         .as_ref()
         .and_then(|processes| processes.first())
         .cloned()?;
-    FrozenProcessIdentity::from_process(&first)
+    let target = FrozenProcessIdentity::from_process(&first)?;
+    app.shell
+        .set_row_selection(ProcessRowId::from_process(&first), Some(&first));
+    Some(target)
 }
 
 pub(super) fn seed_capture_multiple_process_targets(app: &IcedApp) -> Vec<FrozenProcessIdentity> {
@@ -153,7 +156,6 @@ pub(super) fn seed_capture_multiple_process_targets(app: &IcedApp) -> Vec<Frozen
 
 pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSection) {
     if let Some(target) = seed_capture_process_target(app) {
-        app.shell.application.selected_process = Some(target.clone());
         let _ = app.shell.open_process_properties_for(target.clone());
         app.process_presentation.details_section = section;
         if section == DetailsSection::Insights {

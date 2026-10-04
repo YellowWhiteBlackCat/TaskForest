@@ -77,7 +77,7 @@ fn first_run_overlay_scene(palette: &UiPalette) -> impl Scene + use<> {
 fn panel_scene(palette: &UiPalette) -> impl Scene + use<> {
     let title = t("first_run.title").to_owned();
     let desc = t("first_run.description").to_owned();
-    let hint = t("first_run.hint").to_owned();
+    let hint = t("first_run.restart_required").to_owned();
     let radius = palette.panel_radius_px;
     bsn! {
         Node {

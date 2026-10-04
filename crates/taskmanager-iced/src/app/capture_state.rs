@@ -108,7 +108,6 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "process-end-confirm" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
-            app.shell.application.selected_process = Some(target_proc.clone());
             let _ = app
                 .shell
                 .application
@@ -120,7 +119,6 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "process-force-kill" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
-            app.shell.application.selected_process = Some(target_proc.clone());
             let intent = ProcessBatchIntent {
                 action: ProcessBatchAction::Kill,
                 scope: ProcessGroupScope::PidAdjacency,
@@ -137,7 +135,6 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "process-tree-confirm" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
-            app.shell.application.selected_process = Some(target_proc.clone());
             let intent = ProcessBatchIntent {
                 action: ProcessBatchAction::EndProcessTree,
                 scope: ProcessGroupScope::PidAdjacency,

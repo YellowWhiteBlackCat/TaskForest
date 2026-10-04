@@ -44,11 +44,11 @@ use taskmanager_core::core::services::{
 };
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
+use taskmanager_shell::{ProcessRowId, ShellApp};
 
 /// Build the capture-only shell with a warm, deterministic graph window.
 pub(crate) fn demo_shell() -> ShellApp {
@@ -256,7 +256,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             if let Some(process) = process
                 && let Some(target) = FrozenProcessIdentity::from_process(&process)
             {
-                shell.application.selected_process = Some(target.clone());
+                shell.set_row_selection(ProcessRowId::from_process(&process), Some(&process));
                 let revision = ProcessInsightsRevision::new(1);
                 let mut tracker = ProcessInsightsProjection::default();
                 tracker.begin(target, revision);

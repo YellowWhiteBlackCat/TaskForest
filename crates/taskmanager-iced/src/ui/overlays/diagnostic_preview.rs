@@ -11,7 +11,7 @@ pub(crate) fn diagnostic_preview_overlay<'a>(
     app: &'a crate::IcedApp,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
-    let title = t("diagnostics.preview_title");
+    let title = t("diagnostics.title");
     let report = match crate::export::system_diagnostics_markdown(
         app.shell.projection().hardware.as_ref(),
         app.shell.projection().snapshot.as_ref(),
@@ -41,8 +41,8 @@ pub(crate) fn diagnostic_preview_overlay<'a>(
         )
         .style(move |_| theme::card_style(theme_snapshot)),
         row![
-            button(text(t("action.copy")).size(13)).on_press(Message::GenerateDiagnosticsReport),
-            button(text(t("action.close")).size(13)).on_press(Message::DismissOverlay),
+            button(text(t("common.copy")).size(13)).on_press(Message::GenerateDiagnosticsReport),
+            button(text(t("common.close")).size(13)).on_press(Message::DismissOverlay),
         ]
         .spacing(12)
         .padding(12)
@@ -71,8 +71,9 @@ pub(crate) fn diagnostic_failure_overlay<'a>(
         text("System Diagnostics Failed").size(18),
         text("Diagnostic report generation failed or timed out.").size(13),
         row![
-            button(text(t("action.retry")).size(13)).on_press(Message::GenerateDiagnosticsReport),
-            button(text(t("action.close")).size(13)).on_press(Message::DismissOverlay),
+            button(text(t("first_run.retry")).size(13))
+                .on_press(Message::GenerateDiagnosticsReport),
+            button(text(t("common.close")).size(13)).on_press(Message::DismissOverlay),
         ]
         .spacing(12)
         .padding(12),

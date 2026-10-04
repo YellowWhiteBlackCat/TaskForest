@@ -192,8 +192,7 @@ pub(crate) fn render_preview_overlay_at(
     use crate::ui::containers::Modal;
     use ratatui::widgets::{Paragraph, Wrap};
     use taskmanager_ui_contract::IconId;
-    let inner =
-        Modal::new(theme, IconId::Settings, t("diagnostics.preview_title")).render(frame, area);
+    let inner = Modal::new(theme, IconId::Settings, t("diagnostics.title")).render(frame, area);
     let p = Paragraph::new(
         "TaskForest System Diagnostics Report Preview\n\n- System: Linux x86_64\n- Status: Healthy\n- Telemetry: Active\n\nPress Esc to dismiss, Enter to export.",
     )

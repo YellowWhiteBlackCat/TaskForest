@@ -29,7 +29,7 @@ pub(super) fn render_first_run_overlay_at(frame: &mut Frame<'_>, theme: TuiTheme
         )]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            t("first_run.hint"),
+            t("first_run.restart_required"),
             Style::new().fg(theme.accent),
         )]),
     ];
