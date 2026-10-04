@@ -46,7 +46,7 @@ accesskit = "0.24.1"
 # leaves them unresolved. The workspace root uses the identical
 # base-plus-target-tables split for gpui's platform-specific features; the
 # feature union across the tables is exactly the per-target closure below.
-bevy = { version = "=0.20.0-rc.2", default-features = false }
+bevy = { version = "=0.20.0-rc.2", default-features = false, features = ["system_clipboard"] }
 
 # Bevy is locked to the exact patch release and must stay in one workspace
 # resolution with platform-runtime's bevy_app/bevy_ecs 0.20. Upgrades require
@@ -132,6 +132,7 @@ bevy = { version = "=0.20.0-rc.2", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+taskmanager-test-support = { path = "../taskmanager-test-support" }
 accesskit_consumer = "0.38"
 taskmanager-accessibility-linux = { path = "../taskmanager-accessibility-linux" }
 # Headless seam tests inject fake event ports through the application

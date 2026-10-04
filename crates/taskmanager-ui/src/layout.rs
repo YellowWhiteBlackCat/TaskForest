@@ -343,6 +343,30 @@ pub fn bounded_scroll_column_with_fixed_header(
         .child(bounded_scroll_region_with_rail(spec, body))
 }
 
+/// Compose a bounded review whose complete action groups stay below its body.
+/// `max_height` budgets the entire column, including the gap and fixed footer.
+#[must_use]
+pub fn bounded_scroll_column_with_fixed_footer(
+    spec: BoundedScrollRailSpec,
+    gap: Length,
+    body: impl IntoElement,
+    footer: impl IntoElement,
+) -> Div {
+    let width = spec.width;
+    let height = spec.max_height;
+    div()
+        .flex()
+        .flex_col()
+        .min_w(px(0.0))
+        .min_h(px(0.0))
+        .w_full()
+        .max_h(height)
+        .when_some(width, |column, width| column.w(width).max_w(width))
+        .gap(crate::theme_binding::definite_length(gap))
+        .child(bounded_scroll_region_with_rail(spec, body))
+        .child(div().flex_none().min_w(px(0.0)).w_full().child(footer))
+}
+
 /// A scroll viewport with the owned pinned scrollbar rail.
 ///
 /// This is the page-level variant for surfaces where a visible, stable rail

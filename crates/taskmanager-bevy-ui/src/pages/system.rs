@@ -607,6 +607,11 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::System.title();
     let waiting = t("common.waiting_inventory").to_owned();
     let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
+    let about = crate::about_modal::action_scene(
+        t("about.title"),
+        crate::about_modal::AboutCommand::Open,
+        _context.palette,
+    );
     bsn! {
         Node {
             width: percent(100),
@@ -619,6 +624,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
              Text(title) TextRole(Role::Heading) --
              @{ diagnostic } --
+            @{ about } --
 
                 Text(waiting)
                 SystemStatusLine

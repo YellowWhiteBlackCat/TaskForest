@@ -10,7 +10,13 @@
 //! events: `CapabilitySummaryChanged` (the capability inventory line) and
 //! `ShellProjectionFolded` (the pages' data-refresh trigger).
 
+use crate::first_run_modal::SetupState;
+use crate::window_surface::{
+    WindowSurface, WindowSurfaceChanged, WindowSurfaceCommand, WindowSurfaceKind,
+    WindowSurfaceState,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
+use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
@@ -71,6 +77,7 @@ pub(crate) struct DrainCycle {
     /// Non-empty batches folded into the shell this frame. `0` means the
     /// port was quiet and nothing downstream should redraw.
     pub(crate) folded_batches: usize,
+    pub(crate) setup_changed: bool,
     /// The new capability summary line, present only when the shell's cached
     /// capability inventory changed this frame.
     pub(crate) capability_summary: Option<String>,
@@ -93,11 +100,13 @@ pub(crate) fn run_drain_cycle(
     client: &mut PlatformClient,
     shell: &mut ShellApp,
     now_ms: u64,
+    mut setup: Option<&mut FirstRunController>,
 ) -> DrainCycle {
     shell.advance_feedback_time(std::time::Duration::from_millis(16));
     let snapshot = client.capabilities().snapshot();
     let capabilities_changed = shell.apply_capability_snapshot(snapshot.clone());
     let mut folded_batches = 0;
+    let mut setup_changed = false;
     let mut last_appearance = None;
     for _ in 0..EVENT_DRAIN_BATCH {
         match client.try_drain() {
@@ -108,6 +117,13 @@ pub(crate) fn run_drain_cycle(
                 for event in &batch.desktop_appearance_events {
                     let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
                     last_appearance = Some(snapshot.value);
+                }
+                if let Some(setup) = setup.as_deref_mut() {
+                    let outcome = setup.fold_batch(&batch);
+                    setup_changed |= outcome != FirstRunCompletion::Unchanged;
+                    if outcome == FirstRunCompletion::Restart {
+                        shell.request_quit(QuitReason::Restart);
+                    }
                 }
                 shell.apply_platform_batch(batch);
                 folded_batches += 1;
@@ -146,6 +162,7 @@ pub(crate) fn run_drain_cycle(
     }
     DrainCycle {
         folded_batches,
+        setup_changed,
         capability_summary: capabilities_changed.then(|| capability_summary_line(&snapshot)),
         refresh_submitted,
         appearance: last_appearance,
@@ -207,6 +224,8 @@ pub(crate) fn unix_now_ms() -> u64 {
 /// and the drain skips the appearance write it cannot complete.
 #[derive(SystemParam)]
 pub(crate) struct AppearanceTargets<'w> {
+    setup: Option<ResMut<'w, SetupState>>,
+    surface: Option<Res<'w, WindowSurfaceState>>,
     /// Persisted theme preferences, when the settings page installed them.
     prefs: Option<ResMut<'w, crate::pages::settings::ThemePreferences>>,
     /// The resolved window palette every renderer reads.
@@ -253,6 +272,9 @@ pub(crate) fn drain_system(
 
     let mut client = runtime.shared.lock_client();
     if !track.initial_refresh_submitted {
+        if let Some(setup) = appearance_targets.setup.as_deref_mut() {
+            setup.0.observe(Some(&mut client), unix_now_ms());
+        }
         queue_effect(
             &mut track.shell,
             &mut client,
@@ -260,12 +282,44 @@ pub(crate) fn drain_system(
         );
         track.initial_refresh_submitted = true;
     }
-    let cycle = run_drain_cycle(&mut client, &mut track.shell, unix_now_ms());
+    let cycle = run_drain_cycle(
+        &mut client,
+        &mut track.shell,
+        unix_now_ms(),
+        appearance_targets
+            .setup
+            .as_deref_mut()
+            .map(|setup| &mut setup.0),
+    );
     // Effects produced by the input systems cross to the platform here, the
     // one place that holds the client lock — the same `queue_effect` seam
     // every frontend effect uses.
     for effect in pending.0.drain(..) {
-        queue_effect(&mut track.shell, &mut client, effect);
+        if let PlatformEffect::SetupScript(request) = effect {
+            if appearance_targets
+                .surface
+                .as_ref()
+                .is_some_and(|surface| matches!(surface.0, Some(WindowSurface::FirstRun)))
+                && let Some(setup) = appearance_targets.setup.as_deref_mut()
+            {
+                setup
+                    .0
+                    .request(request.action, Some(&mut client), unix_now_ms());
+                commands.trigger(WindowSurfaceChanged);
+            }
+        } else {
+            queue_effect(&mut track.shell, &mut client, effect);
+        }
+    }
+    if cycle.setup_changed {
+        if appearance_targets
+            .setup
+            .as_ref()
+            .is_some_and(|setup| setup.0.view().info.is_none())
+        {
+            commands.trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::FirstRun));
+        }
+        commands.trigger(WindowSurfaceChanged);
     }
     if cycle.folded_batches > 0 {
         commands.trigger(ShellProjectionFolded);
@@ -292,6 +346,24 @@ pub(crate) fn drain_system(
     if feedback_cache.0.as_deref() != Some(feedback.as_str()) {
         feedback_cache.0 = Some(feedback.clone());
         commands.trigger(FeedbackChanged(feedback));
+    }
+}
+
+/// Capture/demo has no provider. Explicit native setup actions still fold an
+/// honest unavailable result instead of leaving an unprocessed effect queue.
+pub(crate) fn drain_demo_effects(
+    mut pending: ResMut<crate::input::PendingEffects>,
+    mut setup: ResMut<SetupState>,
+    surface: Res<WindowSurfaceState>,
+    mut commands: Commands,
+) {
+    for effect in pending.0.drain(..) {
+        if let PlatformEffect::SetupScript(request) = effect
+            && matches!(surface.0, Some(WindowSurface::FirstRun))
+        {
+            setup.0.request(request.action, None, unix_now_ms());
+            commands.trigger(WindowSurfaceChanged);
+        }
     }
 }
 

@@ -79,6 +79,8 @@ codegen-units = 1
 strip = "debuginfo"
 
 [patch.crates-io]
+# Linux system clipboard must retain the strict Wayland dependency closure.
+bevy_clipboard = { path = "./patches/bevy_clipboard" }
 proc-macro-error2 = { path = "./patches/proc-macro-error2" }
 # Vendored gpui 0.2.2 patch (strict Wayland): upstream declares the
 # Linux `xkbcommon` dependency with `features = ["wayland", "x11"]`

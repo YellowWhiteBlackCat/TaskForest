@@ -23,8 +23,9 @@
   保持单一 workspace 解析；升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
-  `bevy_text`、`ui_picking`；Linux 追加 `wayland` 与 `accesskit_unix`，`x11` 永不
-  开启。default features 关闭，`multi_threaded` 关闭以保持 drain 可观察。
+  `bevy_text`、`ui_picking`、`system_clipboard`；Linux 追加 `wayland` 与 `accesskit_unix`，`x11` 永不
+  开启。Linux 的 `bevy_clipboard` 补丁以 `wl-clipboard-rs` 写入系统剪贴板，
+  写入未被 compositor 接受时发布错误。default features 关闭，`multi_threaded` 关闭以保持 drain 可观察。
 - 依赖白名单：application、app-host、core、platform-contract、shell、theme、
   ui-contract、assets、icons（neutral 半，gpui feature 关）、`accesskit`（与
   bevy 栈同版本）—— never platform-runtime、platform crates。Bevy 类型不跨
@@ -62,7 +63,8 @@
 `PreUpdate` drain 每帧以有界批量（`EVENT_DRAIN_BATCH`）非阻塞排水平台事件端口，
 折叠进共享 `ShellApp`，并触发 `ShellProjectionFolded`——页面唯一的数据刷新
 事件，永不轮询。刷新合并与暂停语义复用 shell 的 `TelemetryRefreshPolicy`；
-效果提交只走共享 `queue_effect`。
+效果提交由 drain 统一处理：共享效果走 `queue_effect`，可选设置动作走 application 的
+`FirstRunController`，保持重复提交与相关完成的单一权威。
 
 ## 输入接缝
 

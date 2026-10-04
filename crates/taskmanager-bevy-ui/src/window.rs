@@ -394,6 +394,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
+        crate::window_surface::register(app);
         crate::about_modal::register(app);
         crate::first_run_modal::register(app);
         crate::pages::system::diagnostic_modal::register(app);
@@ -434,6 +435,8 @@ impl Plugin for FrontendWindowPlugin {
         );
         if !app.world().contains_resource::<DemoMode>() {
             app.add_systems(PreUpdate, drain::drain_system);
+        } else {
+            app.add_systems(PreUpdate, drain::drain_demo_effects);
         }
     }
 }

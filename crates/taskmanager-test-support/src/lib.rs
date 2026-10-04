@@ -13,6 +13,7 @@ use taskmanager_core::{
 mod memory;
 mod metrics;
 mod process;
+pub mod setup_script;
 
 // ── locale pinning for text-asserting tests ──────────────────────────────────
 

@@ -49,7 +49,6 @@ use crate::gpui_app::containers_view;
 use crate::gpui_app::cpu_view::{self, CpuHistoryCache};
 use crate::gpui_app::dashboard::{self, DashboardState};
 use crate::gpui_app::elements;
-use crate::gpui_app::first_run;
 use crate::gpui_app::graph;
 use crate::gpui_app::perf_views::{self, MemoryHistoryCache};
 use crate::gpui_app::processes_view;
@@ -60,6 +59,7 @@ use crate::gpui_app::startup_view;
 use crate::gpui_app::system_health_view::{self, SystemHealthCallbacks};
 use crate::gpui_app::system_view;
 use crate::gpui_app::users_view;
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     CommandRouter, ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
@@ -67,10 +67,9 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::target::{ServiceId, SessionId};
-use taskmanager_platform_contract::{OperationFailure, RequestId};
+use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
 
@@ -365,8 +364,7 @@ pub struct RootView {
     /// authority is `shell.interaction` in the application-owned direct track.
     window_surface: window_surface::WindowSurfaceState,
     /// First-run workflow data. Visibility is owned by `window_surface`.
-    pub first_run: first_run::FirstRunUiState,
-    pub(crate) first_run_requests: HashMap<RequestId, SetupScriptAction>,
+    pub first_run: FirstRunController,
     /// Per-window persistent refresh-interval slider entity for the Settings
     /// dialog (owns the thumb position, drag state, and current value).
     /// Created lazily on the first Settings render (see
@@ -790,8 +788,7 @@ impl RootView {
                     .unwrap_or(false)
                     .then_some(window_surface::WindowSurface::Settings),
             ),
-            first_run: first_run::FirstRunUiState::default(),
-            first_run_requests: HashMap::new(),
+            first_run: FirstRunController::default(),
             settings_slider: None,
             graph_points_slider: None,
             run_error: None,

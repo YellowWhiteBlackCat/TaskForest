@@ -180,8 +180,8 @@ fn cycle_after_warmup(
 ) -> super::DrainCycle {
     let mut client = client_with(snapshot.clone(), events.clone());
     let mut shell = ShellApp::new();
-    let _ = run_drain_cycle(&mut client, &mut shell, 0);
-    run_drain_cycle(&mut client, &mut shell, 1_000)
+    let _ = run_drain_cycle(&mut client, &mut shell, 0, None);
+    run_drain_cycle(&mut client, &mut shell, 1_000, None)
 }
 
 #[test]
@@ -229,7 +229,7 @@ fn pending_events_fold_once_then_the_port_is_quiet() {
     ]);
     let mut client = client_with(snapshot_with_mixed_statuses(), events.clone());
     let mut shell = ShellApp::new();
-    let first = run_drain_cycle(&mut client, &mut shell, 0);
+    let first = run_drain_cycle(&mut client, &mut shell, 0, None);
     assert_eq!(
         first.folded_batches, 1,
         "three ready events drain inside one non-empty batch"
@@ -239,7 +239,7 @@ fn pending_events_fold_once_then_the_port_is_quiet() {
         3,
         "every scripted event is consumed"
     );
-    let second = run_drain_cycle(&mut client, &mut shell, 1_000);
+    let second = run_drain_cycle(&mut client, &mut shell, 1_000, None);
     assert_eq!(second.folded_batches, 0, "a drained port stays drained");
 }
 
@@ -248,7 +248,7 @@ fn port_failure_reports_one_notice_and_stops_draining() {
     let events = ScriptedEvents::failing();
     let mut client = client_with(snapshot_with_mixed_statuses(), events.clone());
     let mut shell = ShellApp::new();
-    let cycle = run_drain_cycle(&mut client, &mut shell, 0);
+    let cycle = run_drain_cycle(&mut client, &mut shell, 0, None);
     assert_eq!(cycle.folded_batches, 0);
     assert!(
         !shell.feedback_text().is_empty(),
@@ -266,12 +266,12 @@ fn capability_summary_fires_once_per_inventory_change() {
     let events = ScriptedEvents::quiet();
     let mut client = client_with(snapshot_with_mixed_statuses(), events);
     let mut shell = ShellApp::new();
-    let first = run_drain_cycle(&mut client, &mut shell, 0);
+    let first = run_drain_cycle(&mut client, &mut shell, 0, None);
     assert!(
         first.capability_summary.is_some(),
         "the first fold of a non-empty inventory must publish a summary"
     );
-    let second = run_drain_cycle(&mut client, &mut shell, 1_000);
+    let second = run_drain_cycle(&mut client, &mut shell, 1_000, None);
     assert!(
         second.capability_summary.is_none(),
         "an identical inventory must not re-publish"
@@ -322,11 +322,11 @@ fn advance_feedback_time_clears_timed_notices_in_drain_cycle() {
     );
 
     // Drain cycle 1: advances 16ms, leaving 14ms remaining.
-    let _ = run_drain_cycle(&mut client, &mut shell, 0);
+    let _ = run_drain_cycle(&mut client, &mut shell, 0, None);
     assert!(shell.feedback_notice().is_some());
 
     // Drain cycle 2: advances another 16ms (32ms total >= 30ms). Timed notice expires.
-    let _ = run_drain_cycle(&mut client, &mut shell, 16);
+    let _ = run_drain_cycle(&mut client, &mut shell, 16, None);
     assert!(
         shell.feedback_notice().is_none(),
         "timed notice must expire after elapsed drain cycles exceed its duration"

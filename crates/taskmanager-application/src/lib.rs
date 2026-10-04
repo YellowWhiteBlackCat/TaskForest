@@ -35,6 +35,7 @@ mod control;
 mod device_lifecycle;
 pub mod diagnostic_bundle;
 pub mod diagnostics;
+pub mod first_run;
 /// Toolkit-neutral history-series decimation kernels (LTTB run selection and
 /// the stride max-envelope) — the single source every frontend's replay and
 /// pixel-budgeted downsampling delegates to.

@@ -18,6 +18,7 @@
 //! transition republishes `ConfirmationChanged` so the overlay mounts and
 //! despawns from one authority.
 
+use crate::first_run_modal::{FirstRunCommand, SetupState};
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
@@ -33,9 +34,11 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::process_batch_action_label;
 
 use crate::app::FrontendTrack;
@@ -459,9 +462,13 @@ pub(crate) fn init_capture_confirmation(
     }
     if let Some(target) = crate::capture::capture_scenario_target() {
         if target == "about" || target == "system-about" {
-            commands.trigger(crate::about_modal::AboutModalChanged(true));
+            commands.trigger(crate::about_modal::AboutCommand::Open);
         } else if target == "first-run" {
-            commands.trigger(crate::first_run_modal::FirstRunModalChanged(true));
+            commands.queue(|world: &mut bevy::ecs::world::World| {
+                world.resource_mut::<SetupState>().0 =
+                    FirstRunController::from_observation(Some(setup_script_info()));
+                world.trigger(FirstRunCommand::Open);
+            });
         } else if target == "diagnostic-preview" {
             commands.trigger(DiagnosticCommand::Open);
         } else if target == "diagnostic-failure" {

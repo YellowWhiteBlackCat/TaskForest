@@ -14,8 +14,8 @@
 
 | 项目 | 许可证 | 在本项目中的角色 |
 |---|---|---|
-| [GPUI](https://github.com/zed-industries/zed)（Zed Industries） | Apache-2.0 | GPU 加速桌面主前端，发行包唯一形态（本地补丁见下节） |
-| [Iced](https://github.com/iced-rs/iced) | MIT | 响应式桌面前端，受支持但暂不进发行包 |
+| [GPUI](https://github.com/zed-industries/zed)（Zed Industries） | Apache-2.0 | GPU 加速桌面主前端（本地补丁见下节） |
+| [Iced](https://github.com/iced-rs/iced) | MIT | 响应式独立桌面前端 |
 | [Ratatui](https://github.com/ratatui/ratatui) | MIT | 终端前端 |
 | bevy / bevy_app / bevy_ecs | Apache-2.0 OR MIT | Bevy 门面与应用骨架/ECS：独立 Bevy 前端及平台运行时复用 |
 | naga | MIT OR Apache-2.0 | 着色器翻译；iced 渲染链的 feature pin |
@@ -24,13 +24,16 @@
 
 ## 本地补丁依赖
 
-`[patch]` 覆盖的三个上游 crate 以补丁副本参与构建，源码保留各自原始许可证：
+`[patch]` 覆盖的上游 crate 以补丁副本参与构建，源码保留各自原始许可证：
 
 - **gpui**（Apache-2.0，`patches/gpui`）：上游无条件同时启用 xkbcommon 的 wayland+x11
   feature，导致 wayland-only 构建仍链接 X11；补丁将 x11 移入 dev-only feature，生产
   二进制零 X11 链接。
 - **cryoglyph**（MIT OR Apache-2.0 OR Zlib，`patches/cryoglyph`）：上游 0.1.0 固定
   `lru` 0.16；补丁副本只把依赖下限提到 0.18.2，API 不变（ADR-045）。
+- **bevy_clipboard**（MIT OR Apache-2.0，`patches/bevy_clipboard`）：Linux 文本剪贴板
+  使用 `wl-clipboard-rs`，没有 X11 依赖或本地成功回退；Windows/macOS 保留原生后端。
+- **blade-graphics**（MIT，`patches/blade-graphics`）：Vulkan descriptor pools 使用有界线性分配。
 - **proc-macro-error2**（Apache-2.0 OR MIT，`patches/proc-macro-error2`）：仓库内补丁副本。
 
 ## 平台采集与系统集成

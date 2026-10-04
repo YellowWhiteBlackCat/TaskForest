@@ -12,13 +12,14 @@ use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::seed_direct_track_fact;
+use taskmanager_shell::fixture::setup::setup_script_info;
 
 use super::super::{
-    CaptureEvidence, CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice,
-    TopPage, WindowSurfaceKind,
+    CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
+    WindowSurfaceKind,
 };
 use crate::gpui_app::dashboard::SystemSection;
-use crate::gpui_app::first_run::FirstRunPhase;
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::process_category_projection::category_expansion_key;
 
 pub(super) fn apply_platform_batch(
@@ -162,8 +163,7 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
             .mark_about_ready(view.window_surface_kind() == Some(WindowSurfaceKind::About));
     }
     if view.capture_evidence.first_run_requested() {
-        view.first_run.info = Some(CaptureEvidence::first_run_fixture_info());
-        view.first_run.phase = FirstRunPhase::Available;
+        view.first_run = FirstRunController::from_observation(Some(setup_script_info()));
         view.show_first_run();
         view.capture_evidence
             .mark_first_run_ready(view.first_run_open());

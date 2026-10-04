@@ -40,6 +40,15 @@ adopted — theme tokens are the only skin authority.
   shell page always follows the visible page), the Dialog-scope Enter
   mapping, the per-inventory action-menu open chords, the `PendingEffects`
   effect bridge to the drain, and the one-shot quit forward.
+- `src/window_surface.rs` owns the single About/setup/diagnostic surface.
+  State notifications coalesce before layout; header and complete action groups
+  stay fixed around one bounded, scrollable body.
+- `src/first_run_modal.rs` projects the application setup controller: silent
+  startup discovery, explicit Settings entry, typed native actions and metadata copy.
+- `src/about_modal.rs` reviews cached identity facts and opens diagnostics.
+- `src/text_selection.rs` queues text output for Bevy's native clipboard;
+  success feedback requires a completed system write. Linux uses the strict
+  Wayland `bevy_clipboard` patch; Windows/macOS retain upstream native output.
 - `src/confirmation.rs` — the shell's armed destructive-action gate rendered
   as one modal under the app shell root, with typed confirm/dismiss paths
   and republished gate transitions.
@@ -81,7 +90,7 @@ Dependency whitelist is charter law: `taskmanager-application`,
 `taskmanager-shell`, `taskmanager-theme`, `taskmanager-ui-contract`,
 `taskmanager-assets` and exactly-locked `bevy =0.20.0-rc.2` (features `bevy_ui`,
 `bevy_ui_widgets`, `bevy_scene` — the bsn! macro — plus the
-render/asset/window closure; Linux adds `wayland` only) — never
+render/asset/window closure and `system_clipboard`; Linux adds `wayland` only) — never
 `platform-runtime` or a platform crate. Bevy types never cross this crate's
 public API. The two Worlds never merge: the platform client is
 acquired once per process through the app-host `OnceLock` cache pattern

@@ -5,8 +5,6 @@
 //! submissions, the event port drains typed outcomes, and live process rows
 //! satisfy the host-neutral invariants from `taskmanager-platform-conformance`.
 
-use std::time::Duration;
-
 use taskmanager_application::{PlatformClient, RefreshRequest};
 use taskmanager_platform_conformance::{
     assert_live_smoke_ok, assert_process_rows_consistent, collect_process_rows,
@@ -14,13 +12,7 @@ use taskmanager_platform_conformance::{
 };
 use taskmanager_platform_native::NativePlatformRuntime;
 
-/// How long the drain may wait for the first live process snapshot. This is a
-/// **liveness** budget, not a latency assertion: the probe proves the native
-/// composition publishes at all, so a busy host (or a loaded CI runner) must
-/// not fail it. The shared runtime publishes in a few hundred milliseconds on
-/// an idle host; the budget only needs to outlast a machine under heavy load.
-const DRAIN_DEADLINE: Duration = Duration::from_secs(30);
-const DRAIN_POLL: Duration = Duration::from_millis(5);
+use taskmanager_platform_conformance::smoke_budget::{DRAIN_DEADLINE, DRAIN_POLL};
 
 #[cfg(target_os = "linux")]
 const PROVIDER_PREFIX: &str = "linux.";

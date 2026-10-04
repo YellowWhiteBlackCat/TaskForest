@@ -8,64 +8,27 @@ use gpui::{
     App, ClipboardItem, Context, Div, Entity, InteractiveElement, ParentElement, Styled, Window,
     div, px,
 };
-use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::presentation::first_run::first_run_failure_key;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{RootView, platform_submission_time_ms};
+use crate::gpui_app::root::{WindowSurfaceDismissReason, WindowSurfaceKind};
+use taskmanager_application::CorrelatedSetupScriptEvent;
 use taskmanager_application::i18n;
-use taskmanager_application::{CorrelatedSetupScriptEvent, SetupScriptRequest};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
-use taskmanager_platform_contract::{OperationFailure, SubmissionErrorKind};
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
-/// TaskForest's documentation destination for the First Run dialog. Opening
-/// it still goes through the ordinary typed URL-open port; this module never
-/// launches a browser command directly.
-pub const DOCUMENTATION_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub enum FirstRunPhase {
-    #[default]
-    Hidden,
-    Discovering,
-    Available,
-    Running,
-    Reverting,
-    RestartRequired,
-    Restarting,
-    Failed(FailureKind),
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FirstRunUiState {
-    pub phase: FirstRunPhase,
-    pub info: Option<SetupScriptInfo>,
-    pub last_action: Option<SetupScriptAction>,
-}
-
-fn failure_key(kind: FailureKind) -> &'static str {
-    match kind {
-        FailureKind::Unsupported => "first_run.failure_unsupported",
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            "first_run.failure_permission"
-        }
-        FailureKind::MissingDependency => "first_run.failure_missing_dependency",
-        FailureKind::TimedOut => "first_run.failure_timeout",
-        FailureKind::IdentityChanged => "first_run.failure_identity",
-        FailureKind::TemporarilyUnavailable => "first_run.failure_unavailable",
-        FailureKind::Rejected => "first_run.failure_rejected",
-        FailureKind::ProviderFault => "first_run.failure_provider",
-    }
-}
-
+use taskmanager_application::first_run::{
+    DOCUMENTATION_URL, FirstRunCompletion, FirstRunPhase, FirstRunUiState,
+};
 fn empty_state_message_key(phase: &FirstRunPhase) -> &'static str {
     match phase {
-        FirstRunPhase::Failed(kind) => failure_key(*kind),
+        FirstRunPhase::Failed(kind) => first_run_failure_key(*kind),
         _ => "first_run.discovering",
     }
 }
@@ -142,7 +105,11 @@ fn action_button(
 }
 
 /// Render the dialog body from the latest application projection.
-pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<RootView>) -> Div {
+pub fn render_first_run(
+    theme: &Theme,
+    state: &FirstRunUiState,
+    entity: Entity<RootView>,
+) -> (Div, Div) {
     let Some(info) = state.info.clone() else {
         let failed = matches!(state.phase, FirstRunPhase::Failed(_));
         let close_entity = entity.clone();
@@ -172,12 +139,9 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
                 |_, _, _| {},
             ));
         }
-        return body;
+        return (body, div());
     };
-    let pending = matches!(
-        state.phase,
-        FirstRunPhase::Running | FirstRunPhase::Reverting | FirstRunPhase::Restarting
-    );
+    let pending = state.action_pending();
     let run_entity = entity.clone();
     let revert_entity = entity.clone();
     let view_entity = entity.clone();
@@ -188,8 +152,8 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     let run_command = info.run_command.clone();
     let revert_command = info.revert_command.clone();
     let mut body = div()
-        .w(px(520.0))
-        .max_w(px(520.0))
+        .w_full()
+        .min_w(px(0.0))
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_12))
@@ -226,7 +190,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
             div()
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.danger))
-                .child(i18n::t(failure_key(kind))),
+                .child(i18n::t(first_run_failure_key(kind))),
         );
         Some(kind)
     } else {
@@ -249,6 +213,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     }
 
     let mut actions = div()
+        .debug_selector(|| "tm-first-run-actions".to_owned())
         .flex()
         .flex_row()
         .flex_wrap()
@@ -294,7 +259,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
             pending,
         ));
     if let Some(kind) = failure {
-        let copy_value = i18n::t(failure_key(kind)).to_owned();
+        let copy_value = i18n::t(first_run_failure_key(kind)).to_owned();
         let copy_entity = entity.clone();
         actions = actions
             .child(elements::pill(
@@ -367,7 +332,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
         },
         |_, _, _| {},
     ));
-    body.child(actions)
+    (body, actions)
 }
 
 /// Render the non-modal entry point for optional setup.
@@ -414,41 +379,10 @@ pub(crate) fn render_settings_row(theme: &Theme, entity: Entity<RootView>) -> Di
         ))
 }
 
-fn submission_failure_kind(kind: SubmissionErrorKind) -> FailureKind {
-    match kind {
-        SubmissionErrorKind::UnsupportedCapability => FailureKind::Unsupported,
-        SubmissionErrorKind::Busy | SubmissionErrorKind::RuntimeStopped => {
-            FailureKind::TemporarilyUnavailable
-        }
-        SubmissionErrorKind::InvalidRequest => FailureKind::Rejected,
-    }
-}
-
 impl RootView {
     pub(crate) fn request_first_run_observation(&mut self, _cx: &mut Context<Self>) {
-        self.first_run.phase = FirstRunPhase::Discovering;
-        let result = self.platform.as_mut().map_or_else(
-            || Err(SubmissionErrorKind::RuntimeStopped),
-            |platform| {
-                platform
-                    .submit_setup_script(
-                        SetupScriptRequest {
-                            action: SetupScriptAction::Observe,
-                        },
-                        platform_submission_time_ms(),
-                    )
-                    .map_err(|error| error.kind)
-            },
-        );
-        match result {
-            Ok(request_id) => {
-                self.first_run_requests
-                    .insert(request_id, SetupScriptAction::Observe);
-            }
-            Err(_) => {
-                self.first_run.phase = FirstRunPhase::Hidden;
-            }
-        }
+        self.first_run
+            .observe(self.platform.as_mut(), platform_submission_time_ms());
     }
 
     pub(crate) fn request_first_run_action(
@@ -456,107 +390,25 @@ impl RootView {
         action: SetupScriptAction,
         cx: &mut Context<Self>,
     ) -> bool {
-        if action == SetupScriptAction::Observe
-            || (self.first_run.info.is_none() && action != SetupScriptAction::Restart)
-            || (action == SetupScriptAction::Restart
-                && self.first_run.phase != FirstRunPhase::RestartRequired)
-        {
-            self.first_run.phase = FirstRunPhase::Failed(if action == SetupScriptAction::Restart {
-                FailureKind::Rejected
-            } else {
-                FailureKind::Unsupported
-            });
-            self.show_first_run();
-            cx.notify();
+        if !self.first_run_open() {
             return false;
         }
-        let result = self.platform.as_mut().map_or_else(
-            || Err(SubmissionErrorKind::RuntimeStopped),
-            |platform| {
-                platform
-                    .submit_setup_script(
-                        SetupScriptRequest { action },
-                        platform_submission_time_ms(),
-                    )
-                    .map_err(|error| error.kind)
-            },
+        let accepted = self.first_run.request(
+            action,
+            self.platform.as_mut(),
+            platform_submission_time_ms(),
         );
-        match result {
-            Ok(request_id) => {
-                self.first_run_requests.insert(request_id, action);
-                self.first_run.last_action = Some(action);
-                self.first_run.phase = match action {
-                    SetupScriptAction::Run => FirstRunPhase::Running,
-                    SetupScriptAction::Revert => FirstRunPhase::Reverting,
-                    SetupScriptAction::Restart => FirstRunPhase::Restarting,
-                    SetupScriptAction::Observe => FirstRunPhase::Discovering,
-                    SetupScriptAction::View => FirstRunPhase::Available,
-                };
-                true
-            }
-            Err(kind) => {
-                self.first_run.phase = FirstRunPhase::Failed(submission_failure_kind(kind));
-                self.show_first_run();
-                cx.notify();
-                false
-            }
-        }
+        cx.notify();
+        accepted
     }
 
     pub(crate) fn apply_first_run_event(
         &mut self,
-        correlated: CorrelatedSetupScriptEvent,
+        event: CorrelatedSetupScriptEvent,
         cx: &mut Context<Self>,
     ) -> bool {
-        let Some(requested) = self.first_run_requests.remove(&correlated.request_id) else {
-            return false;
-        };
-        match (requested, correlated.event) {
-            (SetupScriptAction::Observe, SetupScriptEvent::Observed(info)) => {
-                self.first_run.info = info;
-                let available = self.first_run.info.is_some();
-                self.first_run.phase = if available {
-                    FirstRunPhase::Available
-                } else {
-                    FirstRunPhase::Hidden
-                };
-                // Observation is a background capability check. An optional
-                // setup must never become a startup modal; the Settings entry
-                // is the explicit discovery route.
-                if !available {
-                    self.dismiss_window_surface(
-                        crate::gpui_app::root::WindowSurfaceKind::FirstRun,
-                        crate::gpui_app::root::WindowSurfaceDismissReason::Completed,
-                    );
-                }
-                true
-            }
-            (action, SetupScriptEvent::ActionCompleted { action: completed })
-                if action == completed =>
-            {
-                self.first_run.phase = match action {
-                    SetupScriptAction::Run => FirstRunPhase::RestartRequired,
-                    SetupScriptAction::Revert
-                    | SetupScriptAction::View
-                    | SetupScriptAction::Observe => FirstRunPhase::Available,
-                    SetupScriptAction::Restart => {
-                        cx.spawn(async move |_entity, cx| {
-                            let _ = cx.update(|app| app.quit());
-                        })
-                        .detach();
-                        FirstRunPhase::Restarting
-                    }
-                };
-                self.show_first_run();
-                true
-            }
-            _ => {
-                self.first_run.phase = FirstRunPhase::Failed(FailureKind::ProviderFault);
-                self.show_first_run();
-                cx.notify();
-                false
-            }
-        }
+        let outcome = self.first_run.complete(&event);
+        self.apply_first_run_completion(outcome, cx)
     }
 
     pub(crate) fn apply_first_run_failure(
@@ -564,22 +416,30 @@ impl RootView {
         failure: &OperationFailure,
         cx: &mut Context<Self>,
     ) -> bool {
-        if failure.capability != CapabilityId::FIRST_RUN_SETUP {
+        let outcome = self.first_run.fail(failure);
+        self.apply_first_run_completion(outcome, cx)
+    }
+
+    fn apply_first_run_completion(
+        &mut self,
+        outcome: FirstRunCompletion,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if outcome == FirstRunCompletion::Unchanged {
             return false;
         }
-        let Some(action) = self.first_run_requests.remove(&failure.request_id) else {
-            return false;
-        };
-        if action == SetupScriptAction::Observe {
-            self.first_run.phase = FirstRunPhase::Hidden;
+        if outcome == FirstRunCompletion::Restart {
+            cx.spawn(async move |_entity, cx| {
+                let _ = cx.update(|app| app.quit());
+            })
+            .detach();
+        }
+        if self.first_run.view().info.is_none() {
             self.dismiss_window_surface(
-                crate::gpui_app::root::WindowSurfaceKind::FirstRun,
-                crate::gpui_app::root::WindowSurfaceDismissReason::Completed,
+                WindowSurfaceKind::FirstRun,
+                WindowSurfaceDismissReason::Completed,
             );
-            return true;
         }
-        self.first_run.phase = FirstRunPhase::Failed(failure.kind);
-        self.show_first_run();
         cx.notify();
         true
     }

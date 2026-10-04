@@ -7,6 +7,7 @@
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
@@ -27,6 +28,7 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
@@ -659,7 +661,8 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.settings_form.field = 30;
         }
         "first-run" => {
-            app.open_local_surface(TuiSurface::FirstRun);
+            app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
+            app.open_first_run();
         }
         "saved-view-presets" => {
             app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });

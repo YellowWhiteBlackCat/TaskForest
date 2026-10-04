@@ -749,7 +749,10 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             crate::TuiSurfaceKind::ServiceDependencies => (72, 20),
             crate::TuiSurfaceKind::ProcessAffinity => (64, 16),
             crate::TuiSurfaceKind::DiagnosticBundle => (78, 24),
-            crate::TuiSurfaceKind::FirstRun => (54, 14),
+            // Three complete descriptor groups, copy/docs hints and the
+            // fixed action/scroll footer fit the normal review. Compact
+            // terminals clamp this slot and scroll only the body.
+            crate::TuiSurfaceKind::FirstRun => (60, 24),
         },
         TuiInputScope::Help => (68, 24),
         TuiInputScope::Suggestions => (74, 22),

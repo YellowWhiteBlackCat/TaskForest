@@ -186,6 +186,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::AlertsRuleToggle(index) => format!("iced-alerts-rule-toggle-{index}"),
         FocusTarget::AlertsExport => "iced-alerts-export".to_owned(),
         FocusTarget::AlertsImport => "iced-alerts-import".to_owned(),
+        FocusTarget::FirstRunOpen => "iced-first-run-open".to_owned(),
         FocusTarget::FirstRunCopy(row) => format!("iced-first-run-copy-{row}"),
         FocusTarget::FirstRunAction(index) => format!("iced-first-run-action-{index}"),
         FocusTarget::ProcessAffinitySelectAll => "iced-process-affinity-select-all".to_owned(),

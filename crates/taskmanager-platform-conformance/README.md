@@ -16,7 +16,9 @@ discovery coherence. They contain no OS I/O, target-specific paths or
 
 Keep assertions portable across minimal runners. Each adapter runs the same
 contract on its native host; the suite proves shared semantics, not hardware
-coverage or pixel acceptance.
+coverage or pixel acceptance. Native adapters and the root smoke share the
+publication-liveness budget in `src/smoke_budget.rs`; collector latency belongs
+to the scheduler and throughput contracts.
 
 ## Capability-surface same-source scenario
 
@@ -60,6 +62,7 @@ from an escalation probe must publish the same states.
 ```text
 src/capability.rs  escalation.rs  identity.rs   host-agnostic assertions
 src/process.rs     source.rs      smoke.rs      row/live-drain scenarios
+src/smoke_budget.rs                            native publication wait budget
 ```
 
 Run against real hosts by each adapter's tests/conformance.rs and the root live smoke.

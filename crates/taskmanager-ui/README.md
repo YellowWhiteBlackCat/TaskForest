@@ -45,6 +45,8 @@ through `bounded_scroll_column_with_fixed_header`, which keeps that chrome
 outside the tracked coordinate tree and gives the whole column one width
 authority. Unrailed bounded regions are reserved for embedded sub-lists whose
 parent owns the discoverable scroll affordance.
+`bounded_scroll_column_with_fixed_footer` budgets the entire review column,
+reserving complete action groups and a gap below its shrinkable body viewport.
 
 `PageScaffold` is the data-page family's ONE outer shell (ADR-042): every
 non-chart top-level page in `taskmanager-gpui` composes through this

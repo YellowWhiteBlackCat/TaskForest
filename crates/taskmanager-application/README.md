@@ -78,6 +78,9 @@ identity map.
   failure; capture and publication remain outside the application layer. The current
   native one-shot implementation is Linux-only; other platforms keep a typed
   unsupported/unavailable result rather than claiming a capture they cannot provide.
+- `src/first_run.rs` owns quiet optional-setup discovery, the observed descriptor,
+  typed action admission and correlated progress. Frontends own explicit review
+  visibility; native completions never open a dismissed surface (ADR-040).
 - `src/diagnostics.rs` prepares already-redacted diagnostic plans and owns the
   shared Preview/Writing/Complete/Failed review state and request-correlated publication port.
   The app-host owns its worker and file transaction; confirm submits the frozen plan once,

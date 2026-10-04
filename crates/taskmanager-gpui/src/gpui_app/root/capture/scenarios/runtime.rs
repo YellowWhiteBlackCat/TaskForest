@@ -5,7 +5,6 @@ use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
 use std::path::PathBuf;
 use taskmanager_application::ApplicationHistoryStatus;
-use taskmanager_core::core::setup::SetupScriptInfo;
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
@@ -443,18 +442,6 @@ impl CaptureEvidence {
     pub fn mark_first_run_ready(&mut self, open: bool) {
         if self.first_run_requested() && open {
             self.mark_scenario_ready();
-        }
-    }
-
-    /// The fixture mirrors the fixed descriptor emitted by the Linux provider,
-    /// but stays in the capture layer so a screenshot cannot accidentally
-    /// prove that the installed asset or privileged helper exists.
-    #[must_use]
-    pub fn first_run_fixture_info() -> SetupScriptInfo {
-        SetupScriptInfo {
-            path: PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
-            run_command: "pkexec /usr/libexec/taskforest-setup-helper install".to_owned(),
-            revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".to_owned(),
         }
     }
 

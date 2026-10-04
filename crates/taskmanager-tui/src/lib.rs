@@ -30,6 +30,7 @@ mod command_palette;
 mod demo;
 mod diagnostic_bundle;
 mod feature_coverage;
+mod first_run;
 mod functional;
 mod history_runtime;
 mod menus;
@@ -98,6 +99,7 @@ pub fn run_cli(binary_name: &'static str) {
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use taskmanager_application::first_run::FirstRunController;
 
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::{
@@ -173,6 +175,7 @@ pub struct TuiApp {
     /// Typed lifecycle plus the app-host's non-blocking export client.
     snapshot_export: snapshot_export::TuiSnapshotExportRuntime,
     diagnostics: diagnostic_bundle::TuiDiagnosticRuntime,
+    first_run: FirstRunController,
     /// Read-only durable-history lifecycle and replay capability.
     history_runtime: history_runtime::TuiHistoryRuntime,
     /// Frontend-local Performance resource selector (select-a-device detail
@@ -337,6 +340,7 @@ impl TuiApp {
             export_dir: None,
             snapshot_export: snapshot_export::TuiSnapshotExportRuntime::default(),
             diagnostics: diagnostic_bundle::TuiDiagnosticRuntime::default(),
+            first_run: FirstRunController::default(),
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
             detail_scroll: 0,
@@ -372,6 +376,8 @@ impl TuiApp {
     /// per-pid tree state is pruned against the new live set so exited pids
     /// cannot leak into a later pid reuse.
     pub fn apply_platform_batch(&mut self, batch: PlatformEventBatch) {
+        let outcome = self.first_run.fold_batch(&batch);
+        self.apply_first_run_completion(outcome);
         let process_revision_before = self.shell.projection().process_revision;
         let selected_application_anchor = self.selected_application_row_anchor();
         let selected_inventory_anchor = self.selected_inventory_row_anchor();

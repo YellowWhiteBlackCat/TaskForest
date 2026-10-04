@@ -1,100 +1,197 @@
-//! The About modal for the Bevy frontend: system, hardware, and product identity.
+//! About reads cached facts and uses the same primary surface owner as setup/export.
 
+use crate::app::FrontendTrack;
+use crate::pages::system::diagnostic_modal::DiagnosticCommand;
+use crate::palette::{UiPalette, space_8};
+use crate::text_selection::ClipboardPort;
+use crate::window::{Role, TextRole};
+use crate::window_surface::{
+    WindowSurface, WindowSurfaceCommand, WindowSurfaceKind, WindowSurfaceState, modal_scene,
+};
 use bevy::app::App;
 use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
-    UiRect, Val, percent, px,
-};
+use bevy::ecs::system::{Commands, Query};
+use bevy::ecs::world::World;
+use bevy::picking::Pickable;
+use bevy::scene::{Scene, bsn, on};
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
+use bevy::ui::{BackgroundColor, Node, UiRect, Val, percent, px};
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
+use taskmanager_assets::product;
+use taskmanager_shell::presentation::{duration, missing_value};
 
-use crate::palette::{UiPalette, space_8, space_24};
-use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct AboutModalChanged(pub(crate) bool);
-
+#[derive(Event, Clone, Copy, Default)]
+pub(crate) enum AboutCommand {
+    #[default]
+    Open,
+    Close,
+    Copy,
+    Diagnostics,
+}
 #[derive(Component, Clone, Default)]
-pub(crate) struct AboutModalOverlay;
-
+pub(crate) struct AboutControl(pub(crate) AboutCommand);
 pub(crate) fn register(app: &mut App) {
-    app.add_observer(on_about_modal_changed);
+    app.add_observer(on_command);
 }
-
-fn on_about_modal_changed(
-    changed: On<AboutModalChanged>,
-    palette: Option<Res<WindowPalette>>,
-    roots: Query<Entity, With<AppShellRoot>>,
-    overlays: Query<Entity, With<AboutModalOverlay>>,
-    mut commands: Commands,
-) {
-    for entity in &overlays {
-        commands.entity(entity).despawn();
-    }
-    if !changed.event().0 {
-        return;
-    }
-    let Some(palette) = palette else {
-        return;
-    };
-    let Ok(root) = roots.single() else {
-        return;
-    };
-    let overlay = commands
-        .spawn_scene(about_overlay_scene(&palette.inner))
-        .id();
-    commands.entity(root).add_one_related::<ChildOf>(overlay);
-}
-
-fn about_overlay_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let panel = panel_scene(palette);
-    let scrim = palette.scrim;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
+fn on_command(command: On<AboutCommand>, mut commands: Commands) {
+    match command.event() {
+        AboutCommand::Open => commands.trigger(WindowSurfaceCommand::About),
+        AboutCommand::Close => {
+            commands.trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::About))
         }
-        BackgroundColor({ scrim })
-        AboutModalOverlay
-        Children [
-             @{ panel }
-        ]
+        AboutCommand::Copy => commands.queue(|world: &mut World| {
+            if !matches!(
+                world.resource::<WindowSurfaceState>().0,
+                Some(WindowSurface::About)
+            ) {
+                return;
+            }
+            let payload = about_text(world.non_send::<FrontendTrack>());
+            if let Some(mut clipboard) = world.get_resource_mut::<ClipboardPort>() {
+                clipboard.request_text(payload, t("about.title"));
+            }
+        }),
+        AboutCommand::Diagnostics => commands.queue(|world: &mut World| {
+            if matches!(
+                world.resource::<WindowSurfaceState>().0,
+                Some(WindowSurface::About)
+            ) {
+                world.trigger(DiagnosticCommand::Open);
+            }
+        }),
     }
+}
+fn activate(activate: On<Activate>, controls: Query<&AboutControl>, mut commands: Commands) {
+    if let Ok(control) = controls.get(activate.entity) {
+        commands.trigger(control.0);
+    }
+}
+pub(crate) fn action_scene(
+    label: &'static str,
+    command: AboutCommand,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(Val::Px(space_8())) }
+    BackgroundColor({ palette.content_bg }) Button AboutControl({ command }) on(activate)
+    Children [ Text(label) TextRole(Role::Body) Pickable::IGNORE ] }
+}
+fn about_text(track: &FrontendTrack) -> String {
+    let projection = track.shell.projection();
+    let hardware = projection.hardware.as_ref();
+    let snapshot = projection.snapshot.as_ref();
+    let fact = |key, value: Option<&str>| {
+        format!(
+            "{}: {}",
+            t(key),
+            value.map_or_else(missing_value, str::to_owned)
+        )
+    };
+    let rows = [
+        fact(
+            "system.hostname",
+            hardware.and_then(|hardware| hardware.hostname.as_deref()),
+        ),
+        fact(
+            "system.field.os_name",
+            hardware.and_then(|hardware| hardware.os_name.as_deref()),
+        ),
+        fact(
+            "system.field.os_version",
+            hardware.and_then(|hardware| hardware.os_version.as_deref()),
+        ),
+        fact(
+            "system.kernel",
+            hardware.and_then(|hardware| hardware.kernel_version.as_deref()),
+        ),
+        fact(
+            "system.field.architecture",
+            hardware.and_then(|hardware| hardware.architecture.as_deref()),
+        ),
+        fact(
+            "system.field.motherboard_vendor",
+            hardware.and_then(|hardware| hardware.motherboard_vendor.as_deref()),
+        ),
+        fact(
+            "system.field.motherboard_model",
+            hardware.and_then(|hardware| hardware.motherboard_model.as_deref()),
+        ),
+        fact(
+            "system.field.firmware_release_date",
+            hardware.and_then(|hardware| hardware.firmware_release_date.as_deref()),
+        ),
+        fact(
+            "system.secure_boot",
+            hardware
+                .and_then(|hardware| hardware.secure_boot)
+                .map(|enabled| {
+                    if enabled {
+                        t("common.enabled")
+                    } else {
+                        t("common.disabled")
+                    }
+                }),
+        ),
+        fact(
+            "common.cpu",
+            hardware.and_then(|hardware| hardware.cpu_brand.as_deref()),
+        ),
+        format!(
+            "{}: {}",
+            t("common.logical_cores"),
+            hardware
+                .and_then(|hardware| hardware.cpu_cores)
+                .map_or_else(missing_value, |value| value.to_string())
+        ),
+        format!(
+            "{}: {}",
+            t("system.field.installed_memory"),
+            hardware
+                .and_then(|hardware| hardware.total_memory_mb)
+                .map_or_else(missing_value, |value| format!("{value} MiB"))
+        ),
+        format!(
+            "{}: {}",
+            t("common.uptime"),
+            snapshot.map_or_else(missing_value, |snapshot| duration(snapshot.uptime_secs))
+        ),
+    ];
+    format!(
+        "{} {}\n\n{}",
+        product::BEVY_NAME,
+        env!("CARGO_PKG_VERSION"),
+        rows.join("\n\n")
+    )
+}
+pub(crate) fn surface_scene(track: &FrontendTrack, palette: &UiPalette) -> impl Scene + use<> {
+    let text = about_text(track);
+    let body = bsn! { Text(text) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } Node { width: percent(100), min_width: px(0.0), max_width: percent(100) } };
+    let actions: Vec<Box<dyn Scene>> = vec![
+        Box::new(action_scene(t("common.copy"), AboutCommand::Copy, palette)),
+        Box::new(action_scene(
+            t("diagnostics.action"),
+            AboutCommand::Diagnostics,
+            palette,
+        )),
+        Box::new(action_scene(
+            t("common.close"),
+            AboutCommand::Close,
+            palette,
+        )),
+    ];
+    modal_scene(
+        WindowSurfaceKind::About,
+        t("about.title"),
+        Box::new(body),
+        actions,
+        palette,
+    )
 }
 
-fn panel_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let title = t("about.title").to_owned();
-    let version_str = format!("TaskForest v{VERSION}");
-    let desc = "Cross-platform desktop system telemetry and task management".to_owned();
-    let radius = palette.panel_radius_px;
-    bsn! {
-        Node {
-            width: px(460.0),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_24())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor({ palette.panel_fill })
-        Children [
-             Text(title) TextRole(Role::Heading) --
-             Text(version_str) TextRole(Role::Body) --
-             Text(desc) TextRole(Role::Caption)
-        ]
-    }
-}
+#[cfg(test)]
+#[path = "../tests/headless/about_modal.rs"]
+mod tests;

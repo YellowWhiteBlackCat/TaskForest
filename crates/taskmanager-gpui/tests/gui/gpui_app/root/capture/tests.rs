@@ -2,6 +2,7 @@ use taskmanager_core::core::FilesystemHealthSnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::SensorQuantity;
+use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
@@ -478,7 +479,7 @@ fn first_run_capture_waits_for_live_data_and_uses_fixed_fixture_values() {
     );
     assert!(evidence.first_run_requested());
 
-    let info = CaptureEvidence::first_run_fixture_info();
+    let info = setup_script_info();
     assert_eq!(
         info.path,
         std::path::Path::new("/usr/share/taskforest/setup/99-taskforest.rules")

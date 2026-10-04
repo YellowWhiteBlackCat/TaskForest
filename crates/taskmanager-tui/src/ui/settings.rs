@@ -441,7 +441,13 @@ pub(super) fn render_settings_overlay_at(
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
-    let footer_content = settings_footer(form, focused_field, theme, inner);
+    let footer_content = settings_footer(
+        form,
+        focused_field,
+        theme,
+        inner,
+        app.first_run.view().info.is_some(),
+    );
     let [body, footer] = Layout::vertical([
         Constraint::Min(0),
         Constraint::Length(footer_content.height),

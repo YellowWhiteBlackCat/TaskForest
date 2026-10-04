@@ -20,7 +20,8 @@ use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::inputs::text_input::TextInput;
 use taskmanager_ui::layout::{
-    BoundedScrollRailSpec, bounded_scroll_column_with_fixed_header, bounded_scroll_region_with_rail,
+    BoundedScrollRailSpec, bounded_scroll_column_with_fixed_footer,
+    bounded_scroll_column_with_fixed_header, bounded_scroll_region_with_rail,
 };
 use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::button::{Button, ButtonVariant};
@@ -146,7 +147,7 @@ pub(super) fn compose_primary_dialogs(
                 gray_zero_values: presentation.gray_zero_values,
                 notify_enabled: view.projection().alert_center.policy().enabled,
                 history_persistence: view.history_runtime.enabled_next_start(),
-                first_run: &view.first_run,
+                first_run: view.first_run.view(),
                 notify_quiet_start: view
                     .projection()
                     .alert_center
@@ -324,7 +325,9 @@ pub(super) fn compose_primary_dialogs(
         let max_dialog_width = (f32::from(viewport.width) - 48.0).max(320.0);
         let dialog_width = max_dialog_width.min(620.0);
         let content_width = (dialog_width - 50.0).max(280.0);
-        let content: AnyElement = bounded_scroll_region_with_rail(
+        let (body, actions) =
+            first_run::render_first_run(theme, view.first_run.view(), close_entity.clone());
+        let content: AnyElement = bounded_scroll_column_with_fixed_footer(
             BoundedScrollRailSpec {
                 id: "first-run-scroll",
                 viewport_selector: "tm-first-run-scroll",
@@ -336,7 +339,9 @@ pub(super) fn compose_primary_dialogs(
                 scroll: view.dialog_scroll.first_run.clone(),
                 palette: theme.palette(),
             },
-            first_run::render_first_run(theme, &view.first_run, close_entity.clone()),
+            tokens::SPACE_12,
+            body,
+            actions,
         )
         .into_any_element();
         root.child(elements::dialog_overlay_width(

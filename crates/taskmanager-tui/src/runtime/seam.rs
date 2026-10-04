@@ -585,14 +585,22 @@ where
                 let reaction = apply_terminal_event_with_plan(app, events.read()?, &committed_plan);
                 pending_draw |= reaction.dirty;
                 if let Some(effect) = reaction.effect {
-                    match platform.as_deref_mut() {
-                        Some(platform) => queue_effect(app, platform, effect),
-                        None => app.report_notice(
-                            FeedbackSource::Demo,
-                            FeedbackSeverity::Warning,
-                            FeedbackLifecycle::UntilReplaced,
-                            "Demo mode suppresses platform actions",
-                        ),
+                    if let PlatformEffect::SetupScript(request) = effect {
+                        app.submit_first_run_action(
+                            request.action,
+                            platform.as_deref_mut(),
+                            unix_now_ms(),
+                        );
+                    } else {
+                        match platform.as_deref_mut() {
+                            Some(platform) => queue_effect(app, platform, effect),
+                            None => app.report_notice(
+                                FeedbackSource::Demo,
+                                FeedbackSeverity::Warning,
+                                FeedbackLifecycle::UntilReplaced,
+                                "Demo mode suppresses platform actions",
+                            ),
+                        }
                     }
                 }
                 if app.should_quit() || drained + 1 == EVENT_DRAIN_BATCH {

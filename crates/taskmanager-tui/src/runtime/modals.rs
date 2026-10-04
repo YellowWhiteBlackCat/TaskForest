@@ -70,6 +70,10 @@ fn handle_diagnostic_key(app: &mut TuiApp, key: KeyEvent) {
 /// the service-log panel consumes only its documented control chords.
 #[must_use]
 pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatch {
+    if app.local_surface_kind() == Some(TuiSurfaceKind::FirstRun) {
+        return InputDispatch::consumed(crate::first_run::handle_key(app, key));
+    }
+
     if app.process_properties().is_some() {
         // The Process Properties modal traps navigation while open: Tab and
         // Left/Right cycle the four sections (Overview / Performance / Command /
@@ -136,6 +140,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
 
     if let Some(surface) = app.local_surface_kind() {
         let effect = match surface {
+            TuiSurfaceKind::FirstRun => crate::first_run::handle_key(app, key),
             TuiSurfaceKind::CommandPalette => match key.code {
                 ratatui::crossterm::event::KeyCode::Esc => {
                     app.close_command_palette();
@@ -350,7 +355,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 handle_diagnostic_key(app, key);
                 None
             }
-            TuiSurfaceKind::About | TuiSurfaceKind::Containers | TuiSurfaceKind::FirstRun => {
+            TuiSurfaceKind::About | TuiSurfaceKind::Containers => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can

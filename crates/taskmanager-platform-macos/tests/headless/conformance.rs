@@ -1,7 +1,5 @@
 //! Shared platform-conformance scenarios run on the real macOS host.
 
-use std::time::Duration;
-
 use taskmanager_application::{PlatformClient, RefreshRequest};
 use taskmanager_platform_conformance::{
     assert_live_smoke_ok, assert_process_rows_consistent, collect_process_rows,
@@ -9,8 +7,7 @@ use taskmanager_platform_conformance::{
 };
 use taskmanager_platform_macos::MacOsPlatformRuntime;
 
-const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
-const DRAIN_POLL: Duration = Duration::from_millis(5);
+use taskmanager_platform_conformance::smoke_budget::{DRAIN_DEADLINE, DRAIN_POLL};
 
 /// The macOS adapter must publish host-neutral typed outcomes from the real
 /// host: every observation lane accepts submissions, the event port drains,

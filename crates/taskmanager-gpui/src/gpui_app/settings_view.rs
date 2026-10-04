@@ -25,9 +25,10 @@ use self::density::density_row;
 use self::ui_size::ui_size_row;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::elements::pill;
-use crate::gpui_app::first_run::{self, FirstRunUiState};
+use crate::gpui_app::first_run;
 use crate::gpui_app::graph::GraphSettings;
 use crate::gpui_app::root::{Hover, RootView};
+use taskmanager_application::first_run::FirstRunUiState;
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,

@@ -28,9 +28,8 @@ pub(crate) enum LocalSurfaceKind {
     RunTask,
     AlertCenter,
     DiagnosticBundle,
-    /// The optional-setup first-run dialog. Visibility is decided by the
-    /// `ui::first_run` fold's transitions (the boot observation's answer),
-    /// never opened directly by a user trigger.
+    /// Optional setup review, opened explicitly from Settings when the
+    /// application controller has an observed descriptor (ADR-040).
     FirstRun,
 }
 
@@ -54,7 +53,7 @@ pub(crate) enum LocalSurface {
     AlertCenter,
     DiagnosticBundle(DiagnosticBundleUiState),
     /// Carries no payload: the dialog's state lives in
-    /// [`crate::ui::first_run::FirstRunUiState`].
+    /// [`taskmanager_application::first_run::FirstRunUiState`].
     FirstRun,
 }
 

@@ -1,98 +1,254 @@
-//! The First-Run setup modal for the Bevy frontend.
+//! Explicit optional setup review, native actions and shared progress facts.
 
-use bevy::app::App;
+use crate::input::PendingEffects;
+use crate::pages::settings::SettingsBody;
+use crate::palette::{UiPalette, space_8};
+use crate::text_selection::ClipboardPort;
+use crate::window::{Role, TextRole, WindowPalette};
+use crate::window_surface::{
+    ModalBody, WindowSurface, WindowSurfaceCommand, WindowSurfaceKind, WindowSurfaceState,
+    modal_scene,
+};
+use bevy::app::{App, Update};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::ChildOf;
-use bevy::ecs::hierarchy::Children;
+use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
+use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
-    UiRect, Val, percent, px,
-};
+use bevy::ecs::world::World;
+use bevy::picking::Pickable;
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
+use bevy::ui::{ComputedNode, ScrollPosition};
+use bevy::ui_widgets::{Activate, Button};
+use taskmanager_application::first_run::{
+    DOCUMENTATION_URL, FirstRunController, FirstRunPhase, FirstRunUiState,
+};
 use taskmanager_application::i18n::t;
+use taskmanager_application::{PlatformEffect, SetupScriptRequest, UrlOpenRequest};
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_shell::presentation::first_run::first_run_phase_key;
 
-use crate::palette::{UiPalette, space_8, space_24};
-use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
-
-#[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct FirstRunModalChanged(pub(crate) bool);
-
-#[derive(Component, Clone, Default)]
-pub(crate) struct FirstRunModalOverlay;
-
-pub(crate) fn register(app: &mut App) {
-    app.add_observer(on_first_run_modal_changed);
+#[derive(Resource, Default)]
+pub(crate) struct SetupState(pub(crate) FirstRunController);
+#[derive(Event, Clone, Debug, Default)]
+pub(crate) enum FirstRunCommand {
+    #[default]
+    Open,
+    Close,
+    Action(SetupScriptAction),
+    Documentation,
+    Copy(u8),
+    Scroll(f32),
 }
-
-fn on_first_run_modal_changed(
-    changed: On<FirstRunModalChanged>,
+#[derive(Component, Clone, Default)]
+pub(crate) struct SetupControl(pub(crate) FirstRunCommand);
+pub(crate) fn register(app: &mut App) {
+    app.init_resource::<SetupState>()
+        .add_observer(on_command)
+        .add_systems(Update, sync_setup_entry);
+}
+#[derive(Component, Clone, Default)]
+struct SetupEntry;
+fn sync_setup_entry(
+    state: Res<SetupState>,
     palette: Option<Res<WindowPalette>>,
-    roots: Query<Entity, With<AppShellRoot>>,
-    overlays: Query<Entity, With<FirstRunModalOverlay>>,
+    roots: Query<Entity, With<SettingsBody>>,
+    entries: Query<Entity, With<SetupEntry>>,
     mut commands: Commands,
 ) {
-    for entity in &overlays {
-        commands.entity(entity).despawn();
-    }
-    if !changed.event().0 {
+    if state.0.view().info.is_none() || roots.is_empty() {
+        for entity in &entries {
+            commands.entity(entity).despawn();
+        }
         return;
     }
-    let Some(palette) = palette else {
+    if !entries.is_empty() {
+        return;
+    }
+    let (Some(palette), Ok(root)) = (palette, roots.single()) else {
         return;
     };
-    let Ok(root) = roots.single() else {
+    let button = action_scene(
+        t("settings.additional_setup_open"),
+        FirstRunCommand::Open,
+        &palette.inner,
+    );
+    let entry = commands.spawn_scene(bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()) } SetupEntry
+        Children [ Text(t("settings.additional_setup")) TextRole(Role::Heading) -- Text(t("settings.additional_setup_detail")) TextRole(Role::Caption) -- @{ button } ] }).id();
+    commands.entity(root).add_one_related::<ChildOf>(entry);
+}
+
+fn on_command(command: On<FirstRunCommand>, mut commands: Commands) {
+    let command = command.event().clone();
+    commands.queue(move |world: &mut World| apply_command(world, command));
+}
+fn apply_command(world: &mut World, command: FirstRunCommand) {
+    if matches!(command, FirstRunCommand::Open) {
+        world.trigger(WindowSurfaceCommand::FirstRun);
         return;
-    };
-    let overlay = commands
-        .spawn_scene(first_run_overlay_scene(&palette.inner))
-        .id();
-    commands.entity(root).add_one_related::<ChildOf>(overlay);
-}
-
-fn first_run_overlay_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let panel = panel_scene(palette);
-    let scrim = palette.scrim;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
+    }
+    if !matches!(
+        world.resource::<WindowSurfaceState>().0,
+        Some(WindowSurface::FirstRun)
+    ) {
+        return;
+    }
+    match command {
+        FirstRunCommand::Open => {}
+        FirstRunCommand::Close => {
+            world.trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::FirstRun))
         }
-        BackgroundColor({ scrim })
-        FirstRunModalOverlay
-        Children [
-            @{ panel }
-        ]
+        FirstRunCommand::Action(action) => {
+            world
+                .resource_mut::<PendingEffects>()
+                .0
+                .push(PlatformEffect::SetupScript(SetupScriptRequest { action }));
+        }
+        FirstRunCommand::Documentation => {
+            world
+                .resource_mut::<PendingEffects>()
+                .0
+                .push(PlatformEffect::OpenUrl(UrlOpenRequest {
+                    url: DOCUMENTATION_URL.into(),
+                }))
+        }
+        FirstRunCommand::Copy(field) => {
+            let payload = world
+                .resource::<SetupState>()
+                .0
+                .view()
+                .info
+                .as_ref()
+                .and_then(|info| match field {
+                    0 => Some(info.path.display().to_string()),
+                    1 => Some(info.run_command.clone()),
+                    2 => Some(info.revert_command.clone()),
+                    _ => None,
+                });
+            if let Some(payload) = payload
+                && let Some(mut clipboard) = world.get_resource_mut::<ClipboardPort>()
+            {
+                clipboard.request_text(payload, t("first_run.title"));
+            }
+        }
+        FirstRunCommand::Scroll(delta) => {
+            for (node, mut scroll) in world
+                .query_filtered::<(&ComputedNode, &mut ScrollPosition), With<ModalBody>>()
+                .iter_mut(world)
+            {
+                let maximum = ((node.content_size().y - node.size().y)
+                    * node.inverse_scale_factor())
+                .max(0.0);
+                scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
+            }
+        }
     }
 }
-
-fn panel_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let title = t("first_run.title").to_owned();
-    let desc = t("first_run.description").to_owned();
-    let hint = t("first_run.restart_required").to_owned();
-    let radius = palette.panel_radius_px;
-    bsn! {
-        Node {
-            width: px(500.0),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_24())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor({ palette.panel_fill })
-        Children [
-            Text(title) TextRole(Role::Heading) --
-            Text(desc) TextRole(Role::Body) --
-            Text(hint) TextRole(Role::Caption)
-        ]
+fn activate(activate: On<Activate>, controls: Query<&SetupControl>, mut commands: Commands) {
+    if let Ok(control) = controls.get(activate.entity) {
+        commands.trigger(control.0.clone());
     }
 }
+pub(crate) fn action_scene(
+    label: &'static str,
+    command: FirstRunCommand,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(Val::Px(space_8())) }
+    BackgroundColor({ palette.content_bg }) Button SetupControl({ command }) on(activate)
+    Children [ Text(label) TextRole(Role::Body) Pickable::IGNORE ] }
+}
+pub(crate) fn surface_scene(view: &FirstRunUiState, palette: &UiPalette) -> impl Scene + use<> {
+    let mut body: Vec<Box<dyn Scene>> = vec![Box::new(
+        bsn! { Text(t("first_run.description")) TextRole(Role::Body) },
+    )];
+    if let Some(info) = &view.info {
+        for (label, value, copy, index) in [
+            (
+                t("first_run.location"),
+                info.path.display().to_string(),
+                t("first_run.copy_location"),
+                0,
+            ),
+            (
+                t("first_run.run_command"),
+                info.run_command.clone(),
+                t("first_run.copy_command"),
+                1,
+            ),
+            (
+                t("first_run.revert_command"),
+                info.revert_command.clone(),
+                t("first_run.copy_revert_command"),
+                2,
+            ),
+        ] {
+            let copy = action_scene(copy, FirstRunCommand::Copy(index), palette);
+            body.push(Box::new(bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column }
+                Children [ Text(label) TextRole(Role::Caption) -- Text(value) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::AnyCharacter } Node { min_width: px(0.0), max_width: percent(100) } -- @{ copy } ] }));
+        }
+    }
+    if let Some(key) = first_run_phase_key(&view.phase) {
+        body.push(Box::new(bsn! { Text(t(key)) TextRole(Role::Body) }));
+    }
+    let body = bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()) } Children [ { body } ] };
+    let mut actions: Vec<Box<dyn Scene>> = Vec::new();
+    if !view.action_pending() {
+        for (label, command) in [
+            (t("first_run.open_docs"), FirstRunCommand::Documentation),
+            (
+                t("first_run.view_script"),
+                FirstRunCommand::Action(SetupScriptAction::View),
+            ),
+            (
+                t("first_run.run_setup"),
+                FirstRunCommand::Action(SetupScriptAction::Run),
+            ),
+            (
+                t("first_run.revert_setup"),
+                FirstRunCommand::Action(SetupScriptAction::Revert),
+            ),
+        ] {
+            actions.push(Box::new(action_scene(label, command, palette)));
+        }
+        if view.phase == FirstRunPhase::RestartRequired {
+            actions.push(Box::new(action_scene(
+                t("first_run.restart"),
+                FirstRunCommand::Action(SetupScriptAction::Restart),
+                palette,
+            )));
+        }
+        if matches!(view.phase, FirstRunPhase::Failed(_))
+            && let Some(action @ (SetupScriptAction::Run | SetupScriptAction::Revert)) =
+                view.last_action
+        {
+            actions.push(Box::new(action_scene(
+                t("first_run.retry"),
+                FirstRunCommand::Action(action),
+                palette,
+            )));
+        }
+    }
+    actions.push(Box::new(action_scene(
+        t("common.close"),
+        FirstRunCommand::Close,
+        palette,
+    )));
+    modal_scene(
+        WindowSurfaceKind::FirstRun,
+        t("first_run.title"),
+        Box::new(body),
+        actions,
+        palette,
+    )
+}
+
+#[cfg(test)]
+#[path = "../tests/headless/first_run_modal.rs"]
+mod tests;

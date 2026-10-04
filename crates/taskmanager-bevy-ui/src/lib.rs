@@ -81,6 +81,7 @@ pub(crate) mod tooltip;
 pub(crate) mod tray;
 pub mod widgets;
 mod window;
+pub(crate) mod window_surface;
 
 #[cfg(test)]
 #[path = "../tests/headless/visual_parity.rs"]

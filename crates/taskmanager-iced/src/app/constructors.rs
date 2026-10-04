@@ -3,6 +3,7 @@
 //! Extracted from [`super`] so the state + update module stays the entry point.
 
 use std::path::PathBuf;
+use taskmanager_application::first_run::FirstRunController;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -94,8 +95,7 @@ impl IcedApp {
             next_saved_view_id: 10,
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),
-            first_run: crate::ui::first_run::FirstRunUiState::default(),
-            first_run_requests: std::collections::HashMap::new(),
+            first_run: FirstRunController::default(),
             system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
@@ -162,8 +162,7 @@ impl IcedApp {
             // The demo has no platform client, so the boot observation is
             // skipped: the dialog stays hidden (there is no asset answer to
             // wait for and none is fabricated).
-            first_run: crate::ui::first_run::FirstRunUiState::default(),
-            first_run_requests: std::collections::HashMap::new(),
+            first_run: FirstRunController::default(),
             system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),

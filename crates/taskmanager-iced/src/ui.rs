@@ -419,9 +419,7 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
             app.shell.projection().alert_center.policy(),
             app.modal_appear_progress(),
         ),
-        LocalSurface::FirstRun => {
-            first_run::render_first_run(app.theme(), &app.first_run, app.modal_appear_progress())
-        }
+        LocalSurface::FirstRun => first_run::render_first_run(app),
         LocalSurface::DiagnosticBundle(state) => overlays::diagnostic_bundle_overlay(app, state),
     })
 }

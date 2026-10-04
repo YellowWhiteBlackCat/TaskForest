@@ -6,6 +6,7 @@
 //! composition lives in [`registry`].
 
 use super::*;
+use std::sync::Condvar;
 use taskmanager_platform_runtime::ProviderRegistration;
 
 #[path = "fixture/environment.rs"]
@@ -31,6 +32,7 @@ use taskmanager_core::ProcessSignal;
 #[derive(Clone, Default)]
 pub(super) struct FakeProvider {
     pub(super) delay: Duration,
+    pub(super) control_gate: Option<Arc<ControlGate>>,
     pub(super) process_refresh_started: Arc<AtomicBool>,
     pub(super) service_error: Option<ProviderFailure>,
     pub(super) service_operation_error: Option<ProviderFailure>,
@@ -58,6 +60,25 @@ pub(super) struct FakeProvider {
     pub(super) storage_observation_delay: Duration,
     pub(super) gpu_observation_delay: Duration,
     pub(super) process_telemetry_failure: Option<FailureKind>,
+}
+
+/// Keeps control providers blocked until the submission assertion completes.
+#[derive(Default)]
+pub(super) struct ControlGate {
+    released: Mutex<bool>,
+    ready: Condvar,
+}
+impl ControlGate {
+    fn wait(&self) {
+        let mut released = self.released.lock().expect("control gate");
+        while !*released {
+            released = self.ready.wait(released).expect("control gate wait");
+        }
+    }
+    pub(super) fn release(&self) {
+        *self.released.lock().expect("control gate") = true;
+        self.ready.notify_all();
+    }
 }
 
 fn fixture_source(

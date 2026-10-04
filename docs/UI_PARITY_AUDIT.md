@@ -8,9 +8,9 @@
 
 | 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI |
 |---|---|---|:---:|:---:|:---:|
-| 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Pending | Aligned |
-| | `system-about` | 系统关于面板展开 | Aligned | Aligned | Aligned |
-| | `first-run` | 首次运行系统引导配置 | Aligned | Pending | Pending |
+| 基础与系统 | `about` | 应用版本、许可证与仓库说明 | Pending | Pending | Pending |
+| | `system-about` | 独立操作系统与桌面环境完整事实面 | Pending | Pending | Pending |
+| | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
 | | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
 | | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Aligned | Aligned |

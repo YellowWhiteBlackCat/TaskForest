@@ -189,6 +189,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         Some(client)
     };
     if let Some(platform) = platform.as_mut() {
+        app.first_run.observe(Some(platform), unix_now_ms());
         queue_effect(
             &mut app,
             platform,
@@ -277,6 +278,11 @@ fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> boo
 }
 
 pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+    if key.code == ratatui::crossterm::event::KeyCode::F(2) {
+        app.open_first_run();
+        return None;
+    }
+
     if key.code == ratatui::crossterm::event::KeyCode::Enter && app.settings_form.field >= 30 {
         return PrivilegeCenterInputs::from_shell(&app.shell)
             .rows()

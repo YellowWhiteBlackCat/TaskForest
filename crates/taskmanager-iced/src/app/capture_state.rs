@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_shell::fixture::setup::setup_script_info;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -71,6 +73,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "alerts" || target == "active-alert" || target == "alert-rules-manager" {
         app.open_local_surface(LocalSurface::AlertCenter);
     } else if target == "first-run" {
+        app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
         app.open_local_surface(LocalSurface::FirstRun);
     } else if target == "run-task" {
         app.open_local_surface(LocalSurface::RunTask);

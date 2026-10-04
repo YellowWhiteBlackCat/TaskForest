@@ -19,6 +19,7 @@ pub(super) fn settings_footer(
     focused_field: Option<usize>,
     theme: TuiTheme,
     inner: Rect,
+    setup_available: bool,
 ) -> SettingsFooter {
     let action = if focused_field.is_some_and(|field| field >= 30) {
         t("settings.privileges_authorize")
@@ -29,6 +30,12 @@ pub(super) fn settings_footer(
         format!("↑↓/Tab · Enter {action} · Esc {}", t("common.cancel")),
         Style::new().fg(theme.accent),
     ))];
+    if setup_available {
+        lines.push(Line::from(Span::styled(
+            format!("F2 {}", t("settings.additional_setup_open")),
+            Style::new().fg(theme.accent),
+        )));
+    }
     if let Some(error) = form.save_error.as_deref() {
         lines.push(Line::from(Span::styled(
             format!("✗ {error}"),

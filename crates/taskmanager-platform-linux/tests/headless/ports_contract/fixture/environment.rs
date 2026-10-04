@@ -31,6 +31,9 @@ impl StartupEvidenceProvider for FakeProvider {
 
 impl StartupControlProvider for FakeProvider {
     fn set_enabled(&mut self, entry: &StartupEntry, enabled: bool) -> Result<(), ProviderFailure> {
+        if let Some(gate) = &self.control_gate {
+            gate.wait();
+        }
         thread::sleep(self.delay);
         if let Ok(mut controls) = self.startup_controls.lock() {
             controls.push((entry.name.clone(), enabled));
@@ -58,6 +61,9 @@ impl SessionControlProvider for FakeProvider {
         session_id: &SessionId,
         action: SessionControlAction,
     ) -> Result<(), ProviderFailure> {
+        if let Some(gate) = &self.control_gate {
+            gate.wait();
+        }
         thread::sleep(self.delay);
         if let Ok(mut controls) = self.session_controls.lock() {
             controls.push((session_id.to_string(), action));

@@ -1004,8 +1004,6 @@ dependencies = [
 [[package]]
 name = "bevy_clipboard"
 version = "0.20.0-rc.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9e12716395dfcb405555b181d23e70de7291060589c9ce93f6e8b89d4dfb697"
 dependencies = [
  "arboard",
  "bevy_app",
@@ -1015,6 +1013,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "wl-clipboard-rs",
 ]
 
 [[package]]
@@ -9866,6 +9865,7 @@ dependencies = [
  "taskmanager-icons",
  "taskmanager-platform-contract",
  "taskmanager-shell",
+ "taskmanager-test-support",
  "taskmanager-theme",
  "taskmanager-ui-contract",
 ]
@@ -10269,6 +10269,7 @@ version = "0.2.0-rc3"
 dependencies = [
  "taskmanager-application",
  "taskmanager-core",
+ "taskmanager-platform-contract",
 ]
 
 [[package]]

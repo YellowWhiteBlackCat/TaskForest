@@ -282,7 +282,7 @@ impl TuiApp {
                     name: String::from("Diagnostic Report"),
                     description: Some(String::from("System diagnostic summary")),
                 }),
-                crate::TuiSurface::FirstRun => Some(ModalInput {
+                crate::TuiSurface::FirstRun(_) => Some(ModalInput {
                     id: String::from("first-run-modal"),
                     name: String::from(t("first_run.title")),
                     description: Some(String::from(t("first_run.description"))),

@@ -9,6 +9,9 @@ observations through named domain assembly. It is never a product dependency.
 catalog strings — the app correctly follows the host locale, so such tests
 must not; every consumer depends on this crate only through dev-dependencies.
 
+`src/setup_script.rs` supplies an injected, quiet application client with recorded typed
+setup submissions. It performs no host observation or native action.
+
 ## Boundary
 
 Schema-v1 field names, sentinel hydration, OS I/O, and source-text assertions

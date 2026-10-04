@@ -21,11 +21,12 @@ mod tests_inner {
     use super::super::{render_settings, startup_page_row};
     #[cfg(target_os = "linux")]
     use crate::gpui_app::chrome::WindowDecorationsPreference;
-    use crate::gpui_app::first_run::{self, FirstRunPhase};
+    use crate::gpui_app::first_run;
     use crate::gpui_app::graph::GraphSettings;
     use crate::gpui_app::root::RootView;
     use crate::gpui_app::settings_view::init_data_points_slider;
     use crate::gpui_app::settings_view::refresh::init_slider_entity;
+    use taskmanager_application::first_run::FirstRunController;
     use taskmanager_application::i18n;
     use taskmanager_core::ProviderId;
     #[cfg(target_os = "linux")]
@@ -147,7 +148,7 @@ mod tests_inner {
                                 gray_zero_values: presentation.gray_zero_values,
                                 notify_enabled: v.projection().alert_center.policy().enabled,
                                 history_persistence: false,
-                                first_run: &v.first_run,
+                                first_run: v.first_run.view(),
                                 notify_quiet_start: v
                                     .projection()
                                     .alert_center
@@ -437,12 +438,11 @@ mod tests_inner {
     async fn settings_exposes_optional_setup_as_an_explicit_action(cx: &mut TestAppContext) {
         let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
         root_view.update(cx, |view, _cx| {
-            view.first_run.phase = FirstRunPhase::Available;
-            view.first_run.info = Some(SetupScriptInfo {
+            view.first_run = FirstRunController::from_observation(Some(SetupScriptInfo {
                 path: std::path::PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
                 run_command: "taskforest-setup-helper --apply".to_owned(),
                 revert_command: "taskforest-setup-helper --revert".to_owned(),
-            });
+            }));
         });
         {
             let (_, settings_window) = cx.add_window_view(|_window, _cx| SettingsHarness {

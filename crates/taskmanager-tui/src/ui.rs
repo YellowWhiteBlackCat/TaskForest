@@ -237,8 +237,8 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             Some(crate::TuiSurface::DiagnosticBundle(view)) => {
                 crate::diagnostic_bundle::render_diagnostic_bundle_at(frame, view, theme, popup);
             }
-            Some(crate::TuiSurface::FirstRun) => {
-                first_run::render_first_run_overlay_at(frame, theme, popup);
+            Some(crate::TuiSurface::FirstRun(view)) => {
+                first_run::render_first_run_overlay_at(frame, app, view, theme, popup);
             }
             None => {}
         },

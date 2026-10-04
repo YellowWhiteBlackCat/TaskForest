@@ -272,6 +272,7 @@ pub enum FocusTarget {
     AlertsImport,
     /// One first-run dialog descriptor copy stop (location / run command /
     /// revert command rows, indices 0..=2).
+    FirstRunOpen,
     FirstRunCopy(u8),
     /// One first-run dialog action pill (documentation / view / run / revert /
     /// restart / retry, indices 0..=5).
@@ -280,7 +281,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 167] = [
+    pub const ALL: [Self; 168] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -442,6 +443,7 @@ impl FocusTarget {
         Self::AlertsRuleToggle(0),
         Self::AlertsExport,
         Self::AlertsImport,
+        Self::FirstRunOpen,
         Self::FirstRunCopy(0),
         Self::FirstRunCopy(1),
         Self::FirstRunCopy(2),

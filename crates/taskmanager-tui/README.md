@@ -38,6 +38,10 @@ Graphics & accelerators section with identity, driver, aggregate utilization, ev
 engine utilization and dedicated/shared memory; unavailable observations remain dashes and no
 NPU history is invented.
 
+Optional native setup is observed quietly at live startup. When a descriptor is available,
+Settings exposes F2 to review it. View/Run/Revert/Restart use the shared application controller;
+only the descriptor body scrolls, and wrapped action hints keep Close reachable in compact terminals.
+
 ## Boundary
 
 The TUI consumes `taskmanager-shell` projections and owns terminal geometry,

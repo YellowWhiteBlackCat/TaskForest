@@ -14,7 +14,7 @@
 //! text-raster mode — is an explicit unavailable state, never a dead
 //! selector.
 
-use iced::widget::{column, scrollable};
+use iced::widget::{column, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontRole, Theme, tokens,
@@ -63,7 +63,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let language = app.language();
     let prefs = app.preferences();
 
-    let groups: Vec<IcedElement<'_>> = vec![
+    let mut groups: Vec<IcedElement<'_>> = vec![
         privileges_group(app),
         general_group(theme_snapshot, language, prefs),
         appearance_group(theme_snapshot, language, app, prefs),
@@ -72,6 +72,28 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         notifications_group(theme_snapshot, prefs),
         units_group(theme_snapshot, language, prefs),
     ];
+
+    if app.first_run.view().info.is_some() {
+        groups.insert(
+            1,
+            group(
+                theme_snapshot,
+                "settings.additional_setup",
+                vec![
+                    text(t("settings.additional_setup_detail"))
+                        .size(f32::from(tokens::FONT_12))
+                        .into(),
+                    crate::focus::dynamic_button(
+                        theme_snapshot,
+                        FocusTarget::FirstRunOpen,
+                        t("settings.additional_setup_open").to_owned(),
+                        Message::FirstRun(crate::app::FirstRunMessage::Open),
+                        false,
+                    ),
+                ],
+            ),
+        );
+    }
 
     modal_overlay(
         theme_snapshot,

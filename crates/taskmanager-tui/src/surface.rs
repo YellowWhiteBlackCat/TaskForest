@@ -171,7 +171,7 @@ pub(crate) enum TuiSurface {
     ServiceDependencies(ServiceDependenciesTarget),
     ProcessAffinity(AffinityModalState),
     DiagnosticBundle(DiagnosticBundleTargetView),
-    FirstRun,
+    FirstRun(crate::first_run::FirstRunTargetView),
 }
 
 impl TuiSurface {
@@ -191,7 +191,7 @@ impl TuiSurface {
             Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
             Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
             Self::DiagnosticBundle(_) => TuiSurfaceKind::DiagnosticBundle,
-            Self::FirstRun => TuiSurfaceKind::FirstRun,
+            Self::FirstRun(_) => TuiSurfaceKind::FirstRun,
         }
     }
 }

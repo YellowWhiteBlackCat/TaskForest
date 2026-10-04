@@ -14,6 +14,7 @@
 //! loop), `focus_state` (the focus command policy).
 
 use std::time::{Duration, Instant};
+use taskmanager_application::first_run::FirstRunController;
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -22,12 +23,10 @@ use taskmanager_core::core::config::Config;
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::setup::SetupScriptAction;
 
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
@@ -546,10 +545,7 @@ pub struct IcedApp {
     /// state machine and renderer live in `ui::first_run`; the composition
     /// lane in `app::update::first_run` folds correlated platform answers
     /// into it and drives the `LocalSurface::FirstRun` slot.
-    pub(crate) first_run: crate::ui::first_run::FirstRunUiState,
-    /// Pending first-run setup-script submissions, correlated by request id
-    /// (the drained batch's answers and typed failures consume from here).
-    pub(crate) first_run_requests: std::collections::HashMap<RequestId, SetupScriptAction>,
+    pub(crate) first_run: FirstRunController,
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
