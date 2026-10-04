@@ -3,6 +3,7 @@
 use gpui::Context;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
 use taskmanager_core::core::DiagnosticBundleError;
 use taskmanager_core::core::DiagnosticBundleErrorKind;
@@ -19,7 +20,7 @@ use super::super::{
     CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
     WindowSurfaceKind,
 };
-use crate::gpui_app::dashboard::SystemSection;
+
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::process_category_projection::category_expansion_key;
 
@@ -150,7 +151,7 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.system_about_requested() {
         view.page = TopPage::System;
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         view.show_system_about();
         view.capture_evidence.mark_system_about_ready(
             view.window_surface_kind() == Some(WindowSurfaceKind::SystemAbout),
@@ -158,7 +159,7 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.about_requested() {
         view.page = TopPage::System;
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         view.show_about();
         view.capture_evidence
             .mark_about_ready(view.window_surface_kind() == Some(WindowSurfaceKind::About));
@@ -288,6 +289,7 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
                 Some(DiagnosticBundleUiState::Failed(_))
             ));
     }
+    view.prepare_dashboard_capture_history();
     let panel = view.capture_evidence.on_dashboard_state(
         &mut view.dashboard,
         &view.telemetry.system_history,

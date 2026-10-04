@@ -33,7 +33,8 @@ use taskmanager_platform_contract::{
 use taskmanager_theme::tokens;
 use taskmanager_theme::{LightDark, Skin, Theme};
 
-use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, resolve_demo_theme};
+use super::appearance::resolve_demo_theme;
+use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use taskmanager_shell::FeedbackLifecycle;

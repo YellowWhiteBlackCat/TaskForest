@@ -1,5 +1,6 @@
 //! Rendering for the root application shell.
 
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::absolute;
@@ -22,7 +23,7 @@ use super::{
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
 use crate::gpui_app::dashboard;
-use crate::gpui_app::dashboard::SystemSection;
+
 use crate::gpui_app::system_view;
 use crate::gpui_app::theme::ui_font_with_fallback;
 use crate::window_presentation::GpuiSurfaceRole;
@@ -69,7 +70,7 @@ fn schedule_system_inventory_capture(
         return;
     }
     view.page = TopPage::System;
-    view.dashboard.section = SystemSection::Hardware;
+    view.dashboard.section = SystemPageSection::Hardware;
     let inventory_visible = system_view::memory_inventory_card_is_visible(
         &system_view::MemoryInventoryInputs {
             state: view.shell.smbios_memory_state(),

@@ -174,7 +174,10 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::HistoryReplayToggle => "iced-history-replay-toggle".to_owned(),
         FocusTarget::HistoryReplayWindow(w) => format!("iced-history-replay-window-{w:?}"),
         FocusTarget::HistoryReplayRefresh => "iced-history-replay-refresh".to_owned(),
-        FocusTarget::ResourceHistoryWindow(w) => {
+        FocusTarget::SystemDashboardPrevious => "iced-system-dashboard-previous".to_owned(),
+        FocusTarget::SystemDashboardNext => "iced-system-dashboard-next".to_owned(),
+        FocusTarget::SystemSection(section) => format!("iced-system-section-{section:?}"),
+        FocusTarget::SystemHistoryWindow(w) => {
             format!("iced-resource-history-window-{}", w.id())
         }
         FocusTarget::AlertCenterClear => "iced-alert-center-clear".to_owned(),

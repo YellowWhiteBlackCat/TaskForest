@@ -172,12 +172,11 @@ pub fn gap_preserving_envelope_positions(samples: &[f32], target: usize) -> Vec<
     if target == 0 || samples.len() <= target {
         return (0..samples.len()).collect();
     }
-    let bucket = samples.len().div_ceil(target);
-    samples
-        .chunks(bucket)
-        .enumerate()
-        .map(|(bucket_index, values)| {
-            let offset = bucket_index.saturating_mul(bucket);
+    (0..target)
+        .map(|bucket_index| {
+            let offset = bucket_index.saturating_mul(samples.len()) / target;
+            let end = bucket_index.saturating_add(1).saturating_mul(samples.len()) / target;
+            let values = &samples[offset..end];
             let position = values
                 .iter()
                 .position(|value| !value.is_finite())

@@ -1,6 +1,7 @@
 //! Device generation and optional-enrichment history regressions.
 
 use super::*;
+use crate::HistoryRetention;
 use taskmanager_core::SmartAvailability;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
@@ -8,7 +9,8 @@ use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 #[test]
 fn absent_device_writes_a_gap_and_reappearance_resets_generation_history() {
     let device_id = "disk:wwid:fixture";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let present = StorageTelemetryObservation::current(
         vec![healthy_disk(device_id, 1, 42.0)],
         10,
@@ -66,7 +68,8 @@ fn absent_device_writes_a_gap_and_reappearance_resets_generation_history() {
 #[test]
 fn storage_rate_keeps_domain_gaps_but_never_bridges_device_generations() {
     let device_id = "disk:wwid:rate-fixture";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let present = StorageTelemetryObservation::current(
         vec![healthy_disk_with_rate(device_id, 1, 7, 5)],
         10,
@@ -162,7 +165,8 @@ fn aggregate_io_rates_gap_on_partial_devices_but_empty_inventory_is_zero() {
     let disk_gap = "disk:aggregate:gap";
     let network_ok = "network:aggregate:ok";
     let network_gap = "network:aggregate:gap";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let lifecycle_map = |first: &str, second: &str, observed_at_ms| {
         BTreeMap::from([
             (
@@ -280,7 +284,8 @@ fn aggregate_io_rates_gap_on_partial_devices_but_empty_inventory_is_zero() {
 fn smart_temperature_history_is_scoped_to_disk_identity() {
     let disk_a = "disk:wwid:temperature-a";
     let disk_b = "disk:wwid:temperature-b";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let observation = |observed_at_ms, temperature_a, temperature_b| {
         let disk = |device_id: &str, temperature_c| {
             DiskMetricsFixtureBuilder::new()
@@ -332,7 +337,8 @@ fn smart_temperature_history_is_scoped_to_disk_identity() {
 #[test]
 fn smart_temperature_cache_and_failed_refresh_append_gaps() {
     let device_id = "disk:wwid:smart-freshness";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let observation = |storage_observed_at_ms, smart_state, temperature_c| {
         StorageTelemetryObservation::current(
             vec![
@@ -422,7 +428,8 @@ fn smart_temperature_cache_and_failed_refresh_append_gaps() {
 #[test]
 fn mismatched_device_generation_never_bridges_history() {
     let device_id = "gpu:pci:0000:01:00.0";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let mut gpu = GpuMetrics::from_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(77.0, 10),
         ..Default::default()
@@ -461,7 +468,8 @@ fn mismatched_device_generation_never_bridges_history() {
 #[test]
 fn gpu_history_uses_typed_current_truth_and_records_stale_as_a_gap() {
     let device_id = "gpu:pci:0000:03:00.0";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let observation = |scalar_observations, observed_at_ms| {
         let mut gpu = GpuMetrics::from_observations(scalar_observations);
         gpu.device_id = device_id.to_owned();
@@ -551,7 +559,8 @@ fn gpu_history_uses_typed_current_truth_and_records_stale_as_a_gap() {
 #[test]
 fn gpu_typed_history_keeps_scalar_units_and_missing_fields_as_none() {
     let device_id = "gpu:pci:0000:04:00.0";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let mut gpu = GpuMetrics::from_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(37.5, 10),
         temperature_c: ScalarObservation::available(61.0, 10),
@@ -633,7 +642,8 @@ fn gpu_typed_history_keeps_scalar_units_and_missing_fields_as_none() {
 #[test]
 fn every_domain_has_an_independent_typed_ingestion_lane() {
     let device_id = "net:mac:00:11:22:33:44:55";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let memory =
         MemoryTelemetryObservation::current(observed_memory(100, 0, 0, 0, 10), 10, Vec::new());
     let network = NetworkTelemetryObservation::current(
@@ -768,7 +778,8 @@ fn aggregate_network_history_excludes_loopback_but_keeps_physical_rates() {
             ),
         ]),
     );
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     ingestor
         .ingest_correlated_network(stamp(1), &observation)
         .expect("network ingestion");
@@ -792,7 +803,8 @@ fn aggregate_network_history_excludes_loopback_but_keeps_physical_rates() {
 #[test]
 fn current_authoritative_lifecycle_prunes_expired_device_history() {
     let device_id = "disk:wwid:expired";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let present = StorageTelemetryObservation::current(
         vec![healthy_disk(device_id, 1, 1.0)],
         10,
@@ -826,7 +838,8 @@ fn current_authoritative_lifecycle_prunes_expired_device_history() {
 #[test]
 fn valid_metric_survives_unhealthy_optional_enrichment_state() {
     let device_id = "disk:wwid:smart-denied";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let mut disk = healthy_disk(device_id, 1, 25.0);
     disk.device_state = DeviceState {
         status: DeviceStatus::PermissionDenied,
@@ -873,7 +886,8 @@ fn classify_window(samples: &[f32]) -> Vec<Option<f32>> {
 #[test]
 fn disk_active_time_live_window_is_generation_scoped_and_honestly_empty() {
     let device_id = "disk:wwid:active-window";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let observation = |generation, activity, observed_at_ms| {
         StorageTelemetryObservation::current(
             vec![healthy_disk(device_id, generation, activity)],

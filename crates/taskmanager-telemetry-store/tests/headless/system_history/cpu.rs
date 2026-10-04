@@ -1,11 +1,13 @@
 //! Correlated CPU, host, and independent-domain history regressions.
 
 use super::*;
+use crate::HistoryRetention;
 use taskmanager_core::MAX_TRACKED_LOGICAL_CPUS;
 
 #[test]
 fn correlated_history_is_bounded_oldest_first_and_not_prefilled() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     assert!(store.system_history.cpu_usage().samples().is_empty());
 
     for (revision, usage) in [(1, 10.0), (2, 20.0), (3, 30.0)] {
@@ -29,7 +31,8 @@ fn correlated_history_is_bounded_oldest_first_and_not_prefilled() {
 
 #[test]
 fn current_zero_and_non_current_gap_remain_distinct() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let current = CpuTelemetryObservation::current(
         CpuMetrics::from_observations(CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(0.0, 10),
@@ -89,7 +92,8 @@ fn current_zero_and_non_current_gap_remain_distinct() {
 
 #[test]
 fn dynamic_power_and_sensor_history_is_generation_scoped_and_gap_aware() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let battery_id = "power-supply:BAT0";
     let mut battery = BatteryInfo::new(battery_id, DeviceState::healthy(100));
     battery.device_generation = DeviceGeneration::new(1);
@@ -238,7 +242,8 @@ fn dynamic_power_and_sensor_history_is_generation_scoped_and_gap_aware() {
 
 #[test]
 fn current_cpu_domain_keeps_independent_scalar_failures_as_history_gaps() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let cpu = CpuTelemetryObservation::partial(
         CpuMetrics::from_observations(CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(42.0, 10),
@@ -274,7 +279,8 @@ fn current_cpu_domain_keeps_independent_scalar_failures_as_history_gaps() {
 
 #[test]
 fn host_scalar_unknowns_are_gaps_inside_a_current_partial_domain() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let host = HostRuntimeObservation::partial(
         HostRuntimeFacts {
             uptime_secs: ScalarObservation::available(0, 10),
@@ -308,7 +314,8 @@ fn host_scalar_unknowns_are_gaps_inside_a_current_partial_domain() {
 
 #[test]
 fn revisions_are_monotonic_per_domain_and_duplicates_do_not_append() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let cpu = CpuTelemetryObservation::current(CpuMetrics::default(), 10, Vec::new());
     let memory = MemoryTelemetryObservation::current(MemoryMetrics::default(), 10, Vec::new());
 
@@ -348,7 +355,8 @@ fn revisions_are_monotonic_per_domain_and_duplicates_do_not_append() {
 
 #[test]
 fn watermark_tracks_length_and_latest_revision_without_cloning() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     // Empty history: no samples, no revision.
     assert_eq!(store.system_history.cpu_usage().watermark(), (0, None));
 
@@ -370,7 +378,8 @@ fn watermark_tracks_length_and_latest_revision_without_cloning() {
 /// the CPU page consumes.
 #[test]
 fn per_core_temperature_and_frequency_histories_append_and_gap() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let two_cores = CpuTelemetryObservation::current(
         CpuMetrics::from_observations(CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(30.0, 10),
@@ -453,7 +462,8 @@ fn per_core_temperature_and_frequency_histories_append_and_gap() {
 
 #[test]
 fn correlated_per_core_history_has_a_hard_outer_cardinality_bound() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(1);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(1));
     let reported = MAX_TRACKED_LOGICAL_CPUS + 1;
     let cpu = CpuTelemetryObservation::current(
         CpuMetrics::from_observations(CpuScalarObservations {

@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use taskmanager_application::system_timeline::{TimelineMetric, TimelineSeries};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::trend::{self, TrendSeries};
@@ -78,12 +80,19 @@ struct CoreEntry {
     samples: Rc<Vec<Rc<[f32]>>>,
 }
 
+#[derive(Clone)]
+struct TimelineEntry {
+    source: Arc<[f32]>,
+    graph: Rc<[f32]>,
+}
+
 /// Bounded cache for the system-wide, per-core, and identity-specific graph
 /// series. Every entry is keyed by the history revision, so the bounded
 /// `VecDeque` → contiguous-slice copy happens once after a real history write,
 /// not once per retained Iced frame or per device card.
 #[derive(Clone, Default)]
 pub(crate) struct HistorySeriesCache {
+    timeline: HashMap<TimelineMetric, TimelineEntry>,
     entries: Vec<Option<Entry>>,
     core: Option<CoreEntry>,
     device_revision: Option<u64>,
@@ -91,6 +100,23 @@ pub(crate) struct HistorySeriesCache {
 }
 
 impl HistorySeriesCache {
+    pub(super) fn timeline(&mut self, metric: TimelineMetric, source: &Arc<[f32]>) -> Rc<[f32]> {
+        if let Some(entry) = self.timeline.get(&metric)
+            && Arc::ptr_eq(&entry.source, source)
+        {
+            return Rc::clone(&entry.graph);
+        }
+        let graph = Rc::from(source.as_ref());
+        self.timeline.insert(
+            metric,
+            TimelineEntry {
+                source: Arc::clone(source),
+                graph: Rc::clone(&graph),
+            },
+        );
+        graph
+    }
+
     fn slot(series: TrendSeries) -> usize {
         match series {
             TrendSeries::CpuUsagePercent => 0,
@@ -184,6 +210,15 @@ impl HistorySeriesCache {
 }
 
 impl IcedApp {
+    pub(crate) fn system_timeline_graph(
+        &self,
+        series: &TimelineSeries,
+        metric: TimelineMetric,
+    ) -> Rc<[f32]> {
+        self.projection_caches
+            .timeline_series(metric, &series.samples(metric))
+    }
+
     /// Return a shared contiguous series snapshot for the current Iced data
     /// epoch. Cache hits clone only the `Rc`; the bounded `VecDeque`→slice copy
     /// happens once per metric after a real refresh/capacity change.

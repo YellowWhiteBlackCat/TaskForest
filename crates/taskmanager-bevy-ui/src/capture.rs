@@ -156,7 +156,6 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "gpu-engine-inventory"
         | "intel-gpu-telemetry"
         | "history-replay"
-        | "history-60m"
         | "battery-fan-performance"
         | "battery-live-performance"
         | "device-hotplug"
@@ -165,8 +164,10 @@ pub(crate) fn capture_page() -> Option<Page> {
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(Page::Startup)
         }
-        "system" | "system-dashboard" | "system-hardware" | "system-npu" | "about"
-        | "system-about" | "diagnostic-preview" | "diagnostic-failure" => Some(Page::System),
+        "system" | "system-dashboard" | "history-60m" | "system-hardware" | "system-npu"
+        | "about" | "system-about" | "diagnostic-preview" | "diagnostic-failure" => {
+            Some(Page::System)
+        }
         "alerts" | "active-alert" | "alert-rules-manager" | "event-center" => Some(Page::Alerts),
         "users" | "sessions" => Some(Page::Sessions),
         "settings"

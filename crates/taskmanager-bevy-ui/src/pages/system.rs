@@ -33,6 +33,7 @@ use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
+pub(crate) mod dashboard;
 mod hardware;
 use hardware::hardware_fact_rows;
 
@@ -43,10 +44,14 @@ use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::detail_row_scene;
+use crate::widgets::layout::SystemDashboardBudget;
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::ComputedNode;
 use bevy::ui_widgets::ScrollArea;
+use dashboard::{SystemDashboardState, SystemDashboardToolbar};
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::npu::NpuEngineKind;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
@@ -521,6 +526,12 @@ fn system_body_scene(
 /// Content-region scene for the System page. The body container starts empty;
 /// [`paint_system`] is its only author.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
+    let dashboard = dashboard::button(
+        t("dashboard.title").to_owned(),
+        dashboard::DashboardControl::Section(SystemPageSection::Dashboard),
+        false,
+        _context.palette,
+    );
     let title = Page::System.title();
     let waiting = t("common.waiting_inventory").to_owned();
     let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
@@ -546,12 +557,13 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
              Text(title) TextRole(Role::Heading) --
              Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } SystemActions
-             Children [ @{ diagnostic } -- @{ about } -- @{ system_information } ] --
+             Children [ @{ dashboard } -- @{ diagnostic } -- @{ about } -- @{ system_information } ] --
 
                 Text(waiting)
                 SystemStatusLine
                 TextRole(Role::Caption)
             --
+             Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column } SystemDashboardToolbar Children [] --
 
                 Node {
                     width: percent(100),
@@ -590,14 +602,79 @@ pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
         );
         (hardware, smbios, npu, sensors, summary, status)
     };
-    let scene = system_body_scene(
-        hardware.as_ref(),
-        smbios.as_ref(),
-        npu.as_ref(),
-        sensors.as_ref(),
-        &summary,
-        &palette,
-    );
+    let status = if let Some(state) = world
+        .get_resource::<SystemDashboardState>()
+        .filter(|state| state.section == SystemPageSection::Dashboard)
+    {
+        let projection = world.non_send::<FrontendTrack>().shell.projection();
+        let count = projection
+            .processes
+            .as_ref()
+            .map_or_else(missing_value, |rows| rows.len().to_string());
+        format!(
+            "{} {} · {} {} · {}",
+            t("dashboard.processes"),
+            count,
+            t("dashboard.active_alerts"),
+            projection.alert_active.len(),
+            state.window.label()
+        )
+    } else {
+        status
+    };
+    let scene: Box<dyn Scene> = if world
+        .get_resource::<SystemDashboardState>()
+        .is_some_and(|state| state.section == SystemPageSection::Dashboard)
+    {
+        let size = world
+            .query_filtered::<&ComputedNode, With<SystemBody>>()
+            .iter(world)
+            .next()
+            .map(|node| node.size() * node.inverse_scale_factor())
+            .unwrap_or_default();
+        let state = world.resource::<SystemDashboardState>();
+        let series = world
+            .non_send::<FrontendTrack>()
+            .shell
+            .system_timeline_series(state.window);
+        Box::new(dashboard::body(
+            &series,
+            state,
+            SystemDashboardBudget::resolve(size.x, size.y),
+            &palette,
+        ))
+    } else {
+        Box::new(system_body_scene(
+            hardware.as_ref(),
+            smbios.as_ref(),
+            npu.as_ref(),
+            sensors.as_ref(),
+            &summary,
+            &palette,
+        ))
+    };
+    if let Some(state) = world.get_resource::<SystemDashboardState>() {
+        let toolbar = dashboard::toolbar(state, &palette);
+        if let Some(host) = world
+            .query_filtered::<bevy::ecs::entity::Entity, With<SystemDashboardToolbar>>()
+            .iter(world)
+            .next()
+        {
+            let old = world
+                .get::<Children>(host)
+                .map(|children| children.iter().copied().collect::<Vec<_>>())
+                .unwrap_or_default();
+            for child in old {
+                let _ = world.despawn(child);
+            }
+            if let Ok(fresh) = world.spawn_scene(toolbar) {
+                let child = fresh.id();
+                world
+                    .entity_mut(host)
+                    .add_one_related::<bevy::ecs::hierarchy::ChildOf>(child);
+            }
+        }
+    }
     let mut body_query = world.query_filtered::<bevy::ecs::entity::Entity, With<SystemBody>>();
     let Some(body) = body_query.iter(world).next() else {
         return;

@@ -32,6 +32,10 @@ identity map.
 - `src/performance_history_projection.rs` filters the same accepted request into
   performance rows; `src/history_replay_samples.rs` preserves recording downtime
   without mistaking a downsampled time window for missing collection.
+- `src/system_timeline.rs` owns System sections, 1m/5m/15m/60m windows,
+  stable immutable curves and raw latest/peak readouts through an inward read port,
+  without a telemetry-store dependency. Timestamp-spaced cells
+  preserve downtime; unavailable tails do not reuse an older current value.
 - `src/process_category_projection.rs` owns category bucket order and typed
   process aggregates. It selects the PSS-preferred display observation, then
   delegates availability, coverage, freshness, failure, and saturating-add

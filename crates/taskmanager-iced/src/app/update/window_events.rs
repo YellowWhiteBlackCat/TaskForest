@@ -54,7 +54,14 @@ impl IcedApp {
                     return Some(bound_system_body_to_end());
                 }
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
-                    let ready = if self.capture.data_target == CaptureDataTarget::MemoryInventory {
+                    let ready = if self.capture.data_target == CaptureDataTarget::SystemDashboard {
+                        self.shell.page() == AppPage::System
+                            && self
+                                .shell
+                                .system_timeline_series(self.system_dashboard_window)
+                                .covered_ms
+                                >= self.system_dashboard_window.minutes() * 60_000
+                    } else if self.capture.data_target == CaptureDataTarget::MemoryInventory {
                         self.shell.page() == AppPage::System
                             && matches!(
                                 self.shell.smbios_memory_state(),

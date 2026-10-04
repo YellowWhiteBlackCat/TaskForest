@@ -21,10 +21,11 @@ retires histories for identities no longer present; unavailable/partial source
 states never masquerade as removal. Verify append/query/revision behavior,
 retirement and generation isolation without relying on live hardware. The
 three correlated per-core rings share core's hard outer-cardinality limit, so
-one oversized provider vector cannot multiply retained histories. Live graph
-rings have a physical 600-sample maximum and evict the oldest sample; a user
-history preference only narrows the visible tail and cannot make storage grow
-without bound. Dynamic battery/sensor histories retain old identities across
+one oversized provider vector cannot multiply retained histories. CPU, memory, storage and network host aggregates retain at most 36,001 points,
+covering an hour at the minimum 100 ms cadence. Receipts, per-core, device and
+secondary rings stay at 600 points. `HistoryRetention` declares both physical
+budgets; live graphs clone only their requested tail, and preferences never
+replace authority or grow physical storage. Dynamic battery/sensor histories retain old identities across
 partial discovery, append explicit gaps when a retained identity is not sampled,
 and share a 256-identity domain ceiling; new identities above that ceiling are
 rejected with an observable ingestion report until authoritative discovery
@@ -88,6 +89,7 @@ the single path).
 ## Module map
 
 ```text
+src/retention.rs                 physical host/detail budgets
 src/live_graph.rs                revision-keyed immutable series; per-device reads must
 │                                carry generation (double-sided discipline)
 src/system_history.rs

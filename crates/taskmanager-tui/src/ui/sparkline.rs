@@ -405,7 +405,16 @@ const fn history_trend_block(mode: TuiGlyphMode, index: usize) -> char {
 /// terminal reads a monotonic gradient straight from the renderer instead of
 /// the collapsed output of the post-paint cell rewrite.
 pub(super) fn history_trend_in(mode: TuiGlyphMode, samples: &[f32]) -> String {
-    let bounded = gap_preserving_envelope(samples, SPARKLINE_MAX_SAMPLES);
+    history_trend_with_width_in(mode, samples, SPARKLINE_MAX_SAMPLES)
+}
+
+/// The same complete-window trend inside an explicitly allocated terminal slot.
+pub(super) fn history_trend_with_width_in(
+    mode: TuiGlyphMode,
+    samples: &[f32],
+    width: usize,
+) -> String {
+    let bounded = gap_preserving_envelope(samples, width.clamp(1, 600));
     let samples = bounded.as_slice();
     let finite = samples.iter().copied().filter(|sample| sample.is_finite());
     let min = finite.clone().fold(f32::INFINITY, f32::min);

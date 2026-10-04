@@ -3,6 +3,7 @@
 //! same acceptance order, same values, same explicit gaps — and a rejected
 //! observation must never reach the sink.
 
+use crate::HistoryRetention;
 use std::sync::{Arc, Mutex};
 
 use taskmanager_core::{
@@ -61,7 +62,8 @@ fn memory_observation(used_pct: f32) -> MemoryTelemetryObservation {
 fn attached_sink_mirrors_accepted_samples_in_ring_order() {
     let sink = Arc::new(CapturingSink::default());
     let (_store, ingestor) = {
-        let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+        let (store, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
         (store, ingestor.with_record_sink(sink.clone()))
     };
 
@@ -120,7 +122,8 @@ fn gpu_device_series_mirror_usage_and_point_derived_scalars() {
     let sink = Arc::new(CapturingSink::default());
     let device_id = "gpu:pci:0000:01:00.0";
     let (_store, ingestor) = {
-        let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+        let (store, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
         (store, ingestor.with_record_sink(sink.clone()))
     };
 
@@ -169,7 +172,8 @@ fn gpu_device_series_mirror_usage_and_point_derived_scalars() {
 fn domain_unavailable_mirrors_explicit_gaps_for_seen_series() {
     let sink = Arc::new(CapturingSink::default());
     let (_store, ingestor) = {
-        let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+        let (store, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
         (store, ingestor.with_record_sink(sink.clone()))
     };
 
@@ -199,7 +203,8 @@ fn domain_unavailable_mirrors_explicit_gaps_for_seen_series() {
 fn rejected_revisions_never_reach_the_sink() {
     let sink = Arc::new(CapturingSink::default());
     let (_store, ingestor) = {
-        let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+        let (store, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
         (store, ingestor.with_record_sink(sink.clone()))
     };
 
@@ -221,7 +226,8 @@ fn rejected_revisions_never_reach_the_sink() {
 fn battery_dynamic_history_mirrors_to_the_sink() {
     let sink = Arc::new(CapturingSink::default());
     let (_store, ingestor) = {
-        let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+        let (store, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
         (store, ingestor.with_record_sink(sink.clone()))
     };
 

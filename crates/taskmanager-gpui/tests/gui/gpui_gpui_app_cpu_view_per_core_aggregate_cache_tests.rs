@@ -3,11 +3,13 @@ use std::rc::Rc;
 use taskmanager_core::core::CpuTelemetryObservation;
 use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 
 #[test]
 fn aggregate_series_reuse_the_same_rc_until_the_generation_bumps() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(600);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(600));
     for (revision, usage) in [(1, 25.0), (2, 40.0)] {
         let stamp = CorrelatedTelemetryStamp::from_accepted_event(revision, revision * 1000)
             .expect("non-zero revision");

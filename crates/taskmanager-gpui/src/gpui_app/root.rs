@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use taskmanager_telemetry_store::HistoryRetention;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
 #[cfg(target_os = "linux")]
@@ -259,7 +260,6 @@ pub struct RootView {
     /// Per-window Apps process-list and column scroll state.
     pub processes_scroll: processes_view::ProcessesScrollState,
     /// Per-window System dashboard scroll state.
-    pub dashboard_scroll: ScrollHandle,
     /// Per-window System health scroll state.
     pub system_health_scroll: ScrollHandle,
     /// Per-window CPU specification/details scroll state. The CPU rail can
@@ -610,7 +610,7 @@ impl RootView {
     }
     pub fn new(theme: Theme, cx: &mut Context<Self>) -> Self {
         let (telemetry, telemetry_ingestor) =
-            TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
         Self::new_inner(
             theme,
             telemetry,
@@ -751,7 +751,6 @@ impl RootView {
             history_replay_scroll: ScrollHandle::new(),
             sidebar_scroll: ScrollHandle::new(),
             processes_scroll: processes_view::ProcessesScrollState::default(),
-            dashboard_scroll: ScrollHandle::new(),
             system_health_scroll: ScrollHandle::new(),
             cpu_details_scroll: ScrollHandle::new(),
             telemetry,

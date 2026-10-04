@@ -5,6 +5,7 @@ use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_theme::Theme;
@@ -124,7 +125,8 @@ async fn menu_suspend_resume_submit_the_neutral_request(cx: &mut gpui::TestAppCo
         Arc::new(NoEvents),
         facets,
     ));
-    let (telemetry, ingestor) = TelemetryStore::shared_with_correlated_ingestion(60);
+    let (telemetry, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(60));
     let view = cx.new(|cx| {
         super::RootView::new_with_platform(
             Theme::dark(),

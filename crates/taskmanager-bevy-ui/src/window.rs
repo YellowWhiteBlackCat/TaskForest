@@ -53,7 +53,10 @@ use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
 use taskmanager_assets::product;
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::Theme;
+
+mod appearance;
+use appearance::demo_theme_from_env;
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
 use crate::capture::{
@@ -75,10 +78,12 @@ use crate::widgets::controls::{ControlVisual, control_background};
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 
 /// The resolved token palette, injected as a resource for spawn systems.
@@ -152,69 +157,6 @@ pub(crate) fn run(shared: &'static SharedRuntime) -> ExitCode {
 /// explicit no-I/O fixture and the platform drain is omitted.
 pub(crate) fn run_demo(shared: &'static SharedRuntime) -> ExitCode {
     run_with_mode(shared, true)
-}
-
-/// The light reference skin the capture gate has always rendered, and the
-/// fallback whenever no appearance override is present.
-fn reference_demo_theme() -> Theme {
-    Theme::build(
-        Skin::Gnome,
-        LightDark::Light,
-        HighContrast::Off,
-        ResolvedFonts::system_for(Skin::Gnome),
-    )
-}
-
-/// Parse the shared testing/developer appearance override GPUI owns
-/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
-/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
-/// `None` for an unset or syntactically invalid value. This is the SAME
-/// vocabulary (and env name) GPUI's
-/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
-/// vocabulary would let the capture harness and the frontends drift.
-fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
-    let (skin_token, mode_token) = value.split_once('-')?;
-    let skin = match skin_token.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match mode_token.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
-}
-
-/// Resolve the demo/capture theme. The override is a FALLBACK: an explicit
-/// appearance preference (the persisted config, in production) always wins and
-/// the demo path has none, so `TM_SKIN` is the only input here. An unset or
-/// invalid value resolves the unchanged light reference skin.
-fn resolve_demo_theme(value: Option<&str>, high_contrast: bool) -> Theme {
-    let Some((skin, mode)) = value.and_then(parse_tm_skin) else {
-        return reference_demo_theme();
-    };
-    Theme::build(
-        skin,
-        mode,
-        if high_contrast {
-            HighContrast::On
-        } else {
-            HighContrast::Off
-        },
-        ResolvedFonts::system_for(skin),
-    )
-}
-
-/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override for the demo/capture boot.
-fn demo_theme_from_env() -> Theme {
-    let value = std::env::var("TM_SKIN").ok();
-    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
-    resolve_demo_theme(value.as_deref(), high_contrast)
 }
 
 fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
@@ -306,7 +248,9 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         app.init_resource::<CaptureMarkerState>();
         app.add_systems(
             PostUpdate,
-            emit_capture_marker.after(crate::pages::performance::replay::paint_charts),
+            emit_capture_marker
+                .after(crate::pages::performance::replay::paint_charts)
+                .after(crate::pages::system::dashboard::paint_charts),
         );
     }
     match app.run() {
@@ -326,6 +270,11 @@ fn emit_capture_marker(world: &mut World) {
         return;
     }
     match capture_scenario_target() {
+        Some("system-dashboard" | "history-60m")
+            if !crate::pages::system::dashboard::presented(world) =>
+        {
+            return;
+        }
         Some("system-hardware") => {
             let anchor = world
                 .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<MemoryInventoryAnchor>>(
@@ -406,7 +355,13 @@ fn emit_capture_marker(world: &mut World) {
     }
     if matches!(
         capture_scenario_target(),
-        Some("history-replay" | "application-history-replay" | "system-hardware")
+        Some(
+            "history-replay"
+                | "application-history-replay"
+                | "system-hardware"
+                | "system-dashboard"
+                | "history-60m"
+        )
     ) && !world.resource::<CaptureMarkerState>().data_presented
     {
         world.resource_mut::<CaptureMarkerState>().data_presented = true;
@@ -458,6 +413,12 @@ impl Plugin for FrontendWindowPlugin {
                     seed_service_log_fixture(&mut shell);
                 }
                 seed_capture_confirmation_fixture(&mut shell);
+                if matches!(
+                    capture_scenario_target(),
+                    Some("system-dashboard" | "history-60m")
+                ) {
+                    let _ = seed_shell_system_dashboard_history(&mut shell, 7_200_000);
+                }
                 if capture_scenario_target() == Some("system-hardware") {
                     seed_shell_memory_inventory(&mut shell);
                 }
@@ -501,6 +462,18 @@ impl Plugin for FrontendWindowPlugin {
         crate::system_information_modal::register(app);
         crate::first_run_modal::register(app);
         crate::pages::system::diagnostic_modal::register(app);
+        crate::pages::system::dashboard::register(app);
+        if let Some(target @ ("system-dashboard" | "history-60m")) = capture_scenario_target() {
+            let mut state = app
+                .world_mut()
+                .resource_mut::<crate::pages::system::dashboard::SystemDashboardState>();
+            state.section = SystemPageSection::Dashboard;
+            state.window = if target == "history-60m" {
+                SystemHistoryWindow::SixtyMinutes
+            } else {
+                SystemHistoryWindow::FifteenMinutes
+            };
+        }
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);

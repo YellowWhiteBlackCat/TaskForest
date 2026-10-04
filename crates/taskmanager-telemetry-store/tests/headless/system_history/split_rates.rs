@@ -7,6 +7,7 @@
 //! persistence mirror — the persisted vocabulary keeps carrying the summed
 //! series, so already-written history files and their readers stay valid.
 
+use crate::HistoryRetention;
 use std::sync::{Arc, Mutex};
 
 use taskmanager_core::{
@@ -103,7 +104,8 @@ fn classify(samples: Vec<f32>) -> Vec<Option<f32>> {
 #[test]
 fn storage_split_rates_keep_directional_availability_and_generation_resets() {
     let device_id = "disk:wwid:split-storage";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
 
     // Tick 1: both directions measured (7 read, 5 write).
@@ -229,7 +231,8 @@ fn storage_split_rates_keep_directional_availability_and_generation_resets() {
 #[test]
 fn network_split_rates_keep_directional_availability_and_the_summed_lane() {
     let device_id = "net:mac:00:11:22:33:44:56";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
 
     ingestor
@@ -339,7 +342,8 @@ impl HistoryRecordSink for CapturingSink {
 #[test]
 fn split_lanes_are_not_mirrored_to_the_persisted_vocabulary() {
     let sink = Arc::new(CapturingSink::default());
-    let (_store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (_store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let ingestor = ingestor.with_record_sink(sink.clone());
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
 

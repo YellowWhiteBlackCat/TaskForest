@@ -1,9 +1,11 @@
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::FilesystemHealthSnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::SensorQuantity;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
 #[path = "tests/dashboard.rs"]
@@ -21,7 +23,7 @@ const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 use super::{
     CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
     ProcessBatchAction, ProcessDetailsSection, ProcessItem, ServiceId, SystemHealthCaptureOutcome,
-    SystemSection, SystemSnapshot, TopPage,
+    SystemSnapshot, TopPage,
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
 use crate::gpui_app::process_insights::ProcessInsightsState;
@@ -661,7 +663,7 @@ fn health_scenarios_wait_for_exact_visible_fixture_state() {
         );
         assert!(outcome.ready());
         assert_eq!(page, TopPage::System);
-        assert_eq!(dashboard.section, SystemSection::Health);
+        assert_eq!(dashboard.section, SystemPageSection::Health);
         let selected_disk = &snapshot.disks[0];
         assert!(
             evidence
@@ -842,7 +844,8 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
 
     let mut processes = Vec::new();
     evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(32);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(32));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let live_graph = LiveGraphHistory::from_store(store.clone(), 32);
     assert!(evidence.seed_gpu_engine_inventory_history(

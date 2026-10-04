@@ -275,6 +275,15 @@ fn tui_local_command_system(
         }
     }
     if let Some(digit) = digit {
+        let system = run_registry_shortcut(
+            app,
+            crate::command_palette::SYSTEM_HISTORY_DIGITS_SHORTCUT,
+            Some(digit),
+            modifiers,
+        );
+        if system.is_consumed() {
+            return system;
+        }
         return run_registry_shortcut(
             app,
             crate::command_palette::RESOURCE_DIGITS_SHORTCUT,

@@ -37,7 +37,7 @@ use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
-use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::FontPreference;
 use taskmanager_theme::Skin;
@@ -413,7 +413,7 @@ pub fn init<E>(
     // dashboard windows and device pages project the same canonical rings;
     // shrinking a graph tail must never discard history for another surface.
     let (telemetry, telemetry_ingestor) =
-        TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
     // Continuous history belongs to this frontend process. Enabled persistence
     // starts the paired writer/replay session without blocking the UI thread.
     let mut platform = spawn_client()?;

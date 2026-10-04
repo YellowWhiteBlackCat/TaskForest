@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -98,7 +99,9 @@ impl IcedApp {
             alerts_page: alerts::AlertsPageState::default(),
             first_run: FirstRunController::default(),
             observed_appearance: None,
-            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
+            system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
+            system_section: SystemPageSection::Hardware,
+            system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
@@ -170,7 +173,9 @@ impl IcedApp {
             // wait for and none is fabricated).
             first_run: FirstRunController::default(),
             observed_appearance: None,
-            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
+            system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
+            system_section: SystemPageSection::Hardware,
+            system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),

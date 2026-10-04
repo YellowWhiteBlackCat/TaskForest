@@ -99,6 +99,7 @@ windows = { version = "0.58.0", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
 accesskit = "0.24.1"
 accesskit_consumer = "0.38"
 taskmanager-test-support = { path = "../taskmanager-test-support" }

@@ -18,6 +18,7 @@ use taskmanager_ui_contract::IconId;
 use crate::app::{FocusTarget, Message};
 use crate::theme;
 
+pub(crate) mod dashboard_budget;
 pub(crate) mod highlight;
 pub(crate) mod inputs;
 pub(crate) mod popover;

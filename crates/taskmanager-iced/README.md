@@ -143,8 +143,9 @@ real worker rows plus their presented frame; no renderer seeds replay data.
   application controller, quiet observation and explicit Settings entry,
   bounded metadata viewport with fixed actions; dismiss is side-effect free), the Containers full page
   (`ui/containers.rs`, six honest branch states via `page_branch`), and the System-page
-  dashboard segment (`ui/system_dashboard.rs`, summary card + `HistoryWindow` pills +
-  alert mirror — no history is invented without a shell projection).
+  dashboard (`ui/system_dashboard.rs`) consumes the shared application timeline. Fixed
+  window controls and metric paging admit complete cards inside the allocated body;
+  summary CPU/memory values use the same accepted readouts as their curves.
 - Device charts share one window→geometry mapping (`WindowSlots`, right-anchored slots;
   hover crosshairs snap through the same mapping) with DATA/OVERLAY dual caches; the
   dual-series device chart (`ui/device_chart/multi.rs`) separates read/write and rx/tx

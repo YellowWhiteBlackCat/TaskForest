@@ -4,6 +4,9 @@ use std::collections::HashSet;
 use taskmanager_application::AlertEvaluation;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::ManagedAlertRuleEditOutcome;
+use taskmanager_application::system_timeline::{
+    SystemHistoryWindow, SystemPageSection, TimelineSelection,
+};
 use taskmanager_core::core::alerts::AlertRuleTransferError;
 
 mod panels;
@@ -16,21 +19,13 @@ pub use view::{DashboardViewProps, render_dashboard, render_system_header};
 pub use widget::{DashboardWidgetProps, render_widget};
 
 use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::timeline::{HistoryWindow, TimelineSelection, TimelineState};
+use crate::gpui_app::timeline::TimelineGraphCache;
 use taskmanager_application::DesktopNotificationRequest;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::alert_severity_label;
 use taskmanager_core::core::{Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity};
 use taskmanager_shell::SortDir;
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SystemSection {
-    #[default]
-    Dashboard,
-    Hardware,
-    Health,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DashboardPanel {
@@ -206,10 +201,11 @@ impl SavedViewPreset {
 
 #[derive(Clone, Debug)]
 pub struct DashboardState {
-    pub section: SystemSection,
-    pub history_window: HistoryWindow,
+    pub section: SystemPageSection,
+    pub history_window: SystemHistoryWindow,
     pub history_selection: TimelineSelection,
-    pub timeline: TimelineState,
+    pub history_first_metric: usize,
+    pub timeline: TimelineGraphCache,
     pub events: EventCenterState,
     pub saved_views: Vec<SavedViewPreset>,
     pub saved_view_transfer_feedback: Option<saved_view_transfer::SavedViewTransferFeedback>,
@@ -219,10 +215,11 @@ pub struct DashboardState {
 impl DashboardState {
     pub fn new() -> Self {
         Self {
-            section: SystemSection::Dashboard,
-            history_window: HistoryWindow::FifteenMinutes,
+            section: SystemPageSection::Dashboard,
+            history_window: SystemHistoryWindow::FifteenMinutes,
             history_selection: TimelineSelection::default(),
-            timeline: TimelineState::default(),
+            history_first_metric: 0,
+            timeline: TimelineGraphCache::default(),
             events: EventCenterState::default(),
             saved_views: vec![
                 SavedViewPreset::built_in(

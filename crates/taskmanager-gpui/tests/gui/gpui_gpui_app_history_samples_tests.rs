@@ -1,6 +1,7 @@
 use super::*;
 use taskmanager_core::core::SmartAvailability;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn stamp(revision: u64) -> CorrelatedTelemetryStamp {
@@ -102,7 +103,8 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
             .smart_temperature_c(Some(temperature_c))
             .build()
     };
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     ingestor
         .ingest_correlated_storage(
@@ -176,7 +178,8 @@ fn engine_projection_keeps_missing_engine_samples_as_gaps() {
             lifecycle(),
         )
     };
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     for (revision, observed_at_ms, engines) in [
         (

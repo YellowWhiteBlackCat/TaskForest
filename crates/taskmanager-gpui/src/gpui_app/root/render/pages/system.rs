@@ -1,16 +1,18 @@
 //! System page body: section header and the selected section.
 //!
 //! Renders the dashboard/hardware/health section header plus the currently
-//! selected `SystemSection` body, from the frame-local render context.
+//! selected `SystemPageSection` body, from the frame-local render context.
 
 use gpui::{AnyElement, Context, Div, IntoElement, ParentElement, Styled, div, px};
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageScaffold;
 use taskmanager_ui::theme_binding::definite_length;
 
 use super::{PageRenderContext, RootView, SelectedDevice};
-use crate::gpui_app::dashboard::SystemSection;
+use crate::gpui_app::root::responsive::DashboardBudget;
+
 use crate::gpui_app::root::{
     SystemHealthCallbacks, dashboard, responsive, system_health_view, system_view,
 };
@@ -36,23 +38,21 @@ impl RootView {
         let processes = self.processes_arc().clone();
         let system_layout = responsive::SystemPageBudget::from_frame(frame);
         let content: AnyElement = match self.dashboard.section {
-            SystemSection::Dashboard => {
+            SystemPageSection::Dashboard => {
                 dashboard::render_dashboard(dashboard::DashboardViewProps {
                     theme: t,
-                    scroll: &self.dashboard_scroll,
-                    snapshot: snap,
                     history: &self.telemetry.system_history,
-                    process_count: processes.len(),
+                    process_count: self.projection().processes.as_ref().map(|rows| rows.len()),
                     active_alert_count: self.active_alerts().len(),
                     state: &self.dashboard,
-                    layout: system_layout,
+                    layout: DashboardBudget::from_frame(frame),
                     entity: entity.clone(),
                     hover_slot: self.graph_hover.clone(),
                     graph_cache: graph_cache.clone(),
                 })
                 .into_any_element()
             }
-            SystemSection::Hardware => system_view::render_system(
+            SystemPageSection::Hardware => system_view::render_system(
                 t,
                 system_view::SystemViewData {
                     hardware: &hardware,
@@ -71,7 +71,7 @@ impl RootView {
                 entity.clone(),
             )
             .into_any_element(),
-            SystemSection::Health => {
+            SystemPageSection::Health => {
                 let health_entity = entity.clone();
                 let callbacks = SystemHealthCallbacks::new(move |request, _window, cx| {
                     health_entity.update(cx, |view, cx| {

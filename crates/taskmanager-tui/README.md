@@ -33,6 +33,8 @@ only device-wide history, while temperature, frequency, power, idle residency an
 remain simultaneous rows. Standard terminals add live-engine and opt-in PMU detail; compact
 terminals keep a dense primary-fact strip plus the largest possible utilization chart and omit
 the secondary engine region. Only the standard engine region scrolls; the main chart never does.
+System `w` opens the shared dashboard; `1`–`4` select its real time window,
+arrows page complete metric groups, and `b` returns to hardware facts.
 The System viewport counts physical wrapped rows, so the final continuation remains
 reachable in short windows. Its ordered section projection keeps NPU devices in the fixed
 Graphics & accelerators section with identity, driver, aggregate utilization, every reported

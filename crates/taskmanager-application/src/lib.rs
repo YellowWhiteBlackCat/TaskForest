@@ -76,6 +76,7 @@ mod router;
 mod service_lifecycle;
 pub mod snapshot_export;
 mod source_status;
+pub mod system_timeline;
 mod telemetry_refresh_policy;
 pub mod window_capture;
 

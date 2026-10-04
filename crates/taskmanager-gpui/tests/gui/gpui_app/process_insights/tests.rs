@@ -23,6 +23,7 @@ use taskmanager_platform_contract::RequestId;
 use taskmanager_platform_contract::RequestPort;
 use taskmanager_platform_contract::RetryDisposition;
 use taskmanager_platform_contract::SubmissionError;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 
 use taskmanager_application::NetworkEscalationState;
@@ -258,7 +259,8 @@ fn root_with_escalation_platform(
         std::sync::Arc::new(NoEvents),
         facets,
     ));
-    let (telemetry, ingestor) = TelemetryStore::shared_with_correlated_ingestion(60);
+    let (telemetry, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(60));
     let view = cx.new(|cx| {
         crate::gpui_app::root::RootView::new_with_platform(
             Theme::dark(),

@@ -8,6 +8,7 @@ use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarg
 use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
     ProcessInsightsRevision,
@@ -27,6 +28,7 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::{
@@ -492,17 +494,23 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         "system-about" => {
             app.open_system_information();
         }
+        "system-dashboard" | "history-60m" => {
+            app.shell.application.active_page = AppPage::System;
+            app.select_system_section(SystemPageSection::Dashboard);
+            app.system_history_window = if scene == "history-60m" {
+                SystemHistoryWindow::SixtyMinutes
+            } else {
+                SystemHistoryWindow::FifteenMinutes
+            };
+            let _ = seed_shell_system_dashboard_history(&mut app.shell, 7_200_000);
+        }
         "system-hardware" => {
             app.shell.application.active_page = AppPage::System;
             seed_shell_memory_inventory(&mut app.shell);
             app.memory_capture_scroll_pending = true;
         }
 
-        "storage-health"
-        | "sensor-center"
-        | "system-dashboard"
-        | "active-alert"
-        | "alert-rules-manager" => {
+        "storage-health" | "sensor-center" | "active-alert" | "alert-rules-manager" => {
             app.shell.application.active_page = AppPage::Performance;
             app.toggle_health();
         }

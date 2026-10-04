@@ -117,6 +117,10 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   consumed by Iced/TUI through the shell history and by GPUI's direct track through its own
   `LiveGraphHistory` view of the same store — no frontend keeps a second sampling fold.
 
+The System timeline adapter implements the application read port over the
+authoritative telemetry rings. Window, gap and summary rules stay in application;
+frontends receive immutable projections and hold only native rendering caches.
+
 ## Contract and verification
 
 Cross-crate ownership, batch order and lifecycle matrices are authoritative in
@@ -161,5 +165,5 @@ src/history.rs                      correlated outcomes → telemetry store mapp
 src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions
 src/process_filter.rs               process filter predicates
 src/memory.rs                       memory presentation helpers
-src/fixture/ (cpu_topology inventory smbios_memory) deterministic demo/capture/test seam
+src/fixture/ (cpu_topology dashboard_history inventory smbios_memory) deterministic demo/capture/test seam
 ```

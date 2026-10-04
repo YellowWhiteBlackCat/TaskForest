@@ -1,5 +1,8 @@
 //! Renderer-local resource, focus, and process-layout selectors.
 
+use taskmanager_application::system_timeline::{
+    SystemHistoryWindow, SystemPageSection, TimelineMetric,
+};
 use taskmanager_application::{AppPage, DirectoryUsageRequest, PlatformEffect, i18n::t};
 use taskmanager_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus,
@@ -122,6 +125,26 @@ impl TuiApp {
         }
     }
 
+    pub(crate) fn select_system_section(&mut self, section: SystemPageSection) {
+        self.system_section = section;
+        self.system_scroll = 0;
+    }
+    pub(crate) fn select_system_history_window_digit(&mut self, digit: char) -> bool {
+        let window = digit
+            .to_digit(10)
+            .and_then(|value| value.checked_sub(1))
+            .and_then(|index| usize::try_from(index).ok())
+            .and_then(|index| SystemHistoryWindow::ALL.get(index))
+            .copied();
+        if let Some(window) = window {
+            self.system_history_window = window;
+            self.system_scroll = 0;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Move the System section viewport. This is page navigation, not
     /// selection state: all typed facts remain in one fixed order.
     pub(crate) fn scroll_system(&mut self, delta: isize) {
@@ -129,6 +152,11 @@ impl TuiApp {
             self.system_scroll = self.system_scroll.saturating_add(delta as usize);
         } else {
             self.system_scroll = self.system_scroll.saturating_sub(delta.unsigned_abs());
+        }
+        if self.system_section == SystemPageSection::Dashboard {
+            self.system_scroll = self
+                .system_scroll
+                .min(TimelineMetric::ALL.len().saturating_sub(1));
         }
     }
 

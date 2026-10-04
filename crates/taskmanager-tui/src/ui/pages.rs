@@ -15,6 +15,7 @@ use super::containers::{
 use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_shell::presentation::control_error_detail;
@@ -365,6 +366,10 @@ impl SystemFactViewport {
 }
 
 pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    if app.system_section == SystemPageSection::Dashboard {
+        super::system_dashboard::render(frame, app, theme, area);
+        return;
+    }
     let smbios_snapshot = match app.shell.smbios_memory_state() {
         SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
         _ => None,

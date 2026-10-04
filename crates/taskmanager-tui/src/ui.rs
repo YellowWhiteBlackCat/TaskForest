@@ -45,6 +45,7 @@ pub(crate) mod session_menu;
 pub(crate) mod settings;
 mod sparkline;
 pub(crate) mod startup_menu;
+mod system_dashboard;
 mod system_information;
 pub(crate) mod table_hit;
 mod text;

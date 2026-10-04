@@ -42,6 +42,7 @@ use taskmanager_telemetry_store::{
 use crate::{DirectTrackState, FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 mod cpu_topology;
+pub mod dashboard_history;
 mod inventory;
 pub mod setup;
 pub mod smbios_memory;

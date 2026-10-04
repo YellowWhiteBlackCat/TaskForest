@@ -1,6 +1,7 @@
 //! Execution and scope guards for the canonical local command registry.
 
 use super::*;
+use taskmanager_application::system_timeline::SystemPageSection;
 
 pub(super) fn run_direct_arms(
     app: &mut TuiApp,
@@ -22,6 +23,12 @@ pub(super) fn run_direct_arms(
 /// Ctrl/Alt; the resource digits also refuse the platform modifier).
 fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers) -> bool {
     match scope {
+        TuiDirectScope::SystemPage => app.page() == AppPage::System && modifiers == Modifiers::NONE,
+        TuiDirectScope::SystemDashboard => {
+            app.page() == AppPage::System
+                && app.system_section == SystemPageSection::Dashboard
+                && modifiers == Modifiers::NONE
+        }
         TuiDirectScope::PerformanceHistoryAvailable => {
             app.page() == AppPage::Performance
                 && app.history_replay_available()
@@ -87,6 +94,21 @@ fn execute_tui_local_direct(
     action: TuiDirectAction,
 ) -> InputDispatch {
     match action {
+        TuiDirectAction::SystemDashboard => {
+            app.select_system_section(SystemPageSection::Dashboard);
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::SystemHardware => {
+            app.select_system_section(SystemPageSection::Hardware);
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::SelectSystemHistoryWindow => {
+            if digit.is_some_and(|digit| app.select_system_history_window_digit(digit)) {
+                InputDispatch::Consumed
+            } else {
+                InputDispatch::Unhandled
+            }
+        }
         TuiDirectAction::ToggleHistoryReplay => {
             app.toggle_history_replay();
             InputDispatch::Consumed

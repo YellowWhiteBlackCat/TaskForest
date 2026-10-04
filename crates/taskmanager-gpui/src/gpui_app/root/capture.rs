@@ -6,9 +6,10 @@
 //! tokens can also prepare otherwise hard-to-reproduce presentation states;
 //! capture preparation never invokes a destructive action.
 
-use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
+use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState};
 use crate::gpui_app::process_insights::process_insights_capture_fixture;
-use crate::gpui_app::timeline::HistoryWindow;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+
 use taskmanager_core::core::NpuInventorySnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
@@ -25,14 +26,16 @@ use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::{AlertEvent, ServiceId};
 use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::fixture::seed_capture_msr_readout;
+use taskmanager_telemetry_store::live_graph::{LiveGraphHistory, MAX_HISTORY_CAPACITY};
 use taskmanager_telemetry_store::{
-    CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
+    CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor, HistoryRetention,
+    TelemetryStore,
 };
 use taskmanager_theme::Theme;
 
 use super::{ProcessDetailsSection, TopPage};
 
-mod dashboard_history;
+use taskmanager_shell::fixture::dashboard_history::seed_system_dashboard_history;
 mod fixtures;
 mod gpu_history;
 mod marker;
@@ -62,6 +65,17 @@ pub(super) use state::{
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
+    pub(crate) fn dashboard_history_fixture_requested(&self) -> bool {
+        self.is_enabled()
+            && self.telemetry_ready()
+            && self.ui_data_ready()
+            && !self.scenario_ready()
+            && matches!(
+                self.scenario,
+                Some(CaptureScenario::SystemDashboard | CaptureScenario::HistorySixtyMinutes)
+            )
+    }
+
     pub(crate) fn memory_inventory_capture(&self) -> bool {
         self.scenario == Some(CaptureScenario::SystemHardware)
     }
@@ -603,41 +617,41 @@ impl CaptureEvidence {
         }
         let (handled, panel) = match self.scenario {
             Some(CaptureScenario::SystemDashboard) => {
-                dashboard.section = SystemSection::Dashboard;
-                dashboard.history_window = HistoryWindow::FifteenMinutes;
+                dashboard.section = SystemPageSection::Dashboard;
+                dashboard.history_window = SystemHistoryWindow::FifteenMinutes;
                 (
-                    dashboard_history::seed(history, ingestor, anchor_timestamp_ms),
+                    seed_system_dashboard_history(history, ingestor, anchor_timestamp_ms),
                     None,
                 )
             }
             Some(CaptureScenario::SystemHardware) => {
-                dashboard.section = SystemSection::Hardware;
+                dashboard.section = SystemPageSection::Hardware;
                 (false, None)
             }
             Some(CaptureScenario::SystemNpu) => {
-                dashboard.section = SystemSection::Hardware;
+                dashboard.section = SystemPageSection::Hardware;
                 // Readiness belongs to the post-layout scroll state above.
                 (false, None)
             }
             Some(CaptureScenario::HistorySixtyMinutes) => {
-                dashboard.section = SystemSection::Dashboard;
-                dashboard.history_window = HistoryWindow::SixtyMinutes;
+                dashboard.section = SystemPageSection::Dashboard;
+                dashboard.history_window = SystemHistoryWindow::SixtyMinutes;
                 (
-                    dashboard_history::seed(history, ingestor, anchor_timestamp_ms),
+                    seed_system_dashboard_history(history, ingestor, anchor_timestamp_ms),
                     None,
                 )
             }
             Some(CaptureScenario::AlertRulesManager) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 (true, Some(DashboardPanel::AlertRules))
             }
             Some(CaptureScenario::EventCenter) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 self.event_history_fixture = Some(EventCenterState::capture_event_fixture());
                 (true, Some(DashboardPanel::Events))
             }
             Some(CaptureScenario::SavedViewPresets) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 dashboard.add_capture_saved_view();
                 (true, Some(DashboardPanel::SavedViews))
             }
@@ -710,15 +724,18 @@ impl CaptureEvidence {
     }
 }
 
-#[cfg(feature = "test-support")]
 impl super::RootView {
-    /// Seed deterministic dashboard evidence through the production telemetry authority.
-    pub fn seed_dashboard_capture_history(&self, newest_timestamp_ms: u64) -> bool {
-        dashboard_history::seed(
-            &self.telemetry.system_history,
-            &self.telemetry_ingestor,
-            newest_timestamp_ms,
-        )
+    /// Isolate controlled capture observations from host samples collected at startup.
+    pub(crate) fn prepare_dashboard_capture_history(&mut self) {
+        if !self.capture_evidence.dashboard_history_fixture_requested() {
+            return;
+        }
+        let (telemetry, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
+        self.live_graph_history =
+            LiveGraphHistory::from_store(telemetry.clone(), MAX_HISTORY_CAPACITY);
+        self.telemetry = telemetry;
+        self.telemetry_ingestor = ingestor;
     }
 }
 

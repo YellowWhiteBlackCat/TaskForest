@@ -7,6 +7,7 @@
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use taskmanager_application::AppPage;
+use taskmanager_application::system_timeline::SystemPageSection;
 
 use crate::{TuiApp, TuiInputScope};
 
@@ -484,6 +485,8 @@ impl TuiFramePlan {
         let chrome = frame_chrome_layout(
             area,
             if app.page() == AppPage::AppHistory
+                || (app.page() == AppPage::System
+                    && app.system_section == SystemPageSection::Dashboard)
                 || (app.page() == AppPage::Performance && app.history_replay_open())
             {
                 FrameChromePage::HistoryReview

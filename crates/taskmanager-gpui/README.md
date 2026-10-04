@@ -257,6 +257,13 @@ process-termination path. A second launch activates the existing window. The
 capture-only harness and tray-unavailable fallback may close normally so they
 cannot leave an owned process behind.
 
+System windows and readouts come from the application timeline over the four long
+host rings. `timeline.rs` only adapts stable Arc allocations to GPUI graph Rc caches.
+The Dashboard derives whole metric groups from the root content budget. Window
+controls and paging stay fixed; all four complete cards remain reachable with an
+explicit bottom inset. Paint and hover use the selected timeline's actual point
+count across the whole time axis.
+
 SMBIOS review consumes the shared inventory rows with configured units. Fixed labels and
 wrapped, selectable values keep complete module facts inside the bounded System body;
 permission entry stays in Settings, and capture waits for native inventory scrolling.
@@ -292,7 +299,7 @@ src/gpui_app.rs                        RootView composition root
 ├── graph/                             shared graph/chart components
 ├── elements/                          shared UI elements
 ├── list_view.rs                       virtual list component
-├── history_samples.rs  timeline.rs    history and timeline rendering
+├── history_samples.rs  timeline.rs    history reads and application-curve allocation adapter
 ├── help_overlay.rs                    keyboard help overlay
 ├── system_about.rs  about.rs          system/app about pages
 ├── app_history_view.rs  first_run.rs  application history and first-run

@@ -103,6 +103,7 @@ use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
 
 use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
     AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, ManagedAlertRule, ManagedAlertRuleEdit,
     ManagedAlertRuleEditOutcome, Modifiers, SurfaceKind, source_notice,
@@ -216,6 +217,8 @@ pub struct TuiApp {
     /// Stored as navigation intent and clamped by the current projection and
     /// terminal height during paint.
     pub system_scroll: usize,
+    pub(crate) system_section: SystemPageSection,
+    pub(crate) system_history_window: SystemHistoryWindow,
     pub(crate) memory_capture_scroll_pending: bool,
     /// Alert-rule selection index in the health overlay. Clamped against the
     /// projection's managed-rules count during access.
@@ -351,6 +354,8 @@ impl TuiApp {
             gpu_engine_scroll: 0,
             chart_cursor: None,
             system_scroll: 0,
+            system_section: SystemPageSection::Hardware,
+            system_history_window: SystemHistoryWindow::FifteenMinutes,
             memory_capture_scroll_pending: false,
             health_rule_selection: 0,
             expanded_groups: default_category_expansions(),

@@ -1,5 +1,6 @@
 //! Correlation-gated, gap-aware histories for independent system domains.
 
+use crate::HistoryRetention;
 use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -13,6 +14,7 @@ mod device;
 mod dynamic_history;
 mod gpu;
 mod ingest;
+mod ring;
 
 pub use dynamic_history::DynamicTelemetryHistory;
 pub use gpu::GpuMetricPoint;
@@ -150,6 +152,20 @@ impl<T> BoundedHistory<T> {
         let _ = buffer.try_push(value);
     }
 
+    fn tail_samples(&self, limit: usize) -> Vec<T>
+    where
+        T: Clone,
+    {
+        let _commit = lock_unpoisoned(&self.commit_gate);
+        let buffer = self
+            .buffer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut tail = buffer.iter().rev().take(limit).cloned().collect::<Vec<_>>();
+        tail.reverse();
+        tail
+    }
+
     fn samples(&self) -> Vec<T>
     where
         T: Clone,
@@ -168,79 +184,6 @@ impl<T> BoundedHistory<T> {
 #[derive(Clone)]
 pub struct CorrelatedMetricHistory<T> {
     inner: Arc<BoundedHistory<CorrelatedMetricSample<T>>>,
-}
-
-impl<T> CorrelatedMetricHistory<T> {
-    fn new(capacity: usize, commit_gate: Arc<Mutex<()>>) -> Self {
-        Self {
-            inner: Arc::new(BoundedHistory::new(capacity, commit_gate)),
-        }
-    }
-
-    fn push(&self, stamp: CorrelatedTelemetryStamp, measured_at_ms: Option<u64>, value: Option<T>) {
-        self.inner.push_in_transaction(CorrelatedMetricSample {
-            stamp,
-            measured_at_ms,
-            value,
-        });
-    }
-
-    /// Latest real sampling time while the caller already owns this ring's
-    /// domain commit gate. This is deliberately not a public read path: taking
-    /// the gate again from freshness fan-out would deadlock the transaction.
-    fn latest_measured_at_in_transaction(&self) -> Option<u64> {
-        self.inner
-            .buffer
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .iter()
-            .rev()
-            .filter_map(|sample| sample.measured_at_ms)
-            .next()
-    }
-
-    #[must_use]
-    pub fn samples(&self) -> Vec<CorrelatedMetricSample<T>>
-    where
-        T: Clone,
-    {
-        self.inner.samples()
-    }
-
-    #[must_use]
-    pub fn capacity(&self) -> usize {
-        self.inner.capacity
-    }
-
-    /// Stable identity of the underlying storage (the shared buffer's
-    /// address). Derived-projection caches include it so two distinct
-    /// histories that happen to agree on `(len, revision)` can never serve
-    /// each other's cached vector.
-    #[must_use]
-    pub fn ring_id(&self) -> usize {
-        std::sync::Arc::as_ptr(&self.inner) as usize
-    }
-
-    /// Content watermark: `(len, latest_revision)`. Two histories with the
-    /// same watermark cannot differ, so derived projections (graph sample
-    /// vectors) can key their caches on it and skip the sample clone entirely.
-    /// Reads the lock without cloning any sample.
-    #[must_use]
-    pub fn watermark(&self) -> (usize, Option<u64>) {
-        let _commit = lock_unpoisoned(&self.inner.commit_gate);
-        let buffer = self
-            .inner
-            .buffer
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        (
-            buffer.occupied_len(),
-            buffer
-                .iter()
-                .next_back()
-                .map(|sample| sample.stamp.revision()),
-        )
-    }
 }
 
 /// Generation-scoped history for one stable device identity.
@@ -355,7 +298,9 @@ struct CorrelatedSystemTelemetryHistoryInner {
 }
 
 impl CorrelatedSystemTelemetryHistoryInner {
-    fn new(capacity: usize) -> Self {
+    fn new(retention: HistoryRetention) -> Self {
+        let capacity = retention.detail();
+        let host_capacity = retention.host_aggregates();
         let system_commit_gates = std::array::from_fn(|_| Arc::new(Mutex::new(())));
         let dynamic_commit_gates = std::array::from_fn(|_| Arc::new(Mutex::new(())));
         let host_gate = system_commit_gates[SystemHistoryDomain::Host.index()].clone();
@@ -377,25 +322,25 @@ impl CorrelatedSystemTelemetryHistoryInner {
             uptime_secs: CorrelatedMetricHistory::new(capacity, host_gate.clone()),
             process_count: CorrelatedMetricHistory::new(capacity, host_gate.clone()),
             thread_count: CorrelatedMetricHistory::new(capacity, host_gate),
-            cpu_usage: CorrelatedMetricHistory::new(capacity, cpu_gate.clone()),
+            cpu_usage: CorrelatedMetricHistory::new(host_capacity, cpu_gate.clone()),
             cpu_cores: Mutex::new(Vec::new()),
             cpu_core_temperatures: Mutex::new(Vec::new()),
             cpu_core_frequencies: Mutex::new(Vec::new()),
             cpu_temperature: CorrelatedMetricHistory::new(capacity, cpu_gate.clone()),
             cpu_frequency_mhz: CorrelatedMetricHistory::new(capacity, cpu_gate.clone()),
             cpu_power_w: CorrelatedMetricHistory::new(capacity, cpu_gate),
-            memory_usage: CorrelatedMetricHistory::new(capacity, memory_gate.clone()),
+            memory_usage: CorrelatedMetricHistory::new(host_capacity, memory_gate.clone()),
             swap_usage: CorrelatedMetricHistory::new(capacity, memory_gate),
             storage_activity: Mutex::new(HashMap::new()),
             storage_rate: Mutex::new(HashMap::new()),
             storage_read_rate: Mutex::new(HashMap::new()),
             storage_write_rate: Mutex::new(HashMap::new()),
             storage_temperature_c: Mutex::new(HashMap::new()),
-            storage_rate_total: CorrelatedMetricHistory::new(capacity, storage_gate),
+            storage_rate_total: CorrelatedMetricHistory::new(host_capacity, storage_gate),
             network_rate: Mutex::new(HashMap::new()),
             network_rx_rate: Mutex::new(HashMap::new()),
             network_tx_rate: Mutex::new(HashMap::new()),
-            network_rate_total: CorrelatedMetricHistory::new(capacity, network_gate),
+            network_rate_total: CorrelatedMetricHistory::new(host_capacity, network_gate),
             gpu_metrics: Mutex::new(HashMap::new()),
             gpu_engine_metrics: Mutex::new(HashMap::new()),
             gpu_usage: Mutex::new(HashMap::new()),
@@ -509,8 +454,8 @@ pub struct CorrelatedSystemTelemetryHistory {
 }
 
 impl CorrelatedSystemTelemetryHistory {
-    pub(crate) fn shared(capacity: usize) -> (Self, CorrelatedSystemTelemetryIngestor) {
-        let inner = Arc::new(CorrelatedSystemTelemetryHistoryInner::new(capacity));
+    pub(crate) fn shared(retention: HistoryRetention) -> (Self, CorrelatedSystemTelemetryIngestor) {
+        let inner = Arc::new(CorrelatedSystemTelemetryHistoryInner::new(retention));
         (
             Self {
                 inner: inner.clone(),

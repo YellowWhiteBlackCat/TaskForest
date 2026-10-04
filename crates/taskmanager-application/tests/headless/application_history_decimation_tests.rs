@@ -264,11 +264,24 @@ fn coarse_replay_cells_preserve_mixed_gaps_and_pair_values_with_their_original_t
     );
     for target in 1..=values.len() {
         let positions = gap_preserving_envelope_positions(&values, target);
-        assert!(positions.len() <= target);
+        assert_eq!(positions.len(), target);
         assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
         assert!(
             positions.iter().any(|index| values[*index].is_nan()),
             "even a mixed missing interval cannot become a continuous curve"
         );
+    }
+}
+
+#[test]
+fn coarse_replay_fills_non_divisible_budgets_and_keeps_the_complete_window() {
+    use super::gap_preserving_envelope_positions;
+    let values: Vec<f32> = (0..241).map(|index| index as f32).collect();
+    for width in [24, 52, 118, 198] {
+        let positions = gap_preserving_envelope_positions(&values, width);
+        assert_eq!(positions.len(), width);
+        assert_eq!(positions.last(), Some(&240));
+        assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(positions[0] < 241 / width);
     }
 }

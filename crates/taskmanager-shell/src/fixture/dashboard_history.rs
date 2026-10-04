@@ -1,4 +1,4 @@
-//! Deterministic typed facts for the dashboard capture history fixture.
+//! Dense synthetic one-hour history accepted through the production correlation-gated store.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -19,13 +19,13 @@ use taskmanager_telemetry_store::{
 };
 
 /// Feed deterministic capture facts through the production correlation-gated store.
-pub(super) fn seed(
+pub fn seed_system_dashboard_history(
     history: &CorrelatedSystemTelemetryHistory,
     ingestor: &CorrelatedSystemTelemetryIngestor,
     newest_timestamp_ms: u64,
 ) -> bool {
-    const SAMPLE_COUNT: u64 = 241;
-    const STEP_MS: u64 = 15_000;
+    const SAMPLE_COUNT: u64 = 3_601;
+    const STEP_MS: u64 = 1_000;
     const WINDOW_MS: u64 = 60 * 60 * 1_000;
     const DISK_ID: &str = "capture:disk:dashboard";
     const NETWORK_ID: &str = "capture:network:dashboard";
@@ -60,7 +60,7 @@ pub(super) fn seed(
             .ingest_correlated_cpu(
                 stamp,
                 &CpuTelemetryObservation::current(
-                    cpu(index, timestamp_ms),
+                    cpu(index / 15, timestamp_ms),
                     timestamp_ms,
                     Vec::new(),
                 ),
@@ -72,14 +72,18 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_memory(
                 stamp,
-                &MemoryTelemetryObservation::current(memory(index), timestamp_ms, Vec::new()),
+                &MemoryTelemetryObservation::current(
+                    memory(index / 15, timestamp_ms),
+                    timestamp_ms,
+                    Vec::new(),
+                ),
             )
             .is_err()
         {
             return false;
         }
 
-        let (disks, disk_lifecycles) = storage(index, timestamp_ms, DISK_ID);
+        let (disks, disk_lifecycles) = storage(index / 15, timestamp_ms, DISK_ID);
         if ingestor
             .ingest_correlated_storage(
                 stamp,
@@ -96,7 +100,7 @@ pub(super) fn seed(
             return false;
         }
 
-        let (networks, network_lifecycles) = network(index, timestamp_ms, NETWORK_ID);
+        let (networks, network_lifecycles) = network(index / 15, timestamp_ms, NETWORK_ID);
         if ingestor
             .ingest_correlated_network(
                 stamp,
@@ -116,22 +120,22 @@ pub(super) fn seed(
     true
 }
 
-pub(super) fn cpu(index: u64, observed_at_ms: u64) -> CpuMetrics {
+pub fn cpu(index: u64, observed_at_ms: u64) -> CpuMetrics {
     let phase = u16::try_from(index % 24).map_or(0.0, f32::from);
-    let value = 24.0 + phase * 1.9;
+    let value = if index == 0 { 99.0 } else { 24.0 + phase * 1.9 };
     CpuMetrics::from_observations(CpuScalarObservations {
         global_usage_pct: ScalarObservation::available(value, observed_at_ms),
         ..Default::default()
     })
 }
 
-pub(super) fn memory(index: u64) -> MemoryMetrics {
+pub fn memory(index: u64, observed_at_ms: u64) -> MemoryMetrics {
     MemoryMetrics::from_observations(
         MemoryScalarObservations {
-            total_bytes: ScalarObservation::available(1_000, index),
+            total_bytes: ScalarObservation::available(1_000, observed_at_ms),
             used_bytes: ScalarObservation::available(
                 480_u64.saturating_add((index % 16).saturating_mul(7)),
-                index,
+                observed_at_ms,
             ),
             ..Default::default()
         },
@@ -139,7 +143,7 @@ pub(super) fn memory(index: u64) -> MemoryMetrics {
     )
 }
 
-pub(super) fn storage(
+pub fn storage(
     index: u64,
     observed_at_ms: u64,
     device_id: &str,
@@ -164,7 +168,7 @@ pub(super) fn storage(
     )
 }
 
-pub(super) fn network(
+pub fn network(
     index: u64,
     observed_at_ms: u64,
     device_id: &str,
@@ -205,4 +209,17 @@ fn lifecycle(device_id: &str, observed_at_ms: u64) -> BTreeMap<DeviceId, DeviceL
             absent_since_ms: None,
         },
     )])
+}
+
+/// Capture/demo-only seed of the same authoritative host rings used by normal System views.
+pub fn seed_shell_system_dashboard_history(
+    shell: &mut crate::ShellApp,
+    newest_timestamp_ms: u64,
+) -> bool {
+    let ingestor = shell.ensure_history_ingestor();
+    seed_system_dashboard_history(
+        &shell.history.store().system_history,
+        &ingestor,
+        newest_timestamp_ms,
+    )
 }

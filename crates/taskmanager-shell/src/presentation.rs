@@ -34,6 +34,7 @@ mod process;
 mod service_exit;
 mod storage;
 pub mod system_information;
+pub mod system_timeline;
 mod telemetry;
 pub mod trend;
 

@@ -15,6 +15,7 @@
 //! host ring or the per-device ring of the same accepted fact. Wrong-domain
 //! queries are explicit [`ChartSeriesError`]s, never silent redirects.
 
+use crate::HistoryRetention;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -237,7 +238,7 @@ impl LiveGraphHistory {
         // changes only the read tail, so growing it never replaces authority or
         // fabricates points and shrinking does not mutate accepted telemetry.
         let (store, ingestor) =
-            TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
         (Self::from_store(store, projection_capacity), ingestor)
     }
 
@@ -590,11 +591,19 @@ impl LiveGraphHistory {
     }
 
     fn f32_history(&self, history: CorrelatedMetricHistory<f32>) -> Vec<f32> {
-        self.tail(history.samples().iter().map(f32_value).collect())
+        history
+            .tail_samples(self.capacity())
+            .iter()
+            .map(f32_value)
+            .collect()
     }
 
     fn u64_history(&self, history: CorrelatedMetricHistory<u64>) -> Vec<f32> {
-        self.tail(history.samples().iter().map(u64_value).collect())
+        history
+            .tail_samples(self.capacity())
+            .iter()
+            .map(u64_value)
+            .collect()
     }
 
     fn f32_device(&self, history: Option<DeviceMetricHistory<f32>>, generation: u64) -> Vec<f32> {

@@ -41,6 +41,10 @@ fn theme_weight(weight: Weight) -> FontWeight {
 /// [`crate::window`] which join this palette with the embedded-face resource.
 #[derive(Clone, Debug)]
 pub(crate) struct UiPalette {
+    pub(crate) cpu: bevy::color::Color,
+    pub(crate) memory: bevy::color::Color,
+    pub(crate) disk: bevy::color::Color,
+    pub(crate) network: bevy::color::Color,
     /// Window clear color — the theme's window backdrop token.
     pub(crate) window_clear: bevy::color::Color,
     /// Card/panel fill — the theme's derived elevated surface, shared by
@@ -107,6 +111,10 @@ pub(crate) struct UiPalette {
 pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
     let standard = UiSize::Standard;
     UiPalette {
+        cpu: theme_color(theme.cpu),
+        memory: theme_color(theme.memory),
+        disk: theme_color(theme.disk),
+        network: theme_color(theme.network),
         mode: theme.mode,
         window_clear: theme_color(theme.window_bg),
         panel_fill: theme_color(theme.card_surface()),

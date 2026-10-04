@@ -1,5 +1,6 @@
 //! Scope-aware chart series routing over the live graph read model.
 
+use crate::HistoryRetention;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -128,7 +129,8 @@ fn host_and_device_legs_route_through_one_entry() {
     let disk_b = "disk:wwid:route-b";
     let nic = "network:route-nic";
     let gpu_id = "gpu:pci:route-gpu";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     ingestor
         .ingest_correlated_cpu(stamp_at(1, 10), &cpu(42.0))
         .expect("cpu observation");
@@ -308,7 +310,8 @@ fn host_and_device_legs_route_through_one_entry() {
 
 #[test]
 fn wrong_domain_queries_reject_instead_of_redirecting() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     ingestor
         .ingest_correlated_cpu(stamp_at(1, 10), &cpu(42.0))
         .expect("cpu observation");
@@ -400,7 +403,8 @@ fn every_variant_declares_its_scope_and_slots_derive_from_all() {
 #[test]
 fn device_leg_resolves_only_the_current_device_generation() {
     let device_id = "disk:wwid:scoped-generation";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let observation = |generation, activity, observed_at_ms| {
         StorageTelemetryObservation::current(
             vec![disk(
@@ -445,7 +449,8 @@ fn device_leg_resolves_only_the_current_device_generation() {
 #[test]
 fn disk_series_reads_break_the_window_across_a_generation_boundary() {
     let device_id = "disk:wwid:leak-probe";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     ingestor
         .ingest_correlated_storage(
             stamp_at(1, 10),
@@ -514,7 +519,8 @@ fn disk_series_reads_break_the_window_across_a_generation_boundary() {
 #[test]
 fn network_series_reads_break_the_window_across_a_generation_boundary() {
     let device_id = "network:leak-probe";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     ingestor
         .ingest_correlated_network(
             stamp_at(1, 10),
@@ -566,7 +572,8 @@ fn network_series_reads_break_the_window_across_a_generation_boundary() {
 #[test]
 fn gpu_device_legs_share_one_generation_discipline() {
     let device_id = "gpu:leak-probe";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let mut probe = gpu(device_id, 1, Some(55.0));
     probe.engines = vec![GpuEngine {
         name: "Graphics".to_owned(),

@@ -15,6 +15,7 @@
 
 use std::time::{Duration, Instant};
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::appearance::DesktopAppearance;
 
 use taskmanager_application::{
@@ -550,7 +551,9 @@ pub struct IcedApp {
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
-    pub(crate) system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow,
+    pub(crate) system_dashboard_window: SystemHistoryWindow,
+    pub(crate) system_section: SystemPageSection,
+    pub(crate) system_dashboard_first_metric: usize,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.
     history_runtime: history_replay::IcedHistoryRuntime,

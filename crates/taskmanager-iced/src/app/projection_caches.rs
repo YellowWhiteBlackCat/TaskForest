@@ -8,6 +8,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use taskmanager_application::system_timeline::TimelineMetric;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::trend::TrendSeries;
@@ -116,6 +118,10 @@ pub(super) struct IcedProjectionCaches {
 }
 
 impl IcedProjectionCaches {
+    pub(super) fn timeline_series(&self, metric: TimelineMetric, source: &Arc<[f32]>) -> Rc<[f32]> {
+        self.history.borrow_mut().timeline(metric, source)
+    }
+
     pub(super) fn process_performance(
         &self,
         history: &ProcessPerfHistory,

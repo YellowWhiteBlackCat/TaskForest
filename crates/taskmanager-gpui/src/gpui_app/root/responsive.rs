@@ -24,7 +24,9 @@ use taskmanager_ui::theme_binding::hsla;
 
 use super::{NavOrientation, RootView};
 
+mod dashboard;
 pub(crate) mod device_strip;
+pub(crate) use dashboard::{DashboardBudget, DashboardSummaries};
 
 pub const MIN_WIDTH: f32 = 720.0;
 pub const MIN_HEIGHT: f32 = 480.0;

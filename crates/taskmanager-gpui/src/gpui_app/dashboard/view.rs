@@ -1,13 +1,15 @@
 //! Responsive Dashboard header, navigation summaries, and history cards.
 
-use super::readouts::cpu_summary_readout;
-use super::{DashboardPanel, DashboardState, SystemSection};
+use super::{DashboardPanel, DashboardState};
 use gpui::{
-    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, ScrollHandle,
-    Stateful, StatefulInteractiveElement, Styled, Window, div, px, relative,
+    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, Stateful,
+    StatefulInteractiveElement, Styled, Window, div, px, relative,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskmanager_application::system_timeline::{
+    SystemPageSection, TimelineMetric, TimelineSelection, TimelineStatistic,
+};
 use taskmanager_ui::icons_binding;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
@@ -19,26 +21,22 @@ use taskmanager_ui::theme_binding::rgba;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting;
 use crate::gpui_app::graph::{
-    GraphCacheHandle, GraphHover, GraphHoverElement, GraphOpts, graph_element_hover, graph_hover,
+    GraphCacheHandle, GraphHover, GraphHoverElement, GraphOpts, graph_element_hover,
 };
-use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
+use crate::gpui_app::root::responsive::{
+    DashboardBudget, SystemPageBudget, SystemSurfacePresentation,
+};
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
-use crate::gpui_app::timeline::{
-    HistoryWindow, TimelineMetric, TimelineSelection, TimelineSeries, TimelineStatistic,
-};
+use crate::gpui_app::timeline::GraphTimelineSeries;
 use taskmanager_application::i18n;
 use taskmanager_core::core::AlertEvent;
-use taskmanager_core::core::SystemSnapshot;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
-use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
-#[path = "history_grid.rs"]
 mod history_grid;
 use history_grid::render_history_grid;
 
@@ -97,7 +95,7 @@ impl SummaryDestination {
         view.page = navigation.page;
         if let Some(panel) = navigation.panel {
             view.show_dashboard_panel(panel);
-            view.dashboard.section = SystemSection::Dashboard;
+            view.dashboard.section = SystemPageSection::Dashboard;
         }
         if let Some(device) = navigation.device {
             view.select_device(device);
@@ -107,22 +105,22 @@ impl SummaryDestination {
 
 fn section_pill(
     theme: &Theme,
-    section: SystemSection,
-    active: SystemSection,
+    section: SystemPageSection,
+    active: SystemPageSection,
     entity: &Entity<RootView>,
 ) -> AnyElement {
     let (id, label, icon) = match section {
-        SystemSection::Dashboard => (
+        SystemPageSection::Dashboard => (
             "system-dashboard-tab",
             i18n::t("dashboard.title"),
             IconId::System,
         ),
-        SystemSection::Hardware => (
+        SystemPageSection::Hardware => (
             "system-hardware-tab",
             i18n::t("dashboard.hardware"),
             IconId::Properties,
         ),
-        SystemSection::Health => ("system-health-tab", i18n::t("health.title"), IconId::Health),
+        SystemPageSection::Health => ("system-health-tab", i18n::t("health.title"), IconId::Health),
     };
     let entity = entity.clone();
     elements::Pill::new(
@@ -131,6 +129,7 @@ fn section_pill(
         move |_window, cx| {
             entity.update(cx, |view, cx| {
                 view.dashboard.section = section;
+                view.dashboard.history_first_metric = 0;
                 cx.notify();
             });
         },
@@ -173,19 +172,19 @@ pub fn render_system_header(
                 .gap(definite_length(tokens::SPACE_6))
                 .child(section_pill(
                     theme,
-                    SystemSection::Dashboard,
+                    SystemPageSection::Dashboard,
                     state.section,
                     &entity,
                 ))
                 .child(section_pill(
                     theme,
-                    SystemSection::Hardware,
+                    SystemPageSection::Hardware,
                     state.section,
                     &entity,
                 ))
                 .child(section_pill(
                     theme,
-                    SystemSection::Health,
+                    SystemPageSection::Health,
                     state.section,
                     &entity,
                 )),
@@ -306,7 +305,11 @@ fn readout_id(metric: TimelineMetric, statistic: TimelineStatistic) -> &'static 
     }
 }
 
-fn format_readout(series: &TimelineSeries, selection: TimelineSelection, unit: &str) -> String {
+fn format_readout(
+    series: &GraphTimelineSeries,
+    selection: TimelineSelection,
+    unit: &str,
+) -> String {
     series.readout(selection).map_or_else(
         || i18n::t("dashboard.unavailable").to_string(),
         |readout| format!("{:.1} {unit}", readout.value),
@@ -315,7 +318,7 @@ fn format_readout(series: &TimelineSeries, selection: TimelineSelection, unit: &
 
 fn readout_pill(
     theme: &Theme,
-    series: &TimelineSeries,
+    series: &GraphTimelineSeries,
     metric: TimelineMetric,
     statistic: TimelineStatistic,
     unit: &str,
@@ -348,12 +351,12 @@ fn readout_pill(
 struct HistoryCardProps<'a> {
     theme: &'a Theme,
     label: &'a str,
-    series: &'a TimelineSeries,
+    series: &'a GraphTimelineSeries,
     metric: TimelineMetric,
     color: Color,
     max: f32,
     unit: &'a str,
-    layout: SystemPageBudget,
+    layout: DashboardBudget,
     active: TimelineSelection,
     entity: Entity<RootView>,
     hover_slot: Rc<RefCell<Option<GraphHover>>>,
@@ -362,7 +365,7 @@ struct HistoryCardProps<'a> {
 
 /// One history card: readout pills plus the hover graph. The sample buffer
 /// flows through as the shared `Rc<[f32]>` handle from
-/// `TimelineSeries::samples` (no `to_vec()` copy), so an unchanged frame
+/// `GraphTimelineSeries::samples` (no `to_vec()` copy), so an unchanged frame
 /// keeps the allocation identity `graph::scene_cache` keys its scene
 /// replay on.
 fn history_card(props: HistoryCardProps<'_>) -> Div {
@@ -382,18 +385,11 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
     } = props;
     let samples = series.samples(metric);
     div()
-        .w(match layout.surfaces {
-            SystemSurfacePresentation::SingleColumn => relative(1.0),
-            SystemSurfacePresentation::MultiColumn => relative(0.49),
-        })
-        .min_w(px(match layout.surfaces {
-            SystemSurfacePresentation::SingleColumn => 0.0,
-            SystemSurfacePresentation::MultiColumn => 260.0,
-        }))
-        .h(px(match layout.surfaces {
-            SystemSurfacePresentation::SingleColumn => 158.0,
-            SystemSurfacePresentation::MultiColumn => 172.0,
-        }))
+        .debug_selector(move || format!("tm-dashboard-history-card:{}", metric.id()))
+        .w(relative(if layout.columns == 1 { 1.0 } else { 0.49 }))
+        .min_w(px(0.0))
+        .h(px(layout.card_height))
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_5))
@@ -435,19 +431,24 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
                 slide_key: history_graph_id(metric).into(),
                 samples: std::rc::Rc::clone(&samples),
                 base: rgba(color),
-                opts: GraphOpts {
-                    max: max.max(1.0),
-                    gradient_fill: true,
-                    ref_lines: true,
-                    smooth: true,
-                    ..GraphOpts::default()
-                },
+                opts: timeline_graph_options(samples.len(), max),
                 format_value: metric_hover_format(unit),
                 slot: hover_slot,
                 cache: graph_cache,
             }),
             &samples,
         ))
+}
+
+fn timeline_graph_options(sample_count: usize, max: f32) -> GraphOpts {
+    GraphOpts {
+        max: max.max(1.0),
+        data_points: sample_count.max(2),
+        gradient_fill: true,
+        ref_lines: true,
+        smooth: true,
+        ..GraphOpts::default()
+    }
 }
 
 /// Tooltip formatter for one dashboard history card, in the card's native unit
@@ -475,160 +476,18 @@ fn history_graph_id(metric: TimelineMetric) -> &'static str {
 /// consolidation).
 pub struct DashboardViewProps<'a> {
     pub theme: &'a Theme,
-    pub scroll: &'a ScrollHandle,
-    pub snapshot: &'a SystemSnapshot,
     pub history: &'a CorrelatedSystemTelemetryHistory,
-    pub process_count: usize,
+    pub process_count: Option<usize>,
     pub active_alert_count: usize,
     pub state: &'a DashboardState,
-    pub layout: SystemPageBudget,
+    pub(crate) layout: DashboardBudget,
     pub entity: Entity<RootView>,
     pub hover_slot: Rc<RefCell<Option<GraphHover>>>,
     pub(crate) graph_cache: GraphCacheHandle,
 }
 
-pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
-    let DashboardViewProps {
-        theme,
-        scroll,
-        snapshot,
-        history,
-        process_count,
-        active_alert_count,
-        state,
-        layout,
-        entity,
-        hover_slot,
-        graph_cache,
-    } = props;
-    let series = state.timeline.series(history, state.history_window);
-    let coverage_minutes = series.covered_ms as f64 / 60_000.0;
-    let mut windows = div()
-        .flex()
-        .flex_row()
-        .flex_wrap()
-        .gap(definite_length(tokens::SPACE_4));
-    for window in HistoryWindow::ALL {
-        let entity = entity.clone();
-        windows = windows.child(elements::pill(
-            theme,
-            window.id(),
-            &format!("{}m", window.minutes()),
-            window == state.history_window,
-            false,
-            move |_window, cx| {
-                entity.update(cx, |view, cx| {
-                    view.dashboard.history_window = window;
-                    cx.notify();
-                });
-            },
-            |_, _, _| {},
-        ));
-    }
-    let mut root = scroll_region_with_rail(
-        "dashboard-scroll",
-        "tm-dashboard-scroll",
-        "dashboard-scrollbar",
-        "tm-dashboard-scrollbar",
-        scroll.clone(),
-        theme.palette(),
-        div()
-            .pt(definite_length(tokens::SPACE_8))
-            .flex()
-            .flex_col()
-            .gap(definite_length(tokens::SPACE_10))
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .gap(definite_length(tokens::SPACE_8))
-                    .child(summary_card(
-                        theme,
-                        i18n::t("common.cpu"),
-                        cpu_summary_readout(&snapshot.cpu),
-                        theme.cpu,
-                        IconId::Cpu,
-                        SummaryDestination::Cpu,
-                        entity.clone(),
-                    ))
-                    .child(summary_card(
-                        theme,
-                        i18n::t("common.memory"),
-                        snapshot
-                            .memory
-                            .used_percentage_observed()
-                            .map_or_else(formatting::missing_value, |value| format!("{value:.1}%")),
-                        theme.memory,
-                        IconId::Memory,
-                        SummaryDestination::Memory,
-                        entity.clone(),
-                    ))
-                    .child(summary_card(
-                        theme,
-                        i18n::t("dashboard.processes"),
-                        process_count.to_string(),
-                        theme.disk,
-                        IconId::Process,
-                        SummaryDestination::Processes,
-                        entity.clone(),
-                    ))
-                    .child(summary_card(
-                        theme,
-                        i18n::t("dashboard.active_alerts"),
-                        active_alert_count.to_string(),
-                        if active_alert_count == 0 {
-                            theme.fg
-                        } else {
-                            theme.danger
-                        },
-                        IconId::Alert,
-                        SummaryDestination::Events,
-                        entity.clone(),
-                    )),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .items_center()
-                    .justify_between()
-                    .gap(definite_length(tokens::SPACE_6))
-                    .child(
-                        div()
-                            .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
-                            .child(i18n::t("dashboard.history")),
-                    )
-                    .child(windows)
-                    .child(
-                        div()
-                            .text_size(font_size(tokens::FONT_11))
-                            .text_color(hsla(theme.fg_dim))
-                            .child(
-                                i18n::t("dashboard.coverage")
-                                    .replace("{minutes}", &format!("{coverage_minutes:.1}")),
-                            ),
-                    ),
-            )
-            .child(render_history_grid(
-                theme,
-                &series,
-                state,
-                layout,
-                entity,
-                hover_slot.clone(),
-                graph_cache,
-            )),
-    );
-    // Hover tooltip: page-level singleton (one slot, one cursor). Sibling of
-    // the history-card grid so the deferred+anchored label escapes
-    // `overflow_hidden` (same pattern as cpu_view / perf_views).
-    if let Some((pos, text)) = graph_hover(&hover_slot) {
-        root = root.child(elements::tooltip_overlay(theme, &text, pos));
-    }
-    root
-}
+mod review;
+pub use review::render_dashboard;
 
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_dashboard_view_tests.rs"]

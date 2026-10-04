@@ -3,6 +3,7 @@
 //! budget. The stable operation IDs (`iced-…`) are the single identity each
 //! focusable widget registers with Iced's focus traversal.
 
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{AppPage, RefreshRequest};
 use taskmanager_core::core::services::ServiceAction;
 
@@ -10,7 +11,6 @@ use taskmanager_shell::SortCol;
 
 use super::DetailsSection;
 use super::selectors::PerfDevice;
-use crate::ui::system_table::ResourceHistoryWindow;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::ProcessStatusFilter;
 
@@ -251,7 +251,10 @@ pub enum FocusTarget {
     HistoryReplayWindow(HistoryWindow),
     HistoryReplayRefresh,
     /// Resource history window choice (1m, 5m, 15m, 60m).
-    ResourceHistoryWindow(ResourceHistoryWindow),
+    SystemHistoryWindow(SystemHistoryWindow),
+    SystemSection(SystemPageSection),
+    SystemDashboardPrevious,
+    SystemDashboardNext,
     /// Alert center modal controls.
     AlertCenterClear,
     AlertCenterExport,
@@ -284,7 +287,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 171] = [
+    pub const ALL: [Self; 175] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -433,10 +436,14 @@ impl FocusTarget {
         Self::HistoryReplayToggle,
         Self::HistoryReplayWindow(HistoryWindow::OneHour),
         Self::HistoryReplayRefresh,
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::OneMinute),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::FiveMinutes),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::FifteenMinutes),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::SixtyMinutes),
+        Self::SystemDashboardPrevious,
+        Self::SystemDashboardNext,
+        Self::SystemSection(SystemPageSection::Dashboard),
+        Self::SystemSection(SystemPageSection::Hardware),
+        Self::SystemHistoryWindow(SystemHistoryWindow::OneMinute),
+        Self::SystemHistoryWindow(SystemHistoryWindow::FiveMinutes),
+        Self::SystemHistoryWindow(SystemHistoryWindow::FifteenMinutes),
+        Self::SystemHistoryWindow(SystemHistoryWindow::SixtyMinutes),
         Self::AlertCenterClear,
         Self::AlertCenterExport,
         Self::ProcessMenuCopyTsv,

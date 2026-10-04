@@ -9998,6 +9998,7 @@ dependencies = [
  "taskmanager-cli",
  "taskmanager-core",
  "taskmanager-icons",
+ "taskmanager-platform-conformance",
  "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",

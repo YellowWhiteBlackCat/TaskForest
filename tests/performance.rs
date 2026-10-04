@@ -18,6 +18,7 @@
 
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+use taskmanager_telemetry_store::HistoryRetention;
 
 #[cfg(target_os = "linux")]
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -565,7 +566,8 @@ fn simulate_collect_tick(
 #[cfg(target_os = "linux")]
 #[test]
 fn collection_loop_cpu_time_and_retained_memory_stay_bounded() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(600);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(600));
     let fixtures = ProcFixtures {
         stat: (0..COLLECT_TICK_PROCESSES)
             .map(synthetic_proc_stat_text)

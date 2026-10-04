@@ -47,3 +47,39 @@ pub(crate) const fn cpu_core_grid_visible(window_height: f32) -> bool {
 #[cfg(test)]
 #[path = "../../tests/headless/layout.rs"]
 mod tests;
+
+/// Fixed rows include title, two caption lines, coverage, padding, gaps and bottom safety.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SystemDashboardBudget {
+    pub(crate) count: usize,
+    pub(crate) chart_height: f32,
+    pub(crate) card_height: f32,
+}
+impl SystemDashboardBudget {
+    pub(crate) fn resolve(width: f32, height: f32) -> Self {
+        let columns = if width >= 528.0 { 2 } else { 1 };
+        let available = (height - 8.0).max(0.0);
+        if available < 92.0 {
+            return Self {
+                count: 0,
+                chart_height: 0.0,
+                card_height: 0.0,
+            };
+        }
+        let rows = (available / 132.0).floor().clamp(1.0, 4.0) as usize;
+        let count = (rows * columns).min(4);
+        let rows = count.div_ceil(columns);
+        let card_height =
+            ((available - (rows.saturating_sub(1) as f32 * 8.0)) / rows as f32).clamp(92.0, 200.0);
+        let chart_height = if card_height >= 124.0 {
+            card_height - 92.0
+        } else {
+            0.0
+        };
+        Self {
+            count,
+            chart_height,
+            card_height,
+        }
+    }
+}

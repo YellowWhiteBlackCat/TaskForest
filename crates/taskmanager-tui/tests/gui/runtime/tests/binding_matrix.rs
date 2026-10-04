@@ -121,6 +121,13 @@ fn token_rows_declare_token_scopes_and_literal_rows_declare_char_chords() {
                     .all(|arm| matches!(arm.scope, TuiDirectScope::RowTarget(_))),
                 "the Enter row must declare only row-target arms"
             ),
+            crate::command_palette::SYSTEM_HISTORY_DIGITS_SHORTCUT => assert!(
+                command
+                    .direct
+                    .iter()
+                    .all(|arm| arm.scope == TuiDirectScope::SystemDashboard),
+                "System digits are scoped to the dashboard"
+            ),
             crate::command_palette::RESOURCE_DIGITS_SHORTCUT => assert!(
                 command
                     .direct

@@ -3,13 +3,14 @@
 
 use super::*;
 use crate::app::SettingsChange;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_core::core::history::ApplicationHistoryIdentity;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_platform_conformance::smoke_budget::{DRAIN_DEADLINE, DRAIN_POLL};
 
 fn await_rows(app: &mut IcedApp) {
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + DRAIN_DEADLINE;
     loop {
         app.drain_config_publications();
         app.drain_history_replay_completions();
@@ -18,7 +19,7 @@ fn await_rows(app: &mut IcedApp) {
             return;
         }
         assert!(Instant::now() < deadline, "the real query must complete");
-        std::thread::sleep(Duration::from_millis(2));
+        std::thread::sleep(DRAIN_POLL);
     }
 }
 

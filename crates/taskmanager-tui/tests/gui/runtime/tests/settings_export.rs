@@ -3,10 +3,10 @@
 
 use super::super::*;
 use crate::demo_app;
-use taskmanager_application::AppAction;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigStore;
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::{AppAction, i18n::t};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -897,4 +897,87 @@ fn settings_save_failure_message_is_localized() {
     assert!(std::fs::remove_dir_all(root).is_ok());
 
     set_language(Language::En);
+}
+
+#[test]
+fn normal_system_dashboard_keys_select_real_windows_and_keep_all_metric_groups_reachable() {
+    use taskmanager_application::system_timeline::{
+        SystemHistoryWindow, SystemPageSection, TimelineMetric,
+    };
+    use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+    let mut app = demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
+    assert!(seed_shell_system_dashboard_history(
+        &mut app.shell,
+        7_200_000
+    ));
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('w'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(app.system_section, SystemPageSection::Dashboard);
+    for (index, window) in SystemHistoryWindow::ALL.into_iter().enumerate() {
+        let digit = char::from(b'1' + u8::try_from(index).expect("four windows"));
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::Char(digit),
+                KeyModifiers::NONE,
+            ),
+        );
+        assert_eq!(app.system_history_window, window);
+        let series = app.shell.system_timeline_series(window);
+        for metric in TimelineMetric::ALL {
+            assert_eq!(series.coverage_ms(metric), window.minutes() * 60_000);
+        }
+    }
+    for (width, height) in [(54, 16), (120, 36), (200, 16), (54, 60)] {
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::Char('w'),
+                KeyModifiers::NONE,
+            ),
+        );
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
+                .expect("terminal");
+        let mut content = String::new();
+        for _ in 0..4 {
+            terminal
+                .draw(|frame| crate::render(frame, &app, crate::TuiTheme::default()))
+                .expect("dashboard frame");
+            content.push_str(
+                &terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect::<String>(),
+            );
+            let _ = handle_key(
+                &mut app,
+                KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
+            );
+        }
+        for metric in TimelineMetric::ALL {
+            assert!(
+                content.contains(t(metric.label_key())),
+                "metric at {width}x{height}"
+            );
+        }
+        assert!(content.contains("60.0"));
+    }
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('b'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(app.system_section, SystemPageSection::Hardware);
 }

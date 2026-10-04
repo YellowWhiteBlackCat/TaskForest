@@ -3,7 +3,9 @@
 use std::path::PathBuf;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 
@@ -35,6 +37,7 @@ pub(super) enum CaptureDataTarget {
     PerformanceHistory,
     ApplicationHistory,
     MemoryInventory,
+    SystemDashboard,
 }
 
 pub(super) struct CaptureState {
@@ -63,6 +66,7 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "history-replay" => CaptureDataTarget::PerformanceHistory,
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
+        "system-dashboard" | "history-60m" => CaptureDataTarget::SystemDashboard,
         _ => CaptureDataTarget::General,
     };
     if apply_capture_surface_and_process(app, target) {
@@ -88,10 +92,16 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     if target == "service-details" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
-    } else if target == crate::capture::HEALTH_TARGET
-        || target == "system-dashboard"
-        || target == "sensor-center"
-    {
+    } else if matches!(target, "system-dashboard" | "history-60m") {
+        app.shell.application.active_page = AppPage::System;
+        app.system_section = SystemPageSection::Dashboard;
+        let _ = seed_shell_system_dashboard_history(&mut app.shell, 7_200_000);
+        app.system_dashboard_window = if target == "history-60m" {
+            SystemHistoryWindow::SixtyMinutes
+        } else {
+            SystemHistoryWindow::FifteenMinutes
+        };
+    } else if target == crate::capture::HEALTH_TARGET || target == "sensor-center" {
         let _ = app.update(Message::OpenHealth);
     } else if target == "about" {
         app.open_local_surface(LocalSurface::About);
