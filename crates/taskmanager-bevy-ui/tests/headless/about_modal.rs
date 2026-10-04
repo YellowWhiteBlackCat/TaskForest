@@ -125,3 +125,51 @@ fn independent_system_information_copies_the_frozen_review_and_ignores_stale_abo
     app.update();
     assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
 }
+
+#[test]
+fn native_boot_observes_desktop_appearance_once_and_information_uses_the_response() {
+    use crate::app::SharedRuntimeHandle;
+    use crate::runtime::SharedRuntime;
+    use taskmanager_core::core::appearance::{
+        DesktopAppearance, DesktopFamily, PreferredColorScheme,
+    };
+    use taskmanager_test_support::desktop_appearance::platform;
+    let expected = DesktopAppearance {
+        family: DesktopFamily::Kde,
+        color_scheme: PreferredColorScheme::Dark,
+        high_contrast: Some(false),
+    };
+    let (platform, recorder) = platform(expected);
+    let mut app = scripted_frontend_app();
+    let runtime = Box::leak(Box::new(SharedRuntime::new(platform)));
+    app.insert_resource(SharedRuntimeHandle { shared: runtime });
+    app.update();
+    app.update();
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    assert_eq!(
+        app.world()
+            .resource::<crate::pages::settings::ThemePreferences>()
+            .observed_appearance,
+        Some(expected)
+    );
+    app.world_mut()
+        .trigger(crate::system_information_modal::SystemInformationCommand::Open);
+    app.update();
+    let Some(WindowSurface::SystemInformation(facts)) =
+        &app.world().resource::<WindowSurfaceState>().0
+    else {
+        panic!("native information");
+    };
+    assert!(
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.value == "KDE Plasma")
+    );
+    assert!(
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.label_key == "system_about.color_scheme")
+    );
+}

@@ -10,6 +10,7 @@ use taskmanager_core::{
     ProcessMetadataObservations, ProcessScalarObservations, ScalarObservation, SmartAvailability,
 };
 
+pub mod desktop_appearance;
 mod memory;
 mod metrics;
 mod process;

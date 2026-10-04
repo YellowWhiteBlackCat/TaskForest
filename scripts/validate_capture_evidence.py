@@ -501,6 +501,7 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
             if token not in joined_markers:
                 raise EvidenceError(f"{name}: missing marker {token}")
         if scenario != "standard":
+            require_modal_presentation(name, scenario, joined_markers)
             token = f"CAPTURE_MARKER event=scenario_ready scenario={scenario}"
             if token not in joined_markers:
                 raise EvidenceError(f"{name}: missing marker {token}")
@@ -564,7 +565,24 @@ def png_chunk(kind: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", crc)
 
 
+def require_modal_presentation(name: str, scenario: str, markers: str) -> None:
+    if scenario == "system-about":
+        token = f"CAPTURE_MARKER event=surface_presented scenario={scenario}"
+        if token not in markers:
+            raise EvidenceError(f"{name}: missing modal frame presentation marker {token}")
+
+
 def self_test() -> None:
+    ready_only = "CAPTURE_MARKER event=scenario_ready scenario=system-about"
+    for markers in (ready_only, ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=about"):
+        try:
+            require_modal_presentation("system-about", "system-about", markers)
+        except EvidenceError:
+            pass
+        else:
+            raise EvidenceError("a semantic-ready or foreign modal marker certified unpresented pixels")
+    require_modal_presentation("system-about", "system-about", ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=system-about")
+    require_modal_presentation("standard", "standard", "")
     raw_scanline = b"\x00\x10\x20\x30"
     png = (
         PNG_SIGNATURE

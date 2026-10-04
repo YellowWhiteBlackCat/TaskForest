@@ -129,6 +129,7 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
   and Export/Retry/Close actions stay fixed around one bounded scroll body; only explicit
   confirmation admits a writer, and replacing the surface invalidates late completions.
 - About (`ui/about.rs`) uses shared build metadata and typed repository opening.
+  Native boot requests desktop appearance through the shared effect seam.
   System information (`ui/system_information.rs`) has an independent primary slot,
   frozen shared groups and a bounded scroll owner with fixed Copy/Close actions.
 - Iced-local surfaces: the first-run dialog (`ui/first_run.rs`, platform setup-script

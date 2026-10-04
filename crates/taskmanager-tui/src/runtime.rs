@@ -189,7 +189,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         Some(client)
     };
     if let Some(platform) = platform.as_mut() {
-        app.first_run.observe(Some(platform), unix_now_ms());
+        begin_observations(&mut app, platform);
         queue_effect(
             &mut app,
             platform,
@@ -361,6 +361,11 @@ fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {
         event.modifiers.contains(KeyModifiers::SUPER),
     );
     Some(ShellKeyEvent::new(key, modifiers))
+}
+
+fn begin_observations(app: &mut TuiApp, platform: &mut PlatformClient) {
+    app.first_run.observe(Some(platform), unix_now_ms());
+    queue_effect(app, platform, PlatformEffect::ObserveDesktopAppearance);
 }
 
 #[cfg(test)]

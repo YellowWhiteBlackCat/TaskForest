@@ -424,6 +424,8 @@ fn telemetry_paused_capture_waits_for_live_data_and_requires_paused_projection()
 fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SystemAbout));
     assert!(!evidence.system_about_requested());
+    assert!(!evidence.schedule_system_about_presentation());
+    assert!(!evidence.mark_system_about_presented(true));
 
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
@@ -440,6 +442,11 @@ fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
     evidence.mark_system_about_ready(true);
     assert!(evidence.scenario_ready());
     assert!(!evidence.system_about_requested());
+    assert!(evidence.schedule_system_about_presentation());
+    assert!(!evidence.schedule_system_about_presentation());
+    assert!(!evidence.mark_system_about_presented(false));
+    assert!(evidence.mark_system_about_presented(true));
+    assert!(!evidence.mark_system_about_presented(true));
 }
 
 #[test]

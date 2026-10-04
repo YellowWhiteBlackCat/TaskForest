@@ -7,6 +7,7 @@ use taskmanager_application::first_run::FirstRunController;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_shell::queue_effect;
 use taskmanager_theme::{LightDark, Skin};
 
 use super::*;
@@ -119,11 +120,15 @@ impl IcedApp {
             a11y_revision: 0,
             a11y_snapshot: None,
         };
-        // The boot observation is the dialog's trigger (GPUI parity): it is
-        // submitted through the platform channel before the first frame, and
-        // its correlated answer on the tick lane decides visibility. A
-        // missing platform folds the honest hidden state with no notice.
+        // Optional setup observes quietly; an explicit Settings entry owns visibility.
         app.begin_first_run_observation();
+        if let Some(platform) = app.runtime.platform_mut() {
+            queue_effect(
+                &mut app.shell,
+                platform,
+                PlatformEffect::ObserveDesktopAppearance,
+            );
+        }
         // The shared catalog is pinned to this frontend's language at the
         // runtime edges — `load_config` for real launches and the demo boot
         // closure in run.rs — never in the constructors, so parallel headless

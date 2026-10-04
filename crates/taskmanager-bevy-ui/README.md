@@ -40,7 +40,7 @@ adopted — theme tokens are the only skin authority.
   shell page always follows the visible page), the Dialog-scope Enter
   mapping, the per-inventory action-menu open chords, the `PendingEffects`
   effect bridge to the drain, and the one-shot quit forward.
-- `src/window_surface.rs` owns the single About/setup/diagnostic surface.
+- `src/window_surface.rs` owns the single About/system-information/setup/diagnostic surface.
   State notifications coalesce before layout; header and complete action groups
   stay fixed around one bounded, scrollable body.
 - `src/first_run_modal.rs` projects the application setup controller: silent

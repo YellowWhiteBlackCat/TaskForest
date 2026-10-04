@@ -1,5 +1,6 @@
 //! Capture coordinator transitions and scenario preparation.
 
+use super::super::state::SurfacePresentation;
 use super::super::{CaptureEvidence, CaptureMode, HistoryReplayOpenState};
 use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
@@ -403,6 +404,28 @@ impl CaptureEvidence {
         if self.system_about_requested() && open {
             self.mark_scenario_ready();
         }
+    }
+
+    /// Active semantic state is separate from native frame presentation. Wait
+    /// for frame turns after the modal's render before certifying its pixels.
+    pub(crate) fn schedule_system_about_presentation(&mut self) -> bool {
+        if self.scenario != Some(CaptureScenario::SystemAbout)
+            || !self.scenario_ready()
+            || self.system_about_presentation != SurfacePresentation::Waiting
+        {
+            return false;
+        }
+        self.system_about_presentation = SurfacePresentation::Scheduled;
+        true
+    }
+
+    pub(crate) fn mark_system_about_presented(&mut self, open: bool) -> bool {
+        if !open || self.system_about_presentation != SurfacePresentation::Scheduled {
+            return false;
+        }
+        self.system_about_presentation = SurfacePresentation::Presented;
+        super::super::marker::emit_marker("surface_presented", self.scenario);
+        true
     }
 
     /// Strict About evidence waits for the same live read-model readiness as

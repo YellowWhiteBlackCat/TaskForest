@@ -45,7 +45,8 @@ only the descriptor body scrolls, and wrapped action hints keep Close reachable 
 About exposes build version, license, repository opening and a distinct System
 Information review. Both use shared shell projections; `information.rs` owns
 frozen system rows and clipboard payloads, while the modal protocol registry
-owns action keys and fixed footer hints. Only the information body scrolls.
+owns action keys and fixed footer hints. Only the information body scrolls. Native
+boot submits desktop appearance through the shared effect seam and caches its response.
 
 ## Boundary
 

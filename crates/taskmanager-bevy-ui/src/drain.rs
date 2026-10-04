@@ -278,6 +278,11 @@ pub(crate) fn drain_system(
         queue_effect(
             &mut track.shell,
             &mut client,
+            PlatformEffect::ObserveDesktopAppearance,
+        );
+        queue_effect(
+            &mut track.shell,
+            &mut client,
             PlatformEffect::Refresh(RefreshRequest::Dashboard),
         );
         track.initial_refresh_submitted = true;

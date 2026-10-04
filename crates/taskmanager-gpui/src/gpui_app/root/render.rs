@@ -151,6 +151,22 @@ fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Co
 
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.window_surface_kind() == Some(super::WindowSurfaceKind::SystemAbout)
+            && self.capture_evidence.schedule_system_about_presentation()
+        {
+            let root = cx.entity().downgrade();
+            window.on_next_frame(move |window, cx| {
+                let _ = root.update(cx, |_view, cx| cx.notify());
+                window.on_next_frame(move |_window, cx| {
+                    let _ = root.update(cx, |view, _cx| {
+                        view.capture_evidence.mark_system_about_presented(
+                            view.window_surface_kind()
+                                == Some(super::WindowSurfaceKind::SystemAbout),
+                        );
+                    });
+                });
+            });
+        }
         let presentation = self.presentation_snapshot();
         let ui_size = presentation.appearance.ui_size;
         // All FONT_* tokens resolve from this root-relative scale, including

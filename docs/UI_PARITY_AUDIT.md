@@ -9,7 +9,7 @@
 | 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI |
 |---|---|---|:---:|:---:|:---:|
 | 基础与系统 | `about` | 应用版本、许可证与仓库说明 | Aligned | Aligned | Aligned |
-| | `system-about` | 独立操作系统与桌面环境完整事实面 | Pending | Pending | Pending |
+| | `system-about` | 独立操作系统与桌面环境完整事实面 | Aligned | Aligned | Aligned |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
 | | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
 | | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |

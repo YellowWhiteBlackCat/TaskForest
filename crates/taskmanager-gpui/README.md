@@ -72,7 +72,9 @@ history, spawn a tray, or execute host actions.
   projection; the root renderer only supplies shell geometry and mounts the result.
 - `src/gpui_app/root/startup/capture_systems.rs` applies capture-only presentation transforms
   after the shared fold through typed named systems; it has no general mutable materialization
-  accessor. Startup owns acquisition/configuration and schedules the loop.
+  accessor. System-information captures also require a native rendered-frame
+  acknowledgement; semantic opening alone does not certify a screenshot.
+  Startup owns acquisition/configuration and schedules the loop.
 - `src/gpui_app/root/presentation_preferences.rs` is the private authority for persisted
   appearance (including language), device visibility, units, graph options, sidebar preferences,
   the window-frame (decoration) policy token and Apps display policy. Settings mutate named axes;

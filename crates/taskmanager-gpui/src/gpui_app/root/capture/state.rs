@@ -83,6 +83,14 @@ impl WindowCaptureChain {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SurfacePresentation {
+    #[default]
+    Waiting,
+    Scheduled,
+    Presented,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CaptureMode {
     #[default]
     Disabled,
@@ -160,6 +168,7 @@ pub(crate) struct CaptureEvidence {
     /// Capture-only state machine that waits for two rendered frames before
     /// submitting the current-window provider request, then becomes terminal.
     pub(super) window_capture_schedule: WindowCaptureSchedule,
+    pub(super) system_about_presentation: SurfacePresentation,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.

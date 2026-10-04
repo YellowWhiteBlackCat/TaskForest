@@ -159,3 +159,43 @@ fn information_reviews_keep_all_actions_in_frame_and_scroll_only_the_body() {
         }
     }
 }
+
+#[test]
+fn native_boot_observes_desktop_appearance_once_and_information_uses_the_response() {
+    use taskmanager_core::core::appearance::{
+        DesktopAppearance, DesktopFamily, PreferredColorScheme,
+    };
+    use taskmanager_test_support::desktop_appearance::platform;
+    let expected = DesktopAppearance {
+        family: DesktopFamily::Kde,
+        color_scheme: PreferredColorScheme::Dark,
+        high_contrast: Some(false),
+    };
+    let (platform, recorder) = platform(expected);
+    let mut app = crate::IcedApp::new(Some(platform));
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    assert!(
+        app.observed_appearance.is_none(),
+        "submission alone cannot invent an observation"
+    );
+    let _ = app.update(Message::Tick);
+    let _ = app.update(Message::Tick);
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    assert_eq!(app.observed_appearance, Some(expected));
+    let _ = app.update(Message::OpenSystemInformation);
+    let Some(LocalSurface::SystemInformation(facts)) = app.local_surface() else {
+        panic!("native information");
+    };
+    assert!(
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.value == "KDE Plasma")
+    );
+    assert!(
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.label_key == "system_about.color_scheme")
+    );
+}

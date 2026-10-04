@@ -4,8 +4,8 @@
 //! module so the file stays under the source-line ceiling.
 use super::{ProcessControlKind, ShellApp};
 use taskmanager_application::{
-    PlatformClient, PlatformEffect, ProcessControlRequest, ServiceControlRequest,
-    SessionControlRequest, ShellUiActionIntent,
+    DesktopAppearanceRequest, PlatformClient, PlatformEffect, ProcessControlRequest,
+    ServiceControlRequest, SessionControlRequest, ShellUiActionIntent,
 };
 use taskmanager_application::{
     SmartControlRequest, request_submission_failure, service_submission_failure,
@@ -79,6 +79,9 @@ pub fn queue_effect_result(
 ) -> Result<Vec<RequestId>, SubmissionErrorKind> {
     let now_ms = submission_time_ms();
     let results = match &effect {
+        PlatformEffect::ObserveDesktopAppearance => {
+            vec![platform.submit_desktop_appearance(DesktopAppearanceRequest::Observe, now_ms)]
+        }
         PlatformEffect::Refresh(request) => platform.request_refresh(*request, now_ms),
         PlatformEffect::EndTask(target) => {
             // Record the accepted submission so a later EndTaskCompleted can
