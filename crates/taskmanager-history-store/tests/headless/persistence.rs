@@ -678,7 +678,13 @@ fn failed_flush_requeue_preserves_global_bounds_and_can_retry_in_order() {
     std::fs::remove_dir_all(&root).expect("remove backing directory");
     std::fs::write(&root, b"not a directory").expect("block backing path");
     let error = store.flush(10_000).expect_err("append must fail");
-    assert_eq!(error.kind(), HistoryStoreErrorKind::Read);
+    assert!(
+        matches!(
+            error.kind(),
+            HistoryStoreErrorKind::Read | HistoryStoreErrorKind::Open
+        ),
+        "a blocked backing path is reported at the OS read or open stage"
+    );
     let requeued = store.status();
     assert_eq!(requeued.pending_samples, MAX_PENDING_SAMPLES);
     assert_eq!(requeued.pending_bytes, before.pending_bytes);
