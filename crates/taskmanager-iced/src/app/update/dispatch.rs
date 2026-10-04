@@ -163,6 +163,7 @@ fn route(message: Message) -> MessageDomain {
 
         message @ (Message::SelectPerformanceGraphPoints(_)
         | Message::SettingsChanged(_)
+        | Message::AuthorizePrivilege(_)
         // SystemThemeChanged is reduced by `app::appearance` in the run.rs
         // update closure before dispatch; this arm only satisfies exhaustive routing.
         | Message::SystemThemeChanged(_)

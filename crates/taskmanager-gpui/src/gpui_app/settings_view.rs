@@ -59,11 +59,11 @@ use self::graphs::graph_options_group;
 pub(crate) use self::graphs::init_data_points_slider;
 use self::history::history_persistence_row;
 use self::notifications::{notify_row, quiet_hours_rows};
-pub(crate) use self::privilege_center::PrivilegeCenterInputs;
 use self::privilege_center::render_privilege_center;
 use self::refresh::refresh_row;
 use self::units::units_group;
 use self::zero_values::zero_values_row;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens::UiSize;
 
 mod devices;

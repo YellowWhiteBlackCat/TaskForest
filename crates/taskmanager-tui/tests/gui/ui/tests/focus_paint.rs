@@ -160,7 +160,7 @@ fn settings_overlay_highlights_only_the_plan_named_field() {
         let text = frame_text(&render(68, 32, |frame, popup| {
             crate::ui::settings::render_settings_overlay_at(
                 frame,
-                &app.settings_form,
+                &app,
                 TuiTheme::default(),
                 local_surface_focus(TuiSurfaceKind::Settings, TuiFocusControl::SettingsField(3)),
                 popup,
@@ -188,7 +188,7 @@ fn settings_overlay_highlights_only_the_plan_named_field() {
         let text = frame_text(&render(68, 32, |frame, popup| {
             crate::ui::settings::render_settings_overlay_at(
                 frame,
-                &app.settings_form,
+                &app,
                 TuiTheme::default(),
                 local_surface_focus(TuiSurfaceKind::Settings, TuiFocusControl::Viewport),
                 popup,

@@ -310,10 +310,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 _ => None,
             },
-            TuiSurfaceKind::Settings => {
-                handle_settings_key(app, key);
-                None
-            }
+            TuiSurfaceKind::Settings => handle_settings_key(app, key),
             TuiSurfaceKind::About
             | TuiSurfaceKind::Containers
             | TuiSurfaceKind::DiagnosticPreview

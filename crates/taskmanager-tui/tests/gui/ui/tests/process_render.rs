@@ -444,7 +444,7 @@ fn settings_overlay_renders_all_fields_with_enter_apply_hint() {
     assert!(text.contains("Desktop monospace font"));
     assert!(text.contains("Row density"));
     assert!(text.contains("Language"));
-    assert!(text.contains("Enter save"));
+    assert!(text.contains(&format!("Enter {}", t("common.apply"))));
     // The bounded popup wraps the durable-language note after "across".
     assert!(text.contains("language persists across"));
 }

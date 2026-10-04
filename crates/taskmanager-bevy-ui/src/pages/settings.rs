@@ -45,10 +45,10 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, FlexDirection, Node, Overflow, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ValueChange};
+use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ScrollArea, ValueChange};
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{AppAction, TelemetryInterval};
 use taskmanager_core::config::Config;
@@ -67,6 +67,13 @@ use taskmanager_core::core::appearance::PreferredColorScheme;
 
 mod privilege_center;
 use privilege_center::privileges_section_scene;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsHeading;
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsBody;
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsFooter;
 
 /// The telemetry refresh-cadence choices (ms), in display order — the same
 /// four steps the TUI settings form exposes.
@@ -599,7 +606,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         ),
     ];
     let mut rows = rows;
-    rows.push(privileges_section_scene(context.palette));
+    rows.insert(0, privileges_section_scene(context.shell, context.palette));
     bsn! {
         Node {
             width: percent(100),
@@ -610,11 +617,24 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-             Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) --
-            { rows }--
+            Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+            SettingsHeading
+            Children [ Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ] --
+            Node {
+                width: percent(100), flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0),
+                flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()),
+                overflow: Overflow::scroll_y(),
+            }
+            ScrollArea
+            SettingsBody
+            Children [ { rows } ] --
 
-                Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
-                TextRole(Role::Caption)
+                Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+                SettingsFooter
+                Children [
+                    Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
+                    TextRole(Role::Caption)
+                ]
             --
             { EntityScene(page_observer(request_projection_refresh)) }--
             { EntityScene(page_observer(settings_choice_observer)) }

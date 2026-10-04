@@ -176,7 +176,6 @@ mod tests_inner {
                                         .projection()
                                         .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
                                     gpu_engine_device_id,
-                                    gpu_engine_index,
                                     smbios_state: v.shell.smbios_memory_state(),
                                     smbios_capability: v
                                         .projection()
@@ -309,28 +308,28 @@ mod tests_inner {
                 .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
                     CapabilityDescriptor {
                         id: CapabilityId::TELEMETRY_GPU_ENGINES,
-                        status: CapabilityStatus::PermissionRequired,
+                        status: CapabilityStatus::RequiresEscalation,
                         providers: vec![ProviderId::borrowed("fixture.gpu")],
                         observed_at_ms: 1,
                         last_success_at_ms: None,
                     },
                     CapabilityDescriptor {
                         id: CapabilityId::TELEMETRY_MEMORY_SMBIOS,
-                        status: CapabilityStatus::PermissionRequired,
+                        status: CapabilityStatus::RequiresEscalation,
                         providers: vec![ProviderId::borrowed("fixture.smbios")],
                         observed_at_ms: 1,
                         last_success_at_ms: None,
                     },
                     CapabilityDescriptor {
                         id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
-                        status: CapabilityStatus::PermissionRequired,
+                        status: CapabilityStatus::RequiresEscalation,
                         providers: vec![ProviderId::borrowed("fixture.rapl")],
                         observed_at_ms: 1,
                         last_success_at_ms: None,
                     },
                     CapabilityDescriptor {
                         id: CapabilityId::TELEMETRY_CPU_MSR,
-                        status: CapabilityStatus::PermissionRequired,
+                        status: CapabilityStatus::RequiresEscalation,
                         providers: vec![ProviderId::borrowed("fixture.msr")],
                         observed_at_ms: 1,
                         last_success_at_ms: None,
@@ -427,8 +426,8 @@ mod tests_inner {
         assert!(
             window
                 .debug_bounds("tm-settings-privilege-action:msr-readouts")
-                .is_some(),
-            "permission-required state must expose the single authorize action"
+                .is_none(),
+            "a permission gate without an escalation offer must not expose authorization"
         );
     }
 

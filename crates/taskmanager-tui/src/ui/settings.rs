@@ -20,21 +20,25 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::config::Config;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::Skin;
 use taskmanager_ui_contract::IconId;
 
+use super::process_details::wrapped_content_height;
 use crate::ThemeParams;
 use crate::TuiTheme;
 use taskmanager_application::i18n::Language;
 use taskmanager_core::core::alerts::{NotificationPolicy, QuietHours};
+mod footer;
+use footer::settings_footer;
 
 /// Number of settings fields (row count of the form): 0 skin, 1 mode,
 /// 2 high contrast, 3 UI font, 4 mono font, 5 density, 6 language,
 /// 7 refresh interval, 8..18 device visibility (10 families), 18..24 unit
 /// matrix (3 families × bytes/base2), 24 gray-zero-values, 25 graph points,
 /// 26 desktop notifications, 27..28 quiet-hours start/end (hours),
-/// 29 continuous history recording.
-pub const SETTINGS_FIELDS: usize = 30;
+/// 29 continuous history recording, 30..34 permission-center actions.
+pub const SETTINGS_FIELDS: usize = 34;
 
 /// Quiet-hours hour range (inclusive selection 0..=23); start == end means
 /// "no quiet hours" (the gate treats equal bounds as never-suppressing).
@@ -417,11 +421,12 @@ pub fn apply_settings_to_config(
 /// focus marker and scrolls to the top (fail-closed).
 pub(super) fn render_settings_overlay_at(
     frame: &mut Frame<'_>,
-    form: &SettingsForm,
+    app: &crate::TuiApp,
     theme: TuiTheme,
     focus: super::TuiFocusPlan,
     popup: Rect,
 ) {
+    let form = &app.settings_form;
     let focused_field = focus.settings_field();
     frame.render_widget(Clear, popup);
     let block = Block::new()
@@ -436,8 +441,12 @@ pub(super) fn render_settings_overlay_at(
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
-    let [body, footer] =
-        Layout::vertical([Constraint::Min(10), Constraint::Length(4)]).areas(inner);
+    let footer_content = settings_footer(form, focused_field, theme, inner);
+    let [body, footer] = Layout::vertical([
+        Constraint::Min(0),
+        Constraint::Length(footer_content.height),
+    ])
+    .areas(inner);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(SETTINGS_FIELDS + 1);
     lines.push(field_line(
@@ -598,81 +607,48 @@ pub(super) fn render_settings_overlay_at(
         format!("── {} ──", t("settings.privileges")),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     )]));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}: ", t("gpu.per_engine_title")), Style::new()),
-        Span::styled(
-            t("settings.privileges_enabled"),
-            Style::new().fg(theme.accent),
-        ),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  {}: ", t("system.memory_inventory")),
-            Style::new(),
-        ),
-        Span::styled(
-            t("settings.privileges_enabled"),
-            Style::new().fg(theme.accent),
-        ),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}: ", t("cpu.package_power")), Style::new()),
-        Span::styled(
-            t("settings.privileges_authorize_hint"),
-            Style::new().fg(theme.dim),
-        ),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(format!("  {}: ", t("cpu.msr_readouts")), Style::new()),
-        Span::styled(
-            t("settings.privileges_authorize_hint"),
-            Style::new().fg(theme.dim),
-        ),
-    ]));
+    for (index, privilege) in PrivilegeCenterInputs::from_shell(&app.shell)
+        .rows()
+        .into_iter()
+        .enumerate()
+    {
+        let status = if privilege.action.is_some() {
+            format!(
+                "{} · [Enter] {}",
+                t(privilege.state.label_key()),
+                t("settings.privileges_authorize")
+            )
+        } else {
+            t(privilege.state.label_key()).to_owned()
+        };
+        lines.push(field_line(
+            focused_field,
+            30 + index,
+            t(privilege.label_key),
+            &status,
+            theme,
+        ));
+    }
     // Scroll the focused field into view on short terminals (the body shows
     // roughly `body.height - 1` rows; a focused field past that window is
     // still reachable via Tab and becomes visible as the offset follows it).
     let visible_rows = body.height.saturating_sub(1) as usize;
-    let scroll = focused_field
-        .unwrap_or(0)
-        .saturating_sub(visible_rows.saturating_sub(1)) as u16;
+    let focused_row = focused_field.map(|field| field + if field >= 30 { 2 } else { 0 });
+    let scroll = focused_row.map_or(0, |row| {
+        wrapped_content_height(&lines[..(row + 1).min(lines.len())], body.width)
+            .saturating_sub(visible_rows)
+    });
     frame.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: true })
-            .scroll((scroll, 0)),
+            .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
         body,
     );
 
-    let mut footer_spans: Vec<Span<'static>> = vec![
-        Span::styled(
-            format!(" {} ", t("tui.settings_move")),
-            Style::new().fg(theme.color(Color::Black)).bg(theme.accent),
-        ),
-        Span::styled(
-            format!("  {}", t("tui.settings_save")),
-            Style::new().fg(theme.dim),
-        ),
-    ];
-    if let Some(error) = form.save_error.as_deref() {
-        footer_spans.push(Span::styled(
-            format!("  ✗ {error}"),
-            Style::new().fg(theme.danger),
-        ));
-    }
     frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(""),
-            Line::from(footer_spans),
-            Line::from(vec![Span::styled(
-                t("settings.footer_hint"),
-                Style::new().fg(theme.dim),
-            )]),
-            Line::from(vec![Span::styled(
-                t("settings.font_terminal_hint"),
-                Style::new().fg(theme.dim),
-            )]),
-        ])
-        .alignment(Alignment::Center),
+        Paragraph::new(footer_content.lines)
+            .wrap(Wrap { trim: true })
+            .alignment(Alignment::Center),
         footer,
     );
 }

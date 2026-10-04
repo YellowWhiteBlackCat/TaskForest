@@ -93,6 +93,9 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   compatibility row-key API.
 - `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral projections, including the
   product-first GPU display identity that keeps hardware names separate from driver names.
+- `src/presentation/privilege_center.rs` folds helper capability/request states once for all
+  four renderers. Authorization is offered only when the catalog exposes a usable request
+  seam; GPU actions retain the observed device identity.
 - GPU history retains typed utilization/scalar/engine query windows. The shared chart-metric
   selection model in `presentation/gpu_chart_metric.rs` owns the
   telemetry-store

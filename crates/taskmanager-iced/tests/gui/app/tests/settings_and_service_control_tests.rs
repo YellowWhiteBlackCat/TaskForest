@@ -4,20 +4,69 @@ use super::*;
 use taskmanager_application::DirectoryUsageRequest;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{
-    PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
+    PlatformEvent, PlatformFacets, PlatformHandle, RaplPowerRequest, ServiceControlRequest,
+    ServiceFacets, SystemFacets,
 };
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::services::ServiceStatus;
 use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+
+#[derive(Default)]
+struct RecordingRapl(std::sync::Mutex<Vec<RaplPowerRequest>>);
+
+impl RequestPort for RecordingRapl {
+    type Request = RaplPowerRequest;
+    fn try_submit(&self, request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
+        self.0.lock().expect("recorder").push(request.payload);
+        Ok(())
+    }
+}
+
+#[test]
+fn permission_center_action_reaches_the_port_only_with_a_live_offer() {
+    let port = Arc::new(RecordingRapl::default());
+    let client = PlatformClient::new(PlatformHandle::new(
+        Arc::new(EmptyCapabilities),
+        Arc::new(EmptyEvents),
+        PlatformFacets::default()
+            .with_system(SystemFacets::default().with_rapl_power(port.clone())),
+    ));
+    let mut app = IcedApp::new(Some(client));
+    for (status, expected) in [
+        (CapabilityStatus::PermissionRequired, 0),
+        (CapabilityStatus::Unsupported, 0),
+        (CapabilityStatus::RequiresEscalation, 1),
+    ] {
+        app.shell
+            .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
+                CapabilityDescriptor {
+                    id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                    status,
+                    providers: Vec::new(),
+                    observed_at_ms: 1,
+                    last_success_at_ms: None,
+                },
+            ]));
+        let _ = app.update(Message::AuthorizePrivilege(PrivilegeAction::RaplPower));
+        assert_eq!(port.0.lock().expect("recorder").len(), expected);
+    }
+    let _ = app.update(Message::AuthorizePrivilege(PrivilegeAction::RaplPower));
+    assert_eq!(
+        port.0.lock().expect("recorder").len(),
+        1,
+        "an admitted request disables repeated authorization"
+    );
+}
 
 /// Minimal recording service-control port (the same mock shape the shell
 /// tests use): submissions are recorded, never forwarded.

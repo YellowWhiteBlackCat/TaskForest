@@ -7,15 +7,9 @@
 //! turning them into a blanket privileged process.
 
 use gpui::{Div, Entity, InteractiveElement, ParentElement, Styled, div};
-use taskmanager_application::{
-    GpuEngineRowsState, MsrReadoutRequestFailure, MsrReadoutState, RaplPowerRequestFailure,
-    RaplPowerState, SmbiosMemoryRequestFailure, SmbiosMemoryState, i18n,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::CapabilityStatus;
-use taskmanager_shell::presentation::gpu_engine_rows::{
-    GpuEngineRowsPresentation, present_gpu_engine_rows,
+use taskmanager_application::i18n;
+use taskmanager_shell::presentation::privilege_center::{
+    PrivilegeAction, PrivilegeCenterInputs, PrivilegeRow, PrivilegeRowState,
 };
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui::theme_binding::absolute;
@@ -27,110 +21,12 @@ use taskmanager_ui::theme_binding::hsla;
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
 
-/// Immutable render inputs for the central authorization surface.
-pub(crate) struct PrivilegeCenterInputs<'a> {
-    pub(crate) gpu_engine_state: &'a GpuEngineRowsState,
-    pub(crate) gpu_engine_capability: Option<CapabilityStatus>,
-    pub(crate) gpu_engine_device_id: Option<DeviceId>,
-    pub(crate) gpu_engine_index: Option<usize>,
-    pub(crate) smbios_state: &'a SmbiosMemoryState,
-    pub(crate) smbios_capability: Option<CapabilityStatus>,
-    pub(crate) rapl_state: &'a RaplPowerState,
-    pub(crate) rapl_capability: Option<CapabilityStatus>,
-    pub(crate) msr_state: &'a MsrReadoutState,
-    pub(crate) msr_capability: Option<CapabilityStatus>,
-}
-
-#[derive(Clone, Copy)]
-enum PrivilegeAction {
-    GpuEngines(usize),
-    SmbiosMemory,
-    RaplPower,
-    MsrReadouts,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PrivilegeRowState {
-    NeedsAuthorization,
-    Authorizing,
-    Enabled,
-    Denied,
-    Unavailable,
-    Unsupported,
-    Failed,
-}
-
-impl PrivilegeRowState {
-    const fn label_key(self) -> &'static str {
-        match self {
-            Self::NeedsAuthorization => "settings.privileges_authorize_hint",
-            Self::Authorizing => "settings.privileges_authorizing",
-            Self::Enabled => "settings.privileges_enabled",
-            Self::Denied => "settings.privileges_denied",
-            Self::Unavailable => "settings.privileges_unavailable",
-            Self::Unsupported => "settings.privileges_unsupported",
-            Self::Failed => "settings.privileges_failed",
-        }
-    }
-
-    const fn has_action(self) -> bool {
-        matches!(self, Self::NeedsAuthorization | Self::Denied)
-    }
-}
-
-struct PrivilegeRow {
-    id: &'static str,
-    label_key: &'static str,
-    state: PrivilegeRowState,
-    action: PrivilegeAction,
-}
-
-/// Render the central permission group. A capability absent from the runtime
-/// catalog is omitted; an unsupported or missing helper remains visible as a
-/// typed status so the user can distinguish "not installed" from "not yet
-/// authorized" without any page-local placeholder.
 pub(crate) fn render_privilege_center(
     theme: &Theme,
     inputs: &PrivilegeCenterInputs<'_>,
     entity: Entity<RootView>,
 ) -> Option<Div> {
-    let mut rows = Vec::new();
-    if let (Some(_device_id), Some(index), Some(state)) = (
-        inputs.gpu_engine_device_id.as_ref(),
-        inputs.gpu_engine_index,
-        gpu_engine_state(inputs),
-    ) {
-        rows.push(PrivilegeRow {
-            id: "gpu-engines",
-            label_key: "gpu.per_engine_title",
-            state,
-            action: PrivilegeAction::GpuEngines(index),
-        });
-    }
-    if let Some(state) = smbios_state(inputs.smbios_state, inputs.smbios_capability) {
-        rows.push(PrivilegeRow {
-            id: "smbios-memory",
-            label_key: "system.memory_inventory",
-            state,
-            action: PrivilegeAction::SmbiosMemory,
-        });
-    }
-    if let Some(state) = rapl_state(inputs.rapl_state, inputs.rapl_capability) {
-        rows.push(PrivilegeRow {
-            id: "rapl-power",
-            label_key: "cpu.package_power",
-            state,
-            action: PrivilegeAction::RaplPower,
-        });
-    }
-    if let Some(state) = msr_state(inputs.msr_state, inputs.msr_capability) {
-        rows.push(PrivilegeRow {
-            id: "msr-readouts",
-            label_key: "cpu.msr_readouts",
-            state,
-            action: PrivilegeAction::MsrReadouts,
-        });
-    }
+    let rows = inputs.rows();
     if rows.is_empty() {
         return None;
     }
@@ -193,8 +89,8 @@ fn render_row(theme: &Theme, row: PrivilegeRow, entity: Entity<RootView>) -> Div
                 })
                 .child(i18n::t(state.label_key())),
         );
-    if state.has_action() {
-        line = line.child(authorization_button(theme, row.id, entity, row.action));
+    if let Some(action) = row.action {
+        line = line.child(authorization_button(theme, row.id, entity, action));
     }
     line
 }
@@ -215,8 +111,14 @@ fn authorization_button(
             true,
             false,
             move |_window, cx| {
-                entity.update(cx, |view, cx| match action {
-                    PrivilegeAction::GpuEngines(index) => view.enable_gpu_engines(index, cx),
+                entity.update(cx, |view, cx| match &action {
+                    PrivilegeAction::GpuEngines(id) => {
+                        if let Some(index) = (0..view.system_snapshot().gpu.len())
+                            .find(|index| view.gpu_engine_rows_device_id(*index) == *id)
+                        {
+                            view.enable_gpu_engines(index, cx);
+                        }
+                    }
                     PrivilegeAction::SmbiosMemory => view.authorize_memory_inventory(cx),
                     PrivilegeAction::RaplPower => view.authorize_package_power(cx),
                     PrivilegeAction::MsrReadouts => view.authorize_msr_readouts(cx),
@@ -225,121 +127,3 @@ fn authorization_button(
             |_hovered, _window, _cx| {},
         ))
 }
-
-fn gpu_engine_state(inputs: &PrivilegeCenterInputs<'_>) -> Option<PrivilegeRowState> {
-    let device_id = inputs.gpu_engine_device_id.as_ref()?;
-    match present_gpu_engine_rows(
-        inputs.gpu_engine_state,
-        device_id,
-        inputs.gpu_engine_capability,
-    ) {
-        GpuEngineRowsPresentation::PermissionRequired => {
-            Some(PrivilegeRowState::NeedsAuthorization)
-        }
-        GpuEngineRowsPresentation::Loading => Some(PrivilegeRowState::Authorizing),
-        GpuEngineRowsPresentation::Active(_) => Some(PrivilegeRowState::Enabled),
-        GpuEngineRowsPresentation::PermissionDenied => Some(PrivilegeRowState::Denied),
-        GpuEngineRowsPresentation::MissingDependency
-        | GpuEngineRowsPresentation::AuthorizationUnavailable => {
-            Some(PrivilegeRowState::Unavailable)
-        }
-        GpuEngineRowsPresentation::Unsupported => Some(PrivilegeRowState::Unsupported),
-        GpuEngineRowsPresentation::Failed => Some(PrivilegeRowState::Failed),
-    }
-}
-
-fn smbios_state(
-    state: &SmbiosMemoryState,
-    capability: Option<CapabilityStatus>,
-) -> Option<PrivilegeRowState> {
-    match state {
-        SmbiosMemoryState::Ready(_) => Some(PrivilegeRowState::Enabled),
-        SmbiosMemoryState::Loading { .. } => Some(PrivilegeRowState::Authorizing),
-        SmbiosMemoryState::Failed(failed) => {
-            Some(state_from_failure(smbios_failure_kind(&failed.failure)))
-        }
-        SmbiosMemoryState::Closed => capability_state(capability),
-    }
-}
-
-fn rapl_state(
-    state: &RaplPowerState,
-    capability: Option<CapabilityStatus>,
-) -> Option<PrivilegeRowState> {
-    match state {
-        RaplPowerState::Ready(_) => Some(PrivilegeRowState::Enabled),
-        RaplPowerState::Loading { .. } => Some(PrivilegeRowState::Authorizing),
-        RaplPowerState::Failed(failed) => {
-            Some(state_from_failure(rapl_failure_kind(&failed.failure)))
-        }
-        RaplPowerState::Closed => capability_state(capability),
-    }
-}
-
-fn msr_state(
-    state: &MsrReadoutState,
-    capability: Option<CapabilityStatus>,
-) -> Option<PrivilegeRowState> {
-    match state {
-        MsrReadoutState::Ready(_) => Some(PrivilegeRowState::Enabled),
-        MsrReadoutState::Loading { .. } => Some(PrivilegeRowState::Authorizing),
-        MsrReadoutState::Failed(failed) => {
-            Some(state_from_failure(msr_failure_kind(&failed.failure)))
-        }
-        MsrReadoutState::Closed => capability_state(capability),
-    }
-}
-
-fn capability_state(status: Option<CapabilityStatus>) -> Option<PrivilegeRowState> {
-    match status? {
-        // `RequiresEscalation` is the escalatable state; `PermissionRequired`
-        // is a permission gate. Both need one explicit authorization decision,
-        // so both expose the same affordance in this center.
-        CapabilityStatus::Available
-        | CapabilityStatus::PermissionRequired
-        | CapabilityStatus::RequiresEscalation => Some(PrivilegeRowState::NeedsAuthorization),
-        CapabilityStatus::Degraded(kind) => Some(state_from_failure(kind)),
-        CapabilityStatus::Unsupported => Some(PrivilegeRowState::Unsupported),
-        CapabilityStatus::MissingDependency
-        | CapabilityStatus::TemporarilyUnavailable
-        | CapabilityStatus::Stale => Some(PrivilegeRowState::Unavailable),
-    }
-}
-
-const fn state_from_failure(kind: FailureKind) -> PrivilegeRowState {
-    match kind {
-        FailureKind::RequiresEscalation => PrivilegeRowState::NeedsAuthorization,
-        FailureKind::PermissionDenied => PrivilegeRowState::Denied,
-        FailureKind::Unsupported => PrivilegeRowState::Unsupported,
-        FailureKind::ProviderFault | FailureKind::Rejected => PrivilegeRowState::Failed,
-        FailureKind::MissingDependency
-        | FailureKind::TimedOut
-        | FailureKind::TemporarilyUnavailable
-        | FailureKind::IdentityChanged => PrivilegeRowState::Unavailable,
-    }
-}
-
-const fn smbios_failure_kind(failure: &SmbiosMemoryRequestFailure) -> FailureKind {
-    match failure {
-        SmbiosMemoryRequestFailure::Submission(kind) => *kind,
-        SmbiosMemoryRequestFailure::Provider(failure) => failure.kind,
-    }
-}
-
-const fn rapl_failure_kind(failure: &RaplPowerRequestFailure) -> FailureKind {
-    match failure {
-        RaplPowerRequestFailure::Submission(kind) => *kind,
-        RaplPowerRequestFailure::Provider(failure) => failure.kind,
-    }
-}
-
-const fn msr_failure_kind(failure: &MsrReadoutRequestFailure) -> FailureKind {
-    match failure {
-        MsrReadoutRequestFailure::Submission(kind) => *kind,
-        MsrReadoutRequestFailure::Provider(failure) => failure.kind,
-    }
-}
-
-#[cfg(test)]
-#[path = "../../../tests/gui/gpui_gpui_app_settings_privilege_center_tests.rs"]
-mod tests;

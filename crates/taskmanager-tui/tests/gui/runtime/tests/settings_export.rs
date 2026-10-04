@@ -2,6 +2,7 @@
 //! (success path and the honest error when no snapshot is loaded).
 
 use super::super::*;
+use crate::demo_app;
 use taskmanager_application::AppAction;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigStore;
@@ -13,11 +14,58 @@ use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
+use taskmanager_platform_contract::{
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+};
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 use taskmanager_test_support::pin_english;
+
+#[test]
+fn permission_center_enter_requests_only_an_offered_helper_lane() {
+    let mut app = demo_app();
+    app.toggle_settings();
+    app.settings_form.field = 32;
+    for (status, offered) in [
+        (CapabilityStatus::RequiresEscalation, true),
+        (CapabilityStatus::PermissionRequired, false),
+        (CapabilityStatus::Unsupported, false),
+    ] {
+        app.shell
+            .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
+                CapabilityDescriptor {
+                    id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                    status,
+                    providers: Vec::new(),
+                    observed_at_ms: 1,
+                    last_success_at_ms: None,
+                },
+            ]));
+        let effect = handle_key(
+            &mut app,
+            KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::Enter,
+                KeyModifiers::NONE,
+            ),
+        );
+        assert_eq!(
+            matches!(effect, Some(PlatformEffect::RaplPower(_))),
+            offered
+        );
+        assert_eq!(
+            app.local_surface_kind(),
+            Some(crate::TuiSurfaceKind::Settings)
+        );
+    }
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Esc, KeyModifiers::NONE),
+    );
+    assert!(effect.is_none());
+    assert_eq!(app.local_surface_kind(), None);
+}
 
 fn wait_for_config(app: &mut TuiApp, predicate: impl Fn(&Config) -> bool) {
     for _ in 0..64 {

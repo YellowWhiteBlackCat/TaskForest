@@ -15,6 +15,7 @@ use gpui::{
 use taskmanager_application::i18n::t;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_platform_contract::CapabilityStatus;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::inputs::text_input::TextInput;
@@ -168,7 +169,7 @@ pub(super) fn compose_primary_dialogs(
                 window_decorations: presentation.window_decorations,
                 slider_entity,
                 switches: &view.settings_switches,
-                privilege_center: settings_view::PrivilegeCenterInputs {
+                privilege_center: PrivilegeCenterInputs {
                     gpu_engine_state: view.shell.gpu_engine_rows_state(),
                     gpu_engine_capability: if view
                         .capture_evidence
@@ -180,7 +181,6 @@ pub(super) fn compose_primary_dialogs(
                             .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES)
                     },
                     gpu_engine_device_id,
-                    gpu_engine_index,
                     smbios_state: view.shell.smbios_memory_state(),
                     smbios_capability: if view.capture_evidence.settings_permission_center_enabled()
                     {

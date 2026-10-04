@@ -194,13 +194,7 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
         }
         crate::TuiInputScope::LocalSurface(_) => match app.local_surface() {
             Some(crate::TuiSurface::Settings) => {
-                settings::render_settings_overlay_at(
-                    frame,
-                    &app.settings_form,
-                    theme,
-                    plan.focus,
-                    popup,
-                );
+                settings::render_settings_overlay_at(frame, app, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::About) => {
                 about::render_about_overlay_at(frame, app, theme, popup);

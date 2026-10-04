@@ -11,6 +11,7 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
@@ -266,7 +267,14 @@ fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> boo
     }
 }
 
-pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
+pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+    if key.code == ratatui::crossterm::event::KeyCode::Enter && app.settings_form.field >= 30 {
+        return PrivilegeCenterInputs::from_shell(&app.shell)
+            .rows()
+            .get(app.settings_form.field - 30)
+            .and_then(|row| row.action.as_ref())
+            .map(|action| action.effect());
+    }
     match key.code {
         ratatui::crossterm::event::KeyCode::Tab | ratatui::crossterm::event::KeyCode::Down => {
             app.settings_form.move_field(1)
@@ -299,6 +307,7 @@ pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
         }
         _ => {}
     }
+    None
 }
 
 fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {

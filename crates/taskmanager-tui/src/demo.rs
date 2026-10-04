@@ -652,6 +652,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "settings-permission-center" => {
             app.open_local_surface(TuiSurface::Settings);
+            app.settings_form.field = 30;
         }
         "first-run" => {
             app.open_local_surface(TuiSurface::FirstRun);

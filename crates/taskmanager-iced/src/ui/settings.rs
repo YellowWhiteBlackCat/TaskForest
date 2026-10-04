@@ -36,11 +36,6 @@ use controls::*;
 use privilege_center::privileges_group;
 use shortcuts::shortcut_section;
 
-/// The scrollable body height (px contract): the grouped page needs more
-/// vertical room than the legacy 420px strip; the modal panel keeps its
-/// fixed 680px width and the body fills it.
-const SETTINGS_SCROLL_HEIGHT: f32 = 520.0;
-
 fn is_system_font_token(token: &str) -> bool {
     token.eq_ignore_ascii_case("system")
 }
@@ -69,11 +64,11 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let prefs = app.preferences();
 
     let groups: Vec<IcedElement<'_>> = vec![
+        privileges_group(app),
         general_group(theme_snapshot, language, prefs),
         appearance_group(theme_snapshot, language, app, prefs),
         fonts_group(theme_snapshot, language, app, prefs),
         system_group(theme_snapshot, language, prefs),
-        privileges_group(theme_snapshot),
         notifications_group(theme_snapshot, prefs),
         units_group(theme_snapshot, language, prefs),
     ];
@@ -83,7 +78,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         i18n::t(language, Key::Settings),
         t("settings.persist_hint"),
         scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
-            .height(Length::Fixed(SETTINGS_SCROLL_HEIGHT))
+            .height(Length::Fill)
             .width(Length::Fill)
             .into(),
         appear,

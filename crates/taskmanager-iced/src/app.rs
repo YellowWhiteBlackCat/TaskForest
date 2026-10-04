@@ -28,6 +28,7 @@ use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
     ProcessStatusFilter, ShellApp, SortCol,
@@ -280,6 +281,8 @@ pub enum Message {
     AuthorizeRaplPower,
     /// Authorize or refresh CPU MSR readouts via MSR helper.
     AuthorizeMsrReadouts,
+    /// Execute a currently offered, identity-frozen permission-center action.
+    AuthorizePrivilege(PrivilegeAction),
     /// End-task was requested (shows the confirmation bar).
     RequestEndTask,
     /// Request a batch process-control action (Suspend / Resume / Kill /

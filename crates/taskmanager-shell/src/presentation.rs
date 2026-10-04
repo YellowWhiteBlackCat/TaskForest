@@ -24,6 +24,7 @@ mod cpu;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
 mod network;
+pub mod privilege_center;
 mod process;
 mod service_exit;
 mod storage;

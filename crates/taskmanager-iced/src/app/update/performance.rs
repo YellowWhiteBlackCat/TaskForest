@@ -9,10 +9,16 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 use super::super::{IcedApp, Message, PerfDevice};
 use super::dispatch::UpdateDispatch;
 use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 
 impl IcedApp {
     pub(super) fn reduce_performance_message(&mut self, message: Message) -> UpdateDispatch {
         let effect = match message {
+            Message::AuthorizePrivilege(action) => PrivilegeCenterInputs::from_shell(&self.shell)
+                .rows()
+                .into_iter()
+                .find_map(|row| row.action.filter(|current| *current == action))
+                .map(|action| action.effect()),
             Message::SelectPerformanceGraphPoints(points) => {
                 let mut config = self.config_draft();
                 config.graph_data_points = points;
