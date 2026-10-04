@@ -17,7 +17,7 @@ queries are owned by `taskmanager-app-host`'s bounded worker; renderers receive
 only application request/completion values.
 
 Production writes, flush cadence and the single-writer lock are owned by the
-independent collector's app-host-composed writer generation. A query concurrent with an
+frontend session's app-host-composed writer generation. A query concurrent with an
 append is a request-local snapshot: a transient incomplete tail is never
 persisted as corruption state, and a later query re-reads the completed file.
 
@@ -41,9 +41,9 @@ limit; rewrite temporaries use independent short names. Read ingress privately
 indexes published external locations by the current typed key, combines segments
 under one byte ceiling and retains corruption evidence. Retiring one segment
 releases revision guards only when no segment or pending sample remains.
-The read-only claim probe distinguishes absent/live/stale/ambiguous without
-acquiring or replacing ownership; frontend startup uses it only for a bounded
-collector handshake.
+The read-only probe reports a held OS lock independently from free-file
+absent/live/stale/ambiguous claims. A bounded shared read lease permits claim
+inspection without becoming a writer; mandatory locking never fabricates a PID.
 
 ## Module map
 

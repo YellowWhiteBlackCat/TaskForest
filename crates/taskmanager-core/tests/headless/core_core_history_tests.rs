@@ -176,6 +176,8 @@ fn scope_filenames_are_portable_unambiguous_and_case_injective() {
         "_",
         "a__b",
         "_edge_",
+        "-",
+        "--",
         "a%b:c/d\\e",
         "桌面程序",
     ];

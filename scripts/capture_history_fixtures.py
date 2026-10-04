@@ -8,6 +8,8 @@ from pathlib import Path
 
 
 def scope_token(value: str) -> str:
+    if value == "-":
+        return "%2D"
     return "".join(chr(byte) if chr(byte) in "abcdefghijklmnopqrstuvwxyz0123456789.-" else f"%{byte:02X}" for byte in value.encode("utf-8"))
 
 

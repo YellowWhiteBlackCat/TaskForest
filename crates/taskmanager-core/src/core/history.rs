@@ -355,6 +355,9 @@ impl HistorySeriesKey {
 /// so distinct identities cannot collide on case-insensitive filesystems;
 /// underscores are escaped so they cannot become the series separator.
 fn encode_scope(value: &str) -> String {
+    if value == "-" {
+        return "%2D".to_owned();
+    }
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {

@@ -125,7 +125,7 @@ jobs:
           set -o pipefail
           cargo nextest run --locked -p taskmanager-windows-api -p taskmanager-platform-windows --all-targets --profile ci -j 4 2>&1 | tee windows-native-receipt.txt
       - name: Execute portable history storage contract
-        run: cargo nextest run --locked -p taskmanager-history-store --all-targets --profile ci -j 4
+        run: cargo nextest run --locked -p taskmanager-history-store --all-targets --profile ci -j 4 --no-fail-fast
       - name: Upload native boundary receipt
         if: always()
         uses: actions/upload-artifact@v4
