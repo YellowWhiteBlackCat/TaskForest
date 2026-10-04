@@ -18,6 +18,7 @@
 
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+#[cfg(target_os = "linux")]
 use taskmanager_telemetry_store::HistoryRetention;
 
 #[cfg(target_os = "linux")]
