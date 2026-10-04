@@ -12,7 +12,7 @@
 | | `system-about` | 独立操作系统与桌面环境完整事实面 | Aligned | Aligned | Aligned |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
 | | `system-dashboard` | 多硬件总览仪表盘 | Pending | Pending | Pending |
-| | `system-hardware` | SMBIOS 硬件拓扑明细 | Pending | Pending | Pending |
+| | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Aligned | Aligned |
 | 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
 | | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Pending | Aligned |

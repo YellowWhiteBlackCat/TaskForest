@@ -5,6 +5,7 @@ use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::fixture::setup::setup_script_info;
+use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -20,17 +21,28 @@ pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_
 use super::{DetailsSection, IcedApp, LocalSurface, Message, PerfDevice};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) enum HistoryCaptureFrame {
+pub(super) enum CapturePresentationFrame {
     #[default]
     WaitingForData,
     WaitingForPresentation,
     Presented,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum CaptureDataTarget {
+    #[default]
+    General,
+    PerformanceHistory,
+    ApplicationHistory,
+    MemoryInventory,
+}
+
 pub(super) struct CaptureState {
     pub(super) marker: Option<PathBuf>,
     pub(super) emitted: bool,
-    pub(super) history_frame: HistoryCaptureFrame,
+    pub(super) presentation_frame: CapturePresentationFrame,
+    pub(super) data_target: CaptureDataTarget,
+    pub(super) scroll_requested: bool,
 }
 
 impl CaptureState {
@@ -38,13 +50,21 @@ impl CaptureState {
         Self {
             marker,
             emitted: false,
-            history_frame: HistoryCaptureFrame::WaitingForData,
+            presentation_frame: CapturePresentationFrame::WaitingForData,
+            data_target: CaptureDataTarget::General,
+            scroll_requested: false,
         }
     }
 }
 
 /// Apply one fixed capture target and its page-local facts.
 pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
+    app.capture.data_target = match target {
+        "history-replay" => CaptureDataTarget::PerformanceHistory,
+        "application-history-replay" => CaptureDataTarget::ApplicationHistory,
+        "system-hardware" => CaptureDataTarget::MemoryInventory,
+        _ => CaptureDataTarget::General,
+    };
     if apply_capture_surface_and_process(app, target) {
         return;
     }
@@ -79,6 +99,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         let _ = app.update(Message::OpenSystemInformation);
     } else if target == "system-hardware" {
         app.shell.application.active_page = AppPage::System;
+        seed_shell_memory_inventory(&mut app.shell);
     } else if target == "settings" {
         app.open_local_surface(LocalSurface::Settings);
     } else if target == "containers" {

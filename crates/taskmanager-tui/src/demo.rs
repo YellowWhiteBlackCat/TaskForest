@@ -28,6 +28,7 @@ use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::setup::setup_script_info;
+use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
@@ -493,6 +494,8 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "system-hardware" => {
             app.shell.application.active_page = AppPage::System;
+            seed_shell_memory_inventory(&mut app.shell);
+            app.memory_capture_scroll_pending = true;
         }
 
         "storage-health"

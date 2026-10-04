@@ -6,6 +6,7 @@ use crate::demo_app;
 use taskmanager_application::AppAction;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigStore;
+use taskmanager_application::SmbiosMemoryState;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -17,11 +18,14 @@ use taskmanager_core::core::sensors::{
 use taskmanager_platform_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
 };
+use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
+use taskmanager_shell::queue_effect;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 use taskmanager_test_support::pin_english;
+use taskmanager_test_support::smbios_memory;
 
 #[test]
 fn permission_center_enter_requests_only_an_offered_helper_lane() {
@@ -65,6 +69,54 @@ fn permission_center_enter_requests_only_an_offered_helper_lane() {
     );
     assert!(effect.is_none());
     assert_eq!(app.local_surface_kind(), None);
+}
+
+#[test]
+fn memory_permission_entry_drains_its_matching_response_into_system_review() {
+    pin_english();
+    let value = memory_inventory_snapshot();
+    let (mut client, recorder) = smbios_memory::platform(value.clone());
+    let mut app = demo_app();
+    app.shell
+        .apply_capability_snapshot(client.capabilities().snapshot());
+    app.toggle_settings();
+    app.settings_form.field = 31;
+    let enter = KeyEvent::new(
+        ratatui::crossterm::event::KeyCode::Enter,
+        KeyModifiers::NONE,
+    );
+    let effect = handle_key(&mut app, enter).expect("offered memory action");
+    queue_effect(&mut app.shell, &mut client, effect);
+    assert!(
+        handle_key(&mut app, enter).is_none(),
+        "an authorizing request cannot repeat"
+    );
+    app.apply_platform_batch(client.try_drain().expect("matching terminal"));
+    let SmbiosMemoryState::Ready(ready) = app.shell.smbios_memory_state() else {
+        panic!("the normal drain must accept the memory terminal");
+    };
+    assert_eq!(ready.snapshot, value);
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    app.toggle_settings();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
+    let mut terminal =
+        ratatui::Terminal::new(ratatui::backend::TestBackend::new(54, 16)).expect("terminal");
+    let mut visited = String::new();
+    for _ in 0..24 {
+        terminal
+            .draw(|frame| crate::render(frame, &app, crate::TuiTheme::default()))
+            .expect("draw");
+        visited.push_str(&terminal.backend().to_string());
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::PageDown,
+                KeyModifiers::NONE,
+            ),
+        );
+    }
+    assert!(visited.contains("ChannelA-DIMM0") && visited.contains("ChannelB-DIMM0"));
+    assert!(visited.contains("5200 MT/s") && visited.contains("3 / 4 used"));
 }
 
 fn wait_for_config(app: &mut TuiApp, predicate: impl Fn(&Config) -> bool) {

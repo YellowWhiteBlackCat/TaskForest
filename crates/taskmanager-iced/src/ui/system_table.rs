@@ -1,11 +1,14 @@
 //! Typed System facts and telemetry projection for the Iced frontend.
 
+use iced::advanced::widget::Id;
+use iced::widget::operation::{AbsoluteOffset, scroll_to};
 use iced::widget::{column, row, scrollable, text};
-use iced::{Element, Length};
+use iced::{Element, Length, Task};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_core::core::units::UnitPreferences;
 
 use taskmanager_shell::presentation::{duration, missing_value};
 use taskmanager_theme::tokens;
@@ -56,7 +59,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         _ => None,
     };
     let memory_slots_panel = smbios_snapshot.map(|snapshot| {
-        let rows = smbios_memory_inventory_rows(snapshot)
+        let rows = smbios_memory_inventory_rows(snapshot, UnitPreferences::default())
             .into_iter()
             .map(|(label, value)| SystemInfoRow { label, value })
             .collect::<Vec<_>>();
@@ -69,9 +72,9 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         super::system_dashboard::render_system_dashboard(app, app.system_dashboard_window),
     )
     .chain(std::iter::once(hardware_panel))
-    .chain(memory_slots_panel)
     .chain(npu_panels)
     .chain(std::iter::once(telemetry_panel))
+    .chain(memory_slots_panel)
     .collect::<Vec<_>>();
 
     let header_row = row![
@@ -97,11 +100,24 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
 
     column![
         header_row,
-        scrollable(column(content).spacing(12)).height(Length::Fill),
+        scrollable(column(content).spacing(12))
+            .id("system-facts-scroll")
+            .height(Length::Fill),
     ]
     .spacing(8)
     .height(Length::Fill)
     .into()
+}
+
+/// Capture requests the same bounded System scroll owner the user operates.
+pub(crate) fn bound_system_body_to_end() -> Task<Message> {
+    scroll_to(
+        Id::new("system-facts-scroll"),
+        AbsoluteOffset {
+            x: None,
+            y: Some(f32::MAX),
+        },
+    )
 }
 
 pub(crate) fn format_system_spec_export(
@@ -120,7 +136,7 @@ pub(crate) fn format_system_spec_export(
     }
     if let Some(smbios) = smbios_memory {
         lines.push(format!("## {}", t("system.memory_slots")));
-        for (label, value) in smbios_memory_inventory_rows(smbios) {
+        for (label, value) in smbios_memory_inventory_rows(smbios, UnitPreferences::default()) {
             lines.push(format!("- {}: {}", label, value));
         }
     }

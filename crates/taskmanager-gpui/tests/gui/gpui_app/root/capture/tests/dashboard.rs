@@ -68,7 +68,11 @@ fn every_dashboard_capture_token_reaches_its_exact_root_state() {
             &ingestor,
             7_200_000,
         );
-        assert!(evidence.scenario_ready());
+        assert_eq!(
+            evidence.scenario_ready(),
+            scenario != CaptureScenario::SystemHardware,
+            "hardware readiness requires its rendered inventory viewport"
+        );
         (dashboard, store, panel)
     }
     let (overview, _, _) = prepared(CaptureScenario::SystemDashboard);

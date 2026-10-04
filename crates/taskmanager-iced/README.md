@@ -137,6 +137,8 @@ real worker rows plus their presented frame; no renderer seeds replay data.
   Native boot requests desktop appearance through the shared effect seam.
   System information (`ui/system_information.rs`) has an independent primary slot,
   frozen shared groups and a bounded scroll owner with fixed Copy/Close actions.
+- Hardware review uses the shared accepted memory-inventory rows, including incomplete
+  populated slots. System actions remain fixed above one native bounded scroll body.
 - Iced-local surfaces: the first-run dialog (`ui/first_run.rs`, platform setup-script
   application controller, quiet observation and explicit Settings entry,
   bounded metadata viewport with fixed actions; dismiss is side-effect free), the Containers full page

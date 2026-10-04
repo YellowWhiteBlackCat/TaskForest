@@ -344,3 +344,6 @@ mod history_config;
 
 #[path = "history_layout.rs"]
 mod history_layout;
+
+#[path = "system_layout.rs"]
+mod system_layout;

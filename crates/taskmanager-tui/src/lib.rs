@@ -216,6 +216,7 @@ pub struct TuiApp {
     /// Stored as navigation intent and clamped by the current projection and
     /// terminal height during paint.
     pub system_scroll: usize,
+    pub(crate) memory_capture_scroll_pending: bool,
     /// Alert-rule selection index in the health overlay. Clamped against the
     /// projection's managed-rules count during access.
     pub health_rule_selection: usize,
@@ -350,6 +351,7 @@ impl TuiApp {
             gpu_engine_scroll: 0,
             chart_cursor: None,
             system_scroll: 0,
+            memory_capture_scroll_pending: false,
             health_rule_selection: 0,
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),

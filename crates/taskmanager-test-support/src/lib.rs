@@ -15,6 +15,7 @@ mod memory;
 mod metrics;
 mod process;
 pub mod setup_script;
+pub mod smbios_memory;
 
 // ── locale pinning for text-asserting tests ──────────────────────────────────
 

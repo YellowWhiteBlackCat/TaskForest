@@ -8,6 +8,29 @@ use super::frame_text;
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::fixture::edit_snapshot;
 
+#[test]
+fn system_scroll_reaches_the_final_wrapped_fact_continuation_in_a_short_window() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let disk = snapshot
+            .as_mut()
+            .expect("snapshot")
+            .disks
+            .last_mut()
+            .expect("disk");
+        disk.disk_type = format!("{} TAIL_VISIBLE", "long device description ".repeat(24));
+    });
+    app.system_scroll = usize::MAX;
+    for (width, height) in [(54, 16), (80, 24), (140, 48), (200, 16), (54, 60)] {
+        let text = frame_text(&app, width, height);
+        assert!(
+            text.contains("TAIL_VISIBLE"),
+            "the final wrapped value must be reachable at {width}x{height}: {text}"
+        );
+    }
+}
+
 /// The disk panel carries the typed device-health verdict (§2.3 B-1) and the
 /// Removable row for proven removable media (§2.3 B-2); the network panel
 /// carries the same health verdict (§2.4 B-1) while its carrier verdict stays

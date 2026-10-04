@@ -27,11 +27,11 @@ pub enum SystemHealthCaptureOutcome {
     ReadyWithConfirmation(SmartSelfTestConfirmationRequest),
 }
 
-/// The NPU evidence marker is emitted only after its typed fixture has entered
-/// the canonical projection and the Graphics section has actually been laid
+/// Inventory evidence is emitted only after its typed fixture has entered
+/// the canonical projection and its requested section has actually been laid
 /// out and scrolled into the per-window viewport.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SystemNpuCaptureState {
+pub(crate) enum SystemInventoryCaptureState {
     #[default]
     AwaitingFixture,
     AwaitingLayout,
@@ -39,7 +39,7 @@ pub(crate) enum SystemNpuCaptureState {
     Ready,
 }
 
-impl SystemNpuCaptureState {
+impl SystemInventoryCaptureState {
     pub(crate) const fn needs_fixture(self) -> bool {
         matches!(self, Self::AwaitingFixture)
     }
@@ -150,7 +150,7 @@ pub(crate) struct CaptureEvidence {
     pub(super) snapshot_count: u8,
     pub(super) scenario_process_identity: Option<ProcessLiveKey>,
     pub(super) history_replay_open_state: HistoryReplayOpenState,
-    pub(super) system_npu_state: SystemNpuCaptureState,
+    pub(super) system_inventory_state: SystemInventoryCaptureState,
     /// Capture-only comparison evidence. Persistent history runtime is
     /// reader-only; deterministic screenshots must not reintroduce its retired
     /// boot writer/controller state.

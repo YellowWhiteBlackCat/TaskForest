@@ -68,15 +68,18 @@ use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
 use crate::pages::processes::columns_modal::ProcessColumnsModalState;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
+use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
+use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 
 /// The resolved token palette, injected as a resource for spawn systems.
 #[derive(Resource)]
@@ -136,6 +139,7 @@ struct CaptureMarkerState {
     emitted: bool,
     history_open_requested: bool,
     data_presented: bool,
+    hardware_scroll_requested: bool,
 }
 
 /// Build and run the live windowed frontend to completion.
@@ -322,6 +326,46 @@ fn emit_capture_marker(world: &mut World) {
         return;
     }
     match capture_scenario_target() {
+        Some("system-hardware") => {
+            let anchor = world
+                .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<MemoryInventoryAnchor>>(
+                )
+                .iter(world)
+                .next()
+                .map(|(node, transform)| (node.size(), transform.translation));
+            let Some((size, center)) = anchor.filter(|(size, _)| size.x > 0.0 && size.y > 0.0)
+            else {
+                return;
+            };
+            if !world
+                .resource::<CaptureMarkerState>()
+                .hardware_scroll_requested
+            {
+                let mut body = world.query_filtered::<(&ComputedNode, &UiGlobalTransform, &mut ScrollPosition), With<SystemBody>>();
+                for (node, transform, mut scroll) in body.iter_mut(world) {
+                    let maximum = ((node.content_size().y - node.size().y)
+                        * node.inverse_scale_factor())
+                    .max(0.0);
+                    let delta = (center.y - size.y / 2.0 - transform.translation.y
+                        + node.size().y / 2.0)
+                        * node.inverse_scale_factor();
+                    scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
+                }
+                world
+                    .resource_mut::<CaptureMarkerState>()
+                    .hardware_scroll_requested = true;
+                return;
+            }
+            let mut body =
+                world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<SystemBody>>();
+            if !body.iter(world).any(|(node, transform)| {
+                center.y - size.y / 2.0 >= transform.translation.y - node.size().y / 2.0 - 0.5
+                    && center.y + size.y / 2.0
+                        <= transform.translation.y + node.size().y / 2.0 + 0.5
+            }) {
+                return;
+            }
+        }
         Some("history-replay") => {
             use crate::pages::history::control::{
                 HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
@@ -362,7 +406,7 @@ fn emit_capture_marker(world: &mut World) {
     }
     if matches!(
         capture_scenario_target(),
-        Some("history-replay" | "application-history-replay")
+        Some("history-replay" | "application-history-replay" | "system-hardware")
     ) && !world.resource::<CaptureMarkerState>().data_presented
     {
         world.resource_mut::<CaptureMarkerState>().data_presented = true;
@@ -414,6 +458,9 @@ impl Plugin for FrontendWindowPlugin {
                     seed_service_log_fixture(&mut shell);
                 }
                 seed_capture_confirmation_fixture(&mut shell);
+                if capture_scenario_target() == Some("system-hardware") {
+                    seed_shell_memory_inventory(&mut shell);
+                }
                 shell
             } else {
                 ShellApp::new()

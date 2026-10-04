@@ -19,7 +19,7 @@ use super::sections::memory_inventory::{
 };
 use crate::gpui_app::root::RootView;
 use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{Length, Theme, tokens};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -106,6 +106,8 @@ pub(super) fn render_memory_inventory(
         let value_id = format!("memory-inventory-value:{label}");
         content = content.child(
             KeyValueRow::new(label, value, theme.palette())
+                .label_width(Length(120.0))
+                .value_align_right(false)
                 .selectable_value(gpui::ElementId::Name(value_id.into()))
                 .render(),
         );

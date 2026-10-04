@@ -50,6 +50,7 @@ src/lib.rs                     dev-only typed fixture builders
 src/memory.rs  metrics.rs  process.rs
 src/setup_script.rs             quiet setup submission recorder
 src/desktop_appearance.rs       responding appearance port and submission recorder
+src/smbios_memory.rs            responding memory-inventory port and recorded request identity
 ```
 
 Consumed only through dev-dependencies; never a product dependency.

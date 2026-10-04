@@ -160,6 +160,23 @@ pub(crate) fn stat_row_scene(
     }
 }
 
+/// A complete inspection fact: the label and wrapped value own separate rows.
+pub(crate) fn detail_row_scene(
+    label: String,
+    value: Box<dyn Scene>,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    bsn! {
+        Node { width: percent(100), min_width: px(0.0), min_height: px(palette.control_height_px), flex_shrink: 0.0,
+            flex_direction: FlexDirection::Column, row_gap: px(space_2()),
+            padding: UiRect::vertical(px(space_2())) }
+        Children [
+            Text(label) TextRole(Role::Caption) Node { width: percent(100), min_width: px(0.0) } --
+            Node { width: percent(100), min_width: px(0.0) } Children [ @{ value } ]
+        ]
+    }
+}
+
 /// Unstyled Bevy button plus the product pill skin. Interaction wiring belongs
 /// to the caller so the same visual control can carry different typed events.
 pub(crate) fn pill_scene(label: String, active: bool, palette: &UiPalette) -> impl Scene + use<> {

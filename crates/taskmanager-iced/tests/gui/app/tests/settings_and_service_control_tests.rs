@@ -3,6 +3,7 @@ use std::sync::Arc;
 use super::*;
 use taskmanager_application::DirectoryUsageRequest;
 use taskmanager_application::PlatformClient;
+use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::{
     PlatformEvent, PlatformFacets, PlatformHandle, RaplPowerRequest, ServiceControlRequest,
     ServiceFacets, SystemFacets,
@@ -18,8 +19,10 @@ use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::fixture::seed_projection_fact;
+use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_test_support::smbios_memory;
 
 #[derive(Default)]
 struct RecordingRapl(std::sync::Mutex<Vec<RaplPowerRequest>>);
@@ -66,6 +69,30 @@ fn permission_center_action_reaches_the_port_only_with_a_live_offer() {
         1,
         "an admitted request disables repeated authorization"
     );
+}
+
+#[test]
+fn memory_permission_entry_drains_its_matching_response_into_system_review() {
+    let value = memory_inventory_snapshot();
+    let (client, recorder) = smbios_memory::platform(value.clone());
+    let mut app = IcedApp::new(Some(client));
+    let _ = app.update(Message::Tick);
+    let _ = app.update(Message::OpenSettings);
+    let _ = app.update(Message::AuthorizePrivilege(PrivilegeAction::SmbiosMemory));
+    let _ = app.update(Message::AuthorizePrivilege(PrivilegeAction::SmbiosMemory));
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    let _ = app.update(Message::Tick);
+    let SmbiosMemoryState::Ready(ready) = app.shell.smbios_memory_state() else {
+        panic!("the normal tick must accept the matching inventory terminal");
+    };
+    assert_eq!(ready.snapshot, value);
+    let exported =
+        crate::ui::system_table::format_system_spec_export(None, None, None, Some(&ready.snapshot));
+    assert!(exported.contains("ChannelA-DIMM0") && exported.contains("ChannelB-DIMM0"));
+    assert!(exported.contains("5200 MT/s"));
+    let _ = app.update(Message::CloseSettings);
+    let _ = app.update(Message::SelectPage(AppPage::System));
+    assert_eq!(app.shell.application.active_page, AppPage::System);
 }
 
 /// Minimal recording service-control port (the same mock shape the shell

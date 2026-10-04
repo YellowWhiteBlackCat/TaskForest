@@ -90,10 +90,11 @@ impl CaptureEvidence {
         )
     }
 
-    pub fn system_hardware_fixture_requested(&self) -> bool {
+    pub fn system_inventory_fixture_requested(&self) -> bool {
         let scenario_needs_fixture = match self.scenario {
-            Some(CaptureScenario::SystemHardware) => !self.scenario_ready(),
-            Some(CaptureScenario::SystemNpu) => self.system_npu_state.needs_fixture(),
+            Some(CaptureScenario::SystemHardware | CaptureScenario::SystemNpu) => {
+                self.system_inventory_state.needs_fixture()
+            }
             _ => false,
         };
         self.is_enabled()

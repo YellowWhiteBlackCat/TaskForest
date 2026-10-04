@@ -575,6 +575,21 @@ pub(crate) fn history_capture_frame_ready(app: &TuiApp, plan: &frame_plan::TuiFr
     }
 }
 
+/// Prepare the capture viewport from the same committed root geometry as paint.
+pub(crate) fn prepare_memory_inventory_capture(
+    app: &mut TuiApp,
+    theme: TuiTheme,
+    plan: &frame_plan::TuiFramePlan,
+) {
+    if app.memory_capture_scroll_pending
+        && let frame_plan::TuiPageLayout::System { content } = plan.page
+        && let Some(offset) = pages::memory_inventory_capture_offset(app, theme, content)
+    {
+        app.system_scroll = offset;
+        app.memory_capture_scroll_pending = false;
+    }
+}
+
 pub(super) struct TableRenderProps<'a, const WIDTHS: usize, const HEADERS: usize> {
     pub(super) theme: TuiTheme,
     pub(super) area: Rect,

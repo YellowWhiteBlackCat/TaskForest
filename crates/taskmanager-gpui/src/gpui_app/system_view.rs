@@ -129,10 +129,24 @@ pub(crate) fn memory_inventory_card_is_visible(
     units: UnitPreferences,
 ) -> bool {
     use sections::memory_inventory::{MemoryInventoryModel, memory_inventory_model};
-    !matches!(
+    matches!(
         memory_inventory_model(inputs, units),
-        MemoryInventoryModel::Hidden
+        MemoryInventoryModel::Inventory(_)
     )
+}
+
+/// Tracked child of the accepted memory inventory, after its memory section.
+pub(super) fn memory_inventory_scroll_item(
+    hw: &HardwareInfo,
+    snap: &SystemSnapshot,
+    npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios: &SmbiosMemoryState,
+    units: UnitPreferences,
+) -> Option<usize> {
+    build_sections(hw, snap, npu_inventory, smbios, units)
+        .iter()
+        .position(|section| section.title_key == "system.section.memory")
+        .map(|index| 2 + index + 1)
 }
 
 /// Child index of the Graphics card inside the tracked System scroll column.
@@ -355,7 +369,9 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         scroll_col = scroll_col.child(section_card(theme, section));
         // The SMBIOS memory-inventory subsection rides directly beneath the
         // memory section card (it renders no element while `Hidden`).
-        if section.title_key == "system.section.memory" {
+        if section.title_key == "system.section.memory"
+            && memory_inventory_card_is_visible(&memory_inventory, units)
+        {
             scroll_col = scroll_col.child(memory_inventory::render_memory_inventory(
                 theme,
                 &memory_inventory,

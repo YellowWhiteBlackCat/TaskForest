@@ -57,11 +57,14 @@ pub use scenarios::CaptureScenario;
 pub(super) use state::{
     CaptureDataReadiness, CaptureEvidence, CaptureMode, CaptureProcessAction,
     CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,
-    SystemNpuCaptureState,
+    SystemInventoryCaptureState,
 };
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
+    pub(crate) fn memory_inventory_capture(&self) -> bool {
+        self.scenario == Some(CaptureScenario::SystemHardware)
+    }
     pub(crate) const fn is_enabled(&self) -> bool {
         self.mode.enabled()
     }
@@ -510,48 +513,54 @@ impl CaptureEvidence {
     }
 
     pub fn system_hardware_npu_fixture(&self) -> Option<NpuInventorySnapshot> {
-        self.system_hardware_fixture_requested()
+        self.system_inventory_fixture_requested()
             .then(npu_inventory_fixture)
     }
 
-    pub fn mark_system_npu_fixture_ready(&mut self, installed: bool) {
-        if self.scenario == Some(CaptureScenario::SystemNpu)
-            && installed
-            && self.system_npu_state == SystemNpuCaptureState::AwaitingFixture
+    pub fn mark_system_inventory_fixture_ready(&mut self, installed: bool) {
+        if matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) && installed
+            && self.system_inventory_state == SystemInventoryCaptureState::AwaitingFixture
         {
-            self.system_npu_state = SystemNpuCaptureState::AwaitingLayout;
+            self.system_inventory_state = SystemInventoryCaptureState::AwaitingLayout;
         }
     }
 
-    pub fn system_npu_layout_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::SystemNpu)
-            && self.telemetry_ready()
+    pub fn system_inventory_layout_requested(&self) -> bool {
+        matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) && self.telemetry_ready()
             && self.ui_data_ready()
             && !self.scenario_ready()
-            && self.system_npu_state == SystemNpuCaptureState::AwaitingLayout
+            && self.system_inventory_state == SystemInventoryCaptureState::AwaitingLayout
     }
 
     /// Atomically claim one post-layout scroll attempt. Repeated renders before
     /// the next frame cannot queue duplicate callbacks.
-    pub fn schedule_system_npu_scroll(&mut self) -> bool {
-        if !self.system_npu_layout_requested() {
+    pub fn schedule_system_inventory_scroll(&mut self) -> bool {
+        if !self.system_inventory_layout_requested() {
             return false;
         }
-        self.system_npu_state = SystemNpuCaptureState::ScrollScheduled;
+        self.system_inventory_state = SystemInventoryCaptureState::ScrollScheduled;
         true
     }
 
-    pub fn mark_system_npu_scroll_applied(&mut self, graphics_visible: bool) {
-        if self.scenario != Some(CaptureScenario::SystemNpu)
-            || self.system_npu_state != SystemNpuCaptureState::ScrollScheduled
+    pub fn mark_system_inventory_scroll_applied(&mut self, inventory_visible: bool) {
+        if !matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) || self.system_inventory_state != SystemInventoryCaptureState::ScrollScheduled
         {
             return;
         }
-        if graphics_visible {
-            self.system_npu_state = SystemNpuCaptureState::Ready;
+        if inventory_visible {
+            self.system_inventory_state = SystemInventoryCaptureState::Ready;
             self.mark_scenario_ready();
         } else {
-            self.system_npu_state = SystemNpuCaptureState::AwaitingLayout;
+            self.system_inventory_state = SystemInventoryCaptureState::AwaitingLayout;
         }
     }
 
@@ -603,7 +612,7 @@ impl CaptureEvidence {
             }
             Some(CaptureScenario::SystemHardware) => {
                 dashboard.section = SystemSection::Hardware;
-                (true, None)
+                (false, None)
             }
             Some(CaptureScenario::SystemNpu) => {
                 dashboard.section = SystemSection::Hardware;

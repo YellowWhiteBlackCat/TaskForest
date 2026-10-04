@@ -549,6 +549,7 @@ where
                 .draw(|frame| {
                     frame_area = frame.area();
                     let plan = TuiFramePlan::build(app, frame.area());
+                    crate::ui::prepare_memory_inventory_capture(app, theme, &plan);
                     render_with_plan(frame, app, theme, &plan);
                     painted_plan = Some(plan);
                 })
@@ -560,6 +561,7 @@ where
         }
         if demo
             && !capture_marked
+            && !app.memory_capture_scroll_pending
             && (!crate::demo::persisted_history_capture_requested()
                 || crate::ui::history_capture_frame_ready(app, &committed_plan))
             && let Some(path) = capture_marker

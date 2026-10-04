@@ -44,6 +44,7 @@ use crate::{DirectTrackState, FeedbackLifecycle, FeedbackSeverity, FeedbackSourc
 mod cpu_topology;
 mod inventory;
 pub mod setup;
+pub mod smbios_memory;
 
 use inventory::{services, sessions, startup};
 

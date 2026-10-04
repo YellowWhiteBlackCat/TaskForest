@@ -884,28 +884,30 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
 }
 
 #[test]
-fn system_npu_capture_waits_for_fixture_layout_and_visible_scroll_before_marker() {
-    let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SystemNpu));
-    let mut snapshot = SystemSnapshot::default();
-    let mut processes = Vec::new();
-    evidence.on_snapshot(&mut snapshot);
-    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
+fn system_inventory_capture_waits_for_fixture_layout_and_visible_scroll_before_marker() {
+    for scenario in [CaptureScenario::SystemNpu, CaptureScenario::SystemHardware] {
+        let mut evidence = CaptureEvidence::for_test(Some(scenario));
+        let mut snapshot = SystemSnapshot::default();
+        let mut processes = Vec::new();
+        evidence.on_snapshot(&mut snapshot);
+        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
 
-    let fixture = evidence
-        .system_hardware_npu_fixture()
-        .expect("system NPU capture installs the typed NPU fixture");
-    assert!(fixture.is_success());
-    evidence.mark_system_npu_fixture_ready(true);
-    assert!(evidence.system_npu_layout_requested());
-    assert!(evidence.schedule_system_npu_scroll());
-    assert!(!evidence.schedule_system_npu_scroll());
-    evidence.mark_system_npu_scroll_applied(false);
-    assert!(evidence.system_npu_layout_requested());
+        let fixture = evidence
+            .system_hardware_npu_fixture()
+            .expect("system NPU capture installs the typed NPU fixture");
+        assert!(fixture.is_success());
+        evidence.mark_system_inventory_fixture_ready(true);
+        assert!(evidence.system_inventory_layout_requested());
+        assert!(evidence.schedule_system_inventory_scroll());
+        assert!(!evidence.schedule_system_inventory_scroll());
+        evidence.mark_system_inventory_scroll_applied(false);
+        assert!(evidence.system_inventory_layout_requested());
 
-    assert!(evidence.schedule_system_npu_scroll());
-    evidence.mark_system_npu_scroll_applied(true);
-    assert!(evidence.scenario_ready());
-    assert!(!evidence.system_npu_layout_requested());
+        assert!(evidence.schedule_system_inventory_scroll());
+        evidence.mark_system_inventory_scroll_applied(true);
+        assert!(evidence.scenario_ready());
+        assert!(!evidence.system_inventory_layout_requested());
+    }
 }
 
 /// The capture-evidence route runs the production shell, where the privileged

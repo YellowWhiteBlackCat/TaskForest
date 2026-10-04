@@ -13,6 +13,7 @@ use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 use taskmanager_shell::fixture::setup::setup_script_info;
+use taskmanager_shell::fixture::smbios_memory::seed_direct_memory_inventory;
 
 use super::super::{
     CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
@@ -236,6 +237,7 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     // enabled.
     let _ = view.capture_evidence.seed_msr_readout(&mut view.shell);
     if let Some(snapshot) = view.capture_evidence.system_hardware_npu_fixture() {
+        seed_direct_memory_inventory(&mut view.shell);
         seed_direct_track_fact(&mut view.shell, DirectTrackSeedFact::NpuInventory(snapshot));
         let revision = view.projection().system_revision;
         let snapshot = view.projection().npu_inventory.clone();
@@ -248,7 +250,7 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
                     .any(|device| device.device_id.as_str() == "accel:capture-npu0")
         });
         view.capture_evidence
-            .mark_system_npu_fixture_ready(installed);
+            .mark_system_inventory_fixture_ready(installed);
     }
     let timestamp_ms = view.system_snapshot().timestamp_ms;
     if view.capture_evidence.seed_gpu_engine_inventory_history(

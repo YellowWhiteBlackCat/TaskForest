@@ -257,6 +257,10 @@ process-termination path. A second launch activates the existing window. The
 capture-only harness and tray-unavailable fallback may close normally so they
 cannot leave an owned process behind.
 
+SMBIOS review consumes the shared inventory rows with configured units. Fixed labels and
+wrapped, selectable values keep complete module facts inside the bounded System body;
+permission entry stays in Settings, and capture waits for native inventory scrolling.
+
 ## Contract and verification
 
 Keep render-entry folds shared by pointer and keyboard paths. Changes require

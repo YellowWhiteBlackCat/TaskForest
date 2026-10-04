@@ -17,6 +17,7 @@ use taskmanager_core::core::services::{
     ServiceItem, detect_ordering_cycles, detect_requirement_cycles,
 };
 use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
 pub mod about;
@@ -337,7 +338,10 @@ pub fn temperature_c_precise(value: f32) -> String {
 /// Format one SMBIOS memory inventory snapshot into canonical (label, value) rows:
 /// first the slots used/total summary, then each populated physical DIMM module.
 #[must_use]
-pub fn smbios_memory_inventory_rows(snapshot: &SmbiosMemorySnapshot) -> Vec<(String, String)> {
+pub fn smbios_memory_inventory_rows(
+    snapshot: &SmbiosMemorySnapshot,
+    units: UnitPreferences,
+) -> Vec<(String, String)> {
     if snapshot.failure.is_some() {
         return Vec::new();
     }
@@ -364,7 +368,11 @@ pub fn smbios_memory_inventory_rows(snapshot: &SmbiosMemorySnapshot) -> Vec<(Str
             }
         }
         if let Some(mb) = module.size_mb {
-            parts.push(bytes(mb as u64 * 1024 * 1024));
+            parts.push(units.format_quantity(
+                u64::from(mb) * 1024 * 1024,
+                QuantityFamily::Memory,
+                false,
+            ));
         }
         if let Some(speed) = module.configured_speed_mts.or(module.speed_mts) {
             parts.push(format!("{speed} MT/s"));

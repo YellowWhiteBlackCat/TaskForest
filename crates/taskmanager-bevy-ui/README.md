@@ -92,6 +92,8 @@ modal consumes all keyboard input, exposes scroll keys, and reserves title/actio
 around one bounded body viewport.
 
 ## Boundary
+System actions stay fixed above one native scroll area. Facts carry typed section
+groups; a successful SMBIOS or NPU lane remains visible while static hardware is unavailable.
 
 Dependency whitelist is charter law: `taskmanager-application`,
 `taskmanager-app-host`, `taskmanager-core`, `taskmanager-platform-contract`,

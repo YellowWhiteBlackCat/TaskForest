@@ -18,6 +18,7 @@ use taskmanager_core::core::sensors::SensorReading;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
+use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_theme::Theme;
 
 use super::{clean_memory_size, content, paint_system, system_fact_rows, system_summary_model};
@@ -104,6 +105,20 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
 fn a_missing_inventory_states_waiting_and_states_no_facts() {
     let rows = system_fact_rows(None, None, None);
     assert!(rows.is_empty(), "no hardware, no fabricated fact rows");
+}
+
+#[test]
+fn accepted_memory_inventory_survives_an_unavailable_static_hardware_lane() {
+    set_language(Language::En);
+    let snapshot = memory_inventory_snapshot();
+    let rows = system_fact_rows(None, Some(&snapshot), None);
+    assert_eq!(rows.len(), 4);
+    assert!(rows.iter().any(|row| row.value == "3 / 4 used"));
+    assert!(
+        rows.iter()
+            .any(|row| row.label == "ChannelA-DIMM0" && row.value.contains("5200 MT/s"))
+    );
+    assert!(rows.iter().any(|row| row.value == MISSING_VALUE));
 }
 
 #[test]

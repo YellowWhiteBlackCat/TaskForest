@@ -60,12 +60,12 @@ fn should_schedule_cursor_refresh(
     cursor_tooltip_active && refresh_state == CursorRefreshState::Idle
 }
 
-fn schedule_system_npu_capture(
+fn schedule_system_inventory_capture(
     view: &mut RootView,
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) {
-    if !view.capture_evidence.system_npu_layout_requested() {
+    if !view.capture_evidence.system_inventory_layout_requested() {
         return;
     }
     view.page = TopPage::System;
@@ -79,22 +79,34 @@ fn schedule_system_npu_capture(
         },
         view.display_units(),
     );
-    let Some(item) = system_view::graphics_scroll_item(
-        view.hardware_rc(),
-        view.system_snapshot(),
-        view.npu_inventory(),
-        view.shell.smbios_memory_state(),
-        view.display_units(),
-        inventory_visible,
-    ) else {
+    let item = if view.capture_evidence.memory_inventory_capture() {
+        system_view::memory_inventory_scroll_item(
+            view.hardware_rc(),
+            view.system_snapshot(),
+            view.npu_inventory(),
+            view.shell.smbios_memory_state(),
+            view.display_units(),
+        )
+    } else {
+        system_view::graphics_scroll_item(
+            view.hardware_rc(),
+            view.system_snapshot(),
+            view.npu_inventory(),
+            view.shell.smbios_memory_state(),
+            view.display_units(),
+            inventory_visible,
+        )
+    };
+    let Some(item) = item else {
         return;
     };
-    if !view.capture_evidence.schedule_system_npu_scroll() {
+    if !view.capture_evidence.schedule_system_inventory_scroll() {
         return;
     }
     cx.on_next_frame(window, move |view, window, cx| {
         if view.system_scroll.bounds_for_item(item).is_none() {
-            view.capture_evidence.mark_system_npu_scroll_applied(false);
+            view.capture_evidence
+                .mark_system_inventory_scroll_applied(false);
             cx.notify();
             return;
         }
@@ -103,7 +115,7 @@ fn schedule_system_npu_capture(
             let graphics_visible =
                 view.system_scroll.top_item() <= item && view.system_scroll.bottom_item() >= item;
             view.capture_evidence
-                .mark_system_npu_scroll_applied(graphics_visible);
+                .mark_system_inventory_scroll_applied(graphics_visible);
             cx.notify();
         });
         cx.notify();
@@ -181,7 +193,7 @@ impl Render for RootView {
         }
         self.ensure_input_modality_key_interceptor(window, cx);
         self.poll_diagnostic_bundle_result();
-        schedule_system_npu_capture(self, window, cx);
+        schedule_system_inventory_capture(self, window, cx);
         schedule_window_capture(self, window, cx);
         if self.capture_evidence.keyboard_focus_requested() {
             // The capture token represents a keyboard-initiated focus state even

@@ -1,8 +1,10 @@
 //! Window lifecycle, capture-frame and virtual-scroll viewport messages.
 
-use crate::app::capture_state::HistoryCaptureFrame;
+use crate::app::capture_state::{CaptureDataTarget, CapturePresentationFrame};
+use crate::ui::system_table::bound_system_body_to_end;
 use iced::Task;
 use taskmanager_application::AppPage;
+use taskmanager_application::SmbiosMemoryState;
 use taskmanager_shell::QuitReason;
 
 use super::super::{IcedApp, LocalSurfaceKind, Message};
@@ -41,25 +43,42 @@ impl IcedApp {
     pub(super) fn handle_window_message(&mut self, message: Message) -> Option<Task<Message>> {
         match message {
             Message::Frame(now) => {
-                let history_presented = if crate::capture::persisted_history_requested() {
-                    let ready = if self.shell.page() == AppPage::AppHistory {
+                if self.capture.data_target == CaptureDataTarget::MemoryInventory
+                    && matches!(
+                        self.shell.smbios_memory_state(),
+                        SmbiosMemoryState::Ready(_)
+                    )
+                    && !self.capture.scroll_requested
+                {
+                    self.capture.scroll_requested = true;
+                    return Some(bound_system_body_to_end());
+                }
+                let history_presented = if self.capture.data_target != CaptureDataTarget::General {
+                    let ready = if self.capture.data_target == CaptureDataTarget::MemoryInventory {
+                        self.shell.page() == AppPage::System
+                            && matches!(
+                                self.shell.smbios_memory_state(),
+                                SmbiosMemoryState::Ready(_)
+                            )
+                    } else if self.shell.page() == AppPage::AppHistory {
                         !self.application_history_projection().rows.is_empty()
                     } else {
                         self.history_runtime.replay().is_open()
                             && !self.history_runtime.replay().rows().is_empty()
                     };
                     if ready {
-                        match self.capture.history_frame {
-                            HistoryCaptureFrame::WaitingForData => {
-                                self.capture.history_frame =
-                                    HistoryCaptureFrame::WaitingForPresentation;
+                        match self.capture.presentation_frame {
+                            CapturePresentationFrame::WaitingForData => {
+                                self.capture.presentation_frame =
+                                    CapturePresentationFrame::WaitingForPresentation;
                                 false
                             }
-                            HistoryCaptureFrame::WaitingForPresentation => {
-                                self.capture.history_frame = HistoryCaptureFrame::Presented;
+                            CapturePresentationFrame::WaitingForPresentation => {
+                                self.capture.presentation_frame =
+                                    CapturePresentationFrame::Presented;
                                 true
                             }
-                            HistoryCaptureFrame::Presented => true,
+                            CapturePresentationFrame::Presented => true,
                         }
                     } else {
                         false

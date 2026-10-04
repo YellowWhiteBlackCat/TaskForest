@@ -36,12 +36,14 @@ fn authorize(
     let Some(action) = control.0.as_ref() else {
         return;
     };
-    if PrivilegeCenterInputs::from_shell(&track.shell)
-        .rows()
-        .iter()
-        .any(|row| row.action.as_ref() == Some(action))
+    let effect = action.effect();
+    if !pending.0.contains(&effect)
+        && PrivilegeCenterInputs::from_shell(&track.shell)
+            .rows()
+            .iter()
+            .any(|row| row.action.as_ref() == Some(action))
     {
-        pending.0.push(action.effect());
+        pending.0.push(effect);
     }
 }
 

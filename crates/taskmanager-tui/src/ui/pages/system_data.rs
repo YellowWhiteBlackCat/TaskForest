@@ -8,6 +8,7 @@ use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, duration, health_score_for_snapshot, health_score_summary, missing_value,
     optional_bytes,
@@ -20,6 +21,7 @@ pub(crate) struct SystemFact {
 }
 
 pub(crate) struct SystemFactSection {
+    pub(crate) title_key: &'static str,
     pub(crate) title: String,
     pub(crate) facts: Vec<SystemFact>,
 }
@@ -27,6 +29,7 @@ pub(crate) struct SystemFactSection {
 impl SystemFactSection {
     fn new(title_key: &'static str) -> Self {
         Self {
+            title_key,
             title: t(title_key).to_owned(),
             facts: Vec::new(),
         }
@@ -355,7 +358,7 @@ pub(crate) fn system_sections(
     }
     if let Some(smbios) = smbios_memory {
         let mut smbios_section = SystemFactSection::new("system.memory_slots");
-        for (label, value) in smbios_memory_inventory_rows(smbios) {
+        for (label, value) in smbios_memory_inventory_rows(smbios, UnitPreferences::default()) {
             smbios_section.push(label, value);
         }
         if !smbios_section.facts.is_empty() {
