@@ -560,6 +560,8 @@ where
         }
         if demo
             && !capture_marked
+            && (!crate::demo::persisted_history_capture_requested()
+                || crate::ui::history_capture_frame_ready(app, &committed_plan))
             && let Some(path) = capture_marker
         {
             std::fs::write(

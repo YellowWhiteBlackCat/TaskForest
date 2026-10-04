@@ -61,13 +61,13 @@ impl RootView {
             f32::from(sidebar_preferences.width),
         );
         let main = if self.history_replay_visible() {
-            // Read-only history replay (roadmap #4): the persisted
+            // Read-only persisted review: the recorded
             // series replace the live graphs while the panel is open.
             perf_views::history_replay::render_history_replay(
                 t,
                 self.history_replay_state(),
                 &self.local_time_rules,
-                performance_layout.content_height,
+                self.history_replay_scroll.clone(),
                 cx.entity(),
                 graph_cache.clone(),
             )
@@ -211,13 +211,13 @@ impl RootView {
                 elements::tool_btn(
                     t,
                     "tm-replay-toggle",
-                    i18n::t(if self.history_replay_state().is_open() {
+                    i18n::t(if self.history_replay_visible() {
                         "perf.replay.back_to_live"
                     } else {
                         "perf.replay.toggle"
                     }),
                     true,
-                    self.history_replay_state().is_open(),
+                    self.history_replay_visible(),
                     move |_win: &mut gpui::Window, cx: &mut gpui::App| {
                         ent.update(cx, |view, cx| {
                             view.toggle_history_replay(cx);
@@ -235,6 +235,7 @@ impl RootView {
                 .min_w(px(0.0))
                 .min_h(px(0.0))
                 .flex()
+                .flex_col()
                 // The replay entry renders BEFORE the graphs: block
                 // layout gives the device view the remaining height,
                 // so the toggle can never be pushed out of view.
@@ -251,7 +252,14 @@ impl RootView {
                         // "…" box. Text slots yield; controls don't.
                         .child(div().flex_none().child(button))
                 }))
-                .child(main),
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.0))
+                        .min_h(px(0.0))
+                        .w_full()
+                        .child(main),
+                ),
             px(page_padding),
         )
         // Performance owns a pinned right-edge rail inside every
@@ -261,7 +269,10 @@ impl RootView {
         .render()
         .debug_selector(|| "tm-performance-page-frame".to_string());
         let mut body = div().flex_1().min_h(px(0.0)).min_w(px(0.0)).w_full().flex();
-        if performance_layout.device_navigation == responsive::DeviceNavigationPresentation::Strip {
+        if !self.history_replay_visible()
+            && performance_layout.device_navigation
+                == responsive::DeviceNavigationPresentation::Strip
+        {
             body = body.flex_col();
             // When the persistent sidebar is hidden, the strip becomes
             // the accessible device switcher rather than disappearing
@@ -284,7 +295,7 @@ impl RootView {
                 },
                 cx,
             ));
-        } else if self.sidebar_visible {
+        } else if !self.history_replay_visible() && self.sidebar_visible {
             // Render-entry projection: the sidebar's CPU sparkline
             // shares the generation-keyed headline cache instead of
             // re-extracting the correlated history every frame (the

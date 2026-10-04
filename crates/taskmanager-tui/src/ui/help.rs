@@ -64,6 +64,8 @@ pub fn help_rows() -> Vec<LocalBinding> {
 fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
     let key = match binding.shortcut {
         "p" => "chrome.settings",
+        "r" => "help.binding.history_review",
+        "f" => "help.binding.refresh_history",
         "i" => "help.binding.about",
         "h" => "health.system_health_alerts",
         "c" => "containers.title",

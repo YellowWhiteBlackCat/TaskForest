@@ -240,3 +240,35 @@ fn large_input_600k_points_completes_with_honest_output() {
     assert!(down.len() <= 600, "the stride budget is respected");
     assert!(down.iter().all(|value| value.is_finite()));
 }
+
+#[test]
+fn coarse_replay_cells_preserve_mixed_gaps_and_pair_values_with_their_original_times() {
+    use super::{gap_preserving_envelope, gap_preserving_envelope_positions};
+    let values = [1.0, 900.0, f32::NAN, 4.0, 8.0, 2.0, 3.0, 17.0];
+    let selected = gap_preserving_envelope_positions(&values, 2);
+    assert_eq!(
+        selected,
+        [2, 7],
+        "a mixed first cell remains unavailable, the complete second cell keeps its peak"
+    );
+    let coarse = gap_preserving_envelope(&values, 2);
+    assert!(coarse[0].is_nan());
+    assert_eq!(coarse[1], 17.0);
+    let stamps = [10, 20, 30, 40, 50, 60, 70, 80];
+    assert_eq!(
+        selected
+            .iter()
+            .map(|index| stamps[*index])
+            .collect::<Vec<_>>(),
+        [30, 80]
+    );
+    for target in 1..=values.len() {
+        let positions = gap_preserving_envelope_positions(&values, target);
+        assert!(positions.len() <= target);
+        assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(
+            positions.iter().any(|index| values[*index].is_nan()),
+            "even a mixed missing interval cannot become a continuous curve"
+        );
+    }
+}

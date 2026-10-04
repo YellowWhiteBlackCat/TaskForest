@@ -29,6 +29,9 @@ identity map.
 - `src/application_history_projection.rs` joins persistent replay rows into the
   one application-history read model consumed by GPUI, Iced, TUI, and Bevy, including
   explicit capability states and timestamp-aware chart gaps.
+- `src/performance_history_projection.rs` filters the same accepted request into
+  performance rows; `src/history_replay_samples.rs` preserves recording downtime
+  without mistaking a downsampled time window for missing collection.
 - `src/process_category_projection.rs` owns category bucket order and typed
   process aggregates. It selects the PSS-preferred display observation, then
   delegates availability, coverage, freshness, failure, and saturating-add
@@ -157,7 +160,9 @@ src/alert_center.rs  alert_dispatch.rs     alert evaluation and dispatch
 src/alert_suggestion_window.rs             bounded evidence windows for alert/SMART
 src/managed_alert_rules.rs                 full managed-rule list and typed reducer
 src/history_replay.rs  history_decimation.rs  application history projections
-src/application_history_projection.rs      joined read model for all frontends
+src/application_history_projection.rs      joined application read model
+src/performance_history_projection.rs      performance read model for all frontends
+src/history_replay_samples.rs              shared timestamp-aware gap kernel
 src/persistent_app_history.rs              durable per-snapshot metrics
 src/process_category_projection.rs         category aggregates and bucket order
 src/process_details_vm.rs  process_sort.rs process detail view-model and sort axes

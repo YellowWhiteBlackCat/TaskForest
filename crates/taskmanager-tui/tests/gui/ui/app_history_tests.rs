@@ -1,8 +1,5 @@
-//! Application-history page render tests: the durable trend column must paint
-//! its levels for the terminal's selected glyph repertoire — the Unicode block
-//! ramp byte for byte as captured before the paint-time migration, and a
-//! monotonic ASCII ink ladder at paint time on ASCII-only terminals, so the
-//! post-paint cell rewrite never has to collapse (and lose) the levels.
+//! Application-history trends preserve the selected window, gaps and the
+//! terminal's glyph repertoire; compact cards retain complete metric groups.
 
 use std::sync::Arc;
 
@@ -13,6 +10,7 @@ use taskmanager_core::core::history::ApplicationHistoryIdentity;
 
 use super::*;
 use crate::TuiColorMode;
+use crate::TuiGlyphMode;
 use crate::TuiTerminalProfile;
 use crate::ui::test_support::LANG_TEST_GUARD;
 use taskmanager_application::ApplicationHistoryStatus;
@@ -111,17 +109,10 @@ fn trend_row_line(frame: &str, name: &str) -> String {
 
 const RISING_EIGHT: [f32; 8] = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
 
-// ── a) Unicode output stays byte-identical to the pre-migration renderer ────
+// Unicode glyphs keep measured gradients, constant series and missing cells.
 
-// test-intent: behavior
-/// The Unicode repertoire keeps the pre-migration rendering byte for byte.
-/// Every expected string below was captured from the pre-migration
-/// `history_trend` implementation before the glyph-mode migration: the same
-/// block ramp, the same constant-series mid-ramp, the same space gap inside a
-/// live trend, the same bounded recent window, and the same honest collecting
-/// text for a window without a finite sample.
 #[test]
-fn unicode_trend_stays_byte_identical_to_the_pre_migration_ramp() {
+fn unicode_history_trend_preserves_gradient_constants_gaps_and_full_window_peaks() {
     let _guard = LANG_TEST_GUARD.lock().expect("lang test guard");
     set_language(Language::En);
     assert_eq!(
@@ -142,12 +133,16 @@ fn unicode_trend_stays_byte_identical_to_the_pre_migration_ramp() {
         history_trend_in(TuiGlyphMode::Unicode, &[20.0, f32::NAN, 40.0, 10.0]),
         "▃ █▁"
     );
-    let long: Vec<f32> = (0..30).map(|i| i as f32).collect();
-    assert_eq!(
-        history_trend_in(TuiGlyphMode::Unicode, &long),
-        "▁▁▂▂▂▃▃▃▃▄▄▄▅▅▅▆▆▆▆▇▇▇██",
-        "the trend must stay bounded to the recent window"
+    let mut full_window = vec![0.0; 96];
+    full_window[0] = 100.0;
+    full_window[32] = f32::NAN;
+    let trend = history_trend_in(TuiGlyphMode::Ascii, &full_window);
+    assert!(trend.starts_with('#'), "retain an early full-window peak");
+    assert!(
+        trend.contains('_'),
+        "a partially unavailable cell stays a gap"
     );
+    assert!(trend.len() <= super::super::sparkline::SPARKLINE_MAX_SAMPLES);
     assert_eq!(
         history_trend_in(TuiGlyphMode::Unicode, &[f32::NAN, f32::NAN]),
         "Collecting persistent application history",
@@ -161,7 +156,7 @@ fn unicode_trend_stays_byte_identical_to_the_pre_migration_ramp() {
 
 // test-intent: behavior
 /// The page under the Unicode profile renders the pinned block ramp in the
-/// trend column — byte-identical to the pre-migration page paint.
+/// trend column over the selected history window.
 #[test]
 fn unicode_page_frame_renders_the_pinned_block_ramp() {
     let projection = ready_projection(vec![durable_row(
@@ -389,4 +384,59 @@ fn monochrome_profile_keeps_the_trend_readable_through_glyphs_alone() {
         monochrome_ascii, truecolor_ascii,
         "the color mode must not change the painted trend characters"
     );
+}
+
+#[test]
+fn compact_history_cards_keep_selected_metrics_actions_and_bottom_safety() {
+    let _guard = LANG_TEST_GUARD.lock().expect("language guard");
+    set_language(Language::En);
+    let rows = (0..10)
+        .map(|index| {
+            let mut row = durable_row(
+                &format!("record-{index:02}"),
+                Some(cpu_series(&[11.0, 41.0, 23.0])),
+            );
+            let mut memory = cpu_series(&[1.0, 2.0]);
+            memory.peak_value = Some(1_610_612_736.0);
+            let mut count = cpu_series(&[1.0, 3.0]);
+            count.peak_value = Some(3.0);
+            row.memory = Some(memory);
+            row.process_count = Some(count);
+            row
+        })
+        .collect();
+    let projection = ready_projection(rows);
+    for (width, height) in [(32, 14), (54, 16), (80, 24), (140, 48), (160, 20), (54, 60)] {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                super::render_app_history_projection(
+                    frame,
+                    profile(TuiColorMode::TrueColor, TuiGlyphMode::Unicode),
+                    frame.area(),
+                    &projection,
+                    9,
+                    None,
+                )
+            })
+            .expect("draw review");
+        let output = terminal.backend().to_string();
+        for value in ["record-09", "41.0%", "1.5 GiB", "Refresh"] {
+            assert!(
+                output.contains(value),
+                "selected metric/action {value} must remain reachable at {width}x{height}: {output}"
+            );
+        }
+        let buffer = terminal.backend().buffer();
+        assert!(
+            (0..width).all(|x| buffer[(x, height - 1)].symbol() == " "),
+            "the review reserves its bottom safety row"
+        );
+        if width < 96 {
+            assert!(
+                output.contains("Peak processes 3"),
+                "the whole compact record keeps the process count"
+            );
+        }
+    }
 }

@@ -321,6 +321,14 @@ capture_one() {
     local rendered=unknown control=unknown
     local expected_width expected_height
     IFS=x read -r expected_width expected_height <<<"$window_size"
+    if [[ "$page" == "history-replay" || "$page" == "application-history-replay" ]]; then
+        mkdir -p "$RUNTIME_DIR/config/taskmanager"
+        printf '{"history_persistence":true}\n' >"$RUNTIME_DIR/config/taskmanager/config.json"
+        local history_kind=system
+        [[ "$page" == "application-history-replay" ]] && history_kind=application
+        timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" \
+            --directory "$RUNTIME_DIR/data/taskmanager/history" --kind "$history_kind"
+    fi
     XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
         XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
         XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \

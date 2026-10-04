@@ -153,6 +153,7 @@ src/app/session_control.rs          session control state
 src/app/system_telemetry.rs         system telemetry fold
 src/app/on_demand.rs  local_keys.rs  row_summary.rs
 src/presentation.rs                 renderer-neutral presentation helpers
+src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
 ├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs
 src/viewmodel.rs                    product-first view-model projections

@@ -227,6 +227,11 @@ impl IcedApp {
         // active page — the target selector below has to win on page semantics.
         let mut config = Config::default();
         let mut overridden = false;
+        if crate::capture::persisted_history_requested() {
+            config.history_persistence = true;
+            overridden = true;
+        }
+
         if let Some(locale) = locale {
             // The demo boot deliberately skips `load_config` (no host I/O),
             // so the capture locale rides the production pipeline one level

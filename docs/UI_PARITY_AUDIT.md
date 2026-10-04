@@ -11,16 +11,16 @@
 | 基础与系统 | `about` | 应用版本、许可证与仓库说明 | Aligned | Aligned | Aligned |
 | | `system-about` | 独立操作系统与桌面环境完整事实面 | Aligned | Aligned | Aligned |
 | | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
-| | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
-| | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |
+| | `system-dashboard` | 多硬件总览仪表盘 | Pending | Pending | Pending |
+| | `system-hardware` | SMBIOS 硬件拓扑明细 | Pending | Pending | Pending |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Aligned | Aligned |
 | 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
-| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Aligned | Aligned |
-| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Aligned | Aligned | Aligned |
-| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Aligned | Aligned | Aligned |
-| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Aligned | Aligned | Aligned |
-| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Aligned | Aligned | Aligned |
-| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Aligned | Aligned | Aligned |
+| | `process-properties-performance` | 进程性能指标明细 Tab | Aligned | Pending | Aligned |
+| | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Aligned | Pending | Aligned |
+| | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Aligned | Pending | Aligned |
+| | `process-gpu-details` | 进程 GPU 显存与引擎明细 | Aligned | Pending | Aligned |
+| | `process-resource-limits` | cgroups/prlimit 资源配额明细 | Aligned | Pending | Aligned |
+| | `process-isolation` | 命名空间沙箱与 Seccomp 审计 | Aligned | Pending | Aligned |
 | 危险操作确认 | `process-force-kill` | 强制终止（SIGKILL）警示弹窗 | Aligned | Aligned | Aligned |
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
@@ -48,9 +48,9 @@
 | | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Aligned | Aligned |
 | | `saved-view-presets` | 自定义列宽与视图预设切换 | Aligned | Aligned | Aligned |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
-| 历史数据回放 | `history-replay` | 性能指标持久化历史窗口与趋势图 | Aligned | Pending | Pending |
+| 历史数据回放 | `history-replay` | 性能指标持久化历史窗口与趋势图 | Aligned | Aligned | Aligned |
 | | `history-60m` | 系统仪表盘 60 分钟全局历史趋势图 | Pending | Pending | Pending |
-| | `application-history-replay` | 进程级 CPU/内存历史回溯展开 | Aligned | Pending | Aligned |
+| | `application-history-replay` | 应用身份 CPU 趋势与内存/进程数峰值回溯 | Aligned | Aligned | Aligned |
 | 交互与显示形态 | `apps-search-highlight` | 进程搜索关键字高亮与命中过滤 | Aligned | Aligned | Aligned |
 | | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Aligned | Aligned |
 | | `apps-identity-matrix` | 进程身份校验与伪装报警状态 | Aligned | Aligned | Aligned |

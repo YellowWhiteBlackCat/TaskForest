@@ -77,6 +77,7 @@ FRONTEND_SCRIPTS = {
 ROOT_FILES = (
     "locales/en.json",
     "locales/zh.json",
+    "scripts/capture_history_fixtures.py",
 )
 
 

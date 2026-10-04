@@ -1,5 +1,6 @@
 //! Window lifecycle, capture-frame and virtual-scroll viewport messages.
 
+use crate::app::capture_state::HistoryCaptureFrame;
 use iced::Task;
 use taskmanager_application::AppPage;
 use taskmanager_shell::QuitReason;
@@ -40,7 +41,33 @@ impl IcedApp {
     pub(super) fn handle_window_message(&mut self, message: Message) -> Option<Task<Message>> {
         match message {
             Message::Frame(now) => {
-                if !self.capture.emitted {
+                let history_presented = if crate::capture::persisted_history_requested() {
+                    let ready = if self.shell.page() == AppPage::AppHistory {
+                        !self.application_history_projection().rows.is_empty()
+                    } else {
+                        self.history_runtime.replay().is_open()
+                            && !self.history_runtime.replay().rows().is_empty()
+                    };
+                    if ready {
+                        match self.capture.history_frame {
+                            HistoryCaptureFrame::WaitingForData => {
+                                self.capture.history_frame =
+                                    HistoryCaptureFrame::WaitingForPresentation;
+                                false
+                            }
+                            HistoryCaptureFrame::WaitingForPresentation => {
+                                self.capture.history_frame = HistoryCaptureFrame::Presented;
+                                true
+                            }
+                            HistoryCaptureFrame::Presented => true,
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                };
+                if !self.capture.emitted && history_presented {
                     self.capture.emitted = true;
                     if let Some(path) = self.capture.marker.as_deref() {
                         crate::capture::append_marker(

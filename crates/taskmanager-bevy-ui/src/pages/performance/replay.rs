@@ -1,173 +1,237 @@
-//! History replay state and view composition for Bevy Performance page.
+//! Persisted Performance review over the shared history projection and commands.
 
-use bevy::ecs::component::Component;
-use bevy::ecs::hierarchy::Children;
-use bevy::ecs::observer::On;
-use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Query, ResMut};
-use bevy::scene::{Scene, bsn, on};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    UiRect, Val, percent, px,
+use crate::pages::history::control::{
+    HistoryCommand, PerformanceHistoryChanged, PerformanceHistoryProjectionResource,
+    PerformancePresentation,
 };
+use crate::palette::{UiPalette, space_8};
+use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
+use crate::widgets::history_controls::{action_scene, toolbar_scene};
+use crate::window::{Role, TextRole, WindowPalette};
+use bevy::app::{App, PostUpdate};
+use bevy::ecs::{
+    component::Component,
+    entity::Entity,
+    hierarchy::{ChildOf, Children},
+    lifecycle::HookContext,
+    observer::On,
+    query::With,
+    resource::Resource,
+    schedule::IntoScheduleConfigs,
+    system::{Query, Res, ResMut},
+    world::{DeferredWorld, World},
+};
+use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::history::HistoryWindow;
+use bevy::ui::{
+    UiSystems,
+    prelude::{
+        BackgroundColor, ComputedNode, Display, FlexDirection, Node, Overflow, UiRect, percent, px,
+    },
+};
+use bevy::ui_widgets::ScrollArea;
+use std::sync::Arc;
+use taskmanager_application::{
+    ApplicationHistoryStatus, PerformanceHistoryProjection,
+    history_decimation::gap_preserving_envelope, i18n::t,
+};
+use taskmanager_shell::presentation::{history_replay::row_heading, missing_value};
 
-use crate::palette::{UiPalette, space_2, space_4, space_8};
-use crate::window::{Role, TextRole};
+#[derive(Component, Clone, Default)]
+pub(crate) struct PerformanceLiveBody;
+#[derive(Component, Clone, Default)]
+#[component(on_insert = mark_mounted)]
+pub(crate) struct PerformanceReplayRoot;
+#[derive(Component, Clone, Default)]
+pub(crate) struct PerformanceHistoryEntry;
+#[derive(Component, Clone, Default)]
+struct ReplayChart(Arc<[f32]>);
+#[derive(Component, Clone, Default)]
+struct ChartSize(Option<(f32, f32)>);
+#[derive(Resource, Default)]
+struct PaintDirty(bool);
+#[derive(Component, Clone, Default)]
+pub(crate) struct PerformanceReplayBody;
 
-/// Resource controlling whether the Performance page displays historical replay data.
-#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PerformanceHistoryReplay {
-    pub(crate) open: bool,
-    pub(crate) playing: bool,
-    pub(crate) window: HistoryWindow,
+pub(crate) fn register(app: &mut App) {
+    app.init_resource::<PaintDirty>()
+        .add_observer(changed)
+        .add_systems(PostUpdate, paint.before(UiSystems::Prepare))
+        .add_systems(
+            PostUpdate,
+            (
+                visibility.before(UiSystems::Prepare),
+                paint_charts.after(UiSystems::Layout),
+            ),
+        );
 }
-
-impl Default for PerformanceHistoryReplay {
-    fn default() -> Self {
-        Self {
-            open: false,
-            playing: false,
-            window: HistoryWindow::OneHour,
-        }
+fn mark_mounted(mut world: DeferredWorld<'_>, _context: HookContext) {
+    if let Some(mut dirty) = world.get_resource_mut::<PaintDirty>() {
+        dirty.0 = true;
     }
 }
-
-/// Marker component on the mounted replay control strip.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct PerformanceHistoryReplayStrip;
-
-/// Component on a history window selector button.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PerformanceReplayWindowButton(pub(crate) HistoryWindow);
-
-impl Default for PerformanceReplayWindowButton {
-    fn default() -> Self {
-        Self(HistoryWindow::OneHour)
-    }
+fn changed(_event: On<PerformanceHistoryChanged>, mut dirty: ResMut<PaintDirty>) {
+    dirty.0 = true;
 }
-
-/// Component on the play/pause replay button.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct PerformanceReplayPlayButton;
-
-pub(crate) fn replay_window_button_observer(
-    activate: On<Activate>,
-    buttons: Query<&PerformanceReplayWindowButton>,
-    mut replay: ResMut<PerformanceHistoryReplay>,
+pub(crate) fn entry_scene(palette: &UiPalette) -> impl Scene + use<> {
+    let action = action_scene(
+        t("perf.replay.toggle").to_owned(),
+        HistoryCommand::OpenPerformance,
+        palette,
+    );
+    bsn! { Node { display: Display::None, flex_shrink: 0.0 } PerformanceHistoryEntry Children [ @{ action } ] }
+}
+fn review_scene(model: &PerformanceHistoryProjection, palette: &UiPalette) -> impl Scene + use<> {
+    let controls = toolbar_scene(model.selected_window, true, palette);
+    let mut rows: Vec<Box<dyn Scene>> = Vec::new();
+    if model.refreshing {
+        rows.push(Box::new(
+            bsn! { Text(t("history.application.refreshing")) TextRole(Role::Caption) },
+        ));
+    }
+    if let Some(failure) = &model.failure {
+        rows.push(Box::new(
+            bsn! { Text({ failure.kind().stable_code() }) TextRole(Role::Caption) },
+        ));
+    }
+    if model.rows.is_empty() {
+        rows.push(Box::new(
+            bsn! { Text(t("perf.replay.empty")) TextRole(Role::Body) },
+        ));
+    }
+    for row in model.rows.iter() {
+        let peak = row
+            .peak_value
+            .filter(|value| value.is_finite())
+            .map_or_else(missing_value, |value| format!("{value:.1}"));
+        let heading = format!(
+            "{} · {} {}",
+            row_heading(&row.key),
+            t("perf.replay.peak"),
+            peak
+        );
+        let summary = format!(
+            "{} {} · {} {} · {} {}",
+            t("perf.replay.observed"),
+            row.observed,
+            t("perf.replay.gaps"),
+            row.gaps,
+            t("perf.replay.clock_jumps"),
+            row.clock_jumps
+        );
+        let samples: Arc<[f32]> =
+            gap_preserving_envelope(&row.gap_aware_samples(), MAX_CHART_POINTS).into();
+        rows.push(Box::new(bsn! { Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } BackgroundColor({ palette.panel_fill }) Children [ Text(heading) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } -- Text(summary) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::AnyCharacter } -- Node { width: percent(100), height: px(96.0), flex_shrink: 0.0, overflow: Overflow::clip() } ReplayChart(samples) ChartSize(None) ] }));
+    }
+    bsn! { Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } Children [ Text(t("perf.replay.title")) TextRole(Role::Heading) -- @{ controls } -- Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), row_gap: px(space_8()) } ScrollArea PerformanceReplayBody Children [ { rows } ] ] }
+}
+type ReplayVisibilityQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static mut Node,
+        Option<&'static PerformanceLiveBody>,
+        Option<&'static PerformanceReplayRoot>,
+        Option<&'static PerformanceHistoryEntry>,
+    ),
+>;
+fn visibility(
+    presentation: Res<PerformancePresentation>,
+    model: Res<PerformanceHistoryProjectionResource>,
+    mut nodes: ReplayVisibilityQuery,
 ) {
-    if let Ok(btn) = buttons.get(activate.entity) {
-        replay.window = btn.0;
-    }
-}
-
-pub(crate) fn replay_play_button_observer(
-    activate: On<Activate>,
-    buttons: Query<&PerformanceReplayPlayButton>,
-    mut replay: ResMut<PerformanceHistoryReplay>,
-) {
-    if buttons.get(activate.entity).is_ok() {
-        replay.playing = !replay.playing;
-    }
-}
-
-pub(crate) fn history_replay_strip_scene(
-    window: HistoryWindow,
-    playing: bool,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let window_pills: Vec<Box<dyn Scene>> = [
-        (HistoryWindow::OneHour, "1h"),
-        (HistoryWindow::TwentyFourHours, "24h"),
-        (HistoryWindow::SevenDays, "7d"),
-    ]
-    .into_iter()
-    .map(|(w, label)| Box::new(window_pill_scene(w, label, w == window, palette)) as Box<dyn Scene>)
-    .collect();
-
-    let play_label = if playing { "Pause" } else { "Play" };
-
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_4()),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-            display: Display::None,
+    let replay = *presentation == PerformancePresentation::Replay;
+    let available = matches!(
+        model.0.status,
+        ApplicationHistoryStatus::Ready | ApplicationHistoryStatus::Collecting
+    );
+    for (mut node, live, review, entry) in &mut nodes {
+        if live.is_some() {
+            node.display = if replay { Display::None } else { Display::Flex };
+        } else if review.is_some() {
+            node.display = if replay { Display::Flex } else { Display::None };
+        } else if entry.is_some() {
+            node.display = if available && !replay {
+                Display::Flex
+            } else {
+                Display::None
+            };
         }
-        BackgroundColor({ palette.panel_fill })
-        PerformanceHistoryReplayStrip
-        Children [
-            Node {
-                width: percent(100),
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::Center,
+    }
+}
+fn paint(world: &mut World) {
+    if !world.resource::<PaintDirty>().0 {
+        return;
+    }
+    let roots = world
+        .query_filtered::<Entity, With<PerformanceReplayRoot>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    if roots.is_empty() {
+        return;
+    }
+    world.resource_mut::<PaintDirty>().0 = false;
+    let model = world
+        .resource::<PerformanceHistoryProjectionResource>()
+        .0
+        .clone();
+    let palette = world.resource::<WindowPalette>().inner.clone();
+    for root in roots {
+        let old = world
+            .get::<Children>(root)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for child in old {
+            let _ = world.despawn(child);
+        }
+        if let Ok(fresh) = world.spawn_scene(review_scene(&model, &palette)) {
+            let entity = fresh.id();
+            world.entity_mut(root).add_one_related::<ChildOf>(entity);
+        }
+    }
+}
+pub(crate) fn paint_charts(world: &mut World) {
+    let charts = world
+        .query::<(Entity, &ComputedNode, &ReplayChart, &ChartSize)>()
+        .iter(world)
+        .filter_map(|(entity, node, chart, last)| {
+            let size = node.size() * node.inverse_scale_factor();
+            if size.x <= 0.0 || size.y <= 0.0 || last.0 == Some((size.x, size.y)) {
+                None
+            } else {
+                Some((entity, size, Arc::clone(&chart.0)))
             }
-            Children [
-                Text(t("perf.replay.title")) TextRole(Role::Heading) --
-                Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(space_4()),
-                }
-                Children [
-                    { window_pills }
-                ]
-            ] --
-            Node {
-                width: percent(100),
-                height: px(palette.control_height_px),
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                column_gap: Val::Px(space_8()),
-                padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
-                border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-            }
-            BackgroundColor({ palette.content_bg })
-            Children [
-                Node {
-                    padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
-                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                }
-                BackgroundColor({ palette.accent })
-                Button
-                PerformanceReplayPlayButton
-                on(replay_play_button_observer)
-                Children [
-                    Text(play_label) TextRole(Role::Caption)
-                ] --
-                Text("Timeline: -60m ------------------------* 0s (Live Replay)") TextRole(Role::Mono)
-            ]
-        ]
+        })
+        .collect::<Vec<_>>();
+    let accent = world.resource::<WindowPalette>().inner.accent;
+    for (entity, size, samples) in charts {
+        let old = world
+            .get::<Children>(entity)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for child in old {
+            let _ = world.despawn(child);
+        }
+        let segments = line_segments(&samples, size.x, size.y, MAX_CHART_POINTS);
+        if let Ok(fresh) = world.spawn_scene(polyline_scene(&segments, accent)) {
+            let child = fresh.id();
+            world.entity_mut(entity).add_one_related::<ChildOf>(child);
+        }
+        if let Some(mut last) = world.get_mut::<ChartSize>(entity) {
+            last.0 = Some((size.x, size.y));
+        }
     }
 }
 
-fn window_pill_scene(
-    window: HistoryWindow,
-    label: &'static str,
-    active: bool,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let bg = if active {
-        palette.accent
-    } else {
-        palette.content_bg
-    };
-    bsn! {
-        Node {
-            padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+pub(crate) fn charts_presented(world: &mut World) -> bool {
+    let mut charts = world.query::<(&ReplayChart, &ChartSize, Option<&Children>)>();
+    let mut count = 0;
+    for (_, size, children) in charts.iter(world) {
+        count += 1;
+        if size.0.is_none() || children.is_none_or(|children| children.is_empty()) {
+            return false;
         }
-        BackgroundColor({ bg })
-        Button
-        PerformanceReplayWindowButton({ window })
-        on(replay_window_button_observer)
-        Children [
-            Text(label) TextRole(Role::Caption)
-        ]
     }
+    count > 0
 }

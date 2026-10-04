@@ -52,15 +52,11 @@ pub(super) fn app_history_page(
     let theme_snapshot = app.theme();
     let projection = app.application_history_projection();
     let history_model = app.projected_app_history_model();
-    let title = row![
-        // Type scale is px tokens on the Small baseline; the application-wide
-        // `renderer_scale` provides the UiSize product scaling (single track).
+    let title = column![
         text(t("history.application.title")).size(f32::from(tokens::FONT_18)),
-        iced::widget::Space::new().width(Length::Fill),
         history_window_controls(theme_snapshot, projection.selected_window),
     ]
-    .spacing(8)
-    .align_y(iced::Alignment::Center);
+    .spacing(8);
 
     if projection.status != ApplicationHistoryStatus::Ready {
         let (heading, detail) = history_state_copy(projection.status);
@@ -127,6 +123,13 @@ fn history_window_controls<'a>(
             Message::SelectHistoryReplayWindow(window),
         ));
     }
+    controls = controls.push(focus::dynamic_button(
+        theme_snapshot,
+        crate::app::FocusTarget::HistoryReplayRefresh,
+        t("perf.replay.refresh").to_owned(),
+        Message::RefreshHistoryReplay,
+        false,
+    ));
     controls.into()
 }
 

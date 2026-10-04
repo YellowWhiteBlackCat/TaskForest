@@ -20,6 +20,7 @@ use super::{
 };
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
+use iced::Length;
 use taskmanager_core::core::metrics::NetworkAdapterType;
 use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_theme::Theme;
@@ -67,16 +68,23 @@ pub(crate) fn performance_page(
     let replay_open = app.history_replay_entry_available() && app.history_replay_state().is_open();
     let entry_row = history_replay_entry_row(app, theme_snapshot);
 
-    let detail: Element<'_, Message, iced::Theme, iced::Renderer> = if replay_open {
-        scrollable(history_replay::render_history_replay(
-            theme_snapshot,
-            app.history_replay_state(),
-            &app.local_time_rules,
-        ))
-        .width(iced::Length::Fill)
-        .height(iced::Length::Fill)
-        .into()
-    } else {
+    if replay_open {
+        let mut review = column![]
+            .spacing(8)
+            .width(Length::Fill)
+            .height(Length::Fill);
+        if let Some(entry) = entry_row {
+            review = review.push(entry);
+        }
+        return review
+            .push(history_replay::render_history_replay(
+                theme_snapshot,
+                app.history_replay_state(),
+                &app.local_time_rules,
+            ))
+            .into();
+    }
+    let detail: Element<'_, Message, iced::Theme, iced::Renderer> =
         match (compact_detail_viewport(selected), budget.device_navigation) {
             // A sidebar frame already gives `main_with_stats` a definite
             // viewport and its statistics rail owns the only variable-height
@@ -91,8 +99,7 @@ pub(crate) fn performance_page(
                     .height(iced::Length::Fill)
                     .into()
             }
-        }
-    };
+        };
     let detail = column![detail]
         .width(iced::Length::Fill)
         .height(iced::Length::Fill);

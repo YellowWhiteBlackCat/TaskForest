@@ -62,3 +62,6 @@ mod surface_protocol;
 
 #[path = "tests/appearance.rs"]
 mod appearance;
+
+#[path = "tests/history_review.rs"]
+mod history_review;

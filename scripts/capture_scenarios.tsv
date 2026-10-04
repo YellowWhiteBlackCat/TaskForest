@@ -107,6 +107,7 @@ compact-processes	gnome-light	apps	cpu	0	standard	720x480	720x480
 compact-settings	gnome-light	performance	cpu	1	standard	720x480	720x480
 settings-windows-dark	windows-dark	performance	cpu	1	standard	1180x780	1180x780
 history-replay	gnome-light	performance	cpu	0	history-replay	1180x780	1180x780
+history-replay-compact	gnome-light	performance	cpu	0	history-replay	720x480	720x480
 perf-cpu-compact	gnome-light	performance	cpu	0	standard	720x760	720x760
 perf-memory-compact	gnome-light	performance	memory	0	standard	720x760	720x760
 perf-disk-compact	gnome-light	performance	disk	0	standard	720x760	720x760

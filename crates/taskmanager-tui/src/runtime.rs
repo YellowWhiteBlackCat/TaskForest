@@ -158,6 +158,10 @@ fn run_interactive(demo: bool) -> io::Result<()> {
     } else {
         host.local_time_rules()
     };
+    if demo && crate::demo::persisted_history_capture_requested() {
+        app.enable_history_for_capture();
+        app.install_history_frontend_connector(host.history_frontend_connector());
+    }
     if !demo {
         app.request_history_frontend(app.history_persistence_enabled());
         app.install_history_frontend_connector(host.history_frontend_connector());

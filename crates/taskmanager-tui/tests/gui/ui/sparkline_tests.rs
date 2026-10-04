@@ -49,7 +49,7 @@ fn rising_series_renders_ascending_ramp_blocks() {
 fn empty_series_renders_empty_and_window_stays_bounded() {
     assert_eq!(sparkline_in(TuiGlyphMode::Unicode, &[]), "");
     let long: Vec<f32> = (0..128).map(|i| i as f32).collect();
-    let windowed = recent_window(&long);
+    let windowed = recent_window_with(&long, SPARKLINE_MAX_SAMPLES);
     assert_eq!(windowed.len(), SPARKLINE_MAX_SAMPLES);
     assert_eq!(
         sparkline_in(TuiGlyphMode::Unicode, windowed)

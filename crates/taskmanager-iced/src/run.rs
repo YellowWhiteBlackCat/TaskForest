@@ -114,7 +114,11 @@ pub fn run(demo: bool) -> iced::Result {
         // handed over exactly once through interior mutability.
         move || {
             if demo {
-                let app = IcedApp::demo_for_capture();
+                let mut app = IcedApp::demo_for_capture();
+                if crate::capture::persisted_history_requested() {
+                    app.request_history_frontend(true);
+                    app.install_history_frontend_connector(host.history_frontend_connector());
+                }
                 // The demo boot skips `load_config`; pin the shared catalog to
                 // the demo's language here (see `i18n::sync_shared_language`).
                 crate::i18n::sync_shared_language(app.language());

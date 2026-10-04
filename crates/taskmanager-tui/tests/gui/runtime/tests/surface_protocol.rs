@@ -180,7 +180,7 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
     // one press twice (same masking invariant the `c h i p` overlaps ride).
     assert_eq!(
         overlap,
-        ['a', 'c', 'h', 'i', 'p', 't'],
+        ['a', 'c', 'f', 'h', 'i', 'p', 'r', 't'],
         "every chord declared in both layers must be listed here on purpose"
     );
 }

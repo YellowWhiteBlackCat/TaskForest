@@ -65,6 +65,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "gpu-engine-inventory" => Some("gpu-engine-inventory"),
         "intel-gpu-telemetry" => Some("intel-gpu-telemetry"),
         "history-replay" => Some("history-replay"),
+        "application-history-replay" => Some("application-history-replay"),
         "history-60m" => Some("history-60m"),
         "apps-identity-matrix" => Some("apps-identity-matrix"),
         "apps-zero-gray" => Some("apps-zero-gray"),
@@ -173,7 +174,7 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "settings-zero-gray"
         | "settings-switch-focus"
         | "first-run" => Some(Page::Settings),
-        "app-history" | "history" => Some(Page::AppHistory),
+        "app-history" | "history" | "application-history-replay" => Some(Page::AppHistory),
         "containers" => Some(Page::Containers),
         _ => None,
     }

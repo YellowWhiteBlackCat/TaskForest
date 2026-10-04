@@ -481,27 +481,33 @@ fn device_area_fill_uses_the_shared_vertical_gradient() {
 #[test]
 fn device_data_fingerprint_keys_on_generation_max_and_smooth() {
     let samples: Rc<[f32]> = Rc::from([10.0, 50.0].as_slice());
-    let base = DeviceChartDataFingerprint::from_window(&samples, 100.0, false);
+    let base =
+        DeviceChartDataFingerprint::from_window(&samples, 100.0, false, DeviceMetricScale::Percent);
     assert_eq!(
         base,
-        DeviceChartDataFingerprint::from_window(&samples, 100.0, false)
+        DeviceChartDataFingerprint::from_window(&samples, 100.0, false, DeviceMetricScale::Percent)
     );
     let same_len_same_tail: Rc<[f32]> = Rc::from([90.0, 50.0].as_slice());
     assert_ne!(
         base,
-        DeviceChartDataFingerprint::from_window(&same_len_same_tail, 100.0, false),
+        DeviceChartDataFingerprint::from_window(
+            &same_len_same_tail,
+            100.0,
+            false,
+            DeviceMetricScale::Percent
+        ),
         "middle/leading changes cannot hide behind the same length and tail"
     );
     // Auto-scale max changed (bytes/sec peak rose) → not equal.
     assert_ne!(
         base,
-        DeviceChartDataFingerprint::from_window(&samples, 200.0, false),
+        DeviceChartDataFingerprint::from_window(&samples, 200.0, false, DeviceMetricScale::Percent),
         "a max change must force a data-cache rebuild"
     );
     // Smooth toggled → not equal (the cached path family must switch).
     assert_ne!(
         base,
-        DeviceChartDataFingerprint::from_window(&samples, 100.0, true),
+        DeviceChartDataFingerprint::from_window(&samples, 100.0, true, DeviceMetricScale::Percent),
         "a smooth toggle must force a data-cache rebuild"
     );
 }
@@ -559,7 +565,8 @@ fn device_chart_fingerprint_tracks_data_not_color() {
 #[test]
 fn device_overlay_fingerprint_combines_hover_and_data() {
     let samples: Rc<[f32]> = Rc::from([10.0, 50.0].as_slice());
-    let data = DeviceChartDataFingerprint::from_window(&samples, 100.0, false);
+    let data =
+        DeviceChartDataFingerprint::from_window(&samples, 100.0, false, DeviceMetricScale::Percent);
     let none = DeviceChartOverlayFingerprint {
         hover_index: None,
         data: data.clone(),
@@ -582,7 +589,12 @@ fn device_overlay_fingerprint_combines_hover_and_data() {
     );
     // Same hover but data ticked → not equal (pill text must refresh).
     let ticked_samples: Rc<[f32]> = Rc::from([10.0, 60.0].as_slice());
-    let ticked = DeviceChartDataFingerprint::from_window(&ticked_samples, 100.0, false);
+    let ticked = DeviceChartDataFingerprint::from_window(
+        &ticked_samples,
+        100.0,
+        false,
+        DeviceMetricScale::Percent,
+    );
     assert_ne!(
         DeviceChartOverlayFingerprint {
             hover_index: Some(1),
@@ -612,4 +624,21 @@ impl DeviceMetricScale {
         Self::Celsius,
         Self::Megahertz,
     ];
+}
+
+#[test]
+fn a_changed_unit_family_rebuilds_the_cached_data_even_with_the_same_sample_generation() {
+    let samples = Rc::from([-20.0, -5.0].as_slice());
+    let percent =
+        DeviceChartDataFingerprint::from_window(&samples, 100.0, false, DeviceMetricScale::Percent);
+    let magnitude = DeviceChartDataFingerprint::from_window(
+        &samples,
+        100.0,
+        false,
+        DeviceMetricScale::AutoPeak,
+    );
+    assert_ne!(
+        percent, magnitude,
+        "signed coordinates and axis units are part of the rendered data identity"
+    );
 }

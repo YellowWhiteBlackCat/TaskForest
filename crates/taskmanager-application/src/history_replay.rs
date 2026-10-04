@@ -3,7 +3,8 @@
 use std::fmt;
 use std::sync::Arc;
 
-use taskmanager_core::{HistorySeriesKey, HistoryWindow};
+use crate::{ApplicationHistoryCapability, ApplicationHistoryStatus, PerformanceHistoryProjection};
+use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 /// Cross-toolkit replay curve ceiling. The storage query may observe a much
 /// longer window; the background owner publishes only this bounded envelope.
@@ -52,6 +53,18 @@ pub struct HistoryReplayRow {
     pub observed: usize,
     pub gaps: usize,
     pub clock_jumps: u32,
+}
+
+impl HistoryReplayRow {
+    #[must_use]
+    pub fn gap_aware_samples(&self) -> Arc<[f32]> {
+        crate::history_replay_samples::gap_aware_samples(
+            &self.samples,
+            &self.sample_times_ms,
+            self.observed,
+            self.gaps,
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -182,6 +195,7 @@ pub struct HistoryReplayController {
     selected_window: HistoryWindow,
     application_rows_request: Option<HistoryReplayRequestId>,
     application_rows: Arc<[crate::ApplicationHistoryRow]>,
+    performance_rows: Arc<[HistoryReplayRow]>,
 }
 
 impl Default for HistoryReplayController {
@@ -192,6 +206,7 @@ impl Default for HistoryReplayController {
             selected_window: HistoryWindow::OneHour,
             application_rows_request: None,
             application_rows: Arc::from([]),
+            performance_rows: Arc::from([]),
         }
     }
 }
@@ -350,7 +365,7 @@ impl HistoryReplayController {
         // owned by the outgoing state and is intentionally discarded. The
         // selected window remains a user preference for the next open.
         self.state = HistoryReplayState::Closed;
-        self.sync_application_rows();
+        self.sync_replay_projections();
     }
 
     pub fn reject_submission(
@@ -404,7 +419,7 @@ impl HistoryReplayController {
                 last_good,
             },
         };
-        self.sync_application_rows();
+        self.sync_replay_projections();
         HistoryReplayCompletionDisposition::Applied
     }
 
@@ -429,13 +444,49 @@ impl HistoryReplayController {
         )
     }
 
-    fn sync_application_rows(&mut self) {
+    #[must_use]
+    pub fn performance_history_projection(
+        &self,
+        capability: ApplicationHistoryCapability,
+    ) -> PerformanceHistoryProjection {
+        let status = match capability {
+            ApplicationHistoryCapability::Disabled => ApplicationHistoryStatus::Disabled,
+            ApplicationHistoryCapability::Unavailable(_) => ApplicationHistoryStatus::Unavailable,
+            ApplicationHistoryCapability::Connecting => ApplicationHistoryStatus::Connecting,
+            ApplicationHistoryCapability::Available if self.performance_rows.is_empty() => {
+                ApplicationHistoryStatus::Collecting
+            }
+            ApplicationHistoryCapability::Available => ApplicationHistoryStatus::Ready,
+        };
+        PerformanceHistoryProjection {
+            status,
+            selected_window: self.selected_window(),
+            rows_window: self.rows_window(),
+            rows: Arc::clone(&self.performance_rows),
+            source_request: self.rows_request_id(),
+            refreshing: self.is_loading(),
+            failure: self.failure().cloned(),
+            loaded_at_ms: self.loaded_at_ms(),
+            unavailable_reason: match capability {
+                ApplicationHistoryCapability::Unavailable(reason) => Some(reason),
+                _ => None,
+            },
+        }
+    }
+
+    fn sync_replay_projections(&mut self) {
         let request = self.rows_request_id();
         if request == self.application_rows_request {
             return;
         }
         self.application_rows =
             crate::application_history_projection::project_application_history_rows(self.rows());
+        self.performance_rows = self
+            .rows()
+            .iter()
+            .filter(|row| !row.key.is_application_series())
+            .cloned()
+            .collect();
         self.application_rows_request = request;
     }
 

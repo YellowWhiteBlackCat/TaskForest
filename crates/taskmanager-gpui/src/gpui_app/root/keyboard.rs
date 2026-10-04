@@ -369,6 +369,11 @@ impl RootView {
             cx.notify();
             return;
         }
+        if !context.text_input_focused && view.scroll_history_replay_key(event) {
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         let Some(chord) = key_chord(event) else {
             return;
         };

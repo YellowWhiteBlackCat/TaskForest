@@ -12,7 +12,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, Gauge, GraphType, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_shell::presentation::trend;
 use taskmanager_shell::presentation::{graph_summary, missing_value};
@@ -128,37 +127,6 @@ const CPU_RAIL_LABEL_WIDTH: usize = 18;
 /// so the whole rail column is omitted instead.
 const CPU_RAIL_MIN_MAIN_WIDTH: u16 = 44;
 
-fn render_history_replay_panel(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    area: Rect,
-    window: HistoryWindow,
-) {
-    if area.height < 2 || area.width < 30 {
-        return;
-    }
-    let win_str = match window {
-        HistoryWindow::OneHour => "Window: [ 1h* ]  [ 24h ]  [ 7d ]",
-        HistoryWindow::TwentyFourHours => "Window: [ 1h ]  [ 24h* ]  [ 7d ]",
-        HistoryWindow::SevenDays => "Window: [ 1h ]  [ 24h ]  [ 7d* ]",
-    };
-    let line1 = Line::from(vec![
-        Span::styled(
-            " [▶ Play]  [⏸ Pause] ",
-            Style::new().fg(theme.color(Color::Black)).bg(theme.accent),
-        ),
-        Span::styled(
-            format!("   {win_str}"),
-            Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
-        ),
-    ]);
-    let line2 = Line::from(vec![Span::styled(
-        "  Timeline: -60m ━━━━━━━━━━━━━━━━━━━━━━━● 0s (Historical Replay)",
-        Style::new().fg(theme.dim),
-    )]);
-    frame.render_widget(Paragraph::new(vec![line1, line2]), area);
-}
-
 fn render_cpu_overview(
     frame: &mut Frame<'_>,
     app: &TuiApp,
@@ -166,17 +134,6 @@ fn render_cpu_overview(
     area: Rect,
     snapshot: &SystemSnapshot,
 ) {
-    let replay_height = if app.history_replay_open() && area.height >= 12 {
-        3
-    } else {
-        0
-    };
-    let [replay_area, area] =
-        Layout::vertical([Constraint::Length(replay_height), Constraint::Min(0)]).areas(area);
-    if replay_height > 0 {
-        render_history_replay_panel(frame, theme, replay_area, app.history_replay_window());
-    }
-
     let hardware = app.projection().hardware.as_ref();
     let temperature_note = cpu_core_temperature_note(&snapshot.cpu);
 

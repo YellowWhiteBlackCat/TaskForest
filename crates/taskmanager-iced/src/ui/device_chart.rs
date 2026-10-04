@@ -49,7 +49,7 @@ use crate::app::Message;
 use crate::perf_chart::{
     ChartOpts, HoverState, ReadoutColors, SeriesGeneration, WindowSlots, area_path, draw_grid_opts,
     draw_hover_sample_mark, draw_readout_pill, draw_y_axis_ticks, hovered_index, line_path,
-    scaled_y, series_point_runs_for, y_axis_tick_values,
+    scaled_y_in_range, series_point_runs_in_range, y_axis_tick_values,
 };
 use crate::trend_strip::finite_peak;
 
@@ -120,7 +120,7 @@ impl DeviceChart {
     /// [`DeviceChartDataFingerprint`]).
     #[must_use]
     pub(crate) fn fingerprint(&self) -> DeviceChartDataFingerprint {
-        DeviceChartDataFingerprint::from_window(&self.samples, self.max, self.smooth)
+        DeviceChartDataFingerprint::from_window(&self.samples, self.max, self.smooth, self.scale)
     }
 }
 
@@ -137,16 +137,18 @@ impl DeviceChart {
 pub(crate) struct DeviceChartDataFingerprint {
     samples: SeriesGeneration,
     max_bits: u32,
+    scale: DeviceMetricScale,
     smooth: bool,
 }
 
 impl DeviceChartDataFingerprint {
     /// Build the data fingerprint from generation, scale, and smoothing.
     #[must_use]
-    fn from_window(samples: &Rc<[f32]>, max: f32, smooth: bool) -> Self {
+    fn from_window(samples: &Rc<[f32]>, max: f32, smooth: bool, scale: DeviceMetricScale) -> Self {
         Self {
             samples: SeriesGeneration::new(samples),
             max_bits: max.to_bits(),
+            scale,
             smooth,
         }
     }
@@ -250,6 +252,15 @@ impl canvas::Program<Message> for DeviceChart {
         let samples = &self.samples;
         let color = self.color;
         let max = self.max;
+        let min = if self.scale == DeviceMetricScale::Percent {
+            0.0
+        } else {
+            self.samples
+                .iter()
+                .copied()
+                .filter(|value| value.is_finite())
+                .fold(0.0, f32::min)
+        };
         let grid_color = self.grid_color;
         let smooth = self.smooth;
         let scale = self.scale;
@@ -261,7 +272,7 @@ impl canvas::Program<Message> for DeviceChart {
             // summary rule the caption and hover pill use), only in graphs
             // tall enough to read them — the 260px primary and 128px
             // secondary graphs; the 56px engine strips stay clean.
-            if axis_ticks_visible(size.height) {
+            if min == 0.0 && axis_ticks_visible(size.height) {
                 let ticks = y_axis_tick_values(max);
                 draw_y_axis_ticks(
                     frame,
@@ -272,7 +283,7 @@ impl canvas::Program<Message> for DeviceChart {
                     tick_color,
                 );
             }
-            for points in series_point_runs_for(samples, size, max) {
+            for points in series_point_runs_in_range(samples, size, min, max) {
                 if points.len() < 2 {
                     continue;
                 }
@@ -332,7 +343,7 @@ impl canvas::Program<Message> for DeviceChart {
                     frame,
                     size,
                     x,
-                    scaled_y(value, max, size.height),
+                    scaled_y_in_range(value, min, max, size.height),
                     color,
                     grid_color,
                 );

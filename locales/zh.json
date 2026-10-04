@@ -1280,6 +1280,8 @@
   "tui.status.no_row_to_copy": "没有可复制的进程行",
   "tui.status.clipboard_copied": "已复制 {} ({}) 到剪贴板",
   "tui.status.clipboard_failed": "剪贴板复制失败：{}",
+  "help.binding.history_review": "历史回放",
+  "help.binding.refresh_history": "刷新历史记录",
   "help.binding.about": "关于 / 系统信息",
   "help.binding.service_actions": "服务操作（服务页）",
   "help.binding.perf_resource": "性能资源（性能页）",

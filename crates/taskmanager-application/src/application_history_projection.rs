@@ -97,38 +97,12 @@ impl ApplicationHistoryMetricSeries {
     /// normal downsampled cadence. The original persisted gaps remain `NaN`.
     #[must_use]
     pub fn gap_aware_samples(&self) -> Arc<[f32]> {
-        if self.samples.len() < 2 || self.samples.len() != self.sample_times_ms.len() {
-            return Arc::clone(&self.samples);
-        }
-        let mut intervals = self
-            .sample_times_ms
-            .windows(2)
-            .filter_map(|times| times[1].checked_sub(times[0]))
-            .filter(|interval| *interval > 0)
-            .collect::<Vec<_>>();
-        intervals.sort_unstable();
-        // Lower median: with one normal interval and one downtime interval,
-        // the larger outage must not become the inferred cadence.
-        let discontinuity = intervals
-            .get((intervals.len().saturating_sub(1)) / 2)
-            .copied()
-            .map_or(u64::MAX, |cadence| cadence.saturating_mul(3));
-        let absolute_discontinuity = u64::try_from(crate::MAX_TELEMETRY_INTERVAL.as_millis())
-            .unwrap_or(u64::MAX)
-            .saturating_mul(3);
-        let mut projected = Vec::with_capacity(self.samples.len().saturating_mul(2));
-        projected.push(self.samples[0]);
-        for index in 1..self.samples.len() {
-            let previous = self.sample_times_ms[index - 1];
-            let current = self.sample_times_ms[index];
-            let interval = current.saturating_sub(previous);
-            if current <= previous || interval > discontinuity || interval > absolute_discontinuity
-            {
-                projected.push(f32::NAN);
-            }
-            projected.push(self.samples[index]);
-        }
-        Arc::from(projected)
+        crate::history_replay_samples::gap_aware_samples(
+            &self.samples,
+            &self.sample_times_ms,
+            self.observed,
+            self.gaps,
+        )
     }
 }
 

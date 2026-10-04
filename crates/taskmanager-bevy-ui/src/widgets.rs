@@ -17,6 +17,7 @@
 
 pub mod chart;
 pub mod controls;
+pub(crate) mod history_controls;
 pub mod layout;
 pub mod menu;
 pub mod table;

@@ -18,6 +18,7 @@ mod health;
 mod health_data;
 pub(crate) mod help;
 mod highlight;
+mod history_replay;
 mod information_review;
 pub(crate) mod pages;
 mod perf_battery;
@@ -32,6 +33,7 @@ mod perf_npu;
 mod perf_overview;
 mod perf_overview_data;
 mod perf_selector_instances;
+mod pinned_actions;
 mod process_data;
 pub(crate) mod process_details;
 pub(crate) mod process_menu;
@@ -281,6 +283,10 @@ fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan
     let TuiPageLayout::Performance { selector, content } = plan.page else {
         return;
     };
+    if app.history_replay_open() {
+        history_replay::render(frame, app, theme, content);
+        return;
+    }
     let Some(snapshot) = app.projection().snapshot.as_ref() else {
         render_loading(frame, theme, content, t("common.collecting_telemetry"));
         return;
@@ -556,6 +562,19 @@ pub(super) fn render_centered_state(
 /// Complete geometry and interaction projection for a table render. Callers
 /// name every axis so width/header/selection values cannot drift through a
 /// positional argument list.
+pub(crate) fn history_capture_frame_ready(app: &TuiApp, plan: &frame_plan::TuiFramePlan) -> bool {
+    match plan.page {
+        frame_plan::TuiPageLayout::AppHistory { content } => {
+            !app.application_history_projection().rows.is_empty()
+                && app_history::capture_has_visible_rows(content)
+        }
+        frame_plan::TuiPageLayout::Performance { .. } => {
+            app.history_replay_open() && !app.performance_history_projection().rows.is_empty()
+        }
+        _ => false,
+    }
+}
+
 pub(super) struct TableRenderProps<'a, const WIDTHS: usize, const HEADERS: usize> {
     pub(super) theme: TuiTheme,
     pub(super) area: Rect,

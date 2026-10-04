@@ -1,4 +1,4 @@
-//! Performance-page history replay (roadmap #4 follow-up, read-only).
+//! Read-only Performance review over the shared persisted-history controller.
 //!
 //! Renders persisted series from the app-host history replay client
 //! over a 1h/24h/7d window with fact-only peak summaries. The panel exists
@@ -11,38 +11,34 @@ use std::rc::Rc;
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryProjection;
 use taskmanager_application::HistoryReplayError;
-use taskmanager_core::core::HistoryMetric;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_shell::presentation::history_replay::row_heading;
 use taskmanager_shell::presentation::local_timestamp;
 use taskmanager_theme::Color;
+use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rgba;
 
 use gpui::{
-    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, SharedString,
-    Styled, Window, div, px,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
+    ScrollHandle, SharedString, Styled, Window, div, px,
 };
 use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayController,
     HistoryReplayRequest, HistoryReplayRequestId,
 };
-use taskmanager_core::core::{HistorySeriesKey, HistoryWindow};
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
-use super::layout::performance_title_row;
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphCacheHandle, GraphOpts, graph_element};
-use crate::gpui_app::root::RootView;
+use crate::gpui_app::root::{GpuiInputScope, RootView};
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
-const REPLAY_FIXED_CHROME: f32 = 220.0;
-const REPLAY_ROW_SLOT: f32 = 84.0;
-const MAX_VISIBLE_REPLAY_ROWS: usize = 8;
-
-/// One replayed series: the stride-downsampled curve plus its fact-only
+/// One replayed series: the gap-preserving envelope plus its fact-only
 /// summary. Gaps stay `NaN` so the graph renders them as holes.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HistoryReplayRow {
@@ -152,14 +148,15 @@ impl HistoryReplayState {
         if request == self.projected_request {
             return;
         }
-        self.rows = self
+        let projection = self
             .controller
-            .rows()
+            .performance_history_projection(ApplicationHistoryCapability::Available);
+        self.rows = projection
+            .rows
             .iter()
-            .filter(|row| !row.key.is_application_series())
             .map(|row| HistoryReplayRow {
                 key: row.key.clone(),
-                samples: Rc::from(row.samples.as_ref()),
+                samples: Rc::from(row.gap_aware_samples().as_ref()),
                 peak_value: row.peak_value,
                 peak_measured_at_ms: row.peak_measured_at_ms,
                 observed: row.observed,
@@ -169,21 +166,6 @@ impl HistoryReplayState {
             .collect();
         self.projected_request = request;
     }
-}
-
-/// Human heading for one series: the metric slug plus its device/core scope,
-/// stable across locales so tests and captures can key on it.
-#[must_use]
-pub(crate) fn row_heading(key: &HistorySeriesKey) -> String {
-    let mut heading = key.metric().slug().to_owned();
-    if let Some(device) = key.device() {
-        heading.push_str(" · ");
-        heading.push_str(device.as_str());
-    }
-    if let Some(core) = key.core_index() {
-        heading.push_str(&format!(" · core {core}"));
-    }
-    heading
 }
 
 impl RootView {
@@ -216,6 +198,35 @@ impl RootView {
             self.history_runtime.toggle_performance_presentation();
         }
         cx.notify();
+    }
+
+    pub(crate) fn scroll_history_replay_key(&mut self, event: &KeyDownEvent) -> bool {
+        let modifiers = event.keystroke.modifiers;
+        if !self.history_replay_visible()
+            || self.input_scope() != GpuiInputScope::Content
+            || modifiers.control
+            || modifiers.alt
+            || modifiers.platform
+            || modifiers.shift
+        {
+            return false;
+        }
+        let scroll = &self.history_replay_scroll;
+        let step = f32::from(scroll.bounds().size.height).max(32.0);
+        let range = f32::from(scroll.max_offset().height);
+        let mut offset = scroll.offset();
+        let next = match event.keystroke.key.as_str() {
+            "up" => f32::from(offset.y) + 32.0,
+            "down" => f32::from(offset.y) - 32.0,
+            "pageup" => f32::from(offset.y) + step,
+            "pagedown" => f32::from(offset.y) - step,
+            "home" => 0.0,
+            "end" => -range,
+            _ => return false,
+        };
+        offset.y = px(next.clamp(-range, 0.0));
+        scroll.set_offset(offset);
+        true
     }
 
     /// Switch the replay window and reload (the window is part of the query).
@@ -281,7 +292,7 @@ pub(crate) fn render_history_replay(
     theme: &Theme,
     state: &HistoryReplayState,
     local_time_rules: &LocalTimeRulesObservation,
-    content_height: f32,
+    scroll: ScrollHandle,
     entity: gpui::Entity<RootView>,
     graph_cache: GraphCacheHandle,
 ) -> AnyElement {
@@ -289,6 +300,11 @@ pub(crate) fn render_history_replay(
     let mut controls = div()
         .flex()
         .flex_row()
+        .flex_wrap()
+        .flex_none()
+        .w_full()
+        .min_w(px(0.0))
+        .debug_selector(|| "tm-replay-controls".to_string())
         .items_center()
         .gap(definite_length(tokens::SPACE_6));
     for candidate in HistoryWindow::ALL {
@@ -331,13 +347,32 @@ pub(crate) fn render_history_replay(
         .flex_col()
         .gap(definite_length(tokens::SPACE_8))
         .size_full()
+        .min_w(px(0.0))
         .min_h(px(0.0))
         .overflow_hidden()
-        .child(performance_title_row(
-            theme,
-            i18n::t("perf.replay.title").to_string(),
-            i18n::t("perf.replay.subtitle").to_string(),
-        ))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_none()
+                .w_full()
+                .min_w(px(0.0))
+                .children([
+                    div().flex().w_full().min_w(px(0.0)).child(
+                        elements::truncated_text(i18n::t("perf.replay.title"))
+                            .flex_1()
+                            .text_size(font_size(tokens::FONT_26))
+                            .debug_selector(|| "tm-replay-title".to_string()),
+                    ),
+                    div().flex().w_full().min_w(px(0.0)).child(
+                        elements::truncated_text(i18n::t("perf.replay.subtitle"))
+                            .flex_1()
+                            .text_color(hsla(theme.fg_dim))
+                            .text_size(font_size(tokens::FONT_13))
+                            .debug_selector(|| "tm-replay-subtitle".to_string()),
+                    ),
+                ]),
+        )
         .child(controls);
 
     // How old the shown snapshot is — a read-only replay is stale by design,
@@ -394,41 +429,32 @@ pub(crate) fn render_history_replay(
                 .child(i18n::t("perf.replay.empty").to_string()),
         );
     } else {
-        let visible_rows = replay_row_budget(content_height);
-        let row_limit = state.rows().len().min(visible_rows);
-        for (index, row) in state.rows().iter().take(row_limit).enumerate() {
-            column = column.child(replay_row(theme, row, index, graph_cache.clone()));
-        }
-        if state.rows().len() > row_limit {
-            column = column.child(
-                div()
-                    .text_size(font_size(tokens::FONT_11))
-                    .text_color(hsla(theme.fg_dim))
-                    .child(
-                        i18n::t("common.more_rows")
-                            .replace("{count}", &(state.rows().len() - row_limit).to_string()),
-                    ),
+        let rows = div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .w_full()
+            .min_w(px(0.0))
+            .gap(definite_length(tokens::SPACE_8))
+            .pb(definite_length(tokens::SPACE_8))
+            .children(
+                state
+                    .rows()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, row)| replay_row(theme, row, index, graph_cache.clone())),
             );
-        }
+        column = column.child(scroll_region_with_rail(
+            "tm-replay-scroll",
+            "tm-replay-viewport",
+            "tm-replay-rail",
+            "tm-replay-rail",
+            scroll,
+            theme.palette(),
+            rows,
+        ));
     }
     column.into_any_element()
-}
-
-fn replay_row_budget(content_height: f32) -> usize {
-    if content_height <= 0.0 {
-        return MAX_VISIBLE_REPLAY_ROWS;
-    }
-    let available = (content_height - REPLAY_FIXED_CHROME).max(0.0);
-    let mut rows = 0_usize;
-    let mut used = 0.0_f32;
-    for _ in 0..MAX_VISIBLE_REPLAY_ROWS {
-        if used + REPLAY_ROW_SLOT > available {
-            break;
-        }
-        rows += 1;
-        used += REPLAY_ROW_SLOT;
-    }
-    rows
 }
 
 fn history_window_label(window: HistoryWindow) -> &'static str {
@@ -461,29 +487,61 @@ fn replay_row(
         .then(|| format!("{} {}", row.clock_jumps, i18n::t("perf.replay.clock_jumps")));
     div()
         .id(("tm-replay-row", index))
+        .w_full()
+        .min_w(px(0.0))
+        .flex_none()
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_4))
+        .debug_selector(move || format!("tm-replay-row-{index}"))
         .child(
             div()
                 .flex()
                 .flex_row()
+                .flex_wrap()
+                .w_full()
+                .min_w(px(0.0))
                 .gap(definite_length(tokens::SPACE_8))
-                .child(row_heading(&row.key))
+                .child(
+                    elements::truncated_text(&row_heading(&row.key))
+                        .min_w(px(0.0))
+                        .flex_1(),
+                )
                 .child(summary)
                 .children(clock_note),
         )
-        .child(div().h(px(72.0)).child(graph_element(
-            (ElementId::from("tm-replay-graph"), row.key.file_stem()),
-            Rc::clone(&row.samples),
-            rgba(series_color(theme, row.key.metric())),
-            GraphOpts {
-                gradient_fill: true,
-                ref_lines: true,
-                ..GraphOpts::default()
-            },
-            graph_cache,
-        )))
+        .child(
+            div()
+                .h(px(72.0))
+                .w_full()
+                .min_w(px(0.0))
+                .flex_none()
+                .debug_selector(move || format!("tm-replay-curve-{index}"))
+                .child(graph_element(
+                    (ElementId::from("tm-replay-graph"), row.key.file_stem()),
+                    Rc::clone(&row.samples),
+                    rgba(series_color(theme, row.key.metric())),
+                    GraphOpts {
+                        data_points: row.samples.len(),
+                        min: row
+                            .samples
+                            .iter()
+                            .copied()
+                            .filter(|value| value.is_finite())
+                            .fold(0.0, f32::min),
+                        max: row
+                            .samples
+                            .iter()
+                            .copied()
+                            .filter(|value| value.is_finite())
+                            .fold(1.0, f32::max),
+                        gradient_fill: true,
+                        ref_lines: true,
+                        ..GraphOpts::default()
+                    },
+                    graph_cache,
+                )),
+        )
         .into_any_element()
 }
 

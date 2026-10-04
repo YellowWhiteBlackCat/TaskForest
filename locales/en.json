@@ -1280,6 +1280,8 @@
   "tui.status.no_row_to_copy": "No process row to copy",
   "tui.status.clipboard_copied": "Copied {} ({}) to clipboard",
   "tui.status.clipboard_failed": "Clipboard copy failed: {}",
+  "help.binding.history_review": "History replay",
+  "help.binding.refresh_history": "Refresh history",
   "help.binding.about": "About / system info",
   "help.binding.service_actions": "Service actions (Services page)",
   "help.binding.perf_resource": "Performance resource (Performance page)",

@@ -16,7 +16,6 @@ use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::ScalarObservationGroup;
@@ -405,6 +404,15 @@ fn capture_device(name: &str) -> Option<PerfDevice> {
 
 /// Deterministic full-surface demo frame (containers included).
 #[must_use]
+pub(crate) fn persisted_history_capture_requested() -> bool {
+    std::env::var("TM_TUI_CAPTURE_SCENE").is_ok_and(|scene| {
+        matches!(
+            scene.as_str(),
+            "history-replay" | "application-history-replay"
+        )
+    })
+}
+
 pub fn demo_app() -> TuiApp {
     TuiApp::demo()
 }
@@ -652,12 +660,6 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Performance;
             app.select_perf_device(PerfDevice::Cpu);
             app.open_history_replay();
-        }
-        "history-60m" => {
-            app.shell.application.active_page = AppPage::Performance;
-            app.select_perf_device(PerfDevice::Cpu);
-            app.open_history_replay();
-            let _ = app.select_history_replay_window(HistoryWindow::OneHour);
         }
         "event-center" => {
             seed_alert_event_history_fixture(&mut app.shell);

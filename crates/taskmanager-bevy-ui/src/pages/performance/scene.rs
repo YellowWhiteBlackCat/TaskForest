@@ -26,10 +26,9 @@ pub(super) mod blocks;
 pub(super) mod chart;
 pub(super) mod sidebar;
 
-use super::replay::history_replay_strip_scene;
+use super::replay::{PerformanceLiveBody, PerformanceReplayRoot, entry_scene};
 use sidebar::cpu::cpu_main_scene;
 use sidebar::{device_sidebar_scene, stats_rail_scene};
-use taskmanager_core::core::history::HistoryWindow;
 
 /// The disk spare warning is a semantic plate sibling of the live caption.
 /// Keeping the icon outside the text node preserves both the tofu law and the
@@ -83,7 +82,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let devices = device_sidebar_scene(shell, palette);
     let main = cpu_main_scene(shell, palette);
     let stats = stats_rail_scene(shell, palette);
-    let replay_strip = history_replay_strip_scene(HistoryWindow::OneHour, false, palette);
+    let entry = entry_scene(palette);
     bsn! {
         Node {
             width: percent(100),
@@ -120,8 +119,9 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    @{ replay_strip } --
-                    @{ main }
+                    @{ entry } --
+                    Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0 } PerformanceLiveBody Children [ @{ main } ] --
+                    Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, display: Display::None } PerformanceReplayRoot Children []
                 ] --
                 @{ stats }
         ]

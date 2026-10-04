@@ -17,7 +17,7 @@ use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
-use super::replay::PerformanceHistoryReplayStrip;
+use super::replay::{PerformanceHistoryEntry, PerformanceLiveBody, PerformanceReplayRoot};
 use super::scene::content;
 use super::tests::{block_keys, dyn_text_value};
 use super::{DynField, Section, section_keys};
@@ -417,7 +417,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
 }
 
 #[test]
-fn performance_history_replay_strip_visibility_tracks_resource() {
+fn performance_history_mount_starts_live_without_inventing_replay_availability() {
     let mut app = headless_scene_app();
     let shell = ShellApp::new();
     let palette = ui_palette(&Theme::dark());
@@ -436,7 +436,7 @@ fn performance_history_replay_strip_visibility_tracks_resource() {
         .id();
 
     let display = {
-        let mut query = world.query::<(&PerformanceHistoryReplayStrip, &Node)>();
+        let mut query = world.query::<(&PerformanceHistoryEntry, &Node)>();
         query
             .iter(world)
             .next()
@@ -445,5 +445,11 @@ fn performance_history_replay_strip_visibility_tracks_resource() {
     };
 
     assert_eq!(display, Display::None);
+    assert_eq!(world.query::<&PerformanceLiveBody>().iter(world).count(), 1);
+    let mut replay = world.query::<(&PerformanceReplayRoot, &Node)>();
+    assert_eq!(
+        replay.single(world).expect("one review owner").1.display,
+        Display::None
+    );
     assert!(world.despawn(root));
 }

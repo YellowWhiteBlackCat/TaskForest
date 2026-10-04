@@ -20,7 +20,7 @@ use taskmanager_ui_contract::IconId;
 use crate::{TuiApp, TuiTheme};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    let brand = if area.width < 68 {
+    let brand = if area.width < 68 || area.height <= 2 {
         " TF "
     } else {
         product::NAME
@@ -42,7 +42,13 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     {
         let active = app.page() == page;
         spans.push(Span::styled(
-            header_tab_text_with_theme(icon, label, shortcut, area.width, theme),
+            header_tab_text_with_theme(
+                icon,
+                label,
+                shortcut,
+                if area.height <= 2 { 0 } else { area.width },
+                theme,
+            ),
             if active {
                 Style::new()
                     .fg(theme.color(Color::White))

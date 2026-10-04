@@ -338,3 +338,9 @@ fn cross_session_configuration_persistence_round_trip() {
 
     let _ = std::fs::remove_dir_all(path.parent().expect("config parent"));
 }
+
+#[path = "history_config.rs"]
+mod history_config;
+
+#[path = "history_layout.rs"]
+mod history_layout;

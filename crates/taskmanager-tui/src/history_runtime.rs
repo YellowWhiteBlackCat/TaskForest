@@ -5,12 +5,14 @@ use taskmanager_app_host::{
 };
 use taskmanager_application::{
     ApplicationHistoryCapability, ApplicationHistoryProjection,
-    ApplicationHistoryUnavailableReason, HistoryReplayController, HistoryReplayRequest,
+    ApplicationHistoryUnavailableReason, HistoryReplayCompletionDisposition,
+    HistoryReplayController, HistoryReplayRequest, PerformanceHistoryProjection,
 };
 use taskmanager_core::core::history::HistoryWindow;
 
 use crate::TuiApp;
 use taskmanager_app_host::HistoryFrontendSession;
+use taskmanager_application::AppPage;
 use taskmanager_core::core::history::HistoryRecordSink;
 
 enum HistoryResources {
@@ -20,11 +22,21 @@ enum HistoryResources {
     Active(HistoryFrontendSession),
 }
 
+#[derive(Default)]
+enum PerformancePresentation {
+    #[default]
+    Live,
+    Replay {
+        row_scroll: usize,
+    },
+}
+
 pub(crate) struct TuiHistoryRuntime {
     resources: HistoryResources,
     controller: HistoryReplayController,
     connector: Option<HistoryFrontendConnector>,
     requested: bool,
+    performance: PerformancePresentation,
 }
 
 impl Default for TuiHistoryRuntime {
@@ -34,6 +46,7 @@ impl Default for TuiHistoryRuntime {
             controller: HistoryReplayController::default(),
             connector: None,
             requested: false,
+            performance: PerformancePresentation::Live,
         }
     }
 }
@@ -60,6 +73,13 @@ impl TuiHistoryRuntime {
         if !enabled {
             self.resources = HistoryResources::Disabled;
             self.controller.close();
+            self.performance = PerformancePresentation::Live;
+            return;
+        }
+        if matches!(
+            self.resources,
+            HistoryResources::Connecting(_) | HistoryResources::Active(_)
+        ) {
             return;
         }
         let Some(connector) = self.connector.as_mut() else {
@@ -80,17 +100,53 @@ impl TuiHistoryRuntime {
     }
 
     pub(crate) const fn is_open(&self) -> bool {
-        self.controller.is_open()
+        matches!(self.performance, PerformancePresentation::Replay { .. })
     }
 
-    pub(crate) fn open(&mut self) -> Option<HistoryReplayRequest> {
-        let request = self.controller.open().ok();
-        self.submit_new_request(request);
-        request
+    pub(crate) fn available(&self) -> bool {
+        matches!(self.resources, HistoryResources::Active(_))
+    }
+
+    pub(crate) fn performance_projection(&self) -> PerformanceHistoryProjection {
+        self.controller
+            .performance_history_projection(self.capability())
+    }
+
+    pub(crate) fn open(&mut self) -> bool {
+        if !self.available() {
+            return false;
+        }
+        self.performance = PerformancePresentation::Replay { row_scroll: 0 };
+        if !self.controller.is_open() {
+            let request = self.controller.open().ok();
+            self.submit_new_request(request);
+        }
+        true
     }
 
     pub(crate) fn close(&mut self) {
-        self.controller.close();
+        self.performance = PerformancePresentation::Live;
+    }
+
+    pub(crate) fn refresh(&mut self) {
+        if self.available() {
+            let request = self.controller.refresh().ok();
+            self.submit_new_request(request);
+        }
+    }
+
+    pub(crate) fn row_scroll(&self) -> usize {
+        match self.performance {
+            PerformancePresentation::Replay { row_scroll } => row_scroll,
+            PerformancePresentation::Live => 0,
+        }
+    }
+
+    pub(crate) fn scroll_rows(&mut self, delta: isize) {
+        let maximum = self.performance_projection().rows.len().saturating_sub(1);
+        if let PerformancePresentation::Replay { row_scroll } = &mut self.performance {
+            *row_scroll = row_scroll.saturating_add_signed(delta).min(maximum);
+        }
     }
 
     pub(crate) const fn window(&self) -> HistoryWindow {
@@ -129,9 +185,9 @@ impl TuiHistoryRuntime {
         }
         if let HistoryResources::Active(client) = &mut self.resources {
             let completions = client.replay.drain();
-            changed |= !completions.is_empty();
             for completion in completions {
-                let _ = self.controller.complete(completion);
+                changed |= self.controller.complete(completion)
+                    == HistoryReplayCompletionDisposition::Applied;
             }
         }
         changed
@@ -213,6 +269,29 @@ impl TuiApp {
         let _ = self.history_runtime.open();
     }
 
+    pub(crate) fn history_replay_available(&self) -> bool {
+        self.history_runtime.available()
+    }
+    pub(crate) fn performance_history_projection(&self) -> PerformanceHistoryProjection {
+        self.history_runtime.performance_projection()
+    }
+    pub(crate) fn refresh_history_replay(&mut self) {
+        self.history_runtime.refresh();
+    }
+    pub(crate) fn history_replay_row_scroll(&self) -> usize {
+        self.history_runtime.row_scroll()
+    }
+    pub(crate) fn scroll_history_replay_rows(&mut self, delta: isize) {
+        self.history_runtime.scroll_rows(delta);
+    }
+    pub(crate) fn toggle_history_replay(&mut self) {
+        if self.history_replay_open() {
+            self.close_history_replay();
+        } else {
+            self.open_history_replay();
+        }
+    }
+
     pub fn close_history_replay(&mut self) {
         self.history_runtime.close();
     }
@@ -229,6 +308,13 @@ impl TuiApp {
         let changed = self.history_runtime.drain();
         if changed {
             self.sync_history_persistence_sink();
+            if self.history_replay_available()
+                && crate::demo::persisted_history_capture_requested()
+                && self.page() == AppPage::Performance
+                && !self.history_replay_open()
+            {
+                self.open_history_replay();
+            }
         }
         changed
     }

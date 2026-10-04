@@ -55,3 +55,6 @@ fn loading_and_failed_refresh_keep_the_labelled_last_good_graph_projection() {
         "switching Performance presentation must not close the durable reader used by History"
     );
 }
+
+#[path = "history_native_review_tests.rs"]
+mod native_review;

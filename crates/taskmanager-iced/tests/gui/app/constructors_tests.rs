@@ -10,7 +10,6 @@ use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
@@ -368,14 +367,19 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "history-replay");
-    assert!(app.history_replay_state().is_open());
+    assert!(
+        !app.history_replay_state().is_open(),
+        "capture intent waits for a real reader"
+    );
+    assert!(app.history_replay_state().rows().is_empty());
     assert_eq!(app.shell.page(), AppPage::Performance);
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "history-60m");
-    assert!(app.history_replay_state().is_open());
-    assert_eq!(app.history_replay_state().window(), HistoryWindow::OneHour);
-    assert_eq!(app.shell.page(), AppPage::Performance);
+    assert!(
+        !app.history_replay_state().is_open(),
+        "dashboard history cannot alias persisted replay"
+    );
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "event-center");

@@ -22,11 +22,12 @@ use taskmanager_shell::presentation::missing_value;
 /// call sites that have not migrated to a unit-carrying variant yet. The
 /// [`From<MetricSeries>`] keeps the fixed system-wide metric histories on the
 /// same rule as the per-device graphs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum DeviceMetricScale {
     /// Fixed 0..100 ceiling (utilization %, battery charge %).
     Percent,
     /// Ceiling tracks the finite peak across the window (bytes/sec, RPM, °C, MHz).
+    #[default]
     AutoPeak,
     /// Bytes-per-second magnitude whose summary/hover readout formats through
     /// the resolved Drive or Network unit pair (bytes-vs-bits × base-2-vs-

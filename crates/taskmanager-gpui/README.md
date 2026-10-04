@@ -161,7 +161,10 @@ aesthetic injection, and summary row in one place; mini density cells render
 through the shared `mini_graph_cell`. The main column is one fixed
 `overflow_hidden` viewport — never a scrolling body — and the statistics rail
 width. Only the left device selector may scroll at the page level; the
-Performance main viewport and statistics shell remain static. The CPU shell
+Performance live main viewport and statistics shell remain static. Persisted
+review has independent per-window scrolling, pinned window/refresh/return controls
+and complete accessible curves; arrows, PageUp/PageDown and Home/End share that
+viewport. Recorded curves use their whole bounded series and signed value range. The CPU shell
 additionally owns a bounded nested details viewport so its complete
 topology/policy projection remains reachable on short windows without moving
 the chart or rail edge. Lower content is capped, summarized, or omitted only

@@ -9,7 +9,6 @@ use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope};
@@ -20,9 +19,18 @@ use super::capture_fixtures::*;
 pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_from_name};
 use super::{DetailsSection, IcedApp, LocalSurface, Message, PerfDevice};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum HistoryCaptureFrame {
+    #[default]
+    WaitingForData,
+    WaitingForPresentation,
+    Presented,
+}
+
 pub(super) struct CaptureState {
     pub(super) marker: Option<PathBuf>,
     pub(super) emitted: bool,
+    pub(super) history_frame: HistoryCaptureFrame,
 }
 
 impl CaptureState {
@@ -30,6 +38,7 @@ impl CaptureState {
         Self {
             marker,
             emitted: false,
+            history_frame: HistoryCaptureFrame::WaitingForData,
         }
     }
 }
@@ -274,12 +283,8 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "settings-zero-gray" || target == "settings-switch-focus" {
         app.open_local_surface(LocalSurface::Settings);
         app.configuration.preferences_mut().gray_zero_values = true;
-    } else if target == "history-replay" || target == "history-60m" {
+    } else if target == "history-replay" {
         app.shell.application.active_page = AppPage::Performance;
-        app.seed_capture_history_replay();
-        if target == "history-60m" {
-            app.select_history_replay_window(HistoryWindow::OneHour);
-        }
     } else if target == "application-history-replay" {
         app.shell.application.active_page = AppPage::AppHistory;
     } else if target == "battery-fan-performance" || target == "battery-live-performance" {

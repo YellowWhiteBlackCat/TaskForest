@@ -250,6 +250,8 @@ pub struct RootView {
     /// keeping this handle on the RootView avoids a process-global scroll
     /// position when more than one window is open.
     pub app_history_scroll: UniformListScrollHandle,
+    /// Persisted Performance review body, independent of the live viewport.
+    pub(crate) history_replay_scroll: ScrollHandle,
     /// Per-window sidebar device-list scroll state. The list can contain many
     /// disks, NICs, GPUs, batteries, and fans; its rail must remain paired
     /// with this handle across telemetry-driven renders.
@@ -746,6 +748,7 @@ impl RootView {
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
             app_history_scroll: UniformListScrollHandle::new(),
+            history_replay_scroll: ScrollHandle::new(),
             sidebar_scroll: ScrollHandle::new(),
             processes_scroll: processes_view::ProcessesScrollState::default(),
             dashboard_scroll: ScrollHandle::new(),

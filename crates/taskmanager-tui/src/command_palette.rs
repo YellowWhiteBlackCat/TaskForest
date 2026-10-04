@@ -110,6 +110,8 @@ pub enum PaletteLocalAction {
     BrowseServiceDependencies,
     ExportDiagnosticReport,
     OpenProcessAffinity,
+    ToggleHistoryReplay,
+    RefreshHistoryReplay,
 }
 
 /// The typed direct-dispatch lane: what a TUI-local command DOES when its
@@ -119,6 +121,8 @@ pub enum PaletteLocalAction {
 /// armed arm, so a hand-written `match` on a registry chord there is drift.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiDirectAction {
+    ToggleHistoryReplay,
+    RefreshHistoryReplay,
     ToggleSettings,
     ToggleAbout,
     ToggleHealth,
@@ -159,6 +163,8 @@ pub(crate) enum TuiDirectAction {
 /// implementation lives beside the executor in `runtime::keys`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiDirectScope {
+    PerformanceHistoryAvailable,
+    HistoryReviewAvailable,
     /// Any page, any modifiers — the shell's own characters already had their
     /// chance in the precedence order.
     Anywhere,
@@ -222,7 +228,29 @@ pub(crate) struct TuiLocalCommand {
 
 /// The complete TUI-local binding registry.  The direct key router resolves
 /// every chord here — declaration and execution are one authority.
-pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
+pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 20] = [
+    TuiLocalCommand {
+        binding: LocalBinding {
+            shortcut: "r",
+            label: "History replay",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleHistoryReplay),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::PerformanceHistoryAvailable,
+            action: TuiDirectAction::ToggleHistoryReplay,
+        }],
+    },
+    TuiLocalCommand {
+        binding: LocalBinding {
+            shortcut: "f",
+            label: "Refresh history",
+        },
+        palette_action: Some(PaletteLocalAction::RefreshHistoryReplay),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::HistoryReviewAvailable,
+            action: TuiDirectAction::RefreshHistoryReplay,
+        }],
+    },
     TuiLocalCommand {
         binding: LocalBinding {
             shortcut: "p",
@@ -689,6 +717,8 @@ impl TuiApp {
     pub fn run_palette_local_action(&mut self, action: Option<PaletteLocalAction>) {
         use PaletteLocalAction;
         match action {
+            Some(PaletteLocalAction::ToggleHistoryReplay) => self.toggle_history_replay(),
+            Some(PaletteLocalAction::RefreshHistoryReplay) => self.refresh_history_replay(),
             Some(PaletteLocalAction::Quit) => {
                 self.shell.request_quit(QuitReason::CommandPalette);
             }

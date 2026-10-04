@@ -496,13 +496,23 @@ capture_one() {
   local width=0 height=0 bytes=0 hash=- rendered=unknown control=unknown
   local page=performance
   case "$device" in
-  applications|services|startup|users|system|app-history|application-history-replay) page="${device#application-}" ;;
+  applications|services|startup|users|system|app-history) page="$device" ;;
+  application-history-replay) page=app-history ;;
   service-details|service-details-logs|services-search-highlight) page=services ;;
   process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) page=applications ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) page=startup ;;
   about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm|system-about|system-hardware|system-dashboard|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|history-replay|history-60m|battery-fan-performance|battery-live-performance|device-hotplug|sidebar-edit|settings-permission-center|saved-view-presets|event-center) page=performance ;;
   esac
   mkdir -p "$scenario_dir" "$config_home" "$data_home" "$cache_home" "$state_home"
+  case "$device" in
+    history-replay|application-history-replay)
+      mkdir -p "$config_home/taskmanager"
+      printf '{"history_persistence":true}\n' >"$config_home/taskmanager/config.json"
+      local history_kind=system
+      [ "$device" != application-history-replay ] || history_kind=application
+      timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$data_home/taskmanager/history" --kind "$history_kind"
+      ;;
+  esac
 
   # Two attempts per scenario: the nested-Wayland session occasionally shows
   # late-session resource flakiness (a launch that produces no window and no

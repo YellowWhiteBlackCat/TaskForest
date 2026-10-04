@@ -25,8 +25,7 @@ gap-aware adapter), and the semantic accessibility channel (ui-contract
 `SemanticSnapshot` plus `bevy_a11y` nodes published through the
 `accesskit_unix` bridge on Linux). Remaining open surface is declared, never
 hidden: per-row process trends, multi-select process verbs, notification
-history, GPU-engine detail cards, service log streaming, settings persistence
-across sessions, the tray seam, and multi-window composition.
+history, GPU-engine detail cards, service log streaming, the tray seam, and multi-window composition.
 Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
@@ -73,6 +72,12 @@ adopted — theme tokens are the only skin authority.
   alert center. Includes `pages/processes/properties_modal.rs` delivering full
   multi-field process inspection (identity, paths, memory, IO, parent/threads)
   with scrim dismiss and escape handling.
+- `src/pages/history/control.rs` routes both review surfaces through one history
+  controller and native session. Performance review has pinned actions around
+  a bounded body; application review admits complete metric cards in its own
+  bounded body. Settings enables/disables that session through canonical config.
+- `src/widgets/history_controls.rs` owns window, refresh and return-to-live
+  controls; `pages/performance/replay.rs` scales curves to measured chart bounds.
 - `src/widgets.rs` + `src/widgets/` — the owned component layer: table/chart
   projection cores, bsn! render adapters, controls, and the action menu supporting
   both pointer click and keyboard navigation.

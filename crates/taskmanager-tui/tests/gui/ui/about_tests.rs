@@ -5,7 +5,6 @@ use ratatui::backend::TestBackend;
 
 use crate::{TuiApp, TuiSurfaceKind, TuiTheme, demo_app};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::history::HistoryWindow;
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -94,14 +93,19 @@ fn capture_scene_overrides_activate_expected_state() {
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "history-replay");
-    assert!(app.history_replay_open());
+    assert!(
+        !app.history_replay_open(),
+        "capture intent cannot invent an enabled reader"
+    );
+    assert!(app.performance_history_projection().rows.is_empty());
     assert_eq!(app.shell.page(), AppPage::Performance);
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "history-60m");
-    assert!(app.history_replay_open());
-    assert_eq!(app.history_replay_window(), HistoryWindow::OneHour);
-    assert_eq!(app.shell.page(), AppPage::Performance);
+    assert!(
+        !app.history_replay_open(),
+        "a dashboard window cannot alias persisted replay"
+    );
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "event-center");

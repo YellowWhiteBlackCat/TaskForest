@@ -3,7 +3,15 @@
 use bevy::scene::WorldSceneExt;
 
 use super::*;
+use crate::widgets::history_controls::toolbar_scene;
 use crate::window::WindowPalette;
+use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::prelude::{Display, FlexWrap, Overflow};
+use bevy::ui_widgets::ScrollArea;
+use taskmanager_application::history_decimation::gap_preserving_envelope;
+
+#[derive(Component, Clone, Default)]
+struct HistoryToolbar;
 
 // ---- Bevy 0.20 scene adapter ----
 
@@ -22,11 +30,7 @@ pub(crate) fn content(
     _palette: &UiPalette,
 ) -> impl Scene + use<> {
     let model = HistoryPageModel::from_projection(projection);
-    let title = format!(
-        "{} · {}",
-        t("history.application.title"),
-        window_label(model.selected_window)
-    );
+    let title = t("history.application.title").to_owned();
     let line = summary_text(&model);
     bsn! {
         Node {
@@ -45,20 +49,20 @@ pub(crate) fn content(
                     align_items: AlignItems::Center,
                 }
                 Children [
-                     Text(title) TextRole(Role::Heading) --
-                     Node { flex_grow: 1.0 } --
-                     Text({ window_label(model.selected_window).to_owned() }) TextRole(Role::Caption)
+                     Text(title) TextRole(Role::Heading)
                 ]
             --
              Text(line) HistoryStatusLine TextRole(Role::Caption) --
+             Node { width: percent(100), flex_shrink: 0.0 } HistoryToolbar Children [] --
 
                 Node {
                     width: percent(100),
-                    height: Val::Auto,
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                    overflow: Overflow::scroll_y(),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
-                HistoryBody
+                ScrollArea HistoryBody
                 Children []
 
         ]
@@ -71,7 +75,6 @@ fn history_body_scene(model: &HistoryPageModel, palette: &UiPalette) -> impl Sce
         if model.notice.stale || model.notice.error_code.is_some() {
             children.push(Box::new(history_notice_scene(model, palette)));
         }
-        children.push(Box::new(history_header_scene()));
         children.extend(model.rows.iter().map(|row| history_row_scene(row, palette)));
     } else {
         children.push(Box::new(history_empty_scene(model)));
@@ -142,51 +145,36 @@ fn history_empty_scene(model: &HistoryPageModel) -> Box<dyn Scene> {
     })
 }
 
-fn history_header_scene() -> Box<dyn Scene> {
-    let labels = [
-        t("common.name"),
-        t("history.application.peak_cpu"),
-        t("history.application.peak_memory"),
-        t("history.application.peak_processes"),
-        t("proc.trend"),
-    ];
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-             Text({ labels[0].to_owned() }) TextRole(Role::Caption) --
-             Node { width: px(90.0) } Children [ Text({ labels[1].to_owned() }) TextRole(Role::Caption) ] --
-             Node { width: px(110.0) } Children [ Text({ labels[2].to_owned() }) TextRole(Role::Caption) ] --
-             Node { width: px(110.0) } Children [ Text({ labels[3].to_owned() }) TextRole(Role::Caption) ] --
-             Node { width: px(150.0) } Children [ Text({ labels[4].to_owned() }) TextRole(Role::Caption) ]
-        ]
-    })
-}
-
 fn history_row_scene(row: &HistoryRowModel, palette: &UiPalette) -> Box<dyn Scene> {
     let name = format!("{} · {}", row.display_name, row_annotation(row));
-    let chart = row.cpu.as_ref().map_or_else(
-        || empty_trend_scene(),
-        |metric| trend_scene(metric, palette),
+    let chart = row
+        .cpu
+        .as_ref()
+        .map_or_else(empty_trend_scene, |metric| trend_scene(metric, palette));
+    let cpu = format!(
+        "{} {}",
+        t("history.application.peak_cpu"),
+        scalar_text(row.cpu_peak(), "%")
+    );
+    let memory = format!(
+        "{} {}",
+        t("history.application.peak_memory"),
+        memory_text(row.memory_peak())
+    );
+    let count = format!(
+        "{} {}",
+        t("history.application.peak_processes"),
+        process_count_text(row.process_count_peak())
     );
     Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: px(palette.control_height_px),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
+        Node { width: percent(100), min_width: px(0.0), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) }
         BackgroundColor({ palette.panel_fill })
         Children [
-             Text(name) TextRole(Role::Body) --
-             Node { width: px(90.0) } Children [ Text({ scalar_text(row.cpu_peak(), "%") }) TextRole(Role::Body) ] --
-             Node { width: px(110.0) } Children [ Text({ memory_text(row.memory_peak()) }) TextRole(Role::Body) ] --
-             Node { width: px(110.0) } Children [ Text({ process_count_text(row.process_count_peak()) }) TextRole(Role::Body) ] --
-             Node { width: px(150.0) } Children [ @{ chart } ]
+            Node { width: percent(100), min_width: px(0.0) } Children [ Text(name) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } ] --
+            Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } Children [
+                Text(cpu) TextRole(Role::Caption) -- Text(memory) TextRole(Role::Caption) -- Text(count) TextRole(Role::Caption)
+            ] --
+            Node { width: percent(100), height: px(20.0), min_width: px(0.0) } Children [ @{ chart } ]
         ]
     })
 }
@@ -214,8 +202,8 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
     let min = finite.iter().copied().fold(f32::INFINITY, f32::min);
     let max = finite.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let range = max - min;
-    let bars: Vec<Box<dyn Scene>> = metric
-        .samples
+    let compact = gap_preserving_envelope(&metric.samples, 36);
+    let bars: Vec<Box<dyn Scene>> = compact
         .iter()
         .copied()
         .map(|sample| {
@@ -228,12 +216,12 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
             };
             if sample.is_finite() {
                 Box::new(bsn! {
-                    Node { width: px(space_2()), height: px(height) }
+                    Node { flex_grow: 1.0, min_width: px(0.0), flex_basis: px(0.0), height: px(height) }
                     BackgroundColor({ palette.accent })
                 }) as Box<dyn Scene>
             } else {
                 Box::new(bsn! {
-                    Node { width: px(space_2()), height: px(1.0) }
+                    Node { flex_grow: 1.0, min_width: px(0.0), flex_basis: px(0.0), height: px(1.0) }
                 }) as Box<dyn Scene>
             }
         })
@@ -244,7 +232,7 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
             height: px(20.0),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::FlexEnd,
-            column_gap: Val::Px(space_2()),
+            column_gap: px(1.0),
         }
         Children [{ bars }]
     })
@@ -294,6 +282,35 @@ fn paint_history(world: &mut World) {
         Err(_) => return,
     };
     world.entity_mut(body).add_one_related::<ChildOf>(fresh);
+    let toolbars = world
+        .query_filtered::<Entity, With<HistoryToolbar>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    for toolbar in toolbars {
+        let old = world
+            .get::<Children>(toolbar)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for entity in old {
+            let _ = world.despawn(entity);
+        }
+        let available = matches!(
+            model.status,
+            ApplicationHistoryStatus::Ready | ApplicationHistoryStatus::Collecting
+        );
+        if let Some(mut node) = world.get_mut::<Node>(toolbar) {
+            node.display = if available {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+        if let Ok(fresh) = world.spawn_scene(toolbar_scene(model.selected_window, false, &palette))
+        {
+            let child = fresh.id();
+            world.entity_mut(toolbar).add_one_related::<ChildOf>(child);
+        }
+    }
     let mut lines = world.query_filtered::<&mut Text, With<HistoryStatusLine>>();
     if let Ok(mut line) = lines.single_mut(world) {
         line.0 = summary_text(&model);

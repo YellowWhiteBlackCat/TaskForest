@@ -62,6 +62,11 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
 - Canonical system facts live only in `ShellApp`'s private `SystemProjectionStore`; Iced reads
   `projection()` and submits batches or named semantic reducers. Demo/capture/tests use the
   shell's typed fixture facts instead of assigning projection fields.
+Persistent Performance and application reviews use the same accepted query,
+window and refresh lifecycle. Recorded review fixes its controls around one
+bounded body and preserves signed magnitude coordinates and axis-cache identity. Capture writes private input files and waits for
+real worker rows plus their presented frame; no renderer seeds replay data.
+
 - `src/app/history_replay.rs` adapts the application request lifecycle and the exhaustive
   `Disabled | Connecting | Unavailable | Active` reader state. Runtime enable is a non-blocking,
   latest-request-wins connector transition; disable immediately closes replay. The top History

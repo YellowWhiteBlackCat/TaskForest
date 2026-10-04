@@ -281,8 +281,8 @@ mod process_frame_layout_tests {
 
     use crate::demo_app;
     use crate::ui::frame_plan::{
-        TuiFocusControl, TuiFocusOrder, TuiFocusTarget, TuiFramePlan, TuiHitTarget,
-        frame_chrome_layout,
+        FrameChromePage, TuiFocusControl, TuiFocusOrder, TuiFocusTarget, TuiFramePlan,
+        TuiHitTarget, frame_chrome_layout,
     };
     use crate::ui::process_table::process_table_layout;
     use crate::ui::table_hit::table_hit_support::table_panel_projection;
@@ -290,7 +290,7 @@ mod process_frame_layout_tests {
     #[test]
     fn applications_hit_projection_uses_the_painted_frame_bands() {
         let frame = Rect::new(0, 0, 120, 40);
-        let chrome = frame_chrome_layout(frame);
+        let chrome = frame_chrome_layout(frame, FrameChromePage::Standard);
         let page = process_table_layout(chrome.body);
 
         assert_eq!(page.search.y + page.search.height, page.table.y);

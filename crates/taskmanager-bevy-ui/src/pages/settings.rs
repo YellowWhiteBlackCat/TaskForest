@@ -49,9 +49,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ScrollArea, ValueChange};
-use taskmanager_application::i18n::{Language, current_language, set_language};
-use taskmanager_application::{AppAction, TelemetryInterval};
+use taskmanager_application::i18n::{Language, current_language, set_language, t};
+use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInterval};
 use taskmanager_core::config::Config;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -206,6 +207,7 @@ pub(crate) enum SettingsField {
     Language(Language),
     Refresh(TelemetryInterval),
     HistoryCapacity(usize),
+    HistoryPersistence(bool),
     #[default]
     PauseTelemetry,
 }
@@ -225,11 +227,7 @@ where
     let mut config_guard = runtime.shared.lock_config();
     let client = config_guard.as_mut()?;
 
-    if client.snapshot().is_none() {
-        let _ = client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT);
-    } else {
-        let _ = client.drain();
-    }
+    let _ = client.drain();
 
     let current = client.snapshot().cloned()?;
     let mut updated = (*current).clone();
@@ -439,6 +437,19 @@ fn settings_choice_observer(
                 cfg.graph_data_points = u32::try_from(capacity).unwrap_or(u32::MAX);
             });
         }
+        SettingsField::HistoryPersistence(enabled) => {
+            let submitted = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.history_persistence = enabled;
+            });
+            if let Err(error) = submitted.unwrap_or(Err(ConfigSubmitError::NotReady)) {
+                track.shell.report_notice(
+                    FeedbackSource::Settings,
+                    FeedbackSeverity::Error,
+                    FeedbackLifecycle::TIMED_LONG,
+                    t("settings.config_not_queued").replace("{error}", &error.to_string()),
+                );
+            }
+        }
         SettingsField::PauseTelemetry => {
             // Guarded so a repeated activation is a no-op, not a double flip.
             if track.shell.paused() != change.event().value {
@@ -555,6 +566,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let language = current_language();
     let mode = palette_mode(context.palette);
     let hc = context.palette.high_contrast;
+    let persistence = context.history.status != ApplicationHistoryStatus::Disabled;
     let rows: Vec<Box<dyn Scene>> = vec![
         radio_row(
             "Theme",
@@ -594,6 +606,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             "History capacity",
             capacity_entries(capacity),
             &format!("{capacity} samples"),
+        ),
+        toggle_row(
+            t("settings.history_persistence"),
+            ChoiceEntry {
+                label: t("settings.history_persistence").to_owned(),
+                choice: SettingsChoice(SettingsField::HistoryPersistence(!persistence)),
+                selected: persistence,
+            },
+            if persistence { "enabled" } else { "disabled" },
         ),
         toggle_row(
             "Telemetry updates",
@@ -710,7 +731,10 @@ fn choice_widgets(entries: Vec<ChoiceEntry>) -> Vec<Box<dyn Scene>> {
                 selected,
             } = entry;
             let SettingsChoice(field) = choice;
-            let boolean = matches!(field, SettingsField::PauseTelemetry);
+            let boolean = matches!(
+                field,
+                SettingsField::PauseTelemetry | SettingsField::HistoryPersistence(_)
+            );
             match (boolean, selected) {
                 (true, true) => Box::new(checked_checkbox_shape(label, field)) as Box<dyn Scene>,
                 (true, false) => Box::new(unchecked_checkbox_shape(label, field)),

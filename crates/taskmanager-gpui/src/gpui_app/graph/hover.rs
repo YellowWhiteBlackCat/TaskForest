@@ -4,6 +4,7 @@
 //! graph's rendering geometry and its event plumbing from growing together.
 //! Both tooltip and crosshair still consume the exact same sample-slot map.
 
+use super::graph_capacity;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
@@ -17,8 +18,8 @@ use gpui::{
 use super::scene_cache::{GraphPaintContext, paint_graph_dual_scene, paint_graph_scene};
 use super::slide::slide_progress;
 use super::{
-    DualGraphSeries, GraphCacheHandle, GraphOpts, GraphSettings, graph_slide_spacing,
-    graph_slide_supported, sample_x, sample_x_slide, stroke_path,
+    DualGraphSeries, GraphCacheHandle, GraphOpts, graph_slide_spacing, graph_slide_supported,
+    sample_x, sample_x_slide, stroke_path,
 };
 
 /// A live graph hover: the window-space cursor position plus the formatted
@@ -132,7 +133,7 @@ fn sample_slot_at_cursor_x_slide(
     if n == 0 || width <= px(0.0) {
         return None;
     }
-    let capacity = GraphSettings::clamp_data_points(data_points).max(1);
+    let capacity = graph_capacity(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     let slot = f32::from(width) / denom;
     let index = ((f32::from(x) - f32::from(left)) / slot + progress.clamp(0.0, 1.0))
@@ -225,7 +226,7 @@ fn draw_graph_crosshair(window: &mut Window, crosshair: GraphCrosshair<'_>) {
         let Some(&value) = series.get(index).filter(|value| value.is_finite()) else {
             return;
         };
-        let y_value = (value / opts.max.max(1e-6)).clamp(0.0, 1.0);
+        let y_value = opts.normalized(value);
         let sample_point = point(
             if slide {
                 sample_x_slide(left, width, index, opts.data_points, slide_progress)

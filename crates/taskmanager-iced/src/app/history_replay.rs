@@ -6,7 +6,7 @@ use taskmanager_application::{
     HistoryReplayCompletionDisposition, HistoryReplayController, HistoryReplayRequest,
     HistoryReplayRequestId,
 };
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
+use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 use super::IcedApp;
 use taskmanager_app_host::HistoryFrontendConnectRequestId;
@@ -14,6 +14,7 @@ use taskmanager_app_host::HistoryFrontendConnector;
 use taskmanager_app_host::HistoryFrontendConnectorStartError;
 use taskmanager_app_host::HistoryPersistenceWriter;
 use taskmanager_app_host::HistoryReplayClient;
+use taskmanager_application::AppPage;
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryProjection;
 use taskmanager_application::ApplicationHistoryUnavailableReason;
@@ -113,14 +114,15 @@ impl IcedHistoryReplay {
         if request == self.projected_request {
             return;
         }
-        self.rows = self
+        let projection = self
             .controller
-            .rows()
+            .performance_history_projection(ApplicationHistoryCapability::Available);
+        self.rows = projection
+            .rows
             .iter()
-            .filter(|row| !row.key.is_application_series())
             .map(|row| HistoryReplayRow {
                 key: row.key.clone(),
-                samples: Rc::from(row.samples.as_ref()),
+                samples: Rc::from(row.gap_aware_samples().as_ref()),
                 peak_value: row.peak_value,
                 peak_measured_at_ms: row.peak_measured_at_ms,
                 observed: row.observed,
@@ -236,6 +238,8 @@ impl IcedHistoryRuntime {
         if !enabled {
             self.resources = IcedHistoryResources::Disabled;
             self.replay.controller.close();
+            self.replay.close();
+            self.replay.sync_rows_projection();
             return;
         }
         let Some(connector) = self.connector.as_mut() else {
@@ -348,23 +352,7 @@ impl IcedApp {
     }
 
     pub(crate) fn history_replay_entry_available(&self) -> bool {
-        self.history_runtime.is_active() || self.is_demo()
-    }
-
-    pub(crate) fn seed_capture_history_replay(&mut self) {
-        let replay = self.history_runtime.replay_mut();
-        replay.presentation = IcedHistoryPresentation::Replay;
-        let series_key = HistorySeriesKey::system(HistoryMetric::CpuUsagePct);
-        let samples: Rc<[f32]> = vec![24.0, 35.0, 42.0, 38.0, 55.0, 62.0, 48.0, 39.0].into();
-        replay.rows = vec![HistoryReplayRow {
-            key: series_key,
-            samples,
-            peak_value: Some(62.0),
-            peak_measured_at_ms: Some(1_700_000_000_000),
-            observed: 8,
-            gaps: 0,
-            clock_jumps: 0,
-        }];
+        self.history_runtime.is_active()
     }
 
     /// Whether persistence was requested for this run but the replay runtime
@@ -413,6 +401,15 @@ impl IcedApp {
         if connector_changed {
             self.sync_history_persistence_sink();
         }
+        if self.is_demo()
+            && crate::capture::persisted_history_requested()
+            && self.shell.page() == AppPage::Performance
+            && self.history_replay_entry_available()
+            && !self.history_runtime.replay().is_open()
+        {
+            self.toggle_history_replay();
+        }
+
         let Some(client) = self.history_runtime.client_mut() else {
             return;
         };

@@ -92,8 +92,8 @@ fn help_overlay_scrolls_its_two_column_listing_on_a_short_terminal() {
     let text = frame_text(&app, 80, 20);
     assert!(text.contains("Keyboard reference"));
     assert!(
-        text.contains("Quit TaskForest"),
-        "first terminal row visible"
+        text.contains(help_rows()[0].shortcut),
+        "the first declared shortcut is visible"
     );
 
     // Scrolling past the listing bottom keeps a bounded, non-panicking
@@ -102,6 +102,10 @@ fn help_overlay_scrolls_its_two_column_listing_on_a_short_terminal() {
     let text = frame_text(&app, 80, 20);
     assert!(text.contains("Keyboard reference"), "overlay still renders");
     assert!(text.contains("F1 / ? / Esc"), "footer hint still visible");
+    assert!(
+        text.contains("Quit TaskForest"),
+        "the terminal shortcut remains reachable after scrolling"
+    );
 }
 
 #[test]

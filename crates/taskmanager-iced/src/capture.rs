@@ -10,6 +10,15 @@ use taskmanager_application::AppPage;
 
 use crate::app::PerfDevice;
 
+pub(crate) fn persisted_history_requested() -> bool {
+    std::env::var("TM_ICED_CAPTURE_DEVICE").is_ok_and(|target| {
+        matches!(
+            target.as_str(),
+            "history-replay" | "application-history-replay"
+        )
+    })
+}
+
 /// Build one stable marker line for the independent Iced evidence runner.
 #[must_use]
 pub(crate) fn marker_line(event: &str, mode: &str, page: &str) -> String {

@@ -41,6 +41,7 @@ pub mod first_run;
 /// pixel-budgeted downsampling delegates to.
 pub mod history_decimation;
 mod history_replay;
+mod history_replay_samples;
 /// Self-contained i18n (embedded locale catalogs + `t`). Lives in this shared
 /// crate so every frontend (gpui/tui/iced/bevy) imports the same catalog
 /// directly from `taskmanager_application::i18n`.
@@ -48,6 +49,7 @@ pub mod i18n;
 mod interaction;
 mod managed_alert_rules;
 mod path_contract;
+mod performance_history_projection;
 mod persistent_app_history;
 
 mod platform;
@@ -140,6 +142,7 @@ pub use interaction::{
 pub use managed_alert_rules::{
     AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
 };
+pub use performance_history_projection::PerformanceHistoryProjection;
 pub use persistent_app_history::{
     MAX_PERSISTED_APPLICATION_IDENTITIES, PersistentApplicationHistoryRecorder,
     PersistentApplicationRecordReport,

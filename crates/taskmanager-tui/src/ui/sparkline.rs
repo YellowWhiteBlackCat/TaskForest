@@ -27,6 +27,7 @@
 
 use ratatui::style::Style;
 use ratatui::text::Span;
+use taskmanager_application::history_decimation::gap_preserving_envelope;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{bytes, graph_summary, missing_value};
 
@@ -116,15 +117,8 @@ pub(super) fn sparkline_in(mode: TuiGlyphMode, samples: &[f32]) -> String {
         .collect()
 }
 
-/// The most-recent bounded window for `samples` (oldest→newest), so a caller
-/// can render a stable-width trend from a deep ring without allocating more
-/// than [`SPARKLINE_MAX_SAMPLES`].
-pub(super) fn recent_window(samples: &[f32]) -> &[f32] {
-    recent_window_with(samples, SPARKLINE_MAX_SAMPLES)
-}
-
-/// [`recent_window`] with an explicit window (the persisted
-/// graph-data-points preference; the sparkline width adapts to it).
+/// The newest explicit window for a live trend; its width follows the
+/// graph-data-points preference.
 pub(super) fn recent_window_with(samples: &[f32], window: usize) -> &[f32] {
     let tail_start = samples.len().saturating_sub(window);
     &samples[tail_start..]
@@ -371,4 +365,67 @@ pub(super) fn device_summary_line_in(
         t("common.peak"),
         summary_value(summary.maximum, unit, mode),
     ))
+}
+
+/// The glyph for an explicit recording-downtime gap under the selected
+/// repertoire. Both repertoires pick a character outside their own ramp so a
+/// gap can never read as a real level; the ASCII underline mirrors the shared
+/// sparkline's ASCII gap. (The Unicode gap stays the renderer-local space —
+/// deliberately narrower than the device trends' mid-dot, because this trend
+/// renders inside a table text column.)
+const fn history_trend_gap(mode: TuiGlyphMode) -> char {
+    match mode {
+        TuiGlyphMode::Unicode => ' ',
+        TuiGlyphMode::Ascii => '_',
+    }
+}
+
+/// The ramp character for one clamped normalized level (index always 0..=7)
+/// under the selected glyph repertoire. Both repertoires index the shared
+/// `sparkline` component's published ramps (`
+/// SPARKLINE_BLOCKS` / `SPARKLINE_ASCII_BLOCKS`) — the
+/// one ladder single-source — so the app-history trend and the device trends
+/// carry the same level at the same index by construction.
+const fn history_trend_block(mode: TuiGlyphMode, index: usize) -> char {
+    match mode {
+        TuiGlyphMode::Unicode => SPARKLINE_BLOCKS[index],
+        TuiGlyphMode::Ascii => SPARKLINE_ASCII_BLOCKS[index],
+    }
+}
+
+/// Project a bounded envelope of the complete persisted history window
+/// (oldest→newest, `NaN` = a recording-downtime gap) onto a single-line trend
+/// in the given terminal glyph repertoire. Min/max normalization uses the
+/// finite samples only, so downtime gaps never flatten the shape, and a window
+/// without a single finite sample renders the honest "collecting" text instead
+/// of a fabricated trend. The Unicode repertoire keeps the historical block
+/// ramp byte for byte; the ASCII repertoire paints the same normalized levels
+/// through the shared [`SPARKLINE_ASCII_BLOCKS`] ladder at
+/// paint time, so an ASCII-only
+/// terminal reads a monotonic gradient straight from the renderer instead of
+/// the collapsed output of the post-paint cell rewrite.
+pub(super) fn history_trend_in(mode: TuiGlyphMode, samples: &[f32]) -> String {
+    let bounded = gap_preserving_envelope(samples, SPARKLINE_MAX_SAMPLES);
+    let samples = bounded.as_slice();
+    let finite = samples.iter().copied().filter(|sample| sample.is_finite());
+    let min = finite.clone().fold(f32::INFINITY, f32::min);
+    let max = finite.fold(f32::NEG_INFINITY, f32::max);
+    if !min.is_finite() || !max.is_finite() {
+        return t("history.application.collecting").to_owned();
+    }
+    let range = max - min;
+    samples
+        .iter()
+        .map(|sample| {
+            if !sample.is_finite() {
+                return history_trend_gap(mode);
+            }
+            let normalized = if range > 0.0 {
+                ((*sample - min) / range).clamp(0.0, 1.0)
+            } else {
+                0.5
+            };
+            history_trend_block(mode, ((normalized * 7.0).round() as usize).min(7))
+        })
+        .collect()
 }

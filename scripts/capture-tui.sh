@@ -353,6 +353,16 @@ start_capture_host() {
 
 start_capture_host || exit 1
 
+case "$CAPTURE_SCENE" in
+  history-replay|application-history-replay)
+    mkdir -p "$RUNTIME_DIR/config/taskmanager"
+    printf '{"history_persistence":true}\n' >"$RUNTIME_DIR/config/taskmanager/config.json"
+    history_kind=system
+    [ "$CAPTURE_SCENE" != application-history-replay ] || history_kind=application
+    timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$RUNTIME_DIR/data/taskmanager/history" --kind "$history_kind"
+    ;;
+esac
+
 # Software GL keeps the nested capture reliable: on hosts whose GPU context
 # is degraded (KWin "atomic commit failed" storms), EGL initialization hangs
 # and windows never map or present. llvmpipe renders the same frame; pixel

@@ -31,9 +31,15 @@ pub(crate) struct FrameChromeLayout {
 
 /// Resolve the terminal frame's outer chrome once for the current area.
 #[must_use]
-pub(crate) fn frame_chrome_layout(area: Rect) -> FrameChromeLayout {
+pub(crate) fn frame_chrome_layout(area: Rect, page: FrameChromePage) -> FrameChromeLayout {
     let [header, body, footer] = Layout::vertical([
-        Constraint::Length(4),
+        Constraint::Length(
+            if area.height < 20 && page == FrameChromePage::HistoryReview {
+                2
+            } else {
+                4
+            },
+        ),
         Constraint::Min(8),
         Constraint::Length(3),
     ])
@@ -43,6 +49,12 @@ pub(crate) fn frame_chrome_layout(area: Rect) -> FrameChromeLayout {
         body,
         footer,
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FrameChromePage {
+    Standard,
+    HistoryReview,
 }
 
 /// Resolve the shared centered popup geometry.  Every local/shared surface
@@ -469,10 +481,23 @@ pub(crate) struct TuiFramePlan {
 impl TuiFramePlan {
     #[must_use]
     pub(crate) fn build(app: &TuiApp, area: Rect) -> Self {
-        let chrome = frame_chrome_layout(area);
+        let chrome = frame_chrome_layout(
+            area,
+            if app.page() == AppPage::AppHistory
+                || (app.page() == AppPage::Performance && app.history_replay_open())
+            {
+                FrameChromePage::HistoryReview
+            } else {
+                FrameChromePage::Standard
+            },
+        );
         let body = chrome.body;
         let input_scope = app.input_scope();
         let page = match app.page() {
+            AppPage::Performance if app.history_replay_open() => TuiPageLayout::Performance {
+                selector: Rect::ZERO,
+                content: body,
+            },
             AppPage::Performance => {
                 let [selector, content] =
                     Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(body);

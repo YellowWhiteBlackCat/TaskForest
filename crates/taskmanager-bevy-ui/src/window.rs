@@ -28,7 +28,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use bevy::DefaultPlugins;
-use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup, Update};
+use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup};
 use bevy::asset::{Assets, Handle};
 use bevy::camera::{Camera2d, ClearColor};
 use bevy::ecs::component::Component;
@@ -39,6 +39,7 @@ use bevy::ecs::query::{Changed, Has, Or, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::world::World;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
@@ -64,9 +65,7 @@ use crate::demo_fixture::{
 };
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
-use crate::pages::performance::{
-    PerformanceHistoryReplay, PerformanceLayoutState, sync_performance_layout,
-};
+use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
 use crate::pages::processes::columns_modal::ProcessColumnsModalState;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette, space_8, space_12};
@@ -76,7 +75,6 @@ use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::ShellApp;
 
@@ -134,7 +132,11 @@ pub(crate) struct AppShellRoot;
 pub(crate) struct DemoMode;
 
 #[derive(Resource, Default)]
-struct CaptureMarkerState(bool);
+struct CaptureMarkerState {
+    emitted: bool,
+    history_open_requested: bool,
+    data_presented: bool,
+}
 
 /// Build and run the live windowed frontend to completion.
 pub(crate) fn run(shared: &'static SharedRuntime) -> ExitCode {
@@ -266,21 +268,28 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         runtime: shared,
         palette,
     });
+    let history_capture = demo
+        && capture_scenario_target().is_some_and(|target| {
+            matches!(target, "history-replay" | "application-history-replay")
+        });
+    if !demo || history_capture {
+        app.insert_non_send(production_history_runtime());
+        app.add_systems(
+            PreUpdate,
+            crate::pages::history::drain_history_system.before(crate::drain::drain_system),
+        );
+    }
     if !demo {
         app.add_systems(
             Startup,
             crate::pages::settings::restore_persisted_preferences,
         );
-        app.insert_non_send(production_history_runtime());
         if let Ok(client) = NativeAppHost::production().diagnostic_bundle_client() {
             app.world_mut()
                 .resource_mut::<DiagnosticRuntime>()
                 .install(client);
         }
-        app.add_systems(
-            PreUpdate,
-            crate::pages::history::drain_history_system.before(crate::drain::drain_system),
-        );
+
         let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
         app.insert_resource(crate::tray::TrayResource::new(tray_controller, tray_rx));
     } else {
@@ -291,7 +300,10 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     }
     if demo {
         app.init_resource::<CaptureMarkerState>();
-        app.add_systems(Update, emit_capture_marker);
+        app.add_systems(
+            PostUpdate,
+            emit_capture_marker.after(crate::pages::performance::replay::paint_charts),
+        );
     }
     match app.run() {
         AppExit::Success => ExitCode::SUCCESS,
@@ -299,23 +311,73 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     }
 }
 
-fn emit_capture_marker(
-    route: Res<Route>,
-    contents: Query<&crate::app::PageContent>,
-    mut marker: ResMut<CaptureMarkerState>,
-) {
-    if marker.0 || contents.iter().all(|content| content.page != route.page) {
+fn emit_capture_marker(world: &mut World) {
+    let route = world.resource::<Route>().page;
+    if world.resource::<CaptureMarkerState>().emitted
+        || world
+            .query::<&crate::app::PageContent>()
+            .iter(world)
+            .all(|content| content.page != route)
+    {
         return;
     }
-    let page = capture_page_name(route.page);
+    match capture_scenario_target() {
+        Some("history-replay") => {
+            use crate::pages::history::control::{
+                HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
+            };
+            if !world
+                .resource::<CaptureMarkerState>()
+                .history_open_requested
+                && world
+                    .non_send::<crate::pages::history::HistoryRuntime>()
+                    .available()
+            {
+                world
+                    .resource_mut::<CaptureMarkerState>()
+                    .history_open_requested = true;
+                world.trigger(HistoryCommand::OpenPerformance);
+            }
+            if *world.resource::<PerformancePresentation>() != PerformancePresentation::Replay
+                || world
+                    .resource::<PerformanceHistoryProjectionResource>()
+                    .0
+                    .rows
+                    .is_empty()
+                || !crate::pages::performance::replay::charts_presented(world)
+            {
+                return;
+            }
+        }
+        Some("application-history-replay")
+            if world
+                .resource::<HistoryProjectionResource>()
+                .0
+                .rows
+                .is_empty() =>
+        {
+            return;
+        }
+        _ => {}
+    }
+    if matches!(
+        capture_scenario_target(),
+        Some("history-replay" | "application-history-replay")
+    ) && !world.resource::<CaptureMarkerState>().data_presented
+    {
+        world.resource_mut::<CaptureMarkerState>().data_presented = true;
+        return;
+    }
+    let page = capture_page_name(route);
     println!("BEVY_CAPTURE_MARKER event=frame_ready mode=demo page={page}");
     println!("BEVY_CAPTURE_MARKER event=target_ready mode=demo page={page}");
-    marker.0 = true;
+    world.resource_mut::<CaptureMarkerState>().emitted = true;
 }
 
 /// Compose the history connector at the native edge. The config preference is
 /// read once at startup through the bounded app-host client; disabled history
-/// does not launch a writer, replay worker, or frontend connector.
+/// does not launch a writer or replay worker. The inert connector permits a
+/// later canonical Settings change to enable persistence without restarting.
 fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
     let host = NativeAppHost::production();
     let enabled = host
@@ -330,9 +392,7 @@ fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
         .unwrap_or(false);
     let mut runtime = crate::pages::history::HistoryRuntime::default();
     runtime.request(enabled);
-    if enabled {
-        runtime.install_connector(host.history_frontend_connector());
-    }
+    runtime.install_connector(host.history_frontend_connector());
     runtime
 }
 
@@ -370,19 +430,14 @@ impl Plugin for FrontendWindowPlugin {
         if std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|v| v.trim() == "sidebar-hidden") {
             app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
         }
-        app.init_resource::<PerformanceHistoryReplay>();
-        if let Some(target) = capture_scenario_target() {
-            if target == "history-replay" || target == "history-60m" {
-                app.insert_resource(PerformanceHistoryReplay {
-                    open: true,
-                    playing: false,
-                    window: HistoryWindow::OneHour,
-                });
-            } else if target == "saved-view-presets" {
-                let mut col_state = ProcessColumnsModalState::default();
-                col_state.open();
-                app.insert_resource(col_state);
-            }
+        crate::pages::history::control::register(app);
+        crate::pages::performance::replay::register(app);
+        if let Some(target) = capture_scenario_target()
+            && target == "saved-view-presets"
+        {
+            let mut col_state = ProcessColumnsModalState::default();
+            col_state.open();
+            app.insert_resource(col_state);
         }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while

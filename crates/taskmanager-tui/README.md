@@ -38,6 +38,14 @@ Graphics & accelerators section with identity, driver, aggregate utilization, ev
 engine utilization and dedicated/shared memory; unavailable observations remain dashes and no
 NPU history is invented.
 
+Persistent review uses the application controller and app-host query worker.
+Performance exposes `r` to enter/leave review, `1`/`2`/`3` to select windows and
+`f` to refresh. Application History shares that reader and refresh command;
+compact terminals admit complete metric cards. `ui/pinned_actions.rs` reserves
+wrapped controls and a bottom safety row. `runtime/keys/direct.rs` executes the
+local registry and its reader-availability guards. History preference changes reconnect
+through the native connector; renderers never seed replay rows.
+
 Optional native setup is observed quietly at live startup. When a descriptor is available,
 Settings exposes F2 to review it. View/Run/Revert/Restart use the shared application controller;
 only the descriptor body scrolls, and wrapped action hints keep Close reachable in compact terminals.
