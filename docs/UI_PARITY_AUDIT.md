@@ -4,13 +4,13 @@
 
 ## 场景全景审计与当前状态
 
-状态标记：`Aligned`（已建立对应场景与截屏验证）、`Pending`（处于待对齐推进状态）。
+状态标记：`Aligned`（正常入口、状态机、行为测试、矩阵与当前截图均已验证）、`Pending`（处于待对齐推进状态）。
 
 | 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI |
 |---|---|---|:---:|:---:|:---:|
-| 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Aligned | Aligned |
+| 基础与系统 | `about` | 关于系统与版本模态框 | Aligned | Pending | Aligned |
 | | `system-about` | 系统关于面板展开 | Aligned | Aligned | Aligned |
-| | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
+| | `first-run` | 首次运行系统引导配置 | Aligned | Pending | Pending |
 | | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
 | | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |
 | | `system-npu` | NPU 神经网络遥测明细 | Aligned | Aligned | Aligned |
@@ -48,9 +48,9 @@
 | | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Aligned | Aligned |
 | | `saved-view-presets` | 自定义列宽与视图预设切换 | Aligned | Aligned | Aligned |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
-| 历史数据回放 | `history-replay` | 性能指标时间轴历史回放控制条 | Aligned | Aligned | Aligned |
-| | `history-60m` | 60 分钟跨度全局历史趋势图 | Aligned | Aligned | Aligned |
-| | `application-history-replay` | 进程级 CPU/内存历史回溯展开 | Aligned | Aligned | Aligned |
+| 历史数据回放 | `history-replay` | 性能指标时间轴历史回放控制条 | Aligned | Pending | Pending |
+| | `history-60m` | 60 分钟跨度全局历史趋势图 | Aligned | Pending | Pending |
+| | `application-history-replay` | 进程级 CPU/内存历史回溯展开 | Aligned | Pending | Aligned |
 | 交互与显示形态 | `apps-search-highlight` | 进程搜索关键字高亮与命中过滤 | Aligned | Aligned | Aligned |
 | | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Aligned | Aligned |
 | | `apps-identity-matrix` | 进程身份校验与伪装报警状态 | Aligned | Aligned | Aligned |
