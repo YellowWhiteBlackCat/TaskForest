@@ -24,7 +24,7 @@
 //!   kernel intentionally does NOT keep each bucket's edge samples. A bucket
 //!   with no finite value stays an explicit `NaN` gap.
 //!
-//! - [`gap_preserving_envelope`] — coarse review cells keep any unavailable
+//! - [`crate::history_decimation::gap_preserving_envelope`] — coarse review cells keep any unavailable
 //!   interval visible; complete cells retain their maximum.
 //!
 //! # Degenerate budgets (adjudicated: never erase)
