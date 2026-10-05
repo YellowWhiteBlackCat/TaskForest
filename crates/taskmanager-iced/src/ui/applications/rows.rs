@@ -124,6 +124,7 @@ fn tree_node_row(
     let mut elements: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
         iced::widget::container(name_row)
             .width(Length::Fixed(ctx.resolved_column_width(SortCol::Name)))
+            .clip(true)
             .into(),
         text_cell(ctx, cells.user.clone(), SortCol::User),
         text_cell(ctx, cells.pid.clone(), SortCol::Pid),
@@ -341,6 +342,7 @@ fn column_cell(
     column: SortCol,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     container(cell)
+        .clip(true)
         .width(Length::Fixed(ctx.resolved_column_width(column)))
         .align_x(column_alignment(column))
         .into()
@@ -454,14 +456,17 @@ fn group_header_row(
     // boundary aligned with the member rows beneath it.
     let identity_width = ctx.resolved_column_width(SortCol::Name);
     let mut cells: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
-        iced::widget::row![
-            text(marker).size(f32::from(tokens::FONT_12)),
-            text(name.clone()).size(f32::from(tokens::FONT_14)),
-            text(format!("x{member_count}")).size(f32::from(tokens::FONT_12)),
-        ]
-        .spacing(6)
-        .align_y(iced::Alignment::Center)
+        iced::widget::container(
+            iced::widget::row![
+                text(marker).size(f32::from(tokens::FONT_12)),
+                text(name.clone()).size(f32::from(tokens::FONT_14)),
+                text(format!("x{member_count}")).size(f32::from(tokens::FONT_12)),
+            ]
+            .spacing(6)
+            .align_y(iced::Alignment::Center),
+        )
         .width(Length::Fixed(identity_width))
+        .clip(true)
         .into(),
         text_cell(ctx, user.clone(), SortCol::User),
         text_cell(ctx, "—".to_string(), SortCol::Pid),

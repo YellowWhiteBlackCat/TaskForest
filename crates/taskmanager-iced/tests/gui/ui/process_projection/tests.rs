@@ -258,3 +258,29 @@ fn shared_application_rows_sort_disk_columns_by_typed_group_metrics() {
     });
     assert_eq!(write_root, Some(1));
 }
+
+#[test]
+fn structural_category_metadata_does_not_borrow_an_arbitrary_member() {
+    let mut first = proc(20, "first", None);
+    first.status = "Running".into();
+    let mut second = proc(10, "second", None);
+    second.status = "Idle".into();
+    let projection = project(&[first, second], &HashSet::new(), &HashSet::new());
+    let ProjectedRow::GroupHeader {
+        user,
+        status,
+        nice,
+        start_time_secs,
+        start_clock,
+        member_count,
+        ..
+    } = &projection.rows()[0]
+    else {
+        panic!("category");
+    };
+    assert_eq!(*member_count, 2);
+    assert_eq!(user, MISSING_VALUE);
+    assert_eq!(status, MISSING_VALUE);
+    assert!(nice.is_none() && start_time_secs.is_none());
+    assert_eq!(start_clock, MISSING_VALUE);
+}
