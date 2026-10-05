@@ -20,6 +20,25 @@ Wayland/X11、安装方式。TaskForest 是跨平台系统监视器，环境差�
 - 测试一律使用 `cargo nextest ... -j 4`（doctest 仅可使用
   `cargo test --doc ... -j 4`）；quick 门禁会机械拒绝其他形式。
 
+开发与测试默认保留回溯行号，关闭增量缓存；共用仓库 `target/`，避免为每项任务创建
+独立构建目录。日常先检查受影响的 crate，只有需要执行测试或调试时才链接二进制：
+
+```bash
+eval "$(scripts/agent-workdir.sh enter local-check)"
+cargo check --locked -p taskmanager-tui --all-targets -j 4
+cargo nextest run --locked -p taskmanager-tui --lib -j 4 -E 'test(process_properties)'
+```
+
+需要查看调试器中的变量和类型时，针对所调试的产品单次开启完整符号，例如
+`CARGO_PROFILE_DEV_DEBUG=2 cargo build --locked -p taskmanager-tui -j 4`；测试二进制
+使用 `CARGO_PROFILE_TEST_DEBUG=2 cargo nextest run --locked -p taskmanager-tui -j 4`。
+符号设置变化会重建相关依赖，避免在日常验证中反复切换。完整符号仅按需保留，必要时
+用 `cargo clean --profile dev` 清理开发产物。
+
+真实截图验收按二进制 SHA-256 保存不可变副本，同一二进制的各次运行使用硬链接，
+不重复占用二进制空间。旧截图和回执归档到 `.private/` 时应注明其证据状态；删去
+运行二进制后，归档仅供追溯，当前源码验收须重新运行。
+
 ## 本地门禁
 
 提交前至少运行：

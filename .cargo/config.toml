@@ -13,6 +13,11 @@
 # it to every Rust project on that machine, so CI and other machines keep
 # plain rustc. See the "Compile affinity" section of AGENTS.md.
 
+[build]
+jobs = 4
+# Match the local gate's warning flags so ordinary builds reuse its artifacts.
+rustflags = ["-D", "warnings"]
+
 # ADR-051: each frontend is its own product crate. Address a product by
 # package locally (`-p`) instead of re-selecting features — these aliases are
 # the convenience spelling. With four independent toolchains, a workspace-wide

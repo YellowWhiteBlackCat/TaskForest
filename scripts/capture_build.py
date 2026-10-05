@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serialize capture builds and copy one immutable binary into a run root."""
+"""Serialize capture builds and share immutable binaries by content digest."""
 
 from __future__ import annotations
 
@@ -39,10 +39,33 @@ def copy_immutable(source: Path, destination: Path) -> None:
             shutil.copyfileobj(input_file, output, length=1024 * 1024)
             output.flush()
             os.fsync(output.fileno())
-        os.chmod(temporary, 0o755)
+        os.chmod(temporary, 0o555)
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def share_immutable(source: Path, destination: Path, cache: Path) -> str:
+    """Snapshot Cargo output once; run links never point at mutable build output."""
+    digest = sha256(source)
+    artifact = cache / digest
+    if not artifact.exists():
+        copy_immutable(source, artifact)
+    if sha256(artifact) != digest:
+        raise BuildError("capture binary cache digest mismatch")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", dir=destination.parent
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        temporary.unlink()
+        os.link(artifact, temporary)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return digest
 
 
 def build(repo_root: Path, source: Path, destination: Path, command: list[str]) -> str:
@@ -53,6 +76,8 @@ def build(repo_root: Path, source: Path, destination: Path, command: list[str]) 
     destination = destination.resolve()
     if not source.is_relative_to(target_root):
         raise BuildError(f"capture build source is outside target: {source}")
+    if not destination.is_relative_to(target_root) or destination == source:
+        raise BuildError("capture binary destination must be separate from build output inside target")
     run_root = destination.parent.parent
     if not destination.is_relative_to(run_root) or not run_root.name:
         raise BuildError(f"invalid run-owned binary destination: {destination}")
@@ -64,9 +89,9 @@ def build(repo_root: Path, source: Path, destination: Path, command: list[str]) 
         result = subprocess.run(command, cwd=repo_root, check=False, timeout=1200)
         if result.returncode != 0:
             raise BuildError(f"cargo capture build failed with status {result.returncode}")
-        copy_immutable(source, destination)
+        digest = share_immutable(source, destination, lock_root / "binaries")
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-    return sha256(destination)
+    return digest
 
 
 def main(argv: list[str]) -> int:
@@ -89,6 +114,28 @@ def main(argv: list[str]) -> int:
             digest = build(root, source, destination, ["true"])
             if destination.read_bytes() != source.read_bytes() or digest != sha256(destination):
                 raise BuildError("self-test immutable copy mismatch")
+            second = destination.parent.parent.parent / "second" / "bin" / "taskforest-g"
+            build(root, source, second, ["true"])
+            if not os.path.samefile(destination, second) or os.path.samefile(source, second):
+                raise BuildError("self-test did not share a separate immutable snapshot")
+            source.write_bytes(b"new-cargo-build")
+            third = destination.parent.parent.parent / "third" / "bin" / "taskforest-g"
+            newer_digest = build(root, source, third, ["true"])
+            if sha256(destination) != digest or newer_digest == digest:
+                raise BuildError("self-test rebuild changed a previous run")
+            artifact = root / "target" / "capture-runs" / "binaries" / digest
+            artifact.unlink()
+            if sha256(second) != digest:
+                raise BuildError("self-test cache removal damaged a run link")
+            artifact = artifact.with_name(newer_digest)
+            artifact.chmod(0o755)
+            artifact.write_bytes(b"corrupt-cache")
+            try:
+                build(root, source, third, ["true"])
+            except BuildError:
+                pass
+            else:
+                raise BuildError("self-test accepted a corrupted binary cache")
         print("capture build self-test: PASS")
         return 0
     required = (args.repo_root, args.source, args.destination)

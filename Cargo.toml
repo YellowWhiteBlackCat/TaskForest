@@ -73,6 +73,12 @@ taskmanager-test-support = { path = "crates/taskmanager-test-support" }
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 taskmanager-platform-linux = { path = "crates/taskmanager-platform-linux", default-features = false, features = ["test-support"] }
 
+# Tests inherit dev: retain backtrace locations without full DWARF or a growing
+# incremental graph. Full variable/type debugging is an explicit local override.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

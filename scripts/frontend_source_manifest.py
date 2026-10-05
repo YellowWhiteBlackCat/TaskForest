@@ -75,6 +75,9 @@ FRONTEND_SCRIPTS = {
     ),
 }
 ROOT_FILES = (
+    "Cargo.toml",
+    "Cargo.lock",
+    ".cargo/config.toml",
     "locales/en.json",
     "locales/zh.json",
     "scripts/capture_history_fixtures.py",
