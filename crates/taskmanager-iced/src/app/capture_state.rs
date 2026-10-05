@@ -52,6 +52,7 @@ pub(super) enum CaptureDataTarget {
     ActiveAlerts,
     AlertRules,
     SidebarEditor,
+    SavedViews,
     Battery,
     Smart(&'static str),
     Focus,
@@ -99,6 +100,7 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "smart-missing-tool" => CaptureDataTarget::Smart("smart-missing-tool"),
         "smart-permission" => CaptureDataTarget::Smart("smart-permission"),
         "sidebar-edit" => CaptureDataTarget::SidebarEditor,
+        "saved-view-presets" => CaptureDataTarget::SavedViews,
         "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" => {
             CaptureDataTarget::Focus
         }
@@ -311,7 +313,8 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         }
     } else if target == "saved-view-presets" {
         app.shell.application.active_page = AppPage::Applications;
-        app.open_process_columns_menu();
+        let _ = app.update(Message::OpenSavedViews);
+        let _ = app.update(Message::SaveCurrentProcessView);
     } else if target == "keyboard-focus" || target == "vertical-nav" {
         app.shell.application.active_page = AppPage::Applications;
         if target == "keyboard-focus" {

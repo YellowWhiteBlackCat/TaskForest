@@ -105,6 +105,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::UserRowMenuClose => "iced-user-row-menu-close".to_owned(),
         FocusTarget::SettingsTrigger => "iced-settings-trigger".to_owned(),
         FocusTarget::SidebarEditTrigger => "iced-sidebar-edit-trigger".to_owned(),
+        FocusTarget::SavedViewsTrigger => "iced-saved-views-trigger".to_owned(),
+        FocusTarget::SavedViewRemove(id) => format!("iced-saved-view-remove-{id}"),
         FocusTarget::SidebarDeviceControl { index, action } => {
             format!("iced-sidebar-device-{index}-{action}")
         }

@@ -7,6 +7,7 @@ use taskmanager_core::core::alerts::AlertEvent;
 use taskmanager_core::core::alerts::AlertEventKind;
 use taskmanager_core::core::alerts::AlertMetric;
 use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_shell::saved_views::SavedViewTransferFeedback;
 
 #[test]
 fn test_saved_views_presets_lifecycle() {
@@ -41,7 +42,7 @@ fn test_saved_views_presets_lifecycle() {
     let _ = app.update(Message::ExportSavedViews);
     assert_eq!(
         app.saved_view_feedback,
-        Some(crate::saved_views::SavedViewTransferFeedback::ExportCopied)
+        Some(SavedViewTransferFeedback::ExportCopied)
     );
 
     // Delete the custom preset

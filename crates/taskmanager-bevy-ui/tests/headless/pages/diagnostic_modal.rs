@@ -117,6 +117,7 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
     use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
     for kind in [
         WindowSurfaceKind::SidebarDevices,
+        WindowSurfaceKind::SavedViews,
         WindowSurfaceKind::Diagnostic,
         WindowSurfaceKind::FirstRun,
         WindowSurfaceKind::About,
@@ -161,6 +162,9 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
             app.update();
             app.world_mut().non_send_mut::<FrontendTrack>().shell = fixture::demo_app();
             match kind {
+                WindowSurfaceKind::SavedViews => app
+                    .world_mut()
+                    .trigger(crate::window_surface::WindowSurfaceCommand::SavedViews),
                 WindowSurfaceKind::SidebarDevices => app
                     .world_mut()
                     .trigger(crate::window_surface::WindowSurfaceCommand::SidebarDevices),
@@ -227,6 +231,8 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
                     5
                 } else if kind == WindowSurfaceKind::SystemInformation {
                     3
+                } else if kind == WindowSurfaceKind::SavedViews {
+                    4
                 } else if kind == WindowSurfaceKind::SidebarDevices {
                     1
                 } else {

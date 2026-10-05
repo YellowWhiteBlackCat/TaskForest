@@ -31,7 +31,11 @@ pub(super) fn settings_footer(
         Style::new().fg(theme.accent),
     ))];
     lines.push(Line::from(Span::styled(
-        format!("F3 {}", t("sidebar.edit_devices")),
+        format!(
+            "F3 {} · F4 {}",
+            t("sidebar.devices"),
+            t("saved_views.title")
+        ),
         Style::new().fg(theme.accent),
     )));
     if setup_available {

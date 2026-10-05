@@ -32,6 +32,7 @@ pub mod keys;
 pub mod memory;
 pub mod presentation;
 pub mod process_filter;
+pub mod saved_views;
 pub mod system_timeline;
 pub mod viewmodel;
 

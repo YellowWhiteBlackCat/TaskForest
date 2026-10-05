@@ -15,6 +15,7 @@ use crate::app::Message;
 use iced::Size;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortCol;
+use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_theme::Theme;
 
 fn frame(width: f32, height: f32) -> Size {
@@ -510,14 +511,14 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
     // breaking into multiple vertical lines that consume the process table viewport.
     let theme = Theme::dark();
     let presets = vec![
-        crate::saved_views::SavedViewPreset::built_in(
+        SavedViewPreset::built_in(
             1,
             "saved_views.preset_default",
             ProcessStatusFilter::All,
             SortCol::Cpu,
             false,
         ),
-        crate::saved_views::SavedViewPreset::built_in(
+        SavedViewPreset::built_in(
             2,
             "saved_views.preset_running",
             ProcessStatusFilter::Running,

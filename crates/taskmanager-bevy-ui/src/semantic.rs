@@ -165,6 +165,11 @@ pub(crate) fn build_snapshot(
         });
     } else if let Some(surface) = surface {
         let (id, name, description) = match surface {
+            WindowSurface::SavedViews => (
+                "saved-views",
+                t("saved_views.title"),
+                t("saved_views.help").to_owned(),
+            ),
             WindowSurface::SidebarDevices => (
                 "sidebar-devices",
                 "Edit devices",

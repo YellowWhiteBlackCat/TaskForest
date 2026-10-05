@@ -41,6 +41,7 @@ pub(crate) mod process_details;
 pub(crate) mod process_menu;
 pub(crate) mod process_properties;
 mod process_table;
+mod saved_views;
 pub(crate) mod service_dependencies_modal;
 pub(crate) mod service_menu;
 pub(crate) mod session_menu;
@@ -205,6 +206,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             }
             Some(crate::TuiSurface::SidebarEditor { .. }) => {
                 sidebar_editor::render(frame, app, theme, popup);
+            }
+            Some(crate::TuiSurface::SavedViews { .. }) => {
+                saved_views::render(frame, app, theme, popup)
             }
             Some(crate::TuiSurface::About(view)) => {
                 about::render_about_overlay_at(frame, app, view, theme, popup);

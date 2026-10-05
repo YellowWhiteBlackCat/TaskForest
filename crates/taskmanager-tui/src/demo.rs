@@ -636,7 +636,21 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.open_first_run();
         }
         "saved-view-presets" => {
-            app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });
+            prepare_capture_settings(app, 0, false);
+            let _ = crate::runtime::handle_key(
+                app,
+                ratatui::crossterm::event::KeyEvent::new(
+                    ratatui::crossterm::event::KeyCode::F(4),
+                    ratatui::crossterm::event::KeyModifiers::NONE,
+                ),
+            );
+            let _ = crate::runtime::handle_key(
+                app,
+                ratatui::crossterm::event::KeyEvent::new(
+                    ratatui::crossterm::event::KeyCode::F(2),
+                    ratatui::crossterm::event::KeyModifiers::NONE,
+                ),
+            );
         }
         "sidebar-edit" => {
             prepare_capture_settings(app, 9, false);

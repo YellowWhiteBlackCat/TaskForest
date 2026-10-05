@@ -160,6 +160,7 @@ impl TuiApp {
     }
 
     fn apply_config_snapshot(&mut self, config: &Config, startup: bool, update_form: bool) {
+        self.restore_saved_views_config(config);
         self.theme_params = ThemeParams::from_config_tokens_with_appearance(
             &config.skin,
             &config.mode,

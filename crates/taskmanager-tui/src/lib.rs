@@ -40,6 +40,7 @@ mod menus;
 mod preferences;
 mod process_view;
 mod runtime;
+mod saved_views;
 mod selection;
 mod selectors;
 pub(crate) mod service_log;
@@ -183,6 +184,7 @@ pub struct TuiApp {
     /// digit-key handler in `runtime::handle_key`.
     pub perf_device: PerfDevice,
     pub(crate) performance_device_key: Option<String>,
+    pub(crate) saved_views: saved_views::SavedViewsState,
     /// Frontend-local vertical-scroll intent for the inline selected-process
     /// detail/insights panel on the Applications page. The panel content (frozen
     /// identity rows + the bounded ProcessInsights cards) can exceed the fixed
@@ -350,6 +352,7 @@ impl TuiApp {
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
             performance_device_key: None,
+            saved_views: saved_views::SavedViewsState::default(),
             detail_scroll: 0,
             cpu_core_scroll: 0,
             cpu_detail_scroll: 0,

@@ -32,6 +32,7 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 pub(super) struct CaptureAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     window_surface: Res<'w, WindowSurfaceState>,
+    saved_views: Res<'w, crate::saved_views::SavedViewsState>,
     system_state: Res<'w, SystemDashboardState>,
     device_focus: Res<'w, PerformanceDeviceFocus>,
     device_categories: Query<'w, 's, (&'static DeviceViewCategory, &'static ComputedNode)>,
@@ -148,6 +149,36 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
+        Some("saved-view-presets") => {
+            if !matches!(access.window_surface.0, Some(WindowSurface::SavedViews))
+                || !access
+                    .saved_views
+                    .rows
+                    .iter()
+                    .any(|row| row.is_user_saved())
+                || ![
+                    "saved_views.title",
+                    "saved_views.save_current",
+                    "common.apply",
+                    "common.remove",
+                    "common.export",
+                    "common.import",
+                    "common.close",
+                ]
+                .iter()
+                .all(|key| {
+                    access.text.iter().any(|(text, node)| {
+                        text.0 == t(key) && node.size().x > 0.0 && node.size().y > 0.0
+                    })
+                })
+            {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
         Some("sidebar-edit") => {
             if !matches!(access.window_surface.0, Some(WindowSurface::SidebarDevices))
                 || !["Edit devices", "Hide", "Move up", "Move down", "Done"]

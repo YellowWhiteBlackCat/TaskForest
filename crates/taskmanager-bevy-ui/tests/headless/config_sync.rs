@@ -417,3 +417,6 @@ fn sidebar_native_controls_persist_specific_choices_and_order() {
     drop(coordinator);
     let _ = std::fs::remove_dir_all(path.parent().expect("config directory"));
 }
+
+#[path = "saved_views_config.rs"]
+mod saved_views_config;

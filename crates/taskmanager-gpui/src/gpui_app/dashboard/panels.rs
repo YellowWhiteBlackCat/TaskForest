@@ -24,8 +24,10 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 
-use super::saved_view_transfer::{
-    SavedViewTransferFeedback, export_saved_views_json, import_saved_views_json,
+use taskmanager_shell::saved_views::feedback_text;
+use taskmanager_shell::saved_views::{
+    SavedViewPreset, SavedViewTransferFeedback, export_saved_views_json, import_saved_views_json,
+    review_rows, save_current_view,
 };
 
 mod alerts;
@@ -259,7 +261,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_7));
-    for preset in &state.saved_views {
+    for preset in review_rows(&state.saved_views) {
         let apply = entity.clone();
         let remove = entity.clone();
         let preset_for_apply = preset.clone();
@@ -368,12 +370,27 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                     move |_window, cx| {
                         save.update(cx, |view, cx| {
                             let (sort_col, sort_dir) = view.process_sort();
-                            view.dashboard.save_current_view(
+                            let preset = SavedViewPreset::restored(
+                                i18n::t("saved_views.custom_name").replace(
+                                    "{index}",
+                                    &view
+                                        .dashboard
+                                        .next_saved_view_id
+                                        .saturating_sub(3)
+                                        .to_string(),
+                                ),
                                 view.process_status_filter(),
                                 sort_col,
                                 matches!(sort_dir, SortDir::Asc),
                                 view.processes_state.hidden_cols.clone(),
                             );
+                            if let Err(error) = save_current_view(
+                                &mut view.dashboard.saved_views,
+                                &mut view.dashboard.next_saved_view_id,
+                                preset,
+                            ) {
+                                view.show_local_feedback(format!("View not saved: {error}"), cx);
+                            }
                             cx.notify();
                         });
                     },
@@ -390,7 +407,11 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                         import.update(cx, |view, cx| {
                             view.dashboard.saved_view_transfer_feedback = Some(match clipboard {
                                 Some(ref json) if !json.trim().is_empty() => {
-                                    match import_saved_views_json(&mut view.dashboard, json) {
+                                    match import_saved_views_json(
+                                        &mut view.dashboard.saved_views,
+                                        &mut view.dashboard.next_saved_view_id,
+                                        json,
+                                    ) {
                                         Ok(summary) => SavedViewTransferFeedback::Imported(summary),
                                         Err(_) => SavedViewTransferFeedback::ImportInvalid,
                                     }
@@ -411,7 +432,7 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                     move |_window, cx| {
                         export.update(cx, |view, cx| {
                             view.dashboard.saved_view_transfer_feedback =
-                                Some(match export_saved_views_json(&view.dashboard) {
+                                Some(match export_saved_views_json(&view.dashboard.saved_views) {
                                     Ok(json) => {
                                         cx.write_to_clipboard(ClipboardItem::new_string(json));
                                         SavedViewTransferFeedback::ExportCopied
@@ -430,26 +451,10 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                 .id("saved-view-transfer-feedback")
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.fg_dim))
-                .child(saved_view_transfer_feedback(feedback)),
+                .child(feedback_text(feedback)),
         );
     }
     content.child(rows)
-}
-
-fn saved_view_transfer_feedback(feedback: SavedViewTransferFeedback) -> String {
-    match feedback {
-        SavedViewTransferFeedback::ExportCopied => i18n::t("hint.copied").to_string(),
-        SavedViewTransferFeedback::ExportFailed => i18n::t("saved_views.export_failed").to_string(),
-        SavedViewTransferFeedback::Imported(summary) => i18n::t("saved_views.import_success")
-            .replace("{count}", &summary.imported.to_string())
-            .replace("{renamed}", &summary.renamed.to_string()),
-        SavedViewTransferFeedback::ClipboardEmpty => {
-            i18n::t("saved_views.clipboard_empty").to_string()
-        }
-        SavedViewTransferFeedback::ImportInvalid => {
-            i18n::t("saved_views.import_invalid").to_string()
-        }
-    }
 }
 
 fn metric_label(metric: AlertMetric) -> &'static str {

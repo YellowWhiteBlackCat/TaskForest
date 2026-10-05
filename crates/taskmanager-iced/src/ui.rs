@@ -65,6 +65,7 @@ mod performance;
 pub(crate) mod process_projection;
 pub(crate) mod process_sparkline;
 pub mod responsive;
+mod saved_views;
 pub(crate) mod service_details;
 mod service_menu;
 mod settings;
@@ -403,6 +404,7 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
     Some(match app.local_surface()? {
         LocalSurface::Settings => settings::render(app),
         LocalSurface::SidebarEditor => sidebar_editor::render(app),
+        LocalSurface::SavedViews => saved_views::render(app),
         LocalSurface::About => about::render(app),
         LocalSurface::SystemInformation(facts) => system_information::render(app, facts),
         LocalSurface::Health => health::render(app),

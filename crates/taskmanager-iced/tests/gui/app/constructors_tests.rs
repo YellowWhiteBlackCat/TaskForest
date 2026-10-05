@@ -450,7 +450,11 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "saved-view-presets");
-    assert!(app.process_columns_menu_open());
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(crate::app::LocalSurfaceKind::SavedViews)
+    );
+    assert!(app.saved_views.iter().any(|row| row.is_user_saved()));
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "battery-fan-performance");

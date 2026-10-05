@@ -275,7 +275,8 @@ fn capture_scene_overrides_activate_expected_state() {
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "saved-view-presets");
-    assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::ColumnMenu));
+    assert_eq!(app.local_surface_kind(), Some(TuiSurfaceKind::SavedViews));
+    assert!(app.saved_views.rows.iter().any(|row| row.is_user_saved()));
 
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "apps-identity-matrix");

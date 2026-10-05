@@ -82,6 +82,14 @@ pub(super) fn initialize_capture_state(
         preferences.gray_zero_values = true;
     }
     commands.trigger(crate::input::ShellInteractionApplied);
+    if capture_scenario_target() == Some("saved-view-presets") {
+        commands.trigger(crate::saved_views::SavedViewCommand(
+            crate::saved_views::SavedViewAction::Open,
+        ));
+        commands.trigger(crate::saved_views::SavedViewCommand(
+            crate::saved_views::SavedViewAction::Save,
+        ));
+    }
     if capture_scenario_target() == Some("sidebar-edit") {
         commands.trigger(WindowSurfaceCommand::SidebarDevices);
     }

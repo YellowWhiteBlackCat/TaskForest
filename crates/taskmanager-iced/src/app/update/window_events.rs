@@ -85,6 +85,9 @@ impl IcedApp {
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
                     let ready = if self.capture.data_target == CaptureDataTarget::Focus {
                         self.capture.focus_presented
+                    } else if self.capture.data_target == CaptureDataTarget::SavedViews {
+                        self.local_surface_kind() == Some(LocalSurfaceKind::SavedViews)
+                            && self.saved_views.iter().any(|preset| preset.is_user_saved())
                     } else if self.capture.data_target == CaptureDataTarget::SidebarEditor {
                         self.local_surface_kind() == Some(LocalSurfaceKind::SidebarEditor)
                             && self

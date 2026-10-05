@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::saved_views::default_built_in_presets;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -94,7 +95,7 @@ impl IcedApp {
                 crate::font_catalog::system(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
-            saved_views: crate::saved_views::default_built_in_presets(),
+            saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),
@@ -166,7 +167,7 @@ impl IcedApp {
                 crate::font_catalog::bundled_only(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
-            saved_views: crate::saved_views::default_built_in_presets(),
+            saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),

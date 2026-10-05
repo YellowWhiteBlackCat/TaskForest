@@ -152,6 +152,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::ApplyProcessAffinity
         | Message::OpenSettings
         | Message::OpenSidebarEditor
+        | Message::OpenSavedViews
         | Message::CloseSettings
         | Message::OpenAbout
         | Message::OpenSystemInformation
@@ -199,6 +200,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::SaveCurrentProcessView
         | Message::ExportSavedViews
         | Message::ImportSavedViews
+        | Message::SavedViewsClipboardRead(_)
         | Message::DeleteSavedView(_)
         | Message::CopyProcessTsv
         | Message::CopyProcessJson

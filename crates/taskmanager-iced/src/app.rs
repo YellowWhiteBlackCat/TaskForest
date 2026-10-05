@@ -20,6 +20,7 @@ use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSe
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::saved_views::{SavedViewPreset, SavedViewTransferFeedback};
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -68,6 +69,7 @@ mod projection;
 mod projection_caches;
 mod refresh;
 mod runtime;
+mod saved_views;
 mod scroll;
 mod selectors;
 mod service_details;
@@ -485,12 +487,14 @@ pub enum Message {
     RequestCurrentWindowCapture,
     /// Apply a saved process view preset.
     ApplySavedView(u64),
+    OpenSavedViews,
     /// Save current Applications view configuration as a custom preset.
     SaveCurrentProcessView,
     /// Export user saved views to JSON on clipboard.
     ExportSavedViews,
     /// Import user saved views from JSON on clipboard.
     ImportSavedViews,
+    SavedViewsClipboardRead(Option<String>),
     /// Delete a user-saved view preset.
     DeleteSavedView(u64),
     /// Toggle performance history replay panel.
@@ -551,9 +555,9 @@ pub struct IcedApp {
     /// Run New Task state.
     pub(crate) run_task: crate::ui::overlays::run_task::RunTaskState,
     /// User process view presets.
-    pub(crate) saved_views: Vec<crate::saved_views::SavedViewPreset>,
+    pub(crate) saved_views: Vec<SavedViewPreset>,
     pub(crate) next_saved_view_id: u64,
-    pub(crate) saved_view_feedback: Option<crate::saved_views::SavedViewTransferFeedback>,
+    pub(crate) saved_view_feedback: Option<SavedViewTransferFeedback>,
     /// Frontend-local Alerts-page route (an Iced-local
     /// route outside the shared `AppPage` set, GPUI Containers-page style).
     pub(crate) alerts_page: alerts::AlertsPageState,

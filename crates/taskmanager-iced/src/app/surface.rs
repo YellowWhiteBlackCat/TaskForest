@@ -21,6 +21,7 @@ use taskmanager_shell::presentation::system_information::SystemInformationGroup;
 pub(crate) enum LocalSurfaceKind {
     Settings,
     SidebarEditor,
+    SavedViews,
     About,
     SystemInformation,
     Health,
@@ -41,6 +42,7 @@ pub(crate) enum LocalSurfaceKind {
 pub(crate) enum LocalSurface {
     Settings,
     SidebarEditor,
+    SavedViews,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     Health,
@@ -67,6 +69,7 @@ impl LocalSurface {
         match self {
             Self::Settings => LocalSurfaceKind::Settings,
             Self::SidebarEditor => LocalSurfaceKind::SidebarEditor,
+            Self::SavedViews => LocalSurfaceKind::SavedViews,
             Self::About => LocalSurfaceKind::About,
             Self::SystemInformation(_) => LocalSurfaceKind::SystemInformation,
             Self::Health => LocalSurfaceKind::Health,

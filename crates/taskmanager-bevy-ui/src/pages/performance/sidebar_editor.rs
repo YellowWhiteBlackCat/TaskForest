@@ -267,6 +267,7 @@ fn activate(
 fn sync_config(
     runtime: Option<Res<SharedRuntimeHandle>>,
     mut state: ResMut<SidebarState>,
+    mut track: Option<NonSendMut<FrontendTrack>>,
     mut commands: Commands,
 ) {
     let Some(runtime) = runtime else {
@@ -276,7 +277,19 @@ fn sync_config(
     let Some(client) = guard.as_mut() else {
         return;
     };
-    let _ = client.drain();
+    let drain = client.drain();
+    if let Some(publication) = drain
+        .latest()
+        .filter(|publication| publication.outcome().is_failure())
+        && let Some(track) = track.as_mut()
+    {
+        track.shell.report_notice(
+            FeedbackSource::Settings,
+            FeedbackSeverity::Error,
+            FeedbackLifecycle::UntilReplaced,
+            format!("Configuration: {:?}", publication.outcome()),
+        );
+    }
     let Some(snapshot) = client.snapshot().cloned() else {
         return;
     };

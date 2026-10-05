@@ -5,6 +5,10 @@
 本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.20 的数据驱动 ECS 架构范式与交互纪律。
 跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
 
+保存视图由应用页原生按钮进入，typed 命令只声明预设资源、shell、列选择、配置与剪贴板。
+共享 shell 模型负责预设身份及转移；配置发布成功后恢复已保存行，失败由状态反馈说明。
+检查面复用单一 modal 预算：标题与完整动作固定，剩余空间只分配给滚动 body，边缘保留 inset。
+
 ## 1. 核心思维：纯数据驱动的 ECS 哲学
 
 - **显式访问范围**：业务 observer/system 使用具体的资源、查询、事件、`Commands` 或

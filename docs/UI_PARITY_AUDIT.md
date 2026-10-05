@@ -46,7 +46,7 @@
 | 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Pending | Pending | Pending |
 | | `alert-rules-manager` | 自定义告警规则配置中心 | Pending | Pending | Pending |
 | | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Aligned | Aligned |
-| | `saved-view-presets` | 自定义列宽与视图预设切换 | Aligned | Aligned | Aligned |
+| | `saved-view-presets` | 保存、应用、删除、JSON 导入导出与跨会话恢复 | Pending | Pending | Pending |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
 | 历史数据回放 | `history-replay` | 性能指标持久化历史窗口与趋势图 | Aligned | Aligned | Aligned |
 | | `history-60m` | 系统仪表盘 60 分钟全局历史趋势图 | Aligned | Aligned | Aligned |

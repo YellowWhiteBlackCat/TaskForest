@@ -158,6 +158,12 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
 
     if let Some(surface) = app.local_surface_kind() {
         let effect = match surface {
+            TuiSurfaceKind::SavedViews => {
+                if let Some(json) = app.handle_saved_views_key(key) {
+                    app.export_saved_views_to(&mut std::io::stdout(), &json);
+                }
+                None
+            }
             TuiSurfaceKind::SidebarEditor => {
                 app.handle_sidebar_key(key);
                 None

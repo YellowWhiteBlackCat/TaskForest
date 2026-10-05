@@ -67,7 +67,6 @@ use crate::capture::{capture_page, capture_scenario_target, capture_window_resol
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
-use crate::pages::processes::columns_modal::ProcessColumnsModalState;
 use crate::pages::settings::ThemePreferences;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette, space_8, space_12};
@@ -300,13 +299,6 @@ impl Plugin for FrontendWindowPlugin {
         }
         crate::pages::history::control::register(app);
         crate::pages::performance::replay::register(app);
-        if let Some(target) = capture_scenario_target()
-            && target == "saved-view-presets"
-        {
-            let mut col_state = ProcessColumnsModalState::default();
-            col_state.open();
-            app.insert_resource(col_state);
-        }
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while
         // headless compositions remain honestly Disabled.
@@ -323,6 +315,7 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
         crate::window_surface::register(app);
+        crate::saved_views::register(app);
         crate::about_modal::register(app);
         crate::system_information_modal::register(app);
         crate::first_run_modal::register(app);

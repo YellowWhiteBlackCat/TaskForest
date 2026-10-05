@@ -893,3 +893,23 @@ fn capture_marker_records_the_typed_demo_frame_identity() {
         "marker must carry the live page the captured frame shows: {text:?}"
     );
 }
+
+#[test]
+fn saved_views_bracketed_paste_is_owned_only_after_native_import_key() {
+    use ratatui::crossterm::event::KeyCode;
+    use taskmanager_shell::saved_views::export_saved_views_json;
+    let mut app = crate::demo_app();
+    app.toggle_settings();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE));
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE));
+    let json = export_saved_views_json(&app.saved_views.rows).expect("payload");
+    apply_terminal_event(&mut app, Event::Paste(json.clone()), TEST_FRAME);
+    assert_eq!(app.saved_views.rows.len(), 4);
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(6), KeyModifiers::NONE));
+    apply_terminal_event(&mut app, Event::Paste(json), TEST_FRAME);
+    assert_eq!(app.saved_views.rows.len(), 5);
+    assert!(
+        app.shell.query.is_empty(),
+        "saved-view paste cannot become a process search"
+    );
+}

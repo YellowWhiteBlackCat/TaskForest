@@ -74,6 +74,7 @@ pub mod menu_modal;
 pub mod pages;
 pub mod palette;
 pub mod runtime;
+pub(crate) mod saved_views;
 pub mod semantic;
 pub mod snapshot_export;
 pub(crate) mod system_information_modal;

@@ -10,6 +10,8 @@ use taskmanager_application::AppPage;
 use taskmanager_application::system_timeline::SystemPageSection;
 
 use crate::{TuiApp, TuiInputScope};
+mod focus;
+use focus::local_surface_focus_control;
 
 use super::{
     batch_menu, pages, process_menu, process_properties::ProcessDetailsSection, process_table,
@@ -414,66 +416,6 @@ impl TuiFocusPlan {
     }
 }
 
-fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> TuiFocusControl {
-    match surface {
-        crate::TuiSurfaceKind::Settings => TuiFocusControl::SettingsField(app.settings_form.field),
-        crate::TuiSurfaceKind::SidebarEditor => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::SidebarEditor { selected } => selected.as_ref().and_then(|key| {
-                app.sidebar_entries()
-                    .iter()
-                    .position(|entry| &entry.key == key)
-            }),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::CommandPalette => TuiFocusControl::PaletteItem {
-            index: app.command_palette().map_or(0, |palette| palette.selection),
-        },
-        crate::TuiSurfaceKind::ServiceMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ServiceMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::ProcessMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ProcessMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::BatchMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::BatchMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::SessionMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::SessionMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::StartupMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::StartupMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::ColumnMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ColumnMenu { selection } => Some(*selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::About
-        | crate::TuiSurfaceKind::SystemInformation
-        | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers
-        | crate::TuiSurfaceKind::ServiceDependencies
-        | crate::TuiSurfaceKind::ProcessAffinity
-        | crate::TuiSurfaceKind::DiagnosticBundle
-        | crate::TuiSurfaceKind::FirstRun => TuiFocusControl::Viewport,
-    }
-}
-
-fn menu_index(
-    app: &TuiApp,
-    surface: crate::TuiSurfaceKind,
-    index: impl FnOnce(&crate::TuiSurface) -> Option<usize>,
-) -> TuiFocusControl {
-    TuiFocusControl::MenuItem {
-        surface,
-        index: app.local_surface().and_then(index).unwrap_or(0),
-    }
-}
-
 /// The immutable geometry and input-scope plan for one painted terminal
 /// frame. It is built from the current app state before painting and can be
 /// retained by the runtime as the committed hit-test plan until the next draw.
@@ -726,6 +668,7 @@ fn overlay_controls(
         // time so a later keystroke cannot retarget a committed click.
         crate::TuiSurfaceKind::CommandPalette => (3, 2, app.filtered_palette_rows().len()),
         crate::TuiSurfaceKind::Settings
+        | crate::TuiSurfaceKind::SavedViews
         | crate::TuiSurfaceKind::SidebarEditor
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::SystemInformation
@@ -771,6 +714,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
         },
         TuiInputScope::LocalSurface(surface) => match surface {
             crate::TuiSurfaceKind::Settings => (68, 32),
+            crate::TuiSurfaceKind::SavedViews => (68, 24),
             crate::TuiSurfaceKind::SidebarEditor => (68, 24),
             crate::TuiSurfaceKind::About => (72, 20),
             crate::TuiSurfaceKind::SystemInformation => (84, 30),

@@ -41,6 +41,7 @@ use taskmanager_shell::presentation::system_information::{SystemInformationGroup
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum WindowSurfaceKind {
     SidebarDevices,
+    SavedViews,
     About,
     SystemInformation,
     FirstRun,
@@ -50,6 +51,7 @@ pub(crate) enum WindowSurfaceKind {
 #[derive(Clone, Debug)]
 pub(crate) enum WindowSurface {
     SidebarDevices,
+    SavedViews,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     FirstRun,
@@ -58,6 +60,7 @@ pub(crate) enum WindowSurface {
 impl WindowSurface {
     pub(crate) fn kind(&self) -> WindowSurfaceKind {
         match self {
+            Self::SavedViews => WindowSurfaceKind::SavedViews,
             Self::SidebarDevices => WindowSurfaceKind::SidebarDevices,
             Self::About => WindowSurfaceKind::About,
             Self::SystemInformation(_) => WindowSurfaceKind::SystemInformation,
@@ -87,6 +90,7 @@ pub(crate) struct WindowSurfaceChanged;
 #[derive(Event, Clone, Copy)]
 pub(crate) enum WindowSurfaceCommand {
     SidebarDevices,
+    SavedViews,
     About,
     SystemInformation,
     FirstRun,
@@ -135,6 +139,9 @@ fn on_command(
     mut commands: Commands,
 ) {
     match *command.event() {
+        WindowSurfaceCommand::SavedViews => {
+            show(&mut access, &mut commands, WindowSurface::SavedViews)
+        }
         WindowSurfaceCommand::SidebarDevices => {
             show(&mut access, &mut commands, WindowSurface::SidebarDevices)
         }
@@ -247,6 +254,7 @@ fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePain
 #[derive(SystemParam)]
 struct SurfaceRender<'w, 's> {
     sidebar: Res<'w, SidebarState>,
+    saved_views: Option<Res<'w, crate::saved_views::SavedViewsState>>,
     track: Option<NonSend<'w, FrontendTrack>>,
     state: Res<'w, WindowSurfaceState>,
     paint: ResMut<'w, SurfacePaint>,
@@ -267,6 +275,10 @@ fn paint_surface(mut render: SurfaceRender) {
         return;
     };
     let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+        Some(WindowSurface::SavedViews) => render
+            .saved_views
+            .as_ref()
+            .map(|state| Box::new(crate::saved_views::scene(state, palette)) as Box<dyn Scene>),
         Some(WindowSurface::SidebarDevices) => render.track.as_ref().map(|track| {
             Box::new(sidebar_editor::scene(
                 &track.shell,

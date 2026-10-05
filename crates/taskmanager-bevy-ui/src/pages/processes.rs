@@ -52,6 +52,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
 
@@ -715,6 +716,11 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let rows_root = rows_root_scene(&projection, palette, &context.shell.query, &[]);
     let search = search_input_scene(palette, &context.shell.query);
     let choose_columns_btn = choose_columns_button_scene(palette);
+    let saved_views = crate::saved_views::button(
+        t("saved_views.title").into(),
+        crate::saved_views::SavedViewAction::Open,
+        palette,
+    );
     let toolbar = bsn! {
         Node {
             width: percent(100),
@@ -724,7 +730,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         Children [
              @{ search } --
-             @{ choose_columns_btn }
+             @{ choose_columns_btn } -- @{ saved_views }
         ]
     };
     let table = bsn! {

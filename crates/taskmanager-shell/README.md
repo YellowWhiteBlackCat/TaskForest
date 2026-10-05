@@ -14,6 +14,10 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 
 ## Key modules
 
+- `src/saved_views.rs` owns saved process-view identity, built-ins, typed filter/sort/columns,
+  strict JSON transfer and config projection shared by all four frontends. Native controls
+  adapt this model; persisted schema and transfer limits belong to core config.
+
 - `src/presentation/about.rs` owns the common build-metadata projection and copied
   details. Product identity, license and repository remain owned by neutral assets.
 - `src/presentation/system_information.rs` groups cached OS, kernel, desktop and

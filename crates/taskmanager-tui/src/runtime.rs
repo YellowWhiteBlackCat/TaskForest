@@ -285,6 +285,10 @@ fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> boo
 }
 
 pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+    if key.code == ratatui::crossterm::event::KeyCode::F(4) {
+        app.open_saved_views();
+        return None;
+    }
     if key.code == ratatui::crossterm::event::KeyCode::F(3) {
         app.open_sidebar_editor();
         return None;

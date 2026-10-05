@@ -140,6 +140,7 @@ impl AffinityModalState {
 pub(crate) enum TuiSurfaceKind {
     Settings,
     SidebarEditor,
+    SavedViews,
     About,
     SystemInformation,
     Health,
@@ -160,7 +161,13 @@ pub(crate) enum TuiSurfaceKind {
 #[derive(Clone, Debug)]
 pub(crate) enum TuiSurface {
     Settings,
-    SidebarEditor { selected: Option<String> },
+    SidebarEditor {
+        selected: Option<String>,
+    },
+    SavedViews {
+        selected: Option<u64>,
+        input: crate::saved_views::SavedViewInput,
+    },
     About(crate::information::AboutTargetView),
     SystemInformation(crate::information::SystemInformationTargetView),
     Health,
@@ -170,7 +177,9 @@ pub(crate) enum TuiSurface {
     BatchMenu(BatchMenuTarget),
     SessionMenu(SessionMenuTarget),
     StartupMenu(StartupMenuTarget),
-    ColumnMenu { selection: usize },
+    ColumnMenu {
+        selection: usize,
+    },
     CommandPalette(CommandPalette),
     ServiceDependencies(ServiceDependenciesTarget),
     ProcessAffinity(AffinityModalState),
@@ -183,6 +192,7 @@ impl TuiSurface {
         match self {
             Self::Settings => TuiSurfaceKind::Settings,
             Self::SidebarEditor { .. } => TuiSurfaceKind::SidebarEditor,
+            Self::SavedViews { .. } => TuiSurfaceKind::SavedViews,
             Self::About(_) => TuiSurfaceKind::About,
             Self::SystemInformation(_) => TuiSurfaceKind::SystemInformation,
             Self::Health => TuiSurfaceKind::Health,

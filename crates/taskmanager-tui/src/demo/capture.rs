@@ -112,6 +112,13 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
     } else if scene == "keyboard-focus" {
         app.focus_panel == crate::FocusPanel::Details
             && app.shell.selected_process_identity().is_some()
+    } else if scene == "saved-view-presets" {
+        app.local_surface_kind() == Some(crate::TuiSurfaceKind::SavedViews)
+            && app
+                .saved_views
+                .rows
+                .iter()
+                .any(|preset| preset.is_user_saved())
     } else if scene == "sidebar-edit" {
         app.local_surface_kind() == Some(crate::TuiSurfaceKind::SidebarEditor)
             && app

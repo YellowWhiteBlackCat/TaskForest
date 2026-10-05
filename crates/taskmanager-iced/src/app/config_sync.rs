@@ -142,6 +142,7 @@ impl IcedApp {
     }
 
     pub(super) fn apply_config_snapshot(&mut self, config: &Config, startup: bool) {
+        self.restore_saved_views_snapshot(config);
         let history_preference_changed =
             self.configuration.draft().history_persistence != config.history_persistence;
         let language = config

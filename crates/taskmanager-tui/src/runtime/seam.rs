@@ -157,6 +157,12 @@ pub(crate) fn apply_terminal_event_with_plan(
             }
         }
         Event::Paste(text) => {
+            if app.paste_saved_views(&text) {
+                return EventReaction {
+                    dirty: true,
+                    effect: None,
+                };
+            }
             if app.paste_alert_rules(&text) {
                 return EventReaction {
                     dirty: true,
@@ -307,6 +313,7 @@ fn apply_overlay_control_click(
         }
     }
     match surface {
+        crate::TuiSurfaceKind::SavedViews => EventReaction::default(),
         crate::TuiSurfaceKind::SidebarEditor => EventReaction::default(),
         crate::TuiSurfaceKind::ServiceMenu => {
             if let Some(menu) = app.service_menu_mut() {

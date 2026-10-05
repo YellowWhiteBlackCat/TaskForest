@@ -2,6 +2,10 @@
 
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
+use taskmanager_shell::saved_views::{
+    SavedViewPreset, SavedViewTransferFeedback, export_saved_views_json, import_saved_views_json,
+    save_current_view,
+};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::super::{IcedApp, Message};
@@ -73,44 +77,65 @@ impl IcedApp {
                 }
             }
             Message::SaveCurrentProcessView => {
-                let id = self.next_saved_view_id;
-                self.next_saved_view_id = self.next_saved_view_id.wrapping_add(1);
-                let count = self
-                    .saved_views
-                    .iter()
-                    .filter(|preset| preset.is_user_saved())
-                    .count()
-                    + 1;
-                let mut custom = crate::saved_views::SavedViewPreset::restored(
-                    format!("Custom View ({count})"),
+                let preset = SavedViewPreset::restored(
+                    t("saved_views.custom_name").replace(
+                        "{index}",
+                        &self.next_saved_view_id.saturating_sub(3).to_string(),
+                    ),
                     self.shell.process_status_filter,
                     self.shell.process_sort.0,
                     self.shell.process_sort.1 == SortDir::Asc,
                     self.process_presentation.hidden_columns.clone(),
                 );
-                custom.id = id;
-                self.saved_views.push(custom);
-            }
-            Message::ExportSavedViews => {
-                match crate::saved_views::export_saved_views_json(&self.saved_views) {
-                    Ok(json) => {
-                        self.saved_view_feedback =
-                            Some(crate::saved_views::SavedViewTransferFeedback::ExportCopied);
-                        task = Some(iced::clipboard::write(json));
-                    }
-                    Err(_) => {
-                        self.saved_view_feedback =
-                            Some(crate::saved_views::SavedViewTransferFeedback::ExportFailed);
-                    }
+                match save_current_view(&mut self.saved_views, &mut self.next_saved_view_id, preset)
+                {
+                    Ok(_) => self.persist_saved_views(),
+                    Err(error) => self.shell.report_notice(
+                        FeedbackSource::Settings,
+                        FeedbackSeverity::Error,
+                        FeedbackLifecycle::UntilReplaced,
+                        format!("View not saved: {error}"),
+                    ),
                 }
             }
+            Message::ExportSavedViews => match export_saved_views_json(&self.saved_views) {
+                Ok(json) => {
+                    self.saved_view_feedback = Some(SavedViewTransferFeedback::ExportCopied);
+                    task = Some(iced::clipboard::write(json));
+                }
+                Err(_) => {
+                    self.saved_view_feedback = Some(SavedViewTransferFeedback::ExportFailed);
+                }
+            },
             Message::ImportSavedViews => {
+                task = Some(iced::clipboard::read().map(Message::SavedViewsClipboardRead));
+            }
+            Message::SavedViewsClipboardRead(json) => {
                 self.saved_view_feedback =
-                    Some(crate::saved_views::SavedViewTransferFeedback::ClipboardEmpty);
+                    Some(match json.filter(|text| !text.trim().is_empty()) {
+                        Some(json) => match import_saved_views_json(
+                            &mut self.saved_views,
+                            &mut self.next_saved_view_id,
+                            &json,
+                        ) {
+                            Ok(summary) => {
+                                self.persist_saved_views();
+                                SavedViewTransferFeedback::Imported(summary)
+                            }
+                            Err(_) => SavedViewTransferFeedback::ImportInvalid,
+                        },
+                        None => SavedViewTransferFeedback::ClipboardEmpty,
+                    });
             }
             Message::DeleteSavedView(id) => {
-                self.saved_views
-                    .retain(|preset| preset.id != id || preset.built_in);
+                if self
+                    .saved_views
+                    .iter()
+                    .any(|preset| preset.id == id && preset.is_user_saved())
+                {
+                    self.saved_views.retain(|preset| preset.id != id);
+                    self.persist_saved_views();
+                }
             }
             Message::CopyProcessTsv => {
                 if let Some(process) = self.shell.visible_process_at(self.shell.selected) {

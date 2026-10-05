@@ -251,6 +251,8 @@ pub enum FocusTarget {
     ServiceDetailsLogRefresh,
     /// Saved views preset buttons and actions.
     SavedViewPreset(u64),
+    SavedViewsTrigger,
+    SavedViewRemove(u64),
     SavedViewSaveCurrent,
     SavedViewExport,
     SavedViewImport,
@@ -299,7 +301,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 192] = [
+    pub const ALL: [Self; 194] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -455,6 +457,8 @@ impl FocusTarget {
         Self::ServiceDetailsLogCopy,
         Self::ServiceDetailsLogRefresh,
         Self::SavedViewPreset(1),
+        Self::SavedViewsTrigger,
+        Self::SavedViewRemove(4),
         Self::SavedViewSaveCurrent,
         Self::SavedViewExport,
         Self::SavedViewImport,
