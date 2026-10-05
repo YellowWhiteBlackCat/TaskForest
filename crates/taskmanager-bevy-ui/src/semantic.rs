@@ -165,6 +165,9 @@ pub(crate) fn build_snapshot(
         });
     } else if let Some(surface) = surface {
         let (id, name, description) = match surface {
+            WindowSurface::ProcessTree => {
+                ("process-tree", "Process tree", "Process hierarchy".into())
+            }
             WindowSurface::EventCenter => {
                 ("event-center", t("events.title"), t("events.empty").into())
             }

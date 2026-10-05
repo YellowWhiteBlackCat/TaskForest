@@ -17,7 +17,6 @@ use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskmanager_application::{PlatformClient, SmbiosMemoryState, i18n::t};
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
@@ -746,72 +745,65 @@ fn native_navigation_toggle_keeps_route_and_content_within_the_remaining_viewpor
 }
 
 #[test]
-fn expanded_process_tree_reserves_actions_and_scrolls_complete_rows_inside_the_page() {
-    use crate::pages::process_tree::{
-        ProcessTreeSurface, ProcessTreeViewport, TreeExpansionCommand, TreeExpansionControl,
-    };
-    use bevy::ui_widgets::ScrollArea;
-    use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
-    use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
-    use taskmanager_test_support::{pin_english, smbios_memory};
+fn application_table_measures_complete_rows_and_keeps_the_footer_inside_every_window() {
+    use crate::pages::processes::{ProcessRowLink, ProcessRowsRoot, ProcessScrollState};
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     pin_english();
     for (width, height) in [(480, 360), (720, 480), (1280, 720), (1600, 400), (720, 960)] {
         let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
         let mut app = system_layout_app(width, height, client);
-        let mut shell = ShellApp::new();
-        seed_shell_process_tree(&mut shell).expect("root");
-        app.world_mut()
-            .non_send_mut::<crate::app::FrontendTrack>()
-            .shell = shell;
+        let items = (1..=100)
+            .map(|pid| {
+                ProcessItem::new(pid, format!("process-{pid}")).with_scalar_observations(
+                    ProcessScalarObservations {
+                        start_token: ScalarObservation::available(u64::from(pid), 1),
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect();
+        seed_projection_fact(
+            &mut app.world_mut().non_send_mut::<FrontendTrack>().shell,
+            ProjectionSeedFact::Processes(Some(items)),
+        );
         app.world_mut().resource_mut::<Route>().page = Page::Processes;
         app.world_mut().trigger(crate::app::RouteChanged);
-        app.world_mut().trigger(TreeExpansionCommand::ExpandAll);
-        for _ in 0..6 {
+        for _ in 0..8 {
             app.update();
         }
         let world = app.world_mut();
-        let (surface, position) = world
-            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessTreeSurface>>()
+        let (node, position) = world
+            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessRowsRoot>>()
             .single(world)
-            .expect("tree surface");
-        let bottom = position.translation.y + surface.size().y / 2.0;
+            .expect("one measured row slot");
+        let size = node.size();
+        let center = position.translation;
+        assert!(size.x > 0.0 && size.y > 0.0);
+        let bottom = center.y + size.y / 2.0;
         assert!(
             bottom < height as f32,
-            "tree cannot consume the page footer"
+            "table must leave the window bottom protected at {width}x{height}"
         );
-        let (viewport,position,_)=world.query_filtered::<(&ComputedNode,&UiGlobalTransform,&ScrollArea),With<ProcessTreeViewport>>().single(world).expect("bounded row viewport");
+        let capacity = world.resource::<ProcessScrollState>().viewport_rows;
         assert!(
-            viewport.size().x > 0.0 && viewport.size().y > 0.0,
-            "tree needs a readable body"
+            capacity > 0,
+            "one readable row survives at {width}x{height}"
         );
-        assert!(position.translation.y + viewport.size().y / 2.0 <= bottom);
-        let viewport_height = viewport.size().y;
-        let row_height = world
-            .query::<(
-                &crate::pages::process_tree::ProcessTreeRowMarker,
-                &ComputedNode,
-            )>()
-            .iter(world)
-            .map(|(_, node)| node.size().y)
-            .find(|height| *height > 0.0)
-            .expect("row geometry");
-        assert!(
-            viewport_height >= row_height,
-            "viewport must admit a complete tree row at {width}x{height}"
-        );
-        let mut controls =
-            world.query::<(&TreeExpansionControl, &ComputedNode, &UiGlobalTransform)>();
-        assert_eq!(controls.iter(world).count(), 2);
-        for (_, node, position) in controls.iter(world) {
-            let half = node.size() / 2.0;
-            assert!(node.size().x > 0.0 && node.size().y > 0.0);
+        let mut rows = world.query::<(&ProcessRowLink, &ComputedNode, &UiGlobalTransform)>();
+        assert_eq!(rows.iter(world).count(), capacity);
+        for (_, row, position) in rows.iter(world) {
+            let half = row.size() / 2.0;
+            assert!(row.size().y > 0.0);
+            assert!(position.translation.y - half.y >= center.y - size.y / 2.0 - 0.5);
             assert!(
-                position.translation.x - half.x >= 0.0
-                    && position.translation.x + half.x < width as f32
+                position.translation.y + half.y <= bottom - 7.5,
+                "no partial final row at {width}x{height}"
             );
             assert!(
-                position.translation.y + half.y < bottom,
-                "actions remain outside the scrolling body"
+                position.translation.x - half.x >= 0.0
+                    && position.translation.x + half.x <= width as f32
             );
         }
     }

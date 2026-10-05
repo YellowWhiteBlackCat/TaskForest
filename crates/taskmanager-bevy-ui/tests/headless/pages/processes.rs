@@ -39,9 +39,8 @@ use taskmanager_theme::Theme;
 use super::details::ProcessDetailsRoot;
 use super::{
     ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
-    ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, TABLE_VIEWPORT_HEIGHT_PX,
-    centered_scroll_top, content, count_line_text, empty_state_text, rows_projection,
-    sort_projection,
+    ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, centered_scroll_top, content,
+    count_line_text, empty_state_text, rows_projection, sort_projection,
 };
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::palette::{UiPalette, ui_palette};
@@ -107,12 +106,11 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
     // The context borrows the shell while the scene captures what it needs;
     // only then does the shell move into the world's track.
     let history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
         sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -125,6 +123,15 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
         shell,
         initial_refresh_submitted: true,
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
+    });
+    app.update();
+    // Seam tests supply an explicit three-row viewport; measured layout is tested separately.
+    app.world_mut()
+        .resource_mut::<ProcessScrollState>()
+        .viewport_rows = 3;
+    fire_seam(&mut app, |root| ProcessScrollIntent {
+        entity: root,
+        rows: 0,
     });
     app
 }
@@ -622,10 +629,6 @@ fn scroll_intent_rebuilds_the_window_and_clamps() {
     let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
     app.update();
 
-    let viewport = app.world().resource::<ProcessScrollState>().viewport_rows;
-    assert!(viewport >= 4, "the design viewport holds several rows");
-
-    // Overscroll past the end: pinned to the last full page.
     fire_seam(&mut app, |root| ProcessScrollIntent {
         entity: root,
         rows: 100,
@@ -818,32 +821,6 @@ fn the_search_input_displays_the_shell_query() {
         .and_then(|child| world.get::<Text>(*child))
         .expect("the search display text node");
     assert_eq!(text.0, "al", "the display mirrors the shell query");
-}
-
-#[test]
-fn viewport_capacity_comes_from_the_palette_control_height() {
-    // The bootstrap resource-izes viewport/scroll from the palette — the
-    // design viewport divided by the theme's control height.
-    let palette = ui_palette(&Theme::dark());
-    let expected = crate::widgets::table::rows_in_viewport(
-        TABLE_VIEWPORT_HEIGHT_PX,
-        palette.control_height_px,
-    );
-    assert!(expected >= 8, "the design fits a useful page ({expected})");
-    let items: Vec<ProcessItem> = (0..expected + 20)
-        .map(|pid| process(u32::try_from(pid).expect("fixture pid"), "p"))
-        .collect();
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
-    app.update();
-    assert_eq!(
-        app.world().resource::<ProcessScrollState>().viewport_rows,
-        expected
-    );
-    assert_eq!(
-        row_links(&mut app).len(),
-        expected,
-        "the initial window is the viewport, not the whole set"
-    );
 }
 
 #[test]

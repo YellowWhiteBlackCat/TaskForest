@@ -21,7 +21,6 @@ struct Fixture {
     shell: ShellApp,
     palette: UiPalette,
     history: crate::pages::history::HistoryProjectionResource,
-    process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion,
 }
 
 impl Fixture {
@@ -31,7 +30,6 @@ impl Fixture {
             shell: ShellApp::new(),
             palette: ui_palette(&Theme::dark()),
             history: crate::pages::history::HistoryProjectionResource::default(),
-            process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         }
     }
 
@@ -40,7 +38,7 @@ impl Fixture {
             sidebar: &self.sidebar,
             gray_zero_values: false,
             shell: &self.shell,
-            process_tree_expansion: &self.process_tree_expansion,
+
             palette: &self.palette,
             history: &self.history.0,
         }

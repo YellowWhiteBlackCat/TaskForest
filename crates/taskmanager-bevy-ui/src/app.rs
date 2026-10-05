@@ -532,7 +532,6 @@ pub(crate) struct PageContext<'a> {
     /// The shell: projection store + memoized row projections. Read-only.
     pub(crate) shell: &'a ShellApp,
     /// Persistent Bevy-local process-tree expansion state.
-    pub(crate) process_tree_expansion: &'a crate::pages::process_tree::ProcessTreeExpansion,
     /// Resolved theme tokens for this window (see [`crate::palette`]).
     pub(crate) palette: &'a UiPalette,
     /// Read-only application-history projection from the app-host connector.
@@ -586,7 +585,6 @@ fn mount_page_system(
         sidebar: &presentation.sidebar,
         gray_zero_values: presentation.preferences.gray_zero_values,
         shell: track.shell(),
-        process_tree_expansion: track.process_tree_expansion(),
         palette: &presentation.palette.inner,
         history: &history.0,
     };

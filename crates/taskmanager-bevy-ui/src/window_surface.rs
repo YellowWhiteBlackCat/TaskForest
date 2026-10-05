@@ -43,6 +43,7 @@ pub(crate) enum WindowSurfaceKind {
     SidebarDevices,
     SavedViews,
     EventCenter,
+    ProcessTree,
     About,
     SystemInformation,
     FirstRun,
@@ -54,6 +55,7 @@ pub(crate) enum WindowSurface {
     SidebarDevices,
     SavedViews,
     EventCenter,
+    ProcessTree,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     FirstRun,
@@ -62,6 +64,7 @@ pub(crate) enum WindowSurface {
 impl WindowSurface {
     pub(crate) fn kind(&self) -> WindowSurfaceKind {
         match self {
+            Self::ProcessTree => WindowSurfaceKind::ProcessTree,
             Self::EventCenter => WindowSurfaceKind::EventCenter,
             Self::SavedViews => WindowSurfaceKind::SavedViews,
             Self::SidebarDevices => WindowSurfaceKind::SidebarDevices,
@@ -95,6 +98,7 @@ pub(crate) enum WindowSurfaceCommand {
     SidebarDevices,
     SavedViews,
     EventCenter,
+    ProcessTree,
     About,
     SystemInformation,
     FirstRun,
@@ -106,6 +110,7 @@ pub(crate) struct WindowSurfaceOverlay(pub(crate) WindowSurfaceKind);
 pub(crate) struct ModalHeading;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ModalBody;
+
 #[derive(Component, Clone, Default)]
 pub(crate) struct ModalFooter;
 
@@ -143,6 +148,9 @@ fn on_command(
     mut commands: Commands,
 ) {
     match *command.event() {
+        WindowSurfaceCommand::ProcessTree => {
+            show(&mut access, &mut commands, WindowSurface::ProcessTree)
+        }
         WindowSurfaceCommand::EventCenter => {
             show(&mut access, &mut commands, WindowSurface::EventCenter)
         }
@@ -283,6 +291,13 @@ fn paint_surface(mut render: SurfaceRender) {
         return;
     };
     let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+        Some(WindowSurface::ProcessTree) => render.track.as_ref().map(|track| {
+            Box::new(crate::pages::process_tree::scene(
+                &track.shell,
+                &track.process_tree_expansion,
+                palette,
+            )) as Box<dyn Scene>
+        }),
         Some(WindowSurface::EventCenter) => render.track.as_ref().and_then(|track| {
             render.events.as_ref().map(|events| {
                 Box::new(crate::event_center::scene(&track.shell, events, palette))

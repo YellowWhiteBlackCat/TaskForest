@@ -142,12 +142,11 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     let shell = shell_with_hardware(Some(fixture_hardware()));
     let palette = crate::palette::ui_palette(&Theme::dark());
     let history = HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
         sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -426,12 +425,11 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     super::register(&mut app);
 
     let history = HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
         sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &fan_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -484,7 +482,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &thermal_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };

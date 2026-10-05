@@ -270,6 +270,17 @@ fn native_expand_and_collapse_preserve_all_live_tree_identities_and_selection() 
     app.world_mut().trigger(crate::app::RouteChanged);
     app.update();
     app.update();
+    let open = app
+        .world_mut()
+        .query::<(Entity, &TreeWindowControl)>()
+        .iter(app.world())
+        .find(|(_, control)| control.0)
+        .map(|(entity, _)| entity)
+        .expect("normal tree entry");
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity: open });
+    app.update();
+    app.update();
     let selected = app.world().non_send::<FrontendTrack>().shell.selected;
     for action in [
         TreeExpansionCommand::ExpandAll,

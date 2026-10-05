@@ -15,13 +15,13 @@ use crate::pages::performance::replay::{ChartSize, ReplayChart};
 use crate::pages::performance::{
     DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
 };
-use crate::pages::process_tree::{ProcessTreeRowMarker, ProcessTreeViewport};
+use crate::pages::process_tree::ProcessTreeRowMarker;
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
-use crate::window_surface::{WindowSurface, WindowSurfaceState};
+use crate::window_surface::{ModalBody, WindowSurface, WindowSurfaceState};
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
@@ -32,7 +32,7 @@ use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
-type TreeViewportFilter = (With<ProcessTreeViewport>, Without<SystemBody>);
+type TreeViewportFilter = (With<ModalBody>, Without<SystemBody>);
 
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {

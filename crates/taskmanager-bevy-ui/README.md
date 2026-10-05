@@ -68,8 +68,8 @@ adopted — theme tokens are the only skin authority.
 - `src/palette.rs` — the theme-token → bevy adapter; the only place tokens
   become bevy colors/type metrics.
 - `src/pages.rs` + `src/pages/` — nine mounted page modules, one file each
-  (`content(&PageContext) -> impl Scene`), plus the mounted `process_tree.rs`
-  projection and `history.rs` connector adapter: the M1
+  (`content(&PageContext) -> impl Scene`), plus the `process_tree.rs` owned inspection
+  and `history.rs` connector adapter: the measured
   process table, performance summary/curves/device blocks, the three
   read-only inventory tables (services/startup/sessions), settings, and the
   alert center. Includes `pages/processes/properties_modal.rs` delivering full
@@ -105,7 +105,8 @@ adopted — theme tokens are the only skin authority.
 Diagnostic commands open, confirm, retry and close the shared sanitized review lifecycle.
 The native window injects its diagnostic client; capture never creates a writer. The
 modal consumes all keyboard input, exposes scroll keys, and reserves title/actions
-around one bounded body viewport.
+around one bounded body viewport. Applications derive table capacity from its measured slot;
+complete process trees share the modal budget and native expand/collapse controls.
 
 ## Boundary
 

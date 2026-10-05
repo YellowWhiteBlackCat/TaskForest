@@ -19,7 +19,8 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             return true;
         }
         match surface {
-            WindowSurface::EventCenter
+            WindowSurface::ProcessTree
+            | WindowSurface::EventCenter
             | WindowSurface::SavedViews
             | WindowSurface::SidebarDevices => {
                 if press.key_code == KeyCode::Escape {

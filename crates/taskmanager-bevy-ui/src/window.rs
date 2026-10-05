@@ -327,6 +327,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::pages::startup::register(app);
         crate::pages::sessions::register(app);
         crate::pages::process_tree::register(app);
+        crate::pages::processes::layout::register(app);
         crate::pages::performance::register(app);
         crate::pages::history::scene::register(app);
         app.add_observer(rewrite_summary_line);

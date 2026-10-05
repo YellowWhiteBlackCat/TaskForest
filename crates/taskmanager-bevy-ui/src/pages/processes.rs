@@ -1,40 +1,6 @@
-//! Processes page — the M1 process table (the first feature page).
-//!
-//! **Composition model** (the page-proxy contract in [`crate::pages`]): the
-//! static tree (title/status line, search input, contract header, rows root,
-//! and the selected-process details panel) is one declarative `bsn!` assembly
-//! seeded from the shell snapshot at mount; everything dynamic is bound
-//! through observers — never polling:
-//!
-//! - **Data refresh**: `bootstrap_processes_page` runs when the rows root
-//!   lands (an `on(On<Add<ProcessRowsRoot>>)` entity observer) and spawns the
-//!   page's global `ShellProjectionFolded` observer as a child of the root,
-//!   so it lives and dies with the mounted page (a route change despawns the
-//!   page recursively). Idle frames — no folded batches — redraw nothing.
-//! - **Input seams**: the keyboard arrives through [`crate::input`], which
-//!   drives the shell's own routers (`handle_local_key` / `handle_local_char`
-//!   — arrows, Delete gate, search typing, y/n/Esc confirmation); the
-//!   `input` submodule bridges pointer picking and wheel scrolling into the
-//!   typed `EntityEvent` seams below — `ProcessSelectRow`,
-//!   `ProcessScrollIntent` — and re-renders shell mutations through
-//!   `ShellInteractionApplied`. Each seam observer reduces through the SAME
-//!   public shell reducers the TUI keyboard path uses (`move_selection`,
-//!   `select_row`, `push_search_text`).
-//! - **Selection identity**: every accepted selection change publishes
-//!   `ProcessSelectionChanged`. The sibling `details` component consumes
-//!   it, reuses the shared process-details VM, and requests matching frozen
-//!   process insights through the app-host client.
-//!
-//! Semantics align with the TUI Applications table
-//! (`taskmanager-tui/src/ui/process_table.rs`): the visible set, sort, and
-//! cursor are shell-owned (query + status filter + sort memoized in
-//! `ShellApp::visible_processes`); the header marks the active sort; an
-//! unavailable scalar renders `—`, never zero. M1 differences are deliberate
-//! and declared in the capability note: the compact grouped tree strip is
-//! mounted above the table, while per-row trend and multi-select batch verbs
-//! remain unavailable. StartTime cells render `—` until a local-time
-//! observation reaches this frontend; the selected-process details panel is
-//! the first completed F13 slice.
+//! Applications consume cached shell rows and one measured table viewport.
+//! Native tree inspection renders the shared hierarchy in the owned bounded modal.
+//! Query, selection, batch gates and typed unavailable cells retain shell authority.
 
 use bevy::a11y::AccessibilityNode;
 use bevy::ecs::component::Component;
@@ -48,7 +14,8 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Val, percent, px,
+    AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Val,
+    percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -63,7 +30,7 @@ use crate::drain::ShellProjectionFolded;
 use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
-use crate::widgets::table::{header_scene, row_scene, rows_in_viewport, visible_columns};
+use crate::widgets::table::{header_scene, row_scene, visible_columns};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod affinity;
@@ -76,15 +43,13 @@ pub(crate) mod properties_modal;
 
 pub(crate) use projection::*;
 
-use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene};
+pub(crate) mod layout;
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct ProcessPageRoot;
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct ProcessOptionalChrome;
 
-/// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
-/// a computed node height to an observer without a layout system, so M1 fixes
-/// the virtual viewport at design size (the 780 px window's content slot minus
-/// title/search/header chrome). The value feeds [`rows_in_viewport`] together
-/// with the palette's control height; both live in [`ProcessScrollState`] so
-/// tests and later milestones can resize the window dynamically.
-const TABLE_VIEWPORT_HEIGHT_PX: f32 = 512.0;
+use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene};
 
 // ---- pure view model ----------------------------------------------------
 
@@ -142,7 +107,7 @@ pub(crate) struct ProcessTableContainer;
 pub(crate) struct ProcessDetailsContainer;
 
 pub(crate) fn sync_processes_responsive_layout(
-    windows: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    pages: Query<&ComputedNode, With<ProcessPageRoot>>,
     mut tables: Query<
         &mut Node,
         (
@@ -158,10 +123,13 @@ pub(crate) fn sync_processes_responsive_layout(
         ),
     >,
 ) {
-    let width = windows
-        .iter()
-        .next()
-        .map_or(1180.0, bevy::window::Window::width);
+    let Ok(page) = pages.single() else {
+        return;
+    };
+    let width = page.size().x * page.inverse_scale_factor();
+    if width <= 0.0 {
+        return;
+    }
     if width < 960.0 {
         for mut node in &mut tables {
             if node.width != percent(100) {
@@ -325,10 +293,10 @@ fn bootstrap_processes_page(
     commands.init_resource::<crate::input::TextInputState>();
     commands.init_resource::<ProcessHiddenColumns>();
     commands.init_resource::<ProcessColumnsModalState>();
-    let Some(palette) = palette else {
+    let Some(_palette) = palette else {
         return;
     };
-    let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.inner.control_height_px);
+    let viewport_rows = 1;
     commands.insert_resource(ProcessScrollState {
         viewport_rows,
         top: 0,
@@ -647,7 +615,7 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
     }
 }
 
-/// The rows root scene: fixed-height virtual viewport, the five `on()` seam
+/// The rows root scene: measured virtual viewport, the five `on()` seam
 /// observers (bootstrap first, so it is registered before the marker's own
 /// `Add` trigger dispatches), and the mount-time static window inside.
 fn rows_root_scene(
@@ -660,7 +628,7 @@ fn rows_root_scene(
     bsn! {
         Node {
             width: percent(100),
-            height: px(TABLE_VIEWPORT_HEIGHT_PX),
+            min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
             flex_direction: FlexDirection::Column,
         }
         on(bootstrap_processes_page)
@@ -681,14 +649,7 @@ fn rows_root_scene(
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let title = Page::Processes.title();
-    // Honest capability note: the grouped tree strip is mounted; per-row
-    // trend and multi-select batch verbs are not part of this frontend yet.
-    let note = format!(
-        "{} — grouped tree is available; multi-select batch verbs (suspend/resume/kill) are available; Delete arms the shared end-task gate; details follow the selected row",
-        Page::Processes.nav_label()
-    );
-    let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);
-    let projection = rows_projection(context.shell, viewport_rows, 0);
+    let projection = rows_projection(context.shell, 1, 0);
     let count = count_line_text_for_shell(context.shell, projection.total, &context.shell.query);
     let columns = visible_columns(&[]);
     let header = header_scene(
@@ -698,7 +659,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     );
     let header_slot = bsn! {
         Node {
-            width: percent(100),
+            width: percent(100), flex_shrink:0.0,
         }
         ProcessTableHeaderSlot
         Children [
@@ -725,19 +686,19 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
+            align_items: AlignItems::Center, flex_wrap:FlexWrap::Wrap, flex_shrink:0.0,
             column_gap: Val::Px(space_8()),
         }
         Children [
              @{ search } --
-             @{ choose_columns_btn } -- @{ saved_views }
+             @{ choose_columns_btn } -- @{ saved_views } -- @{ crate::pages::process_tree::open_button(palette) }
         ]
     };
     let table = bsn! {
         Node {
             width: percent(68),
             min_width: px(0.0),
-            height: percent(100),
+            height: percent(100), min_height:px(0.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
         }
@@ -756,21 +717,19 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             row_gap: Val::Px(space_8()),
             padding: Val::Px(space_8()),
         }
-        BackgroundColor({ palette.content_bg })
+        BackgroundColor({ palette.content_bg }) ProcessPageRoot
         Children [
-             Text(title) TextRole(Role::Heading) --
-             @{ crate::pages::process_tree::panel_scene(context) } --
-             Text(note) TextRole(Role::Caption) --
+             Text(title) TextRole(Role::Heading) ProcessOptionalChrome --
              @{ toolbar } --
 
                 Text(count)
-                ProcessCountLine
+                ProcessCountLine ProcessOptionalChrome
                 TextRole(Role::Caption)
             --
 
                 Node {
                     width: percent(100),
-                    height: px(TABLE_VIEWPORT_HEIGHT_PX),
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
                     flex_direction: FlexDirection::Row,
                     column_gap: Val::Px(space_8()),
                 }

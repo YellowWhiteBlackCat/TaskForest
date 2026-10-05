@@ -119,6 +119,7 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
         WindowSurfaceKind::SidebarDevices,
         WindowSurfaceKind::SavedViews,
         WindowSurfaceKind::EventCenter,
+        WindowSurfaceKind::ProcessTree,
         WindowSurfaceKind::Diagnostic,
         WindowSurfaceKind::FirstRun,
         WindowSurfaceKind::About,
@@ -163,6 +164,9 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
             app.update();
             app.world_mut().non_send_mut::<FrontendTrack>().shell = fixture::demo_app();
             match kind {
+                WindowSurfaceKind::ProcessTree => app
+                    .world_mut()
+                    .trigger(crate::window_surface::WindowSurfaceCommand::ProcessTree),
                 WindowSurfaceKind::EventCenter => app.world_mut().trigger(
                     crate::event_center::EventCommand(crate::event_center::EventAction::Open),
                 ),
@@ -237,6 +241,8 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
                     3
                 } else if kind == WindowSurfaceKind::EventCenter {
                     6
+                } else if kind == WindowSurfaceKind::ProcessTree {
+                    3
                 } else if kind == WindowSurfaceKind::SavedViews {
                     4
                 } else if kind == WindowSurfaceKind::SidebarDevices {

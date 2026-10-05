@@ -8,7 +8,6 @@
 use bevy::picking::Pickable;
 use std::collections::HashSet;
 
-use crate::widgets::controls::{ControlTone, ControlVisual};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -17,11 +16,9 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::ui::prelude::{
-    AlignItems, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent, px,
-};
+use bevy::ui::prelude::{AlignItems, FlexDirection, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Button, ScrollArea};
+use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
@@ -33,11 +30,12 @@ use taskmanager_shell::{
     process_semantic_key, project_process_tree_rows,
 };
 
-use crate::app::{FrontendTrack, PageContext, ShellTrack};
+use crate::app::{FrontendTrack, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_shell::ShellApp;
 
 /// Stable expansion state for the Applications tree.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -337,92 +335,75 @@ fn on_tree_expansion_command(
     commands.trigger(ProcessTreeExpansionChanged);
 }
 
-/// Compact tree strip mounted above the existing Applications table. The
-/// flat table remains the interaction/detail surface (search, sort, and row
-/// reducers), while this strip makes category/application/process identity
-/// and the typed control/input anchors part of the formal route.
-pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
-    let items = context.shell.projection().processes_slice();
-    let observed_at_ms = context.shell.projection().processes_observed_at_ms;
-    let rows = project_items(items, context.process_tree_expansion, observed_at_ms);
+/// The hierarchy inspection uses the shared bounded modal body.
+pub(crate) fn scene(
+    shell: &ShellApp,
+    expansion: &ProcessTreeExpansion,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let items: Vec<_> = shell.visible_processes().into_iter().cloned().collect();
+    let rows = project_items(
+        &items,
+        expansion,
+        shell.projection().processes_observed_at_ms,
+    );
     let row_scenes: Vec<Box<dyn Scene>> = rows
         .iter()
-        .map(|row| Box::new(row_scene(row, context.palette)) as Box<dyn Scene>)
+        .map(|row| Box::new(row_scene(row, palette)) as Box<dyn Scene>)
         .collect();
-    let title = format!("Process tree · {} processes", items.len());
-    let row_scenes = row_scenes;
-    let end_label = t("proc.end_process_tree").to_owned();
-    let end_height = context.palette.control_height_px;
-    let end_radius = context.palette.control_radius_px;
-    let expand = tree_expansion_button(
-        t("proc.expand_all"),
-        TreeExpansionCommand::ExpandAll,
-        context.palette,
+    let body = Box::new(
+        bsn! {Node {width:percent(100),flex_direction:FlexDirection::Column} ProcessTreeRows Children [{row_scenes}]},
     );
-    let collapse = tree_expansion_button(
-        t("proc.collapse_all"),
-        TreeExpansionCommand::CollapseAll,
-        context.palette,
-    );
-    bsn! {
-        Node {
-            width: percent(100),
-            height: px(context.palette.control_height_px * 6.0),
-            max_height: percent(35),min_height:px(context.palette.control_height_px*3.0),
-            flex_shrink:0.0,
-            flex_direction: bevy::ui::prelude::FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_8())),
-        }
-        ProcessTreeSurface
-        Children [
-
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,flex_wrap:FlexWrap::Wrap,flex_shrink:0.0,
-                    justify_content: bevy::ui::prelude::JustifyContent::SpaceBetween,
-                    align_items: bevy::ui::prelude::AlignItems::Center,
-                }
-                Children [
-                     Text(title) ProcessTreeCountLine TextRole(Role::Caption) -- @{expand} -- @{collapse} --
-
-                        Node {
-                            height: px(end_height),
-                            padding: UiRect::horizontal(Val::Px(space_8())),
-                            align_items: bevy::ui::prelude::AlignItems::Center,
-                            border_radius: BorderRadius::all(Val::Px(end_radius)),
-                        }
-                        ControlVisual(ControlTone::Surface, false)
-                        Button
-                        on(on_end_tree_activated)
-                        Children [
-                             Text(end_label) TextRole(Role::Caption) Pickable::IGNORE
-                        ]
-
-                ]
-            --
-
-                Node { width:percent(100),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),overflow:Overflow::scroll_y(),flex_direction:FlexDirection::Column } ScrollArea ProcessTreeViewport
-                Children [Node {width:percent(100), flex_direction:FlexDirection::Column}
-                ProcessTreeRows
-                Children [{ row_scenes }]]
-
-        ]
+    let actions: Vec<Box<dyn Scene>> = vec![
+        Box::new(tree_expansion_button(
+            t("proc.expand_all"),
+            TreeExpansionCommand::ExpandAll,
+            palette,
+        )),
+        Box::new(tree_expansion_button(
+            t("proc.collapse_all"),
+            TreeExpansionCommand::CollapseAll,
+            palette,
+        )),
+        Box::new(close_button(palette)),
+    ];
+    crate::window_surface::modal_scene(
+        crate::window_surface::WindowSurfaceKind::ProcessTree,
+        "Process tree",
+        body,
+        actions,
+        palette,
+    )
+}
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct TreeWindowControl(pub(crate) bool);
+pub(crate) fn open_button(palette: &UiPalette) -> impl Scene + use<> {
+    window_button("Process tree", true, palette)
+}
+fn close_button(palette: &UiPalette) -> impl Scene + use<> {
+    window_button(t("common.close"), false, palette)
+}
+fn window_button(label: &'static str, open: bool, palette: &UiPalette) -> impl Scene + use<> {
+    bsn! {Node {min_height:px(palette.control_height_px),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeWindowControl(open) on(on_window_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
+}
+fn on_window_activated(
+    event: On<bevy::ui_widgets::Activate>,
+    controls: Query<&TreeWindowControl>,
+    mut commands: Commands,
+) {
+    if let Ok(control) = controls.get(event.entity) {
+        commands.trigger(if control.0 {
+            crate::window_surface::WindowSurfaceCommand::ProcessTree
+        } else {
+            crate::window_surface::WindowSurfaceCommand::Close(
+                crate::window_surface::WindowSurfaceKind::ProcessTree,
+            )
+        });
     }
 }
 
-#[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct ProcessTreeViewport;
-
-/// Marker for the formal Applications route's hierarchy strip.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ProcessTreeSurface;
-
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ProcessTreeRows;
-
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct ProcessTreeCountLine;
 
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_tree_expansion_command);
@@ -467,13 +448,17 @@ fn refresh_tree_on_fold(
     track: ShellTrack,
     palette: Res<WindowPalette>,
     roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    counts: Query<&mut Text, With<ProcessTreeCountLine>>,
     mut commands: Commands,
 ) {
-    let items = track.shell().projection().processes_slice();
+    let items: Vec<_> = track
+        .shell()
+        .visible_processes()
+        .into_iter()
+        .cloned()
+        .collect();
     let observed_at_ms = track.shell().projection().processes_observed_at_ms;
-    let rows = project_items(items, track.process_tree_expansion(), observed_at_ms);
-    refresh_tree_rows(&palette, roots, counts, &mut commands, rows, items);
+    let rows = project_items(&items, track.process_tree_expansion(), observed_at_ms);
+    refresh_tree_rows(&palette, roots, &mut commands, rows);
 }
 
 fn refresh_tree_on_expansion(
@@ -481,22 +466,24 @@ fn refresh_tree_on_expansion(
     track: ShellTrack,
     palette: Res<WindowPalette>,
     roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    counts: Query<&mut Text, With<ProcessTreeCountLine>>,
     mut commands: Commands,
 ) {
-    let items = track.shell().projection().processes_slice();
+    let items: Vec<_> = track
+        .shell()
+        .visible_processes()
+        .into_iter()
+        .cloned()
+        .collect();
     let observed_at_ms = track.shell().projection().processes_observed_at_ms;
-    let rows = project_items(items, track.process_tree_expansion(), observed_at_ms);
-    refresh_tree_rows(&palette, roots, counts, &mut commands, rows, items);
+    let rows = project_items(&items, track.process_tree_expansion(), observed_at_ms);
+    refresh_tree_rows(&palette, roots, &mut commands, rows);
 }
 
 fn refresh_tree_rows(
     palette: &WindowPalette,
     roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    mut counts: Query<&mut Text, With<ProcessTreeCountLine>>,
     commands: &mut Commands,
     rows: Vec<ProcessTreeRowView<'_>>,
-    items: &[ProcessItem],
 ) {
     for (root, children) in roots.iter() {
         let stale: Vec<Entity> = children.iter().copied().collect();
@@ -508,31 +495,6 @@ fn refresh_tree_rows(
             commands.entity(root).add_one_related::<ChildOf>(child);
         }
     }
-    if let Ok(mut count) = counts.single_mut() {
-        count.0 = format!("Process tree · {} processes", items.len());
-    }
-}
-
-/// The End-tree affordance: freeze the selected process's tree into the
-/// shared ProcessBatch gate (`request_process_tree_end`). The confirmation
-/// modal the gate arms is the shared one; this button only arms.
-fn on_end_tree_activated(
-    _activate: On<bevy::ui_widgets::Activate>,
-    mut track: NonSendMut<FrontendTrack>,
-    mut commands: Commands,
-) {
-    let shell = &mut track.shell;
-    let Some(process) = shell.visible_process_at(shell.selected) else {
-        return;
-    };
-    let Some(identity) = ProcessLiveKey::from_process(process) else {
-        return;
-    };
-    shell.request_process_tree_end(identity);
-    let view = shell
-        .pending_confirmation()
-        .and_then(crate::confirmation::PendingConfirmationView::from_pending);
-    commands.trigger(crate::confirmation::ConfirmationChanged(view));
 }
 
 /// Identity marker for later pointer/keyboard observers.

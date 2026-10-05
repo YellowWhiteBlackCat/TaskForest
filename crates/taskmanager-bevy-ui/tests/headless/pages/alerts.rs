@@ -463,12 +463,11 @@ fn pages_assemble_and_despawn_in_a_bare_scene_world() {
     let fixture_shell = ShellApp::new();
     let fixture_palette = ui_palette(&Theme::dark());
     let fixture_history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
         sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &fixture_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &fixture_palette,
         history: &fixture_history.0,
     };
