@@ -88,6 +88,7 @@ impl TuiApp {
     /// the next resource visit.
     pub(crate) fn select_perf_device(&mut self, device: PerfDevice) {
         self.perf_device = device;
+        self.performance_device_key = None;
         self.cpu_core_scroll = 0;
         self.cpu_detail_scroll = 0;
         self.gpu_engine_scroll = 0;
@@ -163,48 +164,22 @@ impl TuiApp {
     /// Performance resources allowed by preferences and currently available facts.
     #[must_use]
     pub fn visible_perf_devices(&self) -> Vec<PerfDevice> {
-        let show = &self.prefs.show;
-        let snapshot = self.shell.projection().snapshot.as_ref();
         let mut devices = Vec::new();
-        if show[0] {
-            devices.push(PerfDevice::Cpu);
-        }
-        if show[1] {
-            devices.push(PerfDevice::Memory);
-        }
-        if show[2] && snapshot.is_some_and(|snapshot| !snapshot.disks.is_empty()) {
-            devices.push(PerfDevice::Disk);
-        }
-        if show[3] && snapshot.is_some_and(|snapshot| !snapshot.networks.is_empty()) {
-            devices.push(PerfDevice::Network);
-        }
-        if show[9] && snapshot.is_some_and(|snapshot| !snapshot.gpu.is_empty()) {
-            devices.push(PerfDevice::Gpu);
-        }
-        if self
-            .shell
-            .projection()
-            .power_supplies
-            .as_ref()
-            .is_some_and(|power| !power.batteries.is_empty())
+        for entry in self
+            .sidebar_entries()
+            .into_iter()
+            .filter(|entry| entry.visible)
         {
-            devices.push(PerfDevice::Battery);
+            if !devices.contains(&entry.device) {
+                devices.push(entry.device);
+            }
         }
-        if self
-            .shell
-            .projection()
-            .sensors
-            .as_ref()
-            .is_some_and(|sensors| {
-                // The Fan resource is also the TUI's thermal surface: any fan
-                // channel OR any temperature reading backs it, so a fanless
-                // host still reaches the system thermal-zone group.
-                sensors.readings.iter().any(|reading| {
-                    matches!(
-                        reading.quantity(),
-                        SensorQuantity::FanSpeed | SensorQuantity::Temperature
-                    )
-                })
+        if !devices.contains(&PerfDevice::Fan)
+            && self.projection().sensors.as_ref().is_some_and(|sensors| {
+                sensors
+                    .readings
+                    .iter()
+                    .any(|reading| reading.quantity() == &SensorQuantity::Temperature)
             })
         {
             devices.push(PerfDevice::Fan);
@@ -256,12 +231,11 @@ impl TuiApp {
         }
         // Start path: scan the first mounted partition (or `/`), mirroring
         // GPUI's default bounds (the UI never customizes depth/entry caps).
-        let root = self
-            .projection()
-            .snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.disks.first())
-            .and_then(|disk| disk.partitions.iter().find(|p| !p.mount_point.is_empty()))
+        let disk = self.sidebar_disks().first().copied()?;
+        let root = disk
+            .partitions
+            .iter()
+            .find(|p| !p.mount_point.is_empty())
             .map(|partition| partition.mount_point.clone())
             .unwrap_or_else(|| "/".to_string());
         let spec = DirectoryScanSpec {
@@ -281,7 +255,7 @@ impl TuiApp {
 
     /// Toggle the per-engine GPU utilization session (`e` on the
     /// Performance·GPU page): enable submits ONE bounded engine-rows request
-    /// for the first GPU's device (the OS-native prompt fires at most on this
+    /// for the painted GPU identity (the OS-native prompt fires at most on this
     /// user-initiated request — the escalation discipline forbids
     /// auto-triggering), disable stops the TUI's re-request cadence. The typed
     /// answer lands in the shared request session, which is also the sole row
@@ -324,12 +298,12 @@ impl TuiApp {
         }
     }
 
-    /// The device identity for the engine-rows request: the first GPU's stable
-    /// native identity from the live snapshot (the PMU helper reads the
+    /// The device identity for the engine-rows request: the selected GPU or
+    /// first visible GPU in the persisted order (the PMU helper reads the
     /// integrated engine block). `None` when no GPU exists — the toggle is an
     /// honest no-op rather than a request about nothing.
     pub(crate) fn gpu_engine_rows_device_id(&self) -> Option<DeviceId> {
-        let gpu = self.projection().snapshot.as_ref()?.gpu.first()?;
+        let gpu = self.sidebar_gpus().first().copied()?;
         let id = gpu.device_id.trim();
         (!id.is_empty()).then(|| DeviceId::new(id.to_owned()))
     }
@@ -356,16 +330,13 @@ impl TuiApp {
         }
     }
 
-    /// The GPU row the shared chart-metric selection is bound to: the first
-    /// device of the Performance·GPU page's snapshot (the panel's headline
+    /// The GPU row the shared chart-metric selection is bound to: the selected
+    /// device or first visible device in the persisted order (the panel's headline
     /// device — the same one the engine-rows session binds to). `None`
     /// everywhere else; the shell fold then leaves the selection untouched.
     pub(crate) fn viewed_gpu(&self) -> Option<&GpuMetrics> {
         if self.page() == AppPage::Performance && self.perf_device == PerfDevice::Gpu {
-            self.projection()
-                .snapshot
-                .as_ref()
-                .and_then(|s| s.gpu.first())
+            self.sidebar_gpus().first().copied()
         } else {
             None
         }

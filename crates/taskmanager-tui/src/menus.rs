@@ -681,7 +681,7 @@ fn affinity_last_good<'a>(
 /// this crate's current surface vocabulary).
 #[must_use]
 pub(crate) fn smart_self_test_target(app: &TuiApp) -> Option<SmartSelfTestIntent> {
-    let disks = &app.projection().snapshot.as_ref()?.disks;
+    let disks = app.sidebar_disks();
     let disk = disks
         .iter()
         .find(|disk| disk.smart_availability == SmartAvailability::Available)?;

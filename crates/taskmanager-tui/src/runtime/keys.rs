@@ -57,7 +57,7 @@ const KEY_SYSTEMS: [KeySystem; 13] = [
     content_system,
 ];
 
-pub(super) fn handle_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+pub(crate) fn handle_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
     for system in KEY_SYSTEMS {
         let dispatch = system(app, &key);
         if dispatch.is_consumed() {

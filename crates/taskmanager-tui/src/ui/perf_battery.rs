@@ -51,14 +51,25 @@ pub(super) fn render_battery_section(
         super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
         return;
     };
-    if supplies.batteries.is_empty() {
+    let batteries = app.order_sidebar_rows(
+        supplies
+            .batteries
+            .iter()
+            .filter_map(|battery| {
+                let key = format!("battery:{}", battery.id);
+                app.sidebar_render_visible(&key, true)
+                    .then(|| (key, battery.clone()))
+            })
+            .collect(),
+    );
+    if batteries.is_empty() {
         super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
         return;
     }
     let lines = if area.height < 12 {
-        compact_battery_lines(&supplies.batteries, app)
+        compact_battery_lines(&batteries, app)
     } else {
-        battery_lines(&supplies.batteries, app, theme, app.prefs.graph_points)
+        battery_lines(&batteries, app, theme, app.prefs.graph_points)
     };
     frame.render_widget(
         Paragraph::new(lines)

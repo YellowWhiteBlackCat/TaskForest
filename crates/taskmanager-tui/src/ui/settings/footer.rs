@@ -30,6 +30,10 @@ pub(super) fn settings_footer(
         format!("↑↓/Tab · Enter {action} · Esc {}", t("common.cancel")),
         Style::new().fg(theme.accent),
     ))];
+    lines.push(Line::from(Span::styled(
+        format!("F3 {}", t("sidebar.edit_devices")),
+        Style::new().fg(theme.accent),
+    )));
     if setup_available {
         lines.push(Line::from(Span::styled(
             format!("F2 {}", t("settings.additional_setup_open")),

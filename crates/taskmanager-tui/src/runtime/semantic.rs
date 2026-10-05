@@ -200,6 +200,11 @@ impl TuiApp {
     fn semantic_active_modal(&self) -> Option<ModalInput> {
         match self.input_scope() {
             crate::TuiInputScope::LocalSurface(_) => match self.local_surface()? {
+                crate::TuiSurface::SidebarEditor { .. } => Some(ModalInput {
+                    id: String::from("sidebar-editor"),
+                    name: String::from(t("sidebar.edit_devices")),
+                    description: Some(String::from(t("tooltip.sidebar_edit"))),
+                }),
                 crate::TuiSurface::CommandPalette(palette) => Some(ModalInput {
                     id: String::from("command-palette"),
                     name: String::from("Command palette"),

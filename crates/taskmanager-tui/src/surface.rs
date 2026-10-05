@@ -139,6 +139,7 @@ impl AffinityModalState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TuiSurfaceKind {
     Settings,
+    SidebarEditor,
     About,
     SystemInformation,
     Health,
@@ -159,6 +160,7 @@ pub(crate) enum TuiSurfaceKind {
 #[derive(Clone, Debug)]
 pub(crate) enum TuiSurface {
     Settings,
+    SidebarEditor { selected: Option<String> },
     About(crate::information::AboutTargetView),
     SystemInformation(crate::information::SystemInformationTargetView),
     Health,
@@ -180,6 +182,7 @@ impl TuiSurface {
     pub(crate) const fn kind(&self) -> TuiSurfaceKind {
         match self {
             Self::Settings => TuiSurfaceKind::Settings,
+            Self::SidebarEditor { .. } => TuiSurfaceKind::SidebarEditor,
             Self::About(_) => TuiSurfaceKind::About,
             Self::SystemInformation(_) => TuiSurfaceKind::SystemInformation,
             Self::Health => TuiSurfaceKind::Health,

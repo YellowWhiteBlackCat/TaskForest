@@ -417,6 +417,14 @@ impl TuiFocusPlan {
 fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> TuiFocusControl {
     match surface {
         crate::TuiSurfaceKind::Settings => TuiFocusControl::SettingsField(app.settings_form.field),
+        crate::TuiSurfaceKind::SidebarEditor => menu_index(app, surface, |surface| match surface {
+            crate::TuiSurface::SidebarEditor { selected } => selected.as_ref().and_then(|key| {
+                app.sidebar_entries()
+                    .iter()
+                    .position(|entry| &entry.key == key)
+            }),
+            _ => None,
+        }),
         crate::TuiSurfaceKind::CommandPalette => TuiFocusControl::PaletteItem {
             index: app.command_palette().map_or(0, |palette| palette.selection),
         },
@@ -718,6 +726,7 @@ fn overlay_controls(
         // time so a later keystroke cannot retarget a committed click.
         crate::TuiSurfaceKind::CommandPalette => (3, 2, app.filtered_palette_rows().len()),
         crate::TuiSurfaceKind::Settings
+        | crate::TuiSurfaceKind::SidebarEditor
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
@@ -762,6 +771,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
         },
         TuiInputScope::LocalSurface(surface) => match surface {
             crate::TuiSurfaceKind::Settings => (68, 32),
+            crate::TuiSurfaceKind::SidebarEditor => (68, 24),
             crate::TuiSurfaceKind::About => (72, 20),
             crate::TuiSurfaceKind::SystemInformation => (84, 30),
             crate::TuiSurfaceKind::Health => (84, 30),

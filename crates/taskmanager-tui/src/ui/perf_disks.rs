@@ -51,6 +51,16 @@ pub(super) fn render_disk_section(
     if area.height == 0 {
         return;
     }
+    let disks = app.order_sidebar_rows(
+        disks
+            .iter()
+            .filter_map(|disk| {
+                let key = format!("disk:{}", disk.device_id);
+                app.sidebar_render_visible(&key, app.prefs.show[2])
+                    .then(|| (key, disk.clone()))
+            })
+            .collect(),
+    );
     if disks.is_empty() {
         super::render_empty_panel(
             frame,
@@ -64,7 +74,7 @@ pub(super) fn render_disk_section(
         return;
     }
     let lines = disk_lines(
-        disks,
+        &disks,
         app,
         theme,
         app.prefs.units[2],

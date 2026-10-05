@@ -26,7 +26,7 @@ mod navigation;
 mod seam;
 mod semantic;
 
-use keys::handle_key;
+pub(crate) use keys::handle_key;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::{ShellKeyEvent, queue_effect};
 
@@ -285,6 +285,10 @@ fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> boo
 }
 
 pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+    if key.code == ratatui::crossterm::event::KeyCode::F(3) {
+        app.open_sidebar_editor();
+        return None;
+    }
     if key.code == ratatui::crossterm::event::KeyCode::F(2) {
         app.open_first_run();
         return None;

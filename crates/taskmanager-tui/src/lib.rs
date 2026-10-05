@@ -43,6 +43,7 @@ mod runtime;
 mod selection;
 mod selectors;
 pub(crate) mod service_log;
+mod sidebar;
 mod snapshot_export;
 mod startup_control;
 mod surface;
@@ -181,6 +182,7 @@ pub struct TuiApp {
     /// model). Default [`PerfDevice::Cpu`]; only mutated by the Performance-page
     /// digit-key handler in `runtime::handle_key`.
     pub perf_device: PerfDevice,
+    pub(crate) performance_device_key: Option<String>,
     /// Frontend-local vertical-scroll intent for the inline selected-process
     /// detail/insights panel on the Applications page. The panel content (frozen
     /// identity rows + the bounded ProcessInsights cards) can exceed the fixed
@@ -347,6 +349,7 @@ impl TuiApp {
             first_run: FirstRunController::default(),
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
+            performance_device_key: None,
             detail_scroll: 0,
             cpu_core_scroll: 0,
             cpu_detail_scroll: 0,

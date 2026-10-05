@@ -34,6 +34,7 @@ mod perf_npu;
 mod perf_overview;
 mod perf_overview_data;
 mod perf_selector_instances;
+mod performance;
 mod pinned_actions;
 mod process_data;
 pub(crate) mod process_details;
@@ -44,6 +45,7 @@ pub(crate) mod service_dependencies_modal;
 pub(crate) mod service_menu;
 pub(crate) mod session_menu;
 pub(crate) mod settings;
+mod sidebar_editor;
 mod sparkline;
 pub(crate) mod startup_menu;
 mod system_dashboard;
@@ -201,6 +203,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             Some(crate::TuiSurface::Settings) => {
                 settings::render_settings_overlay_at(frame, app, theme, plan.focus, popup);
             }
+            Some(crate::TuiSurface::SidebarEditor { .. }) => {
+                sidebar_editor::render(frame, app, theme, popup);
+            }
             Some(crate::TuiSurface::About(view)) => {
                 about::render_about_overlay_at(frame, app, view, theme, popup);
             }
@@ -263,7 +268,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
 
 fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
     match plan.page {
-        TuiPageLayout::Performance { .. } => render_performance(frame, app, theme, plan),
+        TuiPageLayout::Performance { .. } => {
+            performance::render_performance(frame, app, theme, plan)
+        }
         TuiPageLayout::Applications { process, table } => {
             process_table::render_processes(frame, app, theme, process, table, plan.focus)
         }
@@ -278,75 +285,6 @@ fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiF
         TuiPageLayout::AppHistory { content } => {
             app_history::render_app_history(frame, app, theme, content)
         }
-    }
-}
-
-fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
-    let TuiPageLayout::Performance { selector, content } = plan.page else {
-        return;
-    };
-    if app.history_replay_open() {
-        history_replay::render(frame, app, theme, content);
-        return;
-    }
-    let Some(snapshot) = app.projection().snapshot.as_ref() else {
-        render_loading(frame, theme, content, t("common.collecting_telemetry"));
-        return;
-    };
-    // The compact resource selector row sits above the selected resource's
-    // detail; the area below shows ONLY that resource, reusing the existing
-    // per-resource renderers (gauges + history graph for Cpu/Memory, the
-    // dedicated perf_gpu/perf_disks/perf_networks panels for the device views).
-    render_perf_selector(frame, app, theme, selector);
-    match app.perf_device {
-        PerfDevice::Cpu | PerfDevice::Memory => {
-            perf_overview::render_perf_overview(frame, app, theme, content, snapshot);
-        }
-        PerfDevice::Gpu => perf_gpu::render_gpu_section(frame, app, theme, content, &snapshot.gpu),
-        PerfDevice::Disk => {
-            // The directory-usage projection panel (render-only) rides under
-            // the per-disk detail. Adaptive height: a projected snapshot needs
-            // room for root + entries + totals + status; the common idle slot
-            // (no scan projected yet) stays a slim 3-line panel so the disk
-            // detail keeps nearly the whole content area. The data comes from
-            // the SHARED `SystemProjectionStore::directory_usage` slot (latest-wins from
-            // the platform batch fold).
-            let usage_height: u16 =
-                match (app.projection().directory_usage.is_some(), content.height) {
-                    (true, height) if height >= 20 => 12,
-                    (false, height) if height >= 11 => 3,
-                    _ => 0,
-                };
-            let [disk_area, usage_area] =
-                Layout::vertical([Constraint::Min(1), Constraint::Length(usage_height)])
-                    .areas(content);
-            perf_disks::render_disk_section(frame, app, theme, disk_area, &snapshot.disks);
-            perf_disks::render_directory_usage(frame, app, theme, usage_area);
-        }
-        PerfDevice::Network => {
-            perf_networks::render_network_section(frame, app, theme, content, &snapshot.networks)
-        }
-        PerfDevice::Battery => perf_battery::render_battery_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().power_supplies.as_ref(),
-        ),
-        PerfDevice::Fan => perf_fan::render_fan_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().sensors.as_ref(),
-        ),
-        PerfDevice::Npu => perf_npu::render_npu_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().npu_inventory.as_ref(),
-        ),
     }
 }
 
@@ -440,6 +378,7 @@ const SELECTOR_HEADING_MAX_CELLS: usize = 22;
 
 /// One live per-device instance segment of the selector strip, pre-measured
 /// so the strip can admit whole segments only and never paint past its band.
+#[derive(Clone)]
 struct SelectorInstance {
     width: usize,
     spans: Vec<Span<'static>>,

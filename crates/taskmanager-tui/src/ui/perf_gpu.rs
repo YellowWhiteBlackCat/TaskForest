@@ -170,6 +170,16 @@ pub(super) fn render_gpu_section(
     if area.height == 0 {
         return;
     }
+    let gpus = app.order_sidebar_rows(
+        gpus.iter()
+            .filter_map(|gpu| {
+                let key = format!("gpu:{}", gpu.device_id);
+                app.sidebar_render_visible(&key, app.prefs.show[9])
+                    .then(|| (key, gpu.clone()))
+            })
+            .collect(),
+    );
+    let gpus = gpus.as_slice();
     if gpus.is_empty() {
         super::render_empty_panel(
             frame,

@@ -64,6 +64,20 @@ pub(super) fn render_fan_section(
         super::render_empty_panel(frame, theme, area, t("common.fan"), t("fan.empty"));
         return;
     };
+    let mut filtered = sensors.clone();
+    filtered.readings = app.order_sidebar_rows(
+        sensors
+            .readings
+            .iter()
+            .filter_map(|reading| {
+                let key = format!("fan:{}", reading.id());
+                (reading.quantity() != &SensorQuantity::FanSpeed
+                    || app.sidebar_render_visible(&key, true))
+                .then(|| (key, reading.clone()))
+            })
+            .collect(),
+    );
+    let sensors = &filtered;
     let has_fans = sensors
         .readings
         .iter()

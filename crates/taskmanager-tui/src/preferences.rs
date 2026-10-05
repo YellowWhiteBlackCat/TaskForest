@@ -402,7 +402,7 @@ impl TuiApp {
         let _ = self.commit_config_draft(config);
     }
 
-    fn commit_config_draft(&mut self, config: Config) -> bool {
+    pub(crate) fn commit_config_draft(&mut self, config: Config) -> bool {
         let submission = self
             .config_client
             .as_ref()

@@ -138,7 +138,6 @@ fn settings_capture_scenes_use_the_normal_keyboard_form_and_reveal_the_requested
     for (scene, field, label) in [
         ("settings-zero-gray", 24, "Gray out zero"),
         ("settings-switch-focus", 2, "High contrast"),
-        ("sidebar-edit", 9, "Show Memory"),
     ] {
         let mut app = demo_app();
         apply_capture_scene_override(&mut app, scene);

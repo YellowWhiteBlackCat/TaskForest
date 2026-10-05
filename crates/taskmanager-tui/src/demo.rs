@@ -639,7 +639,14 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });
         }
         "sidebar-edit" => {
-            prepare_capture_settings(app, 9, true);
+            prepare_capture_settings(app, 9, false);
+            crate::runtime::handle_key(
+                app,
+                ratatui::crossterm::event::KeyEvent::new(
+                    ratatui::crossterm::event::KeyCode::F(3),
+                    ratatui::crossterm::event::KeyModifiers::NONE,
+                ),
+            );
         }
         "keyboard-focus" => {
             apply_capture_scene_override(app, "process-selection");

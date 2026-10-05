@@ -158,6 +158,10 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
 
     if let Some(surface) = app.local_surface_kind() {
         let effect = match surface {
+            TuiSurfaceKind::SidebarEditor => {
+                app.handle_sidebar_key(key);
+                None
+            }
             TuiSurfaceKind::FirstRun => crate::first_run::handle_key(app, key),
             TuiSurfaceKind::CommandPalette => match key.code {
                 ratatui::crossterm::event::KeyCode::Esc => {

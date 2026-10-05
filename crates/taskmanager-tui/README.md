@@ -116,6 +116,10 @@ The Settings form has a typed Clean/Dirty/Conflict lifecycle: an external revisi
 updates runtime preferences but never discards a dirty form or permits its stale
 unedited fields to overwrite the new canonical snapshot; Cancel reloads the
 latest snapshot before editing may resume.
+Settings F3 opens concrete device editing. Arrows select and reorder stable keys; Space
+toggles visibility through the shared core rule and coordinator. Enter opens that identity;
+removal displays disconnection rather than another device. Title and actions stay fixed around
+whole rows, and the same choices order/filter the selector and detail projection.
 Its continuous-history control uses the same canonical config field as both desktop frontends.
 Enable enters a non-blocking `Connecting` reader state; disable immediately drops replay, while
 the frontend-owned writer follows the preference during the TUI lifetime. The History page reads
@@ -159,7 +163,7 @@ src/ui.rs                                     page rendering root
 │   ├── perf_overview.rs  perf_data.rs        performance overview
 │   ├── perf_core_grid.rs  perf_gpu.rs  perf_memory.rs  perf_disks.rs
 │   ├── perf_networks.rs  perf_battery.rs  perf_fan.rs  perf_npu.rs
-│   ├── perf_selector_instances.rs  perf_overview_data.rs
+│   ├── perf_selector_instances.rs  perf_overview_data.rs  performance.rs  sidebar_editor.rs
 │   ├── process_table.rs  process_data.rs  process_details/  process_menu.rs
 │   ├── process_properties.rs
 │   ├── health.rs  health_data.rs  alerts.rs
@@ -171,7 +175,7 @@ src/ui.rs                                     page rendering root
 │   ├── sparkline.rs  chart_cursor.rs  highlight.rs  table_hit.rs  text.rs  units.rs
 src/command_palette/  (+ surface_protocol.rs) command palette
 src/bindings.rs  capabilities.rs  functional.rs  keys, capabilities, CORE-04
-src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs
+src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs  sidebar.rs
 src/demo.rs  diagnostic_bundle.rs  snapshot_export.rs
 src/history_runtime.rs  menus.rs  process_view.rs
 src/service_log.rs  startup_control.rs  theme.rs

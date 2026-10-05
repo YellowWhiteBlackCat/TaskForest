@@ -307,6 +307,7 @@ fn apply_overlay_control_click(
         }
     }
     match surface {
+        crate::TuiSurfaceKind::SidebarEditor => EventReaction::default(),
         crate::TuiSurfaceKind::ServiceMenu => {
             if let Some(menu) = app.service_menu_mut() {
                 menu.selection = index.min(crate::ui::service_menu::MENU_ACTIONS.len() - 1);

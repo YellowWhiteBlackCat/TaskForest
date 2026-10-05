@@ -113,7 +113,11 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
         app.focus_panel == crate::FocusPanel::Details
             && app.shell.selected_process_identity().is_some()
     } else if scene == "sidebar-edit" {
-        app.settings_open() && app.settings_form.field == 9
+        app.local_surface_kind() == Some(crate::TuiSurfaceKind::SidebarEditor)
+            && app
+                .sidebar_entries()
+                .iter()
+                .any(|entry| entry.key == "memory")
     } else {
         true
     }
