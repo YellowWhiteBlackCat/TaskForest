@@ -769,6 +769,9 @@ capture() {
     rm -f "$f" 2>/dev/null
   fi
 
+  # The window/ownership receipt and PNG are already fixed. Stop every owned
+  # writer before hashing the complete log, including delayed presentation markers.
+  terminate_owned "$APP_PID" "$APP_PGID"
   local log_hash
   log_hash=$(sha256sum "$log" | cut -d' ' -f1)
   local windows_hash=- action_hash=-
@@ -788,7 +791,6 @@ capture() {
     "$windows_hash" "$action_receipt" "$action_hash" \
     >>"$WINDOW_MANIFEST"
 
-  terminate_owned "$APP_PID" "$APP_PGID"
   APP_PID=""
   APP_PGID=""
   [ "$status" = ok ]
