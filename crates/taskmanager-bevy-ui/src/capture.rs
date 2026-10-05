@@ -32,6 +32,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "perf-gpu" => Some("perf-gpu"),
         "perf-battery" => Some("perf-battery"),
         "process-force-kill" => Some("process-force-kill"),
+        "process-selection" => Some("process-selection"),
         "process-tree-confirm" => Some("process-tree-confirm"),
         "process-batch-confirm" => Some("process-batch-confirm"),
         "smart-self-test-confirm" => Some("smart-self-test-confirm"),
@@ -121,6 +122,7 @@ pub(crate) fn capture_page() -> Option<Page> {
     let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match value.trim().to_ascii_lowercase().as_str() {
         "applications"
+        | "process-selection"
         | "processes"
         | "process-force-kill"
         | "process-tree-confirm"

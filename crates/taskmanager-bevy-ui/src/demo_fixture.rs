@@ -161,6 +161,18 @@ pub(crate) fn seed_capture_confirmation_fixture(shell: &mut ShellApp) {
 
 pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario: &str) {
     match scenario.to_ascii_lowercase().as_str() {
+        "process-selection" => {
+            let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+            let process = shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|rows| rows.first())
+                .cloned();
+            if let Some(process) = process {
+                shell.set_row_selection(ProcessRowId::from_process(&process), Some(&process));
+            }
+        }
         "process-force-kill" => {
             let process = shell
                 .projection()

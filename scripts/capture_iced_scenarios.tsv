@@ -183,3 +183,9 @@ vertical-nav	vertical-nav	1180x780	gnome-dark
 vertical-nav-compact	vertical-nav	720x480	gnome-dark
 event-center	event-center	1180x780	gnome-dark
 event-center-compact	event-center	720x480	gnome-dark
+system-npu	system-npu	1180x780	gnome-dark
+system-npu-compact	system-npu	720x480	gnome-dark
+process-selection	process-selection	1180x780	gnome-dark
+process-selection-compact	process-selection	720x480	gnome-dark
+storage-health	storage-health	1180x780	gnome-dark
+storage-health-compact	storage-health	720x480	gnome-dark

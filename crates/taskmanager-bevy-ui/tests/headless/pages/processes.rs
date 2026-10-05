@@ -109,6 +109,7 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,

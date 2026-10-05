@@ -144,6 +144,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     let history = HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
@@ -424,6 +425,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     let history = HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
+        gray_zero_values: false,
         shell: &fan_shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
@@ -474,6 +476,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     thermal_app.init_resource::<HistoryProjectionResource>();
 
     let context2 = crate::app::PageContext {
+        gray_zero_values: false,
         shell: &thermal_shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,

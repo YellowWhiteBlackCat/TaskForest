@@ -13,8 +13,8 @@
 | | `first-run` | 首次运行系统引导配置 | Aligned | Aligned | Aligned |
 | | `system-dashboard` | 多硬件总览仪表盘 | Aligned | Aligned | Aligned |
 | | `system-hardware` | SMBIOS 硬件拓扑明细 | Aligned | Aligned | Aligned |
-| | `system-npu` | NPU 神经网络遥测明细 | Aligned | Aligned | Aligned |
-| 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Aligned | Aligned | Aligned |
+| | `system-npu` | NPU 神经网络遥测明细 | Pending | Aligned | Pending |
+| 进程诊断切片 | `process-selection` | 选中单行进程基准态 | Pending | Pending | Pending |
 | | `process-properties-performance` | 进程性能指标明细 Tab | Pending | Pending | Pending |
 | | `process-memory-pss-swap` | 进程 PSS/USS/Swap 内存展开 | Pending | Pending | Pending |
 | | `process-network-details` | 进程网络 Socket 与 RTT 明细 | Pending | Pending | Pending |
@@ -25,7 +25,7 @@
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Pending | Pending | Pending |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
 | | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Aligned | Aligned | Aligned |
-| 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Aligned | Aligned | Aligned |
+| 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Pending | Aligned | Aligned |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Aligned | Aligned | Aligned |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Aligned | Aligned | Aligned |
 | | `partition-disk-usage` | 分区挂载点与磁盘空间图 | Aligned | Aligned | Aligned |
@@ -36,7 +36,7 @@
 | | `battery-live-performance` | 电池实时放电速率与电压曲线 | Aligned | Aligned | Aligned |
 | | `gpu-engine-inventory` | 多 GPU 引擎枚举与负载图表 | Aligned | Aligned | Aligned |
 | | `intel-gpu-telemetry` | Intel 专属硬件遥测扩展指标 | Aligned | Aligned | Aligned |
-| 服务与系统诊断 | `service-details-logs` | 服务实时日志流输出面板 | Aligned | Aligned | Aligned |
+| 服务与系统诊断 | `service-details-logs` | 服务实时日志流输出面板 | Aligned | Pending | Aligned |
 | | `services-search-highlight` | 服务名关键词搜索过滤态 | Aligned | Aligned | Aligned |
 | | `diagnostic-preview` | 系统一键诊断报告生成后预览 | Aligned | Aligned | Aligned |
 | | `diagnostic-failure` | 诊断生成失败或超时错误模态 | Aligned | Aligned | Aligned |
@@ -54,11 +54,11 @@
 | 交互与显示形态 | `apps-search-highlight` | 进程搜索关键字高亮与命中过滤 | Aligned | Aligned | Aligned |
 | | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Aligned | Aligned |
 | | `apps-identity-matrix` | 进程身份校验与伪装报警状态 | Aligned | Aligned | Aligned |
-| | `apps-zero-gray` | 进程零值置灰与活动值对比渲染 | Aligned | Aligned | Aligned |
-| | `settings-switch-focus` | 设置页焦点切换与高亮状态 | Aligned | Aligned | Aligned |
-| | `settings-zero-gray` | 设置项置灰与可用性状态对比 | Aligned | Aligned | Aligned |
+| | `apps-zero-gray` | 进程零值置灰与活动值对比渲染 | Aligned | Pending | Aligned |
+| | `settings-switch-focus` | 设置页焦点切换与高亮状态 | Aligned | Pending | Aligned |
+| | `settings-zero-gray` | 设置项置灰与可用性状态对比 | Aligned | Pending | Aligned |
 | | `settings-permission-center` | 特权 Helper 授权管理中心视图 | Aligned | Aligned | Aligned |
-| | `keyboard-focus` | 全键盘无障碍导航焦点环形态 | Aligned | Aligned | Aligned |
+| | `keyboard-focus` | 全键盘无障碍导航焦点环形态 | Aligned | Pending | Aligned |
 | | `vertical-nav` | 垂直导航栏折叠与图标态 | Aligned | Aligned | Aligned |
 | | `sidebar-hidden` | 性能页左侧设备导航栏收起态 | Aligned | Aligned | Aligned |
 | | `sidebar-edit` | 性能页设备显示/隐藏列编辑态 | Aligned | Aligned | Aligned |

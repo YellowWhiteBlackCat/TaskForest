@@ -39,7 +39,6 @@ use bevy::ecs::query::{Changed, Has, Or, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
@@ -52,6 +51,9 @@ use bevy::ui::{Pressed, px};
 use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
+mod capture_marker;
+use capture_marker::emit_capture_marker;
+
 use taskmanager_assets::product;
 use taskmanager_theme::Theme;
 
@@ -60,8 +62,8 @@ use appearance::demo_theme_from_env;
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
 use crate::capture::{
-    capture_page, capture_page_name, capture_perf_device_target, capture_scenario_target,
-    capture_wants_service_logs, capture_window_resolution,
+    capture_page, capture_perf_device_target, capture_scenario_target, capture_wants_service_logs,
+    capture_window_resolution,
 };
 use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
@@ -70,12 +72,11 @@ use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
 use crate::pages::processes::columns_modal::ProcessColumnsModalState;
+use crate::pages::settings::ThemePreferences;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
-use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::palette::{self, UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
-use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
@@ -259,144 +260,6 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     }
 }
 
-fn emit_capture_marker(world: &mut World) {
-    let route = world.resource::<Route>().page;
-    if world.resource::<CaptureMarkerState>().emitted
-        || world
-            .query::<&crate::app::PageContent>()
-            .iter(world)
-            .all(|content| content.page != route)
-    {
-        return;
-    }
-    match capture_scenario_target() {
-        Some(
-            "process-force-kill"
-            | "process-tree-confirm"
-            | "process-batch-confirm"
-            | "smart-self-test-confirm",
-        ) if !crate::confirmation::capture_ready(world) => {
-            return;
-        }
-        Some(
-            scenario @ ("process-properties-performance"
-            | "process-memory-pss-swap"
-            | "process-network-details"
-            | "process-gpu-details"
-            | "process-resource-limits"
-            | "process-isolation"),
-        ) if !crate::pages::processes::properties_modal::capture_ready(world, scenario) => {
-            return;
-        }
-        Some("system-dashboard" | "history-60m")
-            if !crate::pages::system::dashboard::presented(world) =>
-        {
-            return;
-        }
-        Some("system-hardware") => {
-            let anchor = world
-                .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<MemoryInventoryAnchor>>(
-                )
-                .iter(world)
-                .next()
-                .map(|(node, transform)| (node.size(), transform.translation));
-            let Some((size, center)) = anchor.filter(|(size, _)| size.x > 0.0 && size.y > 0.0)
-            else {
-                return;
-            };
-            if !world
-                .resource::<CaptureMarkerState>()
-                .hardware_scroll_requested
-            {
-                let mut body = world.query_filtered::<(&ComputedNode, &UiGlobalTransform, &mut ScrollPosition), With<SystemBody>>();
-                for (node, transform, mut scroll) in body.iter_mut(world) {
-                    let maximum = ((node.content_size().y - node.size().y)
-                        * node.inverse_scale_factor())
-                    .max(0.0);
-                    let delta = (center.y - size.y / 2.0 - transform.translation.y
-                        + node.size().y / 2.0)
-                        * node.inverse_scale_factor();
-                    scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
-                }
-                world
-                    .resource_mut::<CaptureMarkerState>()
-                    .hardware_scroll_requested = true;
-                return;
-            }
-            let mut body =
-                world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<SystemBody>>();
-            if !body.iter(world).any(|(node, transform)| {
-                center.y - size.y / 2.0 >= transform.translation.y - node.size().y / 2.0 - 0.5
-                    && center.y + size.y / 2.0
-                        <= transform.translation.y + node.size().y / 2.0 + 0.5
-            }) {
-                return;
-            }
-        }
-        Some("history-replay") => {
-            use crate::pages::history::control::{
-                HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
-            };
-            if !world
-                .resource::<CaptureMarkerState>()
-                .history_open_requested
-                && world
-                    .non_send::<crate::pages::history::HistoryRuntime>()
-                    .available()
-            {
-                world
-                    .resource_mut::<CaptureMarkerState>()
-                    .history_open_requested = true;
-                world.trigger(HistoryCommand::OpenPerformance);
-            }
-            if *world.resource::<PerformancePresentation>() != PerformancePresentation::Replay
-                || world
-                    .resource::<PerformanceHistoryProjectionResource>()
-                    .0
-                    .rows
-                    .is_empty()
-                || !crate::pages::performance::replay::charts_presented(world)
-            {
-                return;
-            }
-        }
-        Some("application-history-replay")
-            if world
-                .resource::<HistoryProjectionResource>()
-                .0
-                .rows
-                .is_empty() =>
-        {
-            return;
-        }
-        _ => {}
-    }
-    if matches!(
-        capture_scenario_target(),
-        Some(
-            "history-replay"
-                | "application-history-replay"
-                | "system-hardware"
-                | "system-dashboard"
-                | "history-60m"
-                | "process-properties-performance"
-                | "process-memory-pss-swap"
-                | "process-network-details"
-                | "process-gpu-details"
-                | "process-resource-limits"
-                | "process-isolation"
-        )
-    ) && !world.resource::<CaptureMarkerState>().data_presented
-    {
-        world.resource_mut::<CaptureMarkerState>().data_presented = true;
-        return;
-    }
-    let page = capture_page_name(route);
-    println!("BEVY_CAPTURE_MARKER event=frame_ready mode=demo page={page}");
-    println!("BEVY_CAPTURE_MARKER event=target_ready mode=demo page={page}");
-    world.resource_mut::<CaptureMarkerState>().emitted = true;
-}
-
 /// Compose the history connector at the native edge. The config preference is
 /// read once at startup through the bounded app-host client; disabled history
 /// does not launch a writer or replay worker. The inert connector permits a
@@ -477,7 +340,12 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<HistoryProjectionResource>();
         app.init_resource::<PerformanceLayoutState>().add_systems(
             PostUpdate,
-            (sync_performance_layout, sync_control_visuals).chain(),
+            (
+                sync_performance_layout,
+                sync_control_visuals,
+                crate::widgets::table::paint_zero_values,
+            )
+                .chain(),
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
@@ -510,6 +378,14 @@ impl Plugin for FrontendWindowPlugin {
             app.add_plugins(bevy::a11y::AccessibilityPlugin);
         }
         app.add_plugins(AppShellPlugin);
+        if matches!(
+            capture_scenario_target(),
+            Some("settings-zero-gray" | "apps-zero-gray")
+        ) {
+            app.world_mut()
+                .resource_mut::<ThemePreferences>()
+                .gray_zero_values = true;
+        }
         crate::icons::register(app);
         crate::confirmation::register(app);
         crate::pages::processes::affinity::register(app);

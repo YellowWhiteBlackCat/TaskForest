@@ -13,9 +13,11 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
+use bevy::ecs::system::Res;
 use bevy::ecs::system::{Commands, NonSendMut, Query};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
+use bevy::text::TextColor;
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -27,9 +29,32 @@ use taskmanager_shell::SortCol;
 use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::app::FrontendTrack;
+use crate::pages::settings::ThemePreferences;
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::window::WindowPalette;
 use crate::window::{Role, TextRole};
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct ZeroValueCell(pub(crate) bool);
+
+/// Dimming follows the live preference; missing cells never become zeros.
+pub(crate) fn paint_zero_values(
+    preferences: Res<ThemePreferences>,
+    palette: Res<WindowPalette>,
+    mut cells: Query<(&ZeroValueCell, &mut TextColor)>,
+) {
+    for (zero, mut color) in &mut cells {
+        let selected = if zero.0 && preferences.gray_zero_values {
+            palette.inner.dim_color
+        } else {
+            palette.inner.body_color
+        };
+        if color.0 != selected {
+            color.0 = selected;
+        }
+    }
+}
 
 /// Active sort as a table-projection input: the ui-contract column token
 /// plus direction. Pages translate their shell sort slot (`SortCol`,
@@ -295,11 +320,7 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
         JustifyContent::FlexStart
     };
     let is_zero = cell == "0" || cell == "0.0%" || cell == "0 B" || cell == "0 B/s";
-    let role = if label || is_zero {
-        Role::Caption
-    } else {
-        Role::Body
-    };
+    let role = if label { Role::Caption } else { Role::Body };
     bsn! {
         Node {
             width: px(width),
@@ -311,6 +332,7 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
         }
         Children [
              Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap }
+             ZeroValueCell({ is_zero && numeric_column && !label })
         ]
     }
 }

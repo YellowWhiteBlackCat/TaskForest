@@ -211,6 +211,7 @@ fn gpu_section_enumerates_every_projected_adapter() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
@@ -310,6 +311,7 @@ fn disk_block_renders_the_projected_partition_rows() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
@@ -387,6 +389,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
@@ -424,6 +427,7 @@ fn performance_history_mount_starts_live_without_inventing_replay_availability()
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,

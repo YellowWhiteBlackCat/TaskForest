@@ -472,6 +472,15 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 );
             }
         }
+        "process-selection" => {
+            app.shell.application.active_page = AppPage::Applications;
+            let index = (0..app.shell.visible_process_count())
+                .find(|index| app.shell.row_identity_at(*index).is_some());
+            if let Some(index) = index {
+                let _ = app.shell.select_row(index);
+                app.reconcile_applications_cursor();
+            }
+        }
         "process-properties-performance" => {
             app.shell.application.active_page = AppPage::Applications;
             if let Some(item) = app

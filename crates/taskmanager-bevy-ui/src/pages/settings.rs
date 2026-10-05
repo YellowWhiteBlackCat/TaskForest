@@ -66,6 +66,9 @@ use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::appearance::PreferredColorScheme;
 
+mod choices;
+use choices::{capacity_entries, language_entries, refresh_entries, theme_entries};
+
 mod privilege_center;
 use privilege_center::privileges_section_scene;
 
@@ -122,6 +125,8 @@ pub(crate) fn theme_for_mode_and_contrast(mode: LightDark, hc: HighContrast) -> 
 /// Dynamic presentation theme preferences for the Bevy desktop shell.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ThemePreferences {
+    /// Current measured zeros may use the muted resource-cell color.
+    pub(crate) gray_zero_values: bool,
     /// Explicit mode choice, or `None` to follow the system desktop preference.
     pub(crate) mode: Option<LightDark>,
     /// Explicit skin choice, or `None` to follow default GNOME skin.
@@ -208,6 +213,7 @@ pub(crate) enum SettingsField {
     Refresh(TelemetryInterval),
     HistoryCapacity(usize),
     HistoryPersistence(bool),
+    GrayZeroValues(bool),
     #[default]
     PauseTelemetry,
 }
@@ -252,6 +258,7 @@ pub(crate) fn apply_persisted_config(
     track: &mut FrontendTrack,
 ) {
     if let Some(prefs) = prefs {
+        prefs.gray_zero_values = config.gray_zero_values;
         if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
             prefs.mode = None;
         } else if config.mode.eq_ignore_ascii_case("Light") {
@@ -450,6 +457,14 @@ fn settings_choice_observer(
                 );
             }
         }
+        SettingsField::GrayZeroValues(enabled) => {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
+                prefs.gray_zero_values = enabled;
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.gray_zero_values = enabled;
+            });
+        }
         SettingsField::PauseTelemetry => {
             // Guarded so a repeated activation is a no-op, not a double flip.
             if track.shell.paused() != change.event().value {
@@ -485,77 +500,6 @@ fn apply_theme(mode: LightDark, palette: &mut WindowPalette, clear: Option<&mut 
 
 // ---- view model rows (pure projections of the authorities) ----
 
-fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
-    vec![
-        ChoiceEntry {
-            label: "System".to_owned(),
-            choice: SettingsChoice(SettingsField::SystemMode),
-            selected: mode.is_none(),
-        },
-        ChoiceEntry {
-            label: "Light".to_owned(),
-            choice: SettingsChoice(SettingsField::Theme(LightDark::Light)),
-            selected: mode == Some(LightDark::Light),
-        },
-        ChoiceEntry {
-            label: "Dark".to_owned(),
-            choice: SettingsChoice(SettingsField::Theme(LightDark::Dark)),
-            selected: mode == Some(LightDark::Dark),
-        },
-    ]
-}
-
-fn language_entries(language: Language) -> Vec<ChoiceEntry> {
-    [(Language::En, "English"), (Language::Zh, "中文")]
-        .into_iter()
-        .map(|(value, label)| ChoiceEntry {
-            label: label.to_owned(),
-            choice: SettingsChoice(SettingsField::Language(value)),
-            selected: language == value,
-        })
-        .collect()
-}
-
-fn refresh_entries(interval: TelemetryInterval) -> Vec<ChoiceEntry> {
-    let selected = refresh_choice_index(interval);
-    REFRESH_CHOICES_MS
-        .iter()
-        .enumerate()
-        .map(|(index, millis)| ChoiceEntry {
-            label: refresh_label(*millis),
-            choice: SettingsChoice(SettingsField::Refresh(interval_for_millis(*millis))),
-            selected: selected == Some(index),
-        })
-        .collect()
-}
-
-fn capacity_entries(capacity: usize) -> Vec<ChoiceEntry> {
-    let selected = capacity_choice_index(capacity);
-    CAPACITY_CHOICES
-        .iter()
-        .enumerate()
-        .map(|(index, samples)| ChoiceEntry {
-            label: samples.to_string(),
-            choice: SettingsChoice(SettingsField::HistoryCapacity(*samples)),
-            selected: selected == Some(index),
-        })
-        .collect()
-}
-
-/// The `TelemetryInterval` for one offered cadence step. The ladder lives
-/// inside the policy's clamp window, so `clamped` never deviates from the
-/// requested step.
-fn interval_for_millis(millis: u64) -> TelemetryInterval {
-    TelemetryInterval::clamped(Duration::from_millis(millis))
-}
-
-fn refresh_label(millis: u64) -> String {
-    format!(
-        "{} s",
-        f64::from(u32::try_from(millis).unwrap_or(u32::MAX)) / 1000.0
-    )
-}
-
 // ---- render adapters ----
 
 /// Content-region scene for the Settings page.
@@ -568,6 +512,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let hc = context.palette.high_contrast;
     let persistence = context.history.status != ApplicationHistoryStatus::Disabled;
     let rows: Vec<Box<dyn Scene>> = vec![
+        toggle_row(
+            t("settings.gray_zero_values"),
+            ChoiceEntry {
+                label: t("settings.gray_zero_values").to_owned(),
+                choice: SettingsChoice(SettingsField::GrayZeroValues(!context.gray_zero_values)),
+                selected: context.gray_zero_values,
+            },
+            t("settings.gray_zero_values_hint"),
+        ),
         radio_row(
             "Theme",
             theme_entries(mode),
@@ -733,7 +686,9 @@ fn choice_widgets(entries: Vec<ChoiceEntry>) -> Vec<Box<dyn Scene>> {
             let SettingsChoice(field) = choice;
             let boolean = matches!(
                 field,
-                SettingsField::PauseTelemetry | SettingsField::HistoryPersistence(_)
+                SettingsField::PauseTelemetry
+                    | SettingsField::HistoryPersistence(_)
+                    | SettingsField::GrayZeroValues(_)
             );
             match (boolean, selected) {
                 (true, true) => Box::new(checked_checkbox_shape(label, field)) as Box<dyn Scene>,

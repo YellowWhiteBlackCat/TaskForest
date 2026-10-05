@@ -24,8 +24,8 @@ curves, sidebar mini-graphs, and the memory composition bar through one
 gap-aware adapter), and the semantic accessibility channel (ui-contract
 `SemanticSnapshot` plus `bevy_a11y` nodes published through the
 `accesskit_unix` bridge on Linux). Remaining open surface is declared, never
-hidden: per-row process trends, multi-select process verbs, notification
-history, GPU-engine detail cards, service log streaming, the tray seam, and multi-window composition.
+hidden: backend capability absence is shown as typed unavailable state;
+per-row process trends and multi-window composition remain separate surfaces.
 Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
@@ -54,6 +54,9 @@ adopted — theme tokens are the only skin authority.
 - `src/confirmation.rs` — the shell's armed destructive-action gate rendered
   as one modal under the app shell root, with typed confirm/dismiss paths
   and republished gate transitions.
+- `src/focus_visible.rs` binds actual widget Tab navigation to toolkit focus,
+  paints one keyboard ring and reveals focused controls through the owned scroll area.
+  Settings zero dimming uses the persisted config field and leaves missing values distinct.
 - `src/semantic.rs` — the accessibility seam: the ui-contract
   `SemanticSnapshot` (revision-keyed) plus accessibility row nodes.
 - `src/window.rs` — the bsn! app shell (route-aware shell + nav rail + content slot),

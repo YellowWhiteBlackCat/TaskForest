@@ -142,6 +142,7 @@ fn containers_scene_assembles_for_all_five_branches() {
     // 1. Waiting (containers is None initially)
     {
         let ctx = PageContext {
+            gray_zero_values: false,
             shell: &shell,
             process_tree_expansion: &process_tree_expansion,
             palette: &palette,
@@ -162,6 +163,7 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            gray_zero_values: false,
             shell: &shell,
             process_tree_expansion: &process_tree_expansion,
             palette: &palette,
@@ -182,6 +184,7 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            gray_zero_values: false,
             shell: &shell,
             process_tree_expansion: &process_tree_expansion,
             palette: &palette,
@@ -199,6 +202,7 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            gray_zero_values: false,
             shell: &shell,
             process_tree_expansion: &process_tree_expansion,
             palette: &palette,
@@ -222,6 +226,7 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            gray_zero_values: false,
             shell: &shell,
             process_tree_expansion: &process_tree_expansion,
             palette: &palette,

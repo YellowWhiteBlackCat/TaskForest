@@ -35,6 +35,7 @@ impl Fixture {
 
     fn context(&self) -> PageContext<'_> {
         PageContext {
+            gray_zero_values: false,
             shell: &self.shell,
             process_tree_expansion: &self.process_tree_expansion,
             palette: &self.palette,

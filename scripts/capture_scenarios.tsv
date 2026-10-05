@@ -129,3 +129,4 @@ process-network-details-compact	gnome-light	apps	cpu	0	process-network-details	7
 process-gpu-details-compact	gnome-light	apps	cpu	0	process-gpu-details	720x480	720x480
 process-resource-limits-compact	gnome-light	apps	cpu	0	process-resource-limits	720x480	720x480
 process-isolation-compact	gnome-light	apps	cpu	0	process-isolation	720x480	720x480
+process-tree-confirmation-compact	gnome-light	apps	cpu	0	process-tree-confirm	720x480	720x480

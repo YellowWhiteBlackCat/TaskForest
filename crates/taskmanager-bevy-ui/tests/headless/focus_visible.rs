@@ -13,14 +13,13 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::input::ButtonState;
 use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
+use bevy::input_focus::{FocusCause, InputFocus};
 use bevy::picking::hover::PickingInteraction;
-use bevy::ui::BorderColor;
+use bevy::ui::{Node, Outline};
+use bevy::ui_widgets::Button;
 use taskmanager_theme::Theme;
 
-use super::{
-    FocusRing, FocusRingVisible, FocusedControl, InputModality, InputModalityChanged,
-    InputModalityState,
-};
+use super::{FocusRingVisible, InputModality, InputModalityState};
 use crate::palette::ui_palette;
 use crate::window::WindowPalette;
 
@@ -129,20 +128,13 @@ fn focus_ring_visible_mounts_on_keyboard_and_despawns_on_pointer() {
     });
     super::register(&mut app);
 
-    let focused = app
-        .world_mut()
-        .spawn((
-            FocusRing,
-            FocusedControl,
-            BorderColor::all(palette.border_color),
-        ))
-        .id();
+    let focused = app.world_mut().spawn((Node::default(), Button)).id();
 
-    let unfocused = app
-        .world_mut()
-        .spawn((FocusRing, BorderColor::all(palette.border_color)))
-        .id();
+    let unfocused = app.world_mut().spawn((Node::default(), Button)).id();
 
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(focused, FocusCause::Navigated);
     app.update();
 
     let world = app.world_mut();
@@ -156,17 +148,9 @@ fn focus_ring_visible_mounts_on_keyboard_and_despawns_on_pointer() {
     );
 
     // 1. Keyboard navigation establishes focus ring
-    let prev = app
-        .world_mut()
-        .resource_mut::<InputModalityState>()
-        .modality();
     app.world_mut()
         .resource_mut::<InputModalityState>()
         .transition(InputModality::Keyboard);
-    app.world_mut().commands().trigger(InputModalityChanged {
-        previous: prev,
-        current: InputModality::Keyboard,
-    });
     app.update();
 
     let world = app.world_mut();
@@ -187,23 +171,15 @@ fn focus_ring_visible_mounts_on_keyboard_and_despawns_on_pointer() {
         "unfocused entity must not mount FocusRingVisible"
     );
     assert_eq!(
-        app.world().get::<BorderColor>(focused).unwrap().top,
+        app.world().get::<Outline>(focused).unwrap().color,
         palette.focus_ring,
         "border color changes to theme focus_ring"
     );
 
     // 2. Pointer interaction dismisses focus ring
-    let prev = app
-        .world_mut()
-        .resource_mut::<InputModalityState>()
-        .modality();
     app.world_mut()
         .resource_mut::<InputModalityState>()
         .transition(InputModality::Pointer);
-    app.world_mut().commands().trigger(InputModalityChanged {
-        previous: prev,
-        current: InputModality::Pointer,
-    });
     app.update();
 
     let world = app.world_mut();
@@ -216,8 +192,107 @@ fn focus_ring_visible_mounts_on_keyboard_and_despawns_on_pointer() {
         "pointer interaction suppresses all FocusRingVisible components"
     );
     assert_eq!(
-        app.world().get::<BorderColor>(focused).unwrap().top,
-        palette.border_color,
+        app.world().get::<Outline>(focused).unwrap().color,
+        bevy::color::Color::NONE,
         "border color restores to default border_color"
     );
+}
+
+#[test]
+fn normal_tab_navigation_moves_the_ring_between_real_product_controls() {
+    use bevy::camera::visibility::InheritedVisibility;
+    use bevy::input_focus::InputDispatchPlugin;
+    use bevy::input_focus::tab_navigation::TabIndex;
+    use bevy::window::{PrimaryWindow, Window};
+
+    let mut app = crate::window::tests::scripted_frontend_app();
+    app.add_plugins(InputDispatchPlugin);
+    let window = app
+        .world_mut()
+        .spawn((Window::default(), PrimaryWindow))
+        .id();
+    app.update();
+    app.update();
+    // The headless composition has no visibility propagation plugin.
+    for mut visible in app
+        .world_mut()
+        .query::<&mut InheritedVisibility>()
+        .iter_mut(app.world_mut())
+    {
+        *visible = InheritedVisibility::VISIBLE;
+    }
+    let tab = |app: &mut App| {
+        app.world_mut().write_message(KeyboardInput {
+            key_code: KeyCode::Tab,
+            logical_key: Key::Tab,
+            state: ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window,
+        });
+        app.update();
+    };
+    tab(&mut app);
+    let first = app
+        .world()
+        .resource::<InputFocus>()
+        .get()
+        .expect("first control");
+    assert!(app.world().get::<Button>(first).is_some());
+    assert!(app.world().get::<TabIndex>(first).is_some());
+    assert!(app.world().get::<FocusRingVisible>(first).is_some());
+    let original_node = app.world().get::<Node>(first).expect("real node").clone();
+    tab(&mut app);
+    let second = app
+        .world()
+        .resource::<InputFocus>()
+        .get()
+        .expect("next control");
+    assert_ne!(first, second);
+    assert!(app.world().get::<FocusRingVisible>(first).is_none());
+    assert!(app.world().get::<FocusRingVisible>(second).is_some());
+    assert_eq!(app.world().get::<Node>(first), Some(&original_node));
+
+    // The normal frozen gate becomes the keyboard owner when it mounts.
+    use crate::app::FrontendTrack;
+    use crate::confirmation::{ConfirmationChanged, ConfirmationOverlay, PendingConfirmationView};
+    use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
+    use bevy::ecs::hierarchy::ChildOf;
+    let view = {
+        let mut track = app.world_mut().non_send_mut::<FrontendTrack>();
+        track.shell = demo_shell();
+        seed_capture_confirmation_scenario(&mut track.shell, "process-tree-confirm");
+        PendingConfirmationView::from_pending(
+            track.shell.pending_confirmation().expect("frozen gate"),
+        )
+        .expect("renderable gate")
+    };
+    app.world_mut().trigger(ConfirmationChanged(Some(view)));
+    app.update();
+    for mut visible in app
+        .world_mut()
+        .query::<&mut InheritedVisibility>()
+        .iter_mut(app.world_mut())
+    {
+        *visible = InheritedVisibility::VISIBLE;
+    }
+    for _ in 0..6 {
+        let focused = app
+            .world()
+            .resource::<InputFocus>()
+            .get()
+            .expect("modal control owns focus");
+        let world = app.world();
+        let mut ancestor = focused;
+        let mut in_modal = false;
+        while let Some(parent) = world.get::<ChildOf>(ancestor) {
+            ancestor = parent.parent();
+            if world.get::<ConfirmationOverlay>(ancestor).is_some() {
+                in_modal = true;
+                break;
+            }
+        }
+        assert!(in_modal, "Tab must remain inside the armed gate");
+        tab(&mut app);
+    }
 }

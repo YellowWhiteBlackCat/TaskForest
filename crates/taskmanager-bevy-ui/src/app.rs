@@ -64,6 +64,7 @@ use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
 
+use crate::pages::settings::ThemePreferences;
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
@@ -547,6 +548,8 @@ pub(crate) struct PageMount {
 /// application-history has a connector-owned lifecycle rather than belonging
 /// to the live process projection.
 pub(crate) struct PageContext<'a> {
+    /// Read-only rendering decision from the window's current preferences.
+    pub(crate) gray_zero_values: bool,
     /// The shell: projection store + memoized row projections. Read-only.
     pub(crate) shell: &'a ShellApp,
     /// Persistent Bevy-local process-tree expansion state.
@@ -581,9 +584,15 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
 /// Chained after the keyboard adapter: an accepted key press triggers the
 /// despawn observer at the deferred sync point, and this system rebuilds the
 /// content before the frame renders. The first frame mounts the initial page.
+#[derive(SystemParam)]
+struct PagePresentation<'w> {
+    preferences: Res<'w, ThemePreferences>,
+    palette: Res<'w, WindowPalette>,
+}
+
 fn mount_page_system(
     track: ShellTrack,
-    palette: Res<WindowPalette>,
+    presentation: PagePresentation,
     history: Res<HistoryProjectionResource>,
     route: Res<Route>,
     mut mount: ResMut<PageMount>,
@@ -594,9 +603,10 @@ fn mount_page_system(
         return;
     }
     let context = PageContext {
+        gray_zero_values: presentation.preferences.gray_zero_values,
         shell: track.shell(),
         process_tree_expansion: track.process_tree_expansion(),
-        palette: &palette.inner,
+        palette: &presentation.palette.inner,
         history: &history.0,
     };
     commands.spawn_scene(bsn! {

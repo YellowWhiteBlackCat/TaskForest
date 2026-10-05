@@ -53,6 +53,14 @@ def audit_doc_scenario_tokens(path: Path) -> set[str]:
     return tokens
 
 
+def require_parity_scenarios(
+    required: set[str], rows: list[dict[str, str]], frontend: str
+) -> None:
+    missing = sorted(required - {row["name"] for row in rows})
+    if missing:
+        raise CoverageError(f"{frontend} parity scenarios lack dedicated capture rows: {missing}")
+
+
 def gpui_device_names(path: Path) -> set[str]:
     source = path.read_text(encoding="utf-8")
     names = set(re.findall(r'Some\("([^"]+)"\).*=> SelectedDevice::', source))
@@ -183,6 +191,8 @@ def validate(root: Path) -> dict[str, object]:
     require_compact(bevy_matrix, "page", required_bevy_pages, "Bevy pages")
 
     tui_matrix = read_tsv(root / "scripts/capture_tui_scenarios.tsv")
+    for frontend, rows in [("Iced", iced_matrix), ("Bevy", bevy_matrix), ("TUI", tui_matrix)]:
+        require_parity_scenarios(audit_tokens, rows, frontend)
     tui_pages = {row["page"] for row in tui_matrix}
     required_tui_pages = {
         "applications", "performance", "services", "system", "startup", "users", "app-history"
@@ -200,20 +210,6 @@ def validate(root: Path) -> dict[str, object]:
     if missing_tui_compact:
         raise CoverageError(f"TUI pages lack compact 54x16 coverage: {missing_tui_compact}")
 
-    parity_floor = 80
-    if len(iced_matrix) < parity_floor:
-        raise CoverageError(
-            f"Iced matrix has {len(iced_matrix)} rows, below parity floor of {parity_floor}"
-        )
-    if len(bevy_matrix) < parity_floor:
-        raise CoverageError(
-            f"Bevy matrix has {len(bevy_matrix)} rows, below parity floor of {parity_floor}"
-        )
-    if len(tui_matrix) < parity_floor:
-        raise CoverageError(
-            f"TUI matrix has {len(tui_matrix)} rows, below parity floor of {parity_floor}"
-        )
-
     return {
         "gpui_rows": len(gpui_matrix),
         "gpui_capture_scenarios": len(required_scenarios),
@@ -227,10 +223,30 @@ def validate(root: Path) -> dict[str, object]:
     }
 
 
+def self_test() -> int:
+    required = {"process-selection", "process-tree-confirm"}
+    complete = [{"name": token} for token in required]
+    require_parity_scenarios(required, complete, "fixture")
+    incomplete = [{"name": "process-selection"}] + [{"name": f"unrelated-{i}"} for i in range(100)]
+    for rows in [incomplete, [{"name": "process-selection"}] * 100, []]:
+        try:
+            require_parity_scenarios(required, rows, "fixture")
+        except CoverageError as error:
+            if "process-tree-confirm" not in str(error):
+                raise AssertionError("missing semantic scenario must be named") from error
+        else:
+            raise AssertionError("row count cannot replace semantic coverage")
+    print("visual capture coverage self-test: PASS")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    if args.self_test:
+        return self_test()
     try:
         summary = validate(args.repo_root.resolve())
     except (CoverageError, OSError, KeyError) as error:

@@ -107,7 +107,14 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
 }
 
 fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
-    if target == "service-details" {
+    if target == "process-selection" {
+        app.shell.application.active_page = AppPage::Applications;
+        let index = (0..app.shell.visible_process_count())
+            .find(|index| app.shell.row_identity_at(*index).is_some());
+        if let Some(index) = index {
+            let _ = app.update(Message::SelectRow(index));
+        }
+    } else if target == "service-details" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
     } else if matches!(target, "system-dashboard" | "history-60m") {
@@ -139,7 +146,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.open_local_surface(LocalSurface::FirstRun);
     } else if target == "run-task" {
         app.open_local_surface(LocalSurface::RunTask);
-    } else if target == "disk-smart" {
+    } else if target == "disk-smart" || target == "storage-health" {
         app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
     } else if target == "diagnostic-preview" {
         app.open_diagnostic_bundle();

@@ -308,6 +308,59 @@ fn activate(app: &mut App, entity: Entity) {
     app.update();
 }
 
+#[test]
+fn zero_value_checkbox_changes_real_cells_without_dimming_missing_values() {
+    use crate::pages::settings::ThemePreferences;
+    use crate::widgets::table::{row_scene, visible_columns};
+    use bevy::scene::CommandsSceneExt;
+    use bevy::text::TextColor;
+    use bevy::ui_widgets::Checkbox;
+
+    let mut app = headless_shell_app();
+    mount_settings(&mut app);
+    let columns = visible_columns(&[])
+        .into_iter()
+        .filter(|column| matches!(column.id, "CPU" | "Memory" | "Network"))
+        .collect::<Vec<_>>();
+    let cells = vec!["0.0%".to_owned(), "—".to_owned(), "8 B/s".to_owned()];
+    app.world_mut()
+        .commands()
+        .spawn_scene(row_scene(&cells, &columns));
+    app.update();
+    let colors = |app: &mut App| {
+        app.world_mut()
+            .query::<(&Text, &TextColor)>()
+            .iter(app.world())
+            .filter(|(text, _)| cells.contains(&text.0))
+            .map(|(text, color)| (text.0.clone(), color.0))
+            .collect::<std::collections::HashMap<_, _>>()
+    };
+    let body = app.world().resource::<WindowPalette>().inner.body_color;
+    let dim = app.world().resource::<WindowPalette>().inner.dim_color;
+    assert_eq!(colors(&mut app)["0.0%"], body);
+    for enabled in [true, false] {
+        let entity = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(enabled));
+        assert!(app.world().get::<Checkbox>(entity).is_some());
+        app.world_mut()
+            .trigger(bevy::ui_widgets::ValueChange::<bool> {
+                source: entity,
+                value: enabled,
+                is_final: true,
+            });
+        app.update();
+        assert_eq!(
+            app.world().resource::<ThemePreferences>().gray_zero_values,
+            enabled
+        );
+        let current = colors(&mut app);
+        assert_eq!(current["0.0%"], if enabled { dim } else { body });
+        assert_eq!(current["—"], body);
+        assert_eq!(current["8 B/s"], body);
+        let next = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(!enabled));
+        assert_eq!(is_checked(app.world_mut(), next), enabled);
+    }
+}
+
 // ---- pure projections of the authorities ----
 
 #[test]

@@ -10,6 +10,16 @@
 //! never source text.
 
 use super::super::*;
+
+#[test]
+fn dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table() {
+    let mut app = crate::demo_app();
+    let expected = app.shell.row_anchor_at(0).expect("canonical first process");
+    crate::demo::apply_capture_scene_override(&mut app, "process-selection");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+    assert_eq!(app.shell.selected_row_anchor(), Some(expected));
+    assert!(app.process_properties().is_none());
+}
 use taskmanager_application::ProcessInsightFacet;
 
 use std::collections::HashSet;

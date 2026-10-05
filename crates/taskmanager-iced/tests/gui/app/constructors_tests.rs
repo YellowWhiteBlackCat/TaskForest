@@ -183,17 +183,31 @@ fn system_and_npu_capture_targets_seed_complete_typed_npu_facts() {
         ScalarAvailability::Unavailable(FailureKind::Unsupported)
     );
 
-    let mut npu = IcedApp::demo();
-    apply_capture_target(&mut npu, "npu");
-    assert_eq!(npu.performance.selected_device, PerfDevice::Npu(0));
-    assert_eq!(
-        npu.shell.projection().npu_inventory,
-        system.shell.projection().npu_inventory
-    );
+    for target in ["npu", "system-npu"] {
+        let mut npu = IcedApp::demo();
+        apply_capture_target(&mut npu, target);
+        assert_eq!(npu.performance.selected_device, PerfDevice::Npu(0));
+        assert_eq!(
+            npu.shell.projection().npu_inventory,
+            system.shell.projection().npu_inventory
+        );
+    }
 
     let mut services = IcedApp::demo();
     apply_capture_target(&mut services, "services");
     assert!(services.shell.projection().npu_inventory.is_none());
+}
+
+#[test]
+fn dedicated_process_and_storage_capture_targets_use_the_normal_surfaces() {
+    let mut app = IcedApp::demo();
+    let expected = app.shell.row_anchor_at(0).expect("canonical first process");
+    apply_capture_target(&mut app, "process-selection");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+    assert_eq!(app.shell.selected_row_anchor(), Some(expected));
+    assert!(app.shell.process_properties_target().is_none());
+    apply_capture_target(&mut app, "storage-health");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::DiskSmart));
 }
 
 #[test]

@@ -300,6 +300,9 @@ fn cross_session_configuration_persistence_round_trip() {
         );
         activate(&mut app, half_sec);
 
+        let gray = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(true));
+        activate(&mut app, gray);
+
         // Modify capacity to 120
         let cap_120 = choice_entity(app.world_mut(), &SettingsField::HistoryCapacity(120));
         activate(&mut app, cap_120);
@@ -325,6 +328,7 @@ fn cross_session_configuration_persistence_round_trip() {
         let prefs_val = app.world().resource::<ThemePreferences>();
         assert_eq!(prefs_val.mode, Some(LightDark::Light));
         assert!(prefs_val.hc);
+        assert!(prefs_val.gray_zero_values);
 
         let track_val = app.world().non_send::<FrontendTrack>();
         assert_eq!(

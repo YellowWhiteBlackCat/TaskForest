@@ -257,7 +257,7 @@ pub(super) fn capture_device_from_name(name: &str) -> Option<PerfDevice> {
         "disk" => Some(PerfDevice::Disk(0)),
         "network" => Some(PerfDevice::Network(0)),
         "gpu" => Some(PerfDevice::Gpu(0)),
-        "npu" => Some(PerfDevice::Npu(0)),
+        "npu" | "system-npu" => Some(PerfDevice::Npu(0)),
         "battery" => Some(PerfDevice::Battery(0)),
         "fan" => Some(PerfDevice::Fan(0)),
         _ => None,

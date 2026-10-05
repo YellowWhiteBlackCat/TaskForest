@@ -336,7 +336,7 @@ capture_one() {
         TM_SKIN="$skin" \
         LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
     app_pid=$!
-    for _ in $(seq 1 120); do
+    for _ in $(seq 1 300); do
         if grep -q "BEVY_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$log" 2>/dev/null \
             && grep -q "BEVY_CAPTURE_MARKER event=target_ready mode=demo page=$page" "$log" 2>/dev/null; then
             break
@@ -345,6 +345,13 @@ capture_one() {
         sleep 0.1
     done
     grep 'BEVY_CAPTURE_MARKER' "$log" >"$markers" 2>/dev/null || true
+    if ! grep -q "BEVY_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$markers" \
+        || ! grep -q "BEVY_CAPTURE_MARKER event=target_ready mode=demo page=$page" "$markers"; then
+        printf '  FAIL %-22s (painted readiness missing)\n' "$name" >&2
+        kill "$app_pid" 2>/dev/null || true
+        wait "$app_pid" 2>/dev/null || true
+        return 1
+    fi
     sleep "${TM_BEVY_CAPTURE_SETTLE_SECONDS:-0.5}"
     window_id=""
     for _ in $(seq 1 60); do

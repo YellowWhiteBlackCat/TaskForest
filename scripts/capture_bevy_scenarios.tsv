@@ -191,3 +191,11 @@ diagnostic-preview	diagnostic-preview	1180x780	gnome-light
 diagnostic-preview-compact	diagnostic-preview	720x480	gnome-light
 diagnostic-failure	diagnostic-failure	1180x780	gnome-light
 diagnostic-failure-compact	diagnostic-failure	720x480	gnome-light
+process-selection	process-selection	1180x780	gnome-light
+process-selection-compact	process-selection	720x480	gnome-light
+service-details-logs	service-logs	1180x780	gnome-light
+service-details-logs-compact	service-logs	720x480	gnome-light
+settings-switch-focus	settings-switch-focus	1180x780	gnome-light
+settings-switch-focus-compact	settings-switch-focus	720x480	gnome-light
+settings-zero-gray	settings-zero-gray	1180x780	gnome-light
+settings-zero-gray-compact	settings-zero-gray	720x480	gnome-light
