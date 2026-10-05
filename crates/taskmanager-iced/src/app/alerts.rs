@@ -391,6 +391,13 @@ pub(crate) struct ActiveAlertLine {
     pub text: String,
 }
 
+pub(crate) fn rule_summary(row: &AlertRuleRowModel) -> String {
+    format!(
+        "{} · {} · {} · {}",
+        row.metric_label, row.severity_label, row.threshold_text, row.current_text
+    )
+}
+
 /// The localized empty-state copy (pure seam).
 pub(crate) fn empty_state_text() -> &'static str {
     t("alerts.empty")

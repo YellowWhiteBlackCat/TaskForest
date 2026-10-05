@@ -41,6 +41,7 @@ use crate::{DirectTrackState, FeedbackLifecycle, FeedbackSeverity, FeedbackSourc
 pub mod alerts;
 mod cpu_topology;
 pub mod dashboard_history;
+pub mod health;
 mod inventory;
 pub mod setup;
 pub mod smbios_memory;

@@ -1,8 +1,9 @@
 use super::*;
+use taskmanager_shell::fixture::health::health_fixture;
 
 #[test]
 fn fixture_exposes_healthy_read_only_error_and_missing_sensor_branches() {
-    let fixture = capture_fixture();
+    let fixture = health_fixture();
     assert_eq!(fixture.filesystems.filesystems.len(), 3);
     assert!(
         fixture

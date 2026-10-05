@@ -1,9 +1,12 @@
 //! Terminal rule gestures reduce the current identity through the shared shell.
 use crate::TuiApp;
 use std::time::Duration;
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRuleEdit};
+use taskmanager_application::{
+    AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
+};
 use taskmanager_core::core::alerts::{
-    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertSeverity,
+    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry,
+    AlertRuleTransferError, AlertSeverity, export_alert_rules_json, import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
@@ -189,5 +192,100 @@ impl TuiApp {
             FeedbackLifecycle::SHORT,
             message,
         );
+    }
+}
+
+impl TuiApp {
+    /// Apply one semantic edit to the canonical managed alert-rule set.
+    pub fn edit_alert_rules(
+        &mut self,
+        edit: ManagedAlertRuleEdit,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.shell.edit_alert_rules(edit)
+    }
+
+    pub fn add_alert_rule(
+        &mut self,
+        rule: AlertRule,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
+    }
+
+    pub fn remove_alert_rule(
+        &mut self,
+        rule_id: String,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
+    }
+
+    pub fn export_alert_rules(&self) -> Result<String, AlertRuleTransferError> {
+        let entries: Vec<AlertRuleTransferEntry> = self
+            .projection()
+            .alert_center
+            .managed_rules()
+            .iter()
+            .map(AlertRuleTransferEntry::from)
+            .collect();
+        export_alert_rules_json(&entries)
+    }
+
+    pub fn import_alert_rules(
+        &mut self,
+        json: &str,
+        mode: AlertRuleImportMode,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        let entries = import_alert_rules_json(json)?;
+        let rules: Vec<ManagedAlertRule> =
+            entries.into_iter().map(ManagedAlertRule::from).collect();
+        self.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
+    }
+
+    /// The currently selected rule index in the health overlay. Clamped against
+    /// the current managed-rules count.
+    #[must_use]
+    pub fn health_rule_selection(&self) -> usize {
+        let count = self.projection().alert_center.managed_rules().len();
+        if count == 0 {
+            0
+        } else {
+            self.health_rule_selection.min(count - 1)
+        }
+    }
+
+    /// Move the health overlay's alert-rule selection cursor by `delta`.
+    pub fn health_rule_move(&mut self, delta: isize) {
+        let count = self.projection().alert_center.managed_rules().len();
+        if count == 0 {
+            self.health_rule_selection = 0;
+            return;
+        }
+        let current = self.health_rule_selection();
+        self.health_rule_selection = current.saturating_add_signed(delta).min(count - 1);
+    }
+
+    /// Toggle the currently selected managed alert rule in the health overlay.
+    pub fn toggle_selected_alert_rule(&mut self) -> bool {
+        let index = self.health_rule_selection();
+        let rules = self.projection().alert_center.managed_rules();
+        if let Some(managed) = rules.get(index) {
+            let rule_id = managed.rule.id.clone();
+            let _ = self.edit_alert_rules(ManagedAlertRuleEdit::Toggle { rule_id });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Toggle a managed alert rule by ID.
+    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
+        self.edit_alert_rules(ManagedAlertRuleEdit::Toggle {
+            rule_id: rule_id.into(),
+        })
+        .is_ok_and(|outcome| outcome.changed())
+    }
+
+    /// Clear the recorded alert event history in the canonical alert center.
+    pub fn clear_alert_event_history(&mut self) {
+        self.shell.clear_alert_event_history();
     }
 }

@@ -506,12 +506,12 @@ capture_one() {
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
   application-history-replay) page=app-history ;;
-  system-hardware|system-dashboard|history-60m) page=system ;;
+  system-hardware|system-dashboard|history-60m|sensor-center|storage-health) page=system ;;
   service-details|service-details-logs|services-search-highlight) page=services ;;
   process-selection|saved-view-presets) page=applications ;;
   process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) page=applications ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) page=startup ;;
-  about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm|system-about|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|history-replay|battery-fan-performance|battery-live-performance|device-hotplug|sidebar-edit|settings-permission-center|event-center) page=performance ;;
+  about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm|system-about|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|history-replay|battery-fan-performance|battery-live-performance|device-hotplug|sidebar-edit|settings-permission-center|event-center) page=performance ;;
   esac
   mkdir -p "$scenario_dir" "$config_home" "$data_home" "$cache_home" "$state_home"
   case "$device" in

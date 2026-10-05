@@ -4,6 +4,7 @@ use crate::app::capture_state::{CaptureDataTarget, CapturePresentationFrame};
 use crate::ui::system_table::bound_system_body_to_end;
 use iced::Task;
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{AppPage, KeyCode, Modifiers};
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_shell::QuitReason;
@@ -84,6 +85,20 @@ impl IcedApp {
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
                     let ready = if self.capture.data_target == CaptureDataTarget::Focus {
                         self.capture.focus_presented
+                    } else if self.capture.data_target == CaptureDataTarget::Health {
+                        self.system_section == SystemPageSection::Health
+                            && self.shell.page() == AppPage::System
+                            && self
+                                .shell
+                                .projection()
+                                .storage_health_projection()
+                                .is_some_and(|(snapshot, _)| snapshot.filesystems.len() == 3)
+                            && self
+                                .shell
+                                .projection()
+                                .sensors
+                                .as_ref()
+                                .is_some_and(|snapshot| snapshot.readings.len() == 4)
                     } else if self.capture.data_target == CaptureDataTarget::StartupFailure {
                         self.shell.page() == AppPage::Startup
                             && self

@@ -16,6 +16,7 @@ mod frame_plan;
 mod header;
 mod health;
 mod health_data;
+pub(crate) mod health_review;
 pub(crate) mod help;
 mod highlight;
 mod history_replay;

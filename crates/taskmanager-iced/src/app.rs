@@ -18,6 +18,8 @@ use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -27,7 +29,6 @@ use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_core::core::session::SessionControlAction;
 
-use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
@@ -452,11 +453,8 @@ pub enum Message {
     OpenDiskSmart {
         index: usize,
     },
-    /// Request a SMART self-test on the observed disk at `index`.
-    RequestSmartSelfTest {
-        index: usize,
-        kind: SmartSelfTestKind,
-    },
+    /// Arm a self-test for the exact identity painted by the activating control.
+    RequestSmartSelfTest(SmartSelfTestIntent),
     /// Confirm the pending SMART self-test request.
     ConfirmSmartSelfTest,
     /// Toggle the expanded state of the GPU engines breakdown panel.
@@ -558,6 +556,7 @@ pub struct IcedApp {
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
     pub(crate) system_dashboard_window: SystemHistoryWindow,
     pub(crate) system_section: SystemPageSection,
+    pub(crate) system_health_section: HealthReviewSection,
     pub(crate) system_dashboard_first_metric: usize,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.

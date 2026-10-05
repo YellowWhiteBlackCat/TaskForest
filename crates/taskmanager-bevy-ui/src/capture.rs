@@ -121,6 +121,7 @@ pub(crate) fn capture_wants_service_logs() -> bool {
 pub(crate) fn capture_page() -> Option<Page> {
     let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match value.trim().to_ascii_lowercase().as_str() {
+        "storage-health" | "sensor-center" => Some(Page::System),
         "applications"
         | "process-selection"
         | "processes"
@@ -149,8 +150,6 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "smart-self-test-confirm"
         | "telemetry-paused"
         | "sidebar-hidden"
-        | "sensor-center"
-        | "storage-health"
         | "smart-missing-tool"
         | "smart-permission"
         | "partition-disk-usage"

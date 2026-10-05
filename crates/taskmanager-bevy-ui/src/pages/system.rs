@@ -77,6 +77,7 @@ pub(crate) struct MemoryInventoryAnchor;
 #[derive(Component, Clone, Default)]
 pub(crate) struct SystemPageRoot;
 
+pub(crate) mod health;
 pub(crate) mod paint;
 pub(crate) use paint::register;
 
@@ -504,6 +505,12 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         _context.palette,
     );
     let title = Page::System.title();
+    let health = dashboard::button(
+        t("health.system_health_alerts").into(),
+        dashboard::DashboardControl::Section(SystemPageSection::Health),
+        false,
+        _context.palette,
+    );
     let waiting = t("common.waiting_inventory").to_owned();
     let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
     let about = crate::about_modal::action_scene(
@@ -528,7 +535,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
              Text(title) TextRole(Role::Heading) --
              Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } SystemActions
-             Children [ @{ dashboard } -- @{ diagnostic } -- @{ about } -- @{ system_information } ] --
+             Children [ @{ dashboard } -- @{ health } -- @{ diagnostic } -- @{ about } -- @{ system_information } ] --
 
                 Text(waiting)
                 SystemStatusLine

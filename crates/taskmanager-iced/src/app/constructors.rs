@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -101,6 +102,7 @@ impl IcedApp {
             observed_appearance: None,
             system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
             system_section: SystemPageSection::Hardware,
+            system_health_section: HealthReviewSection::All,
             system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
@@ -175,6 +177,7 @@ impl IcedApp {
             observed_appearance: None,
             system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
             system_section: SystemPageSection::Hardware,
+            system_health_section: HealthReviewSection::All,
             system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),

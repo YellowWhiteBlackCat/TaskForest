@@ -4,6 +4,8 @@
 //! unchanged — `demo_app()` stays reachable at `crate::demo_app` via a
 //! `pub use` in `lib.rs`.
 
+use crate::command_palette::TuiSurfaceAction;
+use crate::health_review::HealthReviewMode;
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskmanager_application::ProcessInsightFacet;
@@ -27,6 +29,7 @@ use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+use taskmanager_shell::fixture::health::seed_shell_health;
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
@@ -416,8 +419,17 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Performance;
             let _ = seed_shell_active_alert(&mut app.shell);
         }
-        "storage-health" | "sensor-center" | "alert-rules-manager" => {
-            app.shell.application.active_page = AppPage::Performance;
+        "storage-health" | "sensor-center" => {
+            seed_shell_health(&mut app.shell);
+            app.toggle_health();
+            let mode = if scene == "storage-health" {
+                HealthReviewMode::Storage
+            } else {
+                HealthReviewMode::Sensors
+            };
+            let _ = app.run_surface_protocol_action(TuiSurfaceAction::SelectHealthReview(mode));
+        }
+        "alert-rules-manager" => {
             app.toggle_health();
         }
         "diagnostic-preview" => {

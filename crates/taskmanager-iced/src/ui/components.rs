@@ -5,6 +5,7 @@
 //! decisions; they compose these components instead of rebuilding the same
 //! panel, state, key/value, or outer-page structure.
 
+use iced::advanced::text::IntoFragment;
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
@@ -64,7 +65,7 @@ pub(crate) fn card_surface(theme_snapshot: &Theme) -> iced::widget::container::S
 #[must_use]
 pub(crate) fn titled_card<'a>(
     theme_snapshot: &'a Theme,
-    title: &'static str,
+    title: impl IntoFragment<'a>,
     body: impl Into<IcedElement<'a>>,
 ) -> IcedElement<'a> {
     container(

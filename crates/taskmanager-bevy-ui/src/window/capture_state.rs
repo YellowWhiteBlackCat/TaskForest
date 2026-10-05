@@ -10,6 +10,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 pub(super) fn is_production(demo: Option<Res<DemoMode>>) -> bool {
     demo.is_none()
@@ -40,6 +41,17 @@ pub(super) fn initialize_capture_state(
     }
     if capture_scenario_target() == Some("system-hardware") {
         seed_shell_memory_inventory(&mut shell);
+    }
+    if matches!(
+        capture_scenario_target(),
+        Some("storage-health" | "sensor-center")
+    ) {
+        dashboard.section = SystemPageSection::Health;
+        dashboard.health_section = if capture_scenario_target() == Some("sensor-center") {
+            HealthReviewSection::Sensors
+        } else {
+            HealthReviewSection::Storage
+        };
     }
     track.shell = shell;
     track.initial_refresh_submitted = true;

@@ -43,12 +43,14 @@ use taskmanager_application::{
         SystemHistoryWindow, SystemPageSection, TimelineMetric, TimelineSeries, TimelineStatistic,
     },
 };
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 use taskmanager_ui_contract::IconId;
 
 #[derive(Resource)]
 pub(crate) struct SystemDashboardState {
     pub(crate) section: SystemPageSection,
+    pub(crate) health_section: HealthReviewSection,
     pub(crate) window: SystemHistoryWindow,
     pub(crate) first_metric: usize,
     layout: Option<(f32, f32)>,
@@ -57,6 +59,7 @@ impl Default for SystemDashboardState {
     fn default() -> Self {
         Self {
             section: SystemPageSection::Hardware,
+            health_section: HealthReviewSection::All,
             window: SystemHistoryWindow::FifteenMinutes,
             first_metric: 0,
             layout: None,
@@ -68,6 +71,7 @@ pub(crate) struct SystemDashboardToolbar;
 #[derive(Clone, Copy)]
 pub(crate) enum DashboardControl {
     Section(SystemPageSection),
+    HealthSection(HealthReviewSection),
     Window(SystemHistoryWindow),
     Previous,
     Next,
@@ -102,6 +106,10 @@ fn activate(
         return;
     };
     match control.0 {
+        DashboardControl::HealthSection(section) => {
+            state.section = SystemPageSection::Health;
+            state.health_section = section;
+        }
         DashboardControl::Section(section) => {
             state.section = section;
             state.first_metric = 0;
@@ -158,6 +166,21 @@ pub(crate) fn toolbar(state: &SystemDashboardState, palette: &UiPalette) -> impl
             false,
             palette,
         )));
+    }
+    if state.section == SystemPageSection::Health {
+        for section in HealthReviewSection::ALL {
+            let label = match section {
+                HealthReviewSection::All => t("health.system_health_alerts"),
+                HealthReviewSection::Storage => t("health.storage"),
+                HealthReviewSection::Sensors => t("health.sensors"),
+            };
+            controls.push(Box::new(button(
+                label.into(),
+                DashboardControl::HealthSection(section),
+                state.health_section == section,
+                palette,
+            )));
+        }
     }
     bsn! { Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_4()), row_gap: px(space_4()) } Children [{ controls }] }
 }

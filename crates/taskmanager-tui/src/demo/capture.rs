@@ -23,6 +23,23 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
             && process_properties_capture_data_ready(&app.shell, &scene)
     } else if scene == "active-alert" {
         !app.shell.projection().alert_active.is_empty()
+    } else if matches!(scene.as_str(), "storage-health" | "sensor-center") {
+        let expected = if scene == "storage-health" {
+            crate::health_review::HealthReviewMode::Storage
+        } else {
+            crate::health_review::HealthReviewMode::Sensors
+        };
+        app.health_open()
+            && app.health_review.mode == expected
+            && app
+                .projection()
+                .storage_health_projection()
+                .is_some_and(|(snapshot, _)| snapshot.filesystems.len() == 3)
+            && app
+                .projection()
+                .sensors
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.readings.len() == 4)
     } else if scene == "alert-rules-manager" {
         app.health_open()
             && !app

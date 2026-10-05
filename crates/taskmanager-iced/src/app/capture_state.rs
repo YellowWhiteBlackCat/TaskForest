@@ -1,5 +1,6 @@
 //! Capture-only marker lifecycle and target preparation for the Iced frontend.
 
+use crate::ui::system_dashboard::SystemDashboardMessage;
 use std::path::PathBuf;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
@@ -8,9 +9,11 @@ use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSe
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+use taskmanager_shell::fixture::health::seed_shell_health;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -45,6 +48,7 @@ pub(super) enum CaptureDataTarget {
     ApplicationHistory,
     MemoryInventory,
     SystemDashboard,
+    Health,
     ActiveAlerts,
     AlertRules,
     Battery,
@@ -87,6 +91,7 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
         "system-dashboard" | "history-60m" => CaptureDataTarget::SystemDashboard,
+        "storage-health" | "sensor-center" => CaptureDataTarget::Health,
         "active-alert" => CaptureDataTarget::ActiveAlerts,
         "alert-rules-manager" => CaptureDataTarget::AlertRules,
         "battery-fan-performance" | "battery-live-performance" => CaptureDataTarget::Battery,
@@ -113,6 +118,10 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
 
         _ => CaptureDataTarget::General,
     };
+    if matches!(target, "storage-health" | "sensor-center") {
+        prepare_health_capture(app, target);
+        return;
+    }
     if apply_capture_surface_and_process(app, target) {
         return;
     }
@@ -130,6 +139,22 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         }
         app.performance.selected_device = device;
     }
+}
+
+fn prepare_health_capture(app: &mut IcedApp, target: &str) {
+    seed_shell_health(&mut app.shell);
+    let _ = app.update(Message::SelectPage(AppPage::System));
+    let _ = app.update(Message::SystemDashboard(
+        SystemDashboardMessage::SelectSection(SystemPageSection::Health),
+    ));
+    let section = if target == "sensor-center" {
+        HealthReviewSection::Sensors
+    } else {
+        HealthReviewSection::Storage
+    };
+    let _ = app.update(Message::SystemDashboard(
+        SystemDashboardMessage::SelectHealthSection(section),
+    ));
 }
 
 fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
@@ -155,7 +180,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         } else {
             SystemHistoryWindow::FifteenMinutes
         };
-    } else if target == crate::capture::HEALTH_TARGET || target == "sensor-center" {
+    } else if target == crate::capture::HEALTH_TARGET {
         let _ = app.update(Message::OpenHealth);
     } else if target == "about" {
         app.open_local_surface(LocalSurface::About);
@@ -175,7 +200,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.open_local_surface(LocalSurface::FirstRun);
     } else if target == "run-task" {
         app.open_local_surface(LocalSurface::RunTask);
-    } else if target == "disk-smart" || target == "storage-health" {
+    } else if target == "disk-smart" {
         app.open_local_surface(LocalSurface::DiskSmart { index: 0 });
     } else if target == "diagnostic-preview" {
         app.open_diagnostic_bundle();

@@ -6,11 +6,13 @@ use crate::app::{LocalSurfaceKind, Message};
 use taskmanager_application::ConfigClient;
 use taskmanager_application::ConfigCoordinator;
 use taskmanager_application::ConfigDrain;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarAvailability;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
 
@@ -207,7 +209,20 @@ fn dedicated_process_and_storage_capture_targets_use_the_normal_surfaces() {
     assert_eq!(app.shell.selected_row_anchor(), Some(expected));
     assert!(app.shell.process_properties_target().is_none());
     apply_capture_target(&mut app, "storage-health");
-    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::DiskSmart));
+    assert_eq!(app.shell.page(), AppPage::System);
+    assert_eq!(app.system_section, SystemPageSection::Health);
+    assert_eq!(app.system_health_section, HealthReviewSection::Storage);
+    assert_eq!(app.local_surface_kind(), None);
+    assert_eq!(
+        app.shell
+            .projection()
+            .storage_health_projection()
+            .expect("shared storage facts")
+            .0
+            .filesystems
+            .len(),
+        3
+    );
 }
 
 #[test]

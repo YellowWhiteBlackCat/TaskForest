@@ -86,6 +86,20 @@ fn paint_system(mut render: SystemRender) {
             SystemDashboardBudget::resolve(size.x, size.y),
             palette,
         ))
+    } else if render
+        .dashboard
+        .as_ref()
+        .is_some_and(|state| state.section == SystemPageSection::Health)
+    {
+        Box::new(health::body(
+            shell,
+            render
+                .dashboard
+                .as_ref()
+                .map(|state| state.health_section)
+                .unwrap_or_default(),
+            palette,
+        ))
     } else {
         Box::new(system_body_scene(
             hardware, smbios, npu, sensors, &summary, palette,

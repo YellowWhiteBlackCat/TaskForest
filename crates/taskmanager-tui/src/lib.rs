@@ -33,6 +33,7 @@ mod diagnostic_bundle;
 mod feature_coverage;
 mod first_run;
 mod functional;
+mod health_review;
 mod history_runtime;
 mod information;
 mod menus;
@@ -106,18 +107,13 @@ use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
-    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, ManagedAlertRule, ManagedAlertRuleEdit,
-    ManagedAlertRuleEditOutcome, Modifiers, SurfaceKind, source_notice,
+    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
 };
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
     RefreshRequest, i18n::t,
 };
 use taskmanager_cli::{FrontendHandlers, run};
-use taskmanager_core::core::alerts::{
-    AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
-    import_alert_rules_json,
-};
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -225,6 +221,7 @@ pub struct TuiApp {
     /// projection's managed-rules count during access.
     pub health_rule_selection: usize,
     pub(crate) alert_import_mode: Option<AlertRuleImportMode>,
+    pub(crate) health_review: health_review::HealthReviewState,
     /// The locale-neutral category/app/type expansion keys whose headers are
     /// currently expanded on the Applications page. Toggled by activating a
     /// header (Enter / Right). Re-seeded for the canonical category tree when
@@ -361,6 +358,7 @@ impl TuiApp {
             memory_capture_scroll_pending: false,
             health_rule_selection: 0,
             alert_import_mode: None,
+            health_review: health_review::HealthReviewState::default(),
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
@@ -609,101 +607,9 @@ impl TuiApp {
         } else {
             self.health_rule_selection = 0;
             self.alert_import_mode = None;
+            self.health_review = health_review::HealthReviewState::default();
             self.open_local_surface(TuiSurface::Health);
         }
-    }
-
-    /// Apply one semantic edit to the canonical managed alert-rule set.
-    pub fn edit_alert_rules(
-        &mut self,
-        edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.shell.edit_alert_rules(edit)
-    }
-
-    pub fn add_alert_rule(
-        &mut self,
-        rule: AlertRule,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
-    }
-
-    pub fn remove_alert_rule(
-        &mut self,
-        rule_id: String,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
-    }
-
-    pub fn export_alert_rules(&self) -> Result<String, AlertRuleTransferError> {
-        let entries: Vec<AlertRuleTransferEntry> = self
-            .projection()
-            .alert_center
-            .managed_rules()
-            .iter()
-            .map(AlertRuleTransferEntry::from)
-            .collect();
-        export_alert_rules_json(&entries)
-    }
-
-    pub fn import_alert_rules(
-        &mut self,
-        json: &str,
-        mode: AlertRuleImportMode,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        let entries = import_alert_rules_json(json)?;
-        let rules: Vec<ManagedAlertRule> =
-            entries.into_iter().map(ManagedAlertRule::from).collect();
-        self.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
-    }
-
-    /// The currently selected rule index in the health overlay. Clamped against
-    /// the current managed-rules count.
-    #[must_use]
-    pub fn health_rule_selection(&self) -> usize {
-        let count = self.projection().alert_center.managed_rules().len();
-        if count == 0 {
-            0
-        } else {
-            self.health_rule_selection.min(count - 1)
-        }
-    }
-
-    /// Move the health overlay's alert-rule selection cursor by `delta`.
-    pub fn health_rule_move(&mut self, delta: isize) {
-        let count = self.projection().alert_center.managed_rules().len();
-        if count == 0 {
-            self.health_rule_selection = 0;
-            return;
-        }
-        let current = self.health_rule_selection();
-        self.health_rule_selection = current.saturating_add_signed(delta).min(count - 1);
-    }
-
-    /// Toggle the currently selected managed alert rule in the health overlay.
-    pub fn toggle_selected_alert_rule(&mut self) -> bool {
-        let index = self.health_rule_selection();
-        let rules = self.projection().alert_center.managed_rules();
-        if let Some(managed) = rules.get(index) {
-            let rule_id = managed.rule.id.clone();
-            let _ = self.edit_alert_rules(ManagedAlertRuleEdit::Toggle { rule_id });
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Toggle a managed alert rule by ID.
-    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: rule_id.into(),
-        })
-        .is_ok_and(|outcome| outcome.changed())
-    }
-
-    /// Clear the recorded alert event history in the canonical alert center.
-    pub fn clear_alert_event_history(&mut self) {
-        self.shell.clear_alert_event_history();
     }
 
     /// Toggle the containers overlay, closing every other modal first.

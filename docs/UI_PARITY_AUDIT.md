@@ -25,13 +25,13 @@
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Pending | Pending | Pending |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
 | | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Aligned | Aligned | Aligned |
-| 存储与硬件诊断 | `storage-health` | 磁盘 SMART 属性与健康详情 | Pending | Aligned | Aligned |
+| 存储与硬件诊断 | `storage-health` | 文件系统健康、只读与错误状态及 SMART 自检报告 | Pending | Pending | Pending |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Pending | Aligned | Aligned |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Pending | Aligned | Aligned |
 | | `partition-disk-usage` | 分区挂载点与磁盘空间图 | Aligned | Aligned | Aligned |
 | | `partition-live-usage` | 磁盘动态吞吐与 IOPS 视图 | Aligned | Aligned | Aligned |
 | | `device-hotplug` | 设备热插拔事件触发与重排 | Aligned | Aligned | Aligned |
-| | `sensor-center` | 主板温控传感器与各 Thermal Zone | Aligned | Aligned | Aligned |
+| | `sensor-center` | 温度、风扇与功率读数及不可用原因 | Pending | Pending | Pending |
 | | `battery-fan-performance` | 电池状态与风扇转速联动卡 | Pending | Aligned | Aligned |
 | | `battery-live-performance` | 电池实时放电速率与电压曲线 | Pending | Aligned | Aligned |
 | | `gpu-engine-inventory` | 多 GPU 引擎枚举与负载图表 | Aligned | Aligned | Aligned |

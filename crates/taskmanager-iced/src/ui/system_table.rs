@@ -26,6 +26,7 @@ use taskmanager_shell::presentation::kernel_error_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 use taskmanager_theme::Theme;
 
+mod health;
 mod npu;
 pub(crate) use npu::{NpuDeviceViewModel, npu_device_view_models};
 
@@ -100,9 +101,11 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
 
     let tabs = row(SystemPageSection::ALL_REVIEW
         .into_iter()
+        .chain(std::iter::once(SystemPageSection::Health))
         .map(|section| {
             let label = match section {
                 SystemPageSection::Dashboard => t("dashboard.title"),
+                SystemPageSection::Health => t("health.system_health_alerts"),
                 _ => t("dashboard.hardware"),
             };
             crate::focus::choice_pill(
@@ -125,6 +128,8 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
             app.system_dashboard_window,
         ))
         .into()
+    } else if app.system_section == SystemPageSection::Health {
+        page.push(health::render(app)).into()
     } else {
         page.push(
             scrollable(column(content).spacing(12))

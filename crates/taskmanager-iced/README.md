@@ -33,6 +33,8 @@ fallback path.
 - The Alerts page reads the shell's immutable canonical `ManagedAlertRule` list. Wrapped cards expose creation,
   metric/threshold/duration/hysteresis/severity/target edits, removal and clipboard transfers through shared edits.
   Fixed actions surround one bounded scroll body; stale controls resolve stable rule identities against current state.
+- System Health selects shared filesystem, sensor and generation-matched SMART facts in a bounded body.
+  Self-test controls carry the painted physical identity; an inventory replacement invalidates their activation.
   `AlertsPageState` contains only its typed route; disabled rules are neither copied nor removed from the list.
 - `src/app/config_sync.rs` is the only configuration bridge: production receives an app-host `ConfigClient`, ticks drain
   immutable revision publications, and settings use non-blocking base-aware submissions. Queue rejection/save failure

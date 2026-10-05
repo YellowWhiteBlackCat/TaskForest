@@ -96,6 +96,9 @@ Health exposes `n` add, `d` remove, `m` metric, `u/o` threshold, `f/b` duration,
 clipboard; `a` arms merge and `r` arms replacement for the next JSON paste.
 Compact terminals retain the selected rule, four editor rows and fixed action hints;
 the optional device summary and event group are admitted only with their full budget.
+Health `w` selects filesystem and SMART reports; `s` selects sensors and `q`
+returns to rules. Arrows visit complete groups, including denied readings and
+the last observed report. `z`/`x` arm short/extended tests through confirmation.
 
 Configuration I/O is owned by the app-host background coordinator. The event
 loop only drains immutable publications and submits bounded patches. The

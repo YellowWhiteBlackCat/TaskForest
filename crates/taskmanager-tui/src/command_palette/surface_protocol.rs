@@ -6,6 +6,7 @@
 //! `runtime::handle_settings_key`.
 
 use super::*;
+use taskmanager_core::core::smart::SmartSelfTestKind;
 
 /// Which owning surface a protocol chord is consumed by. Declared as data so
 /// the surface-protocol matrix can pin each scope's exact chord set; the
@@ -13,6 +14,7 @@ use super::*;
 /// panel only its declared chords) lives beside the dispatch in
 /// `runtime::modals` and `runtime::handle_settings_key`.
 use crate::alert_editor::RuleGesture;
+use crate::health_review::HealthReviewMode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiSurfaceScope {
@@ -22,6 +24,7 @@ pub(crate) enum TuiSurfaceScope {
     /// one toggle protocol in `runtime::modals`.
     StatusOverlay,
     HealthRule,
+    HealthReview,
     About,
     SystemInformation,
     /// The Services-page service-log panel: a partial owner whose unclaimed
@@ -38,6 +41,8 @@ pub(crate) enum TuiSurfaceAction {
     /// `p` inside the settings form self-closes it (the toggle precedent).
     ToggleSettings,
     EditAlertRule(RuleGesture),
+    SelectHealthReview(HealthReviewMode),
+    HealthSelfTest(SmartSelfTestKind),
     ToggleAbout,
     OpenRepository,
     OpenSystemInformation,
@@ -75,7 +80,32 @@ pub(crate) struct TuiSurfaceArm {
 /// their dispatch sites and must never appear here — the matrix pins the
 /// bare-lowercase-letter shape that enforces it. See the command-palette
 /// module header for the hard masking contract against the command layers.
-pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 30] = [
+pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 35] = [
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'w',
+        action: TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Storage),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 's',
+        action: TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Sensors),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'q',
+        action: TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Rules),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'z',
+        action: TuiSurfaceAction::HealthSelfTest(SmartSelfTestKind::Short),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'x',
+        action: TuiSurfaceAction::HealthSelfTest(SmartSelfTestKind::Extended),
+    },
     TuiSurfaceArm {
         scope: TuiSurfaceScope::HealthRule,
         chord: 'n',

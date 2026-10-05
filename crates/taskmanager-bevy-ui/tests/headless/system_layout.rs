@@ -486,3 +486,114 @@ fn alert_rule_controls_and_scroll_body_fit_measured_product_viewports() {
         );
     }
 }
+
+#[test]
+fn health_controls_keep_measured_bounds_and_reject_a_replaced_physical_disk() {
+    use crate::pages::system::dashboard::{
+        DashboardControl, DashboardControlButton, SystemDashboardState,
+    };
+    use crate::pages::system::health::HealthSelfTest;
+    use taskmanager_application::system_timeline::SystemPageSection;
+    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskmanager_shell::fixture::health::seed_shell_health;
+    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+    use taskmanager_shell::presentation::health_review::HealthReviewSection;
+    pin_english();
+    for (width, height) in [
+        (480, 360),
+        (720, 480),
+        (1280, 720),
+        (1600, 360),
+        (480, 960),
+        (1920, 1080),
+    ] {
+        let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
+        let mut app = system_layout_app(width, height, client);
+        let mut shell = demo_app();
+        seed_shell_health(&mut shell);
+        app.world_mut().non_send_mut::<FrontendTrack>().shell = shell;
+        app.world_mut().resource_mut::<Route>().page = Page::System;
+        for _ in 0..6 {
+            app.update();
+        }
+        let control = app
+            .world_mut()
+            .query::<(Entity, &DashboardControlButton)>()
+            .iter(app.world())
+            .find(|(_, button)| {
+                matches!(
+                    button.0,
+                    DashboardControl::Section(SystemPageSection::Health)
+                )
+            })
+            .map(|(entity, _)| entity)
+            .expect("normal Health action");
+        app.world_mut().trigger(Activate { entity: control });
+        for _ in 0..6 {
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<SystemDashboardState>().section,
+            SystemPageSection::Health
+        );
+        for section in HealthReviewSection::ALL {
+            let control = app.world_mut().query::<(Entity, &DashboardControlButton)>().iter(app.world())
+                .find(|(_, button)| matches!(button.0, DashboardControl::HealthSection(value) if value == section))
+                .map(|(entity, _)| entity).expect("normal section selector");
+            app.world_mut().trigger(Activate { entity: control });
+            for _ in 0..6 {
+                app.update();
+            }
+            assert_eq!(
+                app.world()
+                    .resource::<SystemDashboardState>()
+                    .health_section,
+                section
+            );
+            let world = app.world_mut();
+            let (body, transform) = world
+                .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<SystemBody>>()
+                .single(world)
+                .expect("bounded body");
+            assert!(body.size().x > 0.0 && body.size().y > 0.0);
+            assert!(transform.translation.y + body.size().y / 2.0 <= height as f32 + 0.5);
+            for (node, transform) in world
+                .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<HealthSelfTest>>()
+                .iter(world)
+            {
+                assert!(node.size().x > 0.0 && node.size().y > 0.0);
+                assert!(transform.translation.x - node.size().x / 2.0 >= -0.5);
+                assert!(transform.translation.x + node.size().x / 2.0 <= width as f32 + 0.5);
+            }
+        }
+        let entity = app
+            .world_mut()
+            .query::<(Entity, &HealthSelfTest)>()
+            .iter(app.world())
+            .next()
+            .map(|(entity, _)| entity)
+            .expect("painted exact target");
+        let mut snapshot = app
+            .world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .snapshot
+            .clone()
+            .expect("snapshot");
+        snapshot.disks[0].device_generation =
+            DeviceGeneration::new(snapshot.disks[0].device_generation.get() + 1);
+        seed_projection_fact(
+            &mut app.world_mut().non_send_mut::<FrontendTrack>().shell,
+            ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+        );
+        app.world_mut().trigger(Activate { entity });
+        assert!(
+            app.world()
+                .non_send::<FrontendTrack>()
+                .shell
+                .pending_smart_self_test()
+                .is_none()
+        );
+    }
+}

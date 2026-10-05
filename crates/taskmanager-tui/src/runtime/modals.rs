@@ -19,6 +19,7 @@
 //! panel's `q` close, the menus' navigation), and the consumption rule
 //! (full modals swallow every key; the panel is a partial owner).
 
+mod health;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
 use taskmanager_application::{AppPage, ProcessInsightFacet};
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -394,43 +395,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 None
             }
             TuiSurfaceKind::Health => {
-                // Esc stays structural; the toggle chords resolve through the
-                // declared surface protocol. In the health overlay, arrows and
-                // Space / Enter navigate and toggle managed alert rules.
-                match key.code {
-                    ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
-                    ratatui::crossterm::event::KeyCode::Up
-                    | ratatui::crossterm::event::KeyCode::Char('k') => {
-                        app.health_rule_move(-1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Down
-                    | ratatui::crossterm::event::KeyCode::Char('j') => {
-                        app.health_rule_move(1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Home => {
-                        app.health_rule_selection = 0;
-                    }
-                    ratatui::crossterm::event::KeyCode::End => {
-                        let count = app.projection().alert_center.managed_rules().len();
-                        app.health_rule_selection = count.saturating_sub(1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Enter
-                    | ratatui::crossterm::event::KeyCode::Char(' ') => {
-                        app.toggle_selected_alert_rule();
-                    }
-                    ratatui::crossterm::event::KeyCode::Char(character) => {
-                        if let Some(action) = surface_protocol_action(
-                            TuiSurfaceScope::HealthRule,
-                            character,
-                        )
-                        .or_else(|| {
-                            surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
-                        }) {
-                            app.run_surface_protocol_action(action);
-                        }
-                    }
-                    _ => {}
-                }
+                health::handle(app, key);
                 None
             }
         };

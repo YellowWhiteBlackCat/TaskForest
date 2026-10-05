@@ -141,6 +141,71 @@ fn health_rule_keys_edit_the_selected_rule_and_import_only_when_explicitly_armed
 }
 
 #[test]
+fn health_review_keys_visit_integrity_and_sensor_groups_then_arm_an_exact_self_test() {
+    set_language(Language::En);
+    use crate::health_review::HealthReviewMode;
+    use ratatui::crossterm::event::KeyCode;
+    use taskmanager_core::core::smart::SmartSelfTestKind;
+    use taskmanager_shell::fixture::health::seed_shell_health;
+    let mut app = crate::demo_app();
+    seed_shell_health(&mut app.shell);
+    app.toggle_health();
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('w'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::Storage);
+    let groups = crate::ui::health_review::groups(&app);
+    assert_eq!(groups.len(), 4);
+    for index in 1..groups.len() {
+        apply_terminal_event(
+            &mut app,
+            key(KeyCode::Down, KeyEventKind::Press),
+            TEST_FRAME,
+        );
+        assert_eq!(app.health_review.selected, index);
+    }
+    apply_terminal_event(&mut app, key(KeyCode::Up, KeyEventKind::Press), TEST_FRAME);
+    assert_eq!(
+        app.health_review.selected, 2,
+        "moving back from the final group works"
+    );
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('s'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::Sensors);
+    let groups = crate::ui::health_review::groups(&app);
+    assert_eq!(groups.len(), 4);
+    assert!(groups.iter().any(|group| {
+        group
+            .rows
+            .iter()
+            .any(|row| row.value.contains("Unavailable"))
+    }));
+    let disk = app.projection().snapshot.as_ref().expect("snapshot").disks[0].clone();
+    let reaction = apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('x'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert!(
+        reaction.effect.is_none(),
+        "arming does not submit a platform command"
+    );
+    assert!(!app.health_open(), "confirmation owns subsequent input");
+    let pending = app
+        .shell
+        .pending_smart_self_test()
+        .expect("normal confirmation");
+    assert_eq!(pending.device_id.as_str(), disk.device_id);
+    assert_eq!(pending.device_generation, disk.device_generation);
+    assert_eq!(pending.kind, SmartSelfTestKind::Extended);
+}
+
+#[test]
 fn a_dropping_event_source_fails_the_loop_with_the_source_error_never_hangs() {
     // The remote-transport failure contract: a source that can no longer
     // deliver events surfaces as a typed loop error. The loop must

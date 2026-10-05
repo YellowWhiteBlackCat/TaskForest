@@ -179,6 +179,14 @@ impl TuiApp {
         action: TuiSurfaceAction,
     ) -> Option<PlatformEffect> {
         match action {
+            TuiSurfaceAction::SelectHealthReview(mode) => self.select_health_review(mode),
+            TuiSurfaceAction::HealthSelfTest(kind) => {
+                if let Some(mut target) = crate::menus::smart_self_test_target(self) {
+                    target.kind = kind;
+                    self.close_local_overlays();
+                    self.shell.arm_smart_self_test(target);
+                }
+            }
             TuiSurfaceAction::EditAlertRule(gesture) => self.edit_rule_gesture(gesture),
             TuiSurfaceAction::OpenRepository => {
                 return Some(PlatformEffect::OpenUrl(UrlOpenRequest {

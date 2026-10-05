@@ -17,7 +17,7 @@ use taskmanager_core::core::alerts::AlertRuleConflictPolicy;
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_ui_contract::IconId;
 
-use crate::app::alerts::{active_alert_lines, empty_state_text, rule_rows};
+use crate::app::alerts::{active_alert_lines, empty_state_text, rule_rows, rule_summary};
 mod editor;
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::focus;
@@ -173,13 +173,7 @@ fn rules_section<'a>(
             .enumerate()
             .map(|(index, (managed, model))| {
                 column![
-                    text(format!(
-                        "{} · {} · {} · {}",
-                        model.metric_label,
-                        model.severity_label,
-                        model.threshold_text,
-                        model.current_text
-                    )),
+                    text(rule_summary(&model)),
                     editor::card(theme_snapshot, index, managed)
                 ]
                 .into()

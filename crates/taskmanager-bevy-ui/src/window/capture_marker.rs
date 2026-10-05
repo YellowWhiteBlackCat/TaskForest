@@ -1,6 +1,6 @@
 //! Capture readiness follows explicitly queried mounted and painted surfaces.
 use super::CaptureMarkerState;
-use crate::app::{PageContent, Route};
+use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::capture::{capture_page_name, capture_scenario_target};
 use crate::confirmation::ConfirmationCapture;
 use crate::focus_visible::FocusCapture;
@@ -11,6 +11,7 @@ use crate::pages::history::{HistoryProjectionResource, HistoryRuntime};
 use crate::pages::performance::replay::{ChartSize, ReplayChart};
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::system::dashboard::SystemDashboardCurve;
+use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
 use bevy::ecs::hierarchy::Children;
@@ -18,9 +19,14 @@ use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
+use taskmanager_application::i18n::t;
+use taskmanager_application::system_timeline::SystemPageSection;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {
+    track: NonSend<'w, FrontendTrack>,
+    system_state: Res<'w, SystemDashboardState>,
     route: Res<'w, Route>,
     state: ResMut<'w, CaptureMarkerState>,
     pages: Query<'w, 's, &'static PageContent>,
@@ -75,6 +81,42 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         return;
     }
     match capture_scenario_target() {
+        Some(scenario @ ("storage-health" | "sensor-center")) => {
+            let expected = if scenario == "sensor-center" {
+                HealthReviewSection::Sensors
+            } else {
+                HealthReviewSection::Storage
+            };
+            if route != Page::System
+                || access.system_state.section != SystemPageSection::Health
+                || access.system_state.health_section != expected
+            {
+                return;
+            }
+            let projection = access.track.shell.projection();
+            if !projection
+                .storage_health_projection()
+                .is_some_and(|(snapshot, _)| snapshot.filesystems.len() == 3)
+                || !projection
+                    .sensors
+                    .as_ref()
+                    .is_some_and(|snapshot| snapshot.readings.len() == 4)
+            {
+                return;
+            }
+            let labels: &[&str] = if scenario == "sensor-center" {
+                &["CPU package", "Chassis fan", "Package power"]
+            } else {
+                &[t("health.read_only"), t("health.errors_reported")]
+            };
+            if !labels.iter().all(|label| {
+                access.text.iter().any(|(text, node)| {
+                    node.size().x > 0.0 && node.size().y > 0.0 && text.0.contains(label)
+                })
+            }) {
+                return;
+            }
+        }
         Some("startup-failure-evidence") => {
             if !access.text.iter().any(|(text, node)| {
                 node.size().x > 0.0

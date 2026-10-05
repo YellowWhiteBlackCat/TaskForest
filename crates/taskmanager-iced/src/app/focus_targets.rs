@@ -6,6 +6,7 @@
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{AppPage, ProcessInsightFacet, RefreshRequest};
 use taskmanager_core::core::services::ServiceAction;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_shell::SortCol;
 
@@ -255,6 +256,7 @@ pub enum FocusTarget {
     /// Resource history window choice (1m, 5m, 15m, 60m).
     SystemHistoryWindow(SystemHistoryWindow),
     SystemSection(SystemPageSection),
+    SystemHealthSection(HealthReviewSection),
     SystemDashboardPrevious,
     SystemDashboardNext,
     /// Alert center modal controls.
@@ -292,7 +294,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 186] = [
+    pub const ALL: [Self; 190] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -453,6 +455,10 @@ impl FocusTarget {
         Self::SystemDashboardNext,
         Self::SystemSection(SystemPageSection::Dashboard),
         Self::SystemSection(SystemPageSection::Hardware),
+        Self::SystemSection(SystemPageSection::Health),
+        Self::SystemHealthSection(HealthReviewSection::All),
+        Self::SystemHealthSection(HealthReviewSection::Storage),
+        Self::SystemHealthSection(HealthReviewSection::Sensors),
         Self::SystemHistoryWindow(SystemHistoryWindow::OneMinute),
         Self::SystemHistoryWindow(SystemHistoryWindow::FiveMinutes),
         Self::SystemHistoryWindow(SystemHistoryWindow::FifteenMinutes),

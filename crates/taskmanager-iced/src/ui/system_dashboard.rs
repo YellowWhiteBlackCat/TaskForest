@@ -18,6 +18,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, SystemPageSection, TimelineMetric, TimelineSeries, TimelineStatistic,
 };
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 
 use crate::app::{FocusTarget, Message};
@@ -41,6 +42,7 @@ pub enum SystemDashboardMessage {
     /// Select the history window the segment summarizes.
     SelectWindow(SystemHistoryWindow),
     SelectSection(SystemPageSection),
+    SelectHealthSection(HealthReviewSection),
     Previous,
     Next,
 }

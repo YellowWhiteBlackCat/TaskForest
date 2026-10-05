@@ -47,6 +47,10 @@ pub(super) fn render_health_overlay_at(
 ) {
     let inner =
         Modal::new(theme, IconId::Health, t("health.system_health_alerts")).render(frame, popup);
+    if app.health_review.mode != crate::health_review::HealthReviewMode::Rules {
+        super::health_review::render(frame, app, theme, inner);
+        return;
+    }
 
     let [summary, rules, editor, events, footer] = if inner.height >= 28 {
         Layout::vertical([
@@ -85,10 +89,10 @@ pub(super) fn render_health_overlay_at(
     }
     frame.render_widget(
         Paragraph::new(vec![
-            Line::from("n Add · d Remove · m Metric · v Severity"),
+            Line::from("Up/Down Select n Add d Remove m Metric v Severity"),
             Line::from("u/o Threshold · f/b Duration · g/l Hysteresis"),
-            Line::from("t Target · y Export · a Merge · r Replace"),
-            Line::from("Enter Toggle · Up/Down Select · h / Esc Close"),
+            Line::from("t Target y Export a Merge r Replace"),
+            Line::from("Enter Toggle h / Esc Close w Storage s Sensors"),
         ])
         .style(Style::new().fg(theme.dim)),
         footer,

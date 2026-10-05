@@ -6,9 +6,6 @@ use taskmanager_shell::ShellApp;
 
 use super::super::{ContextMenuKind, IcedApp, Message};
 use super::dispatch::UpdateDispatch;
-use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 impl IcedApp {
     /// Handle a typed control message, returning any emitted platform effect.
@@ -61,25 +58,20 @@ impl IcedApp {
                 self.apply_startup_menu_action(enabled)
             }
             Message::ConfirmStartupControl => self.shell.confirm_startup_control(),
-            Message::RequestSmartSelfTest { index, kind } => {
-                if let Some(disk) = self
+            Message::RequestSmartSelfTest(intent) => {
+                let observed = self
                     .shell
                     .projection()
                     .snapshot
                     .as_ref()
-                    .and_then(|snapshot| snapshot.disks.get(index))
-                {
-                    let intent = SmartSelfTestIntent {
-                        device_id: DeviceId::new(disk.device_id.clone()),
-                        device_generation: disk.device_generation,
-                        device_key: StorageDeviceKey::new(disk.name.clone()),
-                        display_name: if disk.model.is_empty() {
-                            disk.name.clone()
-                        } else {
-                            disk.model.clone()
-                        },
-                        kind,
-                    };
+                    .is_some_and(|snapshot| {
+                        snapshot.disks.iter().any(|disk| {
+                            disk.device_id == intent.device_id.as_str()
+                                && disk.device_generation == intent.device_generation
+                                && disk.device_generation.is_valid()
+                        })
+                    });
+                if observed {
                     self.shell.arm_smart_self_test(intent);
                 }
                 None

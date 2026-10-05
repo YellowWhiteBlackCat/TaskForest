@@ -116,6 +116,12 @@ impl IcedApp {
                 None
             }
             Message::SystemDashboard(
+                crate::ui::system_dashboard::SystemDashboardMessage::SelectHealthSection(section),
+            ) => {
+                self.system_health_section = section;
+                None
+            }
+            Message::SystemDashboard(
                 crate::ui::system_dashboard::SystemDashboardMessage::SelectSection(section),
             ) => {
                 self.system_section = section;

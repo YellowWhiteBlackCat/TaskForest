@@ -12,6 +12,7 @@
 //! appended only inside the capture composition.
 
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
+use taskmanager_shell::fixture::health::seed_shell_health;
 use taskmanager_shell::fixture::process_insights::{
     process_insights_projection, seed_process_properties_history,
 };
@@ -309,48 +310,8 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             );
             seed_projection_fact(shell, ProjectionSeedFact::NpuInventory(Some(inventory)));
         }
-        "sensor-center" => {
-            const OBSERVED_AT_MS: u64 = 7_000;
-            let fan = SensorMeasurementObservation::available(
-                SensorDescriptor::fan_speed(SensorScale::IDENTITY),
-                SensorMagnitude::Unsigned(2_400),
-                OBSERVED_AT_MS,
-            );
-            let package = SensorMeasurementObservation::available(
-                SensorDescriptor::temperature(SensorScale::IDENTITY),
-                SensorMagnitude::Decimal(51.0),
-                OBSERVED_AT_MS,
-            );
-            let acpitz = SensorMeasurementObservation::available(
-                SensorDescriptor::temperature(SensorScale::IDENTITY),
-                SensorMagnitude::Decimal(61.0),
-                OBSERVED_AT_MS,
-            );
-            if let (Ok(fan), Ok(package), Ok(acpitz)) = (fan, package, acpitz) {
-                let reading = |device: &str, id: &str, label: &str, obs| {
-                    SensorReading::from_measurement_observation(
-                        device.into(),
-                        id.into(),
-                        label.into(),
-                        obs,
-                    )
-                    .with_device_generation(DeviceGeneration::new(1))
-                };
-                let readings = vec![
-                    reading("hwmon:cpu", "cpu_fan", "cpu_fan", fan),
-                    reading("hwmon:cpu", "cpu_package", "Package", package),
-                    reading("thermal:acpitz", "acpitz", "acpitz", acpitz),
-                ];
-                seed_projection_fact(
-                    shell,
-                    ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
-                        state: DeviceState::healthy(OBSERVED_AT_MS),
-                        timestamp_ms: OBSERVED_AT_MS,
-                        readings,
-                        ..Default::default()
-                    })),
-                );
-            }
+        "storage-health" | "sensor-center" => {
+            seed_shell_health(shell);
         }
         "active-alert" | "alert-rules-manager" => {
             let _ = seed_shell_active_alert(shell);

@@ -27,6 +27,7 @@ pub mod diagnostics;
 pub mod first_run;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
+pub mod health_review;
 pub mod history_replay;
 mod network;
 pub mod privilege_center;

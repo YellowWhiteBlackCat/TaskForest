@@ -18,6 +18,10 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   details. Product identity, license and repository remain owned by neutral assets.
 - `src/presentation/system_information.rs` groups cached OS, kernel, desktop and
   hardware facts, omits unavailable rows and preserves complete copied values.
+- `src/presentation/health_review.rs` projects complete filesystem integrity,
+  sensor measurements and generation-matched SMART reports. Unknown counts and
+  denied observations remain unavailable. `fixture/health.rs` owns the shared
+  deterministic health inputs and seeds the normal storage/SMART fold.
 
 - `src/app/diagnostics.rs` freezes observed snapshot/process inventory, services, startup
   and diagnostic facts into one sanitized application plan. Missing required observations

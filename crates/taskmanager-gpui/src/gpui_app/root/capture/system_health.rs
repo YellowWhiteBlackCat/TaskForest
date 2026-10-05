@@ -13,6 +13,7 @@ use taskmanager_core::core::{
 };
 
 use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome};
+use taskmanager_shell::fixture::health::health_fixture;
 
 impl CaptureEvidence {
     /// Prepare strict Health-page evidence only after the normal telemetry and
@@ -34,7 +35,7 @@ impl CaptureEvidence {
             return SystemHealthCaptureOutcome::default();
         }
 
-        let fixture = crate::gpui_app::system_health_view::capture_fixture();
+        let fixture = health_fixture();
         *page = TopPage::System;
         dashboard.section = SystemPageSection::Health;
         snapshot.disks = vec![fixture.selected_disk.clone()];

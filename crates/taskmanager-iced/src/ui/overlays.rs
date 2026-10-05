@@ -12,6 +12,7 @@ use taskmanager_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields,
 };
@@ -143,19 +144,19 @@ pub(super) fn smart_overlay<'a>(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestShort { index },
                                     t("health.short_test"),
-                                    Message::RequestSmartSelfTest {
-                                        index,
-                                        kind: SmartSelfTestKind::Short,
-                                    },
+                                    Message::RequestSmartSelfTest(self_test_intent(
+                                        disk,
+                                        SmartSelfTestKind::Short,
+                                    )),
                                 ))
                                 .push(focus::ghost_button(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestExtended { index },
                                     t("health.extended_test"),
-                                    Message::RequestSmartSelfTest {
-                                        index,
-                                        kind: SmartSelfTestKind::Extended,
-                                    },
+                                    Message::RequestSmartSelfTest(self_test_intent(
+                                        disk,
+                                        SmartSelfTestKind::Extended,
+                                    )),
                                 ));
                         } else if is_running {
                             test_row = test_row.push(

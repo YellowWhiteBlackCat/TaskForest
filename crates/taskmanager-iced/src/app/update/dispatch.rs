@@ -136,7 +136,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::RequestStartupControl(_)
         | Message::RequestStartupControlFor { .. }
         | Message::ConfirmStartupControl
-        | Message::RequestSmartSelfTest { .. }
+        | Message::RequestSmartSelfTest(_)
         | Message::ConfirmSmartSelfTest
         | Message::OpenProcessLocation
         | Message::SearchProcessOnline) => MessageDomain::Control(message),

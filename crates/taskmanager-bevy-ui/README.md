@@ -80,6 +80,9 @@ adopted — theme tokens are the only skin authority.
 - `src/pages/alerts/editor.rs` mounts canonical rule creation, field edits,
   enabled state, removal and clipboard import/export. Rules and events scroll
   beneath fixed page actions; edits always reduce through the shared shell.
+- System Health selects shared storage and sensor groups inside the measured
+  System body. SMART controls freeze disk generation before activation and arm
+  the shared confirmation; replaced targets cannot redirect a stale control.
 - `src/pages/history/control.rs` routes both review surfaces through one history
   controller and native session. Performance review has pinned actions around
   a bounded body; application review admits complete metric cards in its own

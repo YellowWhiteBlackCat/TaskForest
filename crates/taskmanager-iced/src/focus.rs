@@ -180,6 +180,9 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::SystemDashboardPrevious => "iced-system-dashboard-previous".to_owned(),
         FocusTarget::SystemDashboardNext => "iced-system-dashboard-next".to_owned(),
         FocusTarget::SystemSection(section) => format!("iced-system-section-{section:?}"),
+        FocusTarget::SystemHealthSection(section) => {
+            format!("iced-system-health-section-{section:?}")
+        }
         FocusTarget::SystemHistoryWindow(w) => {
             format!("iced-resource-history-window-{}", w.id())
         }
