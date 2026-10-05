@@ -9,24 +9,21 @@
 //! `alert.*` catalog keys the TUI suggestions overlay and the GPUI rule
 //! manager already consume.
 
-use iced::widget::{Space, checkbox, column, container, row, scrollable, text};
+use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
+use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::AlertRuleConflictPolicy;
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_ui_contract::IconId;
 
-use crate::app::alerts::{AlertRuleRowModel, active_alert_lines, empty_state_text, rule_rows};
+use crate::app::alerts::{active_alert_lines, empty_state_text, rule_rows};
+mod editor;
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-
-/// Column widths for the rule list (layout contracts, not theme tokens).
-const METRIC_CELL_WIDTH: f32 = 190.0;
-const SEVERITY_CELL_WIDTH: f32 = 80.0;
-const THRESHOLD_CELL_WIDTH: f32 = 90.0;
-const TOGGLE_CELL_WIDTH: f32 = 150.0;
 
 fn severity_color(severity: AlertSeverity, theme_snapshot: &Theme) -> iced::Color {
     let palette = theme_snapshot.palette();
@@ -58,8 +55,6 @@ pub(crate) fn page_tab_pill(
 /// Render the Alerts page body.
 pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
-    let muted = theme::muted_text_color(theme_snapshot);
-
     let export_button = focus::button(
         theme_snapshot,
         FocusTarget::AlertsExport,
@@ -70,42 +65,50 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let import_button = focus::button(
         theme_snapshot,
         FocusTarget::AlertsImport,
-        t("common.import"),
-        Message::Alerts(AlertsMessage::ImportRulesFromClipboard),
+        "Import (merge)",
+        Message::Alerts(AlertsMessage::ImportRulesFromClipboard {
+            mode: AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
+        }),
+        false,
+    );
+    let replace_button = focus::button(
+        theme_snapshot,
+        FocusTarget::AlertsImportReplace,
+        "Import (replace)",
+        Message::Alerts(AlertsMessage::ImportRulesFromClipboard {
+            mode: AlertRuleImportMode::Replace,
+        }),
         false,
     );
 
-    let actions = row![export_button, import_button]
-        .spacing(f32::from(tokens::SPACE_8))
-        .align_y(iced::Alignment::Center);
-
-    let heading = row![
-        row![
-            text(t("alerts.manage")).size(f32::from(tokens::FONT_14)),
-            text(t("alerts.observed_hint"))
-                .size(f32::from(tokens::FONT_11))
-                .color(muted),
-        ]
-        .spacing(f32::from(tokens::SPACE_8))
-        .align_y(iced::Alignment::Center),
-        Space::new().width(Length::Fill),
-        actions,
-    ]
-    .spacing(f32::from(tokens::SPACE_8))
-    .align_y(iced::Alignment::Center)
-    .width(Length::Fill);
+    let add = focus::button(
+        theme_snapshot,
+        FocusTarget::AlertsAdd,
+        t("alerts.add_rule"),
+        Message::Alerts(AlertsMessage::AddDefaultRule),
+        false,
+    );
+    let heading = column![
+        text(t("alerts.manage")).size(f32::from(tokens::FONT_14)),
+        row![add, export_button, import_button, replace_button]
+            .spacing(f32::from(tokens::SPACE_8))
+            .wrap()
+    ];
 
     let active_section = active_section(app, theme_snapshot);
     let rules_section = rules_section(app, theme_snapshot);
 
-    let body = column![heading, active_section, rules_section]
+    let body = column![active_section, rules_section]
         .spacing(f32::from(tokens::SPACE_8))
         .width(Length::Fill);
 
-    scrollable(body)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    column![
+        heading,
+        scrollable(body).width(Length::Fill).height(Length::Fill)
+    ]
+    .spacing(f32::from(tokens::SPACE_8))
+    .height(Length::Fill)
+    .into()
 }
 
 fn active_section<'a>(
@@ -149,7 +152,7 @@ fn rules_section<'a>(
     theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
-    let rows = rule_rows(app);
+    let rows = app.alerts_rules();
 
     if rows.is_empty() {
         return container(
@@ -163,108 +166,28 @@ fn rules_section<'a>(
         .into();
     }
 
-    let header = row![
-        text(t("common.name"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted)
-            .width(Length::Fixed(METRIC_CELL_WIDTH)),
-        text(t("common.status"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted)
-            .width(Length::Fixed(SEVERITY_CELL_WIDTH)),
-        text(t("alerts.threshold"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted)
-            .width(Length::Fixed(THRESHOLD_CELL_WIDTH)),
-        text(t("alerts.current_value"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted)
-            .width(Length::Fill),
-        text(t("common.enabled"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted)
-            .width(Length::Fixed(TOGGLE_CELL_WIDTH)),
-    ]
-    .spacing(f32::from(tokens::SPACE_8));
-
-    let mut list = column![header].spacing(f32::from(tokens::SPACE_4));
-    for (index, row_model) in rows.into_iter().enumerate() {
-        list = list.push(rule_row(theme_snapshot, index, row_model));
-    }
-
-    container(list.padding(f32::from(tokens::SPACE_8)).width(Length::Fill))
-        .width(Length::Fill)
-        .style(move |_| theme::panel_style(theme_snapshot))
-        .into()
-}
-
-fn rule_row<'a>(
-    theme_snapshot: &'a Theme,
-    index: usize,
-    row_model: AlertRuleRowModel,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let muted = theme::muted_text_color(theme_snapshot);
-    let color = severity_color(row_model.severity, theme_snapshot);
-    let enabled = row_model.enabled;
-    let AlertRuleRowModel {
-        rule_id,
-        metric_label,
-        severity_label,
-        threshold_text,
-        current_text,
-        ..
-    } = row_model;
-
-    // The toggle cluster (checkbox + state label) is wrapped in the focusable
-    // shell: Tab reaches it via `FocusTarget::AlertsRuleToggle(index)`, the
-    // inner checkbox keeps the pointer path, and Enter/Space while focused
-    // publishes the same ToggleRule message.
-    let pointer_rule_id = rule_id.clone();
-    let toggle = focus::focusable_control(
-        theme_snapshot,
-        FocusTarget::AlertsRuleToggle(index),
-        row![
-            checkbox(enabled)
-                .on_toggle(move |_| {
-                    Message::Alerts(AlertsMessage::ToggleRule {
-                        rule_id: pointer_rule_id.clone(),
-                    })
-                })
-                .size(f32::from(tokens::FONT_14)),
-            text(if enabled {
-                t("common.enabled")
-            } else {
-                t("common.disabled")
-            })
-            .size(f32::from(tokens::FONT_11))
-            .color(muted),
-        ]
-        .spacing(f32::from(tokens::SPACE_4))
-        .align_y(iced::Alignment::Center)
-        .width(Length::Fixed(TOGGLE_CELL_WIDTH))
-        .into(),
-        Message::Alerts(AlertsMessage::ToggleRule { rule_id }),
-    );
-
-    row![
-        text(metric_label)
-            .size(f32::from(tokens::FONT_12))
-            .width(Length::Fixed(METRIC_CELL_WIDTH)),
-        text(severity_label)
-            .size(f32::from(tokens::FONT_11))
-            .style(move |_theme| iced::widget::text::Style { color: Some(color) })
-            .width(Length::Fixed(SEVERITY_CELL_WIDTH)),
-        text(threshold_text)
-            .size(f32::from(tokens::FONT_12))
-            .width(Length::Fixed(THRESHOLD_CELL_WIDTH)),
-        text(current_text)
-            .size(f32::from(tokens::FONT_12))
-            .color(muted)
-            .width(Length::Fill),
-        toggle,
-    ]
+    let models = rule_rows(app);
+    let list = column(
+        rows.iter()
+            .zip(models)
+            .enumerate()
+            .map(|(index, (managed, model))| {
+                column![
+                    text(format!(
+                        "{} · {} · {} · {}",
+                        model.metric_label,
+                        model.severity_label,
+                        model.threshold_text,
+                        model.current_text
+                    )),
+                    editor::card(theme_snapshot, index, managed)
+                ]
+                .into()
+            }),
+    )
     .spacing(f32::from(tokens::SPACE_8))
-    .into()
+    .width(Length::Fill);
+    list.into()
 }
 
 #[cfg(test)]

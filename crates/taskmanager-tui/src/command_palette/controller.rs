@@ -179,6 +179,7 @@ impl TuiApp {
         action: TuiSurfaceAction,
     ) -> Option<PlatformEffect> {
         match action {
+            TuiSurfaceAction::EditAlertRule(gesture) => self.edit_rule_gesture(gesture),
             TuiSurfaceAction::OpenRepository => {
                 return Some(PlatformEffect::OpenUrl(UrlOpenRequest {
                     url: REPOSITORY_URL.into(),

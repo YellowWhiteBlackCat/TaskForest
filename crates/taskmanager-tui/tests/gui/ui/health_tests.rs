@@ -48,6 +48,26 @@ fn health_overlay_renders_domain_summary_and_alert_rules() {
 }
 
 #[test]
+fn compact_rule_editor_keeps_the_selected_rule_and_all_actions_reachable() {
+    let mut app = demo_app();
+    app.toggle_health();
+    app.health_rule_selection = app.projection().alert_center.managed_rules().len() - 1;
+    for (width, height) in [(54, 16), (80, 24), (120, 40), (160, 16), (54, 48)] {
+        let text = frame_text(&app, width, height);
+        assert!(text.contains("Threshold:"), "threshold at {width}x{height}");
+        assert!(text.contains("Duration:"));
+        assert!(text.contains("Hysteresis:"));
+        assert!(text.contains("Target:"));
+        assert!(
+            text.contains("h / Esc Close"),
+            "last fixed action is inside the frame"
+        );
+        assert!(text.contains("a Merge"));
+        assert!(text.contains("r Replace"));
+    }
+}
+
+#[test]
 fn health_overlay_renders_honest_empty_state_without_a_snapshot() {
     let mut app = demo_app();
     seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));

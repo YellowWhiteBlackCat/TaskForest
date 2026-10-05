@@ -15,12 +15,14 @@ use taskmanager_application::{
     PlatformEffect,
 };
 use taskmanager_core::core::alerts::{
-    AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertRuleTransferError,
-    export_alert_rules_json, import_alert_rules_json,
+    AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
+    import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::IcedApp;
+use editor::RuleAdjustment;
+pub(crate) mod editor;
 
 /// Frontend-local Alerts-page state.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -87,20 +89,33 @@ pub enum AlertsMessage {
     /// Close the alerts page back to the shared shell route.
     ClosePage,
     /// Toggle one managed rule by stable identity.
-    ToggleRule { rule_id: String },
+    ToggleRule {
+        rule_id: String,
+    },
     /// Export managed alert rules to the clipboard or report notice.
     ExportRules,
     /// Read alert rules JSON from the clipboard and import.
-    ImportRulesFromClipboard,
+    ImportRulesFromClipboard {
+        mode: AlertRuleImportMode,
+    },
     /// Import managed alert rules from JSON.
     ImportRules {
         json: String,
         mode: AlertRuleImportMode,
     },
     /// Add one durable alert rule.
-    AddRule { rule: AlertRule },
+    AddRule {
+        rule: AlertRule,
+    },
+    AddDefaultRule,
+    AdjustRule {
+        rule_id: String,
+        adjustment: RuleAdjustment,
+    },
     /// Remove one durable alert rule by stable identity.
-    RemoveRule { rule_id: String },
+    RemoveRule {
+        rule_id: String,
+    },
 }
 
 impl IcedApp {
@@ -111,6 +126,17 @@ impl IcedApp {
         clipboard_task: &mut Option<iced::Task<super::Message>>,
     ) -> Option<PlatformEffect> {
         match message {
+            AlertsMessage::AddDefaultRule => {
+                self.add_default_alert_rule();
+                None
+            }
+            AlertsMessage::AdjustRule {
+                rule_id,
+                adjustment,
+            } => {
+                self.adjust_alert_rule(rule_id, adjustment);
+                None
+            }
             AlertsMessage::OpenPage => {
                 self.open_alerts_page();
                 None
@@ -145,11 +171,11 @@ impl IcedApp {
                 }
                 None
             }
-            AlertsMessage::ImportRulesFromClipboard => {
-                *clipboard_task = Some(iced::clipboard::read().map(|content| {
+            AlertsMessage::ImportRulesFromClipboard { mode } => {
+                *clipboard_task = Some(iced::clipboard::read().map(move |content| {
                     super::Message::Alerts(AlertsMessage::ImportRules {
                         json: content.unwrap_or_default(),
-                        mode: AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
+                        mode,
                     })
                 }));
                 None
@@ -461,7 +487,7 @@ const fn disk_scoped(metric: AlertMetric) -> bool {
 
 /// Metric label through the shared `alerts.metric_*` catalog keys (the same
 /// vocabulary the TUI alerts surface and threshold-suggestions overlay use).
-fn metric_label(metric: AlertMetric) -> &'static str {
+pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
     match metric {
         AlertMetric::CpuUsagePercent => t("alerts.metric_cpu"),
         AlertMetric::MemoryUsagePercent => t("alerts.metric_memory"),
@@ -472,7 +498,7 @@ fn metric_label(metric: AlertMetric) -> &'static str {
 }
 
 /// Unit suffix, mirroring the TUI alerts overlay's unit semantics.
-const fn metric_unit(metric: AlertMetric) -> &'static str {
+pub(crate) const fn metric_unit(metric: AlertMetric) -> &'static str {
     match metric {
         AlertMetric::CpuUsagePercent
         | AlertMetric::MemoryUsagePercent
@@ -483,7 +509,7 @@ const fn metric_unit(metric: AlertMetric) -> &'static str {
 }
 
 /// Severity label through the shared `alert.*` catalog keys (GPUI parity).
-fn severity_label(severity: AlertSeverity) -> &'static str {
+pub(crate) fn severity_label(severity: AlertSeverity) -> &'static str {
     match severity {
         AlertSeverity::Info => t("alert.info"),
         AlertSeverity::Warning => t("alert.warning"),

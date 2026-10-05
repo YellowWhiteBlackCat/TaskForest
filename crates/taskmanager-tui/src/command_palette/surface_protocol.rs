@@ -12,6 +12,8 @@ use super::*;
 /// consumption rule (full-modal surfaces swallow every key, the service-log
 /// panel only its declared chords) lives beside the dispatch in
 /// `runtime::modals` and `runtime::handle_settings_key`.
+use crate::alert_editor::RuleGesture;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiSurfaceScope {
     /// The settings form modal (`runtime::handle_settings_key`).
@@ -19,6 +21,7 @@ pub(crate) enum TuiSurfaceScope {
     /// The Health / Containers status overlays, which share
     /// one toggle protocol in `runtime::modals`.
     StatusOverlay,
+    HealthRule,
     About,
     SystemInformation,
     /// The Services-page service-log panel: a partial owner whose unclaimed
@@ -34,6 +37,7 @@ pub(crate) enum TuiSurfaceScope {
 pub(crate) enum TuiSurfaceAction {
     /// `p` inside the settings form self-closes it (the toggle precedent).
     ToggleSettings,
+    EditAlertRule(RuleGesture),
     ToggleAbout,
     OpenRepository,
     OpenSystemInformation,
@@ -71,7 +75,77 @@ pub(crate) struct TuiSurfaceArm {
 /// their dispatch sites and must never appear here — the matrix pins the
 /// bare-lowercase-letter shape that enforces it. See the command-palette
 /// module header for the hard masking contract against the command layers.
-pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 16] = [
+pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 30] = [
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'n',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Add),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'd',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Remove),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'm',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Metric),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'u',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Threshold(1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'o',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Threshold(-1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'f',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Duration(1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'b',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Duration(-1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'g',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Hysteresis(1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'l',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Hysteresis(-1)),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'v',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Severity),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 't',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Target),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'y',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::Export),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'a',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::ImportMerge),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthRule,
+        chord: 'r',
+        action: TuiSurfaceAction::EditAlertRule(RuleGesture::ImportReplace),
+    },
     TuiSurfaceArm {
         scope: TuiSurfaceScope::About,
         chord: 'r',

@@ -157,6 +157,12 @@ pub(crate) fn apply_terminal_event_with_plan(
             }
         }
         Event::Paste(text) => {
+            if app.paste_alert_rules(&text) {
+                return EventReaction {
+                    dirty: true,
+                    effect: None,
+                };
+            }
             // Bracketed paste is the search box's bulk input path (the read
             // side of the OSC 52 clipboard loop). Paste only lands while the
             // search field is focused — anywhere else it is an honest no-op,

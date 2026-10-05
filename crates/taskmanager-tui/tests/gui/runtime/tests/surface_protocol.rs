@@ -51,7 +51,8 @@ fn overlay_open(app: &crate::TuiApp, action: TuiSurfaceAction) -> bool {
         TuiSurfaceAction::ToggleAbout => app.about_open(),
         TuiSurfaceAction::ToggleHealth => app.health_open(),
         TuiSurfaceAction::ToggleContainers => app.containers_open(),
-        TuiSurfaceAction::OpenRepository
+        TuiSurfaceAction::EditAlertRule(_)
+        | TuiSurfaceAction::OpenRepository
         | TuiSurfaceAction::OpenSystemInformation
         | TuiSurfaceAction::CopyInformation
         | TuiSurfaceAction::ToggleServiceLogFollow
@@ -180,7 +181,9 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
     // one press twice (same masking invariant the `c h i p` overlaps ride).
     assert_eq!(
         overlap,
-        ['a', 'c', 'f', 'h', 'i', 'p', 'r', 't'],
+        [
+            'a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'm', 'o', 'p', 'r', 't', 'y'
+        ],
         "every chord declared in both layers must be listed here on purpose"
     );
 }

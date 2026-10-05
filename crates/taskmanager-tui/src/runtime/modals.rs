@@ -419,9 +419,13 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                         app.toggle_selected_alert_rule();
                     }
                     ratatui::crossterm::event::KeyCode::Char(character) => {
-                        if let Some(action) =
+                        if let Some(action) = surface_protocol_action(
+                            TuiSurfaceScope::HealthRule,
+                            character,
+                        )
+                        .or_else(|| {
                             surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
-                        {
+                        }) {
                             app.run_surface_protocol_action(action);
                         }
                     }

@@ -91,6 +91,11 @@ typed notices instead of mutating a shared status string.
 The Health surface reads the shell's canonical managed alert rules directly;
 disabled rules stay listed and labelled. Threshold suggestions remain a
 separate read-only evidence projection and cannot become rule authority.
+Health exposes `n` add, `d` remove, `m` metric, `u/o` threshold, `f/b` duration,
+`g/l` hysteresis, `v` severity and `t` disk target. `y` exports through the terminal
+clipboard; `a` arms merge and `r` arms replacement for the next JSON paste.
+Compact terminals retain the selected rule, four editor rows and fixed action hints;
+the optional device summary and event group are admitted only with their full budget.
 
 Configuration I/O is owned by the app-host background coordinator. The event
 loop only drains immutable publications and submits bounded patches. The

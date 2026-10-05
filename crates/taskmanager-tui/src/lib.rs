@@ -22,6 +22,7 @@ compile_error!(
      vendor-specific TaskForest artifacts are not supported"
 );
 
+mod alert_editor;
 mod bindings;
 mod capabilities;
 mod clipboard;
@@ -223,6 +224,7 @@ pub struct TuiApp {
     /// Alert-rule selection index in the health overlay. Clamped against the
     /// projection's managed-rules count during access.
     pub health_rule_selection: usize,
+    pub(crate) alert_import_mode: Option<AlertRuleImportMode>,
     /// The locale-neutral category/app/type expansion keys whose headers are
     /// currently expanded on the Applications page. Toggled by activating a
     /// header (Enter / Right). Re-seeded for the canonical category tree when
@@ -358,6 +360,7 @@ impl TuiApp {
             system_history_window: SystemHistoryWindow::FifteenMinutes,
             memory_capture_scroll_pending: false,
             health_rule_selection: 0,
+            alert_import_mode: None,
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
@@ -605,6 +608,7 @@ impl TuiApp {
             self.dismiss_local_surface_kind(TuiSurfaceKind::Health);
         } else {
             self.health_rule_selection = 0;
+            self.alert_import_mode = None;
             self.open_local_surface(TuiSurface::Health);
         }
     }

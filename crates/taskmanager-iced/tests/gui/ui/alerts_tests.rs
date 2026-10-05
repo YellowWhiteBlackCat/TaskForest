@@ -4,6 +4,7 @@ use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_assets::embedded_fonts;
 use taskmanager_core::core::alerts::{AlertMetric, AlertRule};
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
@@ -141,4 +142,91 @@ fn the_alerts_route_renders_in_the_root_view() {
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     assert!(app.alerts_page_open());
     let _ = crate::ui::view(&app);
+}
+
+#[test]
+fn rule_cards_wrap_inside_the_viewport_while_the_toolbar_and_scroll_body_stay_bounded() {
+    use iced::advanced::layout::{Layout, Limits};
+    use iced::advanced::renderer::Headless;
+    use iced::advanced::widget::operation::{Focusable, Scrollable};
+    use iced::advanced::widget::{Id, Operation, Tree};
+    use iced::{Pixels, Rectangle, Size, Vector};
+    #[derive(Default)]
+    struct Bounds {
+        controls: Vec<(Option<Id>, Rectangle)>,
+        bodies: Vec<Rectangle>,
+    }
+    impl Operation for Bounds {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+            operate(self);
+        }
+        fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, _: &mut dyn Focusable) {
+            self.controls.push((id.cloned(), bounds));
+        }
+        fn scrollable(
+            &mut self,
+            _: Option<&Id>,
+            bounds: Rectangle,
+            _: Rectangle,
+            _: Vector,
+            _: &mut dyn Scrollable,
+        ) {
+            self.bodies.push(bounds);
+        }
+    }
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("fonts");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("renderer");
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 360.0),
+        (480.0, 960.0),
+        (1920.0, 1080.0),
+    ] {
+        let app = opened_demo();
+        let mut view = render(&app);
+        let mut tree = Tree::new(&view);
+        let size = Size::new(width, height);
+        let node =
+            view.as_widget_mut()
+                .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+        let mut bounds = Bounds::default();
+        view.as_widget_mut()
+            .operate(&mut tree, Layout::new(&node), &renderer, &mut bounds);
+        assert_eq!(bounds.bodies.len(), 1);
+        let body = bounds.bodies[0];
+        assert!(body.height > 0.0 && body.y + body.height <= height + 0.5);
+        assert!(bounds.controls.len() >= 4 + 5 * 11);
+        for (id, rect) in bounds.controls {
+            assert!(rect.width > 0.0 && rect.height > 0.0);
+            assert!(
+                rect.x >= -0.5 && rect.x + rect.width <= width + 0.5,
+                "{id:?}: {rect:?} at {size:?}"
+            );
+            if [
+                FocusTarget::AlertsAdd,
+                FocusTarget::AlertsExport,
+                FocusTarget::AlertsImport,
+                FocusTarget::AlertsImportReplace,
+            ]
+            .into_iter()
+            .any(|target| id == Some(Id::from(focus::focus_id(target))))
+            {
+                assert!(rect.y >= -0.5 && rect.y + rect.height <= body.y + 0.5);
+            }
+        }
+    }
 }

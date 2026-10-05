@@ -15,6 +15,7 @@ use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_ev
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
@@ -83,6 +84,60 @@ fn quit_key_exits_the_loop_cleanly() {
     );
     assert!(outcome.is_ok());
     assert!(app.should_quit(), "'q' must set the shared quit flag");
+}
+
+#[test]
+fn health_rule_keys_edit_the_selected_rule_and_import_only_when_explicitly_armed() {
+    use ratatui::crossterm::event::KeyCode;
+    let mut app = crate::demo_app();
+    app.toggle_health();
+    let initial = app.projection().alert_center.managed_rules().to_vec();
+    for character in ['n', 'u', 'f', 'l', 'v'] {
+        apply_terminal_event(
+            &mut app,
+            key(KeyCode::Char(character), KeyEventKind::Press),
+            TEST_FRAME,
+        );
+    }
+    let rules = app.projection().alert_center.managed_rules();
+    assert_eq!(rules.len(), initial.len() + 1);
+    let rule = &rules.last().expect("normal key created rule").rule;
+    assert_eq!(rule.threshold, 86.0);
+    assert_eq!(rule.for_duration, Duration::from_secs(6));
+    assert_eq!(rule.hysteresis, 4.0);
+    assert_eq!(rule.severity, AlertSeverity::Critical);
+    let json = app.export_alert_rules().expect("complete transfer");
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('d'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.projection().alert_center.managed_rules(), initial);
+    apply_terminal_event(&mut app, Event::Paste(json.clone()), TEST_FRAME);
+    assert_eq!(
+        app.projection().alert_center.managed_rules(),
+        initial,
+        "unarmed paste is inert"
+    );
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('r'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    apply_terminal_event(&mut app, Event::Paste(json), TEST_FRAME);
+    assert_eq!(
+        app.projection().alert_center.managed_rules().len(),
+        initial.len() + 1
+    );
+    let before = app.projection().alert_center.managed_rules().to_vec();
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('r'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    apply_terminal_event(&mut app, Event::Paste("invalid json".into()), TEST_FRAME);
+    assert_eq!(app.projection().alert_center.managed_rules(), before);
+    assert!(app.alert_import_mode.is_none());
 }
 
 #[test]

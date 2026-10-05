@@ -11,7 +11,7 @@
 //!   overlay and cannot become a second editable rule authority.
 
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
@@ -23,7 +23,6 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::{ProviderRuntimeState, SystemSnapshot};
 use taskmanager_ui_contract::IconId;
 
-use super::containers::KeyHint;
 use super::containers::Modal;
 use super::health_data::{
     Verdict, cpu_value, cpu_verdict, gpu_value, gpu_verdict, memory_value, memory_verdict,
@@ -35,7 +34,7 @@ use crate::TuiApp;
 #[path = "../../tests/headless/ui/health_support.rs"]
 pub(crate) mod health_support;
 use crate::TuiTheme;
-use crate::ui::alerts::{alert_event_line, managed_rule_line};
+use crate::ui::alerts::{alert_event_line, managed_rule_line, metric_label, metric_unit};
 use crate::ui::{DeviceHealth, classify_device_state};
 use taskmanager_core::core::device_state::DeviceState;
 
@@ -49,41 +48,92 @@ pub(super) fn render_health_overlay_at(
     let inner =
         Modal::new(theme, IconId::Health, t("health.system_health_alerts")).render(frame, popup);
 
-    let [summary, rules, events, footer] = if inner.height >= 24 {
+    let [summary, rules, editor, events, footer] = if inner.height >= 28 {
         Layout::vertical([
             Constraint::Length(11),
-            Constraint::Length(7),
-            Constraint::Min(4),
-            Constraint::Length(3),
+            Constraint::Length(6),
+            Constraint::Length(4),
+            Constraint::Min(0),
+            Constraint::Length(4),
         ])
         .areas(inner)
-    } else {
-        let [s, r, f] = Layout::vertical([
-            Constraint::Length(10),
-            Constraint::Min(5),
-            Constraint::Length(3),
+    } else if inner.height >= 24 {
+        let [s, r, e, f] = Layout::vertical([
+            Constraint::Length(9),
+            Constraint::Min(3),
+            Constraint::Length(4),
+            Constraint::Length(4),
         ])
         .areas(inner);
-        [s, r, Rect::default(), f]
+        [s, r, e, Rect::default(), f]
+    } else {
+        let [r, e, f] = Layout::vertical([
+            Constraint::Min(2),
+            Constraint::Length(4),
+            Constraint::Length(4),
+        ])
+        .areas(inner);
+        [Rect::default(), r, e, Rect::default(), f]
     };
-
-    render_device_summary(frame, app, theme, summary);
+    if summary.height > 0 {
+        render_device_summary(frame, app, theme, summary);
+    }
     render_alert_rules(frame, app, theme, rules);
+    render_rule_editor(frame, app, theme, editor);
     if events.height > 0 {
         render_alert_events(frame, app, theme, events);
     }
-
-    let mut hint = KeyHint::spans(
-        theme,
-        crate::command_palette::surface_hint_pairs(
-            crate::command_palette::TuiSurfaceScope::StatusOverlay,
-            crate::command_palette::TuiSurfaceAction::ToggleHealth,
-        ),
-    );
-    hint.push(Span::styled(t("health.t_hint"), Style::new().fg(theme.dim)));
     frame.render_widget(
-        Paragraph::new(vec![Line::from(""), Line::from(hint)]).alignment(Alignment::Center),
+        Paragraph::new(vec![
+            Line::from("n Add · d Remove · m Metric · v Severity"),
+            Line::from("u/o Threshold · f/b Duration · g/l Hysteresis"),
+            Line::from("t Target · y Export · a Merge · r Replace"),
+            Line::from("Enter Toggle · Up/Down Select · h / Esc Close"),
+        ])
+        .style(Style::new().fg(theme.dim)),
         footer,
+    );
+}
+
+fn render_rule_editor(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    let Some(managed) = app
+        .projection()
+        .alert_center
+        .managed_rules()
+        .get(app.health_rule_selection())
+    else {
+        return;
+    };
+    let rule = &managed.rule;
+    let lines = vec![
+        format!("{} · {}", rule.id, metric_label(rule.metric)),
+        format!(
+            "Threshold:{:.1}{}  Duration:{}s",
+            rule.threshold,
+            metric_unit(rule.metric),
+            rule.for_duration.as_secs()
+        ),
+        format!(
+            "Hysteresis:{:.1}  {:?}  {}",
+            rule.hysteresis,
+            rule.severity,
+            if managed.enabled {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        ),
+        format!(
+            "Target:{}",
+            rule.target.as_deref().unwrap_or("System-wide / all disks")
+        ),
+    ]
+    .into_iter()
+    .map(|line| Line::from(truncate_text(&line, usize::from(area.width))))
+    .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::new().fg(theme.accent)),
+        area,
     );
 }
 
@@ -319,6 +369,7 @@ fn render_alert_rules(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area
         .managed_rules()
         .iter()
         .enumerate()
+        .skip(selected_index.saturating_sub(usize::from(rows.height).saturating_sub(1)))
         .map(|(index, managed)| {
             let active = is_health_open && selected_index == index;
             managed_rule_line(managed, active, theme)

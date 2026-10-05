@@ -30,7 +30,9 @@ fallback path.
   `open: bool` beside the shell page. Selecting a shared page or explicit close returns to `SharedPage`, bare Esc closes
   Alerts only when no higher-priority surface owns input, and a modal closes first while preserving the route underneath
   it.
-- The Alerts page reads the shell's immutable canonical `ManagedAlertRule` list and submits the shared toggle edit.
+- The Alerts page reads the shell's immutable canonical `ManagedAlertRule` list. Wrapped cards expose creation,
+  metric/threshold/duration/hysteresis/severity/target edits, removal and clipboard transfers through shared edits.
+  Fixed actions surround one bounded scroll body; stale controls resolve stable rule identities against current state.
   `AlertsPageState` contains only its typed route; disabled rules are neither copied nor removed from the list.
 - `src/app/config_sync.rs` is the only configuration bridge: production receives an app-host `ConfigClient`, ticks drain
   immutable revision publications, and settings use non-blocking base-aware submissions. Queue rejection/save failure
