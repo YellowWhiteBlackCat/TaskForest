@@ -4,6 +4,7 @@ use crate::app::FrontendTrack;
 use crate::first_run_modal::SetupState;
 use crate::input::ShellInteractionApplied;
 use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalChanged};
+use crate::pages::performance::sidebar_editor::{self, SidebarState};
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
@@ -22,7 +23,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
+use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::UiSystems;
@@ -39,6 +40,7 @@ use taskmanager_shell::presentation::system_information::{SystemInformationGroup
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum WindowSurfaceKind {
+    SidebarDevices,
     About,
     SystemInformation,
     FirstRun,
@@ -47,6 +49,7 @@ pub(crate) enum WindowSurfaceKind {
 }
 #[derive(Clone, Debug)]
 pub(crate) enum WindowSurface {
+    SidebarDevices,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     FirstRun,
@@ -55,6 +58,7 @@ pub(crate) enum WindowSurface {
 impl WindowSurface {
     pub(crate) fn kind(&self) -> WindowSurfaceKind {
         match self {
+            Self::SidebarDevices => WindowSurfaceKind::SidebarDevices,
             Self::About => WindowSurfaceKind::About,
             Self::SystemInformation(_) => WindowSurfaceKind::SystemInformation,
             Self::FirstRun => WindowSurfaceKind::FirstRun,
@@ -82,6 +86,7 @@ impl WindowSurfaceState {
 pub(crate) struct WindowSurfaceChanged;
 #[derive(Event, Clone, Copy)]
 pub(crate) enum WindowSurfaceCommand {
+    SidebarDevices,
     About,
     SystemInformation,
     FirstRun,
@@ -103,6 +108,7 @@ struct SurfacePaint {
 
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<WindowSurfaceState>()
+        .init_resource::<SidebarState>()
         .init_resource::<SurfacePaint>()
         .add_observer(on_command)
         .add_observer(request_paint)
@@ -129,6 +135,9 @@ fn on_command(
     mut commands: Commands,
 ) {
     match *command.event() {
+        WindowSurfaceCommand::SidebarDevices => {
+            show(&mut access, &mut commands, WindowSurface::SidebarDevices)
+        }
         WindowSurfaceCommand::About => show(&mut access, &mut commands, WindowSurface::About),
         WindowSurfaceCommand::SystemInformation => {
             let appearance = prefs
@@ -237,6 +246,8 @@ fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePain
 }
 #[derive(SystemParam)]
 struct SurfaceRender<'w, 's> {
+    sidebar: Res<'w, SidebarState>,
+    track: Option<NonSend<'w, FrontendTrack>>,
     state: Res<'w, WindowSurfaceState>,
     paint: ResMut<'w, SurfacePaint>,
     palette: Option<Res<'w, WindowPalette>>,
@@ -256,6 +267,13 @@ fn paint_surface(mut render: SurfaceRender) {
         return;
     };
     let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+        Some(WindowSurface::SidebarDevices) => render.track.as_ref().map(|track| {
+            Box::new(sidebar_editor::scene(
+                &track.shell,
+                &render.sidebar,
+                palette,
+            )) as Box<dyn Scene>
+        }),
         Some(WindowSurface::About) => Some(Box::new(crate::about_modal::surface_scene(palette))),
         Some(WindowSurface::SystemInformation(facts)) => Some(Box::new(
             crate::system_information_modal::surface_scene(facts, palette),

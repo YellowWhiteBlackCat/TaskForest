@@ -165,6 +165,11 @@ pub(crate) fn build_snapshot(
         });
     } else if let Some(surface) = surface {
         let (id, name, description) = match surface {
+            WindowSurface::SidebarDevices => (
+                "sidebar-devices",
+                "Edit devices",
+                "Device visibility and order".to_owned(),
+            ),
             WindowSurface::About => (
                 "about",
                 t("about.title"),

@@ -18,6 +18,7 @@ use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
+use crate::window_surface::{WindowSurface, WindowSurfaceState};
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
@@ -30,6 +31,7 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
+    window_surface: Res<'w, WindowSurfaceState>,
     system_state: Res<'w, SystemDashboardState>,
     device_focus: Res<'w, PerformanceDeviceFocus>,
     device_categories: Query<'w, 's, (&'static DeviceViewCategory, &'static ComputedNode)>,
@@ -146,6 +148,24 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
+        Some("sidebar-edit") => {
+            if !matches!(access.window_surface.0, Some(WindowSurface::SidebarDevices))
+                || !["Edit devices", "Hide", "Move up", "Move down", "Done"]
+                    .iter()
+                    .all(|label| {
+                        access.text.iter().any(|(text, node)| {
+                            text.0 == *label && node.size().x > 0.0 && node.size().y > 0.0
+                        })
+                    })
+            {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+
         Some(scenario @ ("storage-health" | "sensor-center")) => {
             let expected = if scenario == "sensor-center" {
                 HealthReviewSection::Sensors

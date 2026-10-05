@@ -1,63 +1,13 @@
 //! Root-owned projection of persisted sidebar ordering and visibility choices.
 
 use gpui::Context;
-use std::collections::HashSet;
 
 use crate::gpui_app::sidebar::NetworkVisibility;
-use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
+use taskmanager_core::core::config::sidebar::{
+    normalize_sidebar_preferences, reordered_sidebar_order, set_sidebar_override,
+};
 
 use super::RootView;
-
-/// Keep persisted sidebar choices bounded and deterministic before they enter
-/// the per-window render state. Unknown keys are deliberately retained: a
-/// device can disappear temporarily and return later with the same stable key.
-/// Empty keys and duplicate entries, however, are config corruption and must
-/// not create duplicate rows or ambiguous visibility decisions.
-const MAX_PERSISTED_SIDEBAR_KEYS: usize = 128;
-
-pub(super) fn normalize_sidebar_preferences(
-    order: &[String],
-    overrides: &[SidebarDeviceOverrideConfig],
-) -> (Vec<String>, Vec<SidebarDeviceOverrideConfig>) {
-    let mut normalized_order = Vec::with_capacity(order.len().min(MAX_PERSISTED_SIDEBAR_KEYS));
-    let mut seen_order = HashSet::with_capacity(order.len().min(MAX_PERSISTED_SIDEBAR_KEYS));
-    for key in order {
-        let key = key.trim();
-        if key.is_empty() || !seen_order.insert(key) {
-            continue;
-        }
-        normalized_order.push(key.to_owned());
-        if normalized_order.len() == MAX_PERSISTED_SIDEBAR_KEYS {
-            break;
-        }
-    }
-
-    let mut normalized_overrides =
-        Vec::with_capacity(overrides.len().min(MAX_PERSISTED_SIDEBAR_KEYS));
-    for entry in overrides {
-        let device = entry.device.trim();
-        if device.is_empty() {
-            continue;
-        }
-        // The live edit path uses the same last-write-wins rule. Normalizing
-        // here makes a hand-edited config behave exactly like a UI edit.
-        if let Some(previous) = normalized_overrides
-            .iter()
-            .position(|candidate: &SidebarDeviceOverrideConfig| candidate.device == device)
-        {
-            normalized_overrides.remove(previous);
-        }
-        normalized_overrides.push(SidebarDeviceOverrideConfig {
-            device: device.to_owned(),
-            visible: entry.visible,
-        });
-        if normalized_overrides.len() > MAX_PERSISTED_SIDEBAR_KEYS {
-            normalized_overrides.remove(0);
-        }
-    }
-
-    (normalized_order, normalized_overrides)
-}
 
 impl RootView {
     /// Project category flags once for both wide sidebar and compact strip.
@@ -116,40 +66,6 @@ impl RootView {
         self.presentation.set_sidebar(sidebar);
         cx.notify();
     }
-}
-
-fn set_sidebar_override(
-    overrides: &mut Vec<SidebarDeviceOverrideConfig>,
-    device: &str,
-    visible: bool,
-) {
-    overrides.retain(|entry| entry.device != device);
-    overrides.push(SidebarDeviceOverrideConfig {
-        device: device.to_string(),
-        visible,
-    });
-}
-
-fn reordered_sidebar_order(
-    live_order: &[String],
-    persisted_order: &[String],
-    dragged: &str,
-    target: &str,
-) -> Option<Vec<String>> {
-    if dragged == target {
-        return None;
-    }
-    let mut order = live_order.to_vec();
-    for stale in persisted_order {
-        if !order.iter().any(|key| key == stale) {
-            order.push(stale.clone());
-        }
-    }
-    let from = order.iter().position(|key| key == dragged)?;
-    let item = order.remove(from);
-    let to = order.iter().position(|key| key == target)?;
-    order.insert(to, item);
-    Some(order)
 }
 
 #[cfg(test)]

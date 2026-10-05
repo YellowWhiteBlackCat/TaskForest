@@ -351,3 +351,69 @@ mod history_layout;
 
 #[path = "system_layout.rs"]
 mod system_layout;
+
+#[test]
+fn sidebar_native_controls_persist_specific_choices_and_order() {
+    use crate::app::RouteChanged;
+    use crate::demo_fixture::demo_shell;
+    use crate::pages::performance::PerformanceDeviceTarget;
+    use crate::pages::performance::sidebar_editor::{SidebarAction, SidebarControl, SidebarState};
+    use bevy::ui_widgets::Activate;
+    let path = test_path("sidebar-choices");
+    let (coordinator, client) = start_coordinator(&path);
+    let runtime = scripted_runtime_with_config(client);
+    let mut app = headless_settings_app(runtime);
+    app.world_mut().non_send_mut::<FrontendTrack>().shell = demo_shell();
+    app.world_mut().resource_mut::<Route>().page = Page::Performance;
+    app.world_mut().trigger(RouteChanged);
+    for _ in 0..3 {
+        app.update();
+    }
+    for action in [
+        SidebarAction::Open,
+        SidebarAction::Visibility(PerformanceDeviceTarget::Memory, false),
+        SidebarAction::Move(PerformanceDeviceTarget::Memory, -1),
+    ] {
+        let entity = {
+            let world = app.world_mut();
+            world
+                .query::<(Entity, &SidebarControl)>()
+                .iter(world)
+                .find(|(_, control)| control.0 == action)
+                .map(|(entity, _)| entity)
+                .expect("mounted native control")
+        };
+        app.world_mut().trigger(Activate { entity });
+        app.update();
+        wait_for_config_sync(runtime);
+        for _ in 0..3 {
+            app.update();
+        }
+    }
+    let saved = ConfigStore::new(&path).load_or_default();
+    assert_eq!(
+        saved
+            .sidebar_device_overrides
+            .iter()
+            .find(|entry| entry.device == "memory")
+            .map(|entry| entry.visible),
+        Some(false)
+    );
+    assert_eq!(
+        saved.sidebar_order.first().map(String::as_str),
+        Some("memory")
+    );
+    assert_eq!(
+        app.world().resource::<SidebarState>().0.sidebar_order,
+        saved.sidebar_order
+    );
+    let (restarted, client) = start_coordinator(&path);
+    assert_eq!(
+        client.snapshot().expect("persisted snapshot").sidebar_order,
+        saved.sidebar_order
+    );
+    drop(restarted);
+    drop(app);
+    drop(coordinator);
+    let _ = std::fs::remove_dir_all(path.parent().expect("config directory"));
+}

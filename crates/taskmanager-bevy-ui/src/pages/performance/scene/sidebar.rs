@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::pages::performance::metrics::{battery_caption, battery_sidebar_title};
+use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
 pub(super) mod cpu;
@@ -272,31 +273,41 @@ fn disk_sidebar_title(disk: &DiskMetrics) -> String {
     }
 }
 
-pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let mut rows: Vec<Box<dyn Scene>> = vec![Box::new(device_button_scene(
+pub(super) fn device_sidebar_scene(
+    shell: &ShellApp,
+    palette: &UiPalette,
+    preferences: &SidebarState,
+) -> impl Scene + use<> {
+    let mut rows: Vec<(PerformanceDeviceTarget, Box<dyn Scene>)> = vec![(
         PerformanceDeviceTarget::Cpu,
-        Box::new(device_row_with_accessory_scene(
-            t("common.cpu").to_owned(),
-            sidebar_curve_scene(IconId::Cpu, SystemCurve::Cpu, shell, palette),
-            cpu_device_caption_scene(shell),
-            true,
-            palette,
-        )),
-    )) as Box<dyn Scene>];
-    rows.push(Box::new(device_button_scene(
+        Box::new(device_button_scene(
+            PerformanceDeviceTarget::Cpu,
+            Box::new(device_row_with_accessory_scene(
+                t("common.cpu").to_owned(),
+                sidebar_curve_scene(IconId::Cpu, SystemCurve::Cpu, shell, palette),
+                cpu_device_caption_scene(shell),
+                true,
+                palette,
+            )),
+        )) as Box<dyn Scene>,
+    )];
+    rows.push((
         PerformanceDeviceTarget::Memory,
-        Box::new(device_row_with_accessory_scene(
-            t("common.memory").to_owned(),
-            sidebar_curve_scene(IconId::Memory, SystemCurve::Memory, shell, palette),
-            marked_text_scene(
-                summary_value(shell, SummaryField::Memory),
-                Role::Caption,
-                DynField::Summary(SummaryField::Memory),
-            ),
-            false,
-            palette,
+        Box::new(device_button_scene(
+            PerformanceDeviceTarget::Memory,
+            Box::new(device_row_with_accessory_scene(
+                t("common.memory").to_owned(),
+                sidebar_curve_scene(IconId::Memory, SystemCurve::Memory, shell, palette),
+                marked_text_scene(
+                    summary_value(shell, SummaryField::Memory),
+                    Role::Caption,
+                    DynField::Summary(SummaryField::Memory),
+                ),
+                false,
+                palette,
+            )),
         )),
-    )));
+    ));
     if let Some(disks) = shell
         .projection()
         .snapshot
@@ -307,16 +318,19 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
             let samples = shell
                 .history
                 .disk_active_time_pct_for(&disk.device_id, disk.device_generation.get());
-            rows.push(Box::new(device_button_scene(
+            rows.push((
                 PerformanceDeviceTarget::Disk(disk.device_id.clone()),
-                Box::new(device_row_with_accessory_scene(
-                    disk_sidebar_title(disk),
-                    sidebar_activity_scene(IconId::Disk, &samples, palette.accent, palette),
-                    super::disk_caption_scene(disk, palette),
-                    false,
-                    palette,
+                Box::new(device_button_scene(
+                    PerformanceDeviceTarget::Disk(disk.device_id.clone()),
+                    Box::new(device_row_with_accessory_scene(
+                        disk_sidebar_title(disk),
+                        sidebar_activity_scene(IconId::Disk, &samples, palette.accent, palette),
+                        super::disk_caption_scene(disk, palette),
+                        false,
+                        palette,
+                    )),
                 )),
-            )));
+            ));
         }
     }
     if let Some(devices) = network_devices(shell) {
@@ -325,27 +339,30 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
             let samples = shell
                 .history
                 .network_bytes_per_sec_for(&key, nic.device_generation.get());
-            rows.push(Box::new(device_button_scene(
+            rows.push((
                 PerformanceDeviceTarget::Network(key.clone()),
-                Box::new(device_row_with_accessory_scene(
-                    if nic.interface_name.is_empty() {
-                        key.clone()
-                    } else {
-                        (*nic.interface_name).to_owned()
-                    },
-                    sidebar_activity_scene(IconId::Network, &samples, palette.accent, palette),
-                    marked_text_scene(
-                        nic_fact_line(nic),
-                        Role::Mono,
-                        DynField::Device {
-                            section: Section::Network,
-                            device: key,
+                Box::new(device_button_scene(
+                    PerformanceDeviceTarget::Network(key.clone()),
+                    Box::new(device_row_with_accessory_scene(
+                        if nic.interface_name.is_empty() {
+                            key.clone()
+                        } else {
+                            (*nic.interface_name).to_owned()
                         },
-                    ),
-                    false,
-                    palette,
+                        sidebar_activity_scene(IconId::Network, &samples, palette.accent, palette),
+                        marked_text_scene(
+                            nic_fact_line(nic),
+                            Role::Mono,
+                            DynField::Device {
+                                section: Section::Network,
+                                device: key,
+                            },
+                        ),
+                        false,
+                        palette,
+                    )),
                 )),
-            )));
+            ));
         }
     }
     if let Some(devices) = gpu_devices(shell) {
@@ -354,23 +371,26 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
             let samples = shell
                 .history
                 .gpu_usage_pct_for(&key, gpu.device_generation.get());
-            rows.push(Box::new(device_button_scene(
+            rows.push((
                 PerformanceDeviceTarget::Gpu(key.clone()),
-                Box::new(device_row_with_accessory_scene(
-                    gpu_block_title(gpu),
-                    sidebar_activity_scene(IconId::Gpu, &samples, palette.accent, palette),
-                    marked_text_scene(
-                        gpu_fact_line(gpu),
-                        Role::Mono,
-                        DynField::Device {
-                            section: Section::Gpu,
-                            device: key,
-                        },
-                    ),
-                    false,
-                    palette,
+                Box::new(device_button_scene(
+                    PerformanceDeviceTarget::Gpu(key.clone()),
+                    Box::new(device_row_with_accessory_scene(
+                        gpu_block_title(gpu),
+                        sidebar_activity_scene(IconId::Gpu, &samples, palette.accent, palette),
+                        marked_text_scene(
+                            gpu_fact_line(gpu),
+                            Role::Mono,
+                            DynField::Device {
+                                section: Section::Gpu,
+                                device: key,
+                            },
+                        ),
+                        false,
+                        palette,
+                    )),
                 )),
-            )));
+            ));
         }
     }
     if let Some(power) = shell.projection().power_supplies.as_ref() {
@@ -378,23 +398,37 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
             let key = battery.id.clone();
             let title = battery_sidebar_title(battery, index);
             let caption = battery_caption(battery);
-            rows.push(Box::new(device_button_scene(
+            rows.push((
                 PerformanceDeviceTarget::Battery(key.clone()),
-                Box::new(device_row_with_accessory_scene(
-                    title,
-                    sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
-                    marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
-                    false,
-                    palette,
+                Box::new(device_button_scene(
+                    PerformanceDeviceTarget::Battery(key.clone()),
+                    Box::new(device_row_with_accessory_scene(
+                        title,
+                        sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
+                        marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
+                        false,
+                        palette,
+                    )),
                 )),
-            )));
+            ));
         }
     }
     let mut panel_children: Vec<Box<dyn Scene>> = vec![Box::new(bsn! {
         Text(t("sidebar.devices"))
         TextRole(Role::Caption)
     }) as Box<dyn Scene>];
-    panel_children.extend(rows);
+    let targets: Vec<_> = rows.iter().map(|(target, _)| target.clone()).collect();
+    let mut rows: Vec<_> = rows
+        .into_iter()
+        .map(|(target, scene)| (target, Some(scene)))
+        .collect();
+    for index in preferences.order(&targets) {
+        if preferences.visible(&rows[index].0, shell)
+            && let Some(scene) = rows[index].1.take()
+        {
+            panel_children.push(scene);
+        }
+    }
     let panel = surface_scene(SurfaceTone::Content, panel_children, palette);
     bsn! {
         Node {

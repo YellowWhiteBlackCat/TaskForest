@@ -75,6 +75,7 @@ pub(crate) mod device_curves;
 pub(crate) mod replay;
 pub(crate) mod scene;
 mod selection;
+pub(crate) mod sidebar_editor;
 
 mod metrics;
 
@@ -437,6 +438,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(refresh_on_fold);
     selection::register(app);
     device_curves::register(app);
+    sidebar_editor::register(app);
 }
 
 /// Bevy 0.20's official button widget emits `Activate` for pointer and

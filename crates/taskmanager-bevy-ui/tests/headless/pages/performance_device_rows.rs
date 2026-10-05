@@ -218,6 +218,7 @@ fn gpu_section_enumerates_every_projected_adapter() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
@@ -318,6 +319,7 @@ fn disk_block_renders_the_projected_partition_rows() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
@@ -396,6 +398,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
@@ -434,6 +437,7 @@ fn performance_history_mount_starts_live_without_inventing_replay_availability()
     let history = crate::pages::history::HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
         gray_zero_values: false,
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
@@ -464,3 +468,33 @@ fn performance_history_mount_starts_live_without_inventing_replay_availability()
     );
     assert!(world.despawn(root));
 }
+
+#[test]
+fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
+    use super::tests::{GIB, memory_metrics};
+    use crate::pages::performance::scene::blocks::segment_bar_layout;
+    use taskmanager_core::core::metrics::MemoryMetrics;
+    use taskmanager_shell::memory::memory_segments;
+
+    let memory = memory_metrics(1, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
+    let segments = memory_segments(&memory);
+    let layout = segment_bar_layout(&segments);
+    assert_eq!(layout.len(), segments.len(), "one span per segment");
+    let total: f32 = layout.iter().map(|span| span.fraction).sum();
+    assert!(
+        (total - 1.0).abs() < 1e-4,
+        "the spans tile the full width: {total}"
+    );
+    for span in &layout {
+        assert!(
+            span.fraction.is_finite() && span.fraction >= 0.0,
+            "a span width is a real share, never NaN"
+        );
+    }
+
+    // Nothing measured yet: an empty layout, never NaN widths.
+    let zero = MemoryMetrics::default();
+    assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
+}
+
+// ---- SMART self-test request ----------------------------------------------

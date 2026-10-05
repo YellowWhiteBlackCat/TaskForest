@@ -4,8 +4,9 @@ use super::{
     Context, InteractiveElement, IntoElement, NetworkVisibility, ParentElement,
     PowerSupplySnapshot, RootView, SelectedDevice, SensorCenterSnapshot, SensorQuantity,
     SidebarDeviceOverrideConfig, StatefulInteractiveElement, Styled, SystemSnapshot, Theme, div,
-    elements, i18n, ordered_indices, tokens, visible_with_override,
+    elements, i18n, tokens,
 };
+use taskmanager_core::core::config::sidebar::{ordered_indices, visible_with_override};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::hsla;

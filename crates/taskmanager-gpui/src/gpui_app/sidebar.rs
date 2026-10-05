@@ -37,7 +37,6 @@ use taskmanager_ui::layout::scroll_region_with_overlay_rail;
 mod captions;
 mod edit;
 mod network;
-mod order;
 mod row;
 
 use captions::{
@@ -47,8 +46,8 @@ use captions::{
 };
 pub use network::NetworkVisibility;
 pub(crate) use network::{network_category_label, nic_caption_line2};
-pub(crate) use order::{ordered_indices, visible_with_override};
 use row::{DeviceRowProps, device_row};
+use taskmanager_core::core::config::sidebar::{ordered_indices, visible_with_override};
 use taskmanager_theme::WindowCorner;
 
 /// Dedicated right-edge hit gutter for sidebar resizing. It is deliberately

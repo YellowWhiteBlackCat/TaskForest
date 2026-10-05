@@ -1,9 +1,7 @@
 //! Small-window policy shared by the production window and headless tests.
 
 use crate::gpui_app::elements;
-use crate::gpui_app::sidebar::{
-    NetworkVisibility, SelectedDevice, ordered_indices, visible_with_override,
-};
+use crate::gpui_app::sidebar::{NetworkVisibility, SelectedDevice};
 use crate::gpui_app::theme::mono_font_with_fallback;
 use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Pixels, Size,

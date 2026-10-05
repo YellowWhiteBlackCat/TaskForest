@@ -1,13 +1,15 @@
 //! GPUI projection and non-blocking fold of shared configuration publications.
 
+use taskmanager_core::core::config::sidebar::normalize_sidebar_preferences;
+
 use super::super::{
     DeviceVisibilityPreferences, GraphPreferences, PresentationFingerprint, SIDEBAR_MAX_WIDTH,
     SIDEBAR_MIN_WIDTH,
 };
 use super::{
     AsyncApp, ConfigClient, Duration, RootView, SharedString, WeakEntity, apply_process_config,
-    config_from_view, i18n, normalize_graph_data_points, normalize_sidebar_preferences,
-    startup_page_from_token, text_rendering_from_token,
+    config_from_view, i18n, normalize_graph_data_points, startup_page_from_token,
+    text_rendering_from_token,
 };
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigPublicationOutcome;

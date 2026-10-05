@@ -79,8 +79,8 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let shell = context.shell;
     let palette = context.palette;
-    let devices = device_sidebar_scene(shell, palette);
-    let main = cpu_main_scene(shell, palette);
+    let devices = device_sidebar_scene(shell, palette, context.sidebar);
+    let main = cpu_main_scene(shell, palette, context.sidebar);
     let stats = stats_rail_scene(shell, palette);
     let entry = entry_scene(palette);
     bsn! {

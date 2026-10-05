@@ -9,6 +9,7 @@ use crate::demo_fixture::{
 };
 use crate::pages::performance::{PerformanceDeviceFocus, PerformanceFocus};
 use crate::pages::system::dashboard::SystemDashboardState;
+use crate::window_surface::WindowSurfaceCommand;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
@@ -81,4 +82,7 @@ pub(super) fn initialize_capture_state(
         preferences.gray_zero_values = true;
     }
     commands.trigger(crate::input::ShellInteractionApplied);
+    if capture_scenario_target() == Some("sidebar-edit") {
+        commands.trigger(WindowSurfaceCommand::SidebarDevices);
+    }
 }

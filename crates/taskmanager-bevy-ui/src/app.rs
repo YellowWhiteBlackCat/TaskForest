@@ -31,6 +31,7 @@
 //! folds) reaches the tree only through observers — never polling, never
 //! imperative bulk spawn.
 
+use crate::pages::performance::sidebar_editor::SidebarState;
 use bevy::app::{App, Plugin, Update};
 
 #[cfg(test)]
@@ -548,6 +549,7 @@ pub(crate) struct PageMount {
 /// application-history has a connector-owned lifecycle rather than belonging
 /// to the live process projection.
 pub(crate) struct PageContext<'a> {
+    pub(crate) sidebar: &'a SidebarState,
     /// Read-only rendering decision from the window's current preferences.
     pub(crate) gray_zero_values: bool,
     /// The shell: projection store + memoized row projections. Read-only.
@@ -586,6 +588,7 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
 /// content before the frame renders. The first frame mounts the initial page.
 #[derive(SystemParam)]
 struct PagePresentation<'w> {
+    sidebar: Res<'w, SidebarState>,
     preferences: Res<'w, ThemePreferences>,
     palette: Res<'w, WindowPalette>,
 }
@@ -603,6 +606,7 @@ fn mount_page_system(
         return;
     }
     let context = PageContext {
+        sidebar: &presentation.sidebar,
         gray_zero_values: presentation.preferences.gray_zero_values,
         shell: track.shell(),
         process_tree_expansion: track.process_tree_expansion(),
@@ -627,6 +631,7 @@ pub(crate) struct AppShellPlugin;
 impl Plugin for AppShellPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Route>()
+            .init_resource::<SidebarState>()
             .init_resource::<PageMount>()
             .init_resource::<crate::pages::settings::ThemePreferences>()
             .init_resource::<crate::pages::performance::PerformanceSidebarVisible>()

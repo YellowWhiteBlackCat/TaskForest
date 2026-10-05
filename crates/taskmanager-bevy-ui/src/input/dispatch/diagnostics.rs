@@ -4,7 +4,7 @@ use crate::about_modal::AboutCommand;
 use crate::first_run_modal::FirstRunCommand;
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
 use crate::system_information_modal::SystemInformationCommand;
-use crate::window_surface::WindowSurface;
+use crate::window_surface::{WindowSurface, WindowSurfaceCommand, WindowSurfaceKind};
 use bevy::input::keyboard::KeyCode;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunPhase;
@@ -19,6 +19,14 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             return true;
         }
         match surface {
+            WindowSurface::SidebarDevices => {
+                if press.key_code == KeyCode::Escape {
+                    self.commands.trigger(WindowSurfaceCommand::Close(
+                        WindowSurfaceKind::SidebarDevices,
+                    ));
+                }
+                return true;
+            }
             WindowSurface::Diagnostic(state) => {
                 let command = match press.key_code {
                     KeyCode::Escape => Some(DiagnosticCommand::Close),

@@ -17,6 +17,7 @@ use crate::palette::{UiPalette, ui_palette};
 /// A real page context over a fresh shell. The palette outlives the context
 /// exactly like the mount system's does.
 struct Fixture {
+    sidebar: crate::pages::performance::sidebar_editor::SidebarState,
     shell: ShellApp,
     palette: UiPalette,
     history: crate::pages::history::HistoryProjectionResource,
@@ -26,6 +27,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         Self {
+            sidebar: Default::default(),
             shell: ShellApp::new(),
             palette: ui_palette(&Theme::dark()),
             history: crate::pages::history::HistoryProjectionResource::default(),
@@ -35,6 +37,7 @@ impl Fixture {
 
     fn context(&self) -> PageContext<'_> {
         PageContext {
+            sidebar: &self.sidebar,
             gray_zero_values: false,
             shell: &self.shell,
             process_tree_expansion: &self.process_tree_expansion,

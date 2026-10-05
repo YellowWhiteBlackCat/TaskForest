@@ -5,8 +5,8 @@
 //! shared shell track, and commits the frame's refresh intents. The seam core
 //! (`run_drain_cycle`) is a plain function over the application client and
 //! the shell — no window, no bevy — so the drain contract is testable
-//! headlessly; only the thin `drain_system` adapter below touches the bevy
-//! `World`, and it forwards the folded state into the UI through two observer
+//! headlessly; the thin `drain_system` adapter declares its resource access
+//! and forwards the folded state into the UI through two observer
 //! events: `CapabilitySummaryChanged` (the capability inventory line) and
 //! `ShellProjectionFolded` (the pages' data-refresh trigger).
 

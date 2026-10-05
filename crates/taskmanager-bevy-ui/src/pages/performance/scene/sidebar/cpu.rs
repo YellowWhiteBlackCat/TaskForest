@@ -4,6 +4,7 @@ use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
 use crate::pages::performance::metrics::battery_sidebar_title;
+use crate::pages::performance::sidebar_editor::{self, SidebarAction, SidebarState};
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui_widgets::ScrollArea;
@@ -295,7 +296,11 @@ pub(super) fn device_button_scene(
     }
 }
 
-fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
+fn compact_device_pills_scene(
+    shell: &ShellApp,
+    palette: &UiPalette,
+    preferences: &SidebarState,
+) -> impl Scene + use<> {
     let mut labels = vec![
         (PerformanceDeviceTarget::Cpu, t("common.cpu").to_owned()),
         (
@@ -339,8 +344,13 @@ fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sce
             )
         }));
     }
-    let pills: Vec<Box<dyn Scene>> = labels
+    let targets: Vec<_> = labels.iter().map(|(target, _)| target.clone()).collect();
+    let mut labels: Vec<_> = labels.into_iter().map(Some).collect();
+    let pills: Vec<Box<dyn Scene>> = preferences
+        .order(&targets)
         .into_iter()
+        .filter(|index| preferences.visible(&targets[*index], shell))
+        .filter_map(|index| labels[index].take())
         .map(|(target, label)| {
             let active = target == PerformanceDeviceTarget::default();
             Box::new(device_pill_scene(target, label, active, palette)) as Box<dyn Scene>
@@ -364,7 +374,11 @@ fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sce
     }
 }
 
-pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
+pub(crate) fn cpu_main_scene(
+    shell: &ShellApp,
+    palette: &UiPalette,
+    preferences: &SidebarState,
+) -> impl Scene + use<> {
     let cards: Vec<Box<dyn Scene>> = SystemCurve::STRIP
         .iter()
         .map(|&curve| Box::new(curve_card_scene(curve, shell, palette)) as Box<dyn Scene>)
@@ -462,8 +476,9 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
             padding: UiRect::vertical(Val::Px(space_4())),
         }
         Children [
-             @compact_device_pills_scene(shell, palette) --
+             @compact_device_pills_scene(shell, palette, preferences) --
              @metric_selector_scene(shell, palette) --
+             @sidebar_editor::button("Edit devices".into(), SidebarAction::Open, palette) --
 
                 Node {
                     width: percent(100),

@@ -1,7 +1,6 @@
 //! Application startup and persisted shell configuration.
 
 use super::graph_options::normalize_graph_data_points;
-use super::sidebar_preferences::normalize_sidebar_preferences;
 use super::{
     ConfigClient, Duration, PlatformClient, RefreshRequest, RootView, TelemetryStore, Theme,
     TopPage, apply_process_config, config_from_view, i18n, platform_submission_time_ms, responsive,
