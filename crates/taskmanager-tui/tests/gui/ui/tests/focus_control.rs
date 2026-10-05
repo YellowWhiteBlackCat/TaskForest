@@ -25,6 +25,21 @@ fn focused_control(app: &TuiApp) -> (TuiFocusTarget, TuiFocusControl) {
 }
 
 #[test]
+fn keyboard_capture_uses_the_normal_tab_owner_and_a_visible_details_viewport() {
+    use crate::ui::frame_plan::TuiPageLayout;
+    let mut app = demo_app();
+    crate::demo::apply_capture_scene_override(&mut app, "keyboard-focus");
+    for (width, height) in [(120, 36), (54, 16)] {
+        let plan = TuiFramePlan::build(&app, Rect::new(0, 0, width, height));
+        assert_eq!(plan.focus.target, TuiFocusTarget::ApplicationsDetails);
+        let TuiPageLayout::Applications { process, .. } = plan.page else {
+            panic!("applications frame");
+        };
+        assert!(process.details.width > 0 && process.details.height >= 3);
+    }
+}
+
+#[test]
 fn settings_plan_tracks_the_focused_field() {
     let mut app = demo_app();
     app.toggle_settings();

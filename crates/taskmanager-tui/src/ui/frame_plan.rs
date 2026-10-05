@@ -507,7 +507,7 @@ impl TuiFramePlan {
                 TuiPageLayout::Performance { selector, content }
             }
             AppPage::Applications => {
-                let process = process_table::process_table_layout(body);
+                let process = process_table::process_table_layout(body, app.focus_panel);
                 let table =
                     TablePanelProjection::new(process.table, app.visual_row_count(), app.selected);
                 TuiPageLayout::Applications { process, table }

@@ -33,6 +33,42 @@ use taskmanager_shell::fixture::{
 
 use crate::TuiApp;
 
+pub(super) fn seed_hotplug(shell: &mut ShellApp) {
+    use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations};
+    let Some(mut snapshot) = shell.projection().snapshot.clone() else {
+        return;
+    };
+    let anchor = snapshot.timestamp_ms;
+    snapshot
+        .disks
+        .retain(|disk| disk.device_id != "disk:hotplug:usb0");
+    let now = anchor.saturating_add(1);
+    let mut disk = DiskMetrics::new("/dev/sdb");
+    disk.device_id = "disk:hotplug:usb0".into();
+    disk.device_generation = DeviceGeneration::new(2);
+    disk.device_state = DeviceState::healthy(now);
+    disk.model = "TaskForest Flash".into();
+    disk.disk_type = "USB Drive".into();
+    disk.apply_attachment_capabilities(Some(true), Some(true));
+    disk.apply_scalar_observations(DiskScalarObservations {
+        capacity_bytes: ScalarObservation::available(32 * 1024 * 1024 * 1024, now),
+        available_bytes: ScalarObservation::available(20 * 1024 * 1024 * 1024, now),
+        read_bytes_per_sec: ScalarObservation::available(2 * 1024 * 1024, now),
+        write_bytes_per_sec: ScalarObservation::available(512 * 1024, now),
+        active_time_pct: ScalarObservation::available(14.0, now),
+        ..Default::default()
+    });
+    snapshot
+        .disks
+        .retain(|disk| disk.device_id != "disk:hotplug:usb0");
+    snapshot.disks.insert(0, disk);
+    snapshot.timestamp_ms = now;
+    seed_projection_fact(
+        shell,
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
+}
+
 pub(super) fn seed_demo_npu_inventory(app: &mut TuiApp) {
     const OBSERVED_AT_MS: u64 = 1_785_292_800_000;
     let engines = NpuEngineKind::ALL

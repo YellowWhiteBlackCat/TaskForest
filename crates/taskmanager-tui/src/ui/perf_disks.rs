@@ -211,7 +211,11 @@ fn disk_lines(
         lines.push(ratatui::text::Line::from(format!(
             "{} {}{}",
             theme.glyph(IconId::Disk),
-            disk.name,
+            if disk.model.is_empty() {
+                disk.name.clone()
+            } else {
+                format!("{} · {}", disk.model, disk.name)
+            },
             kind_suffix,
         )));
         // Device health verdict (GPUI disk_stats first stat; shared

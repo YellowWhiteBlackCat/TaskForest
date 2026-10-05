@@ -101,6 +101,17 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
             && app.prefs.gray_zero
     } else if scene == "settings-switch-focus" {
         app.settings_open() && app.settings_form.field == 2
+    } else if scene == "device-hotplug" {
+        app.projection().snapshot.as_ref().is_some_and(|snapshot| {
+            snapshot.disks.iter().any(|disk| {
+                disk.device_id == "disk:hotplug:usb0"
+                    && disk.device_generation.get() == 2
+                    && disk.media_removable() == Some(true)
+            })
+        })
+    } else if scene == "keyboard-focus" {
+        app.focus_panel == crate::FocusPanel::Details
+            && app.shell.selected_process_identity().is_some()
     } else if scene == "sidebar-edit" {
         app.settings_open() && app.settings_form.field == 9
     } else {

@@ -11,9 +11,9 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_ui_contract::IconId;
 
-use crate::TuiApp;
 use crate::TuiTheme;
 use crate::process_view::ProcessRow;
+use crate::{FocusPanel, TuiApp};
 use taskmanager_shell::{SortCol, SortDir};
 
 use super::containers::{WindowedTableProps, render_windowed_table};
@@ -68,13 +68,27 @@ pub(crate) struct ProcessTableLayout {
 /// The details panel keeps its product height; the table receives the
 /// remaining space and Ratatui clips only the bounded row window handed to it.
 #[must_use]
-pub(super) fn process_table_layout(area: Rect) -> ProcessTableLayout {
-    let [search, table, details] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Min(5),
-        Constraint::Length(PROCESS_DETAILS_HEIGHT),
-    ])
-    .areas(area);
+pub(super) fn process_table_layout(area: Rect, focus: FocusPanel) -> ProcessTableLayout {
+    let constraints =
+        if focus == FocusPanel::Details && area.height < 3 + 5 + PROCESS_DETAILS_HEIGHT {
+            let search = if area.height >= 11 { 3 } else { 0 };
+            [
+                Constraint::Length(search),
+                Constraint::Min(3),
+                Constraint::Length(
+                    area.height
+                        .saturating_sub(search + 3)
+                        .min(PROCESS_DETAILS_HEIGHT),
+                ),
+            ]
+        } else {
+            [
+                Constraint::Length(3),
+                Constraint::Min(5),
+                Constraint::Length(PROCESS_DETAILS_HEIGHT),
+            ]
+        };
+    let [search, table, details] = Layout::vertical(constraints).areas(area);
     ProcessTableLayout {
         search,
         table,

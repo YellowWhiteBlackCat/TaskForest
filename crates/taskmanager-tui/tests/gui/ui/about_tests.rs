@@ -93,6 +93,46 @@ fn failed_startup_units_are_visible_as_a_complete_group_at_both_sizes() {
 }
 
 #[test]
+fn hotplug_capture_adds_a_generation_bound_device_and_keeps_old_inventory() {
+    let mut app = demo_app();
+    let before = app
+        .projection()
+        .snapshot
+        .as_ref()
+        .expect("initial snapshot")
+        .disks[0]
+        .device_id
+        .clone();
+    crate::demo::apply_capture_scene_override(&mut app, "device-hotplug");
+    let disks = &app
+        .projection()
+        .snapshot
+        .as_ref()
+        .expect("updated snapshot")
+        .disks;
+    assert!(disks.iter().any(|disk| disk.device_id == before));
+    let usb = disks
+        .iter()
+        .find(|disk| disk.device_id == "disk:hotplug:usb0")
+        .expect("new physical device");
+    assert_eq!(usb.device_generation.get(), 2);
+    assert_eq!(usb.media_removable(), Some(true));
+    assert!(
+        app.history
+            .disk_bytes_per_sec_for(&usb.device_id, 2)
+            .is_empty(),
+        "new device remains collecting without matching lifecycle samples"
+    );
+    for (width, height) in [(120, 36), (54, 16)] {
+        let text = review_frame(&app, width, height);
+        assert!(
+            text.contains("TaskForest Flash"),
+            "{width}x{height}: {text}"
+        );
+    }
+}
+
+#[test]
 fn settings_capture_scenes_use_the_normal_keyboard_form_and_reveal_the_requested_row() {
     use crate::demo::apply_capture_scene_override;
     for (scene, field, label) in [

@@ -641,7 +641,11 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         "sidebar-edit" => {
             prepare_capture_settings(app, 9, true);
         }
-        "keyboard-focus" | "vertical-nav" => {
+        "keyboard-focus" => {
+            apply_capture_scene_override(app, "process-selection");
+            app.cycle_focus_panel();
+        }
+        "vertical-nav" => {
             app.shell.application.active_page = AppPage::Applications;
         }
         "battery-fan-performance" | "battery-live-performance" => {
@@ -653,6 +657,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.select_perf_device(PerfDevice::Battery);
         }
         "device-hotplug" => {
+            fixtures::seed_hotplug(&mut app.shell);
             app.shell.application.active_page = AppPage::Performance;
             app.select_perf_device(PerfDevice::Disk);
         }
