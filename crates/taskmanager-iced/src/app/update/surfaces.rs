@@ -37,6 +37,10 @@ impl IcedApp {
                 self.open_local_surface(LocalSurface::SidebarEditor);
                 None
             }
+            Message::ToggleNavigation => {
+                self.nav_orientation = self.nav_orientation.toggled();
+                None
+            }
             Message::OpenSavedViews => {
                 self.open_local_surface(LocalSurface::SavedViews);
                 None

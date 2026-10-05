@@ -69,7 +69,6 @@ use crate::pages::settings::ThemePreferences;
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
-use crate::capture::capture_scenario_target;
 use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, space_8, space_12};
@@ -77,7 +76,6 @@ use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::picking::Pickable;
-use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::page_help;
 
@@ -266,27 +264,6 @@ pub(crate) struct NavItemLabel;
 /// Marker on the nav-tab text container, toggled between Flex and None at the 800px breakpoint.
 #[derive(Component, Clone, Default)]
 pub(crate) struct NavTabLabelNode;
-
-/// Responsive breakpoint for the product navigation strip: below 800px the text
-/// labels hide completely and the tabs show only their semantic icons, preventing
-/// text clipping (e.g. "Perform", "Ap").
-pub(crate) fn sync_nav_strip_layout(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    mut label_nodes: Query<&mut Node, With<NavTabLabelNode>>,
-) {
-    let width = windows.iter().next().map_or(1180.0, Window::width);
-    let is_vertical_nav = capture_scenario_target() == Some("vertical-nav");
-    let display = if width < 800.0 || is_vertical_nav {
-        bevy::ui::Display::None
-    } else {
-        bevy::ui::Display::Flex
-    };
-    for mut node in &mut label_nodes {
-        if node.display != display {
-            node.display = display;
-        }
-    }
-}
 
 /// Marker on the one node that hosts the routed page's content scene.
 #[derive(Component, Clone, Default)]
@@ -630,6 +607,7 @@ pub(crate) struct AppShellPlugin;
 
 impl Plugin for AppShellPlugin {
     fn build(&self, app: &mut App) {
+        crate::navigation::register(app);
         app.init_resource::<Route>()
             .init_resource::<SidebarState>()
             .init_resource::<PageMount>()
@@ -666,7 +644,7 @@ impl Plugin for AppShellPlugin {
                     crate::input::keyboard_dispatch_system,
                     crate::pages::processes::input::scroll_intent_system,
                     mount_page_system,
-                    sync_nav_strip_layout,
+                    crate::navigation::sync_layout,
                     crate::pages::processes::sync_processes_responsive_layout,
                 )
                     .chain(),
@@ -811,9 +789,11 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
             padding: UiRect::all(Val::Px(space_8())),
         }
         BackgroundColor({ palette.nav_bg })
+        crate::navigation::NavigationStrip
+        bevy::ui_widgets::ScrollArea
         Children [
-            { tabs }--
-             Node { flex_grow: 1.0 } --
+            @{crate::navigation::button(palette)} -- { tabs }--
+             Node { flex_grow: 1.0 } crate::navigation::NavigationSpacer --
             { trailing }
         ]
     }

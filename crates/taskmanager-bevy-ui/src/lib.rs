@@ -71,6 +71,7 @@ pub mod icons;
 pub mod input;
 pub mod input_contract;
 pub mod menu_modal;
+pub(crate) mod navigation;
 pub mod pages;
 pub mod palette;
 pub mod runtime;

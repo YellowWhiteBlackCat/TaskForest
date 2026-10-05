@@ -6,10 +6,10 @@
 //! expressions are the oracle.
 
 use super::{
-    ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavOrientation,
-    NavigationPresentation, PageLayoutBudget, PerformanceChartInventory,
-    PerformanceDetailsPresentation, PerformancePageBudget, SystemPageBudget,
-    SystemSurfacePresentation, VerticalSpace, layout_profile, nav_rail_width, vertical_space,
+    ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
+    PageLayoutBudget, PerformanceChartInventory, PerformanceDetailsPresentation,
+    PerformancePageBudget, SystemPageBudget, SystemSurfacePresentation, VerticalSpace,
+    layout_profile, nav_rail_width, vertical_space,
 };
 use crate::app::Message;
 use iced::Size;
@@ -17,6 +17,7 @@ use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 fn frame(width: f32, height: f32) -> Size {
     Size::new(width, height)

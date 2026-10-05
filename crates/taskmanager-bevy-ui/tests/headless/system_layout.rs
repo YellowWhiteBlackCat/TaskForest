@@ -6,7 +6,7 @@ use crate::app::NavTarget;
 use crate::pages::settings::privilege_center::PrivilegeControl;
 use crate::pages::system::{SystemActions, SystemBody, SystemStatusLine};
 use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
-use bevy::ecs::query::{Has, With};
+use bevy::ecs::query::{Has, With, Without};
 use bevy::image::TextureAtlasLayout;
 use bevy::math::UVec2;
 use bevy::picking::DefaultPickingPlugins;
@@ -474,8 +474,10 @@ fn alert_rule_controls_and_scroll_body_fit_measured_product_viewports() {
                 "right edge protected at {width} × {height}"
             );
         }
-        let mut bodies =
-            world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ScrollArea>>();
+        let mut bodies = world.query_filtered::<(&ComputedNode, &UiGlobalTransform), (
+            With<ScrollArea>,
+            Without<crate::navigation::NavigationStrip>,
+        )>();
         let (node, transform) = bodies.single(world).expect("one bounded rule body");
         let half = node.size() * 0.5;
         assert!(node.size().y > 0.0);
@@ -669,5 +671,75 @@ fn native_battery_selection_paints_real_history_inside_measured_device_bounds() 
                 assert_eq!(samples.last().copied(), Some(78.0));
             }
         }
+    }
+}
+
+#[test]
+fn native_navigation_toggle_keeps_route_and_content_within_the_remaining_viewport() {
+    use crate::app::ContentSlot;
+    use crate::navigation::{NavigationState, NavigationStrip, NavigationToggle};
+    use taskmanager_ui_contract::navigation::NavOrientation;
+    pin_english();
+    for (width, height) in [(480, 360), (720, 480), (1280, 720), (1600, 360), (480, 960)] {
+        let mut app = system_layout_app(width, height, super::fake_client());
+        app.world_mut().resource_mut::<Route>().page = Page::Processes;
+        for _ in 0..6 {
+            app.update();
+        }
+        let entity = app
+            .world_mut()
+            .query_filtered::<Entity, With<NavigationToggle>>()
+            .single(app.world())
+            .expect("native toggle");
+        app.world_mut().trigger(Activate { entity });
+        for _ in 0..6 {
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<NavigationState>().0,
+            NavOrientation::Vertical
+        );
+        assert_eq!(app.world().resource::<Route>().page, Page::Processes);
+        let world = app.world_mut();
+        let mut query = world.query::<(
+            &ComputedNode,
+            &UiGlobalTransform,
+            Has<NavigationStrip>,
+            Has<ContentSlot>,
+        )>();
+        let mut rail_edge = None;
+        let mut content_edge = None;
+        for (node, transform, rail, content) in query.iter(world) {
+            if !rail && !content {
+                continue;
+            }
+            let half = node.size() / 2.0;
+            assert!(node.size().x > 0.0 && node.size().y > 0.0, "positive slot");
+            assert!(
+                transform.translation.x - half.x >= -0.5
+                    && transform.translation.x + half.x <= width as f32 + 0.5
+            );
+            assert!(
+                transform.translation.y - half.y >= -0.5
+                    && transform.translation.y + half.y <= height as f32 + 0.5
+            );
+            if rail {
+                rail_edge = Some(transform.translation.x + half.x);
+            } else {
+                content_edge = Some(transform.translation.x - half.x);
+            }
+        }
+        assert!(
+            rail_edge.expect("rail") <= content_edge.expect("content") + 0.5,
+            "rail and page cannot overlap"
+        );
+        app.world_mut().trigger(Activate { entity });
+        for _ in 0..6 {
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<NavigationState>().0,
+            NavOrientation::Horizontal
+        );
     }
 }

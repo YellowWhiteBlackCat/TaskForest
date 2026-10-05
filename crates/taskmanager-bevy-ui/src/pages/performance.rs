@@ -29,6 +29,7 @@
 //! is `metrics::observed_percentage` — no shared percent entry exists (the TUI keeps
 //! its own copy in `ui/units.rs`), so this page owns one with the same shape.
 
+use crate::navigation::{NavigationState, RAIL_WIDTH};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -53,6 +54,7 @@ use taskmanager_core::core::metrics::{
 };
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
@@ -503,6 +505,7 @@ fn device_button_activated(
 /// subtree is rebuilt when a window crosses the breakpoint.
 pub(crate) fn sync_performance_layout(
     windows: Query<&Window, bevy::ecs::query::With<PrimaryWindow>>,
+    navigation: Option<Res<NavigationState>>,
     sidebar: Option<Res<PerformanceSidebarVisible>>,
     replay: Option<Res<PerformancePresentation>>,
     mut state: ResMut<PerformanceLayoutState>,
@@ -515,7 +518,15 @@ pub(crate) fn sync_performance_layout(
         OptionalCoreGridQuery<'_, '_>,
     )>,
 ) {
-    let width = windows.iter().next().map_or(1180.0, Window::width);
+    let width = windows.iter().next().map_or(1180.0, Window::width)
+        - if navigation
+            .as_ref()
+            .is_some_and(|navigation| navigation.0 == NavOrientation::Vertical)
+        {
+            RAIL_WIDTH
+        } else {
+            0.0
+        };
     let height = windows.iter().next().map_or(780.0, Window::height);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;

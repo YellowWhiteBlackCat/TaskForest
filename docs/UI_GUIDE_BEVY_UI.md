@@ -31,6 +31,9 @@
   `scripts/quality/bevy_bsn_guard.py` 拒收（页面级全局事件观察者除外）。
   异步就绪的表现补全（图标位图）用 `apply_scene(bsn! { ... })` 声明。
 
+- 导航方向由原生按钮触发 typed 事件。布局系统只声明方向资源、窗口和 chrome 标记查询；
+  根 workspace 与页内容分配独立槽，竖向 rail 自有滚动，方向切换不改变路由或遥测。
+
 ## 2. 交互与拾取机制（核心避坑守则）
 
 - **拾取穿透铁律（`Pickable::IGNORE`）**：

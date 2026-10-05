@@ -668,6 +668,13 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "vertical-nav" => {
             app.shell.application.active_page = AppPage::Applications;
+            let _ = crate::runtime::handle_key(
+                app,
+                ratatui::crossterm::event::KeyEvent::new(
+                    ratatui::crossterm::event::KeyCode::F(7),
+                    ratatui::crossterm::event::KeyModifiers::NONE,
+                ),
+            );
         }
         "battery-fan-performance" | "battery-live-performance" => {
             power::seed(&mut app.shell);

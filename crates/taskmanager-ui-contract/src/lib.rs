@@ -13,7 +13,7 @@ mod functional;
 mod icon;
 mod keybindings;
 mod message;
-mod navigation;
+pub mod navigation;
 
 pub use accessibility::AlertRuleInput;
 pub use accessibility::{

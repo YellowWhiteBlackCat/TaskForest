@@ -152,6 +152,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::ApplyProcessAffinity
         | Message::OpenSettings
         | Message::OpenSidebarEditor
+        | Message::ToggleNavigation
         | Message::OpenSavedViews
         | Message::CloseSettings
         | Message::OpenAbout

@@ -913,3 +913,70 @@ fn saved_views_bracketed_paste_is_owned_only_after_native_import_key() {
         "saved-view paste cannot become a process search"
     );
 }
+
+#[test]
+fn native_navigation_key_and_rail_click_share_the_painted_page_order_and_protect_edges() {
+    use ratatui::crossterm::event::{KeyCode, MouseEvent};
+    use taskmanager_ui_contract::navigation::NavOrientation;
+    let mut app = crate::demo_app();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(app.nav_orientation, NavOrientation::Vertical);
+    for (width, height) in [
+        (54, 16),
+        (80, 24),
+        (120, 36),
+        (180, 20),
+        (54, 50),
+        (200, 60),
+    ] {
+        let area = Rect::new(0, 0, width, height);
+        let plan = TuiFramePlan::build(&app, area);
+        let (rail_x, rail_y) = (0..height)
+            .flat_map(|row| (0..width).map(move |column| (column, row)))
+            .find(|&(column, row)| {
+                plan.hit_target(column, row)
+                    == Some(crate::ui::TuiHitTarget::NavigationPage(
+                        AppPage::Performance,
+                    ))
+            })
+            .expect("painted rail target");
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                crate::ui::render_with_plan(frame, &app, crate::TuiTheme::default(), &plan)
+            })
+            .expect("paint");
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(text.contains("F7"), "normal visible toggle hint");
+        for (index, page) in AppPage::ALL.into_iter().enumerate() {
+            let reaction = apply_terminal_event_with_plan(
+                &mut app,
+                Event::Mouse(MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: rail_x,
+                    row: rail_y + index as u16,
+                    modifiers: KeyModifiers::NONE,
+                }),
+                &plan,
+            );
+            assert!(reaction.dirty);
+            assert_eq!(app.page(), page);
+        }
+    }
+    app.toggle_settings();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(
+        app.nav_orientation,
+        NavOrientation::Vertical,
+        "modal owns the key"
+    );
+    app.close_local_overlays();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(app.nav_orientation, NavOrientation::Horizontal);
+}

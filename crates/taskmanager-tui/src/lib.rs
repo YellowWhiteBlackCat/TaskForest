@@ -105,6 +105,7 @@ use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
@@ -184,6 +185,7 @@ pub struct TuiApp {
     /// digit-key handler in `runtime::handle_key`.
     pub perf_device: PerfDevice,
     pub(crate) performance_device_key: Option<String>,
+    pub(crate) nav_orientation: NavOrientation,
     pub(crate) saved_views: saved_views::SavedViewsState,
     /// Frontend-local vertical-scroll intent for the inline selected-process
     /// detail/insights panel on the Applications page. The panel content (frozen
@@ -352,6 +354,7 @@ impl TuiApp {
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
             performance_device_key: None,
+            nav_orientation: NavOrientation::default(),
             saved_views: saved_views::SavedViewsState::default(),
             detail_scroll: 0,
             cpu_core_scroll: 0,

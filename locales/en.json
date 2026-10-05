@@ -252,6 +252,7 @@
   "events.mark_all_read": "Mark all read",
   "saved_views.hidden_columns": "Hidden columns: {count}",
   "saved_views.paste_json": "Paste JSON to import",
+  "navigation.toggle": "Toggle navigation",
   "saved_views.title": "Saved views",
   "saved_views.cpu_hotspots": "CPU hotspots",
   "saved_views.running_tree": "Running processes",

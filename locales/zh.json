@@ -252,6 +252,7 @@
   "events.mark_all_read": "全部标为已读",
   "saved_views.hidden_columns": "隐藏列：{count}",
   "saved_views.paste_json": "粘贴 JSON 以导入",
+  "navigation.toggle": "切换导航方向",
   "saved_views.title": "保存的视图",
   "saved_views.cpu_hotspots": "CPU 热点",
   "saved_views.running_tree": "运行中的进程",

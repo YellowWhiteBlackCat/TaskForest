@@ -21,6 +21,7 @@ pub(crate) mod help;
 mod highlight;
 mod history_replay;
 mod information_review;
+mod navigation;
 pub(crate) mod pages;
 mod perf_battery;
 mod perf_core_grid;
@@ -112,6 +113,9 @@ pub(crate) fn render_with_plan(
 
     let chrome = plan.chrome;
     header::render(frame, app, theme, chrome.header);
+    if let Some(rail) = plan.navigation {
+        navigation::render(frame, app, theme, rail);
+    }
     let collecting = app.telemetry_frame_state().is_collecting();
     if collecting {
         // The shared shell has not committed a complete immutable frame yet.

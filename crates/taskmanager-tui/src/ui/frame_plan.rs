@@ -8,6 +8,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use taskmanager_application::AppPage;
 use taskmanager_application::system_timeline::SystemPageSection;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use crate::{TuiApp, TuiInputScope};
 mod focus;
@@ -216,6 +217,7 @@ pub(crate) enum TuiFocusControl {
 /// explicitly here; unsupported cells stay blocked (`Overlay`) or `None`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiHitTarget {
+    NavigationPage(AppPage),
     TableRow {
         page: AppPage,
         index: usize,
@@ -423,6 +425,7 @@ impl TuiFocusPlan {
 pub(crate) struct TuiFramePlan {
     pub(super) area: Rect,
     pub(super) chrome: FrameChromeLayout,
+    pub(super) navigation: Option<Rect>,
     pub(super) page: TuiPageLayout,
     pub(super) input_scope: TuiInputScope,
     pub(super) focus: TuiFocusPlan,
@@ -432,7 +435,7 @@ pub(crate) struct TuiFramePlan {
 impl TuiFramePlan {
     #[must_use]
     pub(crate) fn build(app: &TuiApp, area: Rect) -> Self {
-        let chrome = frame_chrome_layout(
+        let mut chrome = frame_chrome_layout(
             area,
             if app.page() == AppPage::AppHistory
                 || (app.page() == AppPage::System
@@ -444,6 +447,14 @@ impl TuiFramePlan {
                 FrameChromePage::Standard
             },
         );
+        let navigation = if app.nav_orientation == NavOrientation::Vertical {
+            let [rail, body] =
+                Layout::horizontal([Constraint::Length(10), Constraint::Min(1)]).areas(chrome.body);
+            chrome.body = body;
+            Some(rail)
+        } else {
+            None
+        };
         let body = chrome.body;
         let input_scope = app.input_scope();
         let page = match app.page() {
@@ -502,6 +513,7 @@ impl TuiFramePlan {
         Self {
             area,
             chrome,
+            navigation,
             page,
             input_scope,
             focus: TuiFocusPlan::build(app, input_scope),
@@ -573,6 +585,16 @@ impl TuiFramePlan {
             return Some(TuiHitTarget::Overlay {
                 scope: overlay.scope,
             });
+        }
+        if let Some(rail) = self
+            .navigation
+            .filter(|rail| rail.contains((column, row).into()))
+        {
+            let index = usize::from(row.saturating_sub(rail.y));
+            if let Some(page) = AppPage::ALL.get(index) {
+                return Some(TuiHitTarget::NavigationPage(*page));
+            }
+            return None;
         }
         let index = self.table_row_at(column, row)?;
         Some(TuiHitTarget::TableRow {

@@ -8,6 +8,7 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::pixels;
+use taskmanager_ui_contract::navigation::NavOrientation;
 /// Debug-selector identity of the telemetry-ready viewport wrapper.
 ///
 /// Lives on the shared `page_viewport` wrapper, never on the page body: the
@@ -224,9 +225,9 @@ impl Render for RootView {
             cx.notify();
         }
         if self.capture_evidence.vertical_nav_requested() {
-            self.nav_orientation = super::NavOrientation::Vertical;
+            self.nav_orientation = NavOrientation::Vertical;
             self.capture_evidence
-                .mark_vertical_nav_ready(self.nav_orientation == super::NavOrientation::Vertical);
+                .mark_vertical_nav_ready(self.nav_orientation == NavOrientation::Vertical);
             cx.notify();
         }
         let settings_switch_focus = self.capture_evidence.settings_switch_focus_enabled();
@@ -589,7 +590,7 @@ impl Render for RootView {
             .children(alert_banner);
 
         let root = match self.nav_orientation {
-            super::NavOrientation::Horizontal => root.child(nav).child(
+            NavOrientation::Horizontal => root.child(nav).child(
                 div()
                     .flex_1()
                     .min_h(px(0.0))
@@ -599,7 +600,7 @@ impl Render for RootView {
                     .flex_col()
                     .child(body),
             ),
-            super::NavOrientation::Vertical => root.child(
+            NavOrientation::Vertical => root.child(
                 div()
                     .flex()
                     .flex_row()

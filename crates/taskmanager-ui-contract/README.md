@@ -18,6 +18,10 @@ expresses intent and semantics that GPUI, Iced, TUI, and Bevy adapt independentl
 
 ## Contract and verification
 
+`navigation::NavOrientation` is the single horizontal/vertical vocabulary. A native
+control changes presentation while application page identity, selection and telemetry
+remain under their existing authorities; each renderer budgets its own bounded rail.
+
 Keep command IDs, page order, focus reachability, semantic roles, localized
 message keys and product intents exhaustive and stable. Verify enum coverage,
 cross-frontend command parity, and explicit functional surface decisions.

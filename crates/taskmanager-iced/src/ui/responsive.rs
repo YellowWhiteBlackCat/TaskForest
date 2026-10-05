@@ -22,6 +22,7 @@
 //! Pure data only: no widget types, no I/O, panic-free.
 
 use iced::Size;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// Navigation is a layout region, not a collection of independently sized
 /// controls. These widths are the only rail-width decisions (GPUI parity).
@@ -96,16 +97,6 @@ pub enum VerticalSpace {
     Constrained,
     Standard,
     Generous,
-}
-
-/// Orientation of the root navigation region (GPUI `root::NavOrientation`
-/// parity). A horizontal nav consumes no page-body width; a vertical rail is
-/// subtracted before the profile is decided.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum NavOrientation {
-    #[default]
-    Horizontal,
-    Vertical,
 }
 
 /// Root navigation rail presentation (GPUI parity).

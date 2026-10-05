@@ -41,9 +41,10 @@ type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 13] = [
+const KEY_SYSTEMS: [KeySystem; 14] = [
     open_modal_system,
     owned_input_system,
+    navigation_orientation_system,
     character_system,
     details_focus_system,
     selection_extension_system,
@@ -149,6 +150,14 @@ fn route_search(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
         }
         _ => route_shell_owned_input(app, key),
     }
+}
+
+fn navigation_orientation_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
+    if key.code != KeyCode::F(7) || key.modifiers != KeyModifiers::NONE {
+        return InputDispatch::Unhandled;
+    }
+    app.nav_orientation = app.nav_orientation.toggled();
+    InputDispatch::Consumed
 }
 
 fn character_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {

@@ -2,8 +2,10 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskmanager_application::AppPage;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// A scene is ready only when its requested product state exists.
 #[must_use]
@@ -112,6 +114,8 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
     } else if scene == "keyboard-focus" {
         app.focus_panel == crate::FocusPanel::Details
             && app.shell.selected_process_identity().is_some()
+    } else if scene == "vertical-nav" {
+        app.nav_orientation == NavOrientation::Vertical && app.page() == AppPage::Applications
     } else if scene == "saved-view-presets" {
         app.local_surface_kind() == Some(crate::TuiSurfaceKind::SavedViews)
             && app

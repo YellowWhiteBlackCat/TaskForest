@@ -21,6 +21,7 @@ use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::saved_views::{SavedViewPreset, SavedViewTransferFeedback};
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -488,6 +489,7 @@ pub enum Message {
     /// Apply a saved process view preset.
     ApplySavedView(u64),
     OpenSavedViews,
+    ToggleNavigation,
     /// Save current Applications view configuration as a custom preset.
     SaveCurrentProcessView,
     /// Export user saved views to JSON on clipboard.
@@ -555,6 +557,7 @@ pub struct IcedApp {
     /// Run New Task state.
     pub(crate) run_task: crate::ui::overlays::run_task::RunTaskState,
     /// User process view presets.
+    pub(crate) nav_orientation: NavOrientation,
     pub(crate) saved_views: Vec<SavedViewPreset>,
     pub(crate) next_saved_view_id: u64,
     pub(crate) saved_view_feedback: Option<SavedViewTransferFeedback>,

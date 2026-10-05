@@ -13,6 +13,9 @@
   交互全部通过纯键盘和弦（`Alt+1..7` 切页、`Tab` 切换焦点、`s` 排序循环、
   `Space` 多选标记、`Delete` 结束任务）单向驱动。
 
+- F7 在内容面切换横向页签与竖向导航。方向来自 ui-contract；根 FramePlan 先为导航
+  预留独立列，再计算页面槽。页签点击与 Alt 页切换都走同一 application 动作，模态保持输入所有权。
+
 ## 2. 布局与比例约束划分
 
 - **声明式分块（`Layout` / `Constraint`）**：页面结构通过 Ratatui `Layout`

@@ -4,6 +4,7 @@ use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::capture::{capture_page_name, capture_perf_device_target, capture_scenario_target};
 use crate::confirmation::ConfirmationCapture;
 use crate::focus_visible::FocusCapture;
+use crate::navigation::{NavigationState, NavigationStrip, RAIL_WIDTH};
 use crate::pages::history::control::{
     HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
 };
@@ -27,12 +28,15 @@ use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     window_surface: Res<'w, WindowSurfaceState>,
     saved_views: Res<'w, crate::saved_views::SavedViewsState>,
+    navigation: Res<'w, NavigationState>,
+    nav_strip: Query<'w, 's, &'static ComputedNode, With<NavigationStrip>>,
     system_state: Res<'w, SystemDashboardState>,
     device_focus: Res<'w, PerformanceDeviceFocus>,
     device_categories: Query<'w, 's, (&'static DeviceViewCategory, &'static ComputedNode)>,
@@ -149,6 +153,21 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
+        Some("vertical-nav") => {
+            if access.navigation.0 != NavOrientation::Vertical
+                || !access.nav_strip.iter().any(|node| {
+                    node.size().x > 0.0
+                        && node.size().x <= RAIL_WIDTH + 0.5
+                        && node.size().y > node.size().x
+                })
+            {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
         Some("saved-view-presets") => {
             if !matches!(access.window_surface.0, Some(WindowSurface::SavedViews))
                 || !access

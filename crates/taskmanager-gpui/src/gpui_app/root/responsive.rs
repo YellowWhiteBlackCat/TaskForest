@@ -19,8 +19,9 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
-use super::{NavOrientation, RootView};
+use super::RootView;
 
 mod dashboard;
 pub(crate) mod device_strip;

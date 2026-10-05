@@ -55,8 +55,10 @@ pub(crate) fn performance_page(
     // strip (GPUI parity) so every device stays reachable at any width; the
     // statistics rail is Pinned while capacity allows, Stacked below the
     // main viewport while the main floor survives, and only then Hidden.
-    let budget =
-        PerformancePageBudget::for_perf_frame(app.viewport_size(), app.performance.sidebar_visible);
+    let budget = PerformancePageBudget::for_perf_frame(
+        app.page_viewport_size(),
+        app.performance.sidebar_visible,
+    );
     let selected = resolved_perf_device(app);
     let navigation = budget.device_navigation;
 

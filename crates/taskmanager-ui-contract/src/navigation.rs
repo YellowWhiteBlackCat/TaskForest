@@ -8,6 +8,23 @@ use taskmanager_application::{AppPage, CommandBinding, CommandId, KeyChord, defa
 
 use crate::{IconId, MessageKey, descriptor};
 
+/// Presentation direction of the product navigation, independent of toolkit and routing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum NavOrientation {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+impl NavOrientation {
+    #[must_use]
+    pub const fn toggled(self) -> Self {
+        match self {
+            Self::Horizontal => Self::Vertical,
+            Self::Vertical => Self::Horizontal,
+        }
+    }
+}
+
 /// One shared application-shell page entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageDescriptor {

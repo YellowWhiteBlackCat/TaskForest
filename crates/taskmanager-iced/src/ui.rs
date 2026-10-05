@@ -19,7 +19,7 @@ use iced::widget::{column, container, row, scrollable, text};
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{alert_severity_label, t};
 use taskmanager_core::core::alerts::AlertSeverity;
-use taskmanager_shell::{PageHelp, ShellApp};
+use taskmanager_shell::ShellApp;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
 
@@ -27,9 +27,7 @@ use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::i18n::{self, Key};
 use crate::theme;
-use responsive::ChromePresentation;
 use taskmanager_shell::FeedbackSeverity;
-use taskmanager_shell::page_help;
 use taskmanager_theme::Theme;
 
 mod about;
@@ -56,6 +54,7 @@ pub(crate) mod format;
 pub(crate) mod health;
 pub(crate) mod history_replay;
 mod insights;
+mod navigation;
 pub(crate) mod overlays;
 pub(crate) mod perf_devices;
 mod perf_layout;
@@ -122,131 +121,8 @@ pub fn view(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Ren
 fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
-    let language = app.language();
 
-    // One GPUI-shaped nav strip: the page tabs (accent-filled when active — the
-    // same `choice_pill` the Performance device rail uses) on the left, a flex
-    // space, then the toolbar triggers pinned right. Collapses the old three
-    // plain rows (static title / text tabs / toolbar) into the single chrome bar
-    // GPUI renders, so the active page reads at a glance. Page and primary
-    // toolbar icons use the shared semantic SVG registry through Iced's own
-    // `svg` widget.
-    let current_page = shell.page();
-    // The frontend-local alerts route suppresses the shared-tab highlight so
-    // only one route reads as active at a time.
-    let alerts_open = app.alerts_page_open();
-    let mut page_tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = page_help()
-        .into_iter()
-        .map(|PageHelp { page, label, .. }| {
-            focus::choice_pill_with_icon(
-                theme_snapshot,
-                FocusTarget::PageTab(page),
-                page_icon(page),
-                label.to_string(),
-                page == current_page && !alerts_open,
-                Message::SelectPage(page),
-            )
-        })
-        .collect();
-    // The alerts page rides the same tab strip as the shared pages (an
-    // Iced-local route outside the `AppPage` set).
-    page_tabs.push(alerts::page_tab_pill(app));
-    let toolbar_items: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = vec![
-        focus::ghost_button_with_icon(
-            theme_snapshot,
-            FocusTarget::SettingsTrigger,
-            IconId::Settings,
-            i18n::t(language, Key::Settings),
-            Message::OpenSettings,
-        ),
-        focus::ghost_button(
-            theme_snapshot,
-            FocusTarget::ContainersTrigger,
-            i18n::t(language, Key::Containers),
-            Message::OpenContainers,
-        ),
-        focus::ghost_button_with_icon(
-            theme_snapshot,
-            FocusTarget::HealthTrigger,
-            IconId::Health,
-            i18n::t(language, Key::Health),
-            Message::OpenHealth,
-        ),
-        current_window_capture_btn(theme_snapshot, language),
-        focus::ghost_button_with_icon(
-            theme_snapshot,
-            FocusTarget::Export,
-            IconId::Export,
-            i18n::t(language, Key::Export),
-            Message::ExportSnapshot,
-        ),
-        focus::ghost_button_with_icon(
-            theme_snapshot,
-            FocusTarget::AboutTrigger,
-            IconId::System,
-            i18n::t(language, Key::About),
-            Message::OpenAbout,
-        ),
-    ];
-    // The full page vocabulary plus the five toolbar actions is wider than a
-    // normal 1180px desktop viewport. Give the route strip its own horizontal
-    // viewport and put actions on a second bounded row before they can paint
-    // past the right edge. The wide 1440px+ layout keeps the original one-row
-    // desktop composition. The 1320px single-row seam is the frame budget's
-    // chrome presentation (responsive.rs), not a local literal.
-    let chrome = ChromePresentation::for_width(app.viewport_width());
-    let wrapped_chrome = app.compact_layout() || chrome.is_wrapped();
-    let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if app.compact_layout() {
-        scrollable(row(toolbar_items).spacing(4))
-            .direction(iced::widget::scrollable::Direction::Horizontal(
-                iced::widget::scrollable::Scrollbar::default(),
-            ))
-            .height(iced::Length::Fixed(36.0))
-            .width(iced::Length::Fill)
-            .into()
-    } else if wrapped_chrome {
-        // Keep the action band to one bounded row. A wrapped action grid made
-        // the 1180px capture spend a third row on About, pushing the actual
-        // page body below the fold. Horizontal scrolling preserves every
-        // action without changing the page's vertical budget.
-        scrollable(row(toolbar_items).spacing(4))
-            .direction(iced::widget::scrollable::Direction::Horizontal(
-                iced::widget::scrollable::Scrollbar::default(),
-            ))
-            .height(iced::Length::Fixed(36.0))
-            .width(iced::Length::Fill)
-            .into()
-    } else {
-        row(toolbar_items).spacing(4).into()
-    };
-    // The wide layout keeps the action toolbar pinned to the trailing edge.
-    // Compact windows get intentional rows: routes remain in one bounded
-    // strip and actions get their own bounded horizontal row. Mixing both in
-    // one horizontal scroller made the first screenshot look like controls
-    // had disappeared behind the right edge even though they were reachable.
-    let nav: Element<'_, Message, iced::Theme, iced::Renderer> = if wrapped_chrome {
-        let page_nav = scrollable(
-            row(page_tabs)
-                .spacing(4)
-                .padding([f32::from(tokens::SPACE_2), f32::from(tokens::SPACE_4)]),
-        )
-        .direction(iced::widget::scrollable::Direction::Horizontal(
-            iced::widget::scrollable::Scrollbar::default(),
-        ))
-        .height(iced::Length::Fixed(44.0))
-        .width(iced::Length::Fill);
-        column![page_nav, toolbar]
-            .spacing(4)
-            .width(iced::Length::Fill)
-            .into()
-    } else {
-        row(page_tabs)
-            .spacing(4)
-            .push(iced::widget::Space::new().width(iced::Length::Fill))
-            .push(toolbar)
-            .padding([f32::from(tokens::SPACE_2), f32::from(tokens::SPACE_4)])
-            .into()
-    };
+    let nav = navigation::render(app);
 
     let collecting = shell.telemetry_frame_state().is_collecting();
     let body: Element<'_, Message, iced::Theme, iced::Renderer> = if collecting {
@@ -339,8 +215,14 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     .spacing(8)
     .padding(6);
 
-    let base: Element<'_, Message, iced::Theme, iced::Renderer> =
-        components::page_scaffold(nav, body, footer.into());
+    let base: Element<'_, Message, iced::Theme, iced::Renderer> = match nav {
+        navigation::NavigationChrome::Horizontal(nav) => {
+            components::page_scaffold(nav, body, footer.into())
+        }
+        navigation::NavigationChrome::Vertical { rail, toolbar } => {
+            components::page_scaffold_with_rail(rail, toolbar, body, footer.into())
+        }
+    };
 
     if !collecting {
         if let Some(overlay) = overlays::render(app) {

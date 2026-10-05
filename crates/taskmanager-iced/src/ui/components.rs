@@ -48,6 +48,32 @@ pub(crate) fn page_scaffold<'a>(
         .into()
 }
 
+/// Root rail and page consume separate width slots; footer stays mandatory.
+pub(crate) fn page_scaffold_with_rail<'a>(
+    rail: IcedElement<'a>,
+    toolbar: IcedElement<'a>,
+    body: IcedElement<'a>,
+    footer: IcedElement<'a>,
+) -> IcedElement<'a> {
+    column![
+        row![
+            rail,
+            column![toolbar, body]
+                .spacing(8)
+                .width(Length::Fill)
+                .height(Length::Fill)
+        ]
+        .spacing(8)
+        .height(Length::Fill),
+        footer
+    ]
+    .spacing(8)
+    .padding(10)
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .into()
+}
+
 /// The card surface every card-shaped iced component wears: the theme's
 /// elevated panel fill with the palette's border and panel radius plus the
 /// quiet card shadow. Exposed as the components module's owned seam so pages

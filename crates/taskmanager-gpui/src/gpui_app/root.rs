@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_telemetry_store::HistoryRetention;
+use taskmanager_ui_contract::navigation::NavOrientation;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
 #[cfg(target_os = "linux")]
@@ -156,9 +157,7 @@ pub use interaction_state::{Hover, ProcMenuAction};
 use interaction_state::{init_run_entity, init_search_entity};
 pub use nav::*;
 pub use navigation::{StableDeviceKind, TopPage};
-pub use page_state::{
-    NavOrientation, ProcessAffinityEditorState, ProcessesState, ServicesState, StartupState,
-};
+pub use page_state::{ProcessAffinityEditorState, ProcessesState, ServicesState, StartupState};
 use persistence::{apply_process_config, config_from_view};
 pub(crate) use presentation_preferences::{
     AppearancePreferences, DeviceVisibilityPreferences, GraphPreferences, MagnitudeBase,

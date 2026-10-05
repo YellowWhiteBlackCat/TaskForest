@@ -11,6 +11,7 @@ use taskmanager_shell::QuitReason;
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 use taskmanager_shell::presentation::effective_smart_status;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use super::super::{IcedApp, IcedKey, LocalSurfaceKind, Message};
 use crate::app::viewport_state::ViewportRegion;
@@ -85,6 +86,9 @@ impl IcedApp {
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
                     let ready = if self.capture.data_target == CaptureDataTarget::Focus {
                         self.capture.focus_presented
+                    } else if self.capture.data_target == CaptureDataTarget::VerticalNavigation {
+                        self.nav_orientation == NavOrientation::Vertical
+                            && self.shell.page() == AppPage::Applications
                     } else if self.capture.data_target == CaptureDataTarget::SavedViews {
                         self.local_surface_kind() == Some(LocalSurfaceKind::SavedViews)
                             && self.saved_views.iter().any(|preset| preset.is_user_saved())

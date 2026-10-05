@@ -35,6 +35,7 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use super::responsive::NavigationPresentation;
 use taskmanager_theme::Theme;
@@ -317,8 +318,8 @@ pub fn nav_orientation_btn(
         .debug_selector(|| "nav-orientation-btn".to_string())
         .on_click(cx.listener(|v, _ev, _win, cx| {
             v.nav_orientation = match v.nav_orientation {
-                super::NavOrientation::Horizontal => super::NavOrientation::Vertical,
-                super::NavOrientation::Vertical => super::NavOrientation::Horizontal,
+                NavOrientation::Horizontal => NavOrientation::Vertical,
+                NavOrientation::Vertical => NavOrientation::Horizontal,
             };
             v.hovered = None;
             cx.notify();

@@ -22,6 +22,8 @@
 use std::ffi::OsStr;
 use std::io;
 use std::time::{Duration, Instant};
+use taskmanager_application::AppAction;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use ratatui::Terminal;
 use ratatui::backend::Backend;
@@ -223,6 +225,17 @@ pub(crate) fn apply_terminal_event_with_plan(
                             apply_overlay_control_click(app, plan, surface, index)
                         }
                         Some(TuiHitTarget::Overlay { .. }) => EventReaction::default(),
+                        Some(TuiHitTarget::NavigationPage(page)) => {
+                            if app.nav_orientation != NavOrientation::Vertical
+                                || super::modals::any_pointer_surface_open(app)
+                            {
+                                return EventReaction::default();
+                            }
+                            EventReaction {
+                                dirty: true,
+                                effect: app.apply_action(AppAction::SelectPage(page)),
+                            }
+                        }
                         Some(TuiHitTarget::TableRow { page, index }) => {
                             // Click-to-select: the hit-test projects the
                             // clicked cell through the SAME visual row

@@ -32,7 +32,6 @@ use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startu
 use bevy::asset::{Assets, Handle};
 use bevy::camera::{Camera2d, ClearColor};
 use bevy::ecs::component::Component;
-use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, Has, Or, With};
@@ -40,14 +39,11 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::scene::{CommandsSceneExt, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent,
-};
+use bevy::ui::Pressed;
+use bevy::ui::prelude::BackgroundColor;
 use bevy::ui::widget::Text;
-use bevy::ui::{Pressed, px};
 use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
@@ -59,17 +55,19 @@ use capture_state::{initialize_capture_state, is_demo, is_production};
 use taskmanager_assets::product;
 use taskmanager_theme::Theme;
 
+pub(crate) mod chrome;
+use chrome::app_shell_scene;
 mod appearance;
 use appearance::demo_theme_from_env;
 
-use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
+use crate::app::{AppShellPlugin, Route};
 use crate::capture::{capture_page, capture_scenario_target, capture_window_resolution};
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
 use crate::pages::settings::ThemePreferences;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
-use crate::palette::{self, UiPalette, space_8, space_12};
+use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
 use taskmanager_app_host::acquire_single_instance;
@@ -502,97 +500,6 @@ fn rewrite_feedback_line(
                 feedback.event().0.clone()
             };
         }
-    }
-}
-
-/// The full app shell as one declarative scene: the product navigation strip
-/// over the routed page's content. One chrome shape for every route — the
-/// same strip grammar GPUI renders — with the summary/feedback caption band
-/// kept only where no page-local status surface exists.
-fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn Scene> {
-    let strip: Box<dyn Scene> = Box::new(nav_strip_scene(route, palette));
-    if route == Page::Performance {
-        // GPUI chrome parity: the Performance page fills the whole window
-        // under the strip with no extra status band.
-        return Box::new(bsn! {
-            Node {
-                width: percent(100),
-                height: percent(100),
-                min_width: px(0.0), min_height: px(0.0),
-                max_width: percent(100), max_height: percent(100),
-                flex_direction: FlexDirection::Column,
-            }
-            BackgroundColor({ palette.window_clear })
-            AppShellRoot
-            Children [
-                 @{ strip } --
-
-                    Node {
-                        width: percent(100),
-                        min_width: px(0.0), min_height: px(0.0),
-                        flex_basis: px(0.0),
-                        flex_grow: 1.0,
-                        justify_content: JustifyContent::FlexStart,
-                        align_items: AlignItems::Stretch,
-                        padding: UiRect::all(Val::Px(space_8())),
-                    }
-                    BackgroundColor({ palette.content_bg })
-                    ContentSlot
-
-            ]
-        });
-    }
-    Box::new(standard_app_shell_scene(palette, summary, strip))
-}
-
-fn standard_app_shell_scene(
-    palette: &UiPalette,
-    summary: String,
-    strip: Box<dyn Scene>,
-) -> impl Scene + use<> {
-    let radius = palette.panel_radius_px;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            min_width: px(0.0), min_height: px(0.0),
-            max_width: percent(100), max_height: percent(100),
-            flex_direction: FlexDirection::Column,
-        }
-        BackgroundColor({ palette.window_clear })
-        AppShellRoot
-        Children [
-             @{ strip } --
-
-                // The shell's status band: capability summary and the drain's
-                // typed feedback, caption-sized so it informs without adding
-                // a second chrome layer.
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexEnd,
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                }
-                Children [
-                     Text(summary) SummaryLine TextRole(Role::Caption) --
-                     Text("") FeedbackLine TextRole(Role::Caption)
-                ]
-            --
-
-                Node {
-                    width: percent(100),
-                    min_width: px(0.0), min_height: px(0.0),
-                    flex_basis: px(0.0),
-                    flex_grow: 1.0,
-                    justify_content: JustifyContent::FlexStart,
-                    align_items: AlignItems::Stretch,
-                    padding: UiRect::all(Val::Px(space_8())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
-                }
-                BackgroundColor({ palette.content_bg })
-                ContentSlot
-
-        ]
     }
 }
 

@@ -86,10 +86,3 @@ impl Default for ProcessesState {
         }
     }
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum NavOrientation {
-    #[default]
-    Horizontal,
-    Vertical,
-}

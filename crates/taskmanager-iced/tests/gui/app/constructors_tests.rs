@@ -541,3 +541,32 @@ impl IcedApp {
         panic!("configuration predicate was not published");
     }
 }
+
+#[test]
+fn native_navigation_messages_change_the_root_direction_without_changing_page_or_selection() {
+    use taskmanager_ui_contract::navigation::NavOrientation;
+    let mut app = IcedApp::demo();
+    let _ = app.update(Message::SelectPage(AppPage::Applications));
+    let selected = app.shell.selected;
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 360.0),
+        (480.0, 960.0),
+    ] {
+        let _ = app.update(Message::WindowResized(iced::Size::new(width, height)));
+        let _ = app.update(Message::ToggleNavigation);
+        assert_eq!(app.nav_orientation, NavOrientation::Vertical);
+        assert_eq!(app.shell.page(), AppPage::Applications);
+        assert_eq!(app.shell.selected, selected);
+        assert!(
+            app.page_viewport_size().width > 0.0
+                && app.page_viewport_size().width < app.viewport_width()
+        );
+        let _ = crate::ui::view(&app);
+        let _ = app.update(Message::ToggleNavigation);
+        assert_eq!(app.nav_orientation, NavOrientation::Horizontal);
+        assert_eq!(app.page_viewport_size(), app.viewport_size());
+    }
+}

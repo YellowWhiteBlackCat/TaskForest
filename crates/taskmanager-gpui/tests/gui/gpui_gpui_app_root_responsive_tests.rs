@@ -1,4 +1,5 @@
 use gpui::{px, size};
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use super::{
     DeviceNavigationPresentation, FrameBudget, FrameChromeBudget, LayoutProfile,
@@ -7,7 +8,6 @@ use super::{
     SystemSurfacePresentation, VerticalSpace, layout_profile, parse_window_size,
     settings_content_max_height,
 };
-use crate::gpui_app::root::NavOrientation;
 
 #[test]
 fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {

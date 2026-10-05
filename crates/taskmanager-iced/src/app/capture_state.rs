@@ -53,6 +53,7 @@ pub(super) enum CaptureDataTarget {
     AlertRules,
     SidebarEditor,
     SavedViews,
+    VerticalNavigation,
     Battery,
     Smart(&'static str),
     Focus,
@@ -101,6 +102,7 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "smart-permission" => CaptureDataTarget::Smart("smart-permission"),
         "sidebar-edit" => CaptureDataTarget::SidebarEditor,
         "saved-view-presets" => CaptureDataTarget::SavedViews,
+        "vertical-nav" => CaptureDataTarget::VerticalNavigation,
         "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" => {
             CaptureDataTarget::Focus
         }
@@ -317,6 +319,9 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         let _ = app.update(Message::SaveCurrentProcessView);
     } else if target == "keyboard-focus" || target == "vertical-nav" {
         app.shell.application.active_page = AppPage::Applications;
+        if target == "vertical-nav" {
+            let _ = app.update(Message::ToggleNavigation);
+        }
         if target == "keyboard-focus" {
             app.capture.focus_target = Some(FocusTarget::PageTab(AppPage::Applications));
         }
