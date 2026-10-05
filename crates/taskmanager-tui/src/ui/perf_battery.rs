@@ -24,6 +24,7 @@ use ratatui::widgets::{Paragraph, Wrap};
 
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_shell::ShellApp;
 
 use crate::TuiApp;
@@ -54,13 +55,65 @@ pub(super) fn render_battery_section(
         super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
         return;
     }
-    let lines = battery_lines(&supplies.batteries, app, theme, app.prefs.graph_points);
+    let lines = if area.height < 12 {
+        compact_battery_lines(&supplies.batteries, app)
+    } else {
+        battery_lines(&supplies.batteries, app, theme, app.prefs.graph_points)
+    };
     frame.render_widget(
         Paragraph::new(lines)
             .block(super::panel(t("common.battery"), theme))
             .wrap(Wrap { trim: true }),
         area,
     );
+}
+
+/// Compact facts are mandatory; history and descriptor groups require their full footprint.
+fn compact_battery_lines(
+    batteries: &[BatteryInfo],
+    shell: &ShellApp,
+) -> Vec<ratatui::text::Line<'static>> {
+    let mut lines = Vec::new();
+    for battery in batteries {
+        let data = super::perf_data::battery_data(battery);
+        let title = if battery.model_name.is_empty() {
+            &battery.display_name
+        } else {
+            &battery.model_name
+        };
+        lines.push(ratatui::text::Line::from(title.clone()));
+        lines.push(ratatui::text::Line::from(format!(
+            "{} {} · {}",
+            t("battery.capacity"),
+            data.capacity,
+            data.status
+        )));
+        lines.push(ratatui::text::Line::from(format!(
+            "{} {} · {} {}",
+            t("battery.power"),
+            data.power,
+            t("battery.voltage"),
+            data.voltage
+        )));
+        if let Some(sensors) = shell.projection().sensors.as_ref() {
+            for reading in &sensors.readings {
+                if reading.quantity() == &SensorQuantity::FanSpeed {
+                    let value = reading
+                        .current_number()
+                        .filter(|value| value.is_finite())
+                        .map_or_else(
+                            || "Unavailable".to_owned(),
+                            |value| format!("{value:.0} RPM"),
+                        );
+                    lines.push(ratatui::text::Line::from(format!(
+                        "{}: {value}",
+                        reading.label()
+                    )));
+                }
+            }
+        }
+    }
+    lines
 }
 
 /// Build one honest detail line set per battery. Each scalar resolves through
@@ -134,6 +187,23 @@ fn battery_lines(
             t("battery.voltage"),
             data.voltage,
         )));
+        if let Some(sensors) = shell.projection().sensors.as_ref() {
+            for reading in &sensors.readings {
+                if reading.quantity() == &SensorQuantity::FanSpeed {
+                    let value = reading
+                        .current_number()
+                        .filter(|value| value.is_finite())
+                        .map_or_else(
+                            || "Unavailable".to_owned(),
+                            |value| format!("{value:.0} RPM"),
+                        );
+                    lines.push(ratatui::text::Line::from(format!(
+                        "  {}: {value}",
+                        reading.label()
+                    )));
+                }
+            }
+        }
 
         // Degradation health and the one status-applicable runtime estimate.
         // Each renders only when its typed fact is current; both absent → no

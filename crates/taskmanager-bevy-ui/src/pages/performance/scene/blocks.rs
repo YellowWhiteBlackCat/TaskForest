@@ -1,8 +1,10 @@
 //! Dynamic GPU, network, memory, and section scene builders.
 
 use super::*;
+use crate::pages::performance::device_curves::{self, DeviceCurveKind};
 use crate::pages::performance::metrics::{
     batteries, battery_fact_line, disk_partition_view_models, disks, gpu_vram_view_model,
+    smart_source_guidance, smart_source_status,
 };
 use crate::palette::space_2;
 use bevy::text::{LineBreak, TextLayout};
@@ -15,34 +17,6 @@ pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
         (Some(headline), None) => headline.to_owned(),
         (None, Some(qualifier)) => qualifier.to_owned(),
         (None, None) => gpu.device_id.clone(),
-    }
-}
-
-/// One device block: identity line over the joined live fact line, keyed by
-/// the stable device id the shell projection assigns.
-fn device_block(
-    section: Section,
-    key: String,
-    title: String,
-    value: String,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let field = DynField::Device {
-        section,
-        device: key.clone(),
-    };
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-        }
-        BackgroundColor({ palette.content_bg })
-        DynBlock(section, key)
-        Children [
-             Text(title) TextRole(Role::Body) --
-             Text(value) TextRole(Role::Mono) DynText(field)
-        ]
     }
 }
 
@@ -272,7 +246,16 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
         DynBlock(Section::Disk, { disk.device_id.clone() })
         Children [
              Text(title) TextRole(Role::Body) --
+             Text(smart_source_status(disk)) TextRole(Role::Caption)
+             DynText(DynField::SmartStatus({disk.device_id.clone()}))
+             TextLayout { linebreak: LineBreak::WordBoundary } --
+             Text(smart_source_guidance(disk)) TextRole(Role::Caption)
+             DynText(DynField::SmartGuidance({disk.device_id.clone()}))
+             TextLayout { linebreak: LineBreak::WordBoundary } --
              @{ super::disk_caption_scene(disk, palette) } --
+             @device_curves::scene(DeviceCurveKind::DiskRead, &disk.device_id, disk.device_generation, palette) --
+             @device_curves::scene(DeviceCurveKind::DiskWrite, &disk.device_id, disk.device_generation, palette) --
+             @device_curves::scene(DeviceCurveKind::DiskActive, &disk.device_id, disk.device_generation, palette) --
             { partition_rows }
         ]
     }
@@ -301,7 +284,16 @@ fn battery_block_scene(
     if let Some(rpm) = fan_rpm {
         fact.push_str(&format!(" · {}: {rpm} RPM", t("fan.rpm")));
     }
-    device_block(Section::Battery, battery.id.clone(), title, fact, palette)
+    bsn! {
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        DynBlock(Section::Battery, { battery.id.clone() })
+        Children [
+            Text(title) TextRole(Role::Body) --
+            Text(fact) TextRole(Role::Mono) DynText(DynField::Device { section: Section::Battery, device: { battery.id.clone() } }) --
+            @device_curves::scene(DeviceCurveKind::BatteryCharge, &battery.id, battery.device_generation, palette) --
+            @device_curves::scene(DeviceCurveKind::BatteryPower, &battery.id, battery.device_generation, palette)
+        ]
+    }
 }
 
 fn segment_row_scene(

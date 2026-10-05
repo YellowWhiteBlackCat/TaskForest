@@ -3,6 +3,7 @@
 use crate::app::Page;
 use crate::pages::performance::PerformanceDeviceTarget;
 use bevy::window::WindowResolution;
+use taskmanager_shell::ShellApp;
 
 pub(crate) fn capture_page_name(page: Page) -> &'static str {
     if let Some(target) = capture_scenario_target() {
@@ -88,28 +89,46 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
     }
 }
 
-pub(crate) fn capture_perf_device_target() -> Option<PerformanceDeviceTarget> {
+pub(crate) fn capture_perf_device_target(shell: &ShellApp) -> Option<PerformanceDeviceTarget> {
     let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
-    match raw.trim().to_ascii_lowercase().as_str() {
+    performance_device_target(shell, raw.trim().to_ascii_lowercase().as_str())
+}
+
+pub(crate) fn performance_device_target(
+    shell: &ShellApp,
+    scenario: &str,
+) -> Option<PerformanceDeviceTarget> {
+    let projection = shell.projection();
+    match scenario {
         "perf-memory" => Some(PerformanceDeviceTarget::Memory),
         "perf-disk"
-        | "storage-health"
         | "smart-missing-tool"
         | "smart-permission"
         | "partition-disk-usage"
-        | "partition-live-usage" => Some(PerformanceDeviceTarget::Disk("disk:demo:nvme0".into())),
-        "perf-network" => Some(PerformanceDeviceTarget::Network(
-            "network:demo:wlan0".into(),
-        )),
-        "perf-gpu" | "gpu-engine-inventory" | "intel-gpu-telemetry" => {
-            Some(PerformanceDeviceTarget::Gpu("gpu:demo:0".into()))
-        }
-        "perf-battery"
-        | "sensor-center"
-        | "battery-fan-performance"
-        | "battery-live-performance" => {
-            Some(PerformanceDeviceTarget::Battery("battery:demo:0".into()))
-        }
+        | "partition-live-usage" => projection
+            .snapshot
+            .as_ref()?
+            .disks
+            .first()
+            .map(|disk| PerformanceDeviceTarget::Disk(disk.device_id.clone())),
+        "perf-network" => projection
+            .snapshot
+            .as_ref()?
+            .networks
+            .first()
+            .map(|nic| PerformanceDeviceTarget::Network(nic.device_id.to_string())),
+        "perf-gpu" | "gpu-engine-inventory" | "intel-gpu-telemetry" => projection
+            .snapshot
+            .as_ref()?
+            .gpu
+            .first()
+            .map(|gpu| PerformanceDeviceTarget::Gpu(gpu.device_id.clone())),
+        "perf-battery" | "battery-fan-performance" | "battery-live-performance" => projection
+            .power_supplies
+            .as_ref()?
+            .batteries
+            .first()
+            .map(|battery| PerformanceDeviceTarget::Battery(battery.id.clone())),
         _ => None,
     }
 }

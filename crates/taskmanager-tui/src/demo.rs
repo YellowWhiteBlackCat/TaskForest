@@ -42,6 +42,7 @@ pub(crate) mod capture;
 use capture::prepare_capture_settings;
 mod fixtures;
 mod history;
+mod power;
 pub(crate) use fixtures::seed_fan_capture_sensors;
 use fixtures::{
     demo_boot_evidence, demo_directory_usage, seed_alert_event_history_fixture,
@@ -637,6 +638,10 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Applications;
         }
         "battery-fan-performance" | "battery-live-performance" => {
+            power::seed(&mut app.shell);
+            if scene == "battery-fan-performance" {
+                seed_fan_capture_sensors(app);
+            }
             app.shell.application.active_page = AppPage::Performance;
             app.select_perf_device(PerfDevice::Battery);
         }

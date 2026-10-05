@@ -28,6 +28,69 @@ fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports()
 }
 
 #[test]
+fn battery_capture_contains_measured_charge_power_voltage_and_history() {
+    for scene in ["battery-fan-performance", "battery-live-performance"] {
+        let mut app = demo_app();
+        crate::demo::apply_capture_scene_override(&mut app, scene);
+        let power = app
+            .projection()
+            .power_supplies
+            .as_ref()
+            .expect("power sample");
+        let battery = power.batteries.first().expect("captured battery");
+        assert_eq!(battery.current_capacity_pct(), Some(78));
+        assert_eq!(app.history.battery_capacity_pct_for(&battery.id).len(), 8);
+        assert_eq!(app.history.battery_power_w_for(&battery.id).len(), 8);
+        for (width, height) in [(120, 36), (54, 16)] {
+            let text = review_frame(&app, width, height);
+            for value in ["78%", "14.2 W", "12.10 V", "Capture Battery"] {
+                assert!(
+                    text.contains(value),
+                    "{scene} {width}x{height}: {value}: {text}"
+                );
+            }
+            if scene == "battery-fan-performance" {
+                assert!(
+                    text.contains("RPM"),
+                    "the correlated fan fact is visible: {text}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn smart_capture_keeps_failed_source_guidance_visible_at_both_sizes() {
+    for (scene, guidance) in [
+        ("smart-missing-tool", "Install the required"),
+        ("smart-permission", "Grant device access"),
+    ] {
+        let mut app = demo_app();
+        crate::demo::apply_capture_scene_override(&mut app, scene);
+        for (width, height) in [(120, 36), (54, 16)] {
+            let text = review_frame(&app, width, height);
+            assert!(text.contains(guidance), "{scene} {width}x{height}: {text}");
+        }
+    }
+}
+
+#[test]
+fn failed_startup_units_are_visible_as_a_complete_group_at_both_sizes() {
+    let mut app = demo_app();
+    crate::demo::apply_capture_scene_override(&mut app, "startup-failure-evidence");
+    for (width, height) in [(120, 36), (54, 16)] {
+        let text = review_frame(&app, width, height);
+        for unit in [
+            "taskforest-g.service",
+            "taskforest-i.service",
+            "taskforest.service",
+        ] {
+            assert!(text.contains(unit), "{width}x{height}: {unit}: {text}");
+        }
+    }
+}
+
+#[test]
 fn settings_capture_scenes_use_the_normal_keyboard_form_and_reveal_the_requested_row() {
     use crate::demo::apply_capture_scene_override;
     for (scene, field, label) in [

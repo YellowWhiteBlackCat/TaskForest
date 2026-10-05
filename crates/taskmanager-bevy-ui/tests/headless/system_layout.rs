@@ -597,3 +597,77 @@ fn health_controls_keep_measured_bounds_and_reject_a_replaced_physical_disk() {
         );
     }
 }
+
+#[test]
+fn native_battery_selection_paints_real_history_inside_measured_device_bounds() {
+    use crate::app::FrontendTrack;
+    use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
+    use crate::pages::performance::device_curves::{DeviceCurve, DeviceCurveKind};
+    use crate::pages::performance::{
+        PerformanceDeviceBody, PerformanceDeviceButton, PerformanceDeviceTarget,
+    };
+    use crate::widgets::chart::CurveMeasurement;
+    use bevy::ui::{ComputedNode, UiGlobalTransform};
+    use bevy::ui_widgets::ScrollArea;
+    use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
+    use taskmanager_test_support::{pin_english, smbios_memory};
+    pin_english();
+    for (width, height) in [
+        (480, 360),
+        (720, 480),
+        (1280, 720),
+        (1600, 360),
+        (480, 960),
+        (980, 560),
+    ] {
+        let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
+        let mut app = system_layout_app(width, height, client);
+        let mut shell = demo_shell();
+        seed_capture_confirmation_scenario(&mut shell, "battery-live-performance");
+        app.world_mut().non_send_mut::<FrontendTrack>().shell = shell;
+        app.world_mut().resource_mut::<Route>().page = Page::Performance;
+        for _ in 0..4 {
+            app.update();
+        }
+        let button = app
+            .world_mut()
+            .query::<(Entity, &PerformanceDeviceButton)>()
+            .iter(app.world())
+            .find(|(_, button)| matches!(button.0, PerformanceDeviceTarget::Battery(_)))
+            .map(|(entity, _)| entity)
+            .expect("normal battery selector");
+        app.world_mut().trigger(Activate { entity: button });
+        for _ in 0..6 {
+            app.update();
+        }
+        let world = app.world_mut();
+        let mut body = world.query::<(
+            &PerformanceDeviceBody,
+            &ComputedNode,
+            &UiGlobalTransform,
+            &ScrollArea,
+        )>();
+        let (_, node, transform, _) = body.single(world).expect("one device viewport");
+        let size = node.size();
+        assert!(size.x > 0.0 && size.y > 0.0);
+        assert!(transform.translation.x - size.x / 2.0 >= -0.5);
+        assert!(transform.translation.x + size.x / 2.0 <= width as f32 + 0.5);
+        assert!(transform.translation.y + size.y / 2.0 <= height as f32 - 0.5);
+        let mut curves = world.query::<(&DeviceCurve, &ComputedNode, &CurveMeasurement)>();
+        let visible: Vec<_> = curves
+            .iter(world)
+            .filter(|(_, node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+            .collect();
+        assert_eq!(visible.len(), 2);
+        for (curve, node, measurement) in visible {
+            assert!(node.size().x <= size.x + 0.5);
+            assert!(measurement.0.is_some());
+            let samples = curve.samples(&world.non_send::<FrontendTrack>().shell);
+            assert_eq!(samples.len(), 8);
+            if curve.kind == DeviceCurveKind::BatteryCharge {
+                assert_eq!(samples.first().copied(), Some(85.0));
+                assert_eq!(samples.last().copied(), Some(78.0));
+            }
+        }
+    }
+}

@@ -1,6 +1,8 @@
 //! Pure Performance-page metric projections and formatting.
 
 use super::*;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::effective_smart_status;
@@ -10,7 +12,9 @@ use taskmanager_shell::presentation::trend::window;
 
 pub(super) mod battery;
 pub(super) mod cpu;
+mod smart;
 pub(super) use battery::battery_fact_line;
+pub(super) use smart::{smart_source_guidance, smart_source_status};
 
 /// Percent readout. There is no shared percent formatter in
 /// `shell::presentation` (the TUI keeps its own in `ui/units.rs`), so this
@@ -301,12 +305,23 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
     // provider reports a usable SMART state but no concrete field, the shared
     // status fold still speaks (Iced parity), and nothing is fabricated when
     // the section is honestly hidden.
-    if smart_section_visible(disk) && !has_smart_fields(disk) {
+    if smart_section_visible(disk)
+        && (!has_smart_fields(disk) || effective_smart_status(disk) != DeviceStatus::Healthy)
+    {
         parts.push(format!(
             "{} {}",
             t("disk.smart_status"),
             t(device_status_i18n_key(effective_smart_status(disk))),
         ));
+        match disk.smart_availability {
+            SmartAvailability::MissingTool => {
+                parts.push(t("device.action_missing_tool").to_owned())
+            }
+            SmartAvailability::PermissionDenied => {
+                parts.push(t("device.action_permission").to_owned())
+            }
+            _ => {}
+        }
     }
     if disk.current_read_merges_per_sec().is_some() || disk.current_write_merges_per_sec().is_some()
     {
@@ -714,6 +729,12 @@ pub(super) fn dyn_field_text(shell: &ShellApp, field: &DynField) -> String {
             .and_then(|rows| rows.iter().find(|battery| &battery.id == device))
             .map_or_else(missing_value, battery_caption),
         DynField::Cpu(field) => cpu_field_text(shell, *field),
+        DynField::SmartStatus(device) => disks(shell)
+            .and_then(|rows| rows.iter().find(|disk| &disk.device_id == device))
+            .map_or_else(String::new, smart_source_status),
+        DynField::SmartGuidance(device) => disks(shell)
+            .and_then(|rows| rows.iter().find(|disk| &disk.device_id == device))
+            .map_or_else(String::new, smart_source_guidance),
         DynField::Device { section, device } => device_line(shell, *section, device),
         DynField::Segment(kind) => segment_value(shell, *kind),
     }

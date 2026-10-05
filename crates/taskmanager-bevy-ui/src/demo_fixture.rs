@@ -36,6 +36,7 @@ use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
 use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+mod dynamic_history;
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessItem,
 };
@@ -385,20 +386,14 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             shell.replace_alert_event_history(capture_event_fixture());
         }
         "battery-fan-performance" => {
-            seed_projection_fact(
-                shell,
-                ProjectionSeedFact::PowerSupplies(Some(dynamic_power_fixture())),
-            );
+            dynamic_history::seed(shell);
             seed_projection_fact(
                 shell,
                 ProjectionSeedFact::Sensors(Some(dynamic_sensor_fixture())),
             );
         }
         "battery-live-performance" => {
-            seed_projection_fact(
-                shell,
-                ProjectionSeedFact::PowerSupplies(Some(dynamic_power_fixture())),
-            );
+            dynamic_history::seed(shell);
         }
         "device-hotplug" => {
             if let Some(snapshot) = shell.projection().snapshot.as_ref() {

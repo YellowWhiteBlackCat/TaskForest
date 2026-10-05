@@ -3,8 +3,10 @@
 use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
+use crate::pages::performance::metrics::battery_sidebar_title;
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui_widgets::ScrollArea;
 use taskmanager_core::core::hardware::CpuType;
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
@@ -329,6 +331,14 @@ fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sce
             )
         }));
     }
+    if let Some(power) = shell.projection().power_supplies.as_ref() {
+        labels.extend(power.batteries.iter().enumerate().map(|(index, battery)| {
+            (
+                PerformanceDeviceTarget::Battery(battery.id.clone()),
+                battery_sidebar_title(battery, index),
+            )
+        }));
+    }
     let pills: Vec<Box<dyn Scene>> = labels
         .into_iter()
         .map(|(target, label)| {
@@ -464,12 +474,11 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
                     { cards }
                 ]
             --
-             @{ cpu_container } --
-             @{ memory_container } --
-             @{ disk_container } --
-             @{ network_container } --
-             @{ gpu_container } --
-             @{ battery_container }
+            Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: UiRect::bottom(px(8.0)) }
+            ScrollArea PerformanceDeviceBody Children [
+                @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
+                @{ network_container } -- @{ gpu_container } -- @{ battery_container }
+            ]
         ]
     }
 }

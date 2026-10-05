@@ -33,6 +33,9 @@ only device-wide history, while temperature, frequency, power, idle residency an
 remain simultaneous rows. Standard terminals add live-engine and opt-in PMU detail; compact
 terminals keep a dense primary-fact strip plus the largest possible utilization chart and omit
 the secondary engine region. Only the standard engine region scrolls; the main chart never does.
+Disk source failures retain SMART status and recovery guidance even with older readings.
+Battery review shows charge/power history, voltage and typed fan readings. Startup evidence
+puts failed unit identities before optional chain rows so the compact view keeps the failure group.
 System `w` opens the shared dashboard; `1`–`4` select its real time window,
 arrows page complete metric groups, and `b` returns to hardware facts.
 The System viewport counts physical wrapped rows, so the final continuation remains

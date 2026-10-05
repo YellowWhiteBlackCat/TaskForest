@@ -24,7 +24,7 @@ use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
@@ -224,6 +224,19 @@ fn disk_lines(
             t("device.status"),
             t(device_status_i18n_key(disk.device_state.status)),
         )));
+        let guidance = match disk.smart_availability {
+            SmartAvailability::MissingTool => Some("device.action_missing_tool"),
+            SmartAvailability::PermissionDenied => Some("device.action_permission"),
+            _ => None,
+        };
+        if let Some(guidance) = guidance {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("disk.smart_status"),
+                t(device_status_i18n_key(effective_smart_status(disk))),
+            )));
+            lines.push(ratatui::text::Line::from(t(guidance)));
+        }
         // Removable media (GPUI disk_stats tail row). The capability is only
         // named when the adapter PROVED removable media; an unresolved probe
         // renders nothing — never a fabricated Yes/No.

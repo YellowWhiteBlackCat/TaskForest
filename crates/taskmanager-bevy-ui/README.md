@@ -83,6 +83,9 @@ adopted — theme tokens are the only skin authority.
 - System Health selects shared storage and sensor groups inside the measured
   System body. SMART controls freeze disk generation before activation and arm
   the shared confirmation; replaced targets cannot redirect a stale control.
+- Performance preserves device selection across mounting. Disk throughput/activity
+  and battery charge/power curves use identity-scoped history and measured widths;
+  complete device groups scroll beneath fixed selectors and leave a bottom inset.
 - `src/pages/history/control.rs` routes both review surfaces through one history
   controller and native session. Performance review has pinned actions around
   a bounded body; application review admits complete metric cards in its own

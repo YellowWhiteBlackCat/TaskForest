@@ -63,9 +63,7 @@ mod appearance;
 use appearance::demo_theme_from_env;
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
-use crate::capture::{
-    capture_page, capture_perf_device_target, capture_scenario_target, capture_window_resolution,
-};
+use crate::capture::{capture_page, capture_scenario_target, capture_window_resolution};
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
@@ -245,6 +243,7 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         app.add_systems(
             PostUpdate,
             emit_capture_marker
+                .after(crate::pages::performance::device_curves::paint_curves)
                 .after(crate::pages::performance::replay::paint_charts)
                 .after(crate::pages::system::dashboard::paint_charts),
         );
@@ -296,9 +295,6 @@ impl Plugin for FrontendWindowPlugin {
         app.insert_resource(WindowPalette {
             inner: self.palette.clone(),
         });
-        if let Some(target) = capture_perf_device_target() {
-            app.insert_resource(crate::pages::performance::PerformanceDeviceFocus(target));
-        }
         if std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|v| v.trim() == "sidebar-hidden") {
             app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
         }

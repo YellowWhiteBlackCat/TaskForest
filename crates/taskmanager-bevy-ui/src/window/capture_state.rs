@@ -1,10 +1,13 @@
 //! Startup capture state through a declared resource access set.
 use super::{DemoMode, ThemePreferences};
 use crate::app::FrontendTrack;
-use crate::capture::{capture_scenario_target, capture_wants_service_logs};
+use crate::capture::{
+    capture_perf_device_target, capture_scenario_target, capture_wants_service_logs,
+};
 use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
 };
+use crate::pages::performance::{PerformanceDeviceFocus, PerformanceFocus};
 use crate::pages::system::dashboard::SystemDashboardState;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
@@ -23,6 +26,8 @@ pub(super) fn initialize_capture_state(
     mut track: NonSendMut<FrontendTrack>,
     mut dashboard: ResMut<SystemDashboardState>,
     mut preferences: ResMut<ThemePreferences>,
+    mut device_focus: ResMut<PerformanceDeviceFocus>,
+    mut curve_focus: ResMut<PerformanceFocus>,
     mut commands: Commands,
 ) {
     if demo.is_none() {
@@ -33,6 +38,12 @@ pub(super) fn initialize_capture_state(
         seed_service_log_fixture(&mut shell);
     }
     seed_capture_confirmation_fixture(&mut shell);
+    if let Some(target) = capture_perf_device_target(&shell) {
+        if let Some(curve) = target.curve() {
+            curve_focus.0 = curve;
+        }
+        device_focus.0 = target;
+    }
     if matches!(
         capture_scenario_target(),
         Some("system-dashboard" | "history-60m")

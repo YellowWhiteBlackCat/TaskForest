@@ -1,14 +1,18 @@
 //! Capture readiness follows explicitly queried mounted and painted surfaces.
 use super::CaptureMarkerState;
 use crate::app::{FrontendTrack, Page, PageContent, Route};
-use crate::capture::{capture_page_name, capture_scenario_target};
+use crate::capture::{capture_page_name, capture_perf_device_target, capture_scenario_target};
 use crate::confirmation::ConfirmationCapture;
 use crate::focus_visible::FocusCapture;
 use crate::pages::history::control::{
     HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
 };
 use crate::pages::history::{HistoryProjectionResource, HistoryRuntime};
+use crate::pages::performance::device_curves::DeviceCurve;
 use crate::pages::performance::replay::{ChartSize, ReplayChart};
+use crate::pages::performance::{
+    DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
+};
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
@@ -27,6 +31,18 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 pub(super) struct CaptureAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     system_state: Res<'w, SystemDashboardState>,
+    device_focus: Res<'w, PerformanceDeviceFocus>,
+    device_categories: Query<'w, 's, (&'static DeviceViewCategory, &'static ComputedNode)>,
+    device_blocks: Query<'w, 's, (&'static DynBlock, &'static ComputedNode)>,
+    device_curves: Query<
+        'w,
+        's,
+        (
+            &'static DeviceCurve,
+            &'static ComputedNode,
+            &'static CurveMeasurement,
+        ),
+    >,
     route: Res<'w, Route>,
     state: ResMut<'w, CaptureMarkerState>,
     pages: Query<'w, 's, &'static PageContent>,
@@ -79,6 +95,55 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
     let route = access.route.page;
     if access.state.emitted || access.pages.iter().all(|content| content.page != route) {
         return;
+    }
+    if let Some(target) = capture_perf_device_target(&access.track.shell) {
+        if access.device_focus.0 != target
+            || !access.device_categories.iter().any(|(category, node)| {
+                category.0 == target.category() && node.size().x > 0.0 && node.size().y > 0.0
+            })
+        {
+            return;
+        }
+        let device_id = match &target {
+            PerformanceDeviceTarget::Disk(id)
+            | PerformanceDeviceTarget::Network(id)
+            | PerformanceDeviceTarget::Gpu(id)
+            | PerformanceDeviceTarget::Battery(id) => Some(id),
+            _ => None,
+        };
+        if device_id.is_some_and(|id| {
+            !access
+                .device_blocks
+                .iter()
+                .any(|(block, node)| &block.1 == id && node.size().x > 0.0 && node.size().y > 0.0)
+        }) {
+            return;
+        }
+        if let PerformanceDeviceTarget::Battery(id) = &target {
+            let painted = access
+                .device_curves
+                .iter()
+                .filter(|(curve, node, measurement)| {
+                    &curve.id == id
+                        && node.size().x > 0.0
+                        && node.size().y > 0.0
+                        && measurement.0.is_some()
+                        && curve
+                            .samples(&access.track.shell)
+                            .iter()
+                            .filter(|sample| sample.is_finite())
+                            .count()
+                            >= 8
+                })
+                .count();
+            if painted != 2 {
+                return;
+            }
+        }
+        if !access.state.data_presented {
+            access.state.data_presented = true;
+            return;
+        }
     }
     match capture_scenario_target() {
         Some(scenario @ ("storage-health" | "sensor-center")) => {

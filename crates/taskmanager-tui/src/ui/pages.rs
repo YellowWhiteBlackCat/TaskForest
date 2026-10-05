@@ -187,10 +187,11 @@ pub(super) fn startup_page_layout(
     sources: Option<&[SourceStatus]>,
 ) -> StartupPageLayout {
     let (timeline, table_before_notice) = match timeline_rows {
-        Some(rows) if area.height >= 12 => {
+        Some(rows) if area.height >= 8 => {
             let height = rows
                 .saturating_add(2)
-                .min(usize::from(area.height / 2))
+                .min(usize::from((area.height / 2).max(5)))
+                .min(usize::from(area.height.saturating_sub(3)))
                 .min(usize::from(u16::MAX));
             let [timeline, table] = Layout::vertical([
                 Constraint::Length(u16::try_from(height).unwrap_or(u16::MAX)),

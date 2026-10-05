@@ -311,11 +311,12 @@ fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan
             // detail keeps nearly the whole content area. The data comes from
             // the SHARED `SystemProjectionStore::directory_usage` slot (latest-wins from
             // the platform batch fold).
-            let usage_height: u16 = if app.projection().directory_usage.is_some() {
-                12
-            } else {
-                3
-            };
+            let usage_height: u16 =
+                match (app.projection().directory_usage.is_some(), content.height) {
+                    (true, height) if height >= 20 => 12,
+                    (false, height) if height >= 11 => 3,
+                    _ => 0,
+                };
             let [disk_area, usage_area] =
                 Layout::vertical([Constraint::Min(1), Constraint::Length(usage_height)])
                     .areas(content);

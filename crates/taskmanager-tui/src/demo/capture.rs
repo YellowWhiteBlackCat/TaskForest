@@ -2,6 +2,7 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 
 /// A scene is ready only when its requested product state exists.
@@ -23,6 +24,37 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
             && process_properties_capture_data_ready(&app.shell, &scene)
     } else if scene == "active-alert" {
         !app.shell.projection().alert_active.is_empty()
+    } else if matches!(
+        scene.as_str(),
+        "battery-fan-performance" | "battery-live-performance"
+    ) {
+        app.projection()
+            .power_supplies
+            .as_ref()
+            .is_some_and(|power| {
+                power.batteries.iter().any(|battery| {
+                    battery.current_capacity_pct() == Some(78)
+                        && app
+                            .shell
+                            .history
+                            .battery_capacity_pct_for(&battery.id)
+                            .len()
+                            >= 8
+                        && app.shell.history.battery_power_w_for(&battery.id).len() >= 8
+                })
+            })
+    } else if matches!(scene.as_str(), "smart-missing-tool" | "smart-permission") {
+        let expected = if scene == "smart-missing-tool" {
+            SmartAvailability::MissingTool
+        } else {
+            SmartAvailability::PermissionDenied
+        };
+        app.projection().snapshot.as_ref().is_some_and(|snapshot| {
+            snapshot
+                .disks
+                .iter()
+                .any(|disk| disk.smart_availability == expected)
+        })
     } else if matches!(scene.as_str(), "storage-health" | "sensor-center") {
         let expected = if scene == "storage-health" {
             crate::health_review::HealthReviewMode::Storage
