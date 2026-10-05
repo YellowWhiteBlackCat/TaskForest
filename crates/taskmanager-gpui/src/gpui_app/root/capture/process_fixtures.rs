@@ -76,6 +76,7 @@ pub(super) fn prepare_apps_group_expanded(processes: &mut Vec<ProcessItem>) {
         let mut process = ProcessItem::new(pid, "capture-browser");
         process.cmdline = "/usr/bin/capture-browser --group-capture".into();
         process.status = status.into();
+        process.parent_pid = (offset > 0).then_some(BASE_PID);
         process.apply_scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(9_300_000 + u64::from(pid), 1),
             cpu_percentage: ScalarObservation::available(cpu, 1),

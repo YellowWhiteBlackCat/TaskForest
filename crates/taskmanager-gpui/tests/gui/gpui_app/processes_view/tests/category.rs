@@ -9,6 +9,51 @@ use taskmanager_shell::ProcessRowId;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
 
+#[gpui::test]
+async fn expand_all_reveals_nested_application_processes_and_is_idempotent(
+    cx: &mut TestAppContext,
+) {
+    let (_win, view) = wrapped_root(cx);
+    let identity = ProcessApplicationIdentity::new("org.example.Browser", "Browser", None)
+        .expect("fixture application identity");
+    view.update(cx, |v, _cx| {
+        v.page = TopPage::Apps;
+        v.processes_state.expanded_apps.clear();
+        v.processes_state
+            .collapsed
+            .insert(row_id(201).live_key().unwrap());
+        v.replace_processes_for_test(
+            [(201, None), (202, Some(201)), (203, Some(202))]
+                .into_iter()
+                .map(|(pid, parent)| {
+                    ProcessItemFixtureBuilder::new()
+                        .pid(pid)
+                        .parent_pid(parent)
+                        .name(format!("browser-{pid}"))
+                        .application_identity_observation(ProcessMetadataObservation::available(
+                            identity.clone(),
+                            1,
+                        ))
+                        .build()
+                })
+                .collect(),
+        );
+        assert_eq!(v.processes_projection().0.len(), 1);
+        crate::gpui_app::processes_view::rows::expand_all(v);
+        let (rows, _, _) = v.processes_projection();
+        let processes: Vec<_> = rows
+            .iter()
+            .filter_map(|row| row.process_identity.map(|key| (key.pid(), row.depth)))
+            .collect();
+        assert_eq!(processes, [(201, 2), (202, 3), (203, 4)]);
+        assert!(rows.iter().all(|row| !row.has_children || !row.collapsed));
+        let expanded = v.processes_state.expanded_apps.clone();
+        crate::gpui_app::processes_view::rows::expand_all(v);
+        assert_eq!(v.processes_state.expanded_apps, expanded);
+        assert_eq!(v.processes_projection().0.len(), 5);
+    });
+}
+
 /// A primary click on a category aggregate row's chevron must expand and
 /// collapse the same stable-keyed bucket that the row double-click branch and
 /// the directional keys use. The headless `TestPlatform` hard-codes

@@ -124,11 +124,16 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.apps_group_expanded_requested() {
         configure_category_apps(view);
+        view.set_process_query("capture-browser");
+        crate::gpui_app::processes_view::rows::expand_all(view);
         let (rows, _, _) = view.processes_projection();
-        let expanded = rows
-            .iter()
-            .any(|row| row.depth == 0 && row.has_children && !row.collapsed)
-            && rows.iter().any(|row| row.depth >= 1);
+        let expanded = rows.iter().any(|row| row.depth >= 3)
+            && rows
+                .iter()
+                .filter(|row| row.process_identity.is_some())
+                .count()
+                == 3
+            && rows.iter().all(|row| !row.has_children || !row.collapsed);
         view.capture_evidence
             .mark_apps_group_expanded_ready(expanded);
     }
