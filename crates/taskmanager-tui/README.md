@@ -149,7 +149,7 @@ src/ui.rs                                     page rendering root
 │   ├── process_properties.rs
 │   ├── health.rs  health_data.rs  alerts.rs
 │   ├── app_history.rs  boot_timeline.rs
-│   ├── about.rs  about_data.rs  settings.rs  help.rs  containers.rs
+│   ├── about.rs  settings.rs  help.rs  containers.rs
 │   ├── service_dependencies_modal.rs  service_menu.rs  session_menu.rs
 │   ├── startup_menu.rs  batch_menu.rs  column_menu.rs  affinity_modal.rs
 │   ├── confirmations.rs  header.rs  footer.rs  frame_plan.rs

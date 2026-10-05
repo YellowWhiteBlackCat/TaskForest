@@ -441,10 +441,9 @@ start_niri() {
 }
 
 ensure_niri() {
-  # A live host session can refuse nested-compositor setup for minutes at a
-  # time (observed: a KWin/Plasma pause after a burst of nested start/stop
-  # cycles). Fail closed, but spend the budget retrying with backoff before
-  # giving up the whole single-run matrix receipt.
+  # A virtual host can retain a live socket while refusing new nested clients.
+  # Recreate only this run's private host before retrying; its cgroup and UUID
+  # stay authoritative and the operator's compositor is never signalled.
   if start_niri; then
     return 0
   fi
@@ -454,6 +453,10 @@ ensure_niri() {
       "$backoff" >&2
     sleep "$backoff"
     stop_niri
+    if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+      reset_capture_host
+      start_capture_host || continue
+    fi
     if start_niri; then
       return 0
     fi
