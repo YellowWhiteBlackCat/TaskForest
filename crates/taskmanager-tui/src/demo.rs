@@ -585,10 +585,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         "keyboard-help" | "keyboard-help-end" => {
             capture::prepare_help(app, scene == "keyboard-help-end")
         }
-        "apps-zero-gray" => {
-            app.shell.application.active_page = AppPage::Applications;
-            app.prefs.gray_zero = true;
-        }
+        "apps-zero-gray" => capture::prepare_zero_gray(app),
         "settings-zero-gray" | "settings-switch-focus" => {
             prepare_capture_settings(
                 app,

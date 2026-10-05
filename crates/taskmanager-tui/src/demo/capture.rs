@@ -79,6 +79,11 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                 .sensors
                 .as_ref()
                 .is_some_and(|snapshot| snapshot.readings.len() == 4)
+    } else if scene == "apps-zero-gray" {
+        app.prefs.gray_zero
+            && app
+                .selected_detail_process()
+                .is_some_and(|process| process.current_cpu_percentage() == Some(0.0))
     } else if scene == "event-center" {
         app.health_open()
             && app.health_review.mode == crate::health_review::HealthReviewMode::Events
@@ -197,4 +202,11 @@ pub(super) fn prepare_help(app: &mut TuiApp, end: bool) {
             );
         }
     }
+}
+
+pub(super) fn prepare_zero_gray(app: &mut TuiApp) {
+    app.shell.application.active_page = AppPage::Applications;
+    app.prefs.gray_zero = true;
+    app.shell.query = "k".into();
+    let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
 }

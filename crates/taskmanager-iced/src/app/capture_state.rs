@@ -306,6 +306,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "apps-zero-gray" {
         app.shell.application.active_page = AppPage::Applications;
         app.configuration.preferences_mut().gray_zero_values = true;
+        app.shell.query = "k".into();
     } else if target == "apps-identity-matrix" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(processes) = app.shell.projection().processes.as_ref() {
