@@ -8,6 +8,7 @@
 use super::process_projection::{ProcessRowFacts, ProjectedRow, RowCells};
 use super::*;
 use iced::widget::canvas;
+use iced::widget::text::Wrapping;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::ProcessRowId;
@@ -459,7 +460,13 @@ fn group_header_row(
         iced::widget::container(
             iced::widget::row![
                 text(marker).size(f32::from(tokens::FONT_12)),
-                text(name.clone()).size(f32::from(tokens::FONT_14)),
+                container(
+                    text(name.clone())
+                        .size(f32::from(tokens::FONT_14))
+                        .wrapping(Wrapping::None)
+                )
+                .width(Length::Fill)
+                .clip(true),
                 text(format!("x{member_count}")).size(f32::from(tokens::FONT_12)),
             ]
             .spacing(6)
