@@ -2,22 +2,17 @@
 //! minimal placeholder. Each is MC-styled: title + subtitle + main graph (+ composition
 //! bar for memory) on the left, stat panel on the right.
 
-use gpui::{
-    AnyElement, Context, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div, px,
-};
+use gpui::{Context, Div, ElementId, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_shell::presentation::GraphSummary;
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::power_w;
-use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::temperature_c;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
-use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
     GraphUnit, PerformanceSettings, format_drive_graph_megabytes, format_network_graph_megabytes,
 };
@@ -567,35 +562,7 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         .into_any_element()
     });
     let stats = disk_stats(d, units, temperature_samples.as_ref());
-    let has_smart = has_smart_fields(d); // ── SMART health button (opens a dedicated attributes dialog) ──
-    let smart_footer: Option<AnyElement> = if smart_section_visible(d) {
-        if has_smart {
-            let i_val = i;
-            Some(
-                div()
-                    .id("disk-smart-btn")
-                    .focusable()
-                    .tab_stop(true)
-                    .focus(elements::focus_ring(theme))
-                    .cursor_pointer()
-                    .on_click(cx.listener(move |v, _ev, _win, cx| {
-                        v.show_disk_smart(i_val);
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .text_size(font_size(tokens::FONT_12))
-                            .text_color(hsla(theme.accent))
-                            .child(i18n::t("disk.smart_health")),
-                    )
-                    .into_any_element(),
-            )
-        } else {
-            status_footer(theme, effective_smart_status(d))
-        }
-    } else {
-        None
-    };
+    let smart_footer = smart_status::disk_footer(theme, d, i, cx);
     let usage_panel = show_usage
         .then(|| directory_usage::directory_usage_panel(theme, d, directory_usage, units, cx));
     perf_page(PerfPageProps {

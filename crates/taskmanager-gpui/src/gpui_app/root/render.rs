@@ -18,6 +18,7 @@ pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
 
 use std::time::Duration;
 
+use super::capture::schedule_controlled_presentation;
 use super::{
     Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label, i18n,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
@@ -197,6 +198,7 @@ impl Render for RootView {
                 });
             });
         }
+        schedule_controlled_presentation(self, window, cx);
         let presentation = self.presentation_snapshot();
         let ui_size = presentation.appearance.ui_size;
         // All FONT_* tokens resolve from this root-relative scale, including
@@ -265,6 +267,9 @@ impl Render for RootView {
         if let Some(settings_focus_id) = settings_focus_id
             && settings_focus_requested
         {
+            if settings_zero_gray {
+                self.set_gray_zero_values(true, cx);
+            }
             // Strict capture emulates keyboard navigation without dispatching an
             // activation keystroke; the switch value is never changed. The
             // selected settings switch entity owns the focus handle now.
@@ -285,6 +290,21 @@ impl Render for RootView {
                 focus.focus(window);
                 if focus.is_focused(window) {
                     let _ = weak.update(cx, |view, cx| {
+                        let viewport = view.dialog_scroll.settings.bounds();
+                        let visible = view
+                            .settings_switches
+                            .get(settings_focus_id)
+                            .and_then(|state| state.read(cx).painted_bounds())
+                            .is_some_and(|bounds| {
+                                bounds.size.width > px(0.0)
+                                    && bounds.size.height > px(0.0)
+                                    && viewport.contains(&bounds.origin)
+                                    && viewport.contains(&bounds.bottom_right())
+                            });
+                        if !visible {
+                            cx.notify();
+                            return;
+                        }
                         if settings_focus_id == "device-cpu" {
                             view.capture_evidence.mark_settings_switch_focus_ready();
                         } else {

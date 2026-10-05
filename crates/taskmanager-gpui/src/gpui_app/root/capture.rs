@@ -36,6 +36,10 @@ use taskmanager_theme::Theme;
 use super::{ProcessDetailsSection, TopPage};
 
 use taskmanager_shell::fixture::dashboard_history::seed_system_dashboard_history;
+mod dynamic_history;
+mod presentation;
+pub(super) mod service_logs;
+pub(super) use presentation::schedule_controlled_presentation;
 mod fixtures;
 mod gpu_history;
 mod marker;
@@ -173,7 +177,6 @@ impl CaptureEvidence {
                     | CaptureScenario::SmartPermission
                     | CaptureScenario::PartitionDiskUsage
                     | CaptureScenario::IntelGpuTelemetry
-                    | CaptureScenario::ActiveAlert
             )
         ) || (self.scenario == Some(CaptureScenario::DeviceHotplug)
             && self.snapshot_count >= 2)
@@ -400,21 +403,21 @@ impl CaptureEvidence {
             self.mark_scenario_ready();
             return None;
         }
-        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) || self.scenario_ready() {
+        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) {
             return None;
         }
-        if services.is_empty() {
-            services.push(ServiceItem::from_inventory(
-                ServiceId::new("fixture.service:taskmanager-capture.service"),
-                "taskmanager-capture.service",
-                ServiceStatus::Active,
-                "Task Manager screenshot evidence service",
-                "loaded",
-                "active",
-                "running",
-            ));
-        }
-        Some(services[0].id.clone())
+        let id = ServiceId::new("fixture.service:taskmanager-capture.service");
+        services.retain(|service| service.id != id);
+        services.push(ServiceItem::from_inventory(
+            id.clone(),
+            "taskmanager-capture.service",
+            ServiceStatus::Active,
+            "TaskForest capture service",
+            "loaded",
+            "active",
+            "running",
+        ));
+        Some(id)
     }
 
     pub fn on_startup_update(
@@ -630,34 +633,10 @@ impl CaptureEvidence {
     /// the dynamic capability projection; it never mutates static hardware
     /// inventory and does not perform provider I/O.
     pub fn dynamic_device_fixture_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::BatteryFanPerformance)
-    }
-
-    /// Mark a live dynamic-device capture only after the provider supplied the
-    /// requested real capability. Unlike the deterministic fixture path above,
-    /// this method never inserts or rewrites a Battery/Fan observation.
-    pub fn on_live_dynamic_device_state(
-        &mut self,
-        page: &mut TopPage,
-        power_supplies: &PowerSupplySnapshot,
-    ) -> bool {
-        if !self.is_enabled()
-            || !self.telemetry_ready()
-            || !self.ui_data_ready()
-            || self.scenario_ready()
-        {
-            return false;
-        }
-        let target_ready = match self.scenario {
-            Some(CaptureScenario::BatteryLivePerformance) => !power_supplies.batteries.is_empty(),
-            _ => false,
-        };
-        if !target_ready {
-            return false;
-        }
-        *page = TopPage::Performance;
-        self.mark_scenario_ready();
-        true
+        matches!(
+            self.scenario,
+            Some(CaptureScenario::BatteryFanPerformance | CaptureScenario::BatteryLivePerformance)
+        )
     }
 
     pub fn on_dynamic_device_state(
@@ -670,13 +649,37 @@ impl CaptureEvidence {
             || !self.telemetry_ready()
             || !self.ui_data_ready()
             || !self.dynamic_device_fixture_requested()
-            || self.scenario_ready()
+        {
+            return false;
+        }
+        if self.scenario_ready()
+            && power_supplies
+                .batteries
+                .first()
+                .is_some_and(|battery| battery.id == "power-supply:capture-battery")
         {
             return false;
         }
         *page = TopPage::Performance;
         *power_supplies = dynamic_power_fixture();
         *sensors = dynamic_sensor_fixture();
+        true
+    }
+    pub(crate) fn seed_dynamic_capture_history(
+        &mut self,
+        history: &CorrelatedSystemTelemetryHistory,
+        ingestor: &CorrelatedSystemTelemetryIngestor,
+        anchor: u64,
+    ) -> bool {
+        if !self.dynamic_device_fixture_requested() {
+            return false;
+        }
+        if !self.dynamic_history_seeded {
+            if !dynamic_history::seed(history, ingestor, anchor) {
+                return false;
+            }
+            self.dynamic_history_seeded = true;
+        }
         self.mark_scenario_ready();
         true
     }

@@ -1,6 +1,6 @@
 use super::*;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::ServiceLogSnapshot;
+use taskmanager_core::core::services::{ServiceDeps, ServiceLogSnapshot, ServiceRelationKind};
 
 fn dependencies(kind: ServiceRelationKind, target: &str) -> ServiceDeps {
     let mut dependencies = ServiceDeps::default();

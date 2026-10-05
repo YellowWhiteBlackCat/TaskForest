@@ -36,7 +36,6 @@ use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
-use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::FontPreference;
@@ -265,27 +264,20 @@ fn poll_window_systems(view: &mut RootView, cx: &mut gpui::Context<RootView>) {
         view.request_system_health_self_test_confirmation(confirmation);
     }
     let dynamic_ready = view.sync_capture_dynamic_device_system();
-    let live_dynamic_ready = view.sync_capture_live_dynamic_device_system();
-    if dynamic_ready {
-        let stamp = CorrelatedTelemetryStamp::from_accepted_event(
-            u64::MAX,
-            view.power_supplies().timestamp_ms.saturating_add(1),
+    let dynamic_history_ready = dynamic_ready
+        && view.capture_evidence.seed_dynamic_capture_history(
+            &view.telemetry.system_history,
+            &view.telemetry_ingestor,
+            view.system_snapshot().timestamp_ms,
         );
-        if let Some(stamp) = stamp {
-            let _ = view
-                .telemetry_ingestor
-                .ingest_correlated_power_supplies(stamp, view.power_supplies());
-            let _ = view
-                .telemetry_ingestor
-                .ingest_correlated_sensors(stamp, view.sensors());
-        }
-        view.reconcile_device_selection();
+    if dynamic_history_ready {
+        view.select_device(super::SelectedDevice::Battery(0));
     }
     if view.poll_process_insights()
         | view.poll_service_details()
         | health_ready
         | dynamic_ready
-        | live_dynamic_ready
+        | dynamic_history_ready
     {
         cx.notify();
     }

@@ -126,6 +126,10 @@ pub(super) fn compose_primary_dialogs(
                 .entry(id)
                 .or_insert_with(|| cx.new(|cx| SwitchState::new(cx)));
         }
+        for state in view.settings_switches.values() {
+            let parent = view.dialog_scroll.settings.clone();
+            state.update(cx, |state, _cx| state.set_scroll_parent(parent));
+        }
         let content = settings_view::render_settings(
             settings_view::SettingsViewProps {
                 theme,
@@ -209,9 +213,6 @@ pub(super) fn compose_primary_dialogs(
             },
             cx,
         );
-        if view.capture_evidence.settings_zero_gray_enabled() {
-            view.dialog_scroll.settings.scroll_to_bottom();
-        }
         let settings_max_height = responsive::settings_content_max_height(window.viewport_size());
         // Keep the scroll affordance in the dialog viewport instead of letting
         // the native overflow hint disappear into the panel. Settings is long

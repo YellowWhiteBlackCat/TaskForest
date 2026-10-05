@@ -10,6 +10,15 @@ use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
 impl CaptureEvidence {
+    pub(crate) fn active_alert_capture_enabled(&self) -> bool {
+        self.scenario == Some(CaptureScenario::ActiveAlert)
+    }
+    pub(crate) fn mark_active_alert_ready(&mut self) {
+        if self.scenario == Some(CaptureScenario::ActiveAlert) {
+            self.mark_scenario_ready();
+        }
+    }
+
     /// Inventory fixtures must be able to start from an accepted platform
     /// batch even when the live provider reports no new service/startup
     /// inventory. Capture-only preparation still runs after the normal batch
@@ -17,13 +26,9 @@ impl CaptureEvidence {
     /// opportunity to install its typed fixture.
     pub(crate) fn service_inventory_capture_requested(&self) -> bool {
         self.is_enabled()
-            && !self.scenario_ready()
-            && matches!(
-                self.scenario,
-                Some(
-                    CaptureScenario::ServiceDetailsLogs | CaptureScenario::ServicesSearchHighlight,
-                )
-            )
+            && (self.scenario == Some(CaptureScenario::ServiceDetailsLogs)
+                || (!self.scenario_ready()
+                    && self.scenario == Some(CaptureScenario::ServicesSearchHighlight)))
     }
 
     /// Startup capture has the same provider-independent trigger as service

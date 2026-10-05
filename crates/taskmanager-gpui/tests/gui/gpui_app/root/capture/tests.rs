@@ -5,7 +5,7 @@ use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::SensorQuantity;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
-use taskmanager_telemetry_store::HistoryRetention;
+use taskmanager_telemetry_store::{HistoryRetention, TelemetryStore};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
 #[path = "tests/dashboard.rs"]
@@ -707,6 +707,10 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
             .iter()
             .any(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
     );
+    assert!(!evidence.scenario_ready());
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(32));
+    assert!(evidence.seed_dynamic_capture_history(&store.system_history, &ingestor, 10_000));
     assert!(evidence.scenario_ready());
     assert!(!evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
 }

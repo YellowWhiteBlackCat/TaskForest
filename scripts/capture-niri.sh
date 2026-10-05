@@ -668,13 +668,12 @@ capture() {
         && grep -q "CAPTURE_MARKER event=ui_data_ready scenario=$marker_scenario" "$log" 2>/dev/null \
         && grep -q "CAPTURE_MARKER event=theme_ready scenario=$marker_scenario theme=$skin high_contrast=false" "$log" 2>/dev/null \
         && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=scenario_ready scenario=$scenario" "$log" 2>/dev/null; } \
-        && { [ "$scenario" != system-about ] || grep -q "CAPTURE_MARKER event=surface_presented scenario=$scenario" "$log" 2>/dev/null; }; then
+        && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=surface_presented scenario=$scenario" "$log" 2>/dev/null; }; then
         markers=ready
         break
       fi
       sleep 0.5
     done
-    sleep 1.5 # allow the marker-triggered notify to paint the final frame
   fi
 
   # A GPUI surface can map after the first window poll even though readiness

@@ -161,11 +161,13 @@ pub(crate) struct CaptureEvidence {
     /// seeded into the direct track exactly once. This is fixture data for the
     /// evidence frame, never a live privileged read.
     pub(super) msr_readout_seeded: bool,
+    pub(super) dynamic_history_seeded: bool,
     /// Capture-only state machine that waits for two rendered frames before
     /// submitting the current-window provider request, then becomes terminal.
     pub(super) window_capture_schedule: WindowCaptureSchedule,
     pub(super) system_about_presentation: SurfacePresentation,
     pub(super) process_properties_presentation: SurfacePresentation,
+    pub(super) controlled_presentation: SurfacePresentation,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.

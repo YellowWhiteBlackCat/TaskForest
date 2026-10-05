@@ -8,10 +8,18 @@
 //! GPUI footer element itself (toolkit rendering stays at the renderer
 //! edge).
 
-use gpui::{AnyElement, IntoElement, ParentElement, Styled, div};
+use crate::gpui_app::elements;
+use crate::gpui_app::root::RootView;
+use gpui::{
+    AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
+    StatefulInteractiveElement, Styled, div,
+};
 use taskmanager_application::i18n;
 use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_shell::presentation::device_action_i18n_key;
+use taskmanager_shell::presentation::smart::smart_section_visible;
+use taskmanager_shell::presentation::{effective_smart_status, has_smart_fields};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::absolute;
@@ -38,6 +46,40 @@ pub(super) fn status_footer(theme: &Theme, status: DeviceStatus) -> Option<AnyEl
             .text_size(font_size(tokens::FONT_12))
             .text_color(hsla(theme.fg))
             .child(i18n::t(device_action_i18n_key(status)))
+            .into_any_element(),
+    )
+}
+
+pub(super) fn disk_footer(
+    theme: &Theme,
+    disk: &DiskMetrics,
+    index: usize,
+    cx: &mut Context<RootView>,
+) -> Option<AnyElement> {
+    if !smart_section_visible(disk) {
+        return None;
+    }
+    let status = effective_smart_status(disk);
+    if status != DeviceStatus::Healthy || !has_smart_fields(disk) {
+        return status_footer(theme, status);
+    }
+    Some(
+        div()
+            .id("disk-smart-btn")
+            .focusable()
+            .tab_stop(true)
+            .focus(elements::focus_ring(theme))
+            .cursor_pointer()
+            .on_click(cx.listener(move |view, _event, _window, cx| {
+                view.show_disk_smart(index);
+                cx.notify();
+            }))
+            .child(
+                div()
+                    .text_size(font_size(tokens::FONT_12))
+                    .text_color(hsla(theme.accent))
+                    .child(i18n::t("disk.smart_health")),
+            )
             .into_any_element(),
     )
 }

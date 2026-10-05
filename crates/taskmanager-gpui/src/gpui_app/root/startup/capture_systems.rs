@@ -189,7 +189,8 @@ fn apply_inventory_capture(
         services_updated || view.capture_evidence.service_inventory_capture_requested();
     if let Some(service) = view.sync_capture_service_system(service_capture_update) {
         view.page = TopPage::Services;
-        view.open_service_details(service);
+        view.open_service_details(service.clone());
+        super::super::capture::service_logs::seed(view, &service);
         view.capture_evidence
             .mark_service_details_ready(view.service_details_target().is_some());
     }
@@ -244,6 +245,23 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
         });
         view.capture_evidence
             .mark_system_inventory_fixture_ready(installed);
+    }
+    if view.capture_evidence.active_alert_capture_enabled() {
+        let mut snapshot = view.system_snapshot().clone();
+        let mut active = Vec::new();
+        for elapsed in [0, 10_000] {
+            snapshot.timestamp_ms = snapshot.timestamp_ms.saturating_add(elapsed);
+            active = view
+                .shell
+                .evaluate_alerts(&snapshot, snapshot.timestamp_ms)
+                .active;
+        }
+        let ready = !active.is_empty();
+        let revision = view.shell.accept_alert_evaluation(active.clone());
+        view.materialize_active_alerts(revision, active);
+        if ready {
+            view.capture_evidence.mark_active_alert_ready();
+        }
     }
     let timestamp_ms = view.system_snapshot().timestamp_ms;
     if view.capture_evidence.seed_gpu_engine_inventory_history(

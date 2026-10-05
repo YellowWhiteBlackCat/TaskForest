@@ -15,6 +15,7 @@ use taskmanager_core::core::{
 
 fn clear_smart_values(disk: &mut DiskMetrics) {
     disk.smart_temperature_c = None;
+    disk.smart_temperature_sensors_c.clear();
     disk.smart_critical_warning = None;
     disk.smart_temp_critical_c = None;
     disk.smart_percent_used = None;
@@ -107,6 +108,7 @@ pub(super) fn dynamic_power_fixture() -> PowerSupplySnapshot {
         ..Default::default()
     });
     PowerSupplySnapshot {
+        state: DeviceState::healthy(1_000),
         timestamp_ms: 1_000,
         batteries: vec![battery],
         ..Default::default()

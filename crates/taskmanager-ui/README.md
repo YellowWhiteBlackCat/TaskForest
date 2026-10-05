@@ -35,6 +35,9 @@ tests and the current visual evidence route in
 `../../docs/screenshots/README.md`.
 
 A tracked vertical viewport is the sole owner of its `ScrollHandle` offset.
+Switches attached to a scroll viewport measure their real bounds and reveal
+keyboard focus without activating the control. Settings reuses this component
+behavior; capture accepts focus only after the complete switch is visible.
 Pinned scrollbar rails are sibling chrome in a fixed relative frame, never
 children of the tracked node; real-wheel tests must prove that content moves
 while the viewport and rail keep identical window-space bounds across redraws.

@@ -501,7 +501,7 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
             if token not in joined_markers:
                 raise EvidenceError(f"{name}: missing marker {token}")
         if scenario != "standard":
-            require_modal_presentation(name, scenario, joined_markers)
+            require_surface_presentation(name, scenario, joined_markers)
             token = f"CAPTURE_MARKER event=scenario_ready scenario={scenario}"
             if token not in joined_markers:
                 raise EvidenceError(f"{name}: missing marker {token}")
@@ -565,26 +565,25 @@ def png_chunk(kind: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", crc)
 
 
-def require_modal_presentation(name: str, scenario: str, markers: str) -> None:
-    if scenario in {"system-about", "process-properties-performance", "process-memory-pss-swap",
-                    "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation"}:
+def require_surface_presentation(name: str, scenario: str, markers: str) -> None:
+    if scenario and scenario != "standard":
         token = f"CAPTURE_MARKER event=surface_presented scenario={scenario}"
         if token not in markers:
-            raise EvidenceError(f"{name}: missing modal frame presentation marker {token}")
+            raise EvidenceError(f"{name}: missing controlled frame presentation marker {token}")
 
 
 def self_test() -> None:
-    for scenario in ("system-about", "process-properties-performance", "process-memory-pss-swap", "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation"):
+    for scenario in ("system-about", "process-properties-performance", "process-memory-pss-swap", "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation", "active-alert", "alert-rules-manager", "service-details-logs", "smart-missing-tool", "smart-permission", "battery-live-performance", "settings-switch-focus", "settings-zero-gray", "sidebar-edit"):
         ready_only = f"CAPTURE_MARKER event=scenario_ready scenario={scenario}"
         for markers in (ready_only, ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=about"):
             try:
-                require_modal_presentation(scenario, scenario, markers)
+                require_surface_presentation(scenario, scenario, markers)
             except EvidenceError:
                 pass
             else:
                 raise EvidenceError("a semantic-ready or foreign modal marker certified unpresented pixels")
-        require_modal_presentation(scenario, scenario, ready_only + f"\nCAPTURE_MARKER event=surface_presented scenario={scenario}")
-    require_modal_presentation("standard", "standard", "")
+        require_surface_presentation(scenario, scenario, ready_only + f"\nCAPTURE_MARKER event=surface_presented scenario={scenario}")
+    require_surface_presentation("standard", "standard", "")
     raw_scanline = b"\x00\x10\x20\x30"
     png = (
         PNG_SIGNATURE

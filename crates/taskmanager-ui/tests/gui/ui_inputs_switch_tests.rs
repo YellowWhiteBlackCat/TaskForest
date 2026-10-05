@@ -1,7 +1,7 @@
 use super::{Switch, SwitchEvent, SwitchState};
 use gpui::{
-    AppContext, Context, Entity, IntoElement, Modifiers, ParentElement, Render, TestAppContext,
-    Window, div,
+    AppContext, Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
+    ScrollHandle, StatefulInteractiveElement, Styled, TestAppContext, Window, div, px,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -189,4 +189,66 @@ async fn disabled_switch_is_excluded_from_tab_navigation(cx: &mut TestAppContext
             .unwrap(),
         "a disabled switch must not become a tab stop"
     );
+}
+
+struct ScrollingHarness {
+    state: Entity<SwitchState>,
+    scroll: ScrollHandle,
+}
+impl Render for ScrollingHarness {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .id("switch-parent")
+            .w(px(200.0))
+            .h(px(100.0))
+            .overflow_y_scroll()
+            .track_scroll(&self.scroll)
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .child(div().h(px(600.0)).flex_none())
+                    .child(Switch::new(self.state.clone(), Theme::dark().palette())),
+            )
+    }
+}
+#[gpui::test]
+async fn focused_switch_reveals_itself_inside_its_real_scroll_viewport(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_window, cx| {
+        let scroll = ScrollHandle::new();
+        let state = cx.new(|cx| {
+            let mut state = SwitchState::new(cx);
+            state.set_scroll_parent(scroll.clone());
+            state
+        });
+        ScrollingHarness { state, scroll }
+    });
+    let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+    vcx.update(|window, cx| window.draw(cx).clear());
+    let handle = window
+        .read_with(&vcx, |view, app| {
+            view.state.read(app).focus_handle().clone()
+        })
+        .unwrap();
+    vcx.update(|window, _cx| handle.focus(window));
+    for _ in 0..3 {
+        vcx.update(|window, cx| window.draw(cx).clear());
+    }
+    window
+        .read_with(&vcx, |view, app| {
+            let state = view.state.read(app);
+            let control = state.painted_bounds().expect("measured control");
+            let viewport = view.scroll.bounds();
+            assert!(control.size.width > px(0.0) && control.size.height > px(0.0));
+            assert!(
+                viewport.contains(&control.origin) && viewport.contains(&control.bottom_right()),
+                "{control:?} outside {viewport:?}"
+            );
+            assert!(
+                view.scroll.offset().y < px(0.0),
+                "focus moves the actual scroll offset"
+            );
+            assert!(!state.is_on(), "reveal does not activate a switch");
+        })
+        .unwrap();
 }

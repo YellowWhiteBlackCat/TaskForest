@@ -62,7 +62,19 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
     assert!(!service.scenario_ready());
     service.mark_service_details_ready(true);
     assert!(service.scenario_ready());
-    assert!(!service.service_inventory_capture_requested());
+    assert!(service.service_inventory_capture_requested());
+    services.clear();
+    assert_eq!(
+        service.on_services_update(true, &mut services),
+        Some(ServiceId::new(
+            "fixture.service:taskmanager-capture.service"
+        ))
+    );
+    assert_eq!(
+        services.len(),
+        1,
+        "a native refresh cannot erase the controlled review target"
+    );
 }
 
 #[test]
