@@ -5,20 +5,41 @@ use super::*;
 use crate::app::SettingsChange;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use taskmanager_app_host::NativeAppHost;
+use taskmanager_application::ApplicationHistoryStatus;
 use taskmanager_core::core::history::ApplicationHistoryIdentity;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_platform_conformance::smoke_budget::{DRAIN_DEADLINE, DRAIN_POLL};
 
-fn await_rows(app: &mut IcedApp) {
+fn await_rows(app: &mut IcedApp, phase: &str) {
     let deadline = Instant::now() + DRAIN_DEADLINE;
     loop {
         app.drain_config_publications();
         app.drain_history_replay_completions();
+        let projection = app.application_history_projection();
+        assert_ne!(
+            projection.status,
+            ApplicationHistoryStatus::Unavailable,
+            "{phase}: history startup unavailable: {:?}",
+            projection.unavailable_reason
+        );
+        assert!(
+            app.history_replay_state().failure().is_none(),
+            "{phase}: query failed: {:?}",
+            app.history_replay_state().failure()
+        );
         if !app.history_replay_state().rows().is_empty() && !app.history_replay_state().is_loading()
         {
             return;
         }
-        assert!(Instant::now() < deadline, "the real query must complete");
+        assert!(
+            Instant::now() < deadline,
+            "{phase}: the real query must complete: capability={:?}, loading={}, window={:?}, rows_window={:?}, rows={}",
+            app.application_history_projection().status,
+            app.history_replay_state().is_loading(),
+            app.history_replay_state().window(),
+            app.history_replay_state().rows_window(),
+            app.history_replay_state().rows().len()
+        );
         std::thread::sleep(DRAIN_POLL);
     }
 }
@@ -73,13 +94,13 @@ fn normal_history_settings_and_commands_use_real_queries_and_disable_discards_ca
         "disabled history cannot invent a review"
     );
     app.apply_settings_change(SettingsChange::ContinuousHistory(true));
-    await_rows(&mut app);
+    await_rows(&mut app, "enable");
     assert!(app.history_replay_entry_available());
     app.toggle_history_replay();
     assert!(app.history_replay_state().is_open());
     assert_eq!(app.history_replay_state().rows()[0].peak_value, Some(31.0));
     app.select_history_replay_window(HistoryWindow::TwentyFourHours);
-    await_rows(&mut app);
+    await_rows(&mut app, "24h");
     assert_eq!(
         app.history_replay_state().rows_window(),
         Some(HistoryWindow::TwentyFourHours)
@@ -92,7 +113,7 @@ fn normal_history_settings_and_commands_use_real_queries_and_disable_discards_ca
         original,
         "refresh retains the last good curve until its correlated completion"
     );
-    await_rows(&mut app);
+    await_rows(&mut app, "refresh");
     app.toggle_history_replay();
     assert!(!app.history_replay_state().is_open());
     assert_eq!(app.application_history_projection().rows.len(), 1);
