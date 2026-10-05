@@ -785,6 +785,20 @@ fn expanded_process_tree_reserves_actions_and_scrolls_complete_rows_inside_the_p
             "tree needs a readable body"
         );
         assert!(position.translation.y + viewport.size().y / 2.0 <= bottom);
+        let viewport_height = viewport.size().y;
+        let row_height = world
+            .query::<(
+                &crate::pages::process_tree::ProcessTreeRowMarker,
+                &ComputedNode,
+            )>()
+            .iter(world)
+            .map(|(_, node)| node.size().y)
+            .find(|height| *height > 0.0)
+            .expect("row geometry");
+        assert!(
+            viewport_height >= row_height,
+            "viewport must admit a complete tree row at {width}x{height}"
+        );
         let mut controls =
             world.query::<(&TreeExpansionControl, &ComputedNode, &UiGlobalTransform)>();
         assert_eq!(controls.iter(world).count(), 2);

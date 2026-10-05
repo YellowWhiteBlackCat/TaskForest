@@ -68,6 +68,7 @@ pub(super) fn initialize_capture_state(
     }
     if capture_scenario_target() == Some("apps-group-expanded") {
         let _ = seed_shell_process_tree(&mut shell);
+        shell.query = "capture-".into();
     }
     track.shell = shell;
     track.initial_refresh_submitted = true;

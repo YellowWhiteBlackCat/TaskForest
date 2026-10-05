@@ -180,7 +180,11 @@ pub(super) fn prepare_capture_settings(app: &mut TuiApp, field: usize, change: b
 pub(super) fn prepare_expanded_tree(app: &mut TuiApp) {
     app.shell.application.active_page = AppPage::Applications;
     let _ = seed_shell_process_tree(&mut app.shell);
+    app.shell.query = "capture-".into();
     let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
+    for _ in 0..3 {
+        let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    }
 }
 
 pub(super) fn prepare_help(app: &mut TuiApp, end: bool) {

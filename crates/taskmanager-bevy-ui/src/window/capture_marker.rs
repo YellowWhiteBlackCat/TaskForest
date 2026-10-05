@@ -4,6 +4,7 @@ use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::capture::{capture_page_name, capture_perf_device_target, capture_scenario_target};
 use crate::confirmation::ConfirmationCapture;
 use crate::focus_visible::FocusCapture;
+use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::navigation::{NavigationState, NavigationStrip, RAIL_WIDTH};
 use crate::pages::history::control::{
     HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
@@ -14,6 +15,7 @@ use crate::pages::performance::replay::{ChartSize, ReplayChart};
 use crate::pages::performance::{
     DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
 };
+use crate::pages::process_tree::{ProcessTreeRowMarker, ProcessTreeViewport};
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
@@ -21,7 +23,7 @@ use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
 use crate::window_surface::{WindowSurface, WindowSurfaceState};
 use bevy::ecs::hierarchy::Children;
-use bevy::ecs::query::With;
+use bevy::ecs::query::{With, Without};
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
@@ -29,6 +31,8 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_ui_contract::navigation::NavOrientation;
+
+type TreeViewportFilter = (With<ProcessTreeViewport>, Without<SystemBody>);
 
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {
@@ -62,6 +66,26 @@ pub(super) struct CaptureAccess<'w, 's> {
         's,
         (&'static ComputedNode, &'static UiGlobalTransform),
         With<MemoryInventoryAnchor>,
+    >,
+    tree_rows: Query<
+        'w,
+        's,
+        (
+            &'static SemanticAddress,
+            &'static ComputedNode,
+            &'static UiGlobalTransform,
+        ),
+        With<ProcessTreeRowMarker>,
+    >,
+    tree_bodies: Query<
+        'w,
+        's,
+        (
+            &'static ComputedNode,
+            &'static UiGlobalTransform,
+            &'static mut ScrollPosition,
+        ),
+        TreeViewportFilter,
     >,
     bodies: Query<
         'w,
@@ -164,6 +188,43 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 || !rows.iter().any(|row| row.depth >= 3)
                 || rows.iter().any(|row| row.has_children && !row.expanded)
             {
+                return;
+            }
+            let Some(target) = rows
+                .iter()
+                .find(|row| row.item.is_some_and(|item| item.pid == 90_003))
+                .map(|row| stable_semantic_address("process-tree", &row.semantic_key))
+            else {
+                return;
+            };
+            let Some((_, node, position)) = access
+                .tree_rows
+                .iter()
+                .find(|(address, _, _)| address.0 == target)
+            else {
+                return;
+            };
+            let (size, center) = (node.size(), position.translation);
+            if size.y <= 0.0 {
+                return;
+            }
+            if !access.state.tree_scroll_requested {
+                for (body, position, mut scroll) in &mut access.tree_bodies {
+                    let maximum = ((body.content_size().y - body.size().y)
+                        * body.inverse_scale_factor())
+                    .max(0.0);
+                    let delta = (center.y - size.y / 2.0 - position.translation.y
+                        + body.size().y / 2.0)
+                        * body.inverse_scale_factor();
+                    scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
+                }
+                access.state.tree_scroll_requested = true;
+                return;
+            }
+            if !access.tree_bodies.iter().any(|(body, position, _)| {
+                center.y - size.y / 2.0 >= position.translation.y - body.size().y / 2.0 - 0.5
+                    && center.y + size.y / 2.0 <= position.translation.y + body.size().y / 2.0 + 0.5
+            }) {
                 return;
             }
             if !access.state.data_presented {

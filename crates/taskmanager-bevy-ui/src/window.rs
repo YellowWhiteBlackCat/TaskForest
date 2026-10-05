@@ -136,6 +136,7 @@ struct CaptureMarkerState {
     history_open_requested: bool,
     data_presented: bool,
     hardware_scroll_requested: bool,
+    tree_scroll_requested: bool,
 }
 
 /// Build and run the live windowed frontend to completion.
