@@ -6,7 +6,7 @@ use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
 };
 use crate::pages::system::dashboard::SystemDashboardState;
-use bevy::ecs::system::{NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
@@ -22,6 +22,7 @@ pub(super) fn initialize_capture_state(
     mut track: NonSendMut<FrontendTrack>,
     mut dashboard: ResMut<SystemDashboardState>,
     mut preferences: ResMut<ThemePreferences>,
+    mut commands: Commands,
 ) {
     if demo.is_none() {
         return;
@@ -56,4 +57,5 @@ pub(super) fn initialize_capture_state(
     ) {
         preferences.gray_zero_values = true;
     }
+    commands.trigger(crate::input::ShellInteractionApplied);
 }
