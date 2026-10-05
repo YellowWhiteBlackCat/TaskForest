@@ -505,6 +505,9 @@ fi
 if maybe coverage-gate-self; then
     run_stage coverage-gate-self quick run_py scripts/quality/per_crate_coverage_gate.py --self-test
 fi
+if maybe msi-payload-self; then
+    run_stage msi-payload-self quick run_py scripts/quality/validate_msi_payload.py --self-test
+fi
 if maybe capture-isolation-self; then
     run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"
 fi

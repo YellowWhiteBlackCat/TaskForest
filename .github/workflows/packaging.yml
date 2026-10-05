@@ -353,10 +353,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          py=$(command -v python3 || command -v python)
           for ui in G I T B; do
             msi=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.msi" -print -quit)
             test -n "$msi"
             test -s "$msi"
+            validation_dir=".tmp/msi-validation/$ui"
+            mkdir -p "$validation_dir"
+            timeout --kill-after=10s 120s wix msi decompile "$msi" \
+              -x "$(cygpath -w "$validation_dir")" \
+              -o "$(cygpath -w "$validation_dir/package.wxs")"
+            timeout --kill-after=10s 60s "$py" scripts/quality/validate_msi_payload.py \
+              --xml "$validation_dir/package.wxs" --stage msi-stage \
+              --frontend "$ui" --arch "$MSI_ARCH" \
+              --version "${{ steps.version.outputs.version }}" \
+              --full-version "${{ steps.version.outputs.full }}"
           done
       # Sign ONLY when an Authenticode PFX cert secret exists; until then the
       # MSI ships unsigned (SmartScreen will warn) per the owner decision.

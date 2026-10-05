@@ -12,7 +12,7 @@ TaskForest-B）四端发行物与前端语义同权（即「四端平权」）�
 Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名
 和公证暂缓。该平权仅指四端发行物与前端语义同权，不含「跨平台功能对等」；平台能力边界见下方说明。
 
-### 0.1.3 发行面与平价矩阵
+### 0.2.0 发行面与平价矩阵
 
 正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
 Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。
@@ -20,8 +20,8 @@ Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建
 终端渲染，不依赖任何显示服务器（X11 同样不受支持）。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
-该边界只约束发行物，不扩大平台能力。「四端平权」不等于四端「功能对等」，也不表示三个平台
-具备相同的系统级能力。发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed
+四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台
+的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed
 `Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency` 或
 `TemporarilyUnavailable` 呈现（这五个是 `platform-contract::CapabilityStatus` 的真实变体名）；
 `PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 是不同轴，不得
@@ -124,7 +124,7 @@ MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字
 `Software\TaskForest\Version` 注册表值中，CI 会在反编译校验里断言完整版本确实入包。
 rc 与正式版共享数字 `ProductVersion`，覆盖升级由 `AllowSameVersionUpgrades` 保证。
 
-CI 在构建后使用 Windows Installer 管理提取验证 MSI 数据库和关键文件。配置
+CI 构建后通过 WiX 反编译实际 MSI、提取载荷，校验版本、安装文件名、PE 架构及 staged 输入哈希。配置
 `WINDOWS_CERT_B64` 与 `WINDOWS_CERT_PASSWORD` 时执行 Authenticode 签名；没有证书时
 可以生成明确标注的未签名预发布包，但 SmartScreen 可能警告。
 
