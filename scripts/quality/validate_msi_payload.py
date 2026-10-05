@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import struct
 import tempfile
 import xml.etree.ElementTree as ET
@@ -67,12 +67,15 @@ def validate(xml: Path, stage: Path, ui: str, arch: str, version: str, full: str
         source = element.get("Source")
         if not source:
             raise ValueError(f"payload reference missing: {name}")
-        path = Path(source)
+        # WiX 7 authoring keeps a virtual SourceDir prefix even when -x
+        # extracts the corresponding File/<id> under the explicit export root.
+        reference = PureWindowsPath(source)
+        path = extraction.joinpath(*reference.parts[1:]) if reference.parts[:1] == ("SourceDir",) else Path(source)
         if not path.is_absolute():
             path = xml.parent / path
         path = path.resolve()
         if not path.is_relative_to(extraction) or not path.is_file() or path.stat().st_size == 0:
-            raise ValueError(f"extracted payload is absent or outside its owned directory: {name}")
+            raise ValueError(f"extracted payload is absent or outside its owned directory: {name} ({source!r})")
         original = stage / name
         if not original.is_file() or digest(path) != digest(original):
             raise ValueError(f"MSI cabinet payload differs from the staged input: {name}")
@@ -105,12 +108,18 @@ def self_test() -> None:
             (extraction / name).write_bytes(payload)
             ET.SubElement(package, "File", Id=identity, Name=name, Source=name)
         xml = extraction / "package.wxs"
+        # Real WiX decompilation uses File IDs, not installed filenames.
+        (extraction / "File").mkdir()
+        for element in package.iter("File"):
+            identity = element.get("Id")
+            (extraction / "File" / identity).write_bytes((stage / element.get("Name")).read_bytes())
+            element.set("Source", "SourceDir\\File\\" + identity)
         ET.ElementTree(package).write(xml)
         validate(xml, stage, "G", "x64", "0.2.0", "0.2.0")
         mutations = [lambda: package.set("Version", "0.1.0"),
                      lambda: package.find("File").set("Name", "wrong.exe"),
                      lambda: package.find("File").set("Source", "../stage/taskforest-g.exe"),
-                     lambda: (extraction / "taskforest-g.exe").write_bytes(b"broken"),
+                     lambda: (extraction / "File" / "TaskForestExe").write_bytes(b"broken"),
                      lambda: package.remove(package.find("File"))]
         for mutate in mutations:
             original = ET.tostring(package)
@@ -123,7 +132,7 @@ def self_test() -> None:
             else:
                 raise ValueError("corrupt metadata or payload was accepted")
             package = ET.fromstring(original)
-            (extraction / "taskforest-g.exe").write_bytes(bytes(pe))
+            (extraction / "File" / "TaskForestExe").write_bytes(bytes(pe))
         ET.ElementTree(package).write(xml)
         try:
             validate(xml, stage, "G", "arm64", "0.2.0", "0.2.0")
