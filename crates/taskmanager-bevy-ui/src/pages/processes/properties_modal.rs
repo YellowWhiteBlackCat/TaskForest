@@ -1,311 +1,460 @@
-//! Selected-process properties modal overlay (Applications page).
-//!
-//! Ownership line: the shell owns `process_properties_target` via the neutral
-//! application interaction surface; this module owns the Bevy-local modal
-//! surface, the scrollable property list backed by the shared
-//! `process_details_vm`, and the typed dismiss trigger.
-
-use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
-use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::observer::On;
-use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::text::{LineBreak, TextLayout};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    PositionType, UiRect, Val, percent, px,
-};
-use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button, ScrollArea};
-use taskmanager_application::i18n::t;
-use taskmanager_application::process_details_vm::{ProcessDetailsField, process_details_rows};
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::MISSING_VALUE;
+//! Identity-bound process inspection with fixed controls and one bounded body.
 
 use crate::app::{FrontendTrack, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::input::ShellInteractionApplied;
-use crate::palette::{UiPalette, space_4, space_8, space_24};
-use crate::widgets::controls::{ControlTone, ControlVisual};
-use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
+use crate::input::{PendingEffects, ShellInteractionApplied};
+use crate::widgets::chart::CurveMeasurement;
+use crate::widgets::scene_paint::ScenePaint;
+use crate::window::{AppShellRoot, WindowPalette};
+use bevy::app::{App, PostUpdate, Startup};
+use bevy::ecs::{
+    component::Component,
+    entity::Entity,
+    event::Event,
+    hierarchy::ChildOf,
+    observer::On,
+    query::With,
+    resource::Resource,
+    schedule::IntoScheduleConfigs,
+    system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam},
+};
+use bevy::scene::CommandsSceneExt;
+use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
+use bevy::ui_widgets::Activate;
+use taskmanager_application::{PlatformEffect, ProcessInsightFacet, i18n::t};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskmanager_shell::ShellApp;
+use view::ProcessPropertiesCurve;
 
-/// The materialized view data for an active process properties modal.
-#[derive(Clone, Debug, PartialEq, Eq)]
+mod insights;
+mod model;
+mod performance;
+mod view;
+use model::view_model;
+use performance::PerformanceCurve;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum ProcessPropertiesSection {
+    #[default]
+    Overview,
+    Performance,
+    Command,
+    Insights,
+}
+impl ProcessPropertiesSection {
+    pub(crate) const ALL: [Self; 4] = [
+        Self::Overview,
+        Self::Performance,
+        Self::Command,
+        Self::Insights,
+    ];
+    pub(crate) fn label(self) -> &'static str {
+        t(match self {
+            Self::Overview => "prop.overview",
+            Self::Performance => "prop.performance",
+            Self::Command => "prop.command",
+            Self::Insights => "prop.insights",
+        })
+    }
+}
+#[derive(Clone, Debug)]
 pub(crate) struct ProcessPropertiesView {
     pub(crate) target: FrozenProcessIdentity,
+    pub(crate) section: ProcessPropertiesSection,
+    pub(crate) facet: ProcessInsightFacet,
     pub(crate) rows: Vec<(String, String)>,
+    pub(crate) curves: Vec<PerformanceCurve>,
+    pub(crate) authorize_network: bool,
+    pub(crate) live: bool,
 }
-
-/// Publishes properties modal transition: `Some(view)` mounts the overlay,
-/// `None` despawns it.
+impl ProcessPropertiesView {
+    fn same_rendered(&self, other: &Self) -> bool {
+        self.target == other.target
+            && self.section == other.section
+            && self.facet == other.facet
+            && self.rows == other.rows
+            && self.authorize_network == other.authorize_network
+            && self.live == other.live
+            && self.curves.len() == other.curves.len()
+            && self
+                .curves
+                .iter()
+                .zip(&other.curves)
+                .all(|(a, b)| a.same_rendered(b))
+    }
+}
+#[derive(Resource)]
+pub(crate) struct ProcessPropertiesPresentation {
+    pub(crate) section: ProcessPropertiesSection,
+    pub(crate) facet: ProcessInsightFacet,
+    target_key: Option<ProcessLiveKey>,
+}
+impl Default for ProcessPropertiesPresentation {
+    fn default() -> Self {
+        Self {
+            section: ProcessPropertiesSection::Overview,
+            facet: ProcessInsightFacet::Network,
+            target_key: None,
+        }
+    }
+}
+#[derive(Resource, Default)]
+struct PropertiesPaint {
+    dirty: bool,
+    shown: Option<ProcessPropertiesView>,
+}
 #[derive(Event)]
-pub(crate) struct ProcessPropertiesChanged(pub(crate) Option<ProcessPropertiesView>);
-
-/// Marker on the mounted process properties modal overlay.
+pub(crate) struct ProcessPropertiesChanged;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessPropertiesOverlay;
-
-/// Marker on the dismiss/close button.
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessPropertiesBody;
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessPropertiesScrollHint;
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessPropertiesPanel;
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessPropertiesFooter;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessPropertiesDismissButton;
-
-fn field_label(field: ProcessDetailsField) -> &'static str {
-    match field {
-        ProcessDetailsField::Name => t("common.name"),
-        ProcessDetailsField::Pid => "PID",
-        ProcessDetailsField::ParentPid => t("prop.parent_pid"),
-        ProcessDetailsField::AncestorLineage => t("proc.ancestor_lineage"),
-        ProcessDetailsField::User => t("common.user"),
-        ProcessDetailsField::Status => t("common.status"),
-        ProcessDetailsField::Cpu => t("common.cpu"),
-        ProcessDetailsField::Memory => t("common.memory"),
-        ProcessDetailsField::Pss => t("proc.pss"),
-        ProcessDetailsField::Uss => t("proc.uss"),
-        ProcessDetailsField::Shared => t("proc.shared"),
-        ProcessDetailsField::AnonHugePages => t("proc.anon_huge_pages"),
-        ProcessDetailsField::Swap => t("proc.swap"),
-        ProcessDetailsField::Threads => t("common.threads"),
-        ProcessDetailsField::Fds => t("proc.fds"),
-        ProcessDetailsField::Nice => t("proc.nice"),
-        ProcessDetailsField::SchedPolicy => t("proc.sched_policy"),
-        ProcessDetailsField::OomScore => t("proc.oom_score"),
-        ProcessDetailsField::PageFaults => t("proc.page_faults"),
-        ProcessDetailsField::StartTime => t("prop.start_time"),
-        ProcessDetailsField::CpuTime => t("proc.cpu_time"),
-        ProcessDetailsField::DiskReadRate => t("proc.disk_read"),
-        ProcessDetailsField::DiskWriteRate => t("proc.disk_write"),
-        ProcessDetailsField::NetworkRate => t("common.network"),
-        ProcessDetailsField::CancelledWriteBytes => t("proc.cancelled_write"),
-        ProcessDetailsField::DiskReadTotal => t("proc.disk_read"),
-        ProcessDetailsField::DiskWriteTotal => t("proc.disk_write"),
-        ProcessDetailsField::Exe => t("common.executable"),
-        ProcessDetailsField::Cmdline => t("prop.command_line"),
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessPropertiesTab(pub(crate) ProcessPropertiesSection);
+#[derive(Component, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum ProcessPropertiesAction {
+    #[default]
+    Refresh,
+    AuthorizeNetwork,
+}
+#[derive(Component, Clone)]
+pub(crate) struct ProcessPropertiesFacet(pub(crate) ProcessInsightFacet);
+impl Default for ProcessPropertiesFacet {
+    fn default() -> Self {
+        Self(ProcessInsightFacet::Network)
     }
 }
 
-/// Republish the properties modal state from the shell authority.
-pub(crate) fn republish(shell: &ShellApp, commands: &mut Commands) {
-    let view = shell.process_properties_target().map(|target| {
-        let process = target
-            .live_key()
-            .and_then(|key| shell.visible_process_by_identity(key))
-            .or_else(|| {
-                shell
-                    .visible_processes()
-                    .iter()
-                    .copied()
-                    .find(|p| p.pid == target.pid)
-            });
-        let rows = if let Some(process) = process {
-            let mut process_clone = process.clone();
-            process_clone.populate_ancestor_lineage(shell.projection().processes_slice());
-            let units = UnitPreferences::default();
-            let vms = process_details_rows(&process_clone, &units);
-            vms.into_iter()
-                .map(|vm| {
-                    let label = field_label(vm.field);
-                    let val = vm.value.text_or(MISSING_VALUE).to_owned();
-                    (label.to_owned(), val)
-                })
-                .collect()
-        } else {
-            vec![
-                (t("common.name").to_owned(), target.name.clone()),
-                ("PID".to_owned(), target.pid.to_string()),
-                (
-                    t("common.status").to_owned(),
-                    t("feedback.process_gone").to_owned(),
-                ),
-            ]
-        };
-        ProcessPropertiesView {
-            target: target.clone(),
-            rows,
-        }
-    });
-    commands.trigger(ProcessPropertiesChanged(view));
+pub(crate) fn republish(commands: &mut Commands) {
+    commands.trigger(ProcessPropertiesChanged);
 }
-
-/// Construct the declarative scene for the process properties modal.
-pub(crate) fn properties_modal_scene(
-    view: &ProcessPropertiesView,
-    palette: &UiPalette,
-) -> Box<dyn Scene> {
-    let title = format!("{} · {}", t("dialog.properties"), view.target.name);
-    let subtitle = format!("PID: {}", view.target.pid);
-
-    let rows: Vec<Box<dyn Scene>> = view
-        .rows
-        .iter()
-        .map(|(label, value)| {
-            let l = label.clone();
-            let v = value.clone();
-            Box::new(bsn! {
-                Node {
-                    width: percent(100),
-                    min_height: px(palette.control_height_px),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::SpaceBetween,
-                    column_gap: Val::Px(space_8()),
-                    padding: UiRect::horizontal(Val::Px(space_4())),
-                }
-                Children [
-                    (
-                        Node {
-                            width: px(160.0),
-                            align_items: AlignItems::Center,
-                            overflow: Overflow::clip_x(),
-                        }
-                        Children [
-                            ( Text(l) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
-                        ]
-                    ),
-                    (
-                        Node {
-                            flex_grow: 1.0,
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::FlexEnd,
-                            overflow: Overflow::clip_x(),
-                        }
-                        Children [
-                            ( Text(v) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } )
-                        ]
-                    ),
-                ]
-            }) as Box<dyn Scene>
-        })
-        .collect();
-
-    let list = Box::new(bsn! {
-        Node {
-            width: percent(100),
-            max_height: px(360.0),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_4()),
-            overflow: Overflow::scroll_y(),
-        }
-        ScrollArea
-        Children [
-            { rows }
-        ]
-    }) as Box<dyn Scene>;
-
-    let panel = Box::new(bsn! {
-        Node {
-            width: px(520.0),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_24())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-        }
-        BackgroundColor({ palette.panel_fill })
-        Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(subtitle) TextRole(Role::Caption) ),
-            ( { list } ),
-            (
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::End,
-                    margin: UiRect::top(Val::Px(space_8())),
-                }
-                Children [
-                    (
-                        Text({ t("common.close").to_owned() })
-                        TextRole(Role::Body)
-                        ControlVisual(ControlTone::Surface, true)
-                        Button
-                        on(on_properties_dismiss_activated)
-                        ProcessPropertiesDismissButton
-                    ),
-                ]
-            ),
-        ]
-    }) as Box<dyn Scene>;
-
-    let scrim = palette.scrim;
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-        }
-        BackgroundColor({ scrim })
-        ProcessPropertiesOverlay
-        Children [
-            ( { panel } ),
-        ]
-    }) as Box<dyn Scene>
+fn on_changed(_event: On<ProcessPropertiesChanged>, mut paint: ResMut<PropertiesPaint>) {
+    paint.dirty = true;
 }
-
-/// Observer: mount or despawn the modal overlay on state change.
-pub(crate) fn on_properties_changed(
-    changed: On<ProcessPropertiesChanged>,
-    palette: Option<Res<WindowPalette>>,
-    roots: Query<Entity, With<AppShellRoot>>,
-    overlays: Query<Entity, With<ProcessPropertiesOverlay>>,
+fn on_fold(_event: On<ShellProjectionFolded>, track: ShellTrack, mut commands: Commands) {
+    if track.shell().process_properties_target().is_some() {
+        republish(&mut commands);
+    }
+}
+fn on_applied(
+    _event: On<ShellInteractionApplied>,
+    track: ShellTrack,
+    mut state: ResMut<ProcessPropertiesPresentation>,
     mut commands: Commands,
 ) {
-    for entity in &overlays {
-        commands.entity(entity).despawn();
+    let key = track
+        .shell()
+        .process_properties_target()
+        .and_then(FrozenProcessIdentity::live_key);
+    if state.target_key != key {
+        state.target_key = key;
+        state.section = ProcessPropertiesSection::Overview;
+        state.facet = ProcessInsightFacet::Network;
     }
-    let Some(view) = changed.event().0.as_ref() else {
-        return;
-    };
-    let Some(palette) = palette else {
-        return;
-    };
-    let Ok(root) = roots.single() else {
-        return;
-    };
-    let overlay = commands
-        .spawn_scene(properties_modal_scene(view, &palette.inner))
-        .id();
-    commands.entity(root).add_one_related::<ChildOf>(overlay);
+    republish(&mut commands);
 }
-
-/// Close button activation: dismiss through the shell and republish.
+fn request_insights(track: &mut FrontendTrack, effects: &mut PendingEffects, force: bool) {
+    let Some(target) = track.shell.process_properties_target() else {
+        return;
+    };
+    if effects
+        .0
+        .iter()
+        .any(|effect| matches!(effect, PlatformEffect::ProcessInsights(queued) if queued == target))
+    {
+        return;
+    }
+    if let Some(projection) = track
+        .shell
+        .projection()
+        .process_insights
+        .as_ref()
+        .filter(|p| p.target == *target)
+        && (!force || projection.is_collecting())
+    {
+        return;
+    }
+    if let Some(effect) = track.shell.request_properties_process_insights() {
+        effects.0.push(effect);
+    }
+}
+pub(super) fn on_tab(
+    event: On<Activate>,
+    tabs: Query<&ProcessPropertiesTab>,
+    mut state: ResMut<ProcessPropertiesPresentation>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut effects: ResMut<PendingEffects>,
+    mut commands: Commands,
+) {
+    let Ok(tab) = tabs.get(event.event().entity) else {
+        return;
+    };
+    state.section = tab.0;
+    if tab.0 == ProcessPropertiesSection::Insights {
+        request_insights(&mut track, &mut effects, false);
+    }
+    republish(&mut commands);
+}
+pub(super) fn on_facet(
+    event: On<Activate>,
+    facets: Query<&ProcessPropertiesFacet>,
+    mut state: ResMut<ProcessPropertiesPresentation>,
+    mut commands: Commands,
+) {
+    let Ok(facet) = facets.get(event.event().entity) else {
+        return;
+    };
+    state.facet = facet.0;
+    republish(&mut commands);
+}
+pub(super) fn on_refresh(
+    _event: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut effects: ResMut<PendingEffects>,
+    mut commands: Commands,
+) {
+    request_insights(&mut track, &mut effects, true);
+    republish(&mut commands);
+}
+pub(super) fn on_authorize(
+    _event: On<Activate>,
+    track: ShellTrack,
+    mut effects: ResMut<PendingEffects>,
+) {
+    let Some(view) = view_model(
+        track.shell(),
+        ProcessPropertiesSection::Insights,
+        ProcessInsightFacet::Network,
+    ) else {
+        return;
+    };
+    if view.authorize_network {
+        effects
+            .0
+            .push(ShellApp::request_process_network_escalation());
+    }
+}
 pub(crate) fn on_properties_dismiss_activated(
-    _activate: On<Activate>,
+    _event: On<Activate>,
     mut track: NonSendMut<FrontendTrack>,
     mut commands: Commands,
 ) {
     track.shell.dismiss_overlay();
-    republish(&track.shell, &mut commands);
+    republish(&mut commands);
     commands.trigger(ShellInteractionApplied);
 }
+#[derive(SystemParam)]
+struct PropertiesRender<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    state: Res<'w, ProcessPropertiesPresentation>,
+    paint: ResMut<'w, PropertiesPaint>,
+    palette: Res<'w, WindowPalette>,
+    bodies: Query<'w, 's, &'static ScrollPosition, With<ProcessPropertiesBody>>,
+    overlays: Query<'w, 's, Entity, With<ProcessPropertiesOverlay>>,
+    roots: Query<'w, 's, Entity, With<AppShellRoot>>,
+    commands: Commands<'w, 's>,
+}
+fn paint(mut render: PropertiesRender) {
+    if !render.paint.dirty {
+        return;
+    }
+    render.paint.dirty = false;
+    let Some(track) = render.track.as_ref() else {
+        return;
+    };
+    let next = view_model(&track.shell, render.state.section, render.state.facet);
+    let unchanged = match (&render.paint.shown, &next) {
+        (None, None) => true,
+        (Some(a), Some(b)) => a.same_rendered(b),
+        _ => false,
+    };
+    if unchanged {
+        return;
+    }
+    let scroll = if render
+        .paint
+        .shown
+        .as_ref()
+        .zip(next.as_ref())
+        .is_some_and(|(a, b)| a.target == b.target && a.section == b.section && a.facet == b.facet)
+    {
+        render.bodies.iter().next().cloned().unwrap_or_default()
+    } else {
+        ScrollPosition::default()
+    };
+    for entity in &render.overlays {
+        render.commands.entity(entity).despawn();
+    }
+    render.paint.shown = next.clone();
+    let Some(view) = next else {
+        return;
+    };
+    let Some(root) = render.roots.iter().next() else {
+        return;
+    };
+    let entity = render
+        .commands
+        .spawn_scene(view::properties_modal_scene(
+            &view,
+            &render.palette.inner,
+            scroll,
+        ))
+        .id();
+    render
+        .commands
+        .entity(root)
+        .add_one_related::<ChildOf>(entity);
+}
 
-fn on_properties_fold_sync(
-    _fold: On<ShellProjectionFolded>,
+fn startup(
     track: ShellTrack,
+    mut state: ResMut<ProcessPropertiesPresentation>,
     mut commands: Commands,
 ) {
     if track.shell().process_properties_target().is_some() {
-        republish(track.shell(), &mut commands);
+        state.target_key = track
+            .shell()
+            .process_properties_target()
+            .and_then(FrozenProcessIdentity::live_key);
+        republish(&mut commands);
     }
 }
-
-fn on_properties_applied_sync(
-    _applied: On<ShellInteractionApplied>,
-    track: ShellTrack,
-    mut commands: Commands,
-) {
-    republish(track.shell(), &mut commands);
+pub(crate) fn register(app: &mut App) {
+    app.init_resource::<ProcessPropertiesPresentation>()
+        .init_resource::<PropertiesPaint>()
+        .add_systems(Startup, startup)
+        .add_observer(on_changed)
+        .add_observer(on_fold)
+        .add_observer(on_applied)
+        .add_systems(
+            PostUpdate,
+            (
+                paint.in_set(ScenePaint).before(UiSystems::Prepare),
+                view::paint_curves.after(UiSystems::Layout),
+            ),
+        );
 }
+#[cfg(test)]
+#[path = "../../../tests/headless/pages/process_properties.rs"]
+mod tests;
 
-/// Register the properties modal observer on the app composition.
-pub(crate) fn register(app: &mut bevy::app::App) {
-    app.add_observer(on_properties_changed);
-    app.add_observer(on_properties_fold_sync);
-    app.add_observer(on_properties_applied_sync);
+/// Capture follows the mounted normal tab/facet controls and the painted data.
+#[derive(SystemParam)]
+pub(crate) struct PropertiesCapture<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    state: Res<'w, ProcessPropertiesPresentation>,
+    paint: Res<'w, PropertiesPaint>,
+    tabs: Query<'w, 's, (Entity, &'static ProcessPropertiesTab)>,
+    facets: Query<'w, 's, (Entity, &'static ProcessPropertiesFacet)>,
+    bodies: Query<'w, 's, &'static ComputedNode, With<ProcessPropertiesBody>>,
+    curves: Query<
+        'w,
+        's,
+        (
+            &'static ProcessPropertiesCurve,
+            &'static CurveMeasurement,
+            &'static ComputedNode,
+        ),
+    >,
+    commands: Commands<'w, 's>,
+}
+pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> bool {
+    use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
+    if !access
+        .track
+        .as_ref()
+        .is_some_and(|track| process_properties_capture_data_ready(&track.shell, scenario))
+    {
+        return false;
+    }
+    let (section, facet) = match scenario {
+        "process-properties-performance" => (
+            ProcessPropertiesSection::Performance,
+            ProcessInsightFacet::Network,
+        ),
+        "process-memory-pss-swap" => (
+            ProcessPropertiesSection::Overview,
+            ProcessInsightFacet::Network,
+        ),
+        "process-network-details" => (
+            ProcessPropertiesSection::Insights,
+            ProcessInsightFacet::Network,
+        ),
+        "process-gpu-details" => (ProcessPropertiesSection::Insights, ProcessInsightFacet::Gpu),
+        "process-resource-limits" => (
+            ProcessPropertiesSection::Insights,
+            ProcessInsightFacet::Resources,
+        ),
+        "process-isolation" => (
+            ProcessPropertiesSection::Insights,
+            ProcessInsightFacet::Isolation,
+        ),
+        _ => return false,
+    };
+    if access.state.section != section {
+        let button = access
+            .tabs
+            .iter()
+            .find(|(_, button)| button.0 == section)
+            .map(|(entity, _)| entity);
+        if let Some(entity) = button {
+            access.commands.trigger(Activate { entity });
+        }
+        return false;
+    }
+    if access.state.facet != facet {
+        let button = access
+            .facets
+            .iter()
+            .find(|(_, button)| button.0 == facet)
+            .map(|(entity, _)| entity);
+        if let Some(entity) = button {
+            access.commands.trigger(Activate { entity });
+        }
+        return false;
+    }
+    if !access
+        .paint
+        .shown
+        .as_ref()
+        .is_some_and(|view| view.section == section && view.facet == facet && view.live)
+    {
+        return false;
+    }
+    if !access
+        .bodies
+        .iter()
+        .any(|node| node.size().x > 0.0 && node.size().y > 0.0)
+    {
+        return false;
+    }
+    if section == ProcessPropertiesSection::Performance {
+        let mut metrics = Vec::new();
+        for (curve, measured, node) in access.curves.iter() {
+            if measured.0.is_none()
+                || node.size().x <= 0.0
+                || node.size().y <= 0.0
+                || curve
+                    .samples
+                    .iter()
+                    .filter(|value| value.is_finite())
+                    .count()
+                    < 2
+                || metrics.contains(&curve.metric)
+            {
+                return false;
+            }
+            metrics.push(curve.metric);
+        }
+        return metrics.len() == 4;
+    }
+    true
 }

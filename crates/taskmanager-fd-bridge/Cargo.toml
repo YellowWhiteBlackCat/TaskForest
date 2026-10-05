@@ -1,8 +1,8 @@
 [package]
 name = "taskmanager-fd-bridge"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "Audited SCM_RIGHTS fd-passing boundary crate — the third unsafe trust root for TaskForest (AF_PACKET launcher → unprivileged app)"
 

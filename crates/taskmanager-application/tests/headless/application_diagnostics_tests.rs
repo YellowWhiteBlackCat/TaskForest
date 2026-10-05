@@ -5,6 +5,59 @@ use taskmanager_core::core::services::{ServiceLogEntry, ServiceLogLevel};
 
 use super::*;
 
+#[test]
+fn review_confirmation_submits_the_displayed_plan_once_and_preserves_failures() {
+    let displayed = plan("frozen evidence");
+    let mut state = DiagnosticBundleUiState::prepared(Ok(displayed.clone()));
+    let mut session = DiagnosticBundleSession::new(FakePort::default());
+    let target = DiagnosticBundleTarget::current_directory("review.json");
+    assert!(state.confirm(Some(&mut session), target.clone()));
+    assert!(matches!(state, DiagnosticBundleUiState::Writing(_)));
+    assert_eq!(session.port.submitted.len(), 1);
+    assert_eq!(session.port.submitted[0].plan(), &displayed);
+    assert!(!state.confirm(Some(&mut session), target));
+    assert_eq!(session.port.submitted.len(), 1);
+    let request = session.active_request().expect("active request");
+    assert!(state.complete(DiagnosticBundleCompletion {
+        request,
+        destination: "review.json".into(),
+        result: Err(DiagnosticBundleError::new(DiagnosticBundleErrorKind::Io))
+    }));
+    assert!(
+        matches!(state, DiagnosticBundleUiState::Failed(error) if error.kind() == DiagnosticBundleErrorKind::Io)
+    );
+}
+
+#[test]
+fn a_new_review_cannot_be_replaced_by_an_old_export_completion() {
+    let mut session = DiagnosticBundleSession::new(FakePort::default());
+    let request = session
+        .submit(
+            plan("old"),
+            DiagnosticBundleTarget::current_directory("old.json"),
+        )
+        .expect("submit");
+    session.close();
+    session
+        .port
+        .completions
+        .push_back(DiagnosticBundleCompletion {
+            request,
+            destination: "old.json".into(),
+            result: Ok(()),
+        });
+    assert!(session.drain().is_empty());
+    let mut state = DiagnosticBundleUiState::prepared(Ok(plan("new")));
+    assert!(!state.complete(DiagnosticBundleCompletion {
+        request,
+        destination: "old.json".into(),
+        result: Ok(())
+    }));
+    assert!(
+        matches!(state, DiagnosticBundleUiState::Preview(plan) if plan.sanitized_contents("facts.txt") == Some("new"))
+    );
+}
+
 fn plan(contents: &str) -> DiagnosticBundlePlan {
     DiagnosticBundlePlan::prepare(
         vec![DiagnosticSource {

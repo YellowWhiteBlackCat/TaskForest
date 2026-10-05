@@ -29,7 +29,7 @@ use std::time::Instant;
 /// zero-copy-on-fit variant); retained as the slice-tail reference the tests
 /// compare against.
 fn limit_samples(samples: &[f32], data_points: usize) -> Vec<f32> {
-    let limit = GraphSettings::clamp_data_points(data_points);
+    let limit = data_points.clamp(2, MAX_GRAPH_DATA_POINTS);
     if samples.len() <= limit {
         samples.to_vec()
     } else {
@@ -583,10 +583,9 @@ fn latest_samples_rc_tail_cuts_like_limit_samples() {
     let expected = limit_samples(&series, 12);
     assert_eq!(&*limited, expected.as_slice());
 
-    // Below the floor the setting clamps UP, so a 10-sample series is not
-    // cut at all.
+    // The rendering capacity is independent of the validated preference floor.
     let small: Rc<[f32]> = Rc::from((0..10).map(|i| i as f32).collect::<Vec<_>>().as_slice());
-    assert!(Rc::ptr_eq(&small, &latest_samples_rc(Rc::clone(&small), 3)));
+    assert_eq!(&*latest_samples_rc(small, 3), &[7.0, 8.0, 9.0]);
 }
 
 // ── two-series graphs (split-direction throughput families) ────────────────
@@ -712,5 +711,27 @@ fn graph_dual_sample_state_follows_the_union_of_directions() {
     assert_eq!(
         graph_dual_sample_state(&[gap, 3.0], &[4.0, gap]),
         GraphSampleState::Measured
+    );
+}
+
+#[test]
+fn recorded_short_windows_span_both_edges_and_signed_measurements_keep_their_range() {
+    assert_eq!(sample_x(px(12.0), px(180.0), 0, 2, 2), px(12.0));
+    assert_eq!(sample_x(px(12.0), px(180.0), 1, 2, 2), px(192.0));
+    let signed = GraphOpts {
+        min: -20.0,
+        max: -5.0,
+        ..GraphOpts::default()
+    };
+    assert_eq!(signed.normalized(-20.0), 0.0);
+    assert_eq!(signed.normalized(-5.0), 1.0);
+    assert!(signed.normalized(-10.0) > 0.5);
+    let throughput = GraphOpts {
+        max: 28_000_000.0,
+        ..GraphOpts::default()
+    };
+    assert!(
+        throughput.normalized(2_000_000.0) < throughput.normalized(21_000_000.0),
+        "byte-rate curves cannot all clamp to the top of a percentage axis"
     );
 }

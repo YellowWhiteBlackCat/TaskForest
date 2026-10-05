@@ -9,7 +9,9 @@
 use std::sync::Arc;
 
 pub mod live_graph;
+mod retention;
 mod system_history;
+pub use retention::{DETAIL_HISTORY_CAPACITY, HOST_AGGREGATE_HISTORY_CAPACITY, HistoryRetention};
 
 pub use system_history::{
     CorrelatedDomainReceipt, CorrelatedIngestionError, CorrelatedIngestionReport,
@@ -38,10 +40,9 @@ impl TelemetryStore {
     /// outcomes accepted into `PlatformEventBatch::system_telemetry_outcomes`.
     #[must_use]
     pub fn shared_with_correlated_ingestion(
-        history_capacity: usize,
+        retention: HistoryRetention,
     ) -> (Arc<Self>, CorrelatedSystemTelemetryIngestor) {
-        let (system_history, system_ingestor) =
-            CorrelatedSystemTelemetryHistory::shared(history_capacity);
+        let (system_history, system_ingestor) = CorrelatedSystemTelemetryHistory::shared(retention);
         let dynamic_history = system_history.dynamic_history();
         let store = Arc::new(Self {
             system_history,

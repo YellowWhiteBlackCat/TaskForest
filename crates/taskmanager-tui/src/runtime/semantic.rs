@@ -200,6 +200,16 @@ impl TuiApp {
     fn semantic_active_modal(&self) -> Option<ModalInput> {
         match self.input_scope() {
             crate::TuiInputScope::LocalSurface(_) => match self.local_surface()? {
+                crate::TuiSurface::SavedViews { .. } => Some(ModalInput {
+                    id: "saved-views".into(),
+                    name: t("saved_views.title").into(),
+                    description: Some(t("saved_views.help").into()),
+                }),
+                crate::TuiSurface::SidebarEditor { .. } => Some(ModalInput {
+                    id: String::from("sidebar-editor"),
+                    name: String::from(t("sidebar.edit_devices")),
+                    description: Some(String::from(t("tooltip.sidebar_edit"))),
+                }),
                 crate::TuiSurface::CommandPalette(palette) => Some(ModalInput {
                     id: String::from("command-palette"),
                     name: String::from("Command palette"),
@@ -249,10 +259,15 @@ impl TuiApp {
                     name: String::from("Settings"),
                     description: Some(String::from("Adjust application preferences")),
                 }),
-                crate::TuiSurface::About => Some(ModalInput {
+                crate::TuiSurface::About(_) => Some(ModalInput {
                     id: String::from("about"),
                     name: String::from("About"),
-                    description: Some(String::from("System and application information")),
+                    description: self.information_copy_payload(),
+                }),
+                crate::TuiSurface::SystemInformation(_) => Some(ModalInput {
+                    id: String::from("system-information"),
+                    name: String::from("System Information"),
+                    description: self.information_copy_payload(),
                 }),
                 crate::TuiSurface::Health => Some(ModalInput {
                     id: String::from("health"),
@@ -276,6 +291,16 @@ impl TuiApp {
                         state.target.name, state.target.pid
                     ),
                     description: Some(String::from("Process CPU affinity editor")),
+                }),
+                crate::TuiSurface::DiagnosticBundle(_) => Some(ModalInput {
+                    id: String::from("diagnostic-report-modal"),
+                    name: String::from("Diagnostic Report"),
+                    description: Some(String::from("System diagnostic summary")),
+                }),
+                crate::TuiSurface::FirstRun(_) => Some(ModalInput {
+                    id: String::from("first-run-modal"),
+                    name: String::from(t("first_run.title")),
+                    description: Some(String::from(t("first_run.description"))),
                 }),
             },
             crate::TuiInputScope::SharedSurface(SurfaceKind::ProcessProperties) => {

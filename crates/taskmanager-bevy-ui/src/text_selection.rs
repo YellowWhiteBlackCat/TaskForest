@@ -12,6 +12,11 @@
 //! transitions emit [`TextSelectionChanged`] so the observer updates highlight
 //! components without frame-by-frame polling.
 
+use crate::app::FrontendTrack;
+use bevy::app::PostUpdate;
+use bevy::clipboard::{Clipboard, ClipboardError};
+use bevy::ecs::system::NonSendMut;
+use std::collections::VecDeque;
 use std::ops::Range;
 
 use bevy::ecs::component::Component;
@@ -81,23 +86,62 @@ impl TextSelectionState {
     }
 }
 
-/// Cross-platform clipboard port resource for Bevy UI.
-/// Holds the last copied string and acts as the interface to the OS clipboard.
+/// Queued UI output and the last completed write. Success is published only
+/// after the toolkit's native clipboard accepts the text.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ClipboardPort {
-    pub(crate) contents: Option<String>,
+    pending: VecDeque<(String, String)>,
+    contents: Option<String>,
+}
+impl ClipboardPort {
+    pub(crate) fn request_text(&mut self, text: impl Into<String>, label: impl Into<String>) {
+        self.pending.push_back((text.into(), label.into()));
+    }
 }
 
-impl ClipboardPort {
-    pub(crate) fn set_text(&mut self, text: impl Into<String>) {
-        self.contents = Some(text.into());
+pub(crate) fn flush_clipboard(
+    port: &mut ClipboardPort,
+    shell: &mut ShellApp,
+    mut write: impl FnMut(&str) -> Result<(), String>,
+) {
+    for _ in 0..16 {
+        let Some((text, label)) = port.pending.pop_front() else {
+            break;
+        };
+        match write(&text) {
+            Ok(()) => {
+                port.contents = Some(text);
+                shell.report_notice(
+                    FeedbackSource::Clipboard,
+                    FeedbackSeverity::Success,
+                    FeedbackLifecycle::SHORT,
+                    format!("{label} {}", t("common.copied")),
+                );
+            }
+            Err(error) => shell.report_notice(
+                FeedbackSource::Clipboard,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                format!("{label}: {error}"),
+            ),
+        }
     }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    #[must_use]
-    pub(crate) fn get_text(&self) -> Option<&str> {
-        self.contents.as_deref()
-    }
+}
+fn flush_system_clipboard(
+    mut port: ResMut<ClipboardPort>,
+    mut track: Option<NonSendMut<FrontendTrack>>,
+    mut clipboard: Option<ResMut<Clipboard>>,
+) {
+    let Some(track) = track.as_deref_mut() else {
+        return;
+    };
+    flush_clipboard(&mut port, &mut track.shell, |text| {
+        clipboard
+            .as_deref_mut()
+            .ok_or(ClipboardError::ClipboardNotSupported)
+            .and_then(|clipboard| clipboard.set_text(text))
+            .map_err(|error| error.to_string())
+    });
 }
 
 /// Event triggered when text selection session begins, changes, or clears.
@@ -130,23 +174,11 @@ pub(crate) fn copy_selection_or_row(
     if let Some(text) = selection.selected_text().map(ToOwned::to_owned)
         && !text.is_empty()
     {
-        clipboard.set_text(text);
-        shell.report_notice(
-            FeedbackSource::Clipboard,
-            FeedbackSeverity::Success,
-            FeedbackLifecycle::SHORT,
-            format!("Selected Text {}", t("common.copied")),
-        );
+        clipboard.request_text(text, "Selected Text");
         return true;
     }
     if let Some(summary) = shell.selected_row_summary() {
-        clipboard.set_text(summary);
-        shell.report_notice(
-            FeedbackSource::Clipboard,
-            FeedbackSeverity::Success,
-            FeedbackLifecycle::SHORT,
-            format!("Selected Row {}", t("common.copied")),
-        );
+        clipboard.request_text(summary, "Selected Row");
         return true;
     }
     false
@@ -192,6 +224,7 @@ fn on_text_selection_changed(
 
 /// Register text selection state, systems, and observer.
 pub(crate) fn register(app: &mut bevy::app::App) {
+    app.add_systems(PostUpdate, flush_system_clipboard);
     app.init_resource::<TextSelectionState>();
     app.init_resource::<ClipboardPort>();
     app.add_observer(on_text_selection_changed);

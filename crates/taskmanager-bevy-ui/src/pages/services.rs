@@ -7,8 +7,8 @@
 //! translation. Bypassing that accessor is the wrong-row defect class this
 //! page must never reintroduce.
 //!
-//! **Refresh**: the `ServicesPageRoot` insert hook registers the page's
-//! observers exactly once per `World`; `ShellProjectionFolded` repaints the
+//! **Refresh**: composition registers typed observers once;
+//! `ShellProjectionFolded` marks a coalesced repaint of the
 //! table body only when the services-domain revision advanced, so idle frames
 //! and unrelated batches leave the tree untouched (zero redraw at rest).
 //!
@@ -32,12 +32,11 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::{Add, HookContext};
+use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::TextColor;
@@ -68,6 +67,7 @@ pub(crate) mod dependencies_panel;
 pub(crate) mod details_modal;
 pub(crate) mod log_panel;
 pub(crate) mod menu;
+mod paint;
 mod scene;
 
 use scene::{services_body_scene, services_search_input_scene};
@@ -272,11 +272,8 @@ fn sorted_direction(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> Op
 
 // ---- world types: markers, events, per-page resources ----
 
-/// Page root. Its insert hook binds the page's observers exactly once per
-/// `World` (route remounts re-insert this component; the guard keeps the
-/// registration idempotent) and queues the first authoritative body paint.
+/// Root marker for the mounted service inventory.
 #[derive(Clone, Component, Default)]
-#[component(on_insert = bind_services_page)]
 pub(crate) struct ServicesPageRoot;
 
 /// The rebuildable table block (header + notice + rows or empty state).
@@ -298,10 +295,6 @@ pub(crate) struct ServicesRowMarker(pub(crate) usize, pub(crate) ServiceId);
 /// template seed (`Default`) honest for the non-sortable cells.
 #[derive(Clone, Component, Default)]
 pub(crate) struct ServicesSortHeader(pub(crate) Option<InfoSortCol>);
-
-/// Guard resource: the observer set for this page already exists.
-#[derive(Resource)]
-struct ServicesPageBound;
 
 /// The services-domain revision the body was last painted from; the fold
 /// observer's idle gate.
@@ -331,7 +324,7 @@ pub(crate) struct ServicesSearchInput;
 
 /// Content-region scene for the Services page: title, summary line and the
 /// body container. The body's dynamic content is painted by
-/// [`paint_services`] (queued by the insert hook and every observer), so the
+/// the coalesced typed paint system, so the
 /// declarative tree stays structure-only and there is exactly one render
 /// authority for the rows.
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
@@ -348,8 +341,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         ServicesPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -357,15 +350,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     justify_content: JustifyContent::SpaceBetween,
                 }
                 Children [
-                    (
+
                         Text(waiting)
                         ServicesStatusLine
                         TextRole(Role::Caption)
-                    ),
-                    ( { search } ),
+                    --
+                     @{ search }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -373,16 +366,16 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 ServicesBody
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 dependencies_panel::ServicesDependenciesPanelSlot
-            ),
-            (
+            --
+
                 // The service-log panel's mount point. The panel is a
                 // page-local surface fed by the shell's log lifecycle; its
                 // painter is fingerprint-gated so idle folds never respawn.
@@ -392,7 +385,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 log_panel::ServicesLogPanelSlot
-            ),
+
         ]
     }
 }
@@ -435,7 +428,7 @@ fn on_service_start_button_activated(
                 crate::confirmation::republish(&track.shell, &mut commands);
                 commands.trigger(crate::input::ShellInteractionApplied);
             }
-            commands.queue(paint_services);
+            commands.trigger(paint::RepaintRequested);
         }
     }
 }
@@ -469,7 +462,7 @@ fn on_service_stop_button_activated(
                 crate::confirmation::republish(&track.shell, &mut commands);
                 commands.trigger(crate::input::ShellInteractionApplied);
             }
-            commands.queue(paint_services);
+            commands.trigger(paint::RepaintRequested);
         }
     }
 }
@@ -503,7 +496,7 @@ fn on_service_restart_button_activated(
                 crate::confirmation::republish(&track.shell, &mut commands);
                 commands.trigger(crate::input::ShellInteractionApplied);
             }
-            commands.queue(paint_services);
+            commands.trigger(paint::RepaintRequested);
         }
     }
 }
@@ -536,108 +529,36 @@ fn on_services_row_activated(
 
 // ---- observers and the single paint path ----
 
-/// The one authoritative repaint: rebuild the body from the live projection
-/// and rewrite the summary line. Queued as a command by the insert hook and
-/// every page observer; nothing else mutates the body.
-fn paint_services(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let revision = world
-        .non_send::<FrontendTrack>()
-        .shell
-        .projection()
-        .services_revision;
-    let mut selection = world.resource::<ServiceSelection>().clone();
-    let (scene, line) = {
-        let shell = &world.non_send::<FrontendTrack>().shell;
-        let rows = service_rows(shell);
-        if let Some(target) = &selection.target
-            && !rows.iter().any(|row| &row.target == target)
-        {
-            // A target that left the inventory deselects honestly — never a
-            // silent jump to a neighbor row.
-            selection.target = None;
-        }
-        (
-            services_body_scene(shell, &palette, &selection),
-            status_line_text(shell, rows.len()),
-        )
-    };
-    world
-        .resource_mut::<ServicesRenderState>()
-        .rendered_revision = Some(revision);
-    world.resource_mut::<ServiceSelection>().target = selection.target;
-    // A childless container has no `Children` component in this bevy, so the
-    // join must be optional — the first paint finds an empty body.
-    let mut body_query = world.query_filtered::<(Entity, Option<&Children>), With<ServicesBody>>();
-    let Some((body, children)) = body_query.iter(world).next() else {
-        return;
-    };
-    let stale: Vec<Entity> = children
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    let fresh = commands.spawn_scene(scene).id();
-    commands.entity(body).add_one_related::<ChildOf>(fresh);
-    let mut line_query = world.query_filtered::<&mut Text, With<ServicesStatusLine>>();
-    if let Ok(mut text) = line_query.single_mut(world) {
-        text.0 = line;
-    }
-    let shell_query = world.non_send::<FrontendTrack>().shell.query.clone();
-    let new_text = if shell_query.is_empty() {
-        t("search.services").to_owned()
-    } else {
-        shell_query
-    };
-    let mut search_query = world.query_filtered::<&mut Text, With<ServicesSearchInput>>();
-    for mut text_node in search_query.iter_mut(world) {
-        if text_node.0 != new_text {
-            text_node.0 = new_text.clone();
-        }
-    }
-}
-
-/// Insert hook: bind the page's observers once; the initial paint rides
-/// [`on_services_body_added`] (see the comment at the registration site),
-/// because the scene's children apply later in the same command queue.
-/// Initial/mount paint: the body container just came to exist, so the first
-/// (and every remount) row projection can bind to it.
-fn on_services_body_added(_added: On<Add, ServicesBody>, mut commands: Commands) {
-    commands.queue(paint_services);
-}
-
-fn bind_services_page(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if world.get_resource_mut::<ServicesPageBound>().is_some() {
-        return;
-    }
-    let mut commands = world.commands();
-    commands.insert_resource(ServicesPageBound);
-    commands.init_resource::<ServiceSelection>();
-    commands.insert_resource(ServicesRenderState {
+/// Register explicit page access and one coalesced paint authority.
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<ServiceSelection>();
+    app.insert_resource(ServicesRenderState {
         rendered_revision: None,
     });
-    commands.init_resource::<dependencies_panel::ServicesDependenciesRenderState>();
-    commands.init_resource::<log_panel::ServicesLogRenderState>();
-    commands.add_observer(on_services_projection_folded);
-    commands.add_observer(on_services_sort_clicked);
-    commands.add_observer(on_services_row_clicked);
-    commands.add_observer(on_services_selection_moved);
-    commands.add_observer(dependencies_panel::on_services_dependencies_requested);
-    commands.add_observer(dependencies_panel::on_dependencies_panel_repaint_required);
-    commands.add_observer(dependencies_panel::on_dependencies_panel_slot_added);
-    commands.add_observer(dependencies_panel::on_services_fold_dependencies_gate);
-    commands.add_observer(log_panel::on_services_logs_requested);
-    commands.add_observer(log_panel::on_log_panel_repaint_required);
-    commands.add_observer(log_panel::on_log_panel_slot_added);
-    commands.add_observer(log_panel::on_services_fold_log_gate);
-    // The initial paint rides the body's own insertion: the hook runs while
-    // the page scene is still spawning (its children apply later in the same
-    // command queue), so painting here would find no body yet. The observer
-    // fires exactly when the body entity comes to exist — and again on every
-    // route-back remount.
-    commands.add_observer(on_services_body_added);
+    app.init_resource::<dependencies_panel::ServicesDependenciesRenderState>();
+    app.init_resource::<log_panel::ServicesLogRenderState>();
+    app.init_resource::<paint::PaintState>();
+    dependencies_panel::register(app);
+    log_panel::register(app);
+    app.add_observer(paint::on_repaint_requested);
+    app.add_observer(on_services_projection_folded);
+    app.add_observer(on_services_sort_clicked);
+    app.add_observer(on_services_row_clicked);
+    app.add_observer(on_services_selection_moved);
+    app.add_observer(dependencies_panel::on_services_dependencies_requested);
+    app.add_observer(dependencies_panel::on_dependencies_panel_repaint_required);
+    app.add_observer(dependencies_panel::on_dependencies_panel_slot_added);
+    app.add_observer(dependencies_panel::on_services_fold_dependencies_gate);
+    app.add_observer(log_panel::on_services_logs_requested);
+    app.add_observer(log_panel::on_log_panel_repaint_required);
+    app.add_observer(log_panel::on_log_panel_slot_added);
+    app.add_observer(log_panel::on_services_fold_log_gate);
+    app.add_observer(on_services_body_added);
+    paint::register(app);
+}
+
+fn on_services_body_added(_event: On<Add<ServicesBody>>, mut commands: Commands) {
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Fold repaint with the idle gate: only a services-domain revision advance
@@ -653,7 +574,7 @@ fn on_services_projection_folded(
     if rendered.rendered_revision == Some(revision) {
         return;
     }
-    commands.queue(paint_services);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Header-sort tail: the shell's existing sort entry owns the decision (same
@@ -667,7 +588,7 @@ fn on_services_sort_clicked(
     track
         .shell
         .set_info_sort(InfoTable::Services, click.event().0);
-    commands.queue(paint_services);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Row-click tail. The visual row resolves to its target through the shell's
@@ -682,7 +603,7 @@ fn on_services_row_clicked(
         return;
     };
     selection.target = Some(service.id.clone());
-    commands.queue(paint_services);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Keyboard-selection tail: resolve the CURRENT selected row from the target
@@ -703,7 +624,7 @@ fn on_services_selection_moved(
         return;
     };
     selection.target = Some(service.id.clone());
-    commands.queue(paint_services);
+    commands.trigger(paint::RepaintRequested);
 }
 
 #[cfg(test)]

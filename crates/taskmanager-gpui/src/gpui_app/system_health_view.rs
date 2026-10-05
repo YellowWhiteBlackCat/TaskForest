@@ -30,7 +30,7 @@ use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 mod capture;
-pub use capture::{SystemHealthCaptureFixture, capture_english_text, capture_fixture};
+pub use capture::capture_english_text;
 mod localized;
 pub use localized::localized_text;
 mod self_test;

@@ -160,6 +160,7 @@ impl TuiApp {
     }
 
     fn apply_config_snapshot(&mut self, config: &Config, startup: bool, update_form: bool) {
+        self.restore_saved_views_config(config);
         self.theme_params = ThemeParams::from_config_tokens_with_appearance(
             &config.skin,
             &config.mode,
@@ -396,14 +397,19 @@ impl TuiApp {
         }
     }
 
-    fn commit_config_draft(&mut self, config: Config) -> bool {
+    pub(crate) fn enable_history_for_capture(&mut self) {
+        let mut config = self.config_draft.clone();
+        config.history_persistence = true;
+        let _ = self.commit_config_draft(config);
+    }
+
+    pub(crate) fn commit_config_draft(&mut self, config: Config) -> bool {
         let submission = self
             .config_client
             .as_ref()
             .map(|client| client.try_submit(config.clone()));
         match submission {
             None | Some(Ok(ConfigSubmissionStatus::Queued | ConfigSubmissionStatus::NoChange)) => {
-                self.config_draft = config.clone();
                 self.apply_config_snapshot(&config, false, true);
                 self.settings_draft = SettingsDraftLifecycle::Clean {
                     base_revision: self.applied_config_revision,

@@ -1,11 +1,13 @@
 use super::*;
 use crate::app::{FocusTarget, Message, ProcessStatusFilter};
 use taskmanager_application::AppPage;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::alerts::Alert;
 use taskmanager_core::core::alerts::AlertEvent;
 use taskmanager_core::core::alerts::AlertEventKind;
 use taskmanager_core::core::alerts::AlertMetric;
 use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_shell::saved_views::SavedViewTransferFeedback;
 
 #[test]
 fn test_saved_views_presets_lifecycle() {
@@ -40,7 +42,7 @@ fn test_saved_views_presets_lifecycle() {
     let _ = app.update(Message::ExportSavedViews);
     assert_eq!(
         app.saved_view_feedback,
-        Some(crate::saved_views::SavedViewTransferFeedback::ExportCopied)
+        Some(SavedViewTransferFeedback::ExportCopied)
     );
 
     // Delete the custom preset
@@ -90,17 +92,23 @@ fn test_alert_center_lifecycle() {
 }
 
 #[test]
-fn test_diagnostics_report_generation() {
-    let app = IcedApp::demo();
-    let report = crate::export::system_diagnostics_markdown(
-        app.shell.projection().hardware.as_ref(),
-        app.shell.projection().snapshot.as_ref(),
-        Vec::new(),
-    )
-    .expect("the demo report redacts and publishes");
-    assert!(report.contains("TaskForest System Diagnostics Report"));
-    assert!(report.contains("OS:"));
-    assert!(report.contains("Kernel:"));
+fn diagnostics_action_reviews_the_frozen_full_inventory_before_export() {
+    let mut app = IcedApp::demo();
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::GenerateDiagnosticsReport);
+    let Some(crate::app::LocalSurface::DiagnosticBundle(DiagnosticBundleUiState::Preview(plan))) =
+        app.local_surface()
+    else {
+        panic!("diagnostic review must open")
+    };
+    assert_eq!(plan.preview().files.len(), 4);
+    let snapshot = plan
+        .sanitized_contents("snapshot.json")
+        .expect("full snapshot");
+    assert!(snapshot.contains("zed"));
+    assert!(snapshot.contains("<redacted-user>"));
+    assert!(!snapshot.contains("devuser"));
+    assert!(app.shell.feedback_notice().is_none());
 }
 
 #[test]

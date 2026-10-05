@@ -3,6 +3,7 @@ use gpui::{
     AppContext, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window, px,
 };
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_core::core::process_telemetry::{ProcessThreads, ThreadState};
 
 fn labels() -> ProcessInsightsLabels {
@@ -63,6 +64,26 @@ fn format_keeps_missing_cpu_time_honest() {
     );
 }
 
+#[test]
+fn format_thread_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::process_telemetry::ThreadWaitKind;
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let line = format_thread(&thread);
+    assert!(line.contains("[futex_wait_queue_me]"));
+    assert!(line.contains("2.5ms"));
+    assert!(line.contains(" D "));
+}
+
 /// Minimal root view that renders one card frame per draw, so the threads card
 /// can be exercised through the same window-draw path the rest of the
 /// process-insights tests use. The card is rebuilt from the typed snapshot on
@@ -70,10 +91,17 @@ fn format_keeps_missing_cpu_time_honest() {
 /// consumed-once card would leave the explicit assertion draw empty.
 struct ThreadsCardView {
     snapshot: ProcessTelemetrySnapshot,
+    first: usize,
 }
 impl Render for ThreadsCardView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        threads_card(&Theme::dark(), &self.snapshot, &labels(), 480.0)
+        threads_card(
+            &Theme::dark(),
+            &self.snapshot.threads,
+            &labels(),
+            480.0,
+            self.first,
+        )
     }
 }
 
@@ -86,7 +114,7 @@ fn draw_frame(
     cx: &mut TestAppContext,
     snapshot: ProcessTelemetrySnapshot,
 ) -> gpui::WindowHandle<ThreadsCardView> {
-    let window = cx.add_window(move |_w, _cx| ThreadsCardView { snapshot });
+    let window = cx.add_window(move |_w, _cx| ThreadsCardView { snapshot, first: 0 });
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();
     window
@@ -165,5 +193,42 @@ fn populated_threads_render_with_missing_cpu_dash(cx: &mut TestAppContext) {
     assert!(
         vcx.debug_bounds("tm-insight-thread:0:cpu-gap").is_none(),
         "a thread with parsed CPU counters must not carry the gap token"
+    );
+}
+
+#[gpui::test]
+fn a_second_page_paints_real_rows_beyond_the_materialization_limit(cx: &mut TestAppContext) {
+    let mut snapshot = snapshot_with(ProcessThreads {
+        state: DeviceState::healthy(1),
+        threads: Vec::new(),
+    });
+    snapshot.threads.threads = (0..337)
+        .map(|index| ProcessThreadInfo {
+            tid: 5000 + index,
+            comm: format!("worker-{index}"),
+            state: ThreadState::Running,
+            cpu_time_secs: Some(2.0),
+            cpu_percent: Some(3.0),
+            wchan: None,
+            run_queue_wait_ns: None,
+            wait_kind: None,
+        })
+        .collect();
+    let window = cx.add_window(move |_, _| ThreadsCardView {
+        snapshot,
+        first: 200,
+    });
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    let mut view = VisualTestContext::from_window(window.into(), cx);
+    assert!(
+        view.debug_bounds("tm-insight-thread:200:cpu-measured")
+            .is_some(),
+        "page two paints the provider's next row"
+    );
+    assert!(
+        view.debug_bounds("tm-insight-thread:0:cpu-measured")
+            .is_none(),
+        "the first page is replaced rather than repeated"
     );
 }

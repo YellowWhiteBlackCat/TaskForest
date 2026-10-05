@@ -6,7 +6,7 @@
 //!
 //! # Kernel contracts (the adjudicated neutral semantics)
 //!
-//! Two kernels serve two honestly different jobs; each documents its own
+//! The kernels serve distinct jobs; each documents its own
 //! endpoint and gap contract:
 //!
 //! - [`crate::history_decimation::lttb_indices`] — largest-triangle-three-buckets
@@ -23,6 +23,9 @@
 //!   inside a bucket — even at its start — stays visible, which is why this
 //!   kernel intentionally does NOT keep each bucket's edge samples. A bucket
 //!   with no finite value stays an explicit `NaN` gap.
+//!
+//! - [`crate::history_decimation::gap_preserving_envelope`] — coarse review cells keep any unavailable
+//!   interval visible; complete cells retain their maximum.
 //!
 //! # Degenerate budgets (adjudicated: never erase)
 //!
@@ -147,6 +150,46 @@ pub fn stride_envelope(samples: &[f32], target: usize) -> Vec<f32> {
     stride_envelope_positions(samples, target)
         .into_iter()
         .filter_map(|position| samples.get(position).copied())
+        .collect()
+}
+
+/// Coarse history cells retain an unavailable marker whenever their bucket
+/// contains a gap, instead of connecting measurements across missing data.
+#[must_use]
+pub fn gap_preserving_envelope(samples: &[f32], target: usize) -> Vec<f32> {
+    gap_preserving_envelope_positions(samples, target)
+        .into_iter()
+        .filter_map(|position| samples.get(position).copied())
+        .collect()
+}
+
+/// Whole-window positions whose coarse cells retain any missing interval.
+/// A mixed cell selects its first gap; a complete cell selects its maximum.
+/// Timestamps and values use the same position, and the true scalar peak
+/// remains separately available in the replay publication.
+#[must_use]
+pub fn gap_preserving_envelope_positions(samples: &[f32], target: usize) -> Vec<usize> {
+    if target == 0 || samples.len() <= target {
+        return (0..samples.len()).collect();
+    }
+    (0..target)
+        .map(|bucket_index| {
+            let offset = bucket_index.saturating_mul(samples.len()) / target;
+            let end = bucket_index.saturating_add(1).saturating_mul(samples.len()) / target;
+            let values = &samples[offset..end];
+            let position = values
+                .iter()
+                .position(|value| !value.is_finite())
+                .or_else(|| {
+                    values
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, left), (_, right)| left.total_cmp(right))
+                        .map(|(index, _)| index)
+                })
+                .unwrap_or(0);
+            offset.saturating_add(position)
+        })
         .collect()
 }
 

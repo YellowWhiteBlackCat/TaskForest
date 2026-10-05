@@ -29,6 +29,13 @@ identity map.
 - `src/application_history_projection.rs` joins persistent replay rows into the
   one application-history read model consumed by GPUI, Iced, TUI, and Bevy, including
   explicit capability states and timestamp-aware chart gaps.
+- `src/performance_history_projection.rs` filters the same accepted request into
+  performance rows; `src/history_replay_samples.rs` preserves recording downtime
+  without mistaking a downsampled time window for missing collection.
+- `src/system_timeline.rs` owns System sections, 1m/5m/15m/60m windows,
+  stable immutable curves and raw latest/peak readouts through an inward read port,
+  without a telemetry-store dependency. Timestamp-spaced cells
+  preserve downtime; unavailable tails do not reuse an older current value.
 - `src/process_category_projection.rs` owns category bucket order and typed
   process aggregates. It selects the PSS-preferred display observation, then
   delegates availability, coverage, freshness, failure, and saturating-add
@@ -78,9 +85,13 @@ identity map.
   failure; capture and publication remain outside the application layer. The current
   native one-shot implementation is Linux-only; other platforms keep a typed
   unsupported/unavailable result rather than claiming a capture they cannot provide.
+- `src/first_run.rs` owns quiet optional-setup discovery, the observed descriptor,
+  typed action admission and correlated progress. Frontends own explicit review
+  visibility; native completions never open a dismissed surface (ADR-040).
 - `src/diagnostics.rs` prepares already-redacted diagnostic plans and owns the
-  request-correlated publication port. The app-host alone owns its worker and
-  file transaction; closing a frontend session makes a late completion inert.
+  shared Preview/Writing/Complete/Failed review state and request-correlated publication port.
+  The app-host owns its worker and file transaction; confirm submits the frozen plan once,
+  and closing a frontend session makes a late completion inert.
 - `src/interaction.rs` owns the single shared dangerous-confirmation machine: one frozen
   EndTask/ProcessBatch/Service/Startup/Session/SMART-self-test payload, explicit arm/replace/confirm/dismiss
   transitions, and the sole conversion from confirmed intent to platform effect.
@@ -153,7 +164,9 @@ src/alert_center.rs  alert_dispatch.rs     alert evaluation and dispatch
 src/alert_suggestion_window.rs             bounded evidence windows for alert/SMART
 src/managed_alert_rules.rs                 full managed-rule list and typed reducer
 src/history_replay.rs  history_decimation.rs  application history projections
-src/application_history_projection.rs      joined read model for all frontends
+src/application_history_projection.rs      joined application read model
+src/performance_history_projection.rs      performance read model for all frontends
+src/history_replay_samples.rs              shared timestamp-aware gap kernel
 src/persistent_app_history.rs              durable per-snapshot metrics
 src/process_category_projection.rs         category aggregates and bucket order
 src/process_details_vm.rs  process_sort.rs process detail view-model and sort axes

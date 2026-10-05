@@ -399,6 +399,10 @@ fn evidence_line_stays_silent_then_honest() {
     });
     let line = evidence_line(&shell).unwrap_or_default();
     assert!(
+        line.contains("broken.service"),
+        "the failed unit identity must remain reviewable: {line}"
+    );
+    assert!(
         line.contains("1") && line.contains(t("startup.critical_chain")),
         "the chain summary counts its nodes: {line}"
     );

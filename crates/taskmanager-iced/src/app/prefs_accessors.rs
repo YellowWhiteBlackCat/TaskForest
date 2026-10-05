@@ -4,14 +4,16 @@
 
 use super::IcedApp;
 use super::motion::viewport_compact;
+use crate::ui::responsive::{NavigationPresentation, PageLayoutBudget, nav_rail_width};
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 impl IcedApp {
     /// Whether the current viewport is at the GPUI compact breakpoint
     /// ([`viewport_compact`]).
     #[must_use]
     pub(crate) fn compact_layout(&self) -> bool {
-        viewport_compact(self.viewport.size())
+        viewport_compact(self.page_viewport_size())
     }
 
     /// Current viewport width for renderer-local responsive geometry. The
@@ -27,6 +29,23 @@ impl IcedApp {
     #[must_use]
     pub(crate) fn viewport_size(&self) -> iced::Size {
         self.viewport.size()
+    }
+
+    pub(crate) fn navigation_rail_compact(&self) -> bool {
+        PageLayoutBudget::for_frame(self.viewport.size(), self.nav_orientation).navigation
+            == NavigationPresentation::IconOnly
+    }
+    pub(crate) fn navigation_rail_width(&self) -> f32 {
+        nav_rail_width(
+            PageLayoutBudget::for_frame(self.viewport.size(), self.nav_orientation).navigation,
+        )
+    }
+    pub(crate) fn page_viewport_size(&self) -> iced::Size {
+        let mut size = self.viewport.size();
+        if self.nav_orientation == NavOrientation::Vertical {
+            size.width = (size.width - self.navigation_rail_width() - 8.0).max(0.0);
+        }
+        size
     }
 
     /// Resolved row-density preference for the view layer.

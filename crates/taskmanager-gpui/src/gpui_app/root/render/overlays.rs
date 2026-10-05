@@ -15,11 +15,13 @@ use gpui::{
 use taskmanager_application::i18n::t;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_platform_contract::CapabilityStatus;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::inputs::text_input::TextInput;
 use taskmanager_ui::layout::{
-    BoundedScrollRailSpec, bounded_scroll_column_with_fixed_header, bounded_scroll_region_with_rail,
+    BoundedScrollRailSpec, bounded_scroll_column_with_fixed_footer,
+    bounded_scroll_column_with_fixed_header, bounded_scroll_region_with_rail,
 };
 use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::button::{Button, ButtonVariant};
@@ -124,6 +126,10 @@ pub(super) fn compose_primary_dialogs(
                 .entry(id)
                 .or_insert_with(|| cx.new(|cx| SwitchState::new(cx)));
         }
+        for state in view.settings_switches.values() {
+            let parent = view.dialog_scroll.settings.clone();
+            state.update(cx, |state, _cx| state.set_scroll_parent(parent));
+        }
         let content = settings_view::render_settings(
             settings_view::SettingsViewProps {
                 theme,
@@ -145,7 +151,7 @@ pub(super) fn compose_primary_dialogs(
                 gray_zero_values: presentation.gray_zero_values,
                 notify_enabled: view.projection().alert_center.policy().enabled,
                 history_persistence: view.history_runtime.enabled_next_start(),
-                first_run: &view.first_run,
+                first_run: view.first_run.view(),
                 notify_quiet_start: view
                     .projection()
                     .alert_center
@@ -168,7 +174,7 @@ pub(super) fn compose_primary_dialogs(
                 window_decorations: presentation.window_decorations,
                 slider_entity,
                 switches: &view.settings_switches,
-                privilege_center: settings_view::PrivilegeCenterInputs {
+                privilege_center: PrivilegeCenterInputs {
                     gpu_engine_state: view.shell.gpu_engine_rows_state(),
                     gpu_engine_capability: if view
                         .capture_evidence
@@ -180,7 +186,6 @@ pub(super) fn compose_primary_dialogs(
                             .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES)
                     },
                     gpu_engine_device_id,
-                    gpu_engine_index,
                     smbios_state: view.shell.smbios_memory_state(),
                     smbios_capability: if view.capture_evidence.settings_permission_center_enabled()
                     {
@@ -208,9 +213,6 @@ pub(super) fn compose_primary_dialogs(
             },
             cx,
         );
-        if view.capture_evidence.settings_zero_gray_enabled() {
-            view.dialog_scroll.settings.scroll_to_bottom();
-        }
         let settings_max_height = responsive::settings_content_max_height(window.viewport_size());
         // Keep the scroll affordance in the dialog viewport instead of letting
         // the native overflow hint disappear into the panel. Settings is long
@@ -324,7 +326,9 @@ pub(super) fn compose_primary_dialogs(
         let max_dialog_width = (f32::from(viewport.width) - 48.0).max(320.0);
         let dialog_width = max_dialog_width.min(620.0);
         let content_width = (dialog_width - 50.0).max(280.0);
-        let content: AnyElement = bounded_scroll_region_with_rail(
+        let (body, actions) =
+            first_run::render_first_run(theme, view.first_run.view(), close_entity.clone());
+        let content: AnyElement = bounded_scroll_column_with_fixed_footer(
             BoundedScrollRailSpec {
                 id: "first-run-scroll",
                 viewport_selector: "tm-first-run-scroll",
@@ -336,7 +340,9 @@ pub(super) fn compose_primary_dialogs(
                 scroll: view.dialog_scroll.first_run.clone(),
                 palette: theme.palette(),
             },
-            first_run::render_first_run(theme, &view.first_run, close_entity.clone()),
+            tokens::SPACE_12,
+            body,
+            actions,
         )
         .into_any_element();
         root.child(elements::dialog_overlay_width(

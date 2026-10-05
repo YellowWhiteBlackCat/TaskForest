@@ -1,7 +1,9 @@
 //! The read half of the history store: windowed queries over the JSONL
 //! directory, producing the core read models a history-mode surface renders.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use taskmanager_core::{HistoricalSeries, HistorySeriesKey, HistoryWindow, PeakSummary};
 
@@ -16,6 +18,7 @@ const SERIES_EXTENSION: &str = "jsonl";
 #[derive(Clone)]
 pub struct HistoryQuery {
     root: PathBuf,
+    sources: Arc<Mutex<HashMap<HistorySeriesKey, Vec<PathBuf>>>>,
 }
 
 /// One queried series plus the honesty ledger of its file: lines that could
@@ -29,7 +32,10 @@ pub struct SeriesRead {
 impl HistoryQuery {
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            sources: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     /// Every series identity the directory holds, sorted by file stem.
@@ -43,7 +49,7 @@ impl HistoryQuery {
                 format!("{}: {error}", self.root.display()),
             )
         })?;
-        let mut keys = Vec::new();
+        let mut sources: HashMap<HistorySeriesKey, Vec<PathBuf>> = HashMap::new();
         let mut file_count = 0usize;
         let mut entries_seen = 0usize;
         for entry in entries {
@@ -90,10 +96,27 @@ impl HistoryQuery {
             if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
                 && let Some(key) = HistorySeriesKey::from_file_stem(stem)
             {
-                keys.push(key);
+                sources.entry(key).or_default().push(path);
             }
         }
+        // Published external names decode to one current key. Retain their
+        // original locations privately; the active canonical segment follows
+        // archived segments without exposing another identity or API.
+        for (key, paths) in &mut sources {
+            let canonical = key.file_stem();
+            paths.sort_by_key(|path| {
+                (
+                    path.file_stem().and_then(|stem| stem.to_str()) == Some(canonical.as_str()),
+                    path.clone(),
+                )
+            });
+        }
+        let mut keys = sources.keys().cloned().collect::<Vec<_>>();
         keys.sort_by_key(|key| key.file_stem());
+        *self
+            .sources
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = sources;
         Ok(keys)
     }
 
@@ -110,32 +133,56 @@ impl HistoryQuery {
         window: HistoryWindow,
         now_ms: u64,
     ) -> Result<Option<SeriesRead>, HistoryStoreError> {
-        let path = self
-            .root
-            .join(format!("{}.{}", key.file_stem(), SERIES_EXTENSION));
-        match std::fs::metadata(&path) {
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => {
-                return Err(HistoryStoreError::new(
-                    crate::HistoryStoreErrorKind::Read,
-                    format!("{}: {error}", path.display()),
-                ));
-            }
-        }
+        let paths = self
+            .sources
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| {
+                vec![
+                    self.root
+                        .join(format!("{}.{}", key.file_stem(), SERIES_EXTENSION)),
+                ]
+            });
+        let mut remaining_bytes = MAX_SERIES_FILE_BYTES;
+        let mut found = false;
         let floor = now_ms.saturating_sub(window.duration_ms());
         let mut samples = Vec::new();
         let mut corrupt_lines = 0usize;
-        bounded_io::for_each_line_bounded(&path, MAX_SERIES_FILE_BYTES, |line| {
-            if line.trim().is_empty() {
-                return;
+        for path in paths {
+            let bytes = match std::fs::metadata(&path) {
+                Ok(metadata) => metadata.len(),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(HistoryStoreError::new(
+                        crate::HistoryStoreErrorKind::Read,
+                        format!("{}: {error}", path.display()),
+                    ));
+                }
+            };
+            if bytes > remaining_bytes {
+                return Err(HistoryStoreError::new(
+                    crate::HistoryStoreErrorKind::ResourceLimit,
+                    "combined history source segments exceed the series byte ceiling",
+                ));
             }
-            match decode_line(line) {
-                Some(sample) if sample.completed_at_ms >= floor => samples.push(sample),
-                Some(_) => {}
-                None => corrupt_lines = corrupt_lines.saturating_add(1),
-            }
-        })?;
+            found = true;
+            bounded_io::for_each_line_bounded(&path, remaining_bytes, |line| {
+                if line.trim().is_empty() {
+                    return;
+                }
+                match decode_line(line) {
+                    Some(sample) if sample.completed_at_ms >= floor => samples.push(sample),
+                    Some(_) => {}
+                    None => corrupt_lines = corrupt_lines.saturating_add(1),
+                }
+            })?;
+            remaining_bytes = remaining_bytes.saturating_sub(bytes);
+        }
+        if !found {
+            return Ok(None);
+        }
         Ok(Some(SeriesRead {
             series: HistoricalSeries::new(key.clone(), samples),
             corrupt_lines,

@@ -60,8 +60,8 @@ pub(crate) fn curve_card_scene(
         CurveCard(curve)
         CurveGate(curve)
         Children [
-            ( Text(title) TextRole(Role::Caption) ),
-            (
+             Text(title) TextRole(Role::Caption) --
+
                 Node {
                     width: percent(100),
                     height: px(strip_height),
@@ -69,8 +69,8 @@ pub(crate) fn curve_card_scene(
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    ( chart_grid_scene(strip_height, palette) ),
-                    (
+                     @chart_grid_scene(strip_height, palette) --
+
                         Node {
                             width: px(CHART_STRIP_WIDTH_PX),
                             height: percent(100),
@@ -81,17 +81,17 @@ pub(crate) fn curve_card_scene(
                         SparkStrip(curve)
                         ChartSurface({ segments.len() })
                         Children [
-                            ( { polyline_scene(&segments, color) } ),
+                             @{ polyline_scene(&segments, color) }
                         ]
-                    ),
-                    ( { overlay } ),
+                    --
+                     @{ overlay }
                 ]
-            ),
-            (
+            --
+
                 Text(caption)
                 TextRole(Role::Caption)
                 DynText(DynField::CurveCaption(curve))
-            ),
+
         ]
     }
 }
@@ -146,8 +146,8 @@ pub(super) fn chart_grid_scene(height: f32, palette: &UiPalette) -> impl Scene +
             top: px(0.0),
         }
         Children [
-            { horizontal },
-            { vertical },
+            { horizontal }--
+            { vertical }
         ]
     }
 }
@@ -164,7 +164,7 @@ pub(super) fn collecting_overlay_scene(caption: String, palette: &UiPalette) -> 
             justify_content: JustifyContent::Center,
         }
         Children [
-            (
+
                 Node {
                     padding: UiRect::horizontal(Val::Px(space_8())),
                     height: px(palette.control_height_px),
@@ -173,9 +173,9 @@ pub(super) fn collecting_overlay_scene(caption: String, palette: &UiPalette) -> 
                 }
                 BackgroundColor({ palette.content_bg })
                 Children [
-                    ( Text(caption) TextRole(Role::Caption) ),
+                     Text(caption) TextRole(Role::Caption)
                 ]
-            ),
+
         ]
     })
 }

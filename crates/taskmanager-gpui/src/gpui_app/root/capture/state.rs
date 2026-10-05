@@ -2,7 +2,6 @@
 
 use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
-use crate::gpui_app::process_insights::ProcessInsightsState;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::startup::BootTimeline;
@@ -13,10 +12,7 @@ pub enum CaptureProcessAction {
     ApplicationSelection(ProcessLiveKey),
     Batch(ProcessBatchIntent),
     Properties(ProcessLiveKey, ProcessDetailsSection),
-    Insights {
-        identity: ProcessLiveKey,
-        state: ProcessInsightsState,
-    },
+    Insights(ProcessLiveKey),
 }
 
 #[derive(Debug, Default)]
@@ -27,11 +23,11 @@ pub enum SystemHealthCaptureOutcome {
     ReadyWithConfirmation(SmartSelfTestConfirmationRequest),
 }
 
-/// The NPU evidence marker is emitted only after its typed fixture has entered
-/// the canonical projection and the Graphics section has actually been laid
+/// Inventory evidence is emitted only after its typed fixture has entered
+/// the canonical projection and its requested section has actually been laid
 /// out and scrolled into the per-window viewport.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SystemNpuCaptureState {
+pub(crate) enum SystemInventoryCaptureState {
     #[default]
     AwaitingFixture,
     AwaitingLayout,
@@ -39,7 +35,7 @@ pub(crate) enum SystemNpuCaptureState {
     Ready,
 }
 
-impl SystemNpuCaptureState {
+impl SystemInventoryCaptureState {
     pub(crate) const fn needs_fixture(self) -> bool {
         matches!(self, Self::AwaitingFixture)
     }
@@ -80,6 +76,14 @@ impl WindowCaptureChain {
     pub(crate) const fn active(self) -> bool {
         matches!(self, Self::Active)
     }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SurfacePresentation {
+    #[default]
+    Waiting,
+    Scheduled,
+    Presented,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -142,7 +146,7 @@ pub(crate) struct CaptureEvidence {
     pub(super) snapshot_count: u8,
     pub(super) scenario_process_identity: Option<ProcessLiveKey>,
     pub(super) history_replay_open_state: HistoryReplayOpenState,
-    pub(super) system_npu_state: SystemNpuCaptureState,
+    pub(super) system_inventory_state: SystemInventoryCaptureState,
     /// Capture-only comparison evidence. Persistent history runtime is
     /// reader-only; deterministic screenshots must not reintroduce its retired
     /// boot writer/controller state.
@@ -157,9 +161,13 @@ pub(crate) struct CaptureEvidence {
     /// seeded into the direct track exactly once. This is fixture data for the
     /// evidence frame, never a live privileged read.
     pub(super) msr_readout_seeded: bool,
+    pub(super) dynamic_history_seeded: bool,
     /// Capture-only state machine that waits for two rendered frames before
     /// submitting the current-window provider request, then becomes terminal.
     pub(super) window_capture_schedule: WindowCaptureSchedule,
+    pub(super) system_about_presentation: SurfacePresentation,
+    pub(super) process_properties_presentation: SurfacePresentation,
+    pub(super) controlled_presentation: SurfacePresentation,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.

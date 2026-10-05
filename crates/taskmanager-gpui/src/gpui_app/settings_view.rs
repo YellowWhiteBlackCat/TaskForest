@@ -25,9 +25,10 @@ use self::density::density_row;
 use self::ui_size::ui_size_row;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::elements::pill;
-use crate::gpui_app::first_run::{self, FirstRunUiState};
+use crate::gpui_app::first_run;
 use crate::gpui_app::graph::GraphSettings;
 use crate::gpui_app::root::{Hover, RootView};
+use taskmanager_application::first_run::FirstRunUiState;
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
@@ -59,11 +60,11 @@ use self::graphs::graph_options_group;
 pub(crate) use self::graphs::init_data_points_slider;
 use self::history::history_persistence_row;
 use self::notifications::{notify_row, quiet_hours_rows};
-pub(crate) use self::privilege_center::PrivilegeCenterInputs;
 use self::privilege_center::render_privilege_center;
 use self::refresh::refresh_row;
 use self::units::units_group;
 use self::zero_values::zero_values_row;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens::UiSize;
 
 mod devices;

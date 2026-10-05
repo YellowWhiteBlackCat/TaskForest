@@ -4,8 +4,8 @@
 //! sidebar (`sidebar.rs` + `sidebar/captions.rs`).
 
 use super::*;
+use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::metrics::{GpuMetrics, NetworkAdapterType};
 use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_core::core::units::format_quantity_with;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -18,7 +18,7 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
     };
     let window = app.prefs.graph_points;
     let glyphs = theme.terminal.glyphs;
-    match app.perf_device {
+    let instances: Vec<_> = match app.perf_device {
         PerfDevice::Cpu => vec![cpu_selector_instance(app, theme, snapshot, glyphs, window)],
         PerfDevice::Memory => {
             vec![memory_selector_instance(
@@ -28,7 +28,6 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
         PerfDevice::Disk => snapshot
             .disks
             .iter()
-            .filter(|_| app.prefs.show[2])
             .map(|disk| {
                 let trend = sparkline::device_trend_in(
                     glyphs,
@@ -68,7 +67,6 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
         PerfDevice::Network => snapshot
             .networks
             .iter()
-            .filter(|network| selector_network_visible(&app.prefs.show, network.adapter_type()))
             .map(|network| {
                 let trend = sparkline::device_trend_in(
                     glyphs,
@@ -215,26 +213,24 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                 )
             })
             .collect(),
+    };
+    if app.perf_device == PerfDevice::Npu {
+        return instances;
     }
+    app.sidebar_entries()
+        .into_iter()
+        .filter(|entry| {
+            entry.device == app.perf_device
+                && entry.visible
+                && app
+                    .performance_device_key
+                    .as_ref()
+                    .is_none_or(|key| &entry.key == key)
+        })
+        .filter_map(|entry| instances.get(entry.index).cloned())
+        .collect()
 }
 
-/// The applied network-subcategory visibility (the same class map the
-/// network detail panel applies), so a hidden NIC class drops out of the
-/// strip too instead of ghosting back beside the filtered panel.
-fn selector_network_visible(show: &[bool; 10], adapter_type: NetworkAdapterType) -> bool {
-    match adapter_type {
-        NetworkAdapterType::Ethernet => show[4],
-        NetworkAdapterType::WiFi => show[5],
-        NetworkAdapterType::Vpn => show[6],
-        NetworkAdapterType::Virtual => show[7],
-        NetworkAdapterType::Unknown | NetworkAdapterType::Loopback | NetworkAdapterType::Other => {
-            show[8]
-        }
-    }
-}
-
-/// The CPU strip segment: brand plus utilization / clock / package
-/// temperature — the gpui `cpu_caption` fields on one line.
 fn cpu_selector_instance(
     app: &TuiApp,
     theme: TuiTheme,

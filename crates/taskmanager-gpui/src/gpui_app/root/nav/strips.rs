@@ -15,23 +15,20 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// The page-navigation strip: a floating rounded row or column of page tabs.
 pub fn nav_strip(
     t: &Theme,
     active: TopPage,
-    orientation: super::super::NavOrientation,
+    orientation: NavOrientation,
     hovered: Option<&Hover>,
     presentation: NavigationPresentation,
     cx: &mut Context<RootView>,
 ) -> Div {
     match orientation {
-        super::super::NavOrientation::Horizontal => {
-            nav_strip_horizontal(t, active, hovered, presentation, cx)
-        }
-        super::super::NavOrientation::Vertical => {
-            nav_strip_vertical(t, active, hovered, presentation, cx)
-        }
+        NavOrientation::Horizontal => nav_strip_horizontal(t, active, hovered, presentation, cx),
+        NavOrientation::Vertical => nav_strip_vertical(t, active, hovered, presentation, cx),
     }
 }
 

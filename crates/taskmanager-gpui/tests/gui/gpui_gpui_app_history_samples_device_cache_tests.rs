@@ -2,6 +2,7 @@ use super::*;
 use taskmanager_core::core::DeviceLifecycle;
 use taskmanager_core::core::DeviceState;
 use taskmanager_core::core::{GpuScalarObservations, GpuTelemetryObservation, ScalarObservation};
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::{CorrelatedTelemetryStamp, TelemetryStore};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
@@ -40,7 +41,8 @@ fn gpu_observation(utilization: Option<f32>) -> GpuTelemetryObservation {
 
 #[test]
 fn device_sample_cache_reuses_until_the_ring_advances() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     ingestor
         .ingest_correlated_gpu(stamp(1), &gpu_observation(Some(42.0)))
@@ -158,7 +160,8 @@ fn classify(samples: &[f32]) -> Vec<Option<f32>> {
 #[test]
 fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
     let device_id = "disk:wwid:split-cache";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
     let generation = DeviceGeneration::new(1);
@@ -261,7 +264,8 @@ fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
 #[test]
 fn network_split_windows_keep_direction_identity() {
     let device_id = "net:mac:split-cache";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
     let generation = DeviceGeneration::new(1);

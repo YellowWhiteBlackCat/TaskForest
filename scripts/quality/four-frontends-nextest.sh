@@ -12,7 +12,7 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 
 export CARGO_BUILD_JOBS="${JOBS:-4}"
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
 
 timeout --kill-after=30s "${FOUR_FRONTENDS_TIMEOUT:-3600}" \
     cargo nextest run --locked --workspace --all-targets --features test-support -j 4 \

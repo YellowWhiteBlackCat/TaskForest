@@ -149,7 +149,23 @@ def validate_markers(path: Path, device: str) -> None:
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
     page = (
         "services"
-        if device == "service-details"
+        if device in {"service-details", "service-details-logs", "services-search-highlight"}
+        else "startup"
+        if device in {"startup-impact", "startup-failure-evidence", "startup-boot-markers"}
+        else "app-history"
+        if device == "application-history-replay"
+        else "system"
+        if device in {"system-hardware", "system-dashboard", "history-60m", "sensor-center", "storage-health"}
+        else "applications"
+        if device in {
+            "process-selection", "saved-view-presets",
+            "process-details", "process-properties-performance", "process-insights",
+            "process-command", "process-affinity", "process-end-confirm", "apps-search-highlight",
+            "process-force-kill", "process-tree-confirm", "process-batch-confirm",
+            "process-memory-pss-swap", "process-network-details", "process-gpu-details",
+            "process-resource-limits", "process-isolation", "apps-group-expanded",
+            "apps-zero-gray", "apps-identity-matrix", "keyboard-focus", "vertical-nav",
+        }
         else device
         if device in {"applications", "services", "startup", "users", "system", "app-history"}
         else "performance"

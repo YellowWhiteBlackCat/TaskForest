@@ -1,44 +1,42 @@
 use super::super::{CaptureEvidence, CaptureScenario, SystemSnapshot, TopPage};
 use super::PROCESSES_OBSERVED_AT_MS;
 use taskmanager_core::core::metrics::DiskPartition;
-use taskmanager_core::core::{
-    BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceState, PowerSupplySnapshot,
-    ScalarObservation,
-};
+use taskmanager_core::core::{DeviceId, PowerSupplySnapshot, SensorCenterSnapshot};
+use taskmanager_telemetry_store::{HistoryRetention, TelemetryStore};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
-fn live_battery_capture_waits_for_real_data_and_never_inserts_a_fixture() {
+fn dynamic_battery_capture_requires_complete_correlated_histories() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::BatteryLivePerformance));
-    let mut snapshot = SystemSnapshot::default();
-    evidence.on_snapshot(&mut snapshot);
-    let mut processes = Vec::new();
-    assert!(
-        evidence
-            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-            .is_none()
-    );
-
+    evidence.on_snapshot(&mut SystemSnapshot::default());
+    let _ = evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut Vec::new());
     let mut page = TopPage::Apps;
-    let mut power_supplies = PowerSupplySnapshot::default();
-    assert!(!evidence.on_live_dynamic_device_state(&mut page, &power_supplies));
-    assert!(!evidence.scenario_ready());
-
-    let mut battery = BatteryInfo::new("power-supply:real-battery", DeviceState::healthy(100));
-    battery.device_generation = DeviceGeneration::new(1);
-    battery.status = "Discharging".into();
-    battery.apply_scalar_observations(BatteryScalarObservations {
-        capacity_pct: ScalarObservation::available(79, 100),
-        ..Default::default()
-    });
-    power_supplies = PowerSupplySnapshot {
-        timestamp_ms: 100,
-        batteries: vec![battery],
-        ..Default::default()
-    };
-    assert!(evidence.on_live_dynamic_device_state(&mut page, &power_supplies));
-    assert_eq!(page, TopPage::Performance);
+    let mut power = PowerSupplySnapshot::default();
+    let mut sensors = SensorCenterSnapshot::default();
+    assert!(evidence.on_dynamic_device_state(&mut page, &mut power, &mut sensors));
+    assert!(
+        !evidence.scenario_ready(),
+        "a scalar is not a painted history window"
+    );
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(32));
+    assert!(evidence.seed_dynamic_capture_history(&store.system_history, &ingestor, 10_000));
     assert!(evidence.scenario_ready());
+    let dynamic = store.system_history.dynamic_history();
+    let id = DeviceId::new("power-supply:capture-battery");
+    let charge = dynamic
+        .battery_capacity_pct(&id)
+        .expect("charge history")
+        .samples();
+    let watts = dynamic
+        .battery_power_w(&id)
+        .expect("power history")
+        .samples();
+    assert_eq!(charge.len(), 8);
+    assert_eq!(watts.len(), 8);
+    assert_ne!(charge.first(), charge.last());
+    assert_ne!(watts.first(), watts.last());
+    assert!(!evidence.on_dynamic_device_state(&mut page, &mut power, &mut sensors));
 }
 
 #[test]

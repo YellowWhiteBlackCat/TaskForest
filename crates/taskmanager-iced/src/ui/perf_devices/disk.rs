@@ -1,6 +1,7 @@
 //! Performance page Disk detail block, throughput chart and partition summary.
 
 use std::rc::Rc;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use super::*;
 use iced::Element;
@@ -9,7 +10,6 @@ use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot
 
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
-    smart_section_visible,
 };
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
@@ -603,7 +603,7 @@ fn partition_row<'a>(
         Some(value) => {
             let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);
             let remainder_portion = 1000_u16.saturating_sub(fill_portion);
-            let fill = iced::widget::container(iced::widget::text("").size(0))
+            let fill = iced::widget::container(iced::widget::row![])
                 .width(iced::Length::FillPortion(fill_portion))
                 .height(iced::Length::Fixed(6.0))
                 .style(move |_| iced::widget::container::Style {
@@ -614,7 +614,7 @@ fn partition_row<'a>(
                     },
                     ..Default::default()
                 });
-            let remainder = iced::widget::container(iced::widget::text("").size(0))
+            let remainder = iced::widget::container(iced::widget::row![])
                 .width(if remainder_portion > 0 {
                     iced::Length::FillPortion(remainder_portion)
                 } else {

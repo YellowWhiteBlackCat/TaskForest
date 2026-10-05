@@ -8,6 +8,7 @@
 //! seam.
 
 use gpui::{App, ClipboardItem, Div, Entity, ParentElement, Styled, Window, div, px};
+use taskmanager_assets::product;
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -17,33 +18,14 @@ use taskmanager_ui::theme_binding::hsla;
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
+use taskmanager_assets::product::REPOSITORY_URL;
+use taskmanager_shell::presentation::about::metadata;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
 
-/// Stable repository URL shown by the About dialog and used by its explicit
-/// "Open repository" action.
-pub const REPOSITORY_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
-
-/// Build version compiled into this binary by Cargo.
+/// Build version compiled into this frontend binary.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn product_name() -> &'static str {
-    i18n::t("about.name")
-}
-
-/// The exact text copied by the About dialog's Copy details action.
-#[must_use]
-pub fn details_text() -> String {
-    format!(
-        "{}\n{}: {VERSION}\n{}: {}\n{}: {REPOSITORY_URL}",
-        product_name(),
-        i18n::t("about.version"),
-        i18n::t("about.license"),
-        "Apache-2.0",
-        i18n::t("about.repository"),
-    )
-}
 
 fn metadata_row(theme: &Theme, label: &'static str, value: impl Into<String>) -> Div {
     div()
@@ -71,7 +53,8 @@ fn metadata_row(theme: &Theme, label: &'static str, value: impl Into<String>) ->
 /// Render the independent About body. `RootView` owns the modal state; this
 /// module owns only the pure metadata projection and typed button callbacks.
 pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
-    let copy_text = details_text();
+    let metadata = metadata(VERSION, product::LICENSE_SPDX, product::REPOSITORY_URL);
+    let copy_text = metadata.details_text();
     let open_entity = entity.clone();
     let system_entity = entity.clone();
     div()
@@ -102,13 +85,13 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                                 .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
                                 .text_size(font_size(tokens::FONT_18))
                                 .text_color(hsla(theme.fg))
-                                .child(product_name()),
+                                .child(metadata.name),
                         )
                         .child(
                             div()
                                 .text_size(font_size(tokens::FONT_12))
                                 .text_color(hsla(theme.fg_dim))
-                                .child(i18n::t("about.description")),
+                                .child(metadata.description),
                         ),
                 ),
         )
@@ -117,9 +100,9 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                 .flex()
                 .flex_col()
                 .gap(definite_length(tokens::SPACE_8))
-                .child(metadata_row(theme, "about.version", VERSION))
-                .child(metadata_row(theme, "about.license", "Apache-2.0"))
-                .child(metadata_row(theme, "about.repository", REPOSITORY_URL)),
+                .child(metadata_row(theme, "about.version", metadata.version))
+                .child(metadata_row(theme, "about.license", metadata.license))
+                .child(metadata_row(theme, "about.repository", metadata.repository)),
         )
         .child(
             div()
@@ -168,7 +151,3 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                 )),
         )
 }
-
-#[cfg(test)]
-#[path = "../../tests/gui/gpui_gpui_app_about_tests.rs"]
-mod tests;

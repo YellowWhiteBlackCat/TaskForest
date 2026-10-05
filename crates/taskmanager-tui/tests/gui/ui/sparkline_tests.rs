@@ -8,6 +8,19 @@ use super::*;
 use crate::{TuiColorMode, TuiTerminalProfile};
 use taskmanager_application::i18n::{Language, set_language};
 
+#[test]
+fn allocated_history_trend_keeps_old_peaks_and_gaps_across_the_full_slot() {
+    let mut samples = vec![24.0; 241];
+    samples[0] = 99.0;
+    samples[120] = f32::NAN;
+    for width in [52, 118, 198] {
+        let trend = history_trend_with_width_in(TuiGlyphMode::Unicode, &samples, width);
+        assert_eq!(trend.chars().count(), width);
+        assert_eq!(trend.chars().next(), Some('█'));
+        assert!(trend.contains(history_trend_gap(TuiGlyphMode::Unicode)));
+    }
+}
+
 /// A flat series renders as a constant mid-ramp line — honest about the
 /// trend being flat, never a panic on a zero range. `(0.5 * 7.0).round()`
 /// is 4, so the flat ramp is the index-4 block ('▅').
@@ -49,7 +62,7 @@ fn rising_series_renders_ascending_ramp_blocks() {
 fn empty_series_renders_empty_and_window_stays_bounded() {
     assert_eq!(sparkline_in(TuiGlyphMode::Unicode, &[]), "");
     let long: Vec<f32> = (0..128).map(|i| i as f32).collect();
-    let windowed = recent_window(&long);
+    let windowed = recent_window_with(&long, SPARKLINE_MAX_SAMPLES);
     assert_eq!(windowed.len(), SPARKLINE_MAX_SAMPLES);
     assert_eq!(
         sparkline_in(TuiGlyphMode::Unicode, windowed)

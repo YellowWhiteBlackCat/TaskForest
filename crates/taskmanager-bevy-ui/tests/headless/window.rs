@@ -33,7 +33,8 @@ use taskmanager_platform_contract::{
 use taskmanager_theme::tokens;
 use taskmanager_theme::{LightDark, Skin, Theme};
 
-use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, resolve_demo_theme};
+use super::appearance::resolve_demo_theme;
+use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use taskmanager_shell::FeedbackLifecycle;
@@ -145,6 +146,17 @@ fn headless_window_app(runtime: &'static SharedRuntime) -> App {
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     app
+}
+
+/// The real frontend composition and bundled typography, with a quiet injected
+/// platform. Layout tests use this so text measurements match the product.
+pub(crate) fn scripted_frontend_app() -> App {
+    let (client, _) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime");
+    headless_window_app(runtime)
 }
 
 #[test]

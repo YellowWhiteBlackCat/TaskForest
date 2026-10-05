@@ -333,6 +333,18 @@ struct NameQuerySlot {
     name: [u16; MAX_NAME_UTF16_UNITS],
 }
 
+/// Shift the validated inline payload over its header inside the same buffer.
+/// Long names overlap their destination, so this must use a memmove operation.
+fn compact_slot_name(slot: &mut NameQuerySlot) {
+    let buffer_addr = slot.name.as_ptr() as usize;
+    let Some(units) = inline_name_units(buffer_addr, &slot.name) else {
+        return;
+    };
+    slot.name
+        .copy_within(POINTER_BYTES..POINTER_BYTES + units, 0);
+    slot.name_units = units;
+}
+
 /// Decode a finished slot. `None` for a pending/failed/empty/oversized
 /// result — the entry then carries `target: None` and the adapter counts it
 /// unreadable.
@@ -675,20 +687,7 @@ where
         );
         job.slot.status = status.0;
         if status.is_ok() {
-            let buffer_addr = job.slot.name.as_ptr() as usize;
-            if let Some(units) = inline_name_units(buffer_addr, &job.slot.name) {
-                let header_units = POINTER_BYTES;
-                // SAFETY: `inline_name_units` validated both the inline
-                // position and the length against the slot buffer.
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        job.slot.name.as_ptr().add(header_units),
-                        job.slot.name.as_mut_ptr(),
-                        units,
-                    );
-                }
-                job.slot.name_units = units;
-            }
+            compact_slot_name(&mut job.slot);
         }
         0
     }

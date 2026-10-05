@@ -531,3 +531,21 @@ fn overlay_fingerprint_combines_hover_index_and_data() {
         "a data tick must refresh the overlay so the pill text stays live"
     );
 }
+
+#[test]
+fn recorded_signed_ranges_preserve_gaps_and_align_the_hover_with_the_curve() {
+    let samples = [-20.0, -10.0, f32::NAN, -5.0, 0.0];
+    let runs = series_point_runs_in_range(&samples, Size::new(200.0, 80.0), -20.0, 0.0);
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0], [Point::new(0.0, 80.0), Point::new(50.0, 40.0)]);
+    assert_eq!(runs[1], [Point::new(150.0, 20.0), Point::new(200.0, 0.0)]);
+    assert_eq!(scaled_y_in_range(-5.0, -20.0, 0.0, 80.0), runs[1][0].y);
+    let extreme = series_point_runs_in_range(
+        &[-f32::MAX, f32::MAX],
+        Size::new(100.0, 80.0),
+        -f32::MAX,
+        f32::MAX,
+    );
+    assert_eq!(extreme[0][0].y, 80.0);
+    assert_eq!(extreme[0][1].y, 0.0);
+}

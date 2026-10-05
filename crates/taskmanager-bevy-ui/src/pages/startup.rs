@@ -28,13 +28,12 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::{Add, HookContext};
+use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
@@ -60,6 +59,7 @@ use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene}
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod menu;
+mod paint;
 mod scene;
 
 use scene::startup_body_scene;
@@ -196,14 +196,26 @@ pub(crate) fn evidence_line(shell: &ShellApp) -> Option<String> {
     let chain = evidence.critical_chain.len();
     let failed = evidence.failed_units.len();
     (chain > 0 || failed > 0).then(|| {
-        format!(
+        let mut line = format!(
             "{}: {} {}, {} {}",
             t("startup.timeline"),
             chain,
             t("startup.critical_chain"),
             failed,
             t("startup.failed_units"),
-        )
+        );
+        if failed > 0 {
+            line.push_str(" · ");
+            line.push_str(
+                &evidence
+                    .failed_units
+                    .iter()
+                    .map(|unit| unit.unit.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+            );
+        }
+        line
     })
 }
 
@@ -307,7 +319,6 @@ fn sorted_direction(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> Op
 // ---- world types: markers, events, per-page resources ----
 
 #[derive(Clone, Component, Default)]
-#[component(on_insert = bind_startup_page)]
 pub(crate) struct StartupPageRoot;
 
 #[derive(Clone, Component, Default)]
@@ -321,9 +332,6 @@ pub(crate) struct StartupRowMarker(pub(crate) usize, pub(crate) StartupEntryId);
 
 #[derive(Clone, Component, Default)]
 pub(crate) struct StartupSortHeader(pub(crate) Option<InfoSortCol>);
-
-#[derive(Resource)]
-struct StartupPageBound;
 
 #[derive(Resource)]
 struct StartupRenderState {
@@ -346,7 +354,7 @@ pub(crate) struct StartupSelectionMoved(pub(crate) isize);
 // ---- render adapters (bsn!) ----
 
 /// Content-region scene for the Startup page. The body's dynamic content is
-/// painted by [`paint_startup`] — the single render authority for the rows.
+/// painted by the typed paint system — the single render authority for the rows.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Startup.title();
     let waiting = t("common.waiting_inventory").to_owned();
@@ -360,13 +368,13 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         }
         StartupPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Text(waiting)
                 StartupStatusLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -374,90 +382,34 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 StartupBody
-            ),
+
         ]
     }
 }
 
 // ---- observers and the single paint path ----
 
-/// The one authoritative repaint; see `paint_services` in the template page.
-fn paint_startup(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let revision = world
-        .non_send::<FrontendTrack>()
-        .shell
-        .projection()
-        .startup_revision;
-    let mut selection = world.resource::<StartupSelection>().clone();
-    let (scene, line) = {
-        let shell = &world.non_send::<FrontendTrack>().shell;
-        let rows = startup_rows(shell);
-        if let Some(target) = &selection.target
-            && !rows.iter().any(|row| &row.target == target)
-        {
-            // A target that left the inventory deselects honestly.
-            selection.target = None;
-        }
-        (
-            startup_body_scene(shell, &palette, &selection),
-            status_line_text(shell, rows.len()),
-        )
-    };
-    world.resource_mut::<StartupRenderState>().rendered_revision = Some(revision);
-    world.resource_mut::<StartupSelection>().target = selection.target;
-    // A childless container has no `Children` component in this bevy, so the
-    // join must be optional — the first paint finds an empty body.
-    let mut body_query = world.query_filtered::<(Entity, Option<&Children>), With<StartupBody>>();
-    let Some((body, children)) = body_query.iter(world).next() else {
-        return;
-    };
-    let stale: Vec<Entity> = children
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    let fresh = commands.spawn_scene(scene).id();
-    commands.entity(body).add_one_related::<ChildOf>(fresh);
-    let mut line_query = world.query_filtered::<&mut Text, With<StartupStatusLine>>();
-    if let Ok(mut text) = line_query.single_mut(world) {
-        text.0 = line;
-    }
-}
-
-/// Initial/mount paint: the body container just came to exist, so the first
-/// (and every remount) row projection can bind to it.
-fn on_startup_body_added(_added: On<Add, StartupBody>, mut commands: Commands) {
-    commands.queue(paint_startup);
-}
-
-/// Insert hook: bind the page's observers once; the initial paint rides the
-/// body-added observer registered below.
-fn bind_startup_page(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if world.get_resource_mut::<StartupPageBound>().is_some() {
-        return;
-    }
-    let mut commands = world.commands();
-    commands.insert_resource(StartupPageBound);
-    commands.init_resource::<StartupSelection>();
-    commands.insert_resource(StartupRenderState {
+/// The one authoritative repaint; see `paint::paint` in the template page.
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<StartupSelection>();
+    app.insert_resource(StartupRenderState {
         rendered_revision: None,
     });
-    commands.add_observer(on_startup_projection_folded);
-    commands.add_observer(on_startup_sort_clicked);
-    commands.add_observer(on_startup_row_clicked);
-    commands.add_observer(on_startup_toggle_button_activated);
-    commands.add_observer(on_startup_enable_button_activated);
-    commands.add_observer(on_startup_disable_button_activated);
-    commands.add_observer(on_startup_selection_moved);
-    // The initial paint rides the body's own insertion: the hook runs while
-    // the page scene is still spawning (its children apply later in the same
-    // command queue), so painting here would find no body yet. The observer
-    // fires exactly when the body entity comes to exist — and again on every
-    // route-back remount.
-    commands.add_observer(on_startup_body_added);
+    app.init_resource::<paint::PaintState>();
+    app.add_observer(paint::on_repaint_requested);
+    app.add_observer(on_startup_projection_folded);
+    app.add_observer(on_startup_sort_clicked);
+    app.add_observer(on_startup_row_clicked);
+    app.add_observer(on_startup_toggle_button_activated);
+    app.add_observer(on_startup_enable_button_activated);
+    app.add_observer(on_startup_disable_button_activated);
+    app.add_observer(on_startup_selection_moved);
+    app.add_observer(on_startup_body_added);
+    paint::register(app);
+}
+
+fn on_startup_body_added(_event: On<Add<StartupBody>>, mut commands: Commands) {
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Fold repaint with the idle gate (startup-domain revision only).
@@ -471,7 +423,7 @@ fn on_startup_projection_folded(
     if rendered.rendered_revision == Some(revision) {
         return;
     }
-    commands.queue(paint_startup);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Header-sort tail: the shell's existing sort entry owns the decision.
@@ -483,7 +435,7 @@ fn on_startup_sort_clicked(
     track
         .shell
         .set_info_sort(InfoTable::Startup, click.event().0);
-    commands.queue(paint_startup);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Row-click tail. The visual row resolves to its target through the shell's
@@ -498,7 +450,7 @@ fn on_startup_row_clicked(
         return;
     };
     selection.target = Some(entry.id.clone());
-    commands.queue(paint_startup);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Keyboard-selection tail: sort-stable target id, clamped cursor.
@@ -517,7 +469,7 @@ fn on_startup_selection_moved(
         return;
     };
     selection.target = Some(entry.id.clone());
-    commands.queue(paint_startup);
+    commands.trigger(paint::RepaintRequested);
 }
 
 #[cfg(test)]
@@ -550,7 +502,7 @@ fn on_startup_enable_button_activated(
         let _ = track.shell.request_startup_control_for(entry, true);
         crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
-        commands.queue(paint_startup);
+        commands.trigger(paint::RepaintRequested);
     }
 }
 
@@ -571,7 +523,7 @@ fn on_startup_disable_button_activated(
         let _ = track.shell.request_startup_control_for(entry, false);
         crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
-        commands.queue(paint_startup);
+        commands.trigger(paint::RepaintRequested);
     }
 }
 
@@ -600,7 +552,7 @@ fn on_startup_toggle_button_activated(
         let _ = track.shell.request_startup_control_for(entry, next_state);
         crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
-        commands.queue(paint_startup);
+        commands.trigger(paint::RepaintRequested);
     }
 }
 

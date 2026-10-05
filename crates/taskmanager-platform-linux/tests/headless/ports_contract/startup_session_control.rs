@@ -75,8 +75,9 @@ fn startup_evidence_has_an_independent_clocked_provider_chain() {
 fn startup_and_session_controls_are_non_blocking_and_correlated() {
     let startup_controls = Arc::new(Mutex::new(Vec::new()));
     let session_controls = Arc::new(Mutex::new(Vec::new()));
+    let control_gate = Arc::new(ControlGate::default());
     let handle = spawn_complete(fake_registry(FakeProvider {
-        delay: Duration::from_millis(80),
+        control_gate: Some(control_gate.clone()),
         startup_controls: startup_controls.clone(),
         session_controls: session_controls.clone(),
         ..Default::default()
@@ -86,52 +87,67 @@ fn startup_and_session_controls_are_non_blocking_and_correlated() {
     let session_id = control_ids.begin();
     let mut request_ids = RequestIdGenerator::default();
 
-    let started = Instant::now();
-    handle
-        .startup_control()
-        .expect("startup control facet")
-        .try_submit(RequestEnvelope {
-            id: request_ids.next_id(),
-            capability: CapabilityId::STARTUP_CONTROL,
-            submitted_at_ms: 1,
-            payload: StartupControlRequest {
-                request_id: startup_id,
-                entry: StartupEntry {
-                    id: "desktop:demo.desktop".into(),
-                    name: "demo".into(),
-                    exec: "demo".into(),
-                    enabled: false,
-                    source: StartupSource::DesktopEntry,
-                    scope: StartupScope::User,
-                    control_policy: StartupControlPolicy::Direct,
-                    locator: "/tmp/demo.desktop".into(),
-                    impact: StartupImpact::None,
-                    impact_evidence: StartupImpactEvidence::Unknown {
-                        reason: StartupImpactUnknownReason::NotInstrumented,
+    let submit_handle = handle.clone();
+    let (submitted, acknowledgement) = std::sync::mpsc::sync_channel(1);
+    let submission = thread::spawn(move || {
+        submit_handle
+            .startup_control()
+            .expect("startup control facet")
+            .try_submit(RequestEnvelope {
+                id: request_ids.next_id(),
+                capability: CapabilityId::STARTUP_CONTROL,
+                submitted_at_ms: 1,
+                payload: StartupControlRequest {
+                    request_id: startup_id,
+                    entry: StartupEntry {
+                        id: "desktop:demo.desktop".into(),
+                        name: "demo".into(),
+                        exec: "demo".into(),
+                        enabled: false,
+                        source: StartupSource::DesktopEntry,
+                        scope: StartupScope::User,
+                        control_policy: StartupControlPolicy::Direct,
+                        locator: "/tmp/demo.desktop".into(),
+                        impact: StartupImpact::None,
+                        impact_evidence: StartupImpactEvidence::Unknown {
+                            reason: StartupImpactUnknownReason::NotInstrumented,
+                        },
                     },
+                    enabled: true,
                 },
-                enabled: true,
-            },
-        })
-        .expect("startup control accepted");
-    handle
-        .session_control()
-        .expect("session control facet")
-        .try_submit(RequestEnvelope {
-            id: request_ids.next_id(),
-            capability: CapabilityId::SESSION_CONTROL,
-            submitted_at_ms: 1,
-            payload: SessionControlRequest {
-                request_id: session_id,
-                session_id: "7".into(),
-                action: SessionControlAction::Lock,
-            },
-        })
-        .expect("session control accepted");
+            })
+            .expect("startup control accepted");
+        submit_handle
+            .session_control()
+            .expect("session control facet")
+            .try_submit(RequestEnvelope {
+                id: request_ids.next_id(),
+                capability: CapabilityId::SESSION_CONTROL,
+                submitted_at_ms: 1,
+                payload: SessionControlRequest {
+                    request_id: session_id,
+                    session_id: "7".into(),
+                    action: SessionControlAction::Lock,
+                },
+            })
+            .expect("session control accepted");
+
+        submitted.send(()).expect("submission receipt");
+    });
+    let acknowledged = acknowledgement.recv_timeout(Duration::from_secs(5));
+    let no_effects_before_release = startup_controls.lock().expect("startup effects").is_empty()
+        && session_controls.lock().expect("session effects").is_empty();
+    // Always release first, including on failure, so a blocking regression
+    // can terminate its provider and submission worker before the assertion.
+    control_gate.release();
+    submission.join().expect("submission worker");
     assert!(
-        started.elapsed() < Duration::from_millis(50),
-        "control facets blocked for {:?}",
-        started.elapsed()
+        acknowledged.is_ok(),
+        "submissions must return while both providers remain blocked"
+    );
+    assert!(
+        no_effects_before_release,
+        "accepted requests cannot claim completed provider effects"
     );
 
     let events = [wait_event(&handle), wait_event(&handle)];

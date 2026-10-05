@@ -22,12 +22,15 @@ use taskmanager_shell::presentation::missing_value;
 /// call sites that have not migrated to a unit-carrying variant yet. The
 /// [`From<MetricSeries>`] keeps the fixed system-wide metric histories on the
 /// same rule as the per-device graphs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum DeviceMetricScale {
     /// Fixed 0..100 ceiling (utilization %, battery charge %).
     Percent,
     /// Ceiling tracks the finite peak across the window (bytes/sec, RPM, °C, MHz).
+    #[default]
     AutoPeak,
+    /// Memory magnitude in bytes, formatted with the selected storage base.
+    Bytes { use_base2: bool },
     /// Bytes-per-second magnitude whose summary/hover readout formats through
     /// the resolved Drive or Network unit pair (bytes-vs-bits × base-2-vs-
     /// base-10) the call site owns — a disk graph passes the drive pair, a NIC
@@ -75,6 +78,7 @@ pub(crate) fn series_max(scale: impl Into<DeviceMetricScale>, samples: &[f32]) -
     match scale.into() {
         DeviceMetricScale::Percent => PERCENT_MAX,
         DeviceMetricScale::AutoPeak
+        | DeviceMetricScale::Bytes { .. }
         | DeviceMetricScale::BytesPerSecond { .. }
         | DeviceMetricScale::Rpm
         | DeviceMetricScale::Watts
@@ -87,7 +91,9 @@ pub(crate) fn series_max(scale: impl Into<DeviceMetricScale>, samples: &[f32]) -
 fn scale_unit_suffix(scale: DeviceMetricScale) -> &'static str {
     match scale {
         DeviceMetricScale::Percent => "%",
-        DeviceMetricScale::AutoPeak | DeviceMetricScale::BytesPerSecond { .. } => "",
+        DeviceMetricScale::AutoPeak
+        | DeviceMetricScale::Bytes { .. }
+        | DeviceMetricScale::BytesPerSecond { .. } => "",
         DeviceMetricScale::Rpm => " RPM",
         DeviceMetricScale::Watts => " W",
         DeviceMetricScale::Celsius => " \u{b0}C",
@@ -103,6 +109,13 @@ pub(crate) fn summary_value(scale: DeviceMetricScale, value: f32) -> String {
         | DeviceMetricScale::Celsius
         | DeviceMetricScale::Megahertz => format!("{value:.0}{unit}"),
         DeviceMetricScale::Watts | DeviceMetricScale::AutoPeak => format!("{value:.1}{unit}"),
+        DeviceMetricScale::Bytes { use_base2 } => {
+            if value.is_finite() && value >= 0.0 {
+                quantity_text_pref(value.round() as u64, true, use_base2)
+            } else {
+                missing_value()
+            }
+        }
         DeviceMetricScale::BytesPerSecond {
             use_bytes,
             use_base2,

@@ -2,15 +2,16 @@
 
 use iced::widget::{column, container, row, scrollable, text, text_input};
 use iced::{Element, Length};
-use taskmanager_application::ProcessInsightFacetState;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
+use taskmanager_application::{ProcessInsightFacet, ProcessInsightFacetState};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::presentation::process_insight_facet_label;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -19,7 +20,8 @@ use taskmanager_theme::tokens;
 use crate::app::Message;
 use crate::focus;
 use crate::ui::components::key_value_rows;
-use crate::ui::device_chart;
+mod performance;
+use performance::performance_tab;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
 use taskmanager_application::process_details_vm::render_environment_value;
 use taskmanager_application::process_details_vm::render_environment_variable;
@@ -90,9 +92,12 @@ pub(crate) fn details_overlay<'a>(
         )),
         crate::app::DetailsSection::Performance => performance_tab(app, identity),
         crate::app::DetailsSection::Command => command_tab(app, identity),
-        crate::app::DetailsSection::Insights => {
-            crate::ui::insights::insights_block(theme_snapshot, shell, &target)
-        }
+        crate::app::DetailsSection::Insights => crate::ui::insights::insights_block(
+            theme_snapshot,
+            shell,
+            &target,
+            app.process_presentation.insights_facet,
+        ),
     };
 
     let header = row![
@@ -101,20 +106,47 @@ pub(crate) fn details_overlay<'a>(
     ]
     .spacing(8);
 
-    super::modal_overlay(
-        theme_snapshot,
+    let facets: Vec<Element<'a, Message>> =
+        if app.details_section() == crate::app::DetailsSection::Insights {
+            ProcessInsightFacet::ALL
+                .into_iter()
+                .map(|facet| {
+                    focus::choice_pill(
+                        theme_snapshot,
+                        crate::app::FocusTarget::DetailsFacet(facet),
+                        process_insight_facet_label(facet).to_owned(),
+                        app.process_presentation.insights_facet == facet,
+                        Message::SelectInsightsFacet(facet),
+                    )
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+    let actions = if app.details_section() == crate::app::DetailsSection::Insights {
+        vec![focus::button(
+            theme_snapshot,
+            crate::app::FocusTarget::DetailsRefresh,
+            t("common.refresh"),
+            Message::RefreshProcessInsights,
+            false,
+        )]
+    } else {
+        Vec::new()
+    };
+    super::bounded_modal_overlay(
+        app,
         t("prop.process_details"),
-        t("prop.frozen_hint"),
         column![
             header,
-            row(tabs).spacing(4),
-            scrollable(body)
-                .height(Length::Fixed(440.0))
-                .width(Length::Fill),
+            row(tabs).spacing(4).wrap(),
+            row(facets).spacing(4).wrap(),
+            scrollable(body).height(Length::Fill).width(Length::Fill)
         ]
         .spacing(8)
+        .height(Length::Fill)
         .into(),
-        appear,
+        actions,
     )
 }
 
@@ -132,7 +164,7 @@ fn overview_rows_with_local_time(
     shell: &ShellApp,
     local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let Some(process) = shell.visible_process_by_identity(identity) else {
+    let Some(process) = shell.process_by_identity(identity) else {
         return property_rows(identity, shell);
     };
     property_pairs(process, local_time_rules)
@@ -152,7 +184,7 @@ fn command_rows_with_local_time(
     shell: &ShellApp,
     local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let process = shell.visible_process_by_identity(identity);
+    let process = shell.process_by_identity(identity);
     let mut rows = Vec::new();
     let Some(process) = process else {
         push_property(&mut rows, t("common.name"), Some(MISSING_VALUE));
@@ -218,7 +250,7 @@ fn command_tab<'a>(
     let theme_snapshot = app.theme();
     let shell = &app.shell;
     let mut rows = command_rows_with_local_time(identity, shell, &app.local_time_rules);
-    let process = shell.visible_process_by_identity(identity);
+    let process = shell.process_by_identity(identity);
     let mut actions = Vec::new();
     if let Some(cmd) = process
         .map(|p| p.cmdline.as_str())
@@ -417,139 +449,6 @@ fn environment_section<'a>(
     .into()
 }
 
-fn performance_tab<'a>(
-    app: &'a crate::IcedApp,
-    identity: ProcessLiveKey,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let theme_snapshot = app.theme();
-    let smooth = true;
-    let process = app.shell.visible_process_by_identity(identity);
-    let local_time_rules = &app.local_time_rules;
-    let history = app.process_perf_series();
-    let cpu = history.as_ref().map_or_else(
-        || std::rc::Rc::from([].as_slice()),
-        |snapshot| std::rc::Rc::clone(&snapshot.cpu),
-    );
-    let memory = history.as_ref().map_or_else(
-        || std::rc::Rc::from([].as_slice()),
-        |snapshot| std::rc::Rc::clone(&snapshot.memory),
-    );
-    let read = history.as_ref().map_or_else(
-        || std::rc::Rc::from([].as_slice()),
-        |snapshot| std::rc::Rc::clone(&snapshot.disk_read),
-    );
-    let write = history.as_ref().map_or_else(
-        || std::rc::Rc::from([].as_slice()),
-        |snapshot| std::rc::Rc::clone(&snapshot.disk_write),
-    );
-
-    let cpu_caption = process.map_or_else(
-        || t("common.cpu").to_string(),
-        |process| {
-            let vm = details_vm(process, local_time_rules);
-            match detail_value(&vm, ProcessDetailsField::Cpu) {
-                DetailValue::Text(_) => {
-                    format!("{}  {}", t("common.cpu"), vm_cpu_cell(&vm))
-                }
-                DetailValue::Missing => format!("{}  {}", t("common.cpu"), MISSING_VALUE),
-            }
-        },
-    );
-    let memory_caption = process.map_or_else(
-        || t("common.memory").to_string(),
-        |process| {
-            format!(
-                "{}  {}",
-                t("common.memory"),
-                vm_text(
-                    &details_vm(process, local_time_rules),
-                    ProcessDetailsField::Memory
-                )
-            )
-        },
-    );
-    let read_caption = process.map_or_else(
-        || t("proc.disk_read").to_string(),
-        |process| {
-            format!(
-                "{}  {}",
-                t("proc.disk_read"),
-                vm_text(
-                    &details_vm(process, local_time_rules),
-                    ProcessDetailsField::DiskReadRate
-                )
-            )
-        },
-    );
-    let write_caption = process.map_or_else(
-        || t("proc.disk_write").to_string(),
-        |process| {
-            format!(
-                "{}  {}",
-                t("proc.disk_write"),
-                vm_text(
-                    &details_vm(process, local_time_rules),
-                    ProcessDetailsField::DiskWriteRate
-                )
-            )
-        },
-    );
-
-    let palette = theme_snapshot.palette();
-    column![
-        device_chart::device_mini_graph(
-            cpu,
-            device_chart::DeviceMetricScale::Percent,
-            crate::theme_binding::color(palette.accent),
-            cpu_caption,
-            theme_snapshot,
-            device_chart::GraphPrefs {
-                smooth,
-                max_override: None,
-                hover: false,
-            },
-        ),
-        device_chart::device_mini_graph(
-            memory,
-            device_chart::DeviceMetricScale::AutoPeak,
-            crate::theme_binding::color(palette.success),
-            memory_caption,
-            theme_snapshot,
-            device_chart::GraphPrefs {
-                smooth,
-                max_override: None,
-                hover: false,
-            },
-        ),
-        device_chart::device_mini_graph(
-            read,
-            device_chart::DeviceMetricScale::AutoPeak,
-            crate::theme_binding::color(theme_snapshot.disk),
-            read_caption,
-            theme_snapshot,
-            device_chart::GraphPrefs {
-                smooth,
-                max_override: None,
-                hover: false,
-            },
-        ),
-        device_chart::device_mini_graph(
-            write,
-            device_chart::DeviceMetricScale::AutoPeak,
-            crate::theme_binding::color(theme_snapshot.disk),
-            write_caption,
-            theme_snapshot,
-            device_chart::GraphPrefs {
-                smooth,
-                max_override: None,
-                hover: false,
-            },
-        ),
-    ]
-    .spacing(8)
-    .into()
-}
-
 pub(crate) fn properties_target(shell: &ShellApp) -> Option<&FrozenProcessIdentity> {
     shell.process_properties_target()
 }
@@ -564,7 +463,7 @@ fn property_rows_with_local_time(
     shell: &ShellApp,
     local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let process = shell.visible_process_by_identity(identity);
+    let process = shell.process_by_identity(identity);
     let Some(process) = process else {
         let mut rows = Vec::new();
         push_property(&mut rows, t("common.name"), Some(MISSING_VALUE));
@@ -614,6 +513,7 @@ fn property_pairs(
         row(ProcessDetailsField::Memory, t("common.memory")),
         row(ProcessDetailsField::Pss, t("proc.pss")),
         row(ProcessDetailsField::Uss, t("proc.uss")),
+        row(ProcessDetailsField::Swap, t("proc.swap")),
         row(ProcessDetailsField::Shared, t("proc.shared")),
         row(
             ProcessDetailsField::AnonHugePages,
@@ -667,3 +567,7 @@ fn push_property(rows: &mut Vec<(String, String)>, label: &str, value: Option<&s
 #[cfg(test)]
 #[path = "../../../tests/gui/ui/overlays/process_details_vm_parity_tests.rs"]
 mod vm_parity_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/overlays/process_properties_layout.rs"]
+mod properties_layout_tests;

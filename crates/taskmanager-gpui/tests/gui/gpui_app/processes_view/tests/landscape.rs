@@ -2,8 +2,9 @@
 
 use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px, size};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
-use crate::gpui_app::root::{NavOrientation, TopPage};
+use crate::gpui_app::root::TopPage;
 use taskmanager_shell::SortCol;
 
 /// The returned rails must drive the real GPUI handles, not merely register a

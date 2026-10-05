@@ -321,6 +321,14 @@ capture_one() {
     local rendered=unknown control=unknown
     local expected_width expected_height
     IFS=x read -r expected_width expected_height <<<"$window_size"
+    if [[ "$page" == "history-replay" || "$page" == "application-history-replay" ]]; then
+        mkdir -p "$RUNTIME_DIR/config/taskmanager"
+        printf '{"history_persistence":true}\n' >"$RUNTIME_DIR/config/taskmanager/config.json"
+        local history_kind=system
+        [[ "$page" == "application-history-replay" ]] && history_kind=application
+        timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" \
+            --directory "$RUNTIME_DIR/data/taskmanager/history" --kind "$history_kind"
+    fi
     XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
         XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
         XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \
@@ -328,7 +336,7 @@ capture_one() {
         TM_SKIN="$skin" \
         LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
     app_pid=$!
-    for _ in $(seq 1 120); do
+    for _ in $(seq 1 300); do
         if grep -q "BEVY_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$log" 2>/dev/null \
             && grep -q "BEVY_CAPTURE_MARKER event=target_ready mode=demo page=$page" "$log" 2>/dev/null; then
             break
@@ -337,15 +345,31 @@ capture_one() {
         sleep 0.1
     done
     grep 'BEVY_CAPTURE_MARKER' "$log" >"$markers" 2>/dev/null || true
+    if ! grep -q "BEVY_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$markers" \
+        || ! grep -q "BEVY_CAPTURE_MARKER event=target_ready mode=demo page=$page" "$markers"; then
+        printf '  FAIL %-22s (painted readiness missing)\n' "$name" >&2
+        kill "$app_pid" 2>/dev/null || true
+        wait "$app_pid" 2>/dev/null || true
+        return 1
+    fi
     sleep "${TM_BEVY_CAPTURE_SETTLE_SECONDS:-0.5}"
-    NIRI_SOCKET="$IPC" timeout 5s niri msg -j windows >"$windows" 2>/dev/null || true
-    window_id="$(jq -r --arg app "$APP_ID" --arg pid "$app_pid" \
-        '[.[] | select(.app_id == $app and ((.pid|tostring) == $pid))] | if length == 1 then .[0].id else empty end' \
-        "$windows" 2>/dev/null || true)"
+    window_id=""
+    for _ in $(seq 1 60); do
+        NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows" 2>/dev/null || true
+        window_id="$(jq -r --arg app "$APP_ID" --arg pid "$app_pid" \
+            '[.[] | select(.app_id == $app and ((.pid|tostring) == $pid))] | if length >= 1 then .[0].id else empty end' \
+            "$windows" 2>/dev/null || true)"
+        if [ -n "$window_id" ]; then
+            break
+        fi
+        sleep 0.2
+    done
     if [ -n "$window_id" ]; then
         printf 'window_id=%s\n' "$window_id" >"$action"
         printf 'action=screenshot-window --id %s --write-to-disk true --path %s\n' \
             "$window_id" "$image" >>"$action"
+        for paint_attempt in $(seq 1 20); do
+            rm -f "$image"
         if NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
             --id "$window_id" --write-to-disk true --path "$image" >>"$action" 2>&1; then
             # Niri acknowledges the action before the PNG writer has flushed
@@ -362,11 +386,16 @@ capture_one() {
                 bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
                 hash="$(sha256sum "$image" | cut -d' ' -f1)"
                 rendered="$(appearance_of "$image")"
-                if [ "${width:-0}" -ge "$expected_width" ] && [ "${height:-0}" -ge "$expected_height" ]; then
+                if [ "${width:-0}" -ge "$expected_width" ] && [ "${height:-0}" -ge "$expected_height" ] \
+                    && timeout --kill-after=2s 10s python3 "$REPO/scripts/validate_bevy_matrix.py" --probe-content "$image" >>"$action" 2>&1; then
                     status=ok
+                    break
                 fi
             fi
         fi
+            kill -0 "$app_pid" 2>/dev/null || break
+            sleep 0.5
+        done
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$name" "$page" "$window_size" "$name/image.png" "$name/markers.log" \

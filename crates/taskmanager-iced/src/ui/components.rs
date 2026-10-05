@@ -5,6 +5,7 @@
 //! decisions; they compose these components instead of rebuilding the same
 //! panel, state, key/value, or outer-page structure.
 
+use iced::advanced::text::IntoFragment;
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
@@ -18,6 +19,7 @@ use taskmanager_ui_contract::IconId;
 use crate::app::{FocusTarget, Message};
 use crate::theme;
 
+pub(crate) mod dashboard_budget;
 pub(crate) mod highlight;
 pub(crate) mod inputs;
 pub(crate) mod popover;
@@ -46,6 +48,32 @@ pub(crate) fn page_scaffold<'a>(
         .into()
 }
 
+/// Root rail and page consume separate width slots; footer stays mandatory.
+pub(crate) fn page_scaffold_with_rail<'a>(
+    rail: IcedElement<'a>,
+    toolbar: IcedElement<'a>,
+    body: IcedElement<'a>,
+    footer: IcedElement<'a>,
+) -> IcedElement<'a> {
+    column![
+        row![
+            rail,
+            column![toolbar, body]
+                .spacing(8)
+                .width(Length::Fill)
+                .height(Length::Fill)
+        ]
+        .spacing(8)
+        .height(Length::Fill),
+        footer
+    ]
+    .spacing(8)
+    .padding(10)
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .into()
+}
+
 /// The card surface every card-shaped iced component wears: the theme's
 /// elevated panel fill with the palette's border and panel radius plus the
 /// quiet card shadow. Exposed as the components module's owned seam so pages
@@ -63,7 +91,7 @@ pub(crate) fn card_surface(theme_snapshot: &Theme) -> iced::widget::container::S
 #[must_use]
 pub(crate) fn titled_card<'a>(
     theme_snapshot: &'a Theme,
-    title: &'static str,
+    title: impl IntoFragment<'a>,
     body: impl Into<IcedElement<'a>>,
 ) -> IcedElement<'a> {
     container(

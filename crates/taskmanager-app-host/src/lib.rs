@@ -231,10 +231,26 @@ impl NativeAppHost {
     /// platform-specific user-data locations.
     #[must_use]
     pub fn production() -> Self {
+        Self::from_paths(
+            native_config_path(),
+            native_history_dir(),
+            native_local_time_rules(),
+        )
+    }
+
+    /// Compose an isolated host over caller-owned user-data locations and a
+    /// cached time observation. Construction performs no storage work; all
+    /// configuration and history access remains behind the lazy workers.
+    #[must_use]
+    pub fn from_paths(
+        config_path: PathBuf,
+        history_root: PathBuf,
+        local_time: LocalTimeRulesObservation,
+    ) -> Self {
         Self {
-            config_path: native_config_path(),
-            history_root: native_history_dir(),
-            local_time_cache: Arc::new(StartupLocalTimeCache::capture(native_local_time_rules())),
+            config_path,
+            history_root,
+            local_time_cache: Arc::new(StartupLocalTimeCache::capture(local_time)),
             config_runtime: Arc::new(OnceLock::new()),
             history_replay_runtime: Arc::new(OnceLock::new()),
             history_persistence_runtime: Arc::new(OnceLock::new()),

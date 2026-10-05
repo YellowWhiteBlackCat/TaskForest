@@ -7,6 +7,65 @@ use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, Diagnos
 
 use crate::path_contract::is_single_filename;
 use taskmanager_core::DiagnosticSource;
+use taskmanager_core::core::diagnostics::DiagnosticPreview;
+
+/// One review/export lifecycle; a renderer stores it in its sole surface slot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiagnosticBundleUiState {
+    Preview(DiagnosticBundlePlan),
+    Writing(DiagnosticPreview),
+    Complete(PathBuf),
+    Failed(DiagnosticBundleError),
+}
+
+impl DiagnosticBundleUiState {
+    #[must_use]
+    pub fn prepared(plan: Result<DiagnosticBundlePlan, DiagnosticBundleError>) -> Self {
+        match plan {
+            Ok(plan) => Self::Preview(plan),
+            Err(error) => Self::Failed(error),
+        }
+    }
+
+    /// Only explicit confirmation of the displayed sanitized plan can write.
+    /// A repeated confirm while Writing has no effect.
+    pub fn confirm<P: DiagnosticBundlePort>(
+        &mut self,
+        session: Option<&mut DiagnosticBundleSession<P>>,
+        target: DiagnosticBundleTarget,
+    ) -> bool {
+        let Self::Preview(plan) = self else {
+            return false;
+        };
+        let preview = plan.preview().clone();
+        let result = session.map_or_else(
+            || {
+                Err(DiagnosticBundleError::new(
+                    DiagnosticBundleErrorKind::Unavailable,
+                ))
+            },
+            |session| session.submit(plan.clone(), target),
+        );
+        *self = match result {
+            Ok(_) => Self::Writing(preview),
+            Err(error) => Self::Failed(error),
+        };
+        true
+    }
+
+    /// The session filters correlation first. A completion cannot replace a
+    /// newer preview or an unrelated surface.
+    pub fn complete(&mut self, completion: DiagnosticBundleCompletion) -> bool {
+        if !matches!(self, Self::Writing(_)) {
+            return false;
+        }
+        *self = match completion.result {
+            Ok(()) => Self::Complete(completion.destination),
+            Err(error) => Self::Failed(error),
+        };
+        true
+    }
+}
 
 /// Prepare a privacy-safe service-log export using the same diagnostic bundle
 /// redaction contract as the full diagnostics surface.

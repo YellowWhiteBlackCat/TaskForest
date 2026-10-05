@@ -1,10 +1,13 @@
+use super::view::ProcessInsightsViewProps;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window, px, size};
+use gpui::{ParentElement, Styled, div};
 use taskmanager_application::CorrelatedEvent;
 use taskmanager_application::NetworkEscalationReady;
 use taskmanager_application::PlatformEvent;
 use taskmanager_application::PlatformEventBatch;
 use taskmanager_application::PlatformEventContext;
 use taskmanager_application::ProcessEvent;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::ProcessNetworkEscalationRequest;
 use taskmanager_application::TelemetryRefreshPolicy;
 use taskmanager_core::core::FailureKind;
@@ -23,27 +26,27 @@ use taskmanager_platform_contract::RequestId;
 use taskmanager_platform_contract::RequestPort;
 use taskmanager_platform_contract::RetryDisposition;
 use taskmanager_platform_contract::SubmissionError;
+use taskmanager_shell::fixture::process_insights::process_insights_snapshot;
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 
 use taskmanager_application::NetworkEscalationState;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process_telemetry::{ProcessIdentity, ProcessTelemetrySnapshot};
+use taskmanager_application::ProjectedProcessInsights;
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskmanager_shell::fixture::process_insights::process_insights_projection_from_snapshot;
 use taskmanager_theme::Theme;
 
 use super::view::format_connection;
-use super::{
-    ProcessInsightsError, ProcessInsightsErrorKind, ProcessInsightsLabels,
-    ProcessInsightsRenderState, ProcessInsightsState, process_insights_capture_fixture,
-    process_insights_layout, render_process_insights, state_from_snapshot,
-};
+use super::{ProcessInsightsLabels, ProcessInsightsRenderState, render_process_insights};
 
 fn escalation_failed(state: NetworkEscalationState) -> bool {
     matches!(state, NetworkEscalationState::Failed(_))
 }
 
 struct FixtureView {
-    state: ProcessInsightsState,
+    projection: ProjectedProcessInsights,
     labels: ProcessInsightsLabels,
     theme: Theme,
     net_escalation: NetworkEscalationState,
@@ -53,66 +56,41 @@ struct FixtureView {
 impl Render for FixtureView {
     fn render(&mut self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let available = (f32::from(window.viewport_size().width) - 80.0).max(240.0);
-        let state = match &self.state {
-            ProcessInsightsState::Loading { .. } => ProcessInsightsRenderState::Loading,
-            ProcessInsightsState::Ready(snapshot) => ProcessInsightsRenderState::Ready(snapshot),
-            ProcessInsightsState::Error(error) => ProcessInsightsRenderState::Error(error),
-        };
-        render_process_insights(
-            &self.theme,
-            state,
-            &self.labels,
-            available,
-            self.net_escalation,
-            self.entity.clone(),
-            UnitPreferences::default(),
-        )
+        let state = ProcessInsightsRenderState::Projection(&self.projection);
+        div()
+            .flex()
+            .flex_col()
+            .children(ProcessInsightFacet::ALL.into_iter().map(|facet| {
+                render_process_insights(ProcessInsightsViewProps {
+                    theme: &self.theme,
+                    state,
+                    labels: &self.labels,
+                    available_width: available,
+                    net_escalation: self.net_escalation,
+                    entity: self.entity.clone(),
+                    units: UnitPreferences::default(),
+                    facet,
+                    first: 0,
+                })
+            }))
     }
 }
 
-#[test]
-fn typed_state_preserves_unavailable_as_an_error_not_zero() {
-    let mut snapshot = ProcessTelemetrySnapshot {
-        identity: ProcessIdentity {
-            pid: 77,
-            start_token: 1,
-        },
-        state: DeviceState::healthy(10),
-        ..Default::default()
-    };
-    snapshot.state = snapshot
-        .state
-        .transition(DeviceStatus::PermissionDenied, 20);
-    assert_eq!(
-        state_from_snapshot(snapshot),
-        ProcessInsightsState::Error(ProcessInsightsError {
-            identity: ProcessLiveKey::from_parts(77, 1),
-            kind: ProcessInsightsErrorKind::PermissionDenied,
-            last_success_ms: Some(10),
-        })
-    );
-    let ProcessInsightsState::Ready(fixture) = process_insights_capture_fixture() else {
-        panic!("capture fixture must be ready")
-    };
-    assert_eq!(fixture.network.rx_bytes_per_sec, None);
-    assert_eq!(
-        fixture.network.traffic_state.status,
-        DeviceStatus::Unsupported
-    );
-}
-
-#[test]
-fn responsive_layout_switches_to_one_column_at_compact_width() {
-    assert_eq!(process_insights_layout(1100.0).columns, 2);
-    assert_eq!(process_insights_layout(640.0).columns, 1);
-    assert!(process_insights_layout(180.0).card_width >= 240.0);
+fn fixture_projection(snapshot: ProcessTelemetrySnapshot) -> ProjectedProcessInsights {
+    let target = FrozenProcessIdentity::from_authoritative_parts(
+        snapshot.identity.pid,
+        "fixture",
+        1,
+        snapshot.identity.start_token,
+    )
+    .expect("fixture identity");
+    process_insights_projection_from_snapshot(target, snapshot)
+        .expect("fixture application projection")
 }
 
 #[test]
 fn connection_readout_preserves_ip_labels_and_displays_local_endpoint_truth() {
-    let ProcessInsightsState::Ready(fixture) = process_insights_capture_fixture() else {
-        panic!("capture fixture must be ready")
-    };
+    let fixture = process_insights_snapshot();
 
     assert_eq!(
         format_connection(&fixture.network.connections[0]),
@@ -139,7 +117,7 @@ async fn capture_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestApp
     let window = cx.add_window(|_window, _cx| {
         let entity = _cx.new(|cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
         FixtureView {
-            state: process_insights_capture_fixture(),
+            projection: fixture_projection(process_insights_snapshot()),
             labels: ProcessInsightsLabels::capture_fixture(),
             theme: Theme::dark(),
             net_escalation: NetworkEscalationState::Closed,
@@ -163,18 +141,13 @@ async fn escalation_pill_renders_for_requires_escalation_and_submits_on_click(
 ) {
     use taskmanager_core::core::{DeviceStatus, FailureKind};
 
-    let mut snapshot = {
-        let ProcessInsightsState::Ready(snapshot) = process_insights_capture_fixture() else {
-            panic!("capture fixture must be ready");
-        };
-        *snapshot
-    };
+    let mut snapshot = process_insights_snapshot();
     snapshot.network.traffic_failure = Some(FailureKind::RequiresEscalation);
     snapshot.network.traffic_state =
         DeviceState::default().transition(DeviceStatus::PermissionDenied, 1);
     let entity = cx.new(|cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
     let window = cx.add_window(|_window, _cx| FixtureView {
-        state: ProcessInsightsState::Ready(Box::new(snapshot)),
+        projection: fixture_projection(snapshot),
         labels: ProcessInsightsLabels::capture_fixture(),
         theme: Theme::dark(),
         net_escalation: NetworkEscalationState::Closed,
@@ -258,7 +231,8 @@ fn root_with_escalation_platform(
         std::sync::Arc::new(NoEvents),
         facets,
     ));
-    let (telemetry, ingestor) = TelemetryStore::shared_with_correlated_ingestion(60);
+    let (telemetry, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(60));
     let view = cx.new(|cx| {
         crate::gpui_app::root::RootView::new_with_platform(
             Theme::dark(),
@@ -437,18 +411,13 @@ async fn failed_escalation_state_renders_the_clickable_retry_pill(cx: &mut gpui:
     use taskmanager_core::core::{DeviceStatus, FailureKind};
     use taskmanager_platform_contract::RequestId;
 
-    let mut snapshot = {
-        let ProcessInsightsState::Ready(snapshot) = process_insights_capture_fixture() else {
-            panic!("capture fixture must be ready");
-        };
-        *snapshot
-    };
+    let mut snapshot = process_insights_snapshot();
     snapshot.network.traffic_failure = Some(FailureKind::RequiresEscalation);
     snapshot.network.traffic_state =
         DeviceState::default().transition(DeviceStatus::PermissionDenied, 1);
     let entity = cx.new(|cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
     let window = cx.add_window(|_window, _cx| FixtureView {
-        state: ProcessInsightsState::Ready(Box::new(snapshot)),
+        projection: fixture_projection(snapshot),
         labels: ProcessInsightsLabels::capture_fixture(),
         theme: Theme::dark(),
         net_escalation: NetworkEscalationState::Failed(NetworkEscalationFailed {
@@ -476,5 +445,47 @@ async fn failed_escalation_state_renders_the_clickable_retry_pill(cx: &mut gpui:
         escalation_failed(escalation),
         "clicking the failed pill must re-submit (degrading to the typed failure \
          in this no-platform harness), never be a dead control"
+    );
+}
+
+#[gpui::test]
+fn independent_missing_and_pending_messages_paint_their_own_facet(cx: &mut TestAppContext) {
+    use taskmanager_application::{ProcessInsightFacetState, ProcessInsightUnavailable};
+    let mut labels = ProcessInsightsLabels::capture_fixture();
+    labels.loading = "PENDING";
+    labels.permission_denied = "DENIED";
+    labels.unsupported = "UNSUPPORTED";
+    let mut projection = fixture_projection(process_insights_snapshot());
+    projection.network = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
+    );
+    projection.gpu = ProcessInsightFacetState::Unavailable(ProcessInsightUnavailable::Provider(
+        FailureKind::Unsupported,
+    ));
+    projection.resources = ProcessInsightFacetState::Pending;
+    let entity = cx.new(|cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
+    let window = cx.add_window(|_, _| FixtureView {
+        projection,
+        labels,
+        theme: Theme::dark(),
+        net_escalation: NetworkEscalationState::Closed,
+        entity,
+    });
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    let mut view = gpui::VisualTestContext::from_window(window.into(), cx);
+    for selector in [
+        "properties-insight-state:Network:unavailable:DENIED",
+        "properties-insight-state:Gpu:unavailable:UNSUPPORTED",
+        "properties-insight-state:Resources:pending:PENDING",
+    ] {
+        let bounds = view
+            .debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} must paint"));
+        assert!(bounds.size.width > px(0.0) && bounds.size.height > px(0.0));
+    }
+    assert!(
+        view.debug_bounds("properties-insight-state:Gpu:unavailable:DENIED")
+            .is_none()
     );
 }

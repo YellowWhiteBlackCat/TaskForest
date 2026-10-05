@@ -15,6 +15,7 @@ use super::containers::{
 use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_shell::presentation::control_error_detail;
@@ -186,10 +187,11 @@ pub(super) fn startup_page_layout(
     sources: Option<&[SourceStatus]>,
 ) -> StartupPageLayout {
     let (timeline, table_before_notice) = match timeline_rows {
-        Some(rows) if area.height >= 12 => {
+        Some(rows) if area.height >= 8 => {
             let height = rows
                 .saturating_add(2)
-                .min(usize::from(area.height / 2))
+                .min(usize::from((area.height / 2).max(5)))
+                .min(usize::from(area.height.saturating_sub(3)))
                 .min(usize::from(u16::MAX));
             let [timeline, table] = Layout::vertical([
                 Constraint::Length(u16::try_from(height).unwrap_or(u16::MAX)),
@@ -365,6 +367,10 @@ impl SystemFactViewport {
 }
 
 pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    if app.system_section == SystemPageSection::Dashboard {
+        super::system_dashboard::render(frame, app, theme, area);
+        return;
+    }
     let smbios_snapshot = match app.shell.smbios_memory_state() {
         SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
         _ => None,
@@ -389,7 +395,9 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
         );
     }
 
-    let viewport = SystemFactViewport::resolve(lines.len(), app.system_scroll, area);
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+    let rendered_rows = paragraph.line_count(area.width.saturating_sub(2));
+    let viewport = SystemFactViewport::resolve(rendered_rows, app.system_scroll, area);
     let title = if viewport.is_windowed() {
         format!(
             "{} · ↑/↓ {}–{} / {}",
@@ -401,12 +409,57 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
     } else {
         t("page.system_help").to_owned()
     };
+    let title = if Line::from(title.as_str()).width() > usize::from(area.width.saturating_sub(2)) {
+        format!(
+            "{} · ↑/↓ {}–{} / {}",
+            t("system.title"),
+            viewport.start.saturating_add(1),
+            viewport.end,
+            viewport.total,
+        )
+    } else {
+        title
+    };
     frame.render_widget(
-        Paragraph::new(lines[viewport.start..viewport.end].to_vec())
+        paragraph
             .block(panel(&title, theme))
-            .wrap(Wrap { trim: true }),
+            .scroll((u16::try_from(viewport.start).unwrap_or(u16::MAX), 0)),
         area,
     );
+}
+
+pub(super) fn memory_inventory_capture_offset(
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+) -> Option<usize> {
+    let SmbiosMemoryState::Ready(ready) = app.shell.smbios_memory_state() else {
+        return None;
+    };
+    let sections = system_data::system_sections(
+        app.projection().hardware.as_ref(),
+        app.projection().snapshot.as_ref(),
+        app.projection().npu_inventory.as_ref(),
+        Some(&ready.snapshot),
+    );
+    let mut prefix = Vec::new();
+    for section in &sections {
+        if section.title_key == "system.memory_slots" {
+            return Some(
+                Paragraph::new(prefix)
+                    .wrap(Wrap { trim: true })
+                    .line_count(area.width.saturating_sub(2)),
+            );
+        }
+        prefix.push(Line::from(section.title.clone()));
+        prefix.extend(
+            section
+                .facts
+                .iter()
+                .map(|fact| kv(&fact.label, fact.value.clone(), theme)),
+        );
+    }
+    None
 }
 
 pub(super) fn render_startup(

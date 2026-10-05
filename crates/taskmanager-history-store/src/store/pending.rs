@@ -20,8 +20,8 @@ pub const MAX_PENDING_BYTES: usize = 1024 * 1024;
 /// Maximum number of in-session revision guards. A new identity is rejected
 /// once this is reached until retention retires an old series.
 pub const MAX_TRACKED_SERIES: usize = 1_024;
-/// Maximum encoded file-stem size admitted from a series identity.
-pub const MAX_SERIES_KEY_BYTES: usize = 4 * 1024;
+/// Portable ASCII filename component limit, reserving the `.jsonl` suffix.
+pub const MAX_SERIES_KEY_BYTES: usize = 255 - 6;
 
 #[derive(Clone, Copy)]
 pub(super) struct PendingSample {

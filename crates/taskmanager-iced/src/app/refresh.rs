@@ -1,8 +1,8 @@
 //! Named tick systems for platform drain, scheduling and view-local finish.
 
 use super::*;
-use crate::ui::first_run::FirstRunEvent;
-use taskmanager_application::ServiceUpdate;
+use taskmanager_application::first_run::FirstRunCompletion;
+use taskmanager_application::{DesktopAppearanceEvent, ServiceUpdate};
 use taskmanager_core::core::identity::DeviceId;
 
 use taskmanager_application::GpuEngineRowsState;
@@ -41,6 +41,7 @@ impl IcedApp {
         self.drain_config_publications();
         self.drain_history_replay_completions();
         self.drain_snapshot_export_completions();
+        self.drain_diagnostic_bundle_completions();
         self.drain_window_capture_completions();
         let instance_activate = self.runtime.drain_instance_events();
         let tray_activate = crate::tray::drain_tray_events(self);
@@ -58,7 +59,7 @@ impl IcedApp {
     pub(super) fn tick(&mut self) {
         let plan = self.prepare_tick_system();
         let (service_updates, first_run_events) = self.platform_tick_system(plan);
-        self.fold_first_run_events(first_run_events);
+        self.apply_first_run_completion(first_run_events);
         self.finish_tick_system(service_updates);
     }
 
@@ -105,11 +106,12 @@ impl IcedApp {
         }
     }
 
-    fn platform_tick_system(&mut self, plan: TickPlan) -> (Vec<ServiceUpdate>, Vec<FirstRunEvent>) {
+    fn platform_tick_system(&mut self, plan: TickPlan) -> (Vec<ServiceUpdate>, FirstRunCompletion) {
         let Self {
             runtime,
             shell,
             service_details,
+            observed_appearance,
             ..
         } = self;
         let Some(platform) = runtime.platform_mut() else {
@@ -133,7 +135,7 @@ impl IcedApp {
                     ),
                 );
             }
-            return (Vec::new(), Vec::new());
+            return (Vec::new(), FirstRunCompletion::Unchanged);
         };
 
         shell.apply_capability_snapshot(platform.capabilities().snapshot());
@@ -151,10 +153,11 @@ impl IcedApp {
                 // Correlate the first-run lane's own requests before the
                 // shell consumes the batch; the fold itself runs after the
                 // platform borrow ends (see `tick`).
-                let first_run_events = super::update::first_run::extract_batch_events(
-                    &batch,
-                    &mut self.first_run_requests,
-                );
+                let first_run_events = self.first_run.fold_batch(&batch);
+                if let Some(event) = batch.desktop_appearance_events.last() {
+                    let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
+                    *observed_appearance = Some(snapshot.value);
+                }
                 shell.apply_platform_batch(batch);
                 for request in shell.drain_alert_notifications() {
                     queue_effect(
@@ -167,7 +170,7 @@ impl IcedApp {
             }
             Err(error) => {
                 shell.report_event_port_error(error);
-                (Vec::new(), Vec::new())
+                (Vec::new(), FirstRunCompletion::Unchanged)
             }
         };
 
@@ -221,7 +224,14 @@ impl IcedApp {
     }
 
     fn request_selected_process_insights(&mut self) -> Option<PlatformEffect> {
-        let identity = self.shell.selected_process_identity();
+        let identity = if let Some(target) = self.shell.process_properties_target() {
+            target
+                .live_key()
+                .filter(|key| self.shell.process_by_identity(*key).is_some())
+                .map(|_| target.clone())
+        } else {
+            self.shell.selected_process_identity()
+        };
         match identity {
             Some(identity)
                 if self.process_presentation.last_insights_target.as_ref() != Some(&identity) =>
@@ -234,7 +244,7 @@ impl IcedApp {
     }
 }
 
-fn unix_now_ms() -> u64 {
+pub(super) fn unix_now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()

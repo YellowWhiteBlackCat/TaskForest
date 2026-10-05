@@ -48,6 +48,54 @@ fn health_overlay_renders_domain_summary_and_alert_rules() {
 }
 
 #[test]
+fn compact_rule_editor_keeps_the_selected_rule_and_all_actions_reachable() {
+    let mut app = demo_app();
+    app.toggle_health();
+    app.health_rule_selection = app.projection().alert_center.managed_rules().len() - 1;
+    for (width, height) in [(54, 16), (80, 24), (120, 40), (160, 16), (54, 48)] {
+        let text = frame_text(&app, width, height);
+        assert!(text.contains("Threshold:"), "threshold at {width}x{height}");
+        assert!(text.contains("Duration:"));
+        assert!(text.contains("Hysteresis:"));
+        assert!(text.contains("Target:"));
+        assert!(
+            text.contains("h / Esc Close"),
+            "last fixed action is inside the frame"
+        );
+        assert!(text.contains("a Merge"));
+        assert!(text.contains("r Replace"));
+    }
+}
+
+#[test]
+fn every_health_group_and_fixed_action_fits_the_minimum_terminal() {
+    set_language(Language::En);
+    use crate::health_review::HealthReviewMode;
+    use taskmanager_shell::fixture::health::seed_shell_health;
+    let mut app = demo_app();
+    seed_shell_health(&mut app.shell);
+    app.toggle_health();
+    for mode in [HealthReviewMode::Storage, HealthReviewMode::Sensors] {
+        app.select_health_review(mode);
+        let groups = crate::ui::health_review::groups(&app);
+        for (index, group) in groups.iter().enumerate() {
+            app.health_review.selected = index;
+            let text = frame_text(&app, 54, 16);
+            assert!(text.contains("h / Esc Close"));
+            assert!(text.contains("z Short test"));
+            for row in &group.rows {
+                assert!(
+                    text.contains(&row.label),
+                    "{} is reachable in {:?}",
+                    row.label,
+                    mode
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn health_overlay_renders_honest_empty_state_without_a_snapshot() {
     let mut app = demo_app();
     seed_projection_fact(&mut app.shell, ProjectionSeedFact::Snapshot(Box::new(None)));

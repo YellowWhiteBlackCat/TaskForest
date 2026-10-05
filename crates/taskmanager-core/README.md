@@ -23,6 +23,11 @@ the only reuse and change authority.
 ## Key modules
 
 - `src/core/metrics/` owns domain measurements and availability joins.
+- `src/core/config/sidebar.rs` owns deterministic ordering, per-device visibility
+  precedence and bounded preference normalization across all frontend renderers.
+- `src/core/history.rs` emits portable, delimiter-safe and case-injective series
+  names. Its private external-token decoder immediately produces current identities;
+  renderers and persistence writers never carry external spellings.
 - `src/core/process/`, `src/core/services/`, `src/core/startup/` and
   `src/core/export/` own typed product facts.
 - `src/core/process/identity.rs` owns the validated `ProcessLiveKey` used to

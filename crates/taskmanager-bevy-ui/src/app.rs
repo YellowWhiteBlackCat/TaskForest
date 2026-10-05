@@ -31,6 +31,7 @@
 //! folds) reaches the tree only through observers — never polling, never
 //! imperative bulk spawn.
 
+use crate::pages::performance::sidebar_editor::SidebarState;
 use bevy::app::{App, Plugin, Update};
 
 #[cfg(test)]
@@ -64,6 +65,7 @@ use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
 
+use crate::pages::settings::ThemePreferences;
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
@@ -74,7 +76,6 @@ use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::picking::Pickable;
-use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::page_help;
 
@@ -263,26 +264,6 @@ pub(crate) struct NavItemLabel;
 /// Marker on the nav-tab text container, toggled between Flex and None at the 800px breakpoint.
 #[derive(Component, Clone, Default)]
 pub(crate) struct NavTabLabelNode;
-
-/// Responsive breakpoint for the product navigation strip: below 800px the text
-/// labels hide completely and the tabs show only their semantic icons, preventing
-/// text clipping (e.g. "Perform", "Ap").
-pub(crate) fn sync_nav_strip_layout(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    mut label_nodes: Query<&mut Node, With<NavTabLabelNode>>,
-) {
-    let width = windows.iter().next().map_or(1180.0, Window::width);
-    let display = if width < 800.0 {
-        bevy::ui::Display::None
-    } else {
-        bevy::ui::Display::Flex
-    };
-    for mut node in &mut label_nodes {
-        if node.display != display {
-            node.display = display;
-        }
-    }
-}
 
 /// Marker on the one node that hosts the routed page's content scene.
 #[derive(Component, Clone, Default)]
@@ -480,7 +461,7 @@ fn highlight_nav_items(_changed: On<RouteChanged>, mut targets: NavRestyleTarget
     }
 }
 
-/// Bevy 0.19 button activation for both wide and compact route items. Route
+/// Bevy 0.20 button activation for both wide and compact route items. Route
 /// changes still follow the same resource-plus-event protocol as keyboard and
 /// programmatic transitions.
 ///
@@ -545,10 +526,12 @@ pub(crate) struct PageMount {
 /// application-history has a connector-owned lifecycle rather than belonging
 /// to the live process projection.
 pub(crate) struct PageContext<'a> {
+    pub(crate) sidebar: &'a SidebarState,
+    /// Read-only rendering decision from the window's current preferences.
+    pub(crate) gray_zero_values: bool,
     /// The shell: projection store + memoized row projections. Read-only.
     pub(crate) shell: &'a ShellApp,
     /// Persistent Bevy-local process-tree expansion state.
-    pub(crate) process_tree_expansion: &'a crate::pages::process_tree::ProcessTreeExpansion,
     /// Resolved theme tokens for this window (see [`crate::palette`]).
     pub(crate) palette: &'a UiPalette,
     /// Read-only application-history projection from the app-host connector.
@@ -579,9 +562,16 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
 /// Chained after the keyboard adapter: an accepted key press triggers the
 /// despawn observer at the deferred sync point, and this system rebuilds the
 /// content before the frame renders. The first frame mounts the initial page.
+#[derive(SystemParam)]
+struct PagePresentation<'w> {
+    sidebar: Res<'w, SidebarState>,
+    preferences: Res<'w, ThemePreferences>,
+    palette: Res<'w, WindowPalette>,
+}
+
 fn mount_page_system(
     track: ShellTrack,
-    palette: Res<WindowPalette>,
+    presentation: PagePresentation,
     history: Res<HistoryProjectionResource>,
     route: Res<Route>,
     mut mount: ResMut<PageMount>,
@@ -592,15 +582,16 @@ fn mount_page_system(
         return;
     }
     let context = PageContext {
+        sidebar: &presentation.sidebar,
+        gray_zero_values: presentation.preferences.gray_zero_values,
         shell: track.shell(),
-        process_tree_expansion: track.process_tree_expansion(),
-        palette: &palette.inner,
+        palette: &presentation.palette.inner,
         history: &history.0,
     };
     commands.spawn_scene(bsn! {
         PageContent { page: {route.page} }
         ChildOf({*slot})
-        {page_scene(route.page, &context)}
+        @{page_scene(route.page, &context)}
     });
     mount.mounted = Some(route.page);
     mount.requested = false;
@@ -614,7 +605,9 @@ pub(crate) struct AppShellPlugin;
 
 impl Plugin for AppShellPlugin {
     fn build(&self, app: &mut App) {
+        crate::navigation::register(app);
         app.init_resource::<Route>()
+            .init_resource::<SidebarState>()
             .init_resource::<PageMount>()
             .init_resource::<crate::pages::settings::ThemePreferences>()
             .init_resource::<crate::pages::performance::PerformanceSidebarVisible>()
@@ -649,7 +642,7 @@ impl Plugin for AppShellPlugin {
                     crate::input::keyboard_dispatch_system,
                     crate::pages::processes::input::scroll_intent_system,
                     mount_page_system,
-                    sync_nav_strip_layout,
+                    crate::navigation::sync_layout,
                     crate::pages::processes::sync_processes_responsive_layout,
                 )
                     .chain(),
@@ -727,8 +720,8 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
-            (
+             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE --
+
                 Node {
                     min_width: px(0.0),
                     flex_shrink: 1.0,
@@ -738,9 +731,9 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
                 NavTabLabelNode
                 Pickable::IGNORE
                 Children [
-                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
+                     Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
                 ]
-            ),
+
         ]
     }
 }
@@ -769,7 +762,7 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
+             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE
         ]
     }
 }
@@ -794,10 +787,12 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
             padding: UiRect::all(Val::Px(space_8())),
         }
         BackgroundColor({ palette.nav_bg })
+        crate::navigation::NavigationStrip
+        bevy::ui_widgets::ScrollArea
         Children [
-            { tabs },
-            ( Node { flex_grow: 1.0 } ),
-            { trailing },
+            @{crate::navigation::button(palette)} -- { tabs }--
+             Node { flex_grow: 1.0 } crate::navigation::NavigationSpacer --
+            { trailing }
         ]
     }
 }

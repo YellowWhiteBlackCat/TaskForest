@@ -12,6 +12,7 @@ use taskmanager_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields,
 };
@@ -41,6 +42,9 @@ pub(crate) use run_task::*;
 
 pub(crate) mod service_log;
 pub(crate) use service_log::*;
+
+pub(crate) mod diagnostic_preview;
+pub(crate) use diagnostic_preview::*;
 
 /// Select the shell's highest-priority informational overlay.
 pub(super) fn render<'a>(
@@ -140,19 +144,19 @@ pub(super) fn smart_overlay<'a>(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestShort { index },
                                     t("health.short_test"),
-                                    Message::RequestSmartSelfTest {
-                                        index,
-                                        kind: SmartSelfTestKind::Short,
-                                    },
+                                    Message::RequestSmartSelfTest(self_test_intent(
+                                        disk,
+                                        SmartSelfTestKind::Short,
+                                    )),
                                 ))
                                 .push(focus::ghost_button(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestExtended { index },
                                     t("health.extended_test"),
-                                    Message::RequestSmartSelfTest {
-                                        index,
-                                        kind: SmartSelfTestKind::Extended,
-                                    },
+                                    Message::RequestSmartSelfTest(self_test_intent(
+                                        disk,
+                                        SmartSelfTestKind::Extended,
+                                    )),
                                 ));
                         } else if is_running {
                             test_row = test_row.push(
@@ -308,6 +312,44 @@ pub(crate) fn modal_overlay<'a>(
 
     container(opaque(panel))
         .style(move |_| theme::scrim_style_with(theme_snapshot, appear))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
+}
+
+/// Dense reviews reserve the title/actions and scroll only their body. The
+/// outer margin and final padding protect every edge at the tracked viewport.
+pub(crate) fn bounded_modal_overlay<'a>(
+    app: &'a crate::IcedApp,
+    title: &'static str,
+    body: Element<'a, Message, iced::Theme, iced::Renderer>,
+    mut actions: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let theme = app.theme();
+    let margin = f32::from(tokens::SPACE_24);
+    let padding = f32::from(tokens::SPACE_16);
+    let viewport = app.viewport_size();
+    let width = (viewport.width - 2.0 * margin).clamp(0.0, 680.0);
+    let height = (viewport.height - 2.0 * margin).clamp(0.0, 600.0);
+    actions.push(focus::modal_close(theme));
+    let panel = container(
+        column![
+            text(title).size(f32::from(tokens::FONT_18)),
+            body,
+            row(actions).spacing(f32::from(tokens::SPACE_8)).wrap(),
+        ]
+        .spacing(f32::from(tokens::SPACE_12))
+        .height(Length::Fill)
+        .width(Length::Fill),
+    )
+    .style(move |_| theme::elevated_style_with(theme, app.modal_appear_progress()))
+    .padding(padding)
+    .width(Length::Fixed(width))
+    .height(Length::Fixed(height));
+    container(opaque(panel))
+        .style(move |_| theme::scrim_style_with(theme, app.modal_appear_progress()))
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x(Length::Fill)

@@ -245,23 +245,30 @@ fn diagnostic_bundle_decision_is_an_accepted_difference() {
 #[test]
 fn unsupported_intents_are_explicit_and_have_honest_reasons() {
     let declaration = functional_declaration();
-    for intent in [
-        ProductIntent::CurrentWindowScreenshot,
-        ProductIntent::FirstRunSetup,
-    ] {
-        let entry = declaration
-            .entries
-            .iter()
-            .find(|entry| entry.intent == intent)
-            .unwrap_or_else(|| panic!("{intent:?} must be registered"));
-        match entry.decision {
-            SurfaceDecision::Unsupported { reason } => {
-                assert!(
-                    !reason.trim().is_empty(),
-                    "reason for {intent:?} must not be empty"
-                );
-            }
-            other => panic!("expected {intent:?} to be Unsupported, got {other:?}"),
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::CurrentWindowScreenshot)
+        .unwrap_or_else(|| panic!("CurrentWindowScreenshot must be registered"));
+    match entry.decision {
+        SurfaceDecision::Unsupported { reason } => {
+            assert!(
+                !reason.trim().is_empty(),
+                "reason for CurrentWindowScreenshot must not be empty"
+            );
         }
+        other => panic!("expected CurrentWindowScreenshot to be Unsupported, got {other:?}"),
     }
+
+    let first_run_entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::FirstRunSetup)
+        .unwrap_or_else(|| panic!("FirstRunSetup must be registered"));
+    assert_eq!(
+        first_run_entry.decision,
+        SurfaceDecision::Local {
+            route: "first-run.wizard",
+        }
+    );
 }

@@ -14,7 +14,7 @@
 //! text-raster mode — is an explicit unavailable state, never a dead
 //! selector.
 
-use iced::widget::{column, scrollable};
+use iced::widget::{column, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontRole, Theme, tokens,
@@ -29,15 +29,12 @@ use super::overlays::modal_overlay;
 use taskmanager_application::i18n::t;
 
 mod controls;
+mod privilege_center;
 mod shortcuts;
 
 use controls::*;
+use privilege_center::privileges_group;
 use shortcuts::shortcut_section;
-
-/// The scrollable body height (px contract): the grouped page needs more
-/// vertical room than the legacy 420px strip; the modal panel keeps its
-/// fixed 680px width and the body fills it.
-const SETTINGS_SCROLL_HEIGHT: f32 = 520.0;
 
 fn is_system_font_token(token: &str) -> bool {
     token.eq_ignore_ascii_case("system")
@@ -66,7 +63,8 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let language = app.language();
     let prefs = app.preferences();
 
-    let groups: Vec<IcedElement<'_>> = vec![
+    let mut groups: Vec<IcedElement<'_>> = vec![
+        privileges_group(app),
         general_group(theme_snapshot, language, prefs),
         appearance_group(theme_snapshot, language, app, prefs),
         fonts_group(theme_snapshot, language, app, prefs),
@@ -75,12 +73,34 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         units_group(theme_snapshot, language, prefs),
     ];
 
+    if app.first_run.view().info.is_some() {
+        groups.insert(
+            1,
+            group(
+                theme_snapshot,
+                "settings.additional_setup",
+                vec![
+                    text(t("settings.additional_setup_detail"))
+                        .size(f32::from(tokens::FONT_12))
+                        .into(),
+                    crate::focus::dynamic_button(
+                        theme_snapshot,
+                        FocusTarget::FirstRunOpen,
+                        t("settings.additional_setup_open").to_owned(),
+                        Message::FirstRun(crate::app::FirstRunMessage::Open),
+                        false,
+                    ),
+                ],
+            ),
+        );
+    }
+
     modal_overlay(
         theme_snapshot,
         i18n::t(language, Key::Settings),
         t("settings.persist_hint"),
         scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
-            .height(Length::Fixed(SETTINGS_SCROLL_HEIGHT))
+            .height(Length::Fill)
             .width(Length::Fill)
             .into(),
         appear,

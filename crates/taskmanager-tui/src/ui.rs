@@ -1,7 +1,6 @@
 //! Ratatui renderer for the live frontend state.
 
 mod about;
-mod about_data;
 pub(crate) mod affinity_modal;
 mod alerts;
 mod app_history;
@@ -10,14 +9,19 @@ mod boot_timeline;
 pub(crate) mod chart_cursor;
 mod column_menu;
 mod confirmations;
-mod containers;
+pub(crate) mod containers;
+mod first_run;
 mod footer;
 mod frame_plan;
 mod header;
 mod health;
 mod health_data;
+pub(crate) mod health_review;
 pub(crate) mod help;
 mod highlight;
+mod history_replay;
+mod information_review;
+mod navigation;
 pub(crate) mod pages;
 mod perf_battery;
 mod perf_core_grid;
@@ -31,17 +35,23 @@ mod perf_npu;
 mod perf_overview;
 mod perf_overview_data;
 mod perf_selector_instances;
+mod performance;
+mod pinned_actions;
 mod process_data;
 pub(crate) mod process_details;
 pub(crate) mod process_menu;
 pub(crate) mod process_properties;
 mod process_table;
+mod saved_views;
 pub(crate) mod service_dependencies_modal;
 pub(crate) mod service_menu;
 pub(crate) mod session_menu;
 pub(crate) mod settings;
+mod sidebar_editor;
 mod sparkline;
 pub(crate) mod startup_menu;
+mod system_dashboard;
+mod system_information;
 pub(crate) mod table_hit;
 mod text;
 mod units;
@@ -103,6 +113,9 @@ pub(crate) fn render_with_plan(
 
     let chrome = plan.chrome;
     header::render(frame, app, theme, chrome.header);
+    if let Some(rail) = plan.navigation {
+        navigation::render(frame, app, theme, rail);
+    }
     let collecting = app.telemetry_frame_state().is_collecting();
     if collecting {
         // The shared shell has not committed a complete immutable frame yet.
@@ -193,16 +206,19 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
         }
         crate::TuiInputScope::LocalSurface(_) => match app.local_surface() {
             Some(crate::TuiSurface::Settings) => {
-                settings::render_settings_overlay_at(
-                    frame,
-                    &app.settings_form,
-                    theme,
-                    plan.focus,
-                    popup,
-                );
+                settings::render_settings_overlay_at(frame, app, theme, plan.focus, popup);
             }
-            Some(crate::TuiSurface::About) => {
-                about::render_about_overlay_at(frame, app, theme, popup);
+            Some(crate::TuiSurface::SidebarEditor { .. }) => {
+                sidebar_editor::render(frame, app, theme, popup);
+            }
+            Some(crate::TuiSurface::SavedViews { .. }) => {
+                saved_views::render(frame, app, theme, popup)
+            }
+            Some(crate::TuiSurface::About(view)) => {
+                about::render_about_overlay_at(frame, app, view, theme, popup);
+            }
+            Some(crate::TuiSurface::SystemInformation(view)) => {
+                system_information::render(frame, view, theme, popup);
             }
             Some(crate::TuiSurface::Health) => {
                 health::render_health_overlay_at(frame, app, theme, popup);
@@ -239,6 +255,12 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
             Some(crate::TuiSurface::ProcessAffinity(state)) => {
                 affinity_modal::render_affinity_modal_at(frame, app, state, theme, popup);
             }
+            Some(crate::TuiSurface::DiagnosticBundle(view)) => {
+                crate::diagnostic_bundle::render_diagnostic_bundle_at(frame, view, theme, popup);
+            }
+            Some(crate::TuiSurface::FirstRun(view)) => {
+                first_run::render_first_run_overlay_at(frame, app, view, theme, popup);
+            }
             None => {}
         },
         crate::TuiInputScope::Help => help::render_help_overlay_at(frame, app, theme, popup),
@@ -254,7 +276,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
 
 fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
     match plan.page {
-        TuiPageLayout::Performance { .. } => render_performance(frame, app, theme, plan),
+        TuiPageLayout::Performance { .. } => {
+            performance::render_performance(frame, app, theme, plan)
+        }
         TuiPageLayout::Applications { process, table } => {
             process_table::render_processes(frame, app, theme, process, table, plan.focus)
         }
@@ -269,70 +293,6 @@ fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiF
         TuiPageLayout::AppHistory { content } => {
             app_history::render_app_history(frame, app, theme, content)
         }
-    }
-}
-
-fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
-    let TuiPageLayout::Performance { selector, content } = plan.page else {
-        return;
-    };
-    let Some(snapshot) = app.projection().snapshot.as_ref() else {
-        render_loading(frame, theme, content, t("common.collecting_telemetry"));
-        return;
-    };
-    // The compact resource selector row sits above the selected resource's
-    // detail; the area below shows ONLY that resource, reusing the existing
-    // per-resource renderers (gauges + history graph for Cpu/Memory, the
-    // dedicated perf_gpu/perf_disks/perf_networks panels for the device views).
-    render_perf_selector(frame, app, theme, selector);
-    match app.perf_device {
-        PerfDevice::Cpu | PerfDevice::Memory => {
-            perf_overview::render_perf_overview(frame, app, theme, content, snapshot);
-        }
-        PerfDevice::Gpu => perf_gpu::render_gpu_section(frame, app, theme, content, &snapshot.gpu),
-        PerfDevice::Disk => {
-            // The directory-usage projection panel (render-only) rides under
-            // the per-disk detail. Adaptive height: a projected snapshot needs
-            // room for root + entries + totals + status; the common idle slot
-            // (no scan projected yet) stays a slim 3-line panel so the disk
-            // detail keeps nearly the whole content area. The data comes from
-            // the SHARED `SystemProjectionStore::directory_usage` slot (latest-wins from
-            // the platform batch fold).
-            let usage_height: u16 = if app.projection().directory_usage.is_some() {
-                12
-            } else {
-                3
-            };
-            let [disk_area, usage_area] =
-                Layout::vertical([Constraint::Min(1), Constraint::Length(usage_height)])
-                    .areas(content);
-            perf_disks::render_disk_section(frame, app, theme, disk_area, &snapshot.disks);
-            perf_disks::render_directory_usage(frame, app, theme, usage_area);
-        }
-        PerfDevice::Network => {
-            perf_networks::render_network_section(frame, app, theme, content, &snapshot.networks)
-        }
-        PerfDevice::Battery => perf_battery::render_battery_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().power_supplies.as_ref(),
-        ),
-        PerfDevice::Fan => perf_fan::render_fan_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().sensors.as_ref(),
-        ),
-        PerfDevice::Npu => perf_npu::render_npu_section(
-            frame,
-            app,
-            theme,
-            content,
-            app.projection().npu_inventory.as_ref(),
-        ),
     }
 }
 
@@ -426,6 +386,7 @@ const SELECTOR_HEADING_MAX_CELLS: usize = 22;
 
 /// One live per-device instance segment of the selector strip, pre-measured
 /// so the strip can admit whole segments only and never paint past its band.
+#[derive(Clone)]
 struct SelectorInstance {
     width: usize,
     spans: Vec<Span<'static>>,
@@ -551,6 +512,34 @@ pub(super) fn render_centered_state(
 /// Complete geometry and interaction projection for a table render. Callers
 /// name every axis so width/header/selection values cannot drift through a
 /// positional argument list.
+pub(crate) fn history_capture_frame_ready(app: &TuiApp, plan: &frame_plan::TuiFramePlan) -> bool {
+    match plan.page {
+        frame_plan::TuiPageLayout::AppHistory { content } => {
+            !app.application_history_projection().rows.is_empty()
+                && app_history::capture_has_visible_rows(content)
+        }
+        frame_plan::TuiPageLayout::Performance { .. } => {
+            app.history_replay_open() && !app.performance_history_projection().rows.is_empty()
+        }
+        _ => false,
+    }
+}
+
+/// Prepare the capture viewport from the same committed root geometry as paint.
+pub(crate) fn prepare_memory_inventory_capture(
+    app: &mut TuiApp,
+    theme: TuiTheme,
+    plan: &frame_plan::TuiFramePlan,
+) {
+    if app.memory_capture_scroll_pending
+        && let frame_plan::TuiPageLayout::System { content } = plan.page
+        && let Some(offset) = pages::memory_inventory_capture_offset(app, theme, content)
+    {
+        app.system_scroll = offset;
+        app.memory_capture_scroll_pending = false;
+    }
+}
+
 pub(super) struct TableRenderProps<'a, const WIDTHS: usize, const HEADERS: usize> {
     pub(super) theme: TuiTheme,
     pub(super) area: Rect,

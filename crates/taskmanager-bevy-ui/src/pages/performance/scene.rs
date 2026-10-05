@@ -26,6 +26,7 @@ pub(super) mod blocks;
 pub(super) mod chart;
 pub(super) mod sidebar;
 
+use super::replay::{PerformanceLiveBody, PerformanceReplayRoot, entry_scene};
 use sidebar::cpu::cpu_main_scene;
 use sidebar::{device_sidebar_scene, stats_rail_scene};
 
@@ -53,7 +54,7 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Node {
                     width: px(14.0),
                     height: px(14.0),
@@ -63,13 +64,13 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
                 DynDiskSpareAlert({ key })
                 IconPlate({ IconId::Alert })
                 IconInk({ palette.warning_color })
-            ),
-            (
+            --
+
                 Text(disk_caption(disk))
                 TextRole(Role::Mono)
                 DynText({ field })
                 TextLayout { linebreak: LineBreak::NoWrap }
-            ),
+
         ]
     })
 }
@@ -78,9 +79,10 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let shell = context.shell;
     let palette = context.palette;
-    let devices = device_sidebar_scene(shell, palette);
-    let main = cpu_main_scene(shell, palette);
+    let devices = device_sidebar_scene(shell, palette, context.sidebar);
+    let main = cpu_main_scene(shell, palette, context.sidebar);
     let stats = stats_rail_scene(shell, palette);
+    let entry = entry_scene(palette);
     bsn! {
         Node {
             width: percent(100),
@@ -92,8 +94,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         PerformancePageRoot
         Children [
-            ( { devices } ),
-            (
+             @{ devices } --
+
                 Node {
                     width: px(6.0),
                     min_width: px(6.0),
@@ -102,17 +104,26 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     align_items: AlignItems::Center,
                 }
                 Children [
-                    (
+
                         Node {
                             width: px(1.0),
                             height: percent(100),
                         }
                         BackgroundColor({ palette.border_color })
-                    )
-                ]
-            ),
-            ( { main } ),
-            ( { stats } ),
+
+                ] --
+                Node {
+                    flex_grow: 1.0,
+                    height: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(space_2()),
+                }
+                Children [
+                    @{ entry } --
+                    Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0 } PerformanceLiveBody Children [ @{ main } ] --
+                    Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, display: Display::None } PerformanceReplayRoot Children []
+                ] --
+                @{ stats }
         ]
     }
 }

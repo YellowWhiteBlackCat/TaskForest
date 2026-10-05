@@ -13,7 +13,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
@@ -119,7 +118,7 @@ fn relation_section_scene(
         .into_iter()
         .map(|target_id| {
             Box::new(bsn! {
-                (
+
                     Node {
                         height: px(palette.control_height_px),
                         padding: UiRect::horizontal(Val::Px(space_8())),
@@ -129,9 +128,9 @@ fn relation_section_scene(
                     }
                     BackgroundColor({ palette.content_bg })
                     Children [
-                        ( Text(target_id) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap } )
+                         Text(target_id) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap }
                     ]
-                )
+
             }) as Box<dyn Scene>
         })
         .collect();
@@ -144,8 +143,8 @@ fn relation_section_scene(
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            ( Text(count_text) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-            (
+             Text(count_text) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Row,
@@ -154,9 +153,9 @@ fn relation_section_scene(
                     row_gap: Val::Px(space_4()),
                 }
                 Children [
-                    { target_chips },
+                    { target_chips }
                 ]
-            ),
+
         ]
     }
 }
@@ -168,7 +167,7 @@ fn chip_button(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     Box::new(bsn! {
-        (
+
             Node {
                 height: px(palette.control_height_px),
                 padding: UiRect::horizontal(Val::Px(space_12())),
@@ -184,9 +183,9 @@ fn chip_button(
             on(dependencies_panel_control_activated)
             ServiceDependenciesControlButton(action)
             Children [
-                ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                 Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
             ]
-        )
+
     })
 }
 
@@ -210,7 +209,7 @@ pub(crate) fn service_dependencies_panel_scene(
         Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [
-                ( Text(t("svc.details_loading")) TextRole(Role::Caption) )
+                 Text(t("svc.details_loading")) TextRole(Role::Caption)
             ]
         })
     } else if let Some(failure) = lifecycle.failure() {
@@ -218,7 +217,7 @@ pub(crate) fn service_dependencies_panel_scene(
         Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [
-                ( Text(msg) TextRole(Role::Caption) )
+                 Text(msg) TextRole(Role::Caption)
             ]
         })
     } else if let Some(deps) = lifecycle.projected() {
@@ -256,17 +255,17 @@ pub(crate) fn service_dependencies_panel_scene(
             }
             ScrollArea
             Children [
-                ( { req } ),
-                ( { wants } ),
-                ( { wanted_by } ),
-                ( { after } ),
+                 @{ req } --
+                 @{ wants } --
+                 @{ wanted_by } --
+                 @{ after }
             ]
         })
     } else {
         Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [
-                ( Text(t("svc.details_loading")) TextRole(Role::Caption) )
+                 Text(t("svc.details_loading")) TextRole(Role::Caption)
             ]
         })
     };
@@ -282,7 +281,7 @@ pub(crate) fn service_dependencies_panel_scene(
         BackgroundColor({ palette.panel_fill })
         ServicesDependenciesPanelRoot
         Children [
-            (
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Row,
@@ -290,25 +289,25 @@ pub(crate) fn service_dependencies_panel_scene(
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
-                    (
+
                         Text(title)
                         TextRole(Role::Body)
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    ),
-                    ( Node { flex_grow: 1.0 } ),
-                    ( { chip_button(ServiceDependenciesControlAction::Close, t("common.close").to_owned(), false, palette) } ),
+                    --
+                     Node { flex_grow: 1.0 } --
+                     @{ chip_button(ServiceDependenciesControlAction::Close, t("common.close").to_owned(), false, palette) }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    ( { body_scene } ),
+                     @{ body_scene }
                 ]
-            ),
+
         ]
     })
 }
@@ -394,51 +393,18 @@ pub(crate) fn on_services_fold_dependencies_gate(
 }
 
 pub(crate) fn on_dependencies_panel_repaint_required(
-    _repaint: On<DependenciesPanelRepaintRequired>,
-    mut commands: Commands,
+    _event: On<DependenciesPanelRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_dependencies_panel);
+    dirty.0 = true;
 }
-
 pub(crate) fn on_dependencies_panel_slot_added(
-    _added: On<bevy::ecs::lifecycle::Add, ServicesDependenciesPanelSlot>,
-    mut commands: Commands,
+    _event: On<bevy::ecs::lifecycle::Add<ServicesDependenciesPanelSlot>>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_dependencies_panel);
+    dirty.0 = true;
 }
-
-pub(crate) fn paint_dependencies_panel(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let fingerprint =
-        dependencies_fingerprint(&world.non_send::<FrontendTrack>().shell.service_dependencies);
-    let scene = {
-        let track = world.non_send::<FrontendTrack>();
-        if track.shell.service_dependencies.target().is_some() {
-            Some(service_dependencies_panel_scene(&track.shell, &palette))
-        } else {
-            None
-        }
-    };
-    let slot = world
-        .query_filtered::<Entity, With<ServicesDependenciesPanelSlot>>()
-        .iter(world)
-        .next();
-    let Some(slot) = slot else {
-        return;
-    };
-    let stale: Vec<Entity> = world
-        .get::<bevy::ecs::hierarchy::Children>(slot)
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(slot).add_one_related::<ChildOf>(entity);
-    }
-    world
-        .resource_mut::<ServicesDependenciesRenderState>()
-        .rendered = Some(fingerprint);
+pub(crate) fn register(app: &mut bevy::app::App) {
+    paint::register(app);
 }
+mod paint;

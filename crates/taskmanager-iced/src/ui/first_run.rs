@@ -1,25 +1,12 @@
-//! Iced first-run dialog: the Mission Center-compatible optional-setup dialog
-//! (GPUI `first_run` parity).
-//!
-//! Trigger and persistence follow the GPUI contract exactly: the dialog's
-//! authority is the application `first-run.setup` capability — a boot-time
-//! `SetupScriptAction::Observe` request, whose `Observed(info)` answer decides
-//! visibility. There is deliberately **no** "do not show again" config field
-//! anywhere in the stack: the platform-side setup script's *absence* is the
-//! persisted done-state (running or reverting it consumes the asset, so the
-//! next observation honestly reports `None` and the dialog stays hidden).
-//!
-//! This module owns the frontend-local view state machine and the renderer.
-//! The state is a pure fold over typed events (the same shapes GPUI's
-//! `RootView` applies from correlated platform events); submitting the typed
-//! requests and applying their answers is composition-owned wiring —
-//! `FirstRunMessage` carries the dialog's typed button intents for that lane.
+//! Optional setup review over the application controller (ADR-040).
+//! Startup observes quietly; only the Settings entry opens this surface.
+//! Native typed actions never interpret the displayed command strings.
 
 use iced::Length;
-use iced::widget::{column, row, text};
+use iced::widget::{column, row, scrollable, text};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptInfo};
+use taskmanager_shell::presentation::first_run::first_run_failure_key;
 
 use crate::app::Message;
 use crate::focus;
@@ -27,147 +14,16 @@ use crate::theme;
 use taskmanager_theme::tokens;
 
 use super::components::IcedElement;
-use super::overlays::modal_overlay;
+use super::overlays::bounded_modal_overlay;
 use taskmanager_theme::Theme;
 
-/// TaskForest's documentation destination. Opening it stays a typed intent
-/// ([`FirstRunMessage::OpenDocumentation`]) routed through the URL-open port at
-/// composition; this module never launches a browser command itself.
-pub const DOCUMENTATION_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
-
-/// Dialog phases, mirroring GPUI's `FirstRunPhase` one-to-one.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub enum FirstRunPhase {
-    #[default]
-    Hidden,
-    Discovering,
-    Available,
-    Running,
-    Reverting,
-    RestartRequired,
-    Restarting,
-    Failed(FailureKind),
-}
-
-/// Frontend-local first-run view state (GPUI `FirstRunUiState` parity).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FirstRunUiState {
-    pub phase: FirstRunPhase,
-    pub info: Option<SetupScriptInfo>,
-    pub last_action: Option<SetupScriptAction>,
-}
-
-/// Typed events the composition lane folds into [`FirstRunUiState`]. These are
-/// the pure halves of GPUI's `apply_first_run_event` / `apply_first_run_failure`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FirstRunEvent {
-    /// The boot observation answered. `Some(info)` shows the dialog; `None`
-    /// keeps it hidden (the honest no-asset / already-consumed state).
-    ObservationCompleted(Option<SetupScriptInfo>),
-    /// A typed action was accepted for submission (phase moves to the
-    /// action's pending state and `last_action` is retained for Retry).
-    ActionSubmitted(SetupScriptAction),
-    /// A submitted action completed.
-    ActionCompleted(SetupScriptAction),
-    /// A submitted action (or the observation) failed with a typed kind.
-    ActionFailed {
-        action: SetupScriptAction,
-        kind: FailureKind,
-    },
-    /// The dialog was dismissed (Escape / close). Zero side effects: the
-    /// phase, info and retry memory stay exactly as they were.
-    Dismissed,
-}
-
-/// Visibility transition consumed by the composition lane
-/// (`app::update::first_run`), which maps it onto the Iced-owned
-/// `LocalSurface::FirstRun` slot.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum FirstRunTransition {
-    #[default]
-    Unchanged,
-    Shown,
-    Hidden,
-}
-
-impl FirstRunUiState {
-    /// Whether the dialog is on screen. The surface slot owns actual
-    /// visibility; this is the state-machine seam the wiring tests pin.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) const fn visible(&self) -> bool {
-        !matches!(self.phase, FirstRunPhase::Hidden)
-    }
-
-    /// Whether the action row must be disabled (a request is in flight).
-    pub(crate) const fn action_pending(&self) -> bool {
-        matches!(
-            self.phase,
-            FirstRunPhase::Running | FirstRunPhase::Reverting | FirstRunPhase::Restarting
-        )
-    }
-
-    /// Fold one typed event. Pure: no I/O, no platform submission, no clock.
-    /// The transitions mirror GPUI's `apply_first_run_event` /
-    /// `apply_first_run_failure` halves exactly.
-    pub(crate) fn reduce(&mut self, event: FirstRunEvent) -> FirstRunTransition {
-        match event {
-            FirstRunEvent::ObservationCompleted(info) => {
-                self.info = info;
-                let available = self.info.is_some();
-                self.phase = if available {
-                    FirstRunPhase::Available
-                } else {
-                    FirstRunPhase::Hidden
-                };
-                if available {
-                    FirstRunTransition::Shown
-                } else {
-                    FirstRunTransition::Hidden
-                }
-            }
-            FirstRunEvent::ActionSubmitted(action) => {
-                self.last_action = Some(action);
-                self.phase = match action {
-                    SetupScriptAction::Run => FirstRunPhase::Running,
-                    SetupScriptAction::Revert => FirstRunPhase::Reverting,
-                    SetupScriptAction::Restart => FirstRunPhase::Restarting,
-                    SetupScriptAction::Observe => FirstRunPhase::Discovering,
-                    SetupScriptAction::View => FirstRunPhase::Available,
-                };
-                FirstRunTransition::Shown
-            }
-            FirstRunEvent::ActionCompleted(action) => {
-                self.phase = match action {
-                    SetupScriptAction::Run => FirstRunPhase::RestartRequired,
-                    SetupScriptAction::Revert
-                    | SetupScriptAction::View
-                    | SetupScriptAction::Observe => FirstRunPhase::Available,
-                    SetupScriptAction::Restart => FirstRunPhase::Restarting,
-                };
-                FirstRunTransition::Shown
-            }
-            FirstRunEvent::ActionFailed { action, kind } => {
-                if action == SetupScriptAction::Observe {
-                    // A failed observation is the honest "capability cannot
-                    // answer" case: the dialog stays hidden (GPUI parity).
-                    self.phase = FirstRunPhase::Hidden;
-                    FirstRunTransition::Hidden
-                } else {
-                    self.phase = FirstRunPhase::Failed(kind);
-                    FirstRunTransition::Shown
-                }
-            }
-            // Dismissal is side-effect-free by contract: phase, descriptor and
-            // retry memory survive, so reopening shows the same honest state.
-            FirstRunEvent::Dismissed => FirstRunTransition::Unchanged,
-        }
-    }
-}
+use taskmanager_application::first_run::{FirstRunPhase, FirstRunUiState};
 
 /// The first-run dialog's typed button intents, carried by
 /// [`crate::app::Message::FirstRun`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FirstRunMessage {
+    Open,
     /// Dismiss the dialog without side effects.
     Close,
     /// Submit one typed setup-script action (View / Run / Revert / Restart).
@@ -180,29 +36,32 @@ pub enum FirstRunMessage {
 /// shell. Honest states: a missing info renders the discovering line (or the
 /// typed failure), never a fabricated script; pending actions disable the
 /// action row exactly like GPUI's pills.
-pub(crate) fn render_first_run<'a>(
-    theme_snapshot: &'a Theme,
-    state: &'a FirstRunUiState,
-    appear: f32,
-) -> IcedElement<'a> {
+pub(crate) fn render_first_run(app: &crate::IcedApp) -> IcedElement<'_> {
+    let theme = app.theme();
+    let state = app.first_run.view();
     let body = match state.info.as_ref() {
-        None => discovering_body(theme_snapshot, state),
-        Some(info) => info_body(theme_snapshot, state, info),
+        None => discovering_body(theme, state),
+        Some(info) => info_body(theme, state, info),
     };
-    modal_overlay(
-        theme_snapshot,
-        t("first_run.title"),
-        t("first_run.description"),
-        body,
-        appear,
+    let body = scrollable(
+        column![text(t("first_run.description")), body].spacing(f32::from(tokens::SPACE_12)),
     )
+    .height(Length::Fill)
+    .width(Length::Fill)
+    .into();
+    let actions = if state.info.is_some() {
+        action_controls(theme, state, state.action_pending())
+    } else {
+        Vec::new()
+    };
+    bounded_modal_overlay(app, t("first_run.title"), body, actions)
 }
 
 fn discovering_body<'a>(theme_snapshot: &'a Theme, state: &'a FirstRunUiState) -> IcedElement<'a> {
     let muted = theme::muted_text_color(theme_snapshot);
     let danger = crate::theme_binding::color(theme_snapshot.palette().danger);
     let line = if let FirstRunPhase::Failed(kind) = state.phase {
-        text(failure_key(kind))
+        text(t(first_run_failure_key(kind)))
             .size(f32::from(tokens::FONT_13))
             .color(danger)
     } else {
@@ -221,7 +80,6 @@ fn info_body<'a>(
     state: &'a FirstRunUiState,
     info: &'a SetupScriptInfo,
 ) -> IcedElement<'a> {
-    let pending = state.action_pending();
     let mut body = column![].spacing(f32::from(tokens::SPACE_12));
 
     body = body
@@ -249,7 +107,7 @@ fn info_body<'a>(
 
     if let FirstRunPhase::Failed(kind) = state.phase {
         body = body.push(
-            text(failure_key(kind))
+            text(t(first_run_failure_key(kind)))
                 .size(f32::from(tokens::FONT_12))
                 .color(crate::theme_binding::color(theme_snapshot.palette().danger)),
         );
@@ -262,7 +120,6 @@ fn info_body<'a>(
         );
     }
 
-    body = body.push(action_row(theme_snapshot, state, pending));
     body.width(Length::Fill).into()
 }
 
@@ -305,12 +162,12 @@ fn info_row<'a>(
     .into()
 }
 
-fn action_row<'a>(
+fn action_controls<'a>(
     theme_snapshot: &'a Theme,
     state: &'a FirstRunUiState,
     pending: bool,
-) -> IcedElement<'a> {
-    let mut actions = row![].spacing(f32::from(tokens::SPACE_8));
+) -> Vec<IcedElement<'a>> {
+    let mut actions: Vec<IcedElement<'a>> = Vec::new();
     if pending {
         // In flight: the actions render as inert text (GPUI disables the
         // pills); no message can be submitted from this frame.
@@ -320,40 +177,41 @@ fn action_row<'a>(
             t("first_run.run_setup"),
             t("first_run.revert_setup"),
         ] {
-            actions = actions.push(
+            actions.push(
                 text(label)
                     .size(f32::from(tokens::FONT_12))
-                    .color(theme::muted_text_color(theme_snapshot)),
+                    .color(theme::muted_text_color(theme_snapshot))
+                    .into(),
             );
         }
-        return actions.into();
+        return actions;
     }
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(0),
         t("first_run.open_docs").to_owned(),
         Message::FirstRun(FirstRunMessage::OpenDocumentation),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(1),
         t("first_run.view_script").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::View)),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(2),
         t("first_run.run_setup").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::Run)),
     ));
-    actions = actions.push(action_button(
+    actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(3),
         t("first_run.revert_setup").to_owned(),
         Message::FirstRun(FirstRunMessage::RequestAction(SetupScriptAction::Revert)),
     ));
     if state.phase == FirstRunPhase::RestartRequired {
-        actions = actions.push(action_button(
+        actions.push(action_button(
             theme_snapshot,
             FocusSlot::action(4),
             t("first_run.restart").to_owned(),
@@ -364,14 +222,14 @@ fn action_row<'a>(
         && let Some(action @ (SetupScriptAction::Run | SetupScriptAction::Revert)) =
             state.last_action
     {
-        actions = actions.push(action_button(
+        actions.push(action_button(
             theme_snapshot,
             FocusSlot::action(5),
             t("first_run.retry").to_owned(),
             Message::FirstRun(FirstRunMessage::RequestAction(action)),
         ));
     }
-    actions.into()
+    actions
 }
 
 /// The dialog's dedicated focus-stop helper: every control maps onto the
@@ -406,21 +264,6 @@ fn phase_status_key(phase: &FirstRunPhase) -> Option<&'static str> {
         FirstRunPhase::Restarting => Some(t("first_run.restarting")),
         FirstRunPhase::RestartRequired => Some(t("first_run.restart_required")),
         _ => None,
-    }
-}
-
-fn failure_key(kind: FailureKind) -> &'static str {
-    match kind {
-        FailureKind::Unsupported => t("first_run.failure_unsupported"),
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            t("first_run.failure_permission")
-        }
-        FailureKind::MissingDependency => t("first_run.failure_missing_dependency"),
-        FailureKind::TimedOut => t("first_run.failure_timeout"),
-        FailureKind::IdentityChanged => t("first_run.failure_identity"),
-        FailureKind::TemporarilyUnavailable => t("first_run.failure_unavailable"),
-        FailureKind::Rejected => t("first_run.failure_rejected"),
-        FailureKind::ProviderFault => t("first_run.failure_provider"),
     }
 }
 

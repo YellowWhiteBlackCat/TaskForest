@@ -10,9 +10,12 @@ use taskmanager_core::{
     ProcessMetadataObservations, ProcessScalarObservations, ScalarObservation, SmartAvailability,
 };
 
+pub mod desktop_appearance;
 mod memory;
 mod metrics;
 mod process;
+pub mod setup_script;
+pub mod smbios_memory;
 
 // ── locale pinning for text-asserting tests ──────────────────────────────────
 

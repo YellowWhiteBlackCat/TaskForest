@@ -250,14 +250,37 @@ fn page_header(
                 .child(i18n::t("history.application.refreshing").to_string()),
         );
     }
-    div()
+    let refresh_entity = entity.clone();
+    let controls = div()
         .flex()
+        .flex_wrap()
         .items_center()
         .w_full()
-        .gap(definite_length(tokens::SPACE_12))
+        .min_w(px(0.0))
+        .gap(definite_length(tokens::SPACE_8))
+        .debug_selector(|| "tm-app-history-controls".to_string())
+        .child(windows)
+        .child(elements::tool_btn(
+            theme,
+            "app-history-refresh",
+            i18n::t("perf.replay.refresh"),
+            true,
+            false,
+            move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |view, cx| view.refresh_history_replay(cx));
+            },
+            |_hovered: &bool, _window: &mut Window, _cx: &mut App| {},
+        ));
+    div()
+        .flex()
+        .flex_col()
+        .flex_none()
+        .w_full()
+        .min_w(px(0.0))
+        .gap(definite_length(tokens::SPACE_8))
         .debug_selector(|| "tm-app-history-page-header".to_string())
         .child(title)
-        .child(windows)
+        .child(controls)
 }
 
 fn history_window_key(window: HistoryWindow) -> &'static str {

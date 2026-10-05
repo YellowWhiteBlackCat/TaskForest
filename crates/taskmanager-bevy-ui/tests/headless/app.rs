@@ -37,7 +37,7 @@ use super::{
     nav_item_background, page_for_action, route_key_press,
 };
 use crate::input_contract::SemanticAddress;
-use crate::pages::process_tree::ProcessTreeSurface;
+use crate::pages::process_tree::TreeWindowControl;
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::FrontendWindowPlugin;
@@ -583,11 +583,11 @@ fn shell_spawns_the_full_page_surfaces() {
     );
     assert_eq!(
         world
-            .query_filtered::<&ProcessTreeSurface, ()>()
+            .query_filtered::<&TreeWindowControl, ()>()
             .iter(world)
             .count(),
         1,
-        "Applications route mounts the Bevy tree surface"
+        "Applications route mounts the normal tree inspection entry"
     );
     assert_eq!(
         world

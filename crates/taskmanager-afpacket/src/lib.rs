@@ -167,7 +167,7 @@ fn recv_packet(fd: &OwnedFd, buf: &mut [u8]) -> io::Result<(usize, bool)> {
 fn set_recv_timeout(fd: &OwnedFd, ms: i64) -> io::Result<()> {
     let timeout = libc::timeval {
         tv_sec: ms / 1000,
-        tv_usec: ((ms % 1000) * 1000) as libc::suseconds_t,
+        tv_usec: (ms % 1000) * 1000,
     };
     let timeout_ptr: *const libc::timeval = &timeout;
     // SAFETY: `fd` is a valid OwnedFd borrowed for the call; `timeout_ptr` is a

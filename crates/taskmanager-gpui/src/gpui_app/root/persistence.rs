@@ -8,16 +8,16 @@ use gpui::Pixels;
 use super::graph_options::normalize_graph_data_points;
 use super::{PROC_COL_MAX_WIDTH, PROC_COL_MIN_WIDTH, RootView, page_token};
 use crate::gpui_app::dashboard::DashboardState;
-use crate::gpui_app::dashboard::saved_view_transfer::{
-    hidden_from_tokens, hidden_tokens, preset_from_config, preset_to_config, sort_from_token,
-    sort_token,
-};
 use crate::gpui_app::processes_view::rows::is_resizable;
 use taskmanager_core::core::config::{
     ColumnWidthConfig, Config, DENSITY_COMFORTABLE, DENSITY_COMPACT, ProcessViewPresetConfig,
 };
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
+use taskmanager_shell::saved_views::{
+    hidden_from_tokens, hidden_tokens, preset_to_config, restore_saved_views, sort_from_token,
+    sort_token,
+};
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, FontPreference};
 
@@ -27,10 +27,6 @@ fn saved_views_to_config(dashboard: &DashboardState) -> Vec<ProcessViewPresetCon
         .iter()
         .filter_map(preset_to_config)
         .collect()
-}
-
-fn restore_saved_views(dashboard: &mut DashboardState, configs: &[ProcessViewPresetConfig]) {
-    dashboard.restore_user_saved_views(configs.iter().filter_map(preset_from_config).collect());
 }
 
 /// Serialize the live `col_widths` map to the opaque-token config form
@@ -102,7 +98,11 @@ pub(super) fn apply_process_config(view: &mut RootView, config: &Config) {
     // its built-in `default_width` (the pre-persistence byte-identical
     // layout), so a missing or hand-edited field never fabricates widths.
     view.processes_state.col_widths = col_widths_from_config(&config.process_col_widths);
-    restore_saved_views(&mut view.dashboard, &config.saved_process_views);
+    let _ = restore_saved_views(
+        &mut view.dashboard.saved_views,
+        &mut view.dashboard.next_saved_view_id,
+        &config.saved_process_views,
+    );
     // The GPUI frontend does not consume the motion preference this wave; it
     // retains the loaded token verbatim so its periodic saves echo — never
     // clobber — a value another frontend (or a hand edit) recorded.

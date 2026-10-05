@@ -86,10 +86,10 @@ export TMPDIR="$scratch_root/local-gates-$$-$(date +%s)/tmp"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
 
-# Keep local Cargo invocations on the same moving stable channel and warning
+# Keep local Cargo invocations on the same pinned 1.99.0 toolchain and warning
 # policy as CI. The repository's rust-version remains a compatibility floor;
 # it is not the toolchain selected for the current gate run.
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
 export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
 rustflags="${RUSTFLAGS:-}"
@@ -414,6 +414,15 @@ fi
 if maybe install-manifest; then
     run_stage install-manifest quick run_py scripts/quality/system_install_manifest_guard.py
 fi
+if maybe capture-content-self; then
+    run_stage capture-content-self quick run_py scripts/validate_bevy_matrix.py --self-test
+fi
+if maybe capture-build-self; then
+    run_stage capture-build-self quick run_py scripts/capture_build.py --self-test
+fi
+if maybe visual-capture-coverage-self; then
+    run_stage visual-capture-coverage-self quick run_py scripts/quality/visual_capture_coverage.py --self-test
+fi
 if maybe visual-capture-coverage; then
     run_stage visual-capture-coverage quick run_py scripts/quality/visual_capture_coverage.py --repo-root "$repo"
 fi
@@ -452,6 +461,12 @@ fi
 if maybe bevy-bsn-guard; then
     run_stage bevy-bsn-guard quick run_py scripts/quality/bevy_bsn_guard.py --mode enforce
 fi
+if maybe bevy-world-access-self; then
+    run_stage bevy-world-access-self quick run_py scripts/quality/bevy_world_access_guard.py --self-test
+fi
+if maybe bevy-world-access; then
+    run_stage bevy-world-access quick run_py scripts/quality/bevy_world_access_guard.py
+fi
 if maybe test-layout-self; then
     run_stage test-layout-self quick run_py scripts/quality/test_layout_guard.py --self-test
 fi
@@ -489,6 +504,9 @@ if maybe doc-governance; then
 fi
 if maybe coverage-gate-self; then
     run_stage coverage-gate-self quick run_py scripts/quality/per_crate_coverage_gate.py --self-test
+fi
+if maybe msi-payload-self; then
+    run_stage msi-payload-self quick run_py scripts/quality/validate_msi_payload.py --self-test
 fi
 if maybe capture-isolation-self; then
     run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"

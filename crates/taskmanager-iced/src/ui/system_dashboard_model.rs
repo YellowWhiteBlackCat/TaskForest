@@ -3,9 +3,9 @@
 //! non-render module so the paint file (`ui/system_dashboard.rs`) consumes
 //! pre-folded strings and never reads observations inline.
 
+use taskmanager_application::system_timeline::{TimelineMetric, TimelineSeries, TimelineStatistic};
 use taskmanager_shell::SystemProjectionStore;
-
-use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::system_timeline::readout;
 
 /// Pre-folded summary values for the segment's cards. `None` observations
 /// fold to the shared dash string — never `0` / `0.0%`.
@@ -22,21 +22,13 @@ pub(crate) struct DashboardSummaryModel {
 }
 
 /// Fold the shell projection into the summary card values (pure).
-pub(crate) fn summary_model(projection: &SystemProjectionStore) -> DashboardSummaryModel {
-    let snapshot = projection.snapshot.as_ref();
+pub(crate) fn summary_model(
+    projection: &SystemProjectionStore,
+    series: &TimelineSeries,
+) -> DashboardSummaryModel {
     DashboardSummaryModel {
-        cpu: snapshot
-            .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-            .map_or_else(
-                || missing_value().to_owned(),
-                |value| format!("{value:.1}%"),
-            ),
-        memory: snapshot
-            .and_then(|snapshot| snapshot.memory.used_percentage_observed())
-            .map_or_else(
-                || missing_value().to_owned(),
-                |value| format!("{value:.1}%"),
-            ),
+        cpu: readout(series, TimelineMetric::Cpu, TimelineStatistic::Latest),
+        memory: readout(series, TimelineMetric::Memory, TimelineStatistic::Latest),
         processes: projection
             .processes
             .as_ref()

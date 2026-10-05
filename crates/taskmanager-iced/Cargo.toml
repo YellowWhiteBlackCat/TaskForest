@@ -1,8 +1,8 @@
 [package]
 name = "taskmanager-iced"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "Iced desktop frontend product (taskforest-i) for the TaskForest native system monitor (ADR-027/028)"
 readme = "README.md"
@@ -99,6 +99,7 @@ windows = { version = "0.58.0", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
 accesskit = "0.24.1"
 accesskit_consumer = "0.38"
 taskmanager-test-support = { path = "../taskmanager-test-support" }

@@ -1,8 +1,8 @@
 [package]
 name = "taskmanager-net-launcher"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 authors = ["TaskForest"]
 license = "Apache-2.0"
 description = "Privileged launcher binary: opens an AF_PACKET socket (CAP_NET_RAW) and passes the fd to the unprivileged app via SCM_RIGHTS (TaskForest permission-model Boundary 2, ADR-023/024/025)."

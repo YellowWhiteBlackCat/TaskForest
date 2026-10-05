@@ -22,6 +22,8 @@
 use std::ffi::OsStr;
 use std::io;
 use std::time::{Duration, Instant};
+use taskmanager_application::AppAction;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use ratatui::Terminal;
 use ratatui::backend::Backend;
@@ -157,6 +159,18 @@ pub(crate) fn apply_terminal_event_with_plan(
             }
         }
         Event::Paste(text) => {
+            if app.paste_saved_views(&text) {
+                return EventReaction {
+                    dirty: true,
+                    effect: None,
+                };
+            }
+            if app.paste_alert_rules(&text) {
+                return EventReaction {
+                    dirty: true,
+                    effect: None,
+                };
+            }
             // Bracketed paste is the search box's bulk input path (the read
             // side of the OSC 52 clipboard loop). Paste only lands while the
             // search field is focused — anywhere else it is an honest no-op,
@@ -211,6 +225,17 @@ pub(crate) fn apply_terminal_event_with_plan(
                             apply_overlay_control_click(app, plan, surface, index)
                         }
                         Some(TuiHitTarget::Overlay { .. }) => EventReaction::default(),
+                        Some(TuiHitTarget::NavigationPage(page)) => {
+                            if app.nav_orientation != NavOrientation::Vertical
+                                || super::modals::any_pointer_surface_open(app)
+                            {
+                                return EventReaction::default();
+                            }
+                            EventReaction {
+                                dirty: true,
+                                effect: app.apply_action(AppAction::SelectPage(page)),
+                            }
+                        }
                         Some(TuiHitTarget::TableRow { page, index }) => {
                             // Click-to-select: the hit-test projects the
                             // clicked cell through the SAME visual row
@@ -301,6 +326,8 @@ fn apply_overlay_control_click(
         }
     }
     match surface {
+        crate::TuiSurfaceKind::SavedViews => EventReaction::default(),
+        crate::TuiSurfaceKind::SidebarEditor => EventReaction::default(),
         crate::TuiSurfaceKind::ServiceMenu => {
             if let Some(menu) = app.service_menu_mut() {
                 menu.selection = index.min(crate::ui::service_menu::MENU_ACTIONS.len() - 1);
@@ -378,10 +405,13 @@ fn apply_overlay_control_click(
         // fail-closed no-op, not a modeled path.
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies
-        | crate::TuiSurfaceKind::ProcessAffinity => EventReaction::default(),
+        | crate::TuiSurfaceKind::ProcessAffinity
+        | crate::TuiSurfaceKind::DiagnosticBundle
+        | crate::TuiSurfaceKind::FirstRun => EventReaction::default(),
     }
 }
 
@@ -470,6 +500,7 @@ where
         cycle.ancillary_effect |= app.drain_config_publications();
         cycle.ancillary_effect |= app.drain_history_replay_completions();
         cycle.ancillary_effect |= app.drain_snapshot_export_completions();
+        cycle.ancillary_effect |= app.drain_diagnostic_bundle_completions();
         if let Some(platform) = platform.as_deref_mut() {
             cycle.ancillary_effect |= app
                 .shell
@@ -545,6 +576,7 @@ where
                 .draw(|frame| {
                     frame_area = frame.area();
                     let plan = TuiFramePlan::build(app, frame.area());
+                    crate::ui::prepare_memory_inventory_capture(app, theme, &plan);
                     render_with_plan(frame, app, theme, &plan);
                     painted_plan = Some(plan);
                 })
@@ -556,6 +588,10 @@ where
         }
         if demo
             && !capture_marked
+            && !app.memory_capture_scroll_pending
+            && crate::demo::capture::scene_capture_ready(app)
+            && (!crate::demo::persisted_history_capture_requested()
+                || crate::ui::history_capture_frame_ready(app, &committed_plan))
             && let Some(path) = capture_marker
         {
             std::fs::write(
@@ -582,14 +618,22 @@ where
                 let reaction = apply_terminal_event_with_plan(app, events.read()?, &committed_plan);
                 pending_draw |= reaction.dirty;
                 if let Some(effect) = reaction.effect {
-                    match platform.as_deref_mut() {
-                        Some(platform) => queue_effect(app, platform, effect),
-                        None => app.report_notice(
-                            FeedbackSource::Demo,
-                            FeedbackSeverity::Warning,
-                            FeedbackLifecycle::UntilReplaced,
-                            "Demo mode suppresses platform actions",
-                        ),
+                    if let PlatformEffect::SetupScript(request) = effect {
+                        app.submit_first_run_action(
+                            request.action,
+                            platform.as_deref_mut(),
+                            unix_now_ms(),
+                        );
+                    } else {
+                        match platform.as_deref_mut() {
+                            Some(platform) => queue_effect(app, platform, effect),
+                            None => app.report_notice(
+                                FeedbackSource::Demo,
+                                FeedbackSeverity::Warning,
+                                FeedbackLifecycle::UntilReplaced,
+                                "Demo mode suppresses platform actions",
+                            ),
+                        }
                     }
                 }
                 if app.should_quit() || drained + 1 == EVENT_DRAIN_BATCH {

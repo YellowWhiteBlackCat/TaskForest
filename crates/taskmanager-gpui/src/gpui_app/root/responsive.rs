@@ -1,9 +1,7 @@
 //! Small-window policy shared by the production window and headless tests.
 
 use crate::gpui_app::elements;
-use crate::gpui_app::sidebar::{
-    NetworkVisibility, SelectedDevice, ordered_indices, visible_with_override,
-};
+use crate::gpui_app::sidebar::{NetworkVisibility, SelectedDevice};
 use crate::gpui_app::theme::mono_font_with_fallback;
 use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Pixels, Size,
@@ -21,10 +19,13 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
-use super::{NavOrientation, RootView};
+use super::RootView;
 
+mod dashboard;
 pub(crate) mod device_strip;
+pub(crate) use dashboard::{DashboardBudget, DashboardSummaries};
 
 pub const MIN_WIDTH: f32 = 720.0;
 pub const MIN_HEIGHT: f32 = 480.0;

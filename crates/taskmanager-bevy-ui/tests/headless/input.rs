@@ -81,6 +81,12 @@ fn input_app(shell: ShellApp) -> App {
         InputFocusPlugin,
     ));
     app.add_plugins(AppShellPlugin);
+    crate::pages::services::register(&mut app);
+    crate::pages::startup::register(&mut app);
+    crate::pages::sessions::register(&mut app);
+    crate::pages::performance::register(&mut app);
+    crate::pages::process_tree::register(&mut app);
+    crate::pages::history::scene::register(&mut app);
     app.insert_resource(WindowPalette {
         inner: crate::palette::ui_palette(&Theme::dark()),
     });
@@ -805,6 +811,10 @@ fn ctrl_c_copies_selected_row_summary_to_clipboard() {
 
     press_ctrl(&mut app, KeyCode::KeyC, None);
 
+    app.world_mut().resource_scope(|world, mut clipboard: bevy::ecs::change_detection::Mut<crate::text_selection::ClipboardPort>| {
+        let mut track = world.non_send_mut::<FrontendTrack>();
+        crate::text_selection::flush_clipboard(&mut clipboard, &mut track.shell, |_text| Ok(()));
+    });
     let world = app.world();
     let clipboard = world.resource::<crate::text_selection::ClipboardPort>();
     assert_eq!(clipboard.get_text(), Some(expected_summary.as_str()));
@@ -854,3 +864,83 @@ fn text_input_word_navigation_and_deletion() {
 // path-mounted module so each test file stays inside the per-file budget.
 #[path = "input_arms.rs"]
 mod dispatch_arms;
+
+#[test]
+fn diagnostic_review_owns_keys_until_dismissed() {
+    use crate::pages::system::diagnostic_modal::{self, DiagnosticCommand};
+    use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+    let mut app = input_app(fixture::demo_app());
+    crate::window_surface::register(&mut app);
+    diagnostic_modal::register(&mut app);
+    app.update();
+    app.world_mut().trigger(DiagnosticCommand::Open);
+    app.update();
+    let page = app.world().resource::<Route>().page;
+    press(&mut app, KeyCode::KeyQ, Some("q"));
+    app.update();
+    assert!(!app.world().non_send::<FrontendTrack>().shell.should_quit());
+    press(&mut app, KeyCode::Digit2, Some("2"));
+    app.update();
+    assert_eq!(app.world().resource::<Route>().page, page);
+    press(&mut app, KeyCode::Enter, None);
+    app.update();
+    assert!(matches!(
+        app.world()
+            .resource::<crate::window_surface::WindowSurfaceState>()
+            .diagnostic(),
+        Some(DiagnosticBundleUiState::Failed(_))
+    ));
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+    assert!(
+        app.world()
+            .resource::<crate::window_surface::WindowSurfaceState>()
+            .diagnostic()
+            .is_none()
+    );
+    assert!(app.world().resource::<PendingEffects>().0.is_empty());
+}
+
+#[test]
+fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
+    use crate::first_run_modal::{self, FirstRunCommand, SetupState};
+    use crate::window_surface;
+    use taskmanager_application::first_run::FirstRunController;
+    use taskmanager_core::core::setup::SetupScriptAction;
+    use taskmanager_shell::fixture::setup::setup_script_info;
+    let mut app = input_app(shell_with_selection());
+    window_surface::register(&mut app);
+    first_run_modal::register(&mut app);
+    app.world_mut().resource_mut::<SetupState>().0 =
+        FirstRunController::from_observation(Some(setup_script_info()));
+    app.update();
+    app.world_mut().trigger(FirstRunCommand::Open);
+    app.update();
+    for modifier in [
+        KeyCode::ControlLeft,
+        KeyCode::AltLeft,
+        KeyCode::SuperLeft,
+        KeyCode::ShiftLeft,
+    ] {
+        app.world_mut()
+            .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+            .reset_all();
+        press(&mut app, modifier, None);
+        press(&mut app, KeyCode::KeyR, Some("R"));
+        app.update();
+        assert!(
+            app.world().resource::<PendingEffects>().0.is_empty(),
+            "modified R cannot submit Run or an unready Restart"
+        );
+    }
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .reset_all();
+    press(&mut app, KeyCode::KeyR, Some("r"));
+    app.update();
+    let effects = &app.world().resource::<PendingEffects>().0;
+    assert_eq!(effects.len(), 1);
+    assert!(
+        matches!(&effects[0], PlatformEffect::SetupScript(request) if request.action == SetupScriptAction::Run)
+    );
+}

@@ -42,6 +42,8 @@ pub struct SessionControlTarget {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PlatformEffect {
     Refresh(RefreshRequest),
+    /// Observe native desktop metadata once through the integration port.
+    ObserveDesktopAppearance,
     EndTask(FrozenProcessIdentity),
     /// Submit one semantic process signal through the shared process-control
     /// port. Frontends own the menu shape; the shell/application owns the

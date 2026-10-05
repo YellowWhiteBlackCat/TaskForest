@@ -18,9 +18,10 @@ use taskmanager_core::core::sensors::SensorReading;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
+use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_theme::Theme;
 
-use super::{clean_memory_size, content, paint_system, system_fact_rows, system_summary_model};
+use super::{clean_memory_size, content, system_fact_rows, system_summary_model};
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::pages::history::HistoryProjectionResource;
@@ -107,6 +108,20 @@ fn a_missing_inventory_states_waiting_and_states_no_facts() {
 }
 
 #[test]
+fn accepted_memory_inventory_survives_an_unavailable_static_hardware_lane() {
+    set_language(Language::En);
+    let snapshot = memory_inventory_snapshot();
+    let rows = system_fact_rows(None, Some(&snapshot), None);
+    assert_eq!(rows.len(), 4);
+    assert!(rows.iter().any(|row| row.value == "3 / 4 used"));
+    assert!(
+        rows.iter()
+            .any(|row| row.label == "ChannelA-DIMM0" && row.value.contains("5200 MT/s"))
+    );
+    assert!(rows.iter().any(|row| row.value == MISSING_VALUE));
+}
+
+#[test]
 fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     set_language(Language::En);
     let mut app = App::new();
@@ -121,16 +136,17 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.init_resource::<HistoryProjectionResource>();
-    // Mount the REAL page scene: the root's on-insert hook binds the paint
-    // pass, which authors the body container. The context borrows locals;
+    super::register(&mut app);
+    // Mount the real scene after registering its typed paint system. The context borrows locals;
     // the shell moves into the track right after the spawn.
     let shell = shell_with_hardware(Some(fixture_hardware()));
     let palette = crate::palette::ui_palette(&Theme::dark());
     let history = HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -143,8 +159,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         initial_refresh_submitted: true,
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
-    // NO manual paint: the on-insert bind hook must author the body by
-    // itself, exactly as the windowed composition does.
+    // Mount notification must author the body through the scheduled system.
     app.update();
 
     let world = app.world_mut();
@@ -166,7 +181,9 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     // fact is still stated exactly once, never duplicated.
     app.world_mut().trigger(ShellProjectionFolded);
     app.update();
-    paint_system(app.world_mut());
+    app.world_mut().trigger(ShellProjectionFolded);
+    app.world_mut().trigger(ShellProjectionFolded);
+    app.update();
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
     let value_seen = texts
@@ -405,12 +422,14 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.init_resource::<HistoryProjectionResource>();
+    super::register(&mut app);
 
     let history = HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &fan_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -457,10 +476,13 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     thermal_app.init_resource::<HistoryProjectionResource>();
+    super::register(&mut thermal_app);
 
     let context2 = crate::app::PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &thermal_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };

@@ -11,6 +11,17 @@
 
 use super::super::*;
 
+#[test]
+fn dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table() {
+    let mut app = crate::demo_app();
+    let expected = app.shell.row_anchor_at(0).expect("canonical first process");
+    crate::demo::apply_capture_scene_override(&mut app, "process-selection");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+    assert_eq!(app.shell.selected_row_anchor(), Some(expected));
+    assert!(app.process_properties().is_none());
+}
+use taskmanager_application::ProcessInsightFacet;
+
 use std::collections::HashSet;
 
 use taskmanager_application::{AppAction, AppPage};
@@ -309,6 +320,7 @@ fn tui_local_properties_modal_publishes_and_releases_the_dialog() {
     let identity = FrozenProcessIdentity::from_authoritative_parts(4242, "editor", 7_500, 9_000)
         .expect("fixture identity");
     app.process_properties_view = Some(ProcessPropertiesTarget {
+        facet: ProcessInsightFacet::Network,
         item,
         section: ProcessDetailsSection::Overview,
         scroll: 0,

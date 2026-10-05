@@ -6,6 +6,7 @@
 //! and independent `Option` fields, making the modal precedence chain
 //! unrepresentable.
 
+use crate::diagnostic_bundle::DiagnosticBundleTargetView;
 use taskmanager_application::SurfaceKind;
 
 use crate::{
@@ -138,7 +139,10 @@ impl AffinityModalState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TuiSurfaceKind {
     Settings,
+    SidebarEditor,
+    SavedViews,
     About,
+    SystemInformation,
     Health,
     Containers,
     ServiceMenu,
@@ -150,12 +154,22 @@ pub(crate) enum TuiSurfaceKind {
     CommandPalette,
     ServiceDependencies,
     ProcessAffinity,
+    DiagnosticBundle,
+    FirstRun,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum TuiSurface {
     Settings,
-    About,
+    SidebarEditor {
+        selected: Option<String>,
+    },
+    SavedViews {
+        selected: Option<u64>,
+        input: crate::saved_views::SavedViewInput,
+    },
+    About(crate::information::AboutTargetView),
+    SystemInformation(crate::information::SystemInformationTargetView),
     Health,
     Containers,
     ServiceMenu(Box<ServiceMenuTarget>),
@@ -163,17 +177,24 @@ pub(crate) enum TuiSurface {
     BatchMenu(BatchMenuTarget),
     SessionMenu(SessionMenuTarget),
     StartupMenu(StartupMenuTarget),
-    ColumnMenu { selection: usize },
+    ColumnMenu {
+        selection: usize,
+    },
     CommandPalette(CommandPalette),
     ServiceDependencies(ServiceDependenciesTarget),
     ProcessAffinity(AffinityModalState),
+    DiagnosticBundle(DiagnosticBundleTargetView),
+    FirstRun(crate::first_run::FirstRunTargetView),
 }
 
 impl TuiSurface {
     pub(crate) const fn kind(&self) -> TuiSurfaceKind {
         match self {
             Self::Settings => TuiSurfaceKind::Settings,
-            Self::About => TuiSurfaceKind::About,
+            Self::SidebarEditor { .. } => TuiSurfaceKind::SidebarEditor,
+            Self::SavedViews { .. } => TuiSurfaceKind::SavedViews,
+            Self::About(_) => TuiSurfaceKind::About,
+            Self::SystemInformation(_) => TuiSurfaceKind::SystemInformation,
             Self::Health => TuiSurfaceKind::Health,
             Self::Containers => TuiSurfaceKind::Containers,
             Self::ServiceMenu(_) => TuiSurfaceKind::ServiceMenu,
@@ -185,6 +206,8 @@ impl TuiSurface {
             Self::CommandPalette(_) => TuiSurfaceKind::CommandPalette,
             Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
             Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
+            Self::DiagnosticBundle(_) => TuiSurfaceKind::DiagnosticBundle,
+            Self::FirstRun(_) => TuiSurfaceKind::FirstRun,
         }
     }
 }
@@ -305,7 +328,7 @@ impl TuiApp {
 
     #[must_use]
     pub const fn about_open(&self) -> bool {
-        matches!(self.local_surface(), Some(TuiSurface::About))
+        matches!(self.local_surface(), Some(TuiSurface::About(_)))
     }
 
     #[must_use]
@@ -421,6 +444,9 @@ impl TuiApp {
     }
 
     pub(crate) fn open_local_surface(&mut self, surface: TuiSurface) {
+        if self.local_surface_kind() == Some(TuiSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         self.shell.dismiss_overlay();
         self.shell.close_service_log();
         self.shell.dismiss_informational_overlay();
@@ -432,10 +458,18 @@ impl TuiApp {
     }
 
     pub(crate) fn dismiss_local_surface(&mut self) {
+        if self.local_surface_kind() == Some(TuiSurfaceKind::DiagnosticBundle) {
+            self.diagnostics.close();
+        }
         let _ = self.local_surface.reduce(TuiSurfaceEvent::DismissCurrent);
     }
 
     pub(crate) fn dismiss_local_surface_kind(&mut self, expected: TuiSurfaceKind) {
+        if expected == TuiSurfaceKind::DiagnosticBundle
+            && self.local_surface_kind() == Some(expected)
+        {
+            self.diagnostics.close();
+        }
         let _ = self
             .local_surface
             .reduce(TuiSurfaceEvent::Dismiss(expected));

@@ -17,7 +17,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextColor, TextLayout};
@@ -217,27 +216,27 @@ fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene +
             overflow: Overflow::clip_x(),
         }
         Children [
-            (
+
                 Node {
                     width: px(64.0),
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    (
+
                         Text(entry_stamp(entry))
                         TextColor(ink)
                         TextRole(Role::Mono)
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Text({ entry.message.clone() })
                 TextColor(ink)
                 TextRole(Role::Mono)
                 TextLayout { linebreak: LineBreak::NoWrap }
-            ),
+
         ]
     }
 }
@@ -249,7 +248,7 @@ fn chip_button(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     Box::new(bsn! {
-        (
+
             Node {
                 height: px(palette.control_height_px),
                 padding: UiRect::horizontal(Val::Px(space_12())),
@@ -265,9 +264,9 @@ fn chip_button(
             on(log_panel_control_activated)
             ServiceLogControlButton(action)
             Children [
-                ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                 Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
             ]
-        )
+
     })
 }
 
@@ -310,12 +309,12 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         vec![Box::new(bsn! {
             Node { width: percent(100.0), overflow: Overflow::clip_x() }
             Children [
-                (
+
                     Text(status)
                     ServicesLogStatusLine
                     TextRole(Role::Caption)
                     TextLayout { linebreak: LineBreak::NoWrap }
-                )
+
             ]
         }) as Box<dyn Scene>]
     };
@@ -323,7 +322,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [
-                ( Text(t("svc.logs_empty")) TextRole(Role::Caption) )
+                 Text(t("svc.logs_empty")) TextRole(Role::Caption)
             ]
         })
     } else {
@@ -336,7 +335,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
             }
             ScrollArea
             Children [
-                { rows },
+                { rows }
             ]
         })
     };
@@ -351,7 +350,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         BackgroundColor({ palette.panel_fill })
         ServicesLogPanelRoot
         Children [
-            (
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Row,
@@ -359,16 +358,16 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
-                    (
+
                         Text(title)
                         TextRole(Role::Body)
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    ),
-                    ( Node { flex_grow: 1.0 } ),
-                    ( { chip_button(ServiceLogControlAction::Close, t("common.close").to_owned(), false, palette) } ),
+                    --
+                     Node { flex_grow: 1.0 } --
+                     @{ chip_button(ServiceLogControlAction::Close, t("common.close").to_owned(), false, palette) }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Row,
@@ -376,14 +375,14 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
-                    ( { chip_button(ServiceLogControlAction::ToggleFollow, t("svc.logs_follow").to_owned(), feed.follow, palette) } ),
-                    ( { chip_button(ServiceLogControlAction::TogglePaused, t("common.paused").to_owned(), feed.paused, palette) } ),
-                    ( { chip_button(ServiceLogControlAction::CycleLevel, level_caption(feed.level), false, palette) } ),
-                    ( { chip_button(ServiceLogControlAction::CycleTime, time_caption(feed.time), false, palette) } ),
-                    ( { chip_button(ServiceLogControlAction::Export, t("common.export").to_owned(), false, palette) } ),
+                     @{ chip_button(ServiceLogControlAction::ToggleFollow, t("svc.logs_follow").to_owned(), feed.follow, palette) } --
+                     @{ chip_button(ServiceLogControlAction::TogglePaused, t("common.paused").to_owned(), feed.paused, palette) } --
+                     @{ chip_button(ServiceLogControlAction::CycleLevel, level_caption(feed.level), false, palette) } --
+                     @{ chip_button(ServiceLogControlAction::CycleTime, time_caption(feed.time), false, palette) } --
+                     @{ chip_button(ServiceLogControlAction::Export, t("common.export").to_owned(), false, palette) }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -391,10 +390,10 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                 }
                 LogEntriesBox
                 Children [
-                    { status_row },
-                    ( { list } ),
+                    { status_row }--
+                     @{ list }
                 ]
-            ),
+
         ]
     })
 }
@@ -403,7 +402,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct ServicesLogsOpenButton;
 
-/// Bevy 0.19 widget activation for the open affordance.
+/// Bevy 0.20 widget activation for the open affordance.
 pub(crate) fn services_logs_button_activated(
     activate: On<Activate>,
     buttons: Query<&ServicesLogsOpenButton>,
@@ -538,7 +537,7 @@ pub(crate) fn export_service_log(shell: &mut ShellApp, export_dir: Option<&std::
     }
 }
 
-/// Bevy 0.19 widget activation for the panel buttons: shell mutation first,
+/// Bevy 0.20 widget activation for the panel buttons: shell mutation first,
 /// then the typed repaint trigger.
 pub(crate) fn log_panel_control_activated(
     activate: On<Activate>,
@@ -604,57 +603,18 @@ pub(crate) fn on_services_fold_log_gate(
 /// Repaint trigger → world painter: the queue bridge every repaint path
 /// converges on (open, controls, close, fold fingerprint changes).
 pub(crate) fn on_log_panel_repaint_required(
-    _repaint: On<LogPanelRepaintRequired>,
-    mut commands: Commands,
+    _event: On<LogPanelRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_log_panel);
+    dirty.0 = true;
 }
-
-/// Mount-time first paint: the slot spawns after the page's insert hook has
-/// bound the observers, so a pre-seeded lifecycle (capture fixture, route-back
-/// remount) still renders its panel without waiting for a fold.
 pub(crate) fn on_log_panel_slot_added(
-    _added: On<bevy::ecs::lifecycle::Add, ServicesLogPanelSlot>,
-    mut commands: Commands,
+    _event: On<bevy::ecs::lifecycle::Add<ServicesLogPanelSlot>>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_log_panel);
+    dirty.0 = true;
 }
-
-/// The one panel painter (world form, queued like `paint_services`).
-pub(crate) fn paint_log_panel(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let fingerprint = world
-        .non_send::<FrontendTrack>()
-        .shell
-        .service_log
-        .as_ref()
-        .map(|open| log_fingerprint(Some(open)));
-    let scene = {
-        let track = world.non_send::<FrontendTrack>();
-        track
-            .shell
-            .service_log
-            .as_ref()
-            .map(|_| service_log_panel_scene(&track.shell, &palette))
-    };
-    let slot = world
-        .query_filtered::<Entity, With<ServicesLogPanelSlot>>()
-        .iter(world)
-        .next();
-    let Some(slot) = slot else {
-        return;
-    };
-    let stale: Vec<Entity> = world
-        .get::<bevy::ecs::hierarchy::Children>(slot)
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(slot).add_one_related::<ChildOf>(entity);
-    }
-    world.resource_mut::<ServicesLogRenderState>().rendered = fingerprint;
+pub(crate) fn register(app: &mut bevy::app::App) {
+    paint::register(app);
 }
+mod paint;

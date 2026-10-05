@@ -28,8 +28,8 @@ use bevy::ui::Checked;
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{
-    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
-    SystemFacets, TelemetryInterval,
+    HostTelemetryRequest, PlatformClient, PlatformEffect, PlatformEvent, PlatformFacets,
+    PlatformHandle, SystemFacets, TelemetryInterval,
 };
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
@@ -44,10 +44,146 @@ use super::{
     palette_mode, refresh_choice_index, theme_for_mode,
 };
 use crate::app::{FrontendTrack, Page, PageContent, Route};
+use crate::input::PendingEffects;
+use crate::pages::settings::privilege_center::PrivilegeControl;
+use crate::pages::settings::{SettingsBody, SettingsFooter, SettingsHeading};
 use crate::palette::ui_palette;
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
+use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
+use bevy::image::TextureAtlasLayout;
+use bevy::math::UVec2;
+use bevy::picking::DefaultPickingPlugins;
+use bevy::text::TextPlugin;
+use bevy::transform::TransformPlugin;
+use bevy::ui::UiPlugin;
+use bevy::ui::{ComputedNode, UiGlobalTransform};
+use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
+
+#[test]
+fn settings_scroll_body_preserves_header_and_footer_bounds_in_short_frames() {
+    for (width, height) in [(720, 360), (720, 480), (1280, 720), (1600, 480), (720, 960)] {
+        let mut app = headless_shell_app();
+        app.add_plugins((
+            WindowPlugin {
+                primary_window: None,
+                exit_condition: ExitCondition::DontExit,
+                ..Default::default()
+            },
+            DefaultPickingPlugins,
+            TransformPlugin,
+            TextPlugin,
+            UiPlugin,
+        ));
+        app.init_resource::<Assets<TextureAtlasLayout>>();
+        let size = UVec2::new(width, height);
+        app.world_mut().spawn((
+            Window {
+                resolution: (width, height).into(),
+                ..Default::default()
+            },
+            PrimaryWindow,
+        ));
+        app.world_mut().spawn((
+            Camera2d,
+            Camera {
+                computed: ComputedCameraValues {
+                    target_info: Some(RenderTargetInfo {
+                        physical_size: size,
+                        scale_factor: 1.0,
+                    }),
+                    ..Default::default()
+                },
+                viewport: Some(Viewport {
+                    physical_size: size,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ));
+        mount_settings(&mut app);
+        app.update();
+        let world = app.world_mut();
+        let mut query = world.query::<(
+            &ComputedNode,
+            &UiGlobalTransform,
+            Has<SettingsHeading>,
+            Has<SettingsBody>,
+            Has<SettingsFooter>,
+        )>();
+        let mut found = 0;
+        for (node, transform, heading, body, footer) in query.iter(world) {
+            if !(heading || body || footer) {
+                continue;
+            }
+            found += 1;
+            let half = node.size() / 2.0;
+            assert!(
+                node.size().y > 0.0,
+                "every settings slot must retain height at {width}x{height}"
+            );
+            assert!(
+                transform.translation.x + half.x <= width as f32 + 0.5,
+                "right edge must fit at {width}x{height}: center={:?}, size={:?}, slots=({heading},{body},{footer})",
+                transform.translation,
+                node.size()
+            );
+            assert!(
+                transform.translation.y + half.y <= height as f32 + 0.5,
+                "bottom edge must fit at {width}x{height}: center={:?}, size={:?}, slots=({heading},{body},{footer})",
+                transform.translation,
+                node.size()
+            );
+        }
+        assert_eq!(
+            found, 3,
+            "all mandatory slots and the scroll owner must mount"
+        );
+    }
+}
+
+#[test]
+fn permission_center_button_freezes_the_lane_and_rejects_a_stale_offer() {
+    let mut app = headless_shell_app();
+    let snapshot = CapabilitySnapshot::from_descriptors([CapabilityDescriptor {
+        id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+        status: CapabilityStatus::RequiresEscalation,
+        providers: Vec::new(),
+        observed_at_ms: 1,
+        last_success_at_ms: None,
+    }]);
+    app.world_mut()
+        .non_send_mut::<FrontendTrack>()
+        .shell
+        .apply_capability_snapshot(snapshot);
+    mount_settings(&mut app);
+    let entity = app
+        .world_mut()
+        .query::<(Entity, &PrivilegeControl)>()
+        .iter(app.world())
+        .find(|(_, control)| control.0 == Some(PrivilegeAction::RaplPower))
+        .map(|(entity, _)| entity)
+        .expect("the offered RAPL action must mount");
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity });
+    assert!(matches!(
+        app.world().resource::<PendingEffects>().0.as_slice(),
+        [PlatformEffect::RaplPower(_)]
+    ));
+    app.world_mut().resource_mut::<PendingEffects>().0.clear();
+    app.world_mut()
+        .non_send_mut::<FrontendTrack>()
+        .shell
+        .apply_capability_snapshot(CapabilitySnapshot::default());
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity });
+    assert!(
+        app.world().resource::<PendingEffects>().0.is_empty(),
+        "a stale rendered button cannot request a removed capability"
+    );
+}
 use taskmanager_core::core::appearance::DesktopFamily;
 use taskmanager_core::core::appearance::PreferredColorScheme;
 use taskmanager_platform_contract::RequestEnvelope;
@@ -83,13 +219,22 @@ impl RequestPort for QuietRequests {
 }
 
 fn scripted_runtime() -> &'static crate::runtime::SharedRuntime {
-    let snapshot = CapabilitySnapshot::from_descriptors([CapabilityDescriptor {
-        id: CapabilityId::TELEMETRY_HOST,
-        status: CapabilityStatus::Available,
-        providers: Vec::new(),
-        observed_at_ms: 1,
-        last_success_at_ms: None,
-    }]);
+    let snapshot = CapabilitySnapshot::from_descriptors([
+        CapabilityDescriptor {
+            id: CapabilityId::TELEMETRY_HOST,
+            status: CapabilityStatus::Available,
+            providers: Vec::new(),
+            observed_at_ms: 1,
+            last_success_at_ms: None,
+        },
+        CapabilityDescriptor {
+            id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+            status: CapabilityStatus::RequiresEscalation,
+            providers: Vec::new(),
+            observed_at_ms: 1,
+            last_success_at_ms: None,
+        },
+    ]);
     let client = PlatformClient::new(PlatformHandle::new(
         std::sync::Arc::new(FixedCapabilities(snapshot)),
         std::sync::Arc::new(QuietEvents),
@@ -161,6 +306,59 @@ fn activate(app: &mut App, entity: Entity) {
             is_final: true,
         });
     app.update();
+}
+
+#[test]
+fn zero_value_checkbox_changes_real_cells_without_dimming_missing_values() {
+    use crate::pages::settings::ThemePreferences;
+    use crate::widgets::table::{row_scene, visible_columns};
+    use bevy::scene::CommandsSceneExt;
+    use bevy::text::TextColor;
+    use bevy::ui_widgets::Checkbox;
+
+    let mut app = headless_shell_app();
+    mount_settings(&mut app);
+    let columns = visible_columns(&[])
+        .into_iter()
+        .filter(|column| matches!(column.id, "CPU" | "Memory" | "Network"))
+        .collect::<Vec<_>>();
+    let cells = vec!["0.0%".to_owned(), "—".to_owned(), "8 B/s".to_owned()];
+    app.world_mut()
+        .commands()
+        .spawn_scene(row_scene(&cells, &columns));
+    app.update();
+    let colors = |app: &mut App| {
+        app.world_mut()
+            .query::<(&Text, &TextColor)>()
+            .iter(app.world())
+            .filter(|(text, _)| cells.contains(&text.0))
+            .map(|(text, color)| (text.0.clone(), color.0))
+            .collect::<std::collections::HashMap<_, _>>()
+    };
+    let body = app.world().resource::<WindowPalette>().inner.body_color;
+    let dim = app.world().resource::<WindowPalette>().inner.dim_color;
+    assert_eq!(colors(&mut app)["0.0%"], body);
+    for enabled in [true, false] {
+        let entity = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(enabled));
+        assert!(app.world().get::<Checkbox>(entity).is_some());
+        app.world_mut()
+            .trigger(bevy::ui_widgets::ValueChange::<bool> {
+                source: entity,
+                value: enabled,
+                is_final: true,
+            });
+        app.update();
+        assert_eq!(
+            app.world().resource::<ThemePreferences>().gray_zero_values,
+            enabled
+        );
+        let current = colors(&mut app);
+        assert_eq!(current["0.0%"], if enabled { dim } else { body });
+        assert_eq!(current["—"], body);
+        assert_eq!(current["8 B/s"], body);
+        let next = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(!enabled));
+        assert_eq!(is_checked(app.world_mut(), next), enabled);
+    }
 }
 
 // ---- pure projections of the authorities ----

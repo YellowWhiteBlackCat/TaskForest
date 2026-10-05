@@ -50,6 +50,16 @@ pub fn help_rows() -> Vec<LocalBinding> {
             .into_iter()
             .map(|command| localize_tui_binding(command.binding)),
     );
+    rows.extend([
+        LocalBinding {
+            shortcut: "Ctrl+Right",
+            label: t("proc.expand_all"),
+        },
+        LocalBinding {
+            shortcut: "Ctrl+Left",
+            label: t("proc.collapse_all"),
+        },
+    ]);
     rows
 }
 
@@ -64,12 +74,17 @@ pub fn help_rows() -> Vec<LocalBinding> {
 fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
     let key = match binding.shortcut {
         "p" => "chrome.settings",
+        "r" => "help.binding.history_review",
+        "f" => "help.binding.refresh_history",
         "i" => "help.binding.about",
         "h" => "health.system_health_alerts",
         "c" => "containers.title",
         "x" => "system.export_snapshot",
         "Enter" => "help.binding.service_actions",
         "1-7" => "help.binding.perf_resource",
+        "1-4" => "help.binding.system_history",
+        "w" => "help.binding.system_dashboard",
+        "b" => "help.binding.system_hardware",
         "C" => "help.binding.columns",
         "m" => "help.binding.mark_batch",
         "B" => "help.binding.batch_actions",
@@ -103,38 +118,25 @@ pub(super) fn render_help_overlay_at(
 
     let [body, footer] = Layout::vertical([Constraint::Min(6), Constraint::Length(2)]).areas(inner);
 
-    // Two side-by-side columns keep the listing inside a modest popup height.
-    // Each column shows `body.height` rows; the scroll offset walks both
-    // columns together (row N of the listing lives in the left column when
-    // N < the column height, otherwise in the right).
+    // Each column scrolls by the physical rows measured by Ratatui's own wrapper.
     let half = rows.len().div_ceil(2);
     let (left, right) = rows.split_at(half);
-    let column_height = usize::from(body.height);
-    let offset = app.help_scroll.min(half.saturating_sub(column_height));
-    let left_visible = &left[offset.min(left.len())..left.len().min(offset + column_height)];
-    let right_visible = &right[offset.min(right.len())..right.len().min(offset + column_height)];
     let [left_col, right_col] =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
-    frame.render_widget(
-        Paragraph::new(
-            left_visible
+    for (bindings, area) in [(left, left_col), (right, right_col)] {
+        let paragraph = Paragraph::new(
+            bindings
                 .iter()
                 .map(|row| help_line(row, theme))
                 .collect::<Vec<_>>(),
         )
-        .wrap(Wrap { trim: true }),
-        left_col,
-    );
-    frame.render_widget(
-        Paragraph::new(
-            right_visible
-                .iter()
-                .map(|row| help_line(row, theme))
-                .collect::<Vec<_>>(),
-        )
-        .wrap(Wrap { trim: true }),
-        right_col,
-    );
+        .wrap(Wrap { trim: true });
+        let maximum = paragraph
+            .line_count(area.width)
+            .saturating_sub(usize::from(area.height));
+        let offset = u16::try_from(app.help_scroll.min(maximum)).unwrap_or(u16::MAX);
+        frame.render_widget(paragraph.scroll((offset, 0)), area);
+    }
 
     frame.render_widget(
         Paragraph::new(vec![

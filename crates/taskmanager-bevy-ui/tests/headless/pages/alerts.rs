@@ -58,56 +58,6 @@ use taskmanager_platform_contract::RequestEnvelope;
 use taskmanager_ui_contract::ProductIntent;
 use taskmanager_ui_contract::SurfaceDecision;
 
-/// Create a new managed alert rule.
-fn create_alert_rule(
-    shell: &mut ShellApp,
-    id: impl Into<String>,
-    metric: AlertMetric,
-    severity: AlertSeverity,
-    threshold: f32,
-    hysteresis: f32,
-) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-    let rule = AlertRule::new(
-        id,
-        metric,
-        severity,
-        threshold,
-        std::time::Duration::from_secs(5),
-        hysteresis,
-    );
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
-}
-
-/// Edit an existing managed alert rule.
-fn edit_alert_rule(
-    shell: &mut ShellApp,
-    target_id: String,
-    metric: AlertMetric,
-    severity: AlertSeverity,
-    threshold: f32,
-    hysteresis: f32,
-) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-    let enabled = shell
-        .projection()
-        .alert_center
-        .managed_rules()
-        .iter()
-        .find(|m| m.rule.id == target_id)
-        .is_none_or(|m| m.enabled);
-    let rule = AlertRule::new(
-        target_id.clone(),
-        metric,
-        severity,
-        threshold,
-        std::time::Duration::from_secs(5),
-        hysteresis,
-    );
-    shell.edit_alert_rules(ManagedAlertRuleEdit::Update {
-        target_id,
-        managed: ManagedAlertRule::new(rule, enabled),
-    })
-}
-
 /// Export the managed alert rules through the canonical core transfer codec.
 fn export_alert_rules(shell: &ShellApp) -> Result<String, AlertRuleTransferError> {
     let entries: Vec<AlertRuleTransferEntry> = shell
@@ -513,10 +463,11 @@ fn pages_assemble_and_despawn_in_a_bare_scene_world() {
     let fixture_shell = ShellApp::new();
     let fixture_palette = ui_palette(&Theme::dark());
     let fixture_history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &fixture_shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &fixture_palette,
         history: &fixture_history.0,
     };
@@ -596,56 +547,99 @@ fn alert_rule_export_and_import_round_trip() {
     assert_eq!(shell.projection().alert_center.managed_rules().len(), 1);
 }
 
+fn click_rule_control(app: &mut App, action: super::editor::RuleControl) {
+    use super::editor::RuleButton;
+    let entity = app
+        .world_mut()
+        .query::<(Entity, &RuleButton)>()
+        .iter(app.world())
+        .find(|(_, control)| control.0 == action)
+        .map(|(entity, _)| entity)
+        .expect("mounted rule control");
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity });
+    app.update();
+}
 #[test]
 fn alert_rule_authoring_creates_and_edits_rules() {
-    let mut shell = ShellApp::new();
-    let initial_count = shell.projection().alert_center.managed_rules().len();
-
-    // 1. Create rule
-    let outcome = create_alert_rule(
-        &mut shell,
-        "custom-cpu-rule",
-        AlertMetric::CpuUsagePercent,
-        AlertSeverity::Critical,
-        88.0,
-        4.0,
-    )
-    .expect("create rule");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
-    let rules = shell.projection().alert_center.managed_rules();
-    assert_eq!(rules.len(), initial_count + 1);
-    let created = rules
+    use super::editor::RuleControl;
+    let mut app = headless_shell_app();
+    mount_alerts(&mut app);
+    app.update();
+    let count = app
+        .world()
+        .non_send::<FrontendTrack>()
+        .shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .len();
+    click_rule_control(&mut app, RuleControl::Add);
+    let id = app
+        .world()
+        .non_send::<FrontendTrack>()
+        .shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .last()
+        .expect("created")
+        .rule
+        .id
+        .clone();
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .alert_center
+            .managed_rules()
+            .len(),
+        count + 1
+    );
+    click_rule_control(&mut app, RuleControl::Threshold(id.clone(), 1));
+    click_rule_control(&mut app, RuleControl::Duration(id.clone(), 1));
+    click_rule_control(&mut app, RuleControl::Hysteresis(id.clone(), -1));
+    click_rule_control(&mut app, RuleControl::Severity(id.clone()));
+    let track = app.world().non_send::<FrontendTrack>();
+    let rule = &track
+        .shell
+        .projection()
+        .alert_center
+        .managed_rules()
         .iter()
-        .find(|r| r.rule.id == "custom-cpu-rule")
-        .unwrap();
-    assert_eq!(created.rule.threshold, 88.0);
-    assert_eq!(created.rule.severity, AlertSeverity::Critical);
-
-    // 2. Edit rule
-    let edit_outcome = edit_alert_rule(
-        &mut shell,
-        "custom-cpu-rule".to_string(),
-        AlertMetric::CpuUsagePercent,
-        AlertSeverity::Warning,
-        95.0,
-        5.0,
-    )
-    .expect("edit rule");
-    assert_eq!(edit_outcome, ManagedAlertRuleEditOutcome::Applied);
-    let updated_rules = shell.projection().alert_center.managed_rules();
-    let updated = updated_rules
-        .iter()
-        .find(|r| r.rule.id == "custom-cpu-rule")
-        .unwrap();
-    assert_eq!(updated.rule.threshold, 95.0);
-    assert_eq!(updated.rule.severity, AlertSeverity::Warning);
-
-    // 3. Line formatting
-    let line =
-        super::rule_authoring_line(AlertMetric::CpuUsagePercent, 85.0, AlertSeverity::Warning);
-    assert!(line.contains("CPU Usage"));
-    assert!(line.contains("≥ 85.0%"));
-    assert!(line.contains("Warning"));
+        .find(|managed| managed.rule.id == id)
+        .expect("updated")
+        .rule;
+    assert_eq!(rule.threshold, 86.0);
+    assert_eq!(rule.for_duration, std::time::Duration::from_secs(6));
+    assert_eq!(rule.hysteresis, 4.0);
+    assert_eq!(rule.severity, AlertSeverity::Critical);
+    click_rule_control(&mut app, RuleControl::Metric(id.clone()));
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .alert_center
+            .managed_rules()
+            .last()
+            .expect("rule")
+            .rule
+            .metric,
+        AlertMetric::MemoryUsagePercent
+    );
+    click_rule_control(&mut app, RuleControl::Remove(id));
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .alert_center
+            .managed_rules()
+            .len(),
+        count
+    );
 }
 
 #[test]
@@ -661,5 +655,105 @@ fn alert_rule_authoring_intent_declared() {
         SurfaceDecision::Local {
             route: "alerts.page.authoring",
         }
+    );
+}
+
+#[test]
+fn rule_import_publishes_a_complete_document_and_rejects_invalid_json_without_mutation() {
+    use super::editor::PendingImport;
+    use bevy::clipboard::ClipboardRead;
+    let mut app = headless_shell_app();
+    mount_alerts(&mut app);
+    let entries = vec![AlertRuleTransferEntry::new(
+        AlertRule::new(
+            "imported-rule",
+            AlertMetric::MemoryUsagePercent,
+            AlertSeverity::Critical,
+            82.0,
+            std::time::Duration::from_secs(3),
+            7.0,
+        ),
+        false,
+    )];
+    let json = export_alert_rules_json(&entries).expect("valid document");
+    app.world_mut().resource_mut::<PendingImport>().0 =
+        Some((ClipboardRead::Ready(Ok(json)), AlertRuleImportMode::Replace));
+    app.update();
+    let imported = app
+        .world()
+        .non_send::<FrontendTrack>()
+        .shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .to_vec();
+    assert_eq!(imported.len(), 1);
+    assert_eq!(imported[0].rule.id, "imported-rule");
+    assert!(!imported[0].enabled);
+    app.world_mut().resource_mut::<PendingImport>().0 = Some((
+        ClipboardRead::Ready(Ok("not json".into())),
+        AlertRuleImportMode::Replace,
+    ));
+    app.update();
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .alert_center
+            .managed_rules(),
+        imported
+    );
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_text()
+            .contains("failed")
+    );
+}
+
+#[test]
+fn mounted_export_button_queues_the_complete_rule_document_for_native_clipboard_delivery() {
+    use super::editor::{RuleButton, RuleControl};
+    use crate::text_selection::{ClipboardPort, flush_clipboard};
+    let mut app = headless_shell_app();
+    mount_alerts(&mut app);
+    let expected = export_alert_rules(&app.world().non_send::<FrontendTrack>().shell)
+        .expect("canonical document");
+    let entity = app
+        .world_mut()
+        .query::<(Entity, &RuleButton)>()
+        .iter(app.world())
+        .find(|(_, control)| control.0 == RuleControl::Export)
+        .map(|(entity, _)| entity)
+        .expect("normal export button");
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity });
+    let mut port = app
+        .world_mut()
+        .remove_resource::<ClipboardPort>()
+        .expect("owned output port");
+    let mut written = Vec::new();
+    flush_clipboard(
+        &mut port,
+        &mut app.world_mut().non_send_mut::<FrontendTrack>().shell,
+        |text| {
+            written.push(text.to_owned());
+            Ok(())
+        },
+    );
+    assert_eq!(written, [expected]);
+    assert_eq!(
+        import_alert_rules_json(&written[0])
+            .expect("transfer payload")
+            .len(),
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .projection()
+            .alert_center
+            .managed_rules()
+            .len()
     );
 }

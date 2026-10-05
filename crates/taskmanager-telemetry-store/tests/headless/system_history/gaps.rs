@@ -1,11 +1,13 @@
 //! Typed gap, timestamp, and terminal-failure history regressions.
 
 use super::*;
+use crate::HistoryRetention;
 
 #[test]
 fn explicit_disk_scalar_failure_writes_gap_instead_of_legacy_zero_or_value() {
     let device_id = "disk:wwid:typed-gap";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let mut disk = healthy_disk(device_id, 1, 55.0);
     let mut observations = *disk.scalar_observations();
     observations.active_time_pct = ScalarObservation::unavailable(FailureKind::PermissionDenied);
@@ -35,7 +37,8 @@ fn explicit_disk_scalar_failure_writes_gap_instead_of_legacy_zero_or_value() {
 
 #[test]
 fn completion_and_measurement_times_stay_distinct_and_invalid_order_fails_closed() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let cpu = CpuTelemetryObservation::current(observed_cpu(5.0, 100), 100, Vec::new());
     let slow_completion =
         CorrelatedTelemetryStamp::from_accepted_event(1, 250).expect("non-zero revision");
@@ -64,7 +67,8 @@ fn completion_and_measurement_times_stay_distinct_and_invalid_order_fails_closed
 #[test]
 fn accepted_failure_advances_all_existing_device_series_with_gaps() {
     let disk_id = "disk:wwid:failure-gap";
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let present = StorageTelemetryObservation::current(
         vec![healthy_disk(disk_id, 1, 8.0)],
         10,

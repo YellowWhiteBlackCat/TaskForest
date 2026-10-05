@@ -5,6 +5,8 @@
 //! string onto another row.
 
 use ratatui::Frame;
+use taskmanager_application::i18n::t;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/header_support.rs"]
@@ -20,7 +22,7 @@ use taskmanager_ui_contract::IconId;
 use crate::{TuiApp, TuiTheme};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    let brand = if area.width < 68 {
+    let brand = if area.width < 68 || area.height <= 2 {
         " TF "
     } else {
         product::NAME
@@ -32,6 +34,19 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             .bg(theme.accent)
             .add_modifier(Modifier::BOLD),
     )];
+    if app.nav_orientation == NavOrientation::Vertical {
+        spans.push(Span::styled(
+            format!(
+                " {} · F7 {}",
+                page_help()
+                    .iter()
+                    .find(|entry| entry.page == app.page())
+                    .map_or("", |entry| entry.label),
+                t("navigation.toggle")
+            ),
+            Style::new().fg(theme.accent),
+        ));
+    }
     for PageHelp {
         page,
         icon,
@@ -39,10 +54,18 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         shortcut,
         ..
     } in page_help()
+        .into_iter()
+        .filter(|_| app.nav_orientation == NavOrientation::Horizontal)
     {
         let active = app.page() == page;
         spans.push(Span::styled(
-            header_tab_text_with_theme(icon, label, shortcut, area.width, theme),
+            header_tab_text_with_theme(
+                icon,
+                label,
+                shortcut,
+                if area.height <= 2 { 0 } else { area.width },
+                theme,
+            ),
             if active {
                 Style::new()
                     .fg(theme.color(Color::White))

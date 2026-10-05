@@ -137,13 +137,14 @@ fn containers_scene_assembles_for_all_five_branches() {
     let mut shell = ShellApp::new();
     let palette = ui_palette(&Theme::dark());
     let history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
 
     // 1. Waiting (containers is None initially)
     {
         let ctx = PageContext {
+            sidebar: &Default::default(),
+            gray_zero_values: false,
             shell: &shell,
-            process_tree_expansion: &process_tree_expansion,
+
             palette: &palette,
             history: &history.0,
         };
@@ -162,8 +163,10 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            sidebar: &Default::default(),
+            gray_zero_values: false,
             shell: &shell,
-            process_tree_expansion: &process_tree_expansion,
+
             palette: &palette,
             history: &history.0,
         };
@@ -182,8 +185,10 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            sidebar: &Default::default(),
+            gray_zero_values: false,
             shell: &shell,
-            process_tree_expansion: &process_tree_expansion,
+
             palette: &palette,
             history: &history.0,
         };
@@ -199,8 +204,10 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            sidebar: &Default::default(),
+            gray_zero_values: false,
             shell: &shell,
-            process_tree_expansion: &process_tree_expansion,
+
             palette: &palette,
             history: &history.0,
         };
@@ -222,8 +229,10 @@ fn containers_scene_assembles_for_all_five_branches() {
     });
     {
         let ctx = PageContext {
+            sidebar: &Default::default(),
+            gray_zero_values: false,
             shell: &shell,
-            process_tree_expansion: &process_tree_expansion,
+
             palette: &palette,
             history: &history.0,
         };

@@ -10,11 +10,10 @@
 
 use taskmanager_application::SmbiosMemoryRequestFailure;
 use taskmanager_application::SmbiosMemoryState;
-use taskmanager_application::i18n;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_platform_contract::CapabilityStatus;
+use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
 /// Render-entry inputs for the subsection: the shared session state plus the
 /// runtime capability catalog entry for the lane.
@@ -50,12 +49,12 @@ pub(crate) fn memory_inventory_model(
 ) -> MemoryInventoryModel {
     match inputs.state {
         SmbiosMemoryState::Ready(ready) => {
-            MemoryInventoryModel::Inventory(inventory_rows(&ready.snapshot, units))
+            MemoryInventoryModel::Inventory(smbios_memory_inventory_rows(&ready.snapshot, units))
         }
         SmbiosMemoryState::Loading {
             last_good: Some(ready),
             ..
-        } => MemoryInventoryModel::Inventory(inventory_rows(&ready.snapshot, units)),
+        } => MemoryInventoryModel::Inventory(smbios_memory_inventory_rows(&ready.snapshot, units)),
         SmbiosMemoryState::Loading {
             last_good: None, ..
         } => MemoryInventoryModel::Reading,
@@ -81,70 +80,6 @@ pub(crate) fn memory_inventory_model(
             | None => MemoryInventoryModel::Hidden,
         },
     }
-}
-
-/// Slots used/total followed by one row per populated module, in the order
-/// the provider sorted them.
-fn inventory_rows(
-    snapshot: &SmbiosMemorySnapshot,
-    units: UnitPreferences,
-) -> Vec<(String, String)> {
-    let mut rows = vec![(
-        i18n::t("system.memory_slots").to_string(),
-        format!(
-            "{} / {} {}",
-            snapshot.slots_used,
-            snapshot.slots_total,
-            i18n::t("common.used")
-        ),
-    )];
-    rows.extend(
-        snapshot
-            .modules
-            .iter()
-            .map(|module| module_row(module, units)),
-    );
-    rows
-}
-
-/// One populated module: locator (or slot index) on the left, then the facts
-/// the SMBIOS record actually carried — part number, capacity, configured
-/// speed — joined with the page's ` · ` separator. Absent facts drop out of
-/// the value; an entirely empty record keeps its row with the shared dash.
-fn module_row(module: &SmbiosModuleRow, units: UnitPreferences) -> (String, String) {
-    let label = module
-        .locator
-        .as_deref()
-        .map(str::trim)
-        .filter(|locator| !locator.is_empty())
-        .map_or_else(
-            || format!("{} {}", i18n::t("system.memory_module"), module.slot),
-            str::to_string,
-        );
-    let mut facts = Vec::new();
-    if let Some(part) = module
-        .part_number
-        .as_deref()
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-    {
-        facts.push(part.to_string());
-    }
-    // Module capacity is MB (SMBIOS type 17 semantics); `format_quantity`
-    // expects bytes, so scale first — the same fold as the installed row.
-    if let Some(bytes) = module
-        .size_mb
-        .and_then(|mb| u64::from(mb).checked_mul(1024 * 1024))
-    {
-        facts.push(units.format_quantity(bytes, QuantityFamily::Memory, false));
-    }
-    if let Some(speed) = module.configured_speed_mts.filter(|speed| *speed > 0) {
-        facts.push(format!("{speed} MT/s"));
-    }
-    if facts.is_empty() {
-        facts.push(crate::gpui_app::formatting::missing_value());
-    }
-    (label, facts.join(" · "))
 }
 
 /// Both failure spellings carry one `FailureKind`; the provider's detail

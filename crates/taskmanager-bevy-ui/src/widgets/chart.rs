@@ -1,13 +1,15 @@
 //! Bounded, gap-aware chart projection for the Bevy performance surface.
 //!
-//! Bevy UI 0.19 lays out the surface; this module keeps the measurement math
+//! Bevy UI 0.20 lays out the surface; this module keeps the measurement math
 //! toolkit-neutral and makes the render seam a small `bsn!` scene. Non-finite
 //! observations create gaps rather than joining across missing data.
 
 use bevy::ecs::component::Component;
-use bevy::ecs::hierarchy::Children;
-use bevy::math::Rot2;
-use bevy::scene::{Scene, bsn};
+use bevy::ecs::entity::Entity;
+use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::system::{Commands, Query, SystemParam};
+use bevy::math::{Rot2, Vec2};
+use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
 
 /// Hard upper bound used by the performance chart surface.
@@ -219,7 +221,7 @@ pub(crate) fn polyline_scene(
             overflow: bevy::ui::Overflow::clip(),
         }
         Children [
-            { parts },
+            { parts }
         ]
     }
 }
@@ -227,3 +229,40 @@ pub(crate) fn polyline_scene(
 #[cfg(test)]
 #[path = "../../tests/headless/chart.rs"]
 mod tests;
+
+/// Last successfully painted logical chart size, shared by inspection surfaces.
+#[derive(Component, Clone, Default)]
+pub(crate) struct CurveMeasurement(pub(crate) Option<(f32, f32)>);
+
+/// Replace a measured curve through the owned scene adapter. Failed scene
+/// publication cannot certify a rendered curve for capture readiness.
+#[derive(SystemParam)]
+pub(crate) struct CurvePaintAccess<'w, 's> {
+    children: Query<'w, 's, &'static Children>,
+    commands: Commands<'w, 's>,
+}
+
+pub(crate) fn paint_curve_at_size(
+    access: &mut CurvePaintAccess,
+    entity: Entity,
+    size: Vec2,
+    samples: &[f32],
+    ceiling: f32,
+    color: bevy::color::Color,
+) -> bool {
+    if let Ok(children) = access.children.get(entity) {
+        for child in children.iter() {
+            access.commands.entity(*child).despawn();
+        }
+    }
+    let segments = line_segments_scaled(samples, size.x, size.y, samples.len(), ceiling);
+    let child = access
+        .commands
+        .spawn_scene(polyline_scene(&segments, color))
+        .id();
+    access
+        .commands
+        .entity(entity)
+        .add_one_related::<ChildOf>(child);
+    true
+}

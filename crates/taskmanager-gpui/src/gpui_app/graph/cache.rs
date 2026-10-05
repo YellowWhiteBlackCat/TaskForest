@@ -1,12 +1,13 @@
 //! Per-window graph presentation cache.
 
+use super::graph_capacity;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 
 use gpui::{Bounds, Path, Pixels, Rgba};
 
-use super::{GraphSettings, scene_cache, slide};
+use super::{scene_cache, slide};
 
 /// One memoized tail slice: the source projection plus the exact `limit` it
 /// was cut to. The source `Rc` is pinned so a recycled address cannot serve a
@@ -49,11 +50,7 @@ impl GraphPresentationCache {
         data_points: usize,
         sliding: bool,
     ) -> Rc<[f32]> {
-        let limit = GraphSettings::clamp_data_points(data_points).saturating_add(if sliding {
-            1
-        } else {
-            0
-        });
+        let limit = graph_capacity(data_points).saturating_add(if sliding { 1 } else { 0 });
         if samples.len() <= limit {
             return samples;
         }

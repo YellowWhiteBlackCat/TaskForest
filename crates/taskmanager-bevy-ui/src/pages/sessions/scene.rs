@@ -12,8 +12,8 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { flex_grow: 1.0 } ),
-            (
+             Node { flex_grow: 1.0 } --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -29,15 +29,15 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_session_disconnect_button_activated)
                 SessionDisconnectButton
                 Children [
-                    (
+
                         Text({ t("users.disconnect").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -53,14 +53,14 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_session_lock_button_activated)
                 SessionLockButton
                 Children [
-                    (
+
                         Text({ t("users.lock").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
+
         ]
     })
 }
@@ -91,9 +91,9 @@ pub(super) fn sessions_body_scene(
             row_gap: Val::Px(space_2()),
         }
         Children [
-            ( toolbar ),
-            ( header ),
-            { children },
+             @toolbar --
+             @header --
+            { children }
         ]
     }
 }
@@ -152,8 +152,8 @@ pub(super) fn header_scene(
                 }
                 SessionsSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-                    { indicator },
+                     Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+                    { indicator }
                 ]
             }) as Box<dyn Scene>
         })
@@ -214,12 +214,12 @@ pub(super) fn session_row_scene(
         Button
         on(on_sessions_row_activated)
         Children [
-            ( text_cell_scene(session, session_width, Role::Body) ),
-            ( text_cell_scene(user, user_width, Role::Body) ),
-            ( text_cell_scene(seat, seat_width, Role::Body) ),
-            ( text_cell_scene(tty, tty_width, Role::Body) ),
-            ( text_cell_scene(kind, kind_width, Role::Body) ),
-            ( text_cell_scene(since, since_width, Role::Body) ),
+             @text_cell_scene(session, session_width, Role::Body) --
+             @text_cell_scene(user, user_width, Role::Body) --
+             @text_cell_scene(seat, seat_width, Role::Body) --
+             @text_cell_scene(tty, tty_width, Role::Body) --
+             @text_cell_scene(kind, kind_width, Role::Body) --
+             @text_cell_scene(since, since_width, Role::Body)
         ]
     })
 }
@@ -228,7 +228,7 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
     bsn! {
         Node { width: px(width), align_items: AlignItems::FlexStart }
         Children [
-            ( Text(text) TextRole(role) ),
+             Text(text) TextRole(role)
         ]
     }
 }
@@ -237,7 +237,7 @@ pub(super) fn caption_line_scene(text: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100) }
         Children [
-            ( Text(text) TextRole(Role::Caption) ),
+             Text(text) TextRole(Role::Caption)
         ]
     }
 }
@@ -252,7 +252,7 @@ pub(super) fn empty_scene(message: String) -> impl Scene + use<> {
             padding: UiRect::all(Val::Px(space_24())),
         }
         Children [
-            ( Text(message) TextRole(Role::Body) ),
+             Text(message) TextRole(Role::Body)
         ]
     }
 }

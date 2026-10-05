@@ -3,6 +3,8 @@
 //! reasons), extracted from [`super`] so the insights module stays under the
 //! source-size budget. Moved verbatim; the assertions are unchanged.
 
+const PREVIEW_CAP: usize = 8;
+
 use super::*;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process_telemetry::ConnectionState;
@@ -45,7 +47,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     // The facet's row fold enumerates one row per projected thread (same
     // order), and the gap thread's own row keeps both dashes. The cap bounds
     // the materialized rows instead of dropping the trailing ones silently.
-    let rows = thread_rows_vm(&[warm.clone(), gap.clone()], MAX_FACET_ROWS);
+    let rows = thread_rows_vm(&[warm.clone(), gap.clone()], PREVIEW_CAP);
     assert_eq!(rows.len(), 2, "one row per projected thread");
     assert_eq!(
         (
@@ -69,7 +71,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         ("4243", "reaper", "R", "—", "—"),
         "the gap thread row must keep the typed dashes, never 0.0s/0.0%"
     );
-    let many: Vec<ProcessThreadInfo> = (0..MAX_FACET_ROWS + 3)
+    let many: Vec<ProcessThreadInfo> = (0..PREVIEW_CAP + 3)
         .map(|index| ProcessThreadInfo {
             tid: 5_000 + index as u32,
             comm: format!("worker-{index}"),
@@ -77,10 +79,29 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         })
         .collect();
     assert_eq!(
-        thread_rows_vm(&many, MAX_FACET_ROWS).len(),
-        MAX_FACET_ROWS,
+        thread_rows_vm(&many, PREVIEW_CAP).len(),
+        PREVIEW_CAP,
         "the facet cap must bound the materialized thread rows"
     );
+}
+
+#[test]
+fn thread_rows_vm_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::process_telemetry;
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(process_telemetry::ThreadWaitKind::KernelLock),
+    };
+    let rows = thread_rows_vm(&[thread], PREVIEW_CAP);
+    assert_eq!(rows[0].wait, "lock 2.5ms");
+    assert_eq!(rows[0].state, "D");
 }
 
 /// Honesty: an unreadable descriptor (None target) must surface the typed
@@ -109,7 +130,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
     // The facet's row fold enumerates one row per projected descriptor (same
     // order): the readable descriptor keeps its target and the unresolved
     // readlink keeps its typed marker. The cap bounds the materialized rows.
-    let rows = open_file_rows(&[readable.clone(), unreadable.clone()], MAX_FACET_ROWS);
+    let rows = open_file_rows(&[readable.clone(), unreadable.clone()], PREVIEW_CAP);
     assert_eq!(rows.len(), 2, "one row per projected descriptor");
     assert!(rows[0].contains("/dev/null") && rows[0].starts_with("fd 0"));
     assert!(
@@ -126,7 +147,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         target: Some("/tmp/deleted.log".to_string()),
         deleted: true,
     };
-    let deleted_rows = open_file_rows(&[deleted_entry], MAX_FACET_ROWS);
+    let deleted_rows = open_file_rows(&[deleted_entry], PREVIEW_CAP);
     assert!(
         deleted_rows[0].contains("[deleted]"),
         "deleted descriptor is marked"
@@ -135,7 +156,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         deleted_rows[0].contains("[file]"),
         "deleted descriptor classifies handle type"
     );
-    let many: Vec<OpenFileEntry> = (0..MAX_FACET_ROWS + 3)
+    let many: Vec<OpenFileEntry> = (0..PREVIEW_CAP + 3)
         .map(|index| OpenFileEntry {
             fd: index as u32,
             kind: OpenFileKind::File,
@@ -144,8 +165,8 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         })
         .collect();
     assert_eq!(
-        open_file_rows(&many, MAX_FACET_ROWS).len(),
-        MAX_FACET_ROWS,
+        open_file_rows(&many, PREVIEW_CAP).len(),
+        PREVIEW_CAP,
         "the facet cap must bound the materialized descriptor rows"
     );
 }
@@ -275,6 +296,22 @@ mod connection_tests {
         assert!(
             format_connection(&local).contains("/run/user/1000/x"),
             "unix-socket path must not be dropped"
+        );
+    }
+
+    #[test]
+    fn connection_readout_surfaces_rtt_metrics() {
+        let mut conn = connection(
+            ConnectionTransport::Tcp,
+            ConnectionAddressFamily::Ipv4,
+            ConnectionEndpoint::Ip("127.0.0.1:80".parse().unwrap()),
+            ConnectionEndpoint::Ip("10.0.0.2:443".parse().unwrap()),
+        );
+        conn.rtt_ms = Some(16.5);
+        let text = format_connection(&conn);
+        assert!(
+            text.contains("16.5 ms"),
+            "must surface RTT in connection readout: {text}"
         );
     }
 }
@@ -413,4 +450,118 @@ fn open_files_section_renders_fd_limit_saturation() {
     pending.resources = ProcessInsightFacetState::Current(res);
 
     let _section = open_files_section(&theme, Some(&pending));
+}
+
+#[test]
+fn isolation_section_renders_sandbox_detection() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        kind: Some(IsolationKind::Docker),
+        container_id: Some("c-docker123".into()),
+        sandboxed: Some(true),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_posix_capabilities() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        capabilities: Some(ProcessCapabilities::from_masks(
+            DeviceState::healthy(1),
+            Some(0),
+            Some(1 << 21),
+            Some(1 << 21),
+            Some(0),
+            Some(0),
+        )),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_namespace_audit() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{
+        LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry, NamespaceAuditStatus,
+        ProcessIsolation,
+    };
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    let audit = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(1),
+        vec![NamespaceAuditEntry {
+            kind: LinuxNamespaceKind::Pid,
+            status: NamespaceAuditStatus::Isolated {
+                inode: 4026533000,
+                host_inode: 4026531836,
+            },
+        }],
+    );
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        namespaces: Some(audit),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
+}
+
+#[test]
+fn isolation_section_renders_seccomp_filter() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+
+    projection.isolation = ProcessInsightFacetState::Current(ProcessIsolation {
+        state: DeviceState::healthy(1),
+        seccomp_mode: Some(2),
+        ..ProcessIsolation::default()
+    });
+
+    let _section = isolation_section(&theme, Some(&projection));
 }

@@ -300,6 +300,12 @@ fn group_header_from_shared(
         flat_index,
         local_time_rules,
     } = input;
+    let structural = row_key.is_none() || matches!(row_key, Some(ProcessRowId::Category(_)));
+    let start_time_secs = if structural {
+        None
+    } else {
+        root.current_start_time_secs()
+    };
     Some(ProjectedRow::GroupHeader {
         flat_index,
         main_pid: root.pid,
@@ -309,11 +315,23 @@ fn group_header_from_shared(
         member_count,
         expanded,
         metrics: Box::new(aggregate),
-        user: root.current_user().unwrap_or_else(missing_value),
-        status: root.status.clone(),
-        nice: root.current_nice(),
-        start_time_secs: root.current_start_time_secs(),
-        start_clock: start_clock_local(root.current_start_time_secs(), local_time_rules),
+        user: if structural {
+            missing_value()
+        } else {
+            root.current_user().unwrap_or_else(missing_value)
+        },
+        status: if structural {
+            missing_value()
+        } else {
+            root.status.clone()
+        },
+        nice: if structural {
+            None
+        } else {
+            root.current_nice()
+        },
+        start_time_secs,
+        start_clock: start_clock_local(start_time_secs, local_time_rules),
     })
 }
 

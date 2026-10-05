@@ -3,6 +3,61 @@ use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::config::Config;
 
 #[test]
+fn permission_controls_and_cancel_remain_inside_the_smallest_modal() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("language guard");
+    set_language(Language::En);
+    let mut app = crate::demo_app();
+    app.toggle_settings();
+    app.settings_form.field = 33;
+    for (width, height) in [(54, 16), (70, 34), (120, 36)] {
+        let popup = ratatui::layout::Rect::new(1, 1, width - 2, height - 2);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
+                .expect("terminal");
+        terminal
+            .draw(|frame| {
+                render_settings_overlay_at(
+                    frame,
+                    &app,
+                    crate::TuiTheme::default(),
+                    crate::ui::frame_plan::TuiFocusPlan {
+                        target: crate::ui::frame_plan::TuiFocusTarget::LocalSurface(
+                            crate::TuiSurfaceKind::Settings,
+                        ),
+                        order: crate::ui::frame_plan::TuiFocusOrder::None,
+                        control: crate::ui::frame_plan::TuiFocusControl::SettingsField(33),
+                    },
+                    popup,
+                )
+            })
+            .expect("draw");
+        let buffer = terminal.backend().buffer();
+        let text = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(
+            text.contains(t("cpu.msr_readouts")),
+            "the focused final permission row must remain reachable"
+        );
+        assert!(
+            text.contains(t("common.cancel")),
+            "the full cancel hint must remain visible at {width}x{height}"
+        );
+        for x in popup.x + 1..popup.right() - 1 {
+            assert_eq!(
+                buffer[(x, popup.bottom() - 2)].symbol(),
+                " ",
+                "a blank safety row protects the bottom border"
+            );
+        }
+    }
+}
+
+#[test]
 fn form_navigation_wraps_at_edges_and_changes_values() {
     let mut form = SettingsForm::default();
     form.move_field(-1);
@@ -138,7 +193,7 @@ fn overlay_labels_resolve_through_the_shared_catalog() {
         .draw(|frame| {
             render_settings_overlay_at(
                 frame,
-                &app.settings_form,
+                &app,
                 crate::TuiTheme::default(),
                 crate::ui::frame_plan::TuiFocusPlan {
                     target: crate::ui::frame_plan::TuiFocusTarget::LocalSurface(

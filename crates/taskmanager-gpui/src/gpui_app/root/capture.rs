@@ -6,9 +6,10 @@
 //! tokens can also prepare otherwise hard-to-reproduce presentation states;
 //! capture preparation never invokes a destructive action.
 
-use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
-use crate::gpui_app::process_insights::process_insights_capture_fixture;
-use crate::gpui_app::timeline::HistoryWindow;
+use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState};
+use taskmanager_application::ProcessInsightFacet;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+
 use taskmanager_core::core::NpuInventorySnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
@@ -25,18 +26,25 @@ use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::{AlertEvent, ServiceId};
 use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::fixture::seed_capture_msr_readout;
+use taskmanager_telemetry_store::live_graph::{LiveGraphHistory, MAX_HISTORY_CAPACITY};
 use taskmanager_telemetry_store::{
-    CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
+    CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor, HistoryRetention,
+    TelemetryStore,
 };
 use taskmanager_theme::Theme;
 
 use super::{ProcessDetailsSection, TopPage};
 
-mod dashboard_history;
+use taskmanager_shell::fixture::dashboard_history::seed_system_dashboard_history;
+mod dynamic_history;
+mod presentation;
+pub(super) mod service_logs;
+pub(super) use presentation::schedule_controlled_presentation;
 mod fixtures;
 mod gpu_history;
 mod marker;
 mod process_fixtures;
+mod properties;
 mod scenarios;
 mod state;
 mod system_health;
@@ -49,19 +57,40 @@ use marker::{emit_marker, emit_theme_marker};
 use process_fixtures::{
     prepare_apps_group_expanded, prepare_apps_identity_matrix, prepare_apps_search_highlight,
     prepare_apps_zero_gray, prepare_diagnostic_process, prepare_process_batch,
-    prepare_process_histories, prepare_process_insights, prepare_process_memory_pss_swap,
-    prepare_process_tree, prepare_startup_boot_markers, prepare_startup_failure_evidence,
-    prepare_startup_impact,
+    prepare_process_properties, prepare_process_tree, prepare_startup_boot_markers,
+    prepare_startup_failure_evidence, prepare_startup_impact,
 };
 pub use scenarios::CaptureScenario;
 pub(super) use state::{
     CaptureDataReadiness, CaptureEvidence, CaptureMode, CaptureProcessAction,
     CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,
-    SystemNpuCaptureState,
+    SystemInventoryCaptureState,
 };
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
+    pub(crate) fn properties_insight_facet(&self) -> ProcessInsightFacet {
+        match self.scenario {
+            Some(CaptureScenario::ProcessGpuDetails) => ProcessInsightFacet::Gpu,
+            Some(CaptureScenario::ProcessResourceLimits) => ProcessInsightFacet::Resources,
+            Some(CaptureScenario::ProcessIsolation) => ProcessInsightFacet::Isolation,
+            _ => ProcessInsightFacet::Network,
+        }
+    }
+    pub(crate) fn dashboard_history_fixture_requested(&self) -> bool {
+        self.is_enabled()
+            && self.telemetry_ready()
+            && self.ui_data_ready()
+            && !self.scenario_ready()
+            && matches!(
+                self.scenario,
+                Some(CaptureScenario::SystemDashboard | CaptureScenario::HistorySixtyMinutes)
+            )
+    }
+
+    pub(crate) fn memory_inventory_capture(&self) -> bool {
+        self.scenario == Some(CaptureScenario::SystemHardware)
+    }
     pub(crate) const fn is_enabled(&self) -> bool {
         self.mode.enabled()
     }
@@ -148,7 +177,6 @@ impl CaptureEvidence {
                     | CaptureScenario::SmartPermission
                     | CaptureScenario::PartitionDiskUsage
                     | CaptureScenario::IntelGpuTelemetry
-                    | CaptureScenario::ActiveAlert
             )
         ) || (self.scenario == Some(CaptureScenario::DeviceHotplug)
             && self.snapshot_count >= 2)
@@ -201,34 +229,24 @@ impl CaptureEvidence {
             self.mark_scenario_ready();
             return None;
         }
-        if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance)
-            && self.scenario_ready()
+        if self
+            .scenario
+            .is_some_and(CaptureScenario::is_process_properties)
         {
-            if let Some(identity) = self.scenario_process_identity
-                && let Some(process) = processes
-                    .iter_mut()
-                    .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
-            {
-                prepare_process_histories(process);
+            let identity = prepare_process_properties(processes)?;
+            self.scenario_process_identity = Some(identity);
+            if !self.telemetry_ready() {
+                return None;
             }
-            return None;
-        }
-        // The strict insights fixture uses a synthetic identity. Keep that
-        // identity in every refreshed process list until the screenshot is
-        // taken; otherwise the normal 2 s process refresh removes it and the
-        // Properties dialog correctly auto-closes before pixel capture.
-        if self.scenario_ready()
-            && self
-                .scenario
-                .is_some_and(CaptureScenario::is_process_insights)
-        {
-            let identity = prepare_process_insights(processes)?;
-            debug_assert_eq!(self.scenario_process_identity, Some(identity));
-            return None;
-        }
-        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready() {
-            prepare_process_memory_pss_swap(processes);
-            return None;
+            return match self.scenario {
+                Some(CaptureScenario::ProcessPropertiesPerformance) => Some(
+                    CaptureProcessAction::Properties(identity, ProcessDetailsSection::Performance),
+                ),
+                Some(CaptureScenario::ProcessMemoryPssSwap) => Some(
+                    CaptureProcessAction::Properties(identity, ProcessDetailsSection::Overview),
+                ),
+                _ => Some(CaptureProcessAction::Insights(identity)),
+            };
         }
         if self.scenario == Some(CaptureScenario::AppsZeroGray) && self.scenario_ready() {
             prepare_apps_zero_gray(processes);
@@ -288,12 +306,6 @@ impl CaptureEvidence {
             return Some(CaptureProcessAction::ApplicationSelection(root_identity));
         }
 
-        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) {
-            prepare_process_memory_pss_swap(processes);
-            self.mark_scenario_ready();
-            return None;
-        }
-
         if self.scenario == Some(CaptureScenario::AppsZeroGray) {
             prepare_apps_zero_gray(processes);
             self.mark_scenario_ready();
@@ -308,21 +320,6 @@ impl CaptureEvidence {
         if self.scenario == Some(CaptureScenario::AppsIdentityMatrix) {
             prepare_apps_identity_matrix(processes);
             return None;
-        }
-
-        if self
-            .scenario
-            .is_some_and(CaptureScenario::is_process_insights)
-        {
-            if !self.telemetry_ready() {
-                return None;
-            }
-            let identity = prepare_process_insights(processes)?;
-            self.scenario_process_identity = Some(identity);
-            return Some(CaptureProcessAction::Insights {
-                identity,
-                state: process_insights_capture_fixture(),
-            });
         }
 
         if self.scenario == Some(CaptureScenario::ProcessTreeConfirm) {
@@ -372,21 +369,6 @@ impl CaptureEvidence {
                 })
             })
             .or_else(|| processes.iter().find(|process| process.pid > 1))?;
-        if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance) {
-            let identity = ProcessLiveKey::from_process(process)?;
-            if let Some(process) = processes
-                .iter_mut()
-                .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
-            {
-                prepare_process_histories(process);
-            }
-            self.scenario_process_identity = Some(identity);
-            self.mark_scenario_ready();
-            return Some(CaptureProcessAction::Properties(
-                identity,
-                ProcessDetailsSection::Performance,
-            ));
-        }
         if self.scenario != Some(CaptureScenario::ProcessForceKill) {
             return None;
         }
@@ -421,21 +403,21 @@ impl CaptureEvidence {
             self.mark_scenario_ready();
             return None;
         }
-        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) || self.scenario_ready() {
+        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) {
             return None;
         }
-        if services.is_empty() {
-            services.push(ServiceItem::from_inventory(
-                ServiceId::new("fixture.service:taskmanager-capture.service"),
-                "taskmanager-capture.service",
-                ServiceStatus::Active,
-                "Task Manager screenshot evidence service",
-                "loaded",
-                "active",
-                "running",
-            ));
-        }
-        Some(services[0].id.clone())
+        let id = ServiceId::new("fixture.service:taskmanager-capture.service");
+        services.retain(|service| service.id != id);
+        services.push(ServiceItem::from_inventory(
+            id.clone(),
+            "taskmanager-capture.service",
+            ServiceStatus::Active,
+            "TaskForest capture service",
+            "loaded",
+            "active",
+            "running",
+        ));
+        Some(id)
     }
 
     pub fn on_startup_update(
@@ -510,48 +492,54 @@ impl CaptureEvidence {
     }
 
     pub fn system_hardware_npu_fixture(&self) -> Option<NpuInventorySnapshot> {
-        self.system_hardware_fixture_requested()
+        self.system_inventory_fixture_requested()
             .then(npu_inventory_fixture)
     }
 
-    pub fn mark_system_npu_fixture_ready(&mut self, installed: bool) {
-        if self.scenario == Some(CaptureScenario::SystemNpu)
-            && installed
-            && self.system_npu_state == SystemNpuCaptureState::AwaitingFixture
+    pub fn mark_system_inventory_fixture_ready(&mut self, installed: bool) {
+        if matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) && installed
+            && self.system_inventory_state == SystemInventoryCaptureState::AwaitingFixture
         {
-            self.system_npu_state = SystemNpuCaptureState::AwaitingLayout;
+            self.system_inventory_state = SystemInventoryCaptureState::AwaitingLayout;
         }
     }
 
-    pub fn system_npu_layout_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::SystemNpu)
-            && self.telemetry_ready()
+    pub fn system_inventory_layout_requested(&self) -> bool {
+        matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) && self.telemetry_ready()
             && self.ui_data_ready()
             && !self.scenario_ready()
-            && self.system_npu_state == SystemNpuCaptureState::AwaitingLayout
+            && self.system_inventory_state == SystemInventoryCaptureState::AwaitingLayout
     }
 
     /// Atomically claim one post-layout scroll attempt. Repeated renders before
     /// the next frame cannot queue duplicate callbacks.
-    pub fn schedule_system_npu_scroll(&mut self) -> bool {
-        if !self.system_npu_layout_requested() {
+    pub fn schedule_system_inventory_scroll(&mut self) -> bool {
+        if !self.system_inventory_layout_requested() {
             return false;
         }
-        self.system_npu_state = SystemNpuCaptureState::ScrollScheduled;
+        self.system_inventory_state = SystemInventoryCaptureState::ScrollScheduled;
         true
     }
 
-    pub fn mark_system_npu_scroll_applied(&mut self, graphics_visible: bool) {
-        if self.scenario != Some(CaptureScenario::SystemNpu)
-            || self.system_npu_state != SystemNpuCaptureState::ScrollScheduled
+    pub fn mark_system_inventory_scroll_applied(&mut self, inventory_visible: bool) {
+        if !matches!(
+            self.scenario,
+            Some(CaptureScenario::SystemNpu | CaptureScenario::SystemHardware)
+        ) || self.system_inventory_state != SystemInventoryCaptureState::ScrollScheduled
         {
             return;
         }
-        if graphics_visible {
-            self.system_npu_state = SystemNpuCaptureState::Ready;
+        if inventory_visible {
+            self.system_inventory_state = SystemInventoryCaptureState::Ready;
             self.mark_scenario_ready();
         } else {
-            self.system_npu_state = SystemNpuCaptureState::AwaitingLayout;
+            self.system_inventory_state = SystemInventoryCaptureState::AwaitingLayout;
         }
     }
 
@@ -594,41 +582,41 @@ impl CaptureEvidence {
         }
         let (handled, panel) = match self.scenario {
             Some(CaptureScenario::SystemDashboard) => {
-                dashboard.section = SystemSection::Dashboard;
-                dashboard.history_window = HistoryWindow::FifteenMinutes;
+                dashboard.section = SystemPageSection::Dashboard;
+                dashboard.history_window = SystemHistoryWindow::FifteenMinutes;
                 (
-                    dashboard_history::seed(history, ingestor, anchor_timestamp_ms),
+                    seed_system_dashboard_history(history, ingestor, anchor_timestamp_ms),
                     None,
                 )
             }
             Some(CaptureScenario::SystemHardware) => {
-                dashboard.section = SystemSection::Hardware;
-                (true, None)
+                dashboard.section = SystemPageSection::Hardware;
+                (false, None)
             }
             Some(CaptureScenario::SystemNpu) => {
-                dashboard.section = SystemSection::Hardware;
+                dashboard.section = SystemPageSection::Hardware;
                 // Readiness belongs to the post-layout scroll state above.
                 (false, None)
             }
             Some(CaptureScenario::HistorySixtyMinutes) => {
-                dashboard.section = SystemSection::Dashboard;
-                dashboard.history_window = HistoryWindow::SixtyMinutes;
+                dashboard.section = SystemPageSection::Dashboard;
+                dashboard.history_window = SystemHistoryWindow::SixtyMinutes;
                 (
-                    dashboard_history::seed(history, ingestor, anchor_timestamp_ms),
+                    seed_system_dashboard_history(history, ingestor, anchor_timestamp_ms),
                     None,
                 )
             }
             Some(CaptureScenario::AlertRulesManager) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 (true, Some(DashboardPanel::AlertRules))
             }
             Some(CaptureScenario::EventCenter) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 self.event_history_fixture = Some(EventCenterState::capture_event_fixture());
                 (true, Some(DashboardPanel::Events))
             }
             Some(CaptureScenario::SavedViewPresets) => {
-                dashboard.section = SystemSection::Dashboard;
+                dashboard.section = SystemPageSection::Dashboard;
                 dashboard.add_capture_saved_view();
                 (true, Some(DashboardPanel::SavedViews))
             }
@@ -645,38 +633,10 @@ impl CaptureEvidence {
     /// the dynamic capability projection; it never mutates static hardware
     /// inventory and does not perform provider I/O.
     pub fn dynamic_device_fixture_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::BatteryFanPerformance)
-    }
-
-    /// Mark a live dynamic-device capture only after the provider supplied the
-    /// requested real capability. Unlike the deterministic fixture path above,
-    /// this method never inserts or rewrites a Battery/Fan observation.
-    pub fn on_live_dynamic_device_state(
-        &mut self,
-        page: &mut TopPage,
-        power_supplies: &PowerSupplySnapshot,
-    ) -> bool {
-        if !self.is_enabled()
-            || !self.telemetry_ready()
-            || !self.ui_data_ready()
-            || self.scenario_ready()
-        {
-            return false;
-        }
-        let target_ready = match self.scenario {
-            Some(CaptureScenario::BatteryLivePerformance) => !power_supplies.batteries.is_empty(),
-            _ => false,
-        };
-        if !target_ready {
-            return false;
-        }
-        *page = TopPage::Performance;
-        self.mark_scenario_ready();
-        true
-    }
-
-    pub fn process_memory_pss_swap_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready()
+        matches!(
+            self.scenario,
+            Some(CaptureScenario::BatteryFanPerformance | CaptureScenario::BatteryLivePerformance)
+        )
     }
 
     pub fn on_dynamic_device_state(
@@ -689,27 +649,54 @@ impl CaptureEvidence {
             || !self.telemetry_ready()
             || !self.ui_data_ready()
             || !self.dynamic_device_fixture_requested()
-            || self.scenario_ready()
+        {
+            return false;
+        }
+        if self.scenario_ready()
+            && power_supplies
+                .batteries
+                .first()
+                .is_some_and(|battery| battery.id == "power-supply:capture-battery")
         {
             return false;
         }
         *page = TopPage::Performance;
         *power_supplies = dynamic_power_fixture();
         *sensors = dynamic_sensor_fixture();
+        true
+    }
+    pub(crate) fn seed_dynamic_capture_history(
+        &mut self,
+        history: &CorrelatedSystemTelemetryHistory,
+        ingestor: &CorrelatedSystemTelemetryIngestor,
+        anchor: u64,
+    ) -> bool {
+        if !self.dynamic_device_fixture_requested() {
+            return false;
+        }
+        if !self.dynamic_history_seeded {
+            if !dynamic_history::seed(history, ingestor, anchor) {
+                return false;
+            }
+            self.dynamic_history_seeded = true;
+        }
         self.mark_scenario_ready();
         true
     }
 }
 
-#[cfg(feature = "test-support")]
 impl super::RootView {
-    /// Seed deterministic dashboard evidence through the production telemetry authority.
-    pub fn seed_dashboard_capture_history(&self, newest_timestamp_ms: u64) -> bool {
-        dashboard_history::seed(
-            &self.telemetry.system_history,
-            &self.telemetry_ingestor,
-            newest_timestamp_ms,
-        )
+    /// Isolate controlled capture observations from host samples collected at startup.
+    pub(crate) fn prepare_dashboard_capture_history(&mut self) {
+        if !self.capture_evidence.dashboard_history_fixture_requested() {
+            return;
+        }
+        let (telemetry, ingestor) =
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
+        self.live_graph_history =
+            LiveGraphHistory::from_store(telemetry.clone(), MAX_HISTORY_CAPACITY);
+        self.telemetry = telemetry;
+        self.telemetry_ingestor = ingestor;
     }
 }
 

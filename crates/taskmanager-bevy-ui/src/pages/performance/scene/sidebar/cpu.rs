@@ -3,8 +3,11 @@
 use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
+use crate::pages::performance::metrics::battery_sidebar_title;
+use crate::pages::performance::sidebar_editor::{self, SidebarAction, SidebarState};
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui_widgets::ScrollArea;
 use taskmanager_core::core::hardware::CpuType;
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
@@ -15,7 +18,7 @@ fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
             row_gap: Val::Px(space_2()),
         }
         Children [
-            (
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -23,16 +26,16 @@ fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
-                    ( Text(t("common.cpu")) TextRole(Role::Heading) ),
-                    ( Node { flex_grow: 1.0 } ),
-                    (
+                     Text(t("common.cpu")) TextRole(Role::Heading) --
+                     Node { flex_grow: 1.0 } --
+
                         Text(cpu_field_text(shell, CpuField::Brand))
                         TextRole(Role::Body)
                         DynText(DynField::Cpu(CpuField::Brand))
-                    ),
+
                 ]
-            ),
-            ( Text(t("cpu.utilization_over_60s")) TextRole(Role::Caption) ),
+            --
+             Text(t("cpu.utilization_over_60s")) TextRole(Role::Caption)
         ]
     }
 }
@@ -99,7 +102,7 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            { metrics },
+            { metrics }
         ]
     }
 }
@@ -138,17 +141,17 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            (
+
                 Node {
                     width: px(84.0),
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                     Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     flex_grow: 1.0,
                     min_width: px(0.0),
@@ -158,7 +161,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
                 }
                 BackgroundColor({ palette.nav_active_bg })
                 Children [
-                    (
+
                         Node {
                             width: percent(initial_pct),
                             height: percent(100.0),
@@ -166,10 +169,10 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
                         }
                         BackgroundColor({ palette.accent })
                         DynBar(field)
-                    ),
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: px(120.0),
                     flex_shrink: 0.0,
@@ -178,14 +181,14 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    (
+
                         Text(cpu_field_text(shell, field))
                         TextRole(Role::Mono)
                         DynText(DynField::Cpu(field))
                         TextLayout { linebreak: LineBreak::NoWrap }
-                    )
+
                 ]
-            ),
+
         ]
     }
 }
@@ -200,7 +203,7 @@ fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + us
         vec![Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [
-                ( Text(missing_value()) TextRole(Role::Caption) )
+                 Text(missing_value()) TextRole(Role::Caption)
             ]
         }) as Box<dyn Scene>]
     } else {
@@ -215,7 +218,7 @@ fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + us
             row_gap: Val::Px(space_2()),
         }
         Children [
-            { rows },
+            { rows }
         ]
     };
     let hw = shell.projection().hardware.as_ref();
@@ -252,7 +255,7 @@ fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + us
             display: Display::Flex,
         }
         PerformanceOptionalCoreGrid
-        Children [ ( { graph } ) ]
+        Children [  @{ graph }  ]
     }
 }
 
@@ -279,7 +282,7 @@ fn device_pill_scene(
         PerformanceDeviceButton(target)
         on(device_button_activated)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -289,11 +292,15 @@ pub(super) fn device_button_scene(
     row: Box<dyn Scene>,
 ) -> impl Scene + use<> {
     bsn! {
-        ( { row } Button PerformanceDeviceButton(target) on(device_button_activated) )
+         @{ row } Button PerformanceDeviceButton(target) on(device_button_activated)
     }
 }
 
-fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
+fn compact_device_pills_scene(
+    shell: &ShellApp,
+    palette: &UiPalette,
+    preferences: &SidebarState,
+) -> impl Scene + use<> {
     let mut labels = vec![
         (PerformanceDeviceTarget::Cpu, t("common.cpu").to_owned()),
         (
@@ -329,8 +336,21 @@ fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sce
             )
         }));
     }
-    let pills: Vec<Box<dyn Scene>> = labels
+    if let Some(power) = shell.projection().power_supplies.as_ref() {
+        labels.extend(power.batteries.iter().enumerate().map(|(index, battery)| {
+            (
+                PerformanceDeviceTarget::Battery(battery.id.clone()),
+                battery_sidebar_title(battery, index),
+            )
+        }));
+    }
+    let targets: Vec<_> = labels.iter().map(|(target, _)| target.clone()).collect();
+    let mut labels: Vec<_> = labels.into_iter().map(Some).collect();
+    let pills: Vec<Box<dyn Scene>> = preferences
+        .order(&targets)
         .into_iter()
+        .filter(|index| preferences.visible(&targets[*index], shell))
+        .filter_map(|index| labels[index].take())
         .map(|(target, label)| {
             let active = target == PerformanceDeviceTarget::default();
             Box::new(device_pill_scene(target, label, active, palette)) as Box<dyn Scene>
@@ -349,12 +369,16 @@ fn compact_device_pills_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sce
         }
         PerformanceCompactDevicePills
         Children [
-            { pills },
+            { pills }
         ]
     }
 }
 
-pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
+pub(crate) fn cpu_main_scene(
+    shell: &ShellApp,
+    palette: &UiPalette,
+    preferences: &SidebarState,
+) -> impl Scene + use<> {
     let cards: Vec<Box<dyn Scene>> = SystemCurve::STRIP
         .iter()
         .map(|&curve| Box::new(curve_card_scene(curve, shell, palette)) as Box<dyn Scene>)
@@ -369,9 +393,9 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Cpu)
         Children [
-            ( cpu_header_scene(shell) ),
-            ( cpu_metric_strip_scene(shell, palette) ),
-            ( cpu_core_grid_scene(shell, palette) ),
+             @cpu_header_scene(shell) --
+             @cpu_metric_strip_scene(shell, palette) --
+             @cpu_core_grid_scene(shell, palette)
         ]
     };
 
@@ -384,7 +408,7 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Memory)
         Children [
-            ( section_scene(Section::MemorySegments, shell, palette) ),
+             @section_scene(Section::MemorySegments, shell, palette)
         ]
     };
 
@@ -397,7 +421,7 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Disk)
         Children [
-            ( section_scene(Section::Disk, shell, palette) ),
+             @section_scene(Section::Disk, shell, palette)
         ]
     };
 
@@ -410,7 +434,7 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Network)
         Children [
-            ( section_scene(Section::Network, shell, palette) ),
+             @section_scene(Section::Network, shell, palette)
         ]
     };
 
@@ -423,7 +447,7 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Gpu)
         Children [
-            ( section_scene(Section::Gpu, shell, palette) ),
+             @section_scene(Section::Gpu, shell, palette)
         ]
     };
 
@@ -436,7 +460,7 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         }
         DeviceViewCategory(DeviceCategoryKind::Battery)
         Children [
-            ( section_scene(Section::Battery, shell, palette) ),
+             @section_scene(Section::Battery, shell, palette)
         ]
     };
 
@@ -452,24 +476,24 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
             padding: UiRect::vertical(Val::Px(space_4())),
         }
         Children [
-            ( compact_device_pills_scene(shell, palette) ),
-            ( metric_selector_scene(shell, palette) ),
-            (
+             @compact_device_pills_scene(shell, palette, preferences) --
+             @metric_selector_scene(shell, palette) --
+             @sidebar_editor::button("Edit devices".into(), SidebarAction::Open, palette) --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
                 Children [
-                    { cards },
+                    { cards }
                 ]
-            ),
-            ( { cpu_container } ),
-            ( { memory_container } ),
-            ( { disk_container } ),
-            ( { network_container } ),
-            ( { gpu_container } ),
-            ( { battery_container } ),
+            --
+            Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: UiRect::bottom(px(8.0)) }
+            ScrollArea PerformanceDeviceBody Children [
+                @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
+                @{ network_container } -- @{ gpu_container } -- @{ battery_container }
+            ]
         ]
     }
 }

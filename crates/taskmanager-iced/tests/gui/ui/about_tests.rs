@@ -1,155 +1,224 @@
+//! test-intent: behavior
+
 use super::*;
-use taskmanager_shell::FeedbackSeverity;
-use taskmanager_shell::FeedbackSource;
-use taskmanager_shell::ShellApp;
-use taskmanager_shell::demo_app;
+use crate::app::{LocalSurface, LocalSurfaceKind};
+use taskmanager_assets::embedded_fonts;
+use taskmanager_assets::product;
 
 #[test]
-fn about_modal_renders_fixture_hardware_and_snapshot_facts() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
-    let app = crate::IcedApp::demo();
-    let _view = render(&app);
-
-    let shell = demo_app();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
+fn about_and_system_information_have_independent_explicit_entries() {
+    let mut app = crate::IcedApp::demo();
+    let _ = app.update(Message::OpenAbout);
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+    drop(render(&app));
+    let _ = app.update(Message::OpenRepository);
+    let _ = app.update(Message::OpenSystemInformation);
+    let Some(LocalSurface::SystemInformation(facts)) = app.local_surface() else {
+        panic!("independent system information");
+    };
+    assert!(
+        facts.iter().any(|group| group
+            .rows
+            .iter()
+            .any(|row| row.label_key == "system_about.hostname"
+                && row.value == "taskforest-workstation"))
     );
+    let _ = app.update(Message::OpenRepository);
     assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("system.hostname"))
-            .map(|row| row.value.as_str()),
-        Some("taskforest-workstation")
+        app.local_surface_kind(),
+        Some(LocalSurfaceKind::SystemInformation)
     );
-    assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("common.logical_cores"))
-            .map(|row| row.value.as_str()),
-        Some("22")
-    );
-    assert_eq!(
-        rows.iter()
-            .find(|row| row.label == t("common.uptime"))
-            .map(|row| row.value.as_str()),
-        Some("06h 42m")
+    let _ = app.update(Message::OpenAbout);
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+    assert!(
+        metadata(
+            env!("CARGO_PKG_VERSION"),
+            product::LICENSE_SPDX,
+            product::REPOSITORY_URL
+        )
+        .details_text()
+        .contains(product::LICENSE_SPDX)
     );
 }
 
-#[test]
-fn about_modal_renders_dashes_when_facts_are_absent() {
-    let shell = ShellApp::new();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
-    );
-    assert_eq!(rows.len(), 12);
-    assert!(rows.iter().all(|row| row.value == "—"));
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::operation::{Focusable, Scrollable};
+use iced::advanced::widget::{Id, Operation, Tree};
+use iced::{Pixels, Rectangle, Size, Vector};
+use taskmanager_shell::presentation::system_information::{
+    SystemInformationGroup, SystemInformationRow,
+};
+
+#[derive(Default)]
+struct Bounds {
+    controls: Vec<Rectangle>,
+    scrolls: Vec<(Rectangle, Rectangle)>,
+}
+impl Operation for Bounds {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+    fn focusable(&mut self, _id: Option<&Id>, bounds: Rectangle, _state: &mut dyn Focusable) {
+        self.controls.push(bounds);
+    }
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content: Rectangle,
+        _translation: Vector,
+        _state: &mut dyn Scrollable,
+    ) {
+        self.scrolls.push((bounds, content));
+    }
 }
 
-/// The copy-details payload (G-16) carries the version line plus every
-/// rendered row — the same facts the modal shows, never a second source.
 #[test]
-fn copy_payload_carries_the_version_and_every_rendered_row() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
-    let shell = demo_app();
-    let rows = about_rows(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
+fn information_reviews_keep_all_actions_in_frame_and_scroll_only_the_body() {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer");
+    let facts = vec![SystemInformationGroup {
+        title_key: "system_about.hardware",
+        rows: (0..24)
+            .map(|index| SystemInformationRow {
+                label_key: "system_about.cpu",
+                value: format!(
+                    "Observed device {index}: {}",
+                    "long complete hardware description ".repeat(12)
+                ),
+            })
+            .collect(),
+    }];
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 400.0),
+        (720.0, 960.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        let size = Size::new(width, height);
+        let _ = app.update(Message::WindowResized(size));
+        for system_information in [false, true] {
+            let mut view = if system_information {
+                crate::ui::system_information::render(&app, &facts)
+            } else {
+                render(&app)
+            };
+            let mut tree = Tree::new(&view);
+            let node =
+                view.as_widget_mut()
+                    .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+            let mut bounds = Bounds::default();
+            view.as_widget_mut()
+                .operate(&mut tree, Layout::new(&node), &renderer, &mut bounds);
+            assert_eq!(
+                bounds.controls.len(),
+                if system_information { 2 } else { 5 }
+            );
+            let mut close = focus::modal_close(app.theme());
+            let mut close_tree = Tree::new(&close);
+            let natural_close = close
+                .as_widget_mut()
+                .layout(&mut close_tree, &renderer, &Limits::new(Size::ZERO, size))
+                .size();
+            assert!(
+                bounds.controls.last().expect("Close").width >= natural_close.width,
+                "Close must retain its full intrinsic label and padding"
+            );
+            for control in bounds.controls {
+                assert!(control.width > 0.0 && control.height > 0.0);
+                assert!(control.x >= 0.0 && control.y >= 0.0);
+                assert!(
+                    control.x + control.width <= width && control.y + control.height < height,
+                    "action {control:?} exceeds {size:?}"
+                );
+            }
+            assert_eq!(bounds.scrolls.len(), 1, "only review metadata scrolls");
+            if system_information {
+                let (viewport, content) = bounds.scrolls[0];
+                assert!(viewport.width > 0.0 && viewport.height > 0.0);
+                assert!(
+                    viewport.x + viewport.width <= width && viewport.y + viewport.height < height
+                );
+                assert!(content.width <= viewport.width && content.height > viewport.height);
+            }
+        }
+    }
+}
+
+#[test]
+fn native_boot_observes_desktop_appearance_once_and_information_uses_the_response() {
+    use taskmanager_core::core::appearance::{
+        DesktopAppearance, DesktopFamily, PreferredColorScheme,
+    };
+    use taskmanager_test_support::desktop_appearance::platform;
+    let expected = DesktopAppearance {
+        family: DesktopFamily::Kde,
+        color_scheme: PreferredColorScheme::Dark,
+        high_contrast: Some(false),
+    };
+    let (platform, recorder) = platform(expected);
+    let mut app = crate::IcedApp::new(Some(platform));
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    assert!(
+        app.observed_appearance.is_none(),
+        "submission alone cannot invent an observation"
     );
-    let payload = about_copy_payload(
-        shell.projection().hardware.as_ref(),
-        shell.projection().snapshot.as_ref(),
+    let _ = app.update(Message::Tick);
+    let _ = app.update(Message::Tick);
+    assert_eq!(recorder.submissions().expect("requests").len(), 1);
+    assert_eq!(app.observed_appearance, Some(expected));
+    let _ = app.update(Message::OpenSystemInformation);
+    let Some(LocalSurface::SystemInformation(facts)) = app.local_surface() else {
+        panic!("native information");
+    };
+    assert!(
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.value == "KDE Plasma")
     );
     assert!(
-        payload.starts_with("TaskForestI "),
-        "the version line leads the payload: {payload}"
+        facts
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| row.label_key == "system_about.color_scheme")
     );
-    for row in &rows {
-        assert!(
-            payload.contains(&format!("{}: {}", row.label, row.value)),
-            "row {row:?} must appear in the payload"
-        );
-    }
-    assert_eq!(payload.lines().count(), rows.len() + 1);
-
-    // Absent facts copy honestly as the same dash rows the modal renders.
-    let empty = about_copy_payload(None, None);
-    assert!(empty.contains("—"));
 }
 
-/// The copy action records the footer feedback through the real update
-/// path (the clipboard Task itself is runtime-side; the observable state
-/// and the payload seam carry the behavior, G-16).
 #[test]
 fn copy_about_details_message_records_the_footer_feedback() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
+    use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::OpenAbout);
-    assert!(app.about_open());
-    assert_ne!(
-        app.shell.feedback_notice().map(|notice| notice.source()),
-        Some(FeedbackSource::Clipboard)
+    let task = app.update(Message::CopyAboutDetails);
+    assert_eq!(
+        task.units(),
+        1,
+        "copy schedules one native clipboard action"
     );
-    let _ = app.update(Message::CopyAboutDetails);
-    let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
-    assert!(
-        feedback.text().contains("Copied"),
-        "feedback: {}",
-        feedback.text()
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+    let notice = app.shell.feedback_notice().expect("copy feedback");
+    assert_eq!(notice.source(), FeedbackSource::Clipboard);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
+    assert_eq!(
+        notice.text(),
+        format!("{} · {}", t("hint.copied"), t("about.copy_details"))
     );
-}
-
-/// The diagnostic report / bundle export action from the About modal records
-/// clipboard success feedback in the shell footer.
-#[test]
-fn export_diagnostics_report_records_clipboard_feedback_notice() {
-    use taskmanager_application::i18n::{Language, set_language};
-    set_language(Language::En);
-    let mut app = crate::IcedApp::demo();
-    let _ = app.update(Message::OpenAbout);
-    assert!(app.about_open());
-
-    let _ = app.update(Message::GenerateDiagnosticsReport);
-    let feedback = app.shell.feedback_notice().expect("feedback recorded");
-    assert_eq!(feedback.source(), FeedbackSource::Clipboard);
-    assert_eq!(feedback.severity(), FeedbackSeverity::Success);
-    assert!(
-        feedback.text().contains("Copied"),
-        "feedback text must indicate copied status: {}",
-        feedback.text()
-    );
-    assert!(
-        feedback.text().contains("Diagnostic bundle"),
-        "feedback text must name the diagnostic bundle artifact: {}",
-        feedback.text()
-    );
-}
-
-/// The system diagnostics markdown report generated for the About modal includes
-/// hardware facts, live telemetry summary, and strictly redacts host usernames.
-#[test]
-fn system_diagnostics_report_generates_markdown_and_redacts_process_usernames() {
-    let app = crate::IcedApp::demo();
-    let report = crate::export::system_diagnostics_markdown(
-        app.shell.projection().hardware.as_ref(),
-        app.shell.projection().snapshot.as_ref(),
-        vec!["taskforest-admin".to_string(), "alice".to_string()],
-    )
-    .expect("the diagnostic report generates cleanly");
-
-    assert!(report.contains("TaskForest System Diagnostics Report"));
-    assert!(report.contains("OS:"));
-    assert!(report.contains("Kernel:"));
-    assert!(report.contains("Hostname:"));
-    assert!(report.contains("CPU:"));
-    assert!(report.contains("Cores:"));
-    assert!(report.contains("Uptime:"));
-
-    // Host usernames and sensitive paths must be redacted
-    assert!(!report.contains("taskforest-admin"));
-    assert!(!report.contains("alice"));
+    let _ = app.update(Message::DismissOverlay);
+    assert!(app.local_surface_kind().is_none());
 }

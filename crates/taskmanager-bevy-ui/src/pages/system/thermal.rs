@@ -9,7 +9,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
-use super::{SystemFactRow, fact_row_scene, section_card_scene};
+use super::{SystemFactGroup, SystemFactRow, fact_row_scene, section_card_scene};
 use crate::palette::UiPalette;
 
 /// One projected thermal-zone row.
@@ -62,6 +62,7 @@ pub(crate) fn thermal_zone_card_scene(
         .map(|row| {
             Box::new(fact_row_scene(
                 &SystemFactRow {
+                    group: SystemFactGroup::Hardware,
                     label: row.label.clone(),
                     value: row.value.clone(),
                 },

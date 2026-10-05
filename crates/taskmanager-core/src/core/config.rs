@@ -16,6 +16,7 @@
 //! launch behaves identically to before this module existed.
 
 use serde::{Deserialize, Serialize};
+pub mod sidebar;
 
 /// Platform-neutral canonical state for one user-created process view preset.
 ///
@@ -288,7 +289,7 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub network_dynamic_scaling: bool,
     /// Persisted order of concrete Performance sidebar device keys. Missing or
-    /// unknown keys are ignored by the GPUI projection; newly discovered
+    /// unknown keys are ignored by device navigation; newly discovered
     /// devices retain the built-in order and are appended deterministically.
     #[serde(default)]
     pub sidebar_order: Vec<String>,

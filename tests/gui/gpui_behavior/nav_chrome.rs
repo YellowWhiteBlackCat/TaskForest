@@ -19,10 +19,10 @@
 //! assertion ("control absent") is meaningful.
 
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
+use taskmanager_application::first_run::{FirstRunController, FirstRunPhase};
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::setup::SetupScriptInfo;
-use taskmanager_gpui::gpui_app::dashboard::SystemSection;
-use taskmanager_gpui::gpui_app::first_run::{FirstRunPhase, FirstRunUiState};
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage, UnitFamily, WindowSurfaceKind};
 use taskmanager_gpui::gpui_app::sidebar::SelectedDevice;
 use taskmanager_theme::Theme;
@@ -396,7 +396,7 @@ async fn mc06_about_case_system_page_about_entry_opens_independent_modal(cx: &mu
         .unwrap();
 
     win.update(cx, |view, _window, cx| {
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         cx.notify();
     })
     .unwrap();
@@ -449,15 +449,11 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
 ) {
     let win = render_in_mode(cx, true);
     win.update(cx, |view, _window, cx| {
-        view.first_run = FirstRunUiState {
-            phase: FirstRunPhase::Available,
-            info: Some(SetupScriptInfo {
-                path: std::path::PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
-                run_command: "pkexec /usr/libexec/taskforest-setup-helper install".into(),
-                revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".into(),
-            }),
-            last_action: None,
-        };
+        view.first_run = FirstRunController::from_observation(Some(SetupScriptInfo {
+            path: std::path::PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
+            run_command: "pkexec /usr/libexec/taskforest-setup-helper install".into(),
+            revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".into(),
+        }));
         view.show_first_run();
         cx.notify();
     })
@@ -485,7 +481,7 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
     drop(vcx);
 
     assert_eq!(
-        win.read_with(cx, |view, _cx| view.first_run.phase.clone())
+        win.read_with(cx, |view, _cx| view.first_run.view().phase.clone())
             .unwrap(),
         FirstRunPhase::Failed(FailureKind::TemporarilyUnavailable),
         "a missing typed provider must remain an honest failure"

@@ -1,15 +1,24 @@
 //! Capture coordinator transitions and scenario preparation.
 
+use super::super::state::SurfacePresentation;
 use super::super::{CaptureEvidence, CaptureMode, HistoryReplayOpenState};
 use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
 use std::path::PathBuf;
 use taskmanager_application::ApplicationHistoryStatus;
-use taskmanager_core::core::setup::SetupScriptInfo;
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
 impl CaptureEvidence {
+    pub(crate) fn active_alert_capture_enabled(&self) -> bool {
+        self.scenario == Some(CaptureScenario::ActiveAlert)
+    }
+    pub(crate) fn mark_active_alert_ready(&mut self) {
+        if self.scenario == Some(CaptureScenario::ActiveAlert) {
+            self.mark_scenario_ready();
+        }
+    }
+
     /// Inventory fixtures must be able to start from an accepted platform
     /// batch even when the live provider reports no new service/startup
     /// inventory. Capture-only preparation still runs after the normal batch
@@ -17,13 +26,9 @@ impl CaptureEvidence {
     /// opportunity to install its typed fixture.
     pub(crate) fn service_inventory_capture_requested(&self) -> bool {
         self.is_enabled()
-            && !self.scenario_ready()
-            && matches!(
-                self.scenario,
-                Some(
-                    CaptureScenario::ServiceDetailsLogs | CaptureScenario::ServicesSearchHighlight,
-                )
-            )
+            && (self.scenario == Some(CaptureScenario::ServiceDetailsLogs)
+                || (!self.scenario_ready()
+                    && self.scenario == Some(CaptureScenario::ServicesSearchHighlight)))
     }
 
     /// Startup capture has the same provider-independent trigger as service
@@ -90,10 +95,11 @@ impl CaptureEvidence {
         )
     }
 
-    pub fn system_hardware_fixture_requested(&self) -> bool {
+    pub fn system_inventory_fixture_requested(&self) -> bool {
         let scenario_needs_fixture = match self.scenario {
-            Some(CaptureScenario::SystemHardware) => !self.scenario_ready(),
-            Some(CaptureScenario::SystemNpu) => self.system_npu_state.needs_fixture(),
+            Some(CaptureScenario::SystemHardware | CaptureScenario::SystemNpu) => {
+                self.system_inventory_state.needs_fixture()
+            }
             _ => false,
         };
         self.is_enabled()
@@ -406,6 +412,28 @@ impl CaptureEvidence {
         }
     }
 
+    /// Active semantic state is separate from native frame presentation. Wait
+    /// for frame turns after the modal's render before certifying its pixels.
+    pub(crate) fn schedule_system_about_presentation(&mut self) -> bool {
+        if self.scenario != Some(CaptureScenario::SystemAbout)
+            || !self.scenario_ready()
+            || self.system_about_presentation != SurfacePresentation::Waiting
+        {
+            return false;
+        }
+        self.system_about_presentation = SurfacePresentation::Scheduled;
+        true
+    }
+
+    pub(crate) fn mark_system_about_presented(&mut self, open: bool) -> bool {
+        if !open || self.system_about_presentation != SurfacePresentation::Scheduled {
+            return false;
+        }
+        self.system_about_presentation = SurfacePresentation::Presented;
+        super::super::marker::emit_marker("surface_presented", self.scenario);
+        true
+    }
+
     /// Strict About evidence waits for the same live read-model readiness as
     /// System Information, then opens the independent build-metadata modal.
     /// No host facts or shell action are fabricated by this presentation-only
@@ -446,18 +474,6 @@ impl CaptureEvidence {
         }
     }
 
-    /// The fixture mirrors the fixed descriptor emitted by the Linux provider,
-    /// but stays in the capture layer so a screenshot cannot accidentally
-    /// prove that the installed asset or privileged helper exists.
-    #[must_use]
-    pub fn first_run_fixture_info() -> SetupScriptInfo {
-        SetupScriptInfo {
-            path: PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
-            run_command: "pkexec /usr/libexec/taskforest-setup-helper install".to_owned(),
-            revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".to_owned(),
-        }
-    }
-
     pub fn mark_settings_zero_gray_ready(&mut self) {
         if self.settings_zero_gray_requested() {
             self.mark_scenario_ready();
@@ -483,16 +499,28 @@ impl CaptureEvidence {
         }
     }
 
-    pub fn mark_process_insights_ready(&mut self, dialog_ready: bool) {
-        if self
-            .scenario
-            .is_some_and(CaptureScenario::is_process_insights)
-            && self.telemetry_ready()
-            && self.ui_data_ready()
-            && dialog_ready
-            && !self.scenario_ready()
+    pub(crate) fn schedule_process_properties_presentation(&mut self, ready: bool) -> bool {
+        if !self.is_enabled()
+            || !self
+                .scenario
+                .is_some_and(CaptureScenario::is_process_properties)
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
+            || !ready
+            || self.process_properties_presentation != SurfacePresentation::Waiting
         {
+            return false;
+        }
+        self.process_properties_presentation = SurfacePresentation::Scheduled;
+        true
+    }
+    pub(crate) fn mark_process_properties_presented(&mut self, ready: bool) {
+        if ready && self.process_properties_presentation == SurfacePresentation::Scheduled {
+            self.process_properties_presentation = SurfacePresentation::Presented;
             self.mark_scenario_ready();
+            super::super::marker::emit_marker("surface_presented", self.scenario);
+        } else if !ready && self.process_properties_presentation == SurfacePresentation::Scheduled {
+            self.process_properties_presentation = SurfacePresentation::Waiting;
         }
     }
 

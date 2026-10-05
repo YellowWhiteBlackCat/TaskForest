@@ -10,14 +10,17 @@
 //! active-alert mirror — no persisted event history exists in the shell, so
 //! none is invented.
 
+use super::components::dashboard_budget::DashboardBudget;
+use super::device_chart::{DeviceChart, DeviceMetricScale, series_max};
 use iced::Length;
-use iced::widget::{column, row, text};
+use iced::widget::{canvas, column, container, responsive, row, text};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_application::system_timeline::{
+    SystemHistoryWindow, SystemPageSection, TimelineMetric, TimelineSeries, TimelineStatistic,
+};
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 
-pub use super::system_table::ResourceHistoryWindow;
-
-use crate::app::alerts::active_alert_lines;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
@@ -37,11 +40,15 @@ use taskmanager_theme::Theme;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemDashboardMessage {
     /// Select the history window the segment summarizes.
-    SelectWindow(ResourceHistoryWindow),
+    SelectWindow(SystemHistoryWindow),
+    SelectSection(SystemPageSection),
+    SelectHealthSection(HealthReviewSection),
+    Previous,
+    Next,
 }
 
 /// The label for one history window (1m, 5m, 15m, 60m), matching GPUI copy.
-pub(crate) fn history_window_label(window: ResourceHistoryWindow) -> &'static str {
+pub(crate) fn history_window_label(window: SystemHistoryWindow) -> &'static str {
     window.label()
 }
 
@@ -51,16 +58,121 @@ pub(crate) fn history_window_label(window: ResourceHistoryWindow) -> &'static st
 /// [`SystemDashboardMessage::SelectWindow`] for that lane.
 pub(crate) fn render_system_dashboard(
     app: &crate::IcedApp,
-    selected_window: ResourceHistoryWindow,
+    selected_window: SystemHistoryWindow,
 ) -> IcedElement<'_> {
-    let theme_snapshot = app.theme();
-    let model = summary_model(app.shell.projection());
+    let series = app.shell.system_timeline_series(selected_window);
+    responsive(move |size| {
+        let theme_snapshot = app.theme();
+        let budget = DashboardBudget::resolve(size.width, size.height);
+        let model = summary_model(app.shell.projection(), &series);
+        let summary = if budget.compact_summary {
+            text(format!(
+                "{} {} · {} {}",
+                t("dashboard.processes"),
+                model
+                    .processes
+                    .map_or_else(missing_value, |count| count.to_string()),
+                t("dashboard.active_alerts"),
+                model.active_alerts
+            ))
+            .size(f32::from(tokens::FONT_12))
+            .into()
+        } else {
+            summary_card(theme_snapshot, &model)
+        };
+        let previous = focus::dynamic_button(
+            theme_snapshot,
+            FocusTarget::SystemDashboardPrevious,
+            t("dashboard.previous_metrics").to_owned(),
+            Message::SystemDashboard(SystemDashboardMessage::Previous),
+            false,
+        );
+        let next = focus::dynamic_button(
+            theme_snapshot,
+            FocusTarget::SystemDashboardNext,
+            t("dashboard.next_metrics").to_owned(),
+            Message::SystemDashboard(SystemDashboardMessage::Next),
+            false,
+        );
+        let mut body = column![summary, row![previous, next].spacing(8)]
+            .spacing(8)
+            .height(Length::Fill);
+        if budget.count == 0 {
+            return body.push(text(t("dashboard.resize"))).into();
+        }
+        let metrics = TimelineMetric::ALL
+            .into_iter()
+            .skip(app.system_dashboard_first_metric)
+            .take(budget.count)
+            .collect::<Vec<_>>();
+        for pair in metrics.chunks(budget.columns) {
+            body = body.push(
+                row(pair
+                    .iter()
+                    .map(|metric| history_card(app, &series, *metric, budget.chart_height))
+                    .collect::<Vec<_>>())
+                .spacing(8)
+                .width(Length::Fill),
+            );
+        }
+        body.into()
+    })
+    .into()
+}
 
-    let mut segment = column![].spacing(f32::from(tokens::SPACE_12));
-    segment = segment.push(summary_card(theme_snapshot, &model));
-    segment = segment.push(window_card(theme_snapshot, selected_window));
-    segment = segment.push(events_card(app, theme_snapshot));
-    segment.into()
+fn history_card<'a>(
+    app: &'a crate::IcedApp,
+    series: &TimelineSeries,
+    metric: TimelineMetric,
+    chart_height: f32,
+) -> IcedElement<'a> {
+    let theme_snapshot = app.theme();
+    let samples = app.system_timeline_graph(series, metric);
+    let scale = match metric {
+        TimelineMetric::Cpu | TimelineMetric::Memory => DeviceMetricScale::Percent,
+        _ => DeviceMetricScale::AutoPeak,
+    };
+    let color = match metric {
+        TimelineMetric::Cpu => theme_snapshot.cpu,
+        TimelineMetric::Memory => theme_snapshot.memory,
+        TimelineMetric::Disk => theme_snapshot.disk,
+        TimelineMetric::Network => theme_snapshot.network,
+    };
+    let graph = canvas::Canvas::new(DeviceChart {
+        max: series_max(scale, &samples),
+        samples,
+        color: crate::theme_binding::color(color),
+        grid_color: crate::theme_binding::color(theme_snapshot.palette().border),
+        smooth: false,
+        hover: true,
+        scale,
+        readout: crate::perf_chart::ReadoutColors {
+            bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+            fg: crate::theme_binding::color(theme_snapshot.palette().fg),
+        },
+    })
+    .width(Length::Fill)
+    .height(Length::Fixed(chart_height));
+    let stats = format!(
+        "{} {} · {} {}",
+        t("dashboard.latest"),
+        readout(series, metric, TimelineStatistic::Latest),
+        t("dashboard.peak"),
+        readout(series, metric, TimelineStatistic::Peak)
+    );
+    container(titled_card(
+        theme_snapshot,
+        t(metric.label_key()),
+        column![
+            text(stats).size(f32::from(tokens::FONT_12)),
+            graph,
+            text(coverage(series, metric)).size(f32::from(tokens::FONT_11))
+        ]
+        .spacing(4),
+    ))
+    .width(Length::Fill)
+    .id(format!("system-dashboard-card-{}", metric.id()))
+    .into()
 }
 
 /// The four summary value columns (CPU / memory / processes / active alerts),
@@ -111,60 +223,21 @@ fn summary_card<'a>(theme_snapshot: &'a Theme, model: &DashboardSummaryModel) ->
 
 /// The history-window selector: one choice pill per shared window, the
 /// selected window wearing the active pill.
-fn window_card<'a>(
+pub(super) fn window_controls<'a>(
     theme_snapshot: &'a Theme,
-    selected_window: ResourceHistoryWindow,
+    selected_window: SystemHistoryWindow,
 ) -> IcedElement<'a> {
     let mut pills = row![].spacing(f32::from(tokens::SPACE_4));
-    for window in ResourceHistoryWindow::ALL {
+    for window in SystemHistoryWindow::ALL {
         pills = pills.push(focus::choice_pill(
             theme_snapshot,
-            FocusTarget::ResourceHistoryWindow(window),
+            FocusTarget::SystemHistoryWindow(window),
             history_window_label(window).to_owned(),
             window == selected_window,
             Message::SystemDashboard(SystemDashboardMessage::SelectWindow(window)),
         ));
     }
-    titled_card(
-        theme_snapshot,
-        t("dashboard.history"),
-        pills.width(Length::Fill),
-    )
-}
-
-/// The events center segment. The shell has no persisted event history
-/// projection, so the card lists the live active-alert mirror (real current
-/// facts) and renders the honest empty state otherwise — it never fabricates
-/// historical events.
-fn events_card<'a>(app: &crate::IcedApp, theme_snapshot: &'a Theme) -> IcedElement<'a> {
-    let muted = theme::muted_text_color(theme_snapshot);
-    let lines = active_alert_lines(app);
-    let mut list = column![].spacing(f32::from(tokens::SPACE_4));
-    if lines.is_empty() {
-        list = list.push(
-            text(t("common.none"))
-                .size(f32::from(tokens::FONT_12))
-                .color(muted),
-        );
-    } else {
-        for line in lines {
-            let color = match line.severity {
-                AlertSeverity::Critical => {
-                    crate::theme_binding::color(theme_snapshot.palette().danger)
-                }
-                AlertSeverity::Warning => {
-                    crate::theme_binding::color(theme_snapshot.palette().warning)
-                }
-                AlertSeverity::Info => crate::theme_binding::color(theme_snapshot.palette().accent),
-            };
-            list = list.push(
-                text(line.text)
-                    .size(f32::from(tokens::FONT_12))
-                    .style(move |_theme| iced::widget::text::Style { color: Some(color) }),
-            );
-        }
-    }
-    titled_card(theme_snapshot, t("dashboard.active_alerts"), list)
+    pills.width(Length::Fill).into()
 }
 
 #[cfg(test)]

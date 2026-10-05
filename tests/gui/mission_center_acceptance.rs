@@ -1,7 +1,7 @@
 //! End-to-end headless smoke paths for the Mission Center parity surface.
 
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
-use taskmanager_gpui::gpui_app::dashboard::SystemSection;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage};
 use taskmanager_theme::Theme;
 
@@ -73,7 +73,7 @@ async fn hardware_details_scroll_when_sections_exceed_the_viewport(cx: &mut Test
     view.update(cx, |view, cx| {
         view.mark_telemetry_frame_ready();
         view.page = TopPage::System;
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         cx.notify();
     });
     cx.simulate_window_resize(window.into(), gpui::size(gpui::px(720.0), gpui::px(360.0)));

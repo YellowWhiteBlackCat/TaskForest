@@ -10,12 +10,14 @@ use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
+use bevy::ui::prelude::{Display, Node};
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
+use super::replay::{PerformanceHistoryEntry, PerformanceLiveBody, PerformanceReplayRoot};
 use super::scene::content;
 use super::tests::{block_keys, dyn_text_value};
 use super::{DynField, Section, section_keys};
@@ -134,12 +136,19 @@ fn disk_caption_renders_observed_smart_evidence_rows() {
         )),
         "reported availability must paint the shared SMART status: {availability_caption}"
     );
-    let mut missing_tool = DiskMetrics::default();
-    missing_tool.smart_availability = SmartAvailability::MissingTool;
-    assert!(
-        !super::metrics::disk_caption(&missing_tool).contains(t("disk.smart_status")),
-        "a hidden SMART section must not invent a status segment"
-    );
+    for unavailable in [
+        SmartAvailability::MissingTool,
+        SmartAvailability::PermissionDenied,
+    ] {
+        let mut disk = DiskMetrics::default();
+        disk.smart_availability = unavailable;
+        let caption = super::metrics::disk_caption(&disk);
+        assert!(caption.contains(t("disk.smart_status")));
+        assert!(
+            caption.contains(t(device_status_i18n_key(effective_smart_status(&disk)))),
+            "the actionable SMART failure must remain explicit: {caption}"
+        );
+    }
 
     // A disk whose provider supplied nothing keeps every SMART segment
     // absent; no fabricated `0%` spare row.
@@ -207,10 +216,11 @@ fn gpu_section_enumerates_every_projected_adapter() {
     let mut app = headless_scene_app();
     let palette = ui_palette(&Theme::dark());
     let history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -306,10 +316,11 @@ fn disk_block_renders_the_projected_partition_rows() {
     let mut app = headless_scene_app();
     let palette = ui_palette(&Theme::dark());
     let history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -383,10 +394,11 @@ fn battery_block_renders_voltage_health_and_cycles() {
     let mut app = headless_scene_app();
     let palette = ui_palette(&Theme::dark());
     let history = crate::pages::history::HistoryProjectionResource::default();
-    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
         shell: &shell,
-        process_tree_expansion: &process_tree_expansion,
+
         palette: &palette,
         history: &history.0,
     };
@@ -413,3 +425,72 @@ fn battery_block_renders_voltage_health_and_cycles() {
 
     assert!(world.despawn(root), "the seeded page despawns cleanly");
 }
+
+#[test]
+fn performance_history_mount_starts_live_without_inventing_replay_availability() {
+    let mut app = headless_scene_app();
+    let shell = ShellApp::new();
+    let palette = ui_palette(&Theme::dark());
+    let history = crate::pages::history::HistoryProjectionResource::default();
+    let context = PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
+        shell: &shell,
+
+        palette: &palette,
+        history: &history.0,
+    };
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(content(&context))
+        .expect("scene mounts")
+        .id();
+
+    let display = {
+        let mut query = world.query::<(&PerformanceHistoryEntry, &Node)>();
+        query
+            .iter(world)
+            .next()
+            .map(|(_, node)| node.display)
+            .unwrap_or(Display::None)
+    };
+
+    assert_eq!(display, Display::None);
+    assert_eq!(world.query::<&PerformanceLiveBody>().iter(world).count(), 1);
+    let mut replay = world.query::<(&PerformanceReplayRoot, &Node)>();
+    assert_eq!(
+        replay.single(world).expect("one review owner").1.display,
+        Display::None
+    );
+    assert!(world.despawn(root));
+}
+
+#[test]
+fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
+    use super::tests::{GIB, memory_metrics};
+    use crate::pages::performance::scene::blocks::segment_bar_layout;
+    use taskmanager_core::core::metrics::MemoryMetrics;
+    use taskmanager_shell::memory::memory_segments;
+
+    let memory = memory_metrics(1, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
+    let segments = memory_segments(&memory);
+    let layout = segment_bar_layout(&segments);
+    assert_eq!(layout.len(), segments.len(), "one span per segment");
+    let total: f32 = layout.iter().map(|span| span.fraction).sum();
+    assert!(
+        (total - 1.0).abs() < 1e-4,
+        "the spans tile the full width: {total}"
+    );
+    for span in &layout {
+        assert!(
+            span.fraction.is_finite() && span.fraction >= 0.0,
+            "a span width is a real share, never NaN"
+        );
+    }
+
+    // Nothing measured yet: an empty layout, never NaN widths.
+    let zero = MemoryMetrics::default();
+    assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
+}
+
+// ---- SMART self-test request ----------------------------------------------

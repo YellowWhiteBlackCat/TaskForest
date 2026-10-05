@@ -11,6 +11,8 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
@@ -24,7 +26,7 @@ mod navigation;
 mod seam;
 mod semantic;
 
-use keys::handle_key;
+pub(crate) use keys::handle_key;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::{ShellKeyEvent, queue_effect};
 
@@ -97,8 +99,7 @@ pub fn run_demo() -> io::Result<()> {
 pub fn snapshot_text(width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
     let mut terminal = unwrap_infallible(Terminal::new(backend));
-    let mut app = crate::demo_app();
-    app.expanded_groups = crate::default_category_expansions();
+    let app = crate::demo_app();
     let theme = TuiTheme::from_params(app.theme_params);
     let _ = unwrap_infallible(terminal.draw(|frame| render(frame, &app, theme)));
     terminal.backend().to_string()
@@ -134,9 +135,7 @@ fn unwrap_infallible<T>(result: Result<T, Infallible>) -> T {
 fn run_interactive(demo: bool) -> io::Result<()> {
     let host = NativeAppHost::production();
     let mut app = if demo {
-        let mut app = crate::demo_app();
-        app.expanded_groups = crate::default_category_expansions();
-        app
+        crate::demo_app()
     } else {
         match host.config_client() {
             Ok(client) => TuiApp::new_with_config_client(client),
@@ -157,6 +156,10 @@ fn run_interactive(demo: bool) -> io::Result<()> {
     } else {
         host.local_time_rules()
     };
+    if demo && crate::demo::persisted_history_capture_requested() {
+        app.enable_history_for_capture();
+        app.install_history_frontend_connector(host.history_frontend_connector());
+    }
     if !demo {
         app.request_history_frontend(app.history_persistence_enabled());
         app.install_history_frontend_connector(host.history_frontend_connector());
@@ -169,6 +172,15 @@ fn run_interactive(demo: bool) -> io::Result<()> {
                 format!("Snapshot export runtime unavailable: {error}"),
             ),
         }
+        match host.diagnostic_bundle_client() {
+            Ok(client) => app.install_diagnostic_bundle_client(client),
+            Err(error) => app.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                format!("Diagnostic bundle runtime unavailable: {error}"),
+            ),
+        }
     }
     let mut platform = if demo {
         None
@@ -179,6 +191,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         Some(client)
     };
     if let Some(platform) = platform.as_mut() {
+        begin_observations(&mut app, platform);
         queue_effect(
             &mut app,
             platform,
@@ -246,7 +259,9 @@ fn submit_alert_notifications(app: &mut ShellApp, platform: &mut PlatformClient)
 /// current projection did not ask for.
 fn inline_network_escalation_ready(app: &TuiApp) -> bool {
     app.selected_detail_process().is_some_and(|process| {
-        crate::ui::process_details::network_requires_escalation(app, process.pid)
+        ProcessLiveKey::from_process(&process).is_some_and(|identity| {
+            crate::ui::process_details::network_requires_escalation(app, identity)
+        })
     })
 }
 
@@ -266,7 +281,27 @@ fn drain_process_refresh(app: &mut TuiApp, platform: &mut PlatformClient) -> boo
     }
 }
 
-pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
+pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<PlatformEffect> {
+    if key.code == ratatui::crossterm::event::KeyCode::F(4) {
+        app.open_saved_views();
+        return None;
+    }
+    if key.code == ratatui::crossterm::event::KeyCode::F(3) {
+        app.open_sidebar_editor();
+        return None;
+    }
+    if key.code == ratatui::crossterm::event::KeyCode::F(2) {
+        app.open_first_run();
+        return None;
+    }
+
+    if key.code == ratatui::crossterm::event::KeyCode::Enter && app.settings_form.field >= 30 {
+        return PrivilegeCenterInputs::from_shell(&app.shell)
+            .rows()
+            .get(app.settings_form.field - 30)
+            .and_then(|row| row.action.as_ref())
+            .map(|action| action.effect());
+    }
     match key.code {
         ratatui::crossterm::event::KeyCode::Tab | ratatui::crossterm::event::KeyCode::Down => {
             app.settings_form.move_field(1)
@@ -299,6 +334,7 @@ pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
         }
         _ => {}
     }
+    None
 }
 
 fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {
@@ -337,6 +373,11 @@ fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {
         event.modifiers.contains(KeyModifiers::SUPER),
     );
     Some(ShellKeyEvent::new(key, modifiers))
+}
+
+fn begin_observations(app: &mut TuiApp, platform: &mut PlatformClient) {
+    app.first_run.observe(Some(platform), unix_now_ms());
+    queue_effect(app, platform, PlatformEffect::ObserveDesktopAppearance);
 }
 
 #[cfg(test)]

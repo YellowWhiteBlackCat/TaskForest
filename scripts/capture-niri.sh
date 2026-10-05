@@ -441,10 +441,9 @@ start_niri() {
 }
 
 ensure_niri() {
-  # A live host session can refuse nested-compositor setup for minutes at a
-  # time (observed: a KWin/Plasma pause after a burst of nested start/stop
-  # cycles). Fail closed, but spend the budget retrying with backoff before
-  # giving up the whole single-run matrix receipt.
+  # A virtual host can retain a live socket while refusing new nested clients.
+  # Recreate only this run's private host before retrying; its cgroup and UUID
+  # stay authoritative and the operator's compositor is never signalled.
   if start_niri; then
     return 0
   fi
@@ -454,6 +453,10 @@ ensure_niri() {
       "$backoff" >&2
     sleep "$backoff"
     stop_niri
+    if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+      reset_capture_host
+      start_capture_host || continue
+    fi
     if start_niri; then
       return 0
     fi
@@ -550,87 +553,6 @@ ensure_capture_host() {
 start_capture_host || exit 1
 start_niri || ensure_niri || exit 1
 
-# seed_history_fixtures <dir> — deterministic JSONL series for the replay
-# panel (roadmap #4): five system series spanning the last ~23h so the 24h
-# window shows full waves and the 1h window shows the tail. The exact wire
-# format is the history store's contract: {r,c,m,v} per line, one file per
-# series named by the HistorySeriesKey stem (system series: `-` device/core).
-seed_history_fixtures() {
-  timeout 60s python3 - "$1" <<'PY'
-import json, os, sys, time
-
-root = sys.argv[1]
-now_ms = int(time.time() * 1000)
-span_ms = 23 * 3600 * 1000
-points = 96
-
-def lines(base, amplitude, period):
-    step = span_ms // (points - 1)
-    out = []
-    for i in range(points):
-        value = base + amplitude * ((i % period) / period)
-        at = now_ms - span_ms + i * step
-        out.append({"r": i + 1, "c": at, "m": at, "v": round(value, 3)})
-    return out
-
-fixtures = {
-    "cpu-usage-pct__-__-": lines(12.0, 55.0, 17),
-    "memory-used-pct__-__-": lines(38.0, 22.0, 31),
-    "swap-used-pct__-__-": lines(4.0, 9.0, 23),
-    "network-rate-bps__-__-": lines(2_000_000.0, 28_000_000.0, 11),
-    "gpu-usage-pct__-__-": lines(8.0, 40.0, 13),
-}
-for stem, rows in fixtures.items():
-    with open(os.path.join(root, stem + ".jsonl"), "w") as handle:
-        for row in rows:
-            handle.write(json.dumps(row, separators=(",", ":")) + "\n")
-PY
-}
-
-# seed_application_history_fixtures <dir> — deterministic application CPU,
-# memory and process-count series. Every filename is the canonical four-part
-# HistorySeriesKey stem, including typed launcher/process provenance. The app
-# reads these through the real history-store query and application projection.
-seed_application_history_fixtures() {
-  timeout 60s python3 - "$1" <<'PY'
-import json, os, sys, time
-
-root = sys.argv[1]
-now_ms = int(time.time() * 1000)
-span_ms = 23 * 3600 * 1000
-points = 96
-
-def lines(base, amplitude, period, integral=False):
-    step = span_ms // (points - 1)
-    out = []
-    for i in range(points):
-        value = base + amplitude * ((i % period) / period)
-        if integral:
-            value = round(value)
-        at = now_ms - span_ms + i * step
-        out.append({"r": i + 1, "c": at, "m": at, "v": round(value, 3)})
-    return out
-
-applications = [
-    ("launcher:org.mozilla.firefox", 32.0, 1_180_000_000.0, 12.0),
-    ("launcher:com.google.Chrome", 24.0, 2_620_000_000.0, 26.0),
-    ("launcher:com.visualstudio.code", 18.0, 1_040_000_000.0, 9.0),
-    ("launcher:io.github.YellowWhiteBlackCat.TaskForestG", 11.0, 168_000_000.0, 1.0),
-    ("process:mihomo", 6.0, 58_000_000.0, 1.0),
-]
-for index, (identity, cpu, memory, count) in enumerate(applications):
-    fixtures = {
-        f"application-cpu-usage-pct__-__-__{identity}": lines(cpu, 18.0, 11 + index),
-        f"application-memory-bytes__-__-__{identity}": lines(memory, memory * 0.18, 17 + index),
-        f"application-process-count__-__-__{identity}": lines(count, 2.0, 19 + index, True),
-    }
-    for stem, rows in fixtures.items():
-        with open(os.path.join(root, stem + ".jsonl"), "w") as handle:
-            for row in rows:
-                handle.write(json.dumps(row, separators=(",", ":")) + "\n")
-PY
-}
-
 # capture <name> <skin> <page> <device> <settings> <scenario> <window-size> <capture-size> <attempt>
 FAILURES=0
 BLOCKED_CAPTURES=0
@@ -667,9 +589,9 @@ capture() {
       mkdir -p "$config_home/taskmanager" "$data_home/taskmanager/history"
       printf '{"history_persistence": true}\n' >"$config_home/taskmanager/config.json"
       if [ "$scenario" = "history-replay" ]; then
-        seed_history_fixtures "$data_home/taskmanager/history"
+        timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$data_home/taskmanager/history" --kind system
       else
-        seed_application_history_fixtures "$data_home/taskmanager/history"
+        timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$data_home/taskmanager/history" --kind application
       fi
       printf '  seeded %s history fixture series for %s\n' \
         "$(find "$data_home/taskmanager/history" -name '*.jsonl' 2>/dev/null | wc -l)" "$name"
@@ -745,13 +667,13 @@ capture() {
       if grep -q "CAPTURE_MARKER event=telemetry_ready scenario=$marker_scenario" "$log" 2>/dev/null \
         && grep -q "CAPTURE_MARKER event=ui_data_ready scenario=$marker_scenario" "$log" 2>/dev/null \
         && grep -q "CAPTURE_MARKER event=theme_ready scenario=$marker_scenario theme=$skin high_contrast=false" "$log" 2>/dev/null \
-        && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=scenario_ready scenario=$scenario" "$log" 2>/dev/null; }; then
+        && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=scenario_ready scenario=$scenario" "$log" 2>/dev/null; } \
+        && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=surface_presented scenario=$scenario" "$log" 2>/dev/null; }; then
         markers=ready
         break
       fi
       sleep 0.5
     done
-    sleep 1.5 # allow the marker-triggered notify to paint the final frame
   fi
 
   # A GPUI surface can map after the first window poll even though readiness
@@ -847,6 +769,9 @@ capture() {
     rm -f "$f" 2>/dev/null
   fi
 
+  # The window/ownership receipt and PNG are already fixed. Stop every owned
+  # writer before hashing the complete log, including delayed presentation markers.
+  terminate_owned "$APP_PID" "$APP_PGID"
   local log_hash
   log_hash=$(sha256sum "$log" | cut -d' ' -f1)
   local windows_hash=- action_hash=-
@@ -866,7 +791,6 @@ capture() {
     "$windows_hash" "$action_receipt" "$action_hash" \
     >>"$WINDOW_MANIFEST"
 
-  terminate_owned "$APP_PID" "$APP_PGID"
   APP_PID=""
   APP_PGID=""
   [ "$status" = ok ]

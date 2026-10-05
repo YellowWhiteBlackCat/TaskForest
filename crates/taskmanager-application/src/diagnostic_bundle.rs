@@ -14,9 +14,12 @@ use atomicwrites::{AllowOverwrite, AtomicFile};
 use serde::{Deserialize, Serialize};
 
 use taskmanager_core::config::Config;
+use taskmanager_core::core::export::snapshot_to_json;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::{
     DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource,
 };
@@ -48,6 +51,42 @@ pub struct DiagnosticBundle {
 }
 
 impl DiagnosticBundle {
+    /// Freeze the full inventories reviewed by the desktop reference plus
+    /// the neutral diagnostic facts into one sanitized export transaction.
+    pub fn prepare_review_plan(
+        &self,
+        snapshot: &SystemSnapshot,
+        processes: &[ProcessItem],
+        services: Option<&[ServiceItem]>,
+        startup: Option<&[StartupEntry]>,
+    ) -> Result<DiagnosticBundlePlan, DiagnosticBundleError> {
+        let sources = vec![
+            DiagnosticSource {
+                name: "snapshot.json".into(),
+                contents: snapshot_to_json(snapshot, processes),
+            },
+            DiagnosticSource {
+                name: "services.json".into(),
+                contents: serde_json::to_string_pretty(&services).map_err(encode_error)?,
+            },
+            DiagnosticSource {
+                name: "startup.json".into(),
+                contents: serde_json::to_string_pretty(&startup).map_err(encode_error)?,
+            },
+            DiagnosticSource {
+                name: "diagnostic-bundle.json".into(),
+                contents: self.to_json_string()?,
+            },
+        ];
+        DiagnosticBundlePlan::prepare(
+            sources,
+            processes
+                .iter()
+                .filter_map(ProcessItem::current_user)
+                .chain(self.collected_usernames()),
+        )
+    }
+
     #[must_use]
     pub fn build(
         hardware: Option<&HardwareInfo>,
@@ -68,7 +107,7 @@ impl DiagnosticBundle {
             .unwrap_or_default();
         let configuration = config
             .and_then(|c| serde_json::to_value(c).ok())
-            .unwrap_or_else(|| serde_json::to_value(Config::default()).unwrap_or_default());
+            .unwrap_or(serde_json::Value::Null);
         let threads = snapshot.and_then(|s| s.threads);
         let process_summary = DiagnosticProcessSummary::from_processes(processes, threads);
         let telemetry_health = DiagnosticTelemetryHealth::from_telemetry(projection, snapshot);

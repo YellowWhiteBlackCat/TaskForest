@@ -720,18 +720,6 @@ impl super::RootView {
             Rc::make_mut(&mut materialized.sensors.materialized.value),
         )
     }
-
-    pub(super) fn sync_capture_live_dynamic_device_system(&mut self) -> bool {
-        let (capture_evidence, page, materialized) = (
-            &mut self.capture_evidence,
-            &mut self.page,
-            &self.materialized,
-        );
-        capture_evidence.on_live_dynamic_device_state(
-            page,
-            materialized.power_supplies.materialized.value.as_ref(),
-        )
-    }
 }
 
 #[cfg(any(test, feature = "test-support"))]

@@ -7,8 +7,12 @@
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use taskmanager_application::AppPage;
+use taskmanager_application::system_timeline::SystemPageSection;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use crate::{TuiApp, TuiInputScope};
+mod focus;
+use focus::local_surface_focus_control;
 
 use super::{
     batch_menu, pages, process_menu, process_properties::ProcessDetailsSection, process_table,
@@ -31,9 +35,15 @@ pub(crate) struct FrameChromeLayout {
 
 /// Resolve the terminal frame's outer chrome once for the current area.
 #[must_use]
-pub(crate) fn frame_chrome_layout(area: Rect) -> FrameChromeLayout {
+pub(crate) fn frame_chrome_layout(area: Rect, page: FrameChromePage) -> FrameChromeLayout {
     let [header, body, footer] = Layout::vertical([
-        Constraint::Length(4),
+        Constraint::Length(
+            if area.height < 20 && page == FrameChromePage::HistoryReview {
+                2
+            } else {
+                4
+            },
+        ),
         Constraint::Min(8),
         Constraint::Length(3),
     ])
@@ -43,6 +53,12 @@ pub(crate) fn frame_chrome_layout(area: Rect) -> FrameChromeLayout {
         body,
         footer,
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FrameChromePage {
+    Standard,
+    HistoryReview,
 }
 
 /// Resolve the shared centered popup geometry.  Every local/shared surface
@@ -201,6 +217,7 @@ pub(crate) enum TuiFocusControl {
 /// explicitly here; unsupported cells stay blocked (`Overlay`) or `None`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiHitTarget {
+    NavigationPage(AppPage),
     TableRow {
         page: AppPage,
         index: usize,
@@ -401,55 +418,6 @@ impl TuiFocusPlan {
     }
 }
 
-fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> TuiFocusControl {
-    match surface {
-        crate::TuiSurfaceKind::Settings => TuiFocusControl::SettingsField(app.settings_form.field),
-        crate::TuiSurfaceKind::CommandPalette => TuiFocusControl::PaletteItem {
-            index: app.command_palette().map_or(0, |palette| palette.selection),
-        },
-        crate::TuiSurfaceKind::ServiceMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ServiceMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::ProcessMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ProcessMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::BatchMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::BatchMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::SessionMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::SessionMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::StartupMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::StartupMenu(menu) => Some(menu.selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::ColumnMenu => menu_index(app, surface, |surface| match surface {
-            crate::TuiSurface::ColumnMenu { selection } => Some(*selection),
-            _ => None,
-        }),
-        crate::TuiSurfaceKind::About
-        | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers
-        | crate::TuiSurfaceKind::ServiceDependencies
-        | crate::TuiSurfaceKind::ProcessAffinity => TuiFocusControl::Viewport,
-    }
-}
-
-fn menu_index(
-    app: &TuiApp,
-    surface: crate::TuiSurfaceKind,
-    index: impl FnOnce(&crate::TuiSurface) -> Option<usize>,
-) -> TuiFocusControl {
-    TuiFocusControl::MenuItem {
-        surface,
-        index: app.local_surface().and_then(index).unwrap_or(0),
-    }
-}
-
 /// The immutable geometry and input-scope plan for one painted terminal
 /// frame. It is built from the current app state before painting and can be
 /// retained by the runtime as the committed hit-test plan until the next draw.
@@ -457,6 +425,7 @@ fn menu_index(
 pub(crate) struct TuiFramePlan {
     pub(super) area: Rect,
     pub(super) chrome: FrameChromeLayout,
+    pub(super) navigation: Option<Rect>,
     pub(super) page: TuiPageLayout,
     pub(super) input_scope: TuiInputScope,
     pub(super) focus: TuiFocusPlan,
@@ -466,17 +435,40 @@ pub(crate) struct TuiFramePlan {
 impl TuiFramePlan {
     #[must_use]
     pub(crate) fn build(app: &TuiApp, area: Rect) -> Self {
-        let chrome = frame_chrome_layout(area);
+        let mut chrome = frame_chrome_layout(
+            area,
+            if app.page() == AppPage::AppHistory
+                || (app.page() == AppPage::System
+                    && app.system_section == SystemPageSection::Dashboard)
+                || (app.page() == AppPage::Performance && app.history_replay_open())
+            {
+                FrameChromePage::HistoryReview
+            } else {
+                FrameChromePage::Standard
+            },
+        );
+        let navigation = if app.nav_orientation == NavOrientation::Vertical {
+            let [rail, body] =
+                Layout::horizontal([Constraint::Length(10), Constraint::Min(1)]).areas(chrome.body);
+            chrome.body = body;
+            Some(rail)
+        } else {
+            None
+        };
         let body = chrome.body;
         let input_scope = app.input_scope();
         let page = match app.page() {
+            AppPage::Performance if app.history_replay_open() => TuiPageLayout::Performance {
+                selector: Rect::ZERO,
+                content: body,
+            },
             AppPage::Performance => {
                 let [selector, content] =
                     Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(body);
                 TuiPageLayout::Performance { selector, content }
             }
             AppPage::Applications => {
-                let process = process_table::process_table_layout(body);
+                let process = process_table::process_table_layout(body, app.focus_panel);
                 let table =
                     TablePanelProjection::new(process.table, app.visual_row_count(), app.selected);
                 TuiPageLayout::Applications { process, table }
@@ -521,6 +513,7 @@ impl TuiFramePlan {
         Self {
             area,
             chrome,
+            navigation,
             page,
             input_scope,
             focus: TuiFocusPlan::build(app, input_scope),
@@ -592,6 +585,16 @@ impl TuiFramePlan {
             return Some(TuiHitTarget::Overlay {
                 scope: overlay.scope,
             });
+        }
+        if let Some(rail) = self
+            .navigation
+            .filter(|rail| rail.contains((column, row).into()))
+        {
+            let index = usize::from(row.saturating_sub(rail.y));
+            if let Some(page) = AppPage::ALL.get(index) {
+                return Some(TuiHitTarget::NavigationPage(*page));
+            }
+            return None;
         }
         let index = self.table_row_at(column, row)?;
         Some(TuiHitTarget::TableRow {
@@ -687,11 +690,16 @@ fn overlay_controls(
         // time so a later keystroke cannot retarget a committed click.
         crate::TuiSurfaceKind::CommandPalette => (3, 2, app.filtered_palette_rows().len()),
         crate::TuiSurfaceKind::Settings
+        | crate::TuiSurfaceKind::SavedViews
+        | crate::TuiSurfaceKind::SidebarEditor
         | crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::SystemInformation
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
         | crate::TuiSurfaceKind::ServiceDependencies
-        | crate::TuiSurfaceKind::ProcessAffinity => return None,
+        | crate::TuiSurfaceKind::ProcessAffinity
+        | crate::TuiSurfaceKind::DiagnosticBundle
+        | crate::TuiSurfaceKind::FirstRun => return None,
     };
     let header_rows = u16::try_from(header_rows).unwrap_or(u16::MAX);
     let footer_rows = u16::try_from(footer_rows).unwrap_or(u16::MAX);
@@ -728,7 +736,10 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
         },
         TuiInputScope::LocalSurface(surface) => match surface {
             crate::TuiSurfaceKind::Settings => (68, 32),
-            crate::TuiSurfaceKind::About => (72, 18),
+            crate::TuiSurfaceKind::SavedViews => (68, 24),
+            crate::TuiSurfaceKind::SidebarEditor => (68, 24),
+            crate::TuiSurfaceKind::About => (72, 20),
+            crate::TuiSurfaceKind::SystemInformation => (84, 30),
             crate::TuiSurfaceKind::Health => (84, 30),
             crate::TuiSurfaceKind::Containers => (84, 22),
             crate::TuiSurfaceKind::ServiceMenu => (52, 13),
@@ -744,6 +755,11 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             crate::TuiSurfaceKind::CommandPalette => (72, 26),
             crate::TuiSurfaceKind::ServiceDependencies => (72, 20),
             crate::TuiSurfaceKind::ProcessAffinity => (64, 16),
+            crate::TuiSurfaceKind::DiagnosticBundle => (78, 24),
+            // Three complete descriptor groups, copy/docs hints and the
+            // fixed action/scroll footer fit the normal review. Compact
+            // terminals clamp this slot and scroll only the body.
+            crate::TuiSurfaceKind::FirstRun => (60, 24),
         },
         TuiInputScope::Help => (68, 24),
         TuiInputScope::Suggestions => (74, 22),

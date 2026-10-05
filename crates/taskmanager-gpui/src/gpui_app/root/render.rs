@@ -1,5 +1,6 @@
 //! Rendering for the root application shell.
 
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::absolute;
@@ -7,6 +8,7 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::pixels;
+use taskmanager_ui_contract::navigation::NavOrientation;
 /// Debug-selector identity of the telemetry-ready viewport wrapper.
 ///
 /// Lives on the shared `page_viewport` wrapper, never on the page body: the
@@ -17,12 +19,13 @@ pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
 
 use std::time::Duration;
 
+use super::capture::schedule_controlled_presentation;
 use super::{
     Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label, i18n,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
 use crate::gpui_app::dashboard;
-use crate::gpui_app::dashboard::SystemSection;
+
 use crate::gpui_app::system_view;
 use crate::gpui_app::theme::ui_font_with_fallback;
 use crate::window_presentation::GpuiSurfaceRole;
@@ -60,16 +63,16 @@ fn should_schedule_cursor_refresh(
     cursor_tooltip_active && refresh_state == CursorRefreshState::Idle
 }
 
-fn schedule_system_npu_capture(
+fn schedule_system_inventory_capture(
     view: &mut RootView,
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) {
-    if !view.capture_evidence.system_npu_layout_requested() {
+    if !view.capture_evidence.system_inventory_layout_requested() {
         return;
     }
     view.page = TopPage::System;
-    view.dashboard.section = SystemSection::Hardware;
+    view.dashboard.section = SystemPageSection::Hardware;
     let inventory_visible = system_view::memory_inventory_card_is_visible(
         &system_view::MemoryInventoryInputs {
             state: view.shell.smbios_memory_state(),
@@ -79,22 +82,34 @@ fn schedule_system_npu_capture(
         },
         view.display_units(),
     );
-    let Some(item) = system_view::graphics_scroll_item(
-        view.hardware_rc(),
-        view.system_snapshot(),
-        view.npu_inventory(),
-        view.shell.smbios_memory_state(),
-        view.display_units(),
-        inventory_visible,
-    ) else {
+    let item = if view.capture_evidence.memory_inventory_capture() {
+        system_view::memory_inventory_scroll_item(
+            view.hardware_rc(),
+            view.system_snapshot(),
+            view.npu_inventory(),
+            view.shell.smbios_memory_state(),
+            view.display_units(),
+        )
+    } else {
+        system_view::graphics_scroll_item(
+            view.hardware_rc(),
+            view.system_snapshot(),
+            view.npu_inventory(),
+            view.shell.smbios_memory_state(),
+            view.display_units(),
+            inventory_visible,
+        )
+    };
+    let Some(item) = item else {
         return;
     };
-    if !view.capture_evidence.schedule_system_npu_scroll() {
+    if !view.capture_evidence.schedule_system_inventory_scroll() {
         return;
     }
     cx.on_next_frame(window, move |view, window, cx| {
         if view.system_scroll.bounds_for_item(item).is_none() {
-            view.capture_evidence.mark_system_npu_scroll_applied(false);
+            view.capture_evidence
+                .mark_system_inventory_scroll_applied(false);
             cx.notify();
             return;
         }
@@ -103,7 +118,7 @@ fn schedule_system_npu_capture(
             let graphics_visible =
                 view.system_scroll.top_item() <= item && view.system_scroll.bottom_item() >= item;
             view.capture_evidence
-                .mark_system_npu_scroll_applied(graphics_visible);
+                .mark_system_inventory_scroll_applied(graphics_visible);
             cx.notify();
         });
         cx.notify();
@@ -151,6 +166,40 @@ fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Co
 
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.window_surface_kind() == Some(super::WindowSurfaceKind::SystemAbout)
+            && self.capture_evidence.schedule_system_about_presentation()
+        {
+            let root = cx.entity().downgrade();
+            window.on_next_frame(move |window, cx| {
+                let _ = root.update(cx, |_view, cx| cx.notify());
+                window.on_next_frame(move |_window, cx| {
+                    let _ = root.update(cx, |view, _cx| {
+                        view.capture_evidence.mark_system_about_presented(
+                            view.window_surface_kind()
+                                == Some(super::WindowSurfaceKind::SystemAbout),
+                        );
+                    });
+                });
+            });
+        }
+        let properties_ready = self.process_properties_capture_ready();
+        if self
+            .capture_evidence
+            .schedule_process_properties_presentation(properties_ready)
+        {
+            let root = cx.entity().downgrade();
+            window.on_next_frame(move |window, cx| {
+                let _ = root.update(cx, |_view, cx| cx.notify());
+                window.on_next_frame(move |_window, cx| {
+                    let _ = root.update(cx, |view, _cx| {
+                        let ready = view.process_properties_capture_ready();
+                        view.capture_evidence
+                            .mark_process_properties_presented(ready);
+                    });
+                });
+            });
+        }
+        schedule_controlled_presentation(self, window, cx);
         let presentation = self.presentation_snapshot();
         let ui_size = presentation.appearance.ui_size;
         // All FONT_* tokens resolve from this root-relative scale, including
@@ -165,7 +214,7 @@ impl Render for RootView {
         }
         self.ensure_input_modality_key_interceptor(window, cx);
         self.poll_diagnostic_bundle_result();
-        schedule_system_npu_capture(self, window, cx);
+        schedule_system_inventory_capture(self, window, cx);
         schedule_window_capture(self, window, cx);
         if self.capture_evidence.keyboard_focus_requested() {
             // The capture token represents a keyboard-initiated focus state even
@@ -176,9 +225,9 @@ impl Render for RootView {
             cx.notify();
         }
         if self.capture_evidence.vertical_nav_requested() {
-            self.nav_orientation = super::NavOrientation::Vertical;
+            self.nav_orientation = NavOrientation::Vertical;
             self.capture_evidence
-                .mark_vertical_nav_ready(self.nav_orientation == super::NavOrientation::Vertical);
+                .mark_vertical_nav_ready(self.nav_orientation == NavOrientation::Vertical);
             cx.notify();
         }
         let settings_switch_focus = self.capture_evidence.settings_switch_focus_enabled();
@@ -219,6 +268,9 @@ impl Render for RootView {
         if let Some(settings_focus_id) = settings_focus_id
             && settings_focus_requested
         {
+            if settings_zero_gray {
+                self.set_gray_zero_values(true, cx);
+            }
             // Strict capture emulates keyboard navigation without dispatching an
             // activation keystroke; the switch value is never changed. The
             // selected settings switch entity owns the focus handle now.
@@ -239,6 +291,21 @@ impl Render for RootView {
                 focus.focus(window);
                 if focus.is_focused(window) {
                     let _ = weak.update(cx, |view, cx| {
+                        let viewport = view.dialog_scroll.settings.bounds();
+                        let visible = view
+                            .settings_switches
+                            .get(settings_focus_id)
+                            .and_then(|state| state.read(cx).painted_bounds())
+                            .is_some_and(|bounds| {
+                                bounds.size.width > px(0.0)
+                                    && bounds.size.height > px(0.0)
+                                    && viewport.contains(&bounds.origin)
+                                    && viewport.contains(&bounds.bottom_right())
+                            });
+                        if !visible {
+                            cx.notify();
+                            return;
+                        }
                         if settings_focus_id == "device-cpu" {
                             view.capture_evidence.mark_settings_switch_focus_ready();
                         } else {
@@ -523,7 +590,7 @@ impl Render for RootView {
             .children(alert_banner);
 
         let root = match self.nav_orientation {
-            super::NavOrientation::Horizontal => root.child(nav).child(
+            NavOrientation::Horizontal => root.child(nav).child(
                 div()
                     .flex_1()
                     .min_h(px(0.0))
@@ -533,7 +600,7 @@ impl Render for RootView {
                     .flex_col()
                     .child(body),
             ),
-            super::NavOrientation::Vertical => root.child(
+            NavOrientation::Vertical => root.child(
                 div()
                     .flex()
                     .flex_row()

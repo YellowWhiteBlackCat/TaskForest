@@ -43,7 +43,7 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         Button
         on(on_services_search_input_activated)
         Children [
-            ( Text(text) TextRole(Role::Body) TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap } ),
+             Text(text) TextRole(Role::Body) TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap }
         ]
     }
 }
@@ -70,9 +70,9 @@ pub(super) fn services_body_scene(
             row_gap: Val::Px(space_2()),
         }
         Children [
-            ( toolbar ),
-            ( header ),
-            { children },
+             @toolbar --
+             @header --
+            { children }
         ]
     }
 }
@@ -115,8 +115,8 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { flex_grow: 1.0 } ),
-            (
+             Node { flex_grow: 1.0 } --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -132,15 +132,15 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_start_button_activated)
                 ServiceStartButton
                 Children [
-                    (
+
                         Text({ t("svc.start").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -156,15 +156,15 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_stop_button_activated)
                 ServiceStopButton
                 Children [
-                    (
+
                         Text({ t("svc.stop").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -180,15 +180,15 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_restart_button_activated)
                 ServiceRestartButton
                 Children [
-                    (
+
                         Text({ t("svc.restart").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -204,15 +204,15 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(details_modal::on_details_button_activated)
                 details_modal::ServiceDetailsOpenButton
                 Children [
-                    (
+
                         Text({ t("common.details").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -228,15 +228,15 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(dependencies_panel::services_dependencies_button_activated)
                 dependencies_panel::ServicesDependenciesOpenButton
                 Children [
-                    (
+
                         Text({ t("svc.dependencies").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
-            (
+            --
+
                 Node {
                     height: px(palette.control_height_px),
                     padding: UiRect::horizontal(Val::Px(space_12())),
@@ -252,14 +252,14 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(log_panel::services_logs_button_activated)
                 log_panel::ServicesLogsOpenButton
                 Children [
-                    (
+
                         Text({ t("svc.logs").to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
-                    )
+
                 ]
-            ),
+
         ]
     })
 }
@@ -289,8 +289,8 @@ pub(super) fn header_scene(
                     Button
                     on(on_services_sort_header_activated)
                     Children [
-                        ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
-                        { indicator },
+                         Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
+                        { indicator }
                     ]
                 }) as Box<dyn Scene>
             } else {
@@ -304,8 +304,8 @@ pub(super) fn header_scene(
                     }
                     ServicesSortHeader(sort_target)
                     Children [
-                        ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
-                        { indicator },
+                         Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
+                        { indicator }
                     ]
                 }) as Box<dyn Scene>
             }
@@ -363,9 +363,9 @@ pub(super) fn service_row_scene(
         Button
         on(on_services_row_activated)
         Children [
-            ( service_name_cell_scene(name, name_width, row.cycle, palette) ),
-            ( chip_cell_scene(status, status_width, chip, palette) ),
-            ( text_cell_scene(description, description_width, Role::Body) ),
+             @service_name_cell_scene(name, name_width, row.cycle, palette) --
+             @chip_cell_scene(status, status_width, chip, palette) --
+             @text_cell_scene(description, description_width, Role::Body)
         ]
     })
 }
@@ -395,13 +395,13 @@ pub(super) fn service_name_cell_scene(
         }
         Pickable::IGNORE
         Children [
-            { alert },
-            (
+            { alert }--
+
                 Text(name)
                 TextRole(Role::Body)
                 TextLayout { linebreak: LineBreak::NoWrap }
                 Pickable::IGNORE
-            ),
+
         ]
     }
 }
@@ -411,7 +411,7 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
         Node { width: px(width), align_items: AlignItems::FlexStart }
         Pickable::IGNORE
         Children [
-            ( Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
+             Text(text) TextRole(role) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
         ]
     }
 }
@@ -427,7 +427,7 @@ pub(super) fn chip_cell_scene(
         Node { width: px(width), align_items: AlignItems::Center }
         Pickable::IGNORE
         Children [
-            (
+
                 Node {
                     height: Val::Auto,
                     padding: UiRect::horizontal(Val::Px(space_8())),
@@ -436,9 +436,9 @@ pub(super) fn chip_cell_scene(
                 BackgroundColor(fill)
                 Pickable::IGNORE
                 Children [
-                    ( Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE ),
+                     Text(word) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
                 ]
-            ),
+
         ]
     }
 }
@@ -447,7 +447,7 @@ pub(super) fn caption_line_scene(text: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100) }
         Children [
-            ( Text(text) TextRole(Role::Caption) ),
+             Text(text) TextRole(Role::Caption)
         ]
     }
 }
@@ -462,7 +462,7 @@ pub(super) fn empty_scene(message: String) -> impl Scene + use<> {
             padding: UiRect::all(Val::Px(space_24())),
         }
         Children [
-            ( Text(message) TextRole(Role::Body) ),
+             Text(message) TextRole(Role::Body)
         ]
     }
 }

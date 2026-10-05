@@ -15,7 +15,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -24,7 +24,7 @@ license = "Apache-2.0"
 repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
 homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 publish = false
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 # The `tests/gui.rs` suite's product target is declared by
 # `taskmanager-gpui` (ADR-051); this host registers only its own suites.
 autotests = false
@@ -73,12 +73,20 @@ taskmanager-test-support = { path = "crates/taskmanager-test-support" }
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 taskmanager-platform-linux = { path = "crates/taskmanager-platform-linux", default-features = false, features = ["test-support"] }
 
+# Tests inherit dev: retain backtrace locations without full DWARF or a growing
+# incremental graph. Full variable/type debugging is an explicit local override.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 
 [patch.crates-io]
+# Linux system clipboard must retain the strict Wayland dependency closure.
+bevy_clipboard = { path = "./patches/bevy_clipboard" }
 proc-macro-error2 = { path = "./patches/proc-macro-error2" }
 # Vendored gpui 0.2.2 patch (strict Wayland): upstream declares the
 # Linux `xkbcommon` dependency with `features = ["wayland", "x11"]`

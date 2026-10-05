@@ -16,6 +16,7 @@ use taskmanager_application::AppPage;
 use taskmanager_application::RefreshRequest;
 use taskmanager_theme::Theme;
 
+pub(crate) mod reveal;
 mod widget;
 pub(crate) use widget::*;
 
@@ -30,6 +31,8 @@ pub(crate) const MODAL_CLOSE_ID: &str = "iced-modal-close";
 #[must_use]
 pub(crate) fn focus_id(target: FocusTarget) -> String {
     match target {
+        FocusTarget::DiagnosticConfirm => "iced-diagnostic-confirm".to_owned(),
+        FocusTarget::DiagnosticRetry => "iced-diagnostic-retry".to_owned(),
         FocusTarget::ModalClose => MODAL_CLOSE_ID.to_owned(),
         FocusTarget::TableRow { page, index } => {
             format!("iced-table-row-{}-{index}", page_key(page))
@@ -66,6 +69,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DetailsTab(section) => {
             format!("iced-details-tab-{}", section.key())
         }
+        FocusTarget::DetailsFacet(facet) => format!("iced-details-facet-{facet:?}"),
+        FocusTarget::DetailsRefresh => "iced-details-refresh".to_owned(),
         FocusTarget::SuspendProcess => "iced-suspend-process".to_owned(),
         FocusTarget::ResumeProcess => "iced-resume-process".to_owned(),
         FocusTarget::KillProcess => "iced-kill-process".to_owned(),
@@ -99,6 +104,13 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::UserRowMenuLock => "iced-user-row-menu-lock".to_owned(),
         FocusTarget::UserRowMenuClose => "iced-user-row-menu-close".to_owned(),
         FocusTarget::SettingsTrigger => "iced-settings-trigger".to_owned(),
+        FocusTarget::SidebarEditTrigger => "iced-sidebar-edit-trigger".to_owned(),
+        FocusTarget::NavigationToggle => "iced-navigation-toggle".to_owned(),
+        FocusTarget::SavedViewsTrigger => "iced-saved-views-trigger".to_owned(),
+        FocusTarget::SavedViewRemove(id) => format!("iced-saved-view-remove-{id}"),
+        FocusTarget::SidebarDeviceControl { index, action } => {
+            format!("iced-sidebar-device-{index}-{action}")
+        }
         FocusTarget::ContainersTrigger => "iced-containers-trigger".to_owned(),
         FocusTarget::HealthTrigger => "iced-health-trigger".to_owned(),
         FocusTarget::AboutTrigger => "iced-about-trigger".to_owned(),
@@ -154,6 +166,9 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::CancelSmartSelfTest => "iced-cancel-smart-self-test".to_owned(),
         FocusTarget::GpuEnginesExpandToggle => "iced-gpu-engines-expand-toggle".to_owned(),
         FocusTarget::GpuEngineRowsToggle => "iced-gpu-engine-rows-toggle".to_owned(),
+        FocusTarget::AboutRepository => "iced-about-repository".to_owned(),
+        FocusTarget::AboutSystemInformation => "iced-about-system-information".to_owned(),
+        FocusTarget::SystemInformationCopy => "iced-system-information-copy".to_owned(),
         FocusTarget::AboutCopyDetails => "iced-about-copy-details".to_owned(),
         FocusTarget::ServiceLogFollow => "iced-service-log-follow".to_owned(),
         FocusTarget::ServiceLogPause => "iced-service-log-pause".to_owned(),
@@ -169,7 +184,13 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::HistoryReplayToggle => "iced-history-replay-toggle".to_owned(),
         FocusTarget::HistoryReplayWindow(w) => format!("iced-history-replay-window-{w:?}"),
         FocusTarget::HistoryReplayRefresh => "iced-history-replay-refresh".to_owned(),
-        FocusTarget::ResourceHistoryWindow(w) => {
+        FocusTarget::SystemDashboardPrevious => "iced-system-dashboard-previous".to_owned(),
+        FocusTarget::SystemDashboardNext => "iced-system-dashboard-next".to_owned(),
+        FocusTarget::SystemSection(section) => format!("iced-system-section-{section:?}"),
+        FocusTarget::SystemHealthSection(section) => {
+            format!("iced-system-health-section-{section:?}")
+        }
+        FocusTarget::SystemHistoryWindow(w) => {
             format!("iced-resource-history-window-{}", w.id())
         }
         FocusTarget::AlertCenterClear => "iced-alert-center-clear".to_owned(),
@@ -184,6 +205,10 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::AlertsRuleToggle(index) => format!("iced-alerts-rule-toggle-{index}"),
         FocusTarget::AlertsExport => "iced-alerts-export".to_owned(),
         FocusTarget::AlertsImport => "iced-alerts-import".to_owned(),
+        FocusTarget::AlertsAdd => "iced-alerts-add".to_owned(),
+        FocusTarget::AlertsImportReplace => "iced-alerts-import-replace".to_owned(),
+        FocusTarget::AlertsEdit(index, field) => format!("iced-alerts-edit-{index}-{field}"),
+        FocusTarget::FirstRunOpen => "iced-first-run-open".to_owned(),
         FocusTarget::FirstRunCopy(row) => format!("iced-first-run-copy-{row}"),
         FocusTarget::FirstRunAction(index) => format!("iced-first-run-action-{index}"),
         FocusTarget::ProcessAffinitySelectAll => "iced-process-affinity-select-all".to_owned(),

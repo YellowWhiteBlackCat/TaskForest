@@ -13,7 +13,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
-use bevy::ecs::world::World;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -143,7 +142,7 @@ pub(crate) fn affinity_modal_scene(
         };
 
         cpu_buttons.push(Box::new(bsn! {
-            (
+
                 Node {
                     width: px(88.0),
                     height: px(palette.control_height_px),
@@ -157,9 +156,9 @@ pub(crate) fn affinity_modal_scene(
                 on(on_cpu_button_activated)
                 AffinityCpuButton(cpu)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                     Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            )
+
         }) as Box<dyn Scene>);
     }
 
@@ -175,7 +174,7 @@ pub(crate) fn affinity_modal_scene(
         }
         ScrollArea
         Children [
-            { cpu_buttons },
+            { cpu_buttons }
         ]
     }) as Box<dyn Scene>;
 
@@ -190,10 +189,10 @@ pub(crate) fn affinity_modal_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(subtitle) TextRole(Role::Caption) ),
-            ( { grid } ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Text(subtitle) TextRole(Role::Caption) --
+             @{ grid } --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -202,32 +201,32 @@ pub(crate) fn affinity_modal_scene(
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text({ t("common.all").to_owned() })
                         TextRole(Role::Caption)
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_toggle_all_activated)
                         AffinityToggleAllButton
-                    ),
-                    (
+                    --
+
                         Text({ t("common.apply").to_owned() })
                         TextRole(Role::Body)
                         ControlVisual(ControlTone::Surface, true)
                         Button
                         on(on_apply_activated)
                         AffinityApplyButton
-                    ),
-                    (
+                    --
+
                         Text({ t("common.cancel").to_owned() })
                         TextRole(Role::Caption)
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_cancel_activated)
                         AffinityCancelButton
-                    ),
+
                 ]
-            ),
+
         ]
     }) as Box<dyn Scene>;
 
@@ -243,7 +242,7 @@ pub(crate) fn affinity_modal_scene(
         BackgroundColor({ scrim })
         ProcessAffinityOverlay
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }) as Box<dyn Scene>
 }
@@ -331,46 +330,18 @@ pub(crate) fn on_affinity_fold_sync(
 }
 
 pub(crate) fn on_affinity_repaint_required(
-    _repaint: On<ProcessAffinityRepaintRequired>,
-    mut commands: Commands,
+    _event: On<ProcessAffinityRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_affinity_modal);
-}
-
-pub(crate) fn paint_affinity_modal(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let modal_state = world.resource::<ProcessAffinityModalState>();
-    let scene = modal_state
-        .session
-        .as_ref()
-        .map(|session| affinity_modal_scene(session, &palette));
-
-    let roots: Vec<Entity> = world
-        .query_filtered::<Entity, With<AppShellRoot>>()
-        .iter(world)
-        .collect();
-    let Some(&root) = roots.first() else {
-        return;
-    };
-
-    let overlays: Vec<Entity> = world
-        .query_filtered::<Entity, With<ProcessAffinityOverlay>>()
-        .iter(world)
-        .collect();
-    let mut commands = world.commands();
-    for entity in overlays {
-        commands.entity(entity).despawn();
-    }
-
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(root).add_one_related::<ChildOf>(entity);
-    }
+    dirty.0 = true;
 }
 
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<ProcessAffinityModalState>();
+    paint::register(app);
     app.add_observer(on_affinity_requested);
     app.add_observer(on_affinity_repaint_required);
     app.add_observer(on_affinity_fold_sync);
 }
+
+mod paint;

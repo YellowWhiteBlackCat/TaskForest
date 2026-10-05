@@ -21,13 +21,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
+use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
-    smart_section_visible,
 };
 use taskmanager_ui_contract::IconId;
 
@@ -51,6 +51,16 @@ pub(super) fn render_disk_section(
     if area.height == 0 {
         return;
     }
+    let disks = app.order_sidebar_rows(
+        disks
+            .iter()
+            .filter_map(|disk| {
+                let key = format!("disk:{}", disk.device_id);
+                app.sidebar_render_visible(&key, app.prefs.show[2])
+                    .then(|| (key, disk.clone()))
+            })
+            .collect(),
+    );
     if disks.is_empty() {
         super::render_empty_panel(
             frame,
@@ -64,7 +74,7 @@ pub(super) fn render_disk_section(
         return;
     }
     let lines = disk_lines(
-        disks,
+        &disks,
         app,
         theme,
         app.prefs.units[2],
@@ -211,7 +221,11 @@ fn disk_lines(
         lines.push(ratatui::text::Line::from(format!(
             "{} {}{}",
             theme.glyph(IconId::Disk),
-            disk.name,
+            if disk.model.is_empty() {
+                disk.name.clone()
+            } else {
+                format!("{} · {}", disk.model, disk.name)
+            },
             kind_suffix,
         )));
         // Device health verdict (GPUI disk_stats first stat; shared
@@ -224,6 +238,19 @@ fn disk_lines(
             t("device.status"),
             t(device_status_i18n_key(disk.device_state.status)),
         )));
+        let guidance = match disk.smart_availability {
+            SmartAvailability::MissingTool => Some("device.action_missing_tool"),
+            SmartAvailability::PermissionDenied => Some("device.action_permission"),
+            _ => None,
+        };
+        if let Some(guidance) = guidance {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("disk.smart_status"),
+                t(device_status_i18n_key(effective_smart_status(disk))),
+            )));
+            lines.push(ratatui::text::Line::from(t(guidance)));
+        }
         // Removable media (GPUI disk_stats tail row). The capability is only
         // named when the adapter PROVED removable media; an unresolved probe
         // renders nothing — never a fabricated Yes/No.

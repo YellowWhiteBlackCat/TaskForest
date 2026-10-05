@@ -19,22 +19,63 @@
 //! panel's `q` close, the menus' navigation), and the consumption rule
 //! (full modals swallow every key; the panel is a partial owner).
 
+mod health;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
-use taskmanager_application::AppPage;
+use taskmanager_application::{AppPage, ProcessInsightFacet};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::InputDispatch;
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurfaceKind};
 
 use super::handle_settings_key;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
+
+fn handle_diagnostic_key(app: &mut TuiApp, key: KeyEvent) {
+    use ratatui::crossterm::event::KeyCode;
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => app.close_local_overlays(),
+        KeyCode::Enter => {
+            if matches!(app.local_surface(), Some(crate::TuiSurface::DiagnosticBundle(view)) if matches!(view.state, DiagnosticBundleUiState::Failed(_)))
+            {
+                app.open_diagnostic_bundle();
+            } else {
+                app.confirm_diagnostic_bundle();
+            }
+        }
+        KeyCode::Up
+        | KeyCode::Down
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::Home
+        | KeyCode::End => {
+            if let Some(crate::TuiSurface::DiagnosticBundle(view)) = app.local_surface_mut() {
+                view.scroll = match key.code {
+                    KeyCode::Up => view.scroll.saturating_sub(1),
+                    KeyCode::Down => view.scroll.saturating_add(1),
+                    KeyCode::PageUp => view.scroll.saturating_sub(5),
+                    KeyCode::PageDown => view.scroll.saturating_add(5),
+                    KeyCode::Home => 0,
+                    KeyCode::End => usize::MAX,
+                    _ => view.scroll,
+                };
+            }
+        }
+        _ => {}
+    }
+}
 
 /// Route one key through the open TUI-local modals, highest-precedence first.
 /// `Unhandled` means no modal was open. Every full modal consumes every key;
 /// the service-log panel consumes only its documented control chords.
 #[must_use]
 pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatch {
+    if app.local_surface_kind() == Some(TuiSurfaceKind::FirstRun) {
+        return InputDispatch::consumed(crate::first_run::handle_key(app, key));
+    }
+
     if app.process_properties().is_some() {
         // The Process Properties modal traps navigation while open: Tab and
         // Left/Right cycle the four sections (Overview / Performance / Command /
@@ -70,6 +111,20 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 app.process_properties_scroll_by(1);
                 None
             }
+            ratatui::crossterm::event::KeyCode::Char(number @ '1'..='7') if !ctrl => {
+                if let Some(target) = app.process_properties_mut()
+                    && target.section == crate::ProcessDetailsSection::Insights
+                    && let Some(facet) =
+                        ProcessInsightFacet::ALL.get((number as usize) - ('1' as usize))
+                {
+                    target.facet = *facet;
+                    target.scroll = 0;
+                }
+                None
+            }
+            ratatui::crossterm::event::KeyCode::Char('r') if !ctrl => {
+                app.shell.request_properties_process_insights()
+            }
             // Per-process network escalation trigger (G-04b): `e` on the
             // Insights tab fires the shared one-shot escalation request when
             // — and only when — the projected network facet reports the typed
@@ -80,10 +135,12 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 if !ctrl
                     && app.process_properties().is_some_and(|target| {
                         target.section == crate::ProcessDetailsSection::Insights
-                            && crate::ui::process_details::network_requires_escalation(
-                                app,
-                                target.item.pid,
-                            )
+                            && target.facet == ProcessInsightFacet::Network
+                            && ProcessLiveKey::from_process(&target.item).is_some_and(|identity| {
+                                crate::ui::process_details::network_requires_escalation(
+                                    app, identity,
+                                )
+                            })
                     }) =>
             {
                 return InputDispatch::Effect(Box::new(
@@ -101,6 +158,17 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
 
     if let Some(surface) = app.local_surface_kind() {
         let effect = match surface {
+            TuiSurfaceKind::SavedViews => {
+                if let Some(json) = app.handle_saved_views_key(key) {
+                    app.export_saved_views_to(&mut std::io::stdout(), &json);
+                }
+                None
+            }
+            TuiSurfaceKind::SidebarEditor => {
+                app.handle_sidebar_key(key);
+                None
+            }
+            TuiSurfaceKind::FirstRun => crate::first_run::handle_key(app, key),
             TuiSurfaceKind::CommandPalette => match key.code {
                 ratatui::crossterm::event::KeyCode::Esc => {
                     app.close_command_palette();
@@ -310,11 +378,15 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 _ => None,
             },
-            TuiSurfaceKind::Settings => {
-                handle_settings_key(app, key);
+            TuiSurfaceKind::Settings => handle_settings_key(app, key),
+            TuiSurfaceKind::DiagnosticBundle => {
+                handle_diagnostic_key(app, key);
                 None
             }
-            TuiSurfaceKind::About | TuiSurfaceKind::Containers => {
+            TuiSurfaceKind::About | TuiSurfaceKind::SystemInformation => {
+                crate::information::handle_key(app, key)
+            }
+            TuiSurfaceKind::Containers => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can
@@ -333,39 +405,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 None
             }
             TuiSurfaceKind::Health => {
-                // Esc stays structural; the toggle chords resolve through the
-                // declared surface protocol. In the health overlay, arrows and
-                // Space / Enter navigate and toggle managed alert rules.
-                match key.code {
-                    ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
-                    ratatui::crossterm::event::KeyCode::Up
-                    | ratatui::crossterm::event::KeyCode::Char('k') => {
-                        app.health_rule_move(-1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Down
-                    | ratatui::crossterm::event::KeyCode::Char('j') => {
-                        app.health_rule_move(1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Home => {
-                        app.health_rule_selection = 0;
-                    }
-                    ratatui::crossterm::event::KeyCode::End => {
-                        let count = app.projection().alert_center.managed_rules().len();
-                        app.health_rule_selection = count.saturating_sub(1);
-                    }
-                    ratatui::crossterm::event::KeyCode::Enter
-                    | ratatui::crossterm::event::KeyCode::Char(' ') => {
-                        app.toggle_selected_alert_rule();
-                    }
-                    ratatui::crossterm::event::KeyCode::Char(character) => {
-                        if let Some(action) =
-                            surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
-                        {
-                            app.run_surface_protocol_action(action);
-                        }
-                    }
-                    _ => {}
-                }
+                health::handle(app, key);
                 None
             }
         };

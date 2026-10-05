@@ -35,6 +35,9 @@ tests and the current visual evidence route in
 `../../docs/screenshots/README.md`.
 
 A tracked vertical viewport is the sole owner of its `ScrollHandle` offset.
+Switches attached to a scroll viewport measure their real bounds and reveal
+keyboard focus without activating the control. Settings reuses this component
+behavior; capture accepts focus only after the complete switch is visible.
 Pinned scrollbar rails are sibling chrome in a fixed relative frame, never
 children of the tracked node; real-wheel tests must prove that content moves
 while the viewport and rail keep identical window-space bounds across redraws.
@@ -45,6 +48,8 @@ through `bounded_scroll_column_with_fixed_header`, which keeps that chrome
 outside the tracked coordinate tree and gives the whole column one width
 authority. Unrailed bounded regions are reserved for embedded sub-lists whose
 parent owns the discoverable scroll affordance.
+`bounded_scroll_column_with_fixed_footer` budgets the entire review column,
+reserving complete action groups and a gap below its shrinkable body viewport.
 
 `PageScaffold` is the data-page family's ONE outer shell (ADR-042): every
 non-chart top-level page in `taskmanager-gpui` composes through this

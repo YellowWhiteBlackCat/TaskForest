@@ -794,7 +794,7 @@ fn points_are_finite(points: &[Point]) -> bool {
 /// vertices.
 #[must_use]
 pub(crate) fn series_point_runs_for(samples: &[f32], size: Size, max: f32) -> Vec<Vec<Point>> {
-    series_point_runs_with(samples, size, max, &|index| {
+    series_point_runs_with(samples, size, 0.0, max, &|index| {
         sample_x(index, samples.len(), size.width)
     })
 }
@@ -811,14 +811,28 @@ pub(crate) fn series_point_runs_windowed(
     max: f32,
     slots: &WindowSlots,
 ) -> Vec<Vec<Point>> {
-    series_point_runs_with(samples, size, max, &|index| slots.x(index))
+    series_point_runs_with(samples, size, 0.0, max, &|index| slots.x(index))
 }
 
 /// The shared run splitter behind both projections: finite contiguous runs of
 /// points, y from [`scaled_y`], x from the injected slot mapping.
+/// Complete recorded windows retain signed magnitude coordinates and gaps.
+#[must_use]
+pub(crate) fn series_point_runs_in_range(
+    samples: &[f32],
+    size: Size,
+    min: f32,
+    max: f32,
+) -> Vec<Vec<Point>> {
+    series_point_runs_with(samples, size, min, max, &|index| {
+        sample_x(index, samples.len(), size.width)
+    })
+}
+
 fn series_point_runs_with(
     samples: &[f32],
     size: Size,
+    min: f32,
     max: f32,
     x_of: &dyn Fn(usize) -> f32,
 ) -> Vec<Vec<Point>> {
@@ -837,7 +851,7 @@ fn series_point_runs_with(
             continue;
         }
         let x = x_of(index);
-        let y = scaled_y(raw, max, height);
+        let y = scaled_y_in_range(raw, min, max, height);
         current.push(Point::new(x, y));
     }
     if !current.is_empty() {
@@ -854,15 +868,19 @@ fn series_point_runs_with(
 /// the drawn sample.
 #[must_use]
 pub(crate) fn scaled_y(value: f32, max: f32, height: f32) -> f32 {
+    scaled_y_in_range(value, 0.0, max, height)
+}
+
+#[must_use]
+pub(crate) fn scaled_y_in_range(value: f32, min: f32, max: f32, height: f32) -> f32 {
     let height = finite_nonnegative(height);
-    let ceiling = if max.is_finite() { max.max(0.0) } else { 0.0 };
-    let scale = if ceiling > 0.0 { 1.0 / ceiling } else { 0.0 };
-    let value = if value.is_finite() {
-        value.clamp(0.0, ceiling)
-    } else {
-        0.0
-    };
-    height * (1.0 - value * scale)
+    let floor = if min.is_finite() { min.min(0.0) } else { 0.0 };
+    let ceiling = if max.is_finite() { max.max(floor) } else { 0.0 };
+    let span = f64::from(ceiling) - f64::from(floor);
+    if !value.is_finite() || span <= 0.0 {
+        return height;
+    }
+    height * (1.0 - ((f64::from(value) - f64::from(floor)) / span).clamp(0.0, 1.0) as f32)
 }
 
 fn finite_nonnegative(value: f32) -> f32 {

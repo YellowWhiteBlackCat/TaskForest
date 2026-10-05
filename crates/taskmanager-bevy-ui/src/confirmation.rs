@@ -18,22 +18,29 @@
 //! transition republishes `ConfirmationChanged` so the overlay mounts and
 //! despawns from one authority.
 
+use crate::first_run_modal::{FirstRunCommand, SetupState};
+use crate::pages::system::diagnostic_modal::DiagnosticCommand;
+use crate::system_information_modal::SystemInformationCommand;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::ComputedNode;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
+use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::process_batch_action_label;
 
 use crate::app::FrontendTrack;
@@ -295,6 +302,37 @@ pub(crate) struct ConfirmChoice;
 #[derive(Component, Clone, Default)]
 pub(crate) struct DismissChoice;
 
+/// A capture must show the frozen gate and both usable choices after layout.
+#[derive(SystemParam)]
+pub(crate) struct ConfirmationCapture<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    gates: Query<'w, 's, (&'static ArmedConfirmation, &'static ComputedNode)>,
+    confirm: Query<'w, 's, &'static ComputedNode, With<ConfirmChoice>>,
+    dismiss: Query<'w, 's, &'static ComputedNode, With<DismissChoice>>,
+}
+pub(crate) fn capture_ready(access: &ConfirmationCapture) -> bool {
+    let pending = access
+        .track
+        .as_ref()
+        .and_then(|track| track.shell.pending_confirmation())
+        .and_then(PendingConfirmationView::from_pending);
+    let Some(pending) = pending else {
+        return false;
+    };
+    let mounted = access.gates.iter().any(|(armed, node)| {
+        armed.0.as_ref() == Some(&pending) && node.size().x > 0.0 && node.size().y > 0.0
+    });
+    let confirm = access
+        .confirm
+        .iter()
+        .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
+    let dismiss = access
+        .dismiss
+        .iter()
+        .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
+    mounted && confirm && dismiss
+}
+
 /// Observer: mount/despawn the overlay under the app shell root so it stacks
 /// above the routed page and survives page remounts.
 fn on_confirmation_changed(
@@ -378,7 +416,7 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
         ConfirmationOverlay
         ArmedConfirmation({ Some(armed) })
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }
 }
@@ -402,9 +440,9 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            ( Text(body) TextRole(Role::Body) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Text(body) TextRole(Role::Body) --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -414,24 +452,24 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text(confirm)
                         TextRole(Role::Body)
                         ConfirmChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_confirm_activated)
-                    ),
-                    (
+                    --
+
                         Text(cancel)
                         TextRole(Role::Caption)
                         DismissChoice
                         ControlVisual(ControlTone::Surface, false)
                         Button
                         on(on_dismiss_activated)
-                    ),
+
                 ]
-            ),
+
         ]
     }
 }
@@ -440,6 +478,38 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
 /// window plugin; the input seam triggers [`ConfirmationChanged`].
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_confirmation_changed);
+    app.add_systems(bevy::app::Startup, init_capture_confirmation);
+}
+
+pub(crate) fn init_capture_confirmation(
+    track: Option<NonSend<FrontendTrack>>,
+    mut setup: ResMut<SetupState>,
+    mut commands: Commands,
+) {
+    let Some(track) = track else { return };
+    if let Some(view) = track
+        .shell
+        .pending_confirmation()
+        .and_then(PendingConfirmationView::from_pending)
+    {
+        commands.trigger(ConfirmationChanged(Some(view)));
+    }
+    if let Some(target) = crate::capture::capture_scenario_target() {
+        if target == "about" {
+            commands.trigger(crate::about_modal::AboutCommand::Open);
+        } else if target == "system-about" {
+            commands.trigger(SystemInformationCommand::Open);
+        } else if target == "first-run" {
+            setup.0 = FirstRunController::from_observation(Some(setup_script_info()));
+            commands.trigger(FirstRunCommand::Open);
+        } else if target == "diagnostic-preview" {
+            commands.trigger(DiagnosticCommand::Open);
+        } else if target == "diagnostic-failure" {
+            commands.trigger(DiagnosticCommand::Failure(DiagnosticBundleError::new(
+                DiagnosticBundleErrorKind::Unavailable,
+            )));
+        }
+    }
 }
 
 #[cfg(test)]

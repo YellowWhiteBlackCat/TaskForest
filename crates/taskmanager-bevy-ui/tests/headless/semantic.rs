@@ -97,11 +97,11 @@ fn rows_keep_stable_identity_while_selected_state_follows_the_cursor() {
         fixture_process(200, "beta", 3.0),
     ]);
 
-    let before = build_snapshot(&shell).expect("the shell projects a valid snapshot");
+    let before = build_snapshot(&shell, None, None).expect("the shell projects a valid snapshot");
     // Move the keyboard cursor to the second row exactly like the input
     // seam's arrow path does, then rebuild the snapshot independently.
     shell.move_selection(1);
-    let after = build_snapshot(&shell).expect("a rebuild stays valid");
+    let after = build_snapshot(&shell, None, None).expect("a rebuild stays valid");
 
     // The identity is stable across rebuilds — an AT user keeps their join
     // to the same row — while the selected state moved to the landed row.
@@ -132,7 +132,7 @@ fn rows_keep_stable_identity_while_selected_state_follows_the_cursor() {
 #[test]
 fn unavailable_shares_are_announced_unavailable_and_real_values_are_announced() {
     let shell = shell_with(vec![fixture_process(100, "alpha", 12.5)]);
-    let snapshot = build_snapshot(&shell).expect("valid snapshot");
+    let snapshot = build_snapshot(&shell, None, None).expect("valid snapshot");
 
     let cpu = snapshot
         .get(&cell_id(100, "cpu"))
@@ -160,7 +160,7 @@ fn arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss() {
     let mut shell = shell_with(vec![fixture_process(100, "alpha", 1.0)]);
 
     // Before arming: no dialog exists in the semantic tree.
-    let quiet = build_snapshot(&shell).expect("valid snapshot");
+    let quiet = build_snapshot(&shell, None, None).expect("valid snapshot");
     assert!(
         quiet
             .nodes()
@@ -176,7 +176,7 @@ fn arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss() {
         .clone();
     let view = PendingConfirmationView::from_pending(&pending).expect("EndTask renders a view");
 
-    let armed = build_snapshot(&shell).expect("valid snapshot with the modal");
+    let armed = build_snapshot(&shell, None, None).expect("valid snapshot with the modal");
     let dialog = armed
         .nodes()
         .find(|node| node.role() == SemanticRole::Dialog)
@@ -203,7 +203,7 @@ fn mapped_tree_is_well_formed_under_accesskit_consumer_oracle() {
         fixture_process(100, "alpha", 12.5),
         fixture_process(200, "beta", 3.0),
     ]);
-    let snapshot = build_snapshot(&shell).expect("valid snapshot");
+    let snapshot = build_snapshot(&shell, None, None).expect("valid snapshot");
     let update = snapshot_to_tree_update(&snapshot);
     let tree = accesskit_consumer::Tree::new(update, false);
 
@@ -219,7 +219,7 @@ fn rows_are_published_highest_cpu_first_with_deterministic_tie_break() {
         fixture_process(200, "fast", 75.0),
         fixture_process(300, "medium", 25.0),
     ]);
-    let snapshot = build_snapshot(&shell).expect("valid snapshot");
+    let snapshot = build_snapshot(&shell, None, None).expect("valid snapshot");
     let table = snapshot
         .get(&SemanticNodeId::borrowed("process-table"))
         .expect("process table present");
@@ -248,7 +248,7 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
         initial_refresh_submitted: true,
         process_tree_expansion: Default::default(),
     };
-    let snapshot = build_snapshot(&track.shell).expect("valid snapshot");
+    let snapshot = build_snapshot(&track.shell, None, None).expect("valid snapshot");
 
     let request = AccessibilityActionRequest {
         snapshot_revision: snapshot.revision(),
@@ -266,7 +266,7 @@ fn assistive_technology_actions_drive_bevy_selection_and_modal() {
 
     // Modal dismiss
     let _ = track.shell.apply_action(AppAction::RequestEndTask);
-    let modal_snapshot = build_snapshot(&track.shell).expect("modal snapshot");
+    let modal_snapshot = build_snapshot(&track.shell, None, None).expect("modal snapshot");
     let pending = track.shell.pending_confirmation().unwrap();
     let view = PendingConfirmationView::from_pending(pending).unwrap();
     let dismiss_request = AccessibilityActionRequest {

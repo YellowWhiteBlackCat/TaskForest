@@ -1,26 +1,32 @@
 //! Typed System facts and telemetry projection for the Iced frontend.
 
+use iced::advanced::widget::Id;
+use iced::widget::operation::{AbsoluteOffset, scroll_to};
 use iced::widget::{column, row, scrollable, text};
-use iced::{Element, Length};
+use iced::{Element, Length, Task};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_core::core::units::UnitPreferences;
 
 use taskmanager_shell::presentation::{duration, missing_value};
 use taskmanager_theme::tokens;
 
 use super::components::{key_value_rows, message_panel, titled_card};
+use super::system_dashboard::{SystemDashboardMessage, window_controls};
 use super::tables::ListState;
 use crate::IcedApp;
 use crate::app::Message;
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::metrics::CpuMetrics;
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_shell::presentation::kernel_error_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 use taskmanager_theme::Theme;
 
+mod health;
 mod npu;
 pub(crate) use npu::{NpuDeviceViewModel, npu_device_view_models};
 
@@ -56,23 +62,21 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         _ => None,
     };
     let memory_slots_panel = smbios_snapshot.map(|snapshot| {
-        let rows = smbios_memory_inventory_rows(snapshot)
+        let rows = smbios_memory_inventory_rows(snapshot, UnitPreferences::default())
             .into_iter()
             .map(|(label, value)| SystemInfoRow { label, value })
             .collect::<Vec<_>>();
         info_panel(theme_snapshot, t("system.memory_slots"), &rows)
     });
-    let content = std::iter::once(
-        // Dashboard segment leads the System page (summary card + history
-        // window selection + alert mirror); the window pills publish
-        // frontend-local state reduced in `reduce_performance_message`.
-        super::system_dashboard::render_system_dashboard(app, app.system_dashboard_window),
-    )
-    .chain(std::iter::once(hardware_panel))
-    .chain(memory_slots_panel)
-    .chain(npu_panels)
-    .chain(std::iter::once(telemetry_panel))
-    .collect::<Vec<_>>();
+    let content = if app.system_section == SystemPageSection::Dashboard {
+        Vec::new()
+    } else {
+        std::iter::once(hardware_panel)
+            .chain(npu_panels)
+            .chain(std::iter::once(telemetry_panel))
+            .chain(memory_slots_panel)
+            .collect::<Vec<_>>()
+    };
 
     let header_row = row![
         text(t("system.title")).size(f32::from(tokens::FONT_16)),
@@ -95,13 +99,56 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
     .spacing(12)
     .align_y(iced::Alignment::Center);
 
-    column![
-        header_row,
-        scrollable(column(content).spacing(12)).height(Length::Fill),
-    ]
-    .spacing(8)
-    .height(Length::Fill)
-    .into()
+    let tabs = row(SystemPageSection::ALL_REVIEW
+        .into_iter()
+        .chain(std::iter::once(SystemPageSection::Health))
+        .map(|section| {
+            let label = match section {
+                SystemPageSection::Dashboard => t("dashboard.title"),
+                SystemPageSection::Health => t("health.system_health_alerts"),
+                _ => t("dashboard.hardware"),
+            };
+            crate::focus::choice_pill(
+                theme_snapshot,
+                crate::app::FocusTarget::SystemSection(section),
+                label.to_owned(),
+                app.system_section == section,
+                Message::SystemDashboard(SystemDashboardMessage::SelectSection(section)),
+            )
+        })
+        .collect::<Vec<_>>())
+    .spacing(8);
+    let mut page = column![header_row, tabs].spacing(8).height(Length::Fill);
+    if app.system_section == SystemPageSection::Dashboard {
+        page = page.push(window_controls(theme_snapshot, app.system_dashboard_window));
+    }
+    if app.system_section == SystemPageSection::Dashboard {
+        page.push(super::system_dashboard::render_system_dashboard(
+            app,
+            app.system_dashboard_window,
+        ))
+        .into()
+    } else if app.system_section == SystemPageSection::Health {
+        page.push(health::render(app)).into()
+    } else {
+        page.push(
+            scrollable(column(content).spacing(12))
+                .id("system-facts-scroll")
+                .height(Length::Fill),
+        )
+        .into()
+    }
+}
+
+/// Capture requests the same bounded System scroll owner the user operates.
+pub(crate) fn bound_system_body_to_end() -> Task<Message> {
+    scroll_to(
+        Id::new("system-facts-scroll"),
+        AbsoluteOffset {
+            x: None,
+            y: Some(f32::MAX),
+        },
+    )
 }
 
 pub(crate) fn format_system_spec_export(
@@ -120,7 +167,7 @@ pub(crate) fn format_system_spec_export(
     }
     if let Some(smbios) = smbios_memory {
         lines.push(format!("## {}", t("system.memory_slots")));
-        for (label, value) in smbios_memory_inventory_rows(smbios) {
+        for (label, value) in smbios_memory_inventory_rows(smbios, UnitPreferences::default()) {
             lines.push(format!("- {}: {}", label, value));
         }
     }
@@ -532,59 +579,3 @@ fn push_value<T: ToString>(rows: &mut Vec<SystemInfoRow>, label: &str, value: Op
         });
     }
 }
-
-/// Time-window options for the resource history view, matching GPUI timeline window (1m, 5m, 15m, 60m).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum ResourceHistoryWindow {
-    OneMinute,
-    FiveMinutes,
-    FifteenMinutes,
-    #[default]
-    SixtyMinutes,
-}
-
-impl ResourceHistoryWindow {
-    pub const ALL: [Self; 4] = [
-        Self::OneMinute,
-        Self::FiveMinutes,
-        Self::FifteenMinutes,
-        Self::SixtyMinutes,
-    ];
-
-    pub const fn minutes(self) -> u64 {
-        match self {
-            Self::OneMinute => 1,
-            Self::FiveMinutes => 5,
-            Self::FifteenMinutes => 15,
-            Self::SixtyMinutes => 60,
-        }
-    }
-
-    pub const fn id(self) -> &'static str {
-        match self {
-            Self::OneMinute => "history-1m",
-            Self::FiveMinutes => "history-5m",
-            Self::FifteenMinutes => "history-15m",
-            Self::SixtyMinutes => "history-60m",
-        }
-    }
-
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::OneMinute => "1m",
-            Self::FiveMinutes => "5m",
-            Self::FifteenMinutes => "15m",
-            Self::SixtyMinutes => "60m",
-        }
-    }
-}
-
-impl std::fmt::Display for ResourceHistoryWindow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.label())
-    }
-}
-
-// (the `history_window_label` re-export was a dead forwarding shim: the
-// `system_dashboard_tests` module reaches the function through its own
-// `#[cfg(test)]` include, so nothing consumed this path.)

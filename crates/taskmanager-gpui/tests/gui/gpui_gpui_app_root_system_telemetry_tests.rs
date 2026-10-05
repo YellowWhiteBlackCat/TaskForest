@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use taskmanager_application::apply_system_outcome_lifecycle;
+use taskmanager_telemetry_store::HistoryRetention;
 
 use std::rc::Rc;
 
@@ -434,7 +435,8 @@ fn mc02_partition_recovery_case_device_lifecycles_apply_as_three_independent_typ
 
 #[test]
 fn accepted_outcome_writes_measurement_and_completion_times() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(2));
     let revision = SystemTelemetryRevision::new(7);
     let event = correlated(
         9,
@@ -459,7 +461,8 @@ fn accepted_outcome_writes_measurement_and_completion_times() {
 
 #[test]
 fn accepted_failure_advances_history_with_an_explicit_gap() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let observed = correlated(
         1,
         CapabilityId::TELEMETRY_CPU,
@@ -504,7 +507,8 @@ fn accepted_failure_advances_history_with_an_explicit_gap() {
 
 #[test]
 fn stale_outcome_is_diagnosed_without_polluting_history() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let current = correlated(
         2,
         CapabilityId::TELEMETRY_CPU,
@@ -559,7 +563,8 @@ fn stale_outcome_is_diagnosed_without_polluting_history() {
 
 #[test]
 fn zero_revision_and_completion_before_measurement_fail_closed_at_root_boundary() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(3);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(3));
     let zero = correlated(
         1,
         CapabilityId::TELEMETRY_CPU,

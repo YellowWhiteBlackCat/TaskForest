@@ -28,6 +28,17 @@ pub enum ProcessInsightFacet {
     OpenFiles,
     Environment,
 }
+impl ProcessInsightFacet {
+    pub const ALL: [Self; 7] = [
+        Self::Network,
+        Self::Gpu,
+        Self::Resources,
+        Self::Isolation,
+        Self::Threads,
+        Self::OpenFiles,
+        Self::Environment,
+    ];
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum ProcessInsightFacetState<T> {
@@ -59,6 +70,16 @@ pub struct ProjectedProcessInsights {
 }
 
 impl ProjectedProcessInsights {
+    #[must_use]
+    pub fn is_collecting(&self) -> bool {
+        matches!(self.network, ProcessInsightFacetState::Pending)
+            || matches!(self.gpu, ProcessInsightFacetState::Pending)
+            || matches!(self.resources, ProcessInsightFacetState::Pending)
+            || matches!(self.isolation, ProcessInsightFacetState::Pending)
+            || matches!(self.threads, ProcessInsightFacetState::Pending)
+            || matches!(self.open_files, ProcessInsightFacetState::Pending)
+            || matches!(self.environment, ProcessInsightFacetState::Pending)
+    }
     pub(crate) fn pending(
         target: FrozenProcessIdentity,
         revision: ProcessInsightsRevision,

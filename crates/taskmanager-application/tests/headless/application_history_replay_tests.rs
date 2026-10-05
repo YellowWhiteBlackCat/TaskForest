@@ -130,3 +130,80 @@ fn closed_controller_rejects_refresh_and_window_selection() {
         MAX_HISTORY_REPLAY_ERROR_CHARS
     );
 }
+
+#[test]
+fn performance_projection_filters_application_rows_and_keeps_last_good_request_identity() {
+    use taskmanager_application::{ApplicationHistoryCapability, ApplicationHistoryStatus};
+    use taskmanager_core::core::history::ApplicationHistoryIdentity;
+    let mut replay = HistoryReplayController::default();
+    let request = replay.open().expect("open");
+    let system = rows(12.0)[0].clone();
+    let mut application = system.clone();
+    application.key = HistorySeriesKey::for_application(
+        HistoryMetric::ApplicationCpuUsagePct,
+        ApplicationHistoryIdentity::verified_launcher("io.example.Reader").expect("identity"),
+    );
+    let _ = replay.complete(HistoryReplayCompletion {
+        request,
+        loaded_at_ms: 1_000,
+        outcome: HistoryReplayCompletionOutcome::Loaded(Arc::from([system, application])),
+    });
+    let initial = replay.performance_history_projection(ApplicationHistoryCapability::Available);
+    assert_eq!(initial.status, ApplicationHistoryStatus::Ready);
+    assert_eq!(initial.rows.len(), 1);
+    assert!(!initial.rows[0].key.is_application_series());
+    assert_eq!(
+        replay
+            .application_history_projection(ApplicationHistoryCapability::Available)
+            .rows
+            .len(),
+        1
+    );
+    let current = replay
+        .select_window(HistoryWindow::TwentyFourHours)
+        .expect("select");
+    let refreshing = replay.performance_history_projection(ApplicationHistoryCapability::Available);
+    assert!(refreshing.stale());
+    assert_eq!(refreshing.rows_window, Some(HistoryWindow::OneHour));
+    assert!(Arc::ptr_eq(&initial.rows, &refreshing.rows));
+    assert_eq!(refreshing.source_request, Some(request.id()));
+    assert_eq!(
+        replay.complete(HistoryReplayCompletion {
+            request,
+            loaded_at_ms: 2_000,
+            outcome: HistoryReplayCompletionOutcome::Loaded(rows(99.0))
+        }),
+        HistoryReplayCompletionDisposition::StaleIgnored
+    );
+    let _ = replay.complete(HistoryReplayCompletion {
+        request: current,
+        loaded_at_ms: 3_000,
+        outcome: HistoryReplayCompletionOutcome::Loaded(rows(24.0)),
+    });
+    let next = replay.performance_history_projection(ApplicationHistoryCapability::Available);
+    assert!(!next.stale());
+    assert_eq!(next.rows[0].samples[0], 24.0);
+    replay.close();
+    let closed = replay.performance_history_projection(ApplicationHistoryCapability::Disabled);
+    assert_eq!(closed.status, ApplicationHistoryStatus::Disabled);
+    assert!(closed.rows.is_empty());
+}
+
+#[test]
+fn replay_gap_projection_preserves_downtime_without_inventing_gaps_in_downsampled_windows() {
+    let mut row = rows(0.0)[0].clone();
+    row.samples = Arc::from([0.0, 10.0, 20.0, 30.0]);
+    row.sample_times_ms = Arc::from([1_000, 2_000, 3_600_000, 3_601_000]);
+    row.observed = 4;
+    let samples = row.gap_aware_samples();
+    assert_eq!(samples[0], 0.0, "measured zero remains a measurement");
+    assert_eq!(samples.len(), 5);
+    assert!(samples[2].is_nan());
+    row.sample_times_ms = Arc::from([1_000, 301_000, 601_000, 901_000]);
+    row.observed = 100_000;
+    assert_eq!(
+        &*row.gap_aware_samples(),
+        &*row.samples,
+        "regular downsampled points represent continuous dense records"
+    );
+}

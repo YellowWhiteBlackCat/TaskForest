@@ -64,7 +64,16 @@ impl IcedApp {
                 self.process_presentation.services_query = query
             }
             Message::SelectDetailsSection(section) => {
-                self.process_presentation.details_section = section
+                self.process_presentation.details_section = section;
+                if section == super::super::DetailsSection::Insights {
+                    return UpdateDispatch::effect(
+                        self.shell.request_properties_process_insights(),
+                    );
+                }
+            }
+            Message::SelectInsightsFacet(facet) => self.process_presentation.insights_facet = facet,
+            Message::RefreshProcessInsights => {
+                return UpdateDispatch::effect(self.shell.request_properties_process_insights());
             }
             Message::OpenProcessRowMenu { identity } => {
                 if self.shell.select_row_id(ProcessRowId::Process(identity)) {

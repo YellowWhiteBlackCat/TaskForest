@@ -17,9 +17,8 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
-    ServiceDeps, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevelFilter,
-    ServiceLogQuery, ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
-    ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
+    ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogQuery,
+    ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_core::core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
@@ -198,31 +197,6 @@ impl ServiceDetailsState {
         service_id: &ServiceId,
         dependencies: &ServiceDependenciesLifecycle,
     ) -> ServiceDetailsSnapshot {
-        if std::env::var("TM_CAPTURE_SCENARIO").as_deref() == Ok("service-details-logs") {
-            let deps = ServiceDeps::from_relations(ServiceRelationGraph::from_edges([
-                ServiceRelationEdge::new(ServiceRelationKind::Requires, "sysinit.target"),
-                ServiceRelationEdge::new(ServiceRelationKind::Requires, "basic.target"),
-                ServiceRelationEdge::new(ServiceRelationKind::Wants, "network-online.target"),
-                ServiceRelationEdge::new(ServiceRelationKind::WantedBy, "multi-user.target"),
-                ServiceRelationEdge::new(ServiceRelationKind::After, "network.target"),
-                ServiceRelationEdge::new(ServiceRelationKind::After, "systemd-journald.socket"),
-            ]));
-            let mut dependencies = ServiceDependenciesLifecycle::default();
-            dependencies.begin(RequestId::MIN, service_id.clone());
-            dependencies.resolve(RequestId::MIN, service_id.clone(), deps);
-            return ServiceDetailsSnapshot {
-                dependencies,
-                logs: ServiceLogState::from_lines(vec![
-                    "Jul 29 08:41:02 taskmanager systemd[1]: Started telemetry service.".into(),
-                    "Jul 29 08:41:03 taskmanager daemon[842]: Collectors ready: cpu memory disk network gpu".into(),
-                    "Jul 29 08:41:04 taskmanager daemon[842]: Health check passed".into(),
-                    "Jul 29 08:41:05 taskmanager daemon[842]: Waiting for next refresh".into(),
-                ]),
-                copy_feedback: None,
-                feed: ServiceLogFeed::default(),
-                log_stream: ServiceLogStreamState::Empty,
-            };
-        }
         self.select(service_id);
         self.snapshot(dependencies)
     }

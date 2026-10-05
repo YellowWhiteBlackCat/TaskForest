@@ -4,6 +4,7 @@
 //! and appends peak metadata (behavior acceptance, not source text).
 use super::*;
 use std::path::PathBuf;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField, detail_value};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
@@ -78,7 +79,7 @@ fn overview_rows_mirror_the_neutral_vm() {
         &fixture(),
         &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
-    assert_eq!(pairs.len(), 17);
+    assert_eq!(pairs.len(), 19);
     let fields = [
         ProcessDetailsField::Name,
         ProcessDetailsField::Pid,
@@ -87,6 +88,8 @@ fn overview_rows_mirror_the_neutral_vm() {
         ProcessDetailsField::User,
         ProcessDetailsField::Status,
         ProcessDetailsField::Threads,
+        ProcessDetailsField::Memory,
+        ProcessDetailsField::Swap,
         ProcessDetailsField::Pss,
         ProcessDetailsField::Uss,
         ProcessDetailsField::Shared,
@@ -157,6 +160,42 @@ fn command_rows_mirror_the_neutral_vm() {
 }
 
 #[test]
+fn performance_histories_render_four_bounded_trends_with_honest_gaps() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    set_language(Language::En);
+    let mut item = fixture();
+    item.cpu_history = vec![0.0, 1.0, 2.0];
+    item.mem_history = vec![2.0, 1.0, 0.0];
+    item.disk_read_history = vec![0.0, f32::NAN, 2.0];
+    item.disk_write_history.clear();
+    let lines = performance_lines(
+        &item,
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
+        crate::TuiTheme::default(),
+    );
+    let text: Vec<String> = lines.iter().map(ToString::to_string).collect();
+    assert_eq!(text.len(), 9);
+    assert!(text[5].contains("▁▅█"));
+    assert!(text[6].contains("█▅▁"));
+    assert!(text[7].contains("▁") && text[7].contains("█"));
+    assert!(text[8].contains(t("history.application.collecting")));
+    let mut terminal = Terminal::new(TestBackend::new(48, 9)).expect("test terminal");
+    terminal
+        .draw(|frame| {
+            frame.render_widget(
+                Paragraph::new(lines).wrap(Wrap { trim: true }),
+                frame.area(),
+            );
+        })
+        .expect("draw bounded history rows");
+    let buffer = terminal.backend().buffer();
+    let last_row: String = (0..48).map(|x| buffer[(x, 8)].symbol()).collect();
+    assert!(last_row.contains(t("proc.disk_write")), "{last_row}");
+}
+
+#[test]
 fn performance_currents_mirror_the_neutral_vm() {
     set_language(Language::En);
     let pairs = performance_pairs(
@@ -195,6 +234,7 @@ fn properties_modal_host_paints_border_and_identity_title() {
     let app = crate::demo_app();
     let theme = crate::TuiTheme::default();
     let target = ProcessPropertiesTarget {
+        facet: ProcessInsightFacet::Network,
         item: fixture(),
         section: ProcessDetailsSection::Overview,
         scroll: 0,

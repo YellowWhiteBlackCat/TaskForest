@@ -2,7 +2,7 @@
 
 > **Role**: Architecture — decisions, constraints, layer boundaries. For widget/rendering patterns see [UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md).
 
-`taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.19 的官方两件套 `bevy_ui` +
+`taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.20 的官方两件套 `bevy_ui` +
 `bevy_ui_widgets` 渲染同一份中立 shell 投影。本文是它当前的公开事实权威；
 跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)，
 行为与像素门禁归 [QUALITY_GATES.md](QUALITY_GATES.md)。
@@ -19,12 +19,20 @@
 
 ## 基座与边界铁律
 
-- Bevy 锁定 `=0.19.1`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
+- **业务系统必须声明访问范围**：页面、命令归约、绘制、弹窗、图表与捕获验证只接受明确的
+  `Res` / `ResMut`、`NonSend` / `NonSendMut`、`Query`、`Commands`、事件或聚合这些参数的
+  `SystemParam`。禁止接收或保存整个 `World`、`DeferredWorld`、`UnsafeWorldCell`，也禁止
+  用 `commands.queue(|world| ...)`、组件 hook 或服务定位器把全世界访问藏在回调中。
+  状态变更经 typed observer/system 同步更新其明确拥有的资源；实体变更由 `Commands` 提交。
+  Bevy 应用的组合入口只负责注册资源、系统与插件；业务不能通过 `App::world()` /
+  `App::world_mut()` 借回整个世界。测试夹具可操作测试 App，但不能成为生产业务入口。
+- Bevy 锁定 `=0.20.0-rc.2`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
   保持单一 workspace 解析；升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
-  `bevy_text`、`ui_picking`；Linux 追加 `wayland` 与 `accesskit_unix`，`x11` 永不
-  开启。default features 关闭，`multi_threaded` 关闭以保持 drain 可观察。
+  `bevy_text`、`ui_picking`、`system_clipboard`；Linux 追加 `wayland` 与 `accesskit_unix`，`x11` 永不
+  开启。Linux 的 `bevy_clipboard` 补丁以 `wl-clipboard-rs` 写入系统剪贴板，
+  写入未被 compositor 接受时发布错误。default features 关闭，`multi_threaded` 关闭以保持 drain 可观察。
 - 依赖白名单：application、app-host、core、platform-contract、shell、theme、
   ui-contract、assets、icons（neutral 半，gpui feature 关）、`accesskit`（与
   bevy 栈同版本）—— never platform-runtime、platform crates。Bevy 类型不跨
@@ -62,7 +70,8 @@
 `PreUpdate` drain 每帧以有界批量（`EVENT_DRAIN_BATCH`）非阻塞排水平台事件端口，
 折叠进共享 `ShellApp`，并触发 `ShellProjectionFolded`——页面唯一的数据刷新
 事件，永不轮询。刷新合并与暂停语义复用 shell 的 `TelemetryRefreshPolicy`；
-效果提交只走共享 `queue_effect`。
+效果提交由 drain 统一处理：共享效果走 `queue_effect`，可选设置动作走 application 的
+`FirstRunController`，保持重复提交与相关完成的单一权威。
 
 ## 输入接缝
 
@@ -130,4 +139,4 @@ feature 让 winit 的 AccessKit 桥把组件树发布到 AT-SPI；无窗口的 h
 - `bash scripts/accept-bevy-interactions.sh`：交互矩阵先 discovery 后全量，
   见 [QUALITY_GATES.md](QUALITY_GATES.md) 前端证据表。
 - `bash scripts/capture-bevy.sh`：真实像素，fail-closed 验证器。
-- `cargo tree -p taskmanager-bevy-ui -d`：bevy 栈单一 0.19 解析。
+- `cargo tree -p taskmanager-bevy-ui -d`：bevy 栈单一 0.20 解析。

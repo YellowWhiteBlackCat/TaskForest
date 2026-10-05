@@ -1,162 +1,146 @@
-// test-intent: behavior
-//! Headless behavior tests for the Iced first-run dialog: the GPUI-parity
-//! trigger/persistence fold, the typed action phases, side-effect-free
-//! dismissal, and render coverage of the honest dialog states.
+//! test-intent: behavior
 
 use super::*;
-use std::path::PathBuf;
+use taskmanager_application::first_run::FirstRunController;
+use taskmanager_assets::embedded_fonts;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptInfo};
+use taskmanager_shell::fixture::setup::setup_script_info;
 
-fn info() -> SetupScriptInfo {
-    SetupScriptInfo {
-        path: PathBuf::from("/usr/share/taskforest/setup.sh"),
-        run_command: "taskforest-setup run".to_owned(),
-        revert_command: "taskforest-setup revert".to_owned(),
+#[test]
+fn explicit_entry_renders_a_bounded_review() {
+    let mut app = crate::IcedApp::demo();
+    app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
+    let _ = app.update(Message::FirstRun(FirstRunMessage::Open));
+    drop(render_first_run(&app));
+    let _ = app.update(Message::FirstRun(FirstRunMessage::RequestAction(
+        SetupScriptAction::Run,
+    )));
+    assert!(matches!(
+        app.first_run.view().phase,
+        FirstRunPhase::Failed(FailureKind::TemporarilyUnavailable)
+    ));
+    drop(render_first_run(&app));
+}
+
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::operation::{Focusable, Scrollable};
+use iced::advanced::widget::{Id, Operation, Tree};
+use iced::{Pixels, Rectangle, Size, Vector};
+
+#[derive(Default)]
+struct Bounds {
+    controls: Vec<(Option<Id>, Rectangle)>,
+    scrolls: Vec<(Rectangle, Rectangle)>,
+}
+
+impl Operation for Bounds {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+        operate(self);
+    }
+    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, _state: &mut dyn Focusable) {
+        self.controls.push((id.cloned(), bounds));
+    }
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content: Rectangle,
+        _translation: Vector,
+        _state: &mut dyn Scrollable,
+    ) {
+        self.scrolls.push((bounds, content));
     }
 }
 
-fn available_state() -> FirstRunUiState {
-    let mut state = FirstRunUiState::default();
-    let _ = state.reduce(FirstRunEvent::ObservationCompleted(Some(info())));
-    state
-}
-
 #[test]
-fn observation_with_asset_shows_dialog_and_absence_keeps_it_hidden() {
-    let mut state = FirstRunUiState::default();
-    assert!(!state.visible(), "the dialog starts hidden");
-
-    assert_eq!(
-        state.reduce(FirstRunEvent::ObservationCompleted(Some(info()))),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::Available);
-    assert!(state.info.is_some());
-    assert!(state.visible());
-
-    // The persisted done-state is the platform-side asset's absence (there
-    // is no "do not show again" config field anywhere in the stack): after
-    // Run/Revert consumes the script the next observation answers None and
-    // the dialog stays hidden — never re-shown from stale state.
-    assert_eq!(
-        state.reduce(FirstRunEvent::ObservationCompleted(None)),
-        FirstRunTransition::Hidden
-    );
-    assert_eq!(state.phase, FirstRunPhase::Hidden);
-    assert!(state.info.is_none());
-    assert!(!state.visible());
-}
-
-#[test]
-fn submitted_actions_move_to_pending_and_completion_sets_the_next_phase() {
-    let mut state = available_state();
-
-    assert_eq!(
-        state.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Run)),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::Running);
-    assert!(state.action_pending());
-    assert_eq!(state.last_action, Some(SetupScriptAction::Run));
-
-    assert_eq!(
-        state.reduce(FirstRunEvent::ActionCompleted(SetupScriptAction::Run)),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::RestartRequired);
-    assert!(!state.action_pending());
-
-    assert_eq!(
-        state.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Revert)),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::Reverting);
-    assert_eq!(
-        state.reduce(FirstRunEvent::ActionCompleted(SetupScriptAction::Revert)),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::Available);
-}
-
-#[test]
-fn typed_failures_surface_and_a_failed_observation_hides() {
-    let mut state = available_state();
-
-    // The failure follows a real submission, so the retry memory survives it.
-    let _ = state.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Run));
-    assert_eq!(
-        state.reduce(FirstRunEvent::ActionFailed {
-            action: SetupScriptAction::Run,
-            kind: FailureKind::TimedOut,
-        }),
-        FirstRunTransition::Shown
-    );
-    assert_eq!(state.phase, FirstRunPhase::Failed(FailureKind::TimedOut));
-    // The retry memory survives the failure.
-    assert_eq!(state.last_action, Some(SetupScriptAction::Run));
-
-    // A failed boot observation is the honest "capability cannot answer"
-    // case: the dialog stays hidden instead of rendering a broken shell.
-    let mut fresh = FirstRunUiState::default();
-    let _ = fresh.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Observe));
-    assert_eq!(fresh.phase, FirstRunPhase::Discovering);
-    assert_eq!(
-        fresh.reduce(FirstRunEvent::ActionFailed {
-            action: SetupScriptAction::Observe,
-            kind: FailureKind::Unsupported,
-        }),
-        FirstRunTransition::Hidden
-    );
-    assert_eq!(fresh.phase, FirstRunPhase::Hidden);
-}
-
-#[test]
-fn dismissal_has_zero_side_effects() {
-    let mut state = available_state();
-    let _ = state.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Revert));
-    let before = state.clone();
-
-    assert_eq!(
-        state.reduce(FirstRunEvent::Dismissed),
-        FirstRunTransition::Unchanged
-    );
-    assert_eq!(
-        state, before,
-        "Escape/close must not mutate any dialog state"
-    );
-}
-
-#[test]
-fn render_covers_the_honest_dialog_states_without_panic() {
-    let app = crate::IcedApp::demo();
-    let theme_snapshot = app.theme();
-
-    let _ = render_first_run(theme_snapshot, &available_state(), 1.0);
-
-    let mut failed = available_state();
-    let _ = failed.reduce(FirstRunEvent::ActionFailed {
-        action: SetupScriptAction::Run,
-        kind: FailureKind::PermissionDenied,
-    });
-    let _ = render_first_run(theme_snapshot, &failed, 1.0);
-
-    // Still discovering (no descriptor yet): the honest waiting body.
-    let mut discovering = FirstRunUiState::default();
-    let _ = discovering.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Observe));
-    let _ = render_first_run(theme_snapshot, &discovering, 0.5);
-
-    // Restart-required renders the restart affordance branch.
-    let mut restart = available_state();
-    let _ = restart.reduce(FirstRunEvent::ActionSubmitted(SetupScriptAction::Run));
-    let _ = restart.reduce(FirstRunEvent::ActionCompleted(SetupScriptAction::Run));
-    let _ = render_first_run(theme_snapshot, &restart, 1.0);
-}
-
-#[test]
-fn documentation_action_uses_the_taskforest_destination() {
-    assert_eq!(
-        DOCUMENTATION_URL,
-        "https://github.com/YellowWhiteBlackCat/TaskForest"
-    );
+fn first_run_review_keeps_native_actions_fixed_around_bounded_metadata() {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer");
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 400.0),
+        (720.0, 960.0),
+    ] {
+        let size = Size::new(width, height);
+        let mut app = crate::IcedApp::demo();
+        let _ = app.update(Message::WindowResized(size));
+        let mut info = setup_script_info();
+        info.run_command = info.run_command.repeat(12);
+        info.revert_command = info.revert_command.repeat(12);
+        app.first_run = FirstRunController::from_observation(Some(info));
+        let _ = app.update(Message::FirstRun(FirstRunMessage::Open));
+        let mut view = render_first_run(&app);
+        let mut tree = Tree::new(&view);
+        let node =
+            view.as_widget_mut()
+                .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+        let mut bounds = Bounds::default();
+        view.as_widget_mut()
+            .operate(&mut tree, Layout::new(&node), &renderer, &mut bounds);
+        assert_eq!(
+            bounds.controls.len(),
+            8,
+            "three metadata copies, four explicit actions and the shared Close control"
+        );
+        let (viewport, content) = bounds.scrolls[0];
+        let fixed_actions: Vec<_> = bounds
+            .controls
+            .into_iter()
+            .filter(|(id, _)| {
+                id.as_ref().is_some_and(|id| {
+                    (0..4).any(|index| {
+                        *id == Id::from(focus::focus_id(crate::app::FocusTarget::FirstRunAction(
+                            index,
+                        )))
+                    }) || *id == Id::new(focus::MODAL_CLOSE_ID)
+                })
+            })
+            .collect();
+        assert_eq!(
+            fixed_actions.len(),
+            5,
+            "four native actions and Close are outside the metadata viewport"
+        );
+        for (index, (_, first)) in fixed_actions.iter().enumerate() {
+            for (_, second) in &fixed_actions[index + 1..] {
+                assert!(
+                    first.intersection(second).is_none(),
+                    "fixed actions must not cover each other: {first:?}, {second:?}"
+                );
+            }
+        }
+        for (_, control) in fixed_actions {
+            assert!(control.width > 0.0 && control.height > 0.0);
+            assert!(control.x >= 0.0 && control.y >= 0.0);
+            assert!(
+                control.x + control.width <= width && control.y + control.height < height,
+                "action bounds {control:?} exceed {size:?}"
+            );
+        }
+        assert_eq!(bounds.scrolls.len(), 1, "only setup metadata scrolls");
+        assert!(viewport.width > 0.0 && viewport.height > 0.0);
+        assert!(viewport.x + viewport.width <= width && viewport.y + viewport.height < height);
+        assert!(content.width <= viewport.width);
+        if height <= 480.0 {
+            assert!(
+                content.height > viewport.height,
+                "metadata must be scrollable in compact reviews"
+            );
+        }
+    }
 }

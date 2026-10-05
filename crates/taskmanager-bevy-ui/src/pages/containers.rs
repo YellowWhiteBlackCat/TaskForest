@@ -156,8 +156,8 @@ pub(crate) fn scene(ctx: &PageContext<'_>) -> impl Scene + use<> {
         ContainersPageRoot
         ContainersBranchMarker({ branch })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            { body },
+             Text(title) TextRole(Role::Heading) --
+            { body }
         ]
     }
 }
@@ -171,7 +171,7 @@ fn message_scene(text: &'static str) -> Box<dyn Scene> {
             justify_content: JustifyContent::Center,
         }
         Children [
-            ( Text(text) TextRole(Role::Body) ),
+             Text(text) TextRole(Role::Body)
         ]
     })
 }
@@ -195,8 +195,8 @@ fn table_scene(containers: &[ContainerSummary], palette: &UiPalette) -> Box<dyn 
         }
         ScrollArea
         Children [
-            ( { header } ),
-            { rows },
+             @{ header } --
+            { rows }
         ]
     })
 }
@@ -212,36 +212,36 @@ fn header_scene(palette: &UiPalette) -> impl Scene + use<> {
             padding: UiRect::horizontal(Val::Px(space_8())),
         }
         Children [
-            (
+
                 Node { width: px(200.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text("ID") TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text("ID") TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(220.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.name")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text(t("containers.name")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(90.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.cpu")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text(t("containers.cpu")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(110.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.memory")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text(t("containers.memory")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(90.0), overflow: Overflow::clip_x() }
                 Children [
-                    ( Text(t("containers.processes")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ),
+                     Text(t("containers.processes")) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
+
         ]
     }
 }
@@ -266,36 +266,36 @@ fn container_row_scene(model: &ContainerRowModel, palette: &UiPalette) -> impl S
         }
         ContainerRowMarker({ id.clone() })
         Children [
-            (
+
                 Node { width: px(200.0), align_items: AlignItems::FlexStart }
                 Children [
-                    ( Text(id) TextRole(Role::Mono) ),
+                     Text(id) TextRole(Role::Mono)
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(220.0), align_items: AlignItems::FlexStart }
                 Children [
-                    ( Text(name) TextRole(Role::Body) ),
+                     Text(name) TextRole(Role::Body)
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(90.0), align_items: AlignItems::FlexStart }
                 Children [
-                    ( Text(cpu) TextRole(Role::Body) ),
+                     Text(cpu) TextRole(Role::Body)
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(110.0), align_items: AlignItems::FlexStart }
                 Children [
-                    ( Text(memory) TextRole(Role::Body) ),
+                     Text(memory) TextRole(Role::Body)
                 ]
-            ),
-            (
+            --
+
                 Node { width: px(90.0), align_items: AlignItems::FlexStart }
                 Children [
-                    ( Text(pids) TextRole(Role::Body) ),
+                     Text(pids) TextRole(Role::Body)
                 ]
-            ),
+
         ]
     }
 }

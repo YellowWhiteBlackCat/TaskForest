@@ -9,6 +9,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use taskmanager_application::ProcessInsightFacet;
+use taskmanager_telemetry_store::HistoryRetention;
+use taskmanager_ui_contract::navigation::NavOrientation;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
 #[cfg(target_os = "linux")]
@@ -49,7 +52,6 @@ use crate::gpui_app::containers_view;
 use crate::gpui_app::cpu_view::{self, CpuHistoryCache};
 use crate::gpui_app::dashboard::{self, DashboardState};
 use crate::gpui_app::elements;
-use crate::gpui_app::first_run;
 use crate::gpui_app::graph;
 use crate::gpui_app::perf_views::{self, MemoryHistoryCache};
 use crate::gpui_app::processes_view;
@@ -60,6 +62,7 @@ use crate::gpui_app::startup_view;
 use crate::gpui_app::system_health_view::{self, SystemHealthCallbacks};
 use crate::gpui_app::system_view;
 use crate::gpui_app::users_view;
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     CommandRouter, ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
@@ -67,10 +70,9 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::target::{ServiceId, SessionId};
-use taskmanager_platform_contract::{OperationFailure, RequestId};
+use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
 
@@ -147,7 +149,6 @@ mod units;
 mod window_surface;
 use capture::{CaptureEvidence, CaptureProcessAction};
 pub use chrome::*;
-pub use diagnostic_bundle::DiagnosticBundleUiState;
 use dialog_scroll_state::DialogScrollState;
 pub use dispatch::*;
 pub use input_modality::InputModality;
@@ -156,9 +157,7 @@ pub use interaction_state::{Hover, ProcMenuAction};
 use interaction_state::{init_run_entity, init_search_entity};
 pub use nav::*;
 pub use navigation::{StableDeviceKind, TopPage};
-pub use page_state::{
-    NavOrientation, ProcessAffinityEditorState, ProcessesState, ServicesState, StartupState,
-};
+pub use page_state::{ProcessAffinityEditorState, ProcessesState, ServicesState, StartupState};
 use persistence::{apply_process_config, config_from_view};
 pub(crate) use presentation_preferences::{
     AppearancePreferences, DeviceVisibilityPreferences, GraphPreferences, MagnitudeBase,
@@ -252,6 +251,8 @@ pub struct RootView {
     /// keeping this handle on the RootView avoids a process-global scroll
     /// position when more than one window is open.
     pub app_history_scroll: UniformListScrollHandle,
+    /// Persisted Performance review body, independent of the live viewport.
+    pub(crate) history_replay_scroll: ScrollHandle,
     /// Per-window sidebar device-list scroll state. The list can contain many
     /// disks, NICs, GPUs, batteries, and fans; its rail must remain paired
     /// with this handle across telemetry-driven renders.
@@ -259,7 +260,6 @@ pub struct RootView {
     /// Per-window Apps process-list and column scroll state.
     pub processes_scroll: processes_view::ProcessesScrollState,
     /// Per-window System dashboard scroll state.
-    pub dashboard_scroll: ScrollHandle,
     /// Per-window System health scroll state.
     pub system_health_scroll: ScrollHandle,
     /// Per-window CPU specification/details scroll state. The CPU rail can
@@ -366,8 +366,7 @@ pub struct RootView {
     /// authority is `shell.interaction` in the application-owned direct track.
     window_surface: window_surface::WindowSurfaceState,
     /// First-run workflow data. Visibility is owned by `window_surface`.
-    pub first_run: first_run::FirstRunUiState,
-    pub(crate) first_run_requests: HashMap<RequestId, SetupScriptAction>,
+    pub first_run: FirstRunController,
     /// Per-window persistent refresh-interval slider entity for the Settings
     /// dialog (owns the thumb position, drag state, and current value).
     /// Created lazily on the first Settings render (see
@@ -384,6 +383,8 @@ pub struct RootView {
     /// Active section in the process Properties dialog. RootView owns this UI
     /// state; `root::chrome` renders stateless Overview/Performance/Command views.
     pub details_section: ProcessDetailsSection,
+    pub details_facet: ProcessInsightFacet,
+    pub details_insight_offset: usize,
     /// Exact target/request-correlated lifecycle for independently scheduled
     /// process-insight facets. Application owns facet correlation; this
     /// component accepts only the matching shared projection and cannot keep
@@ -611,7 +612,7 @@ impl RootView {
     }
     pub fn new(theme: Theme, cx: &mut Context<Self>) -> Self {
         let (telemetry, telemetry_ingestor) =
-            TelemetryStore::shared_with_correlated_ingestion(MAX_HISTORY_CAPACITY);
+            TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::PRODUCT);
         Self::new_inner(
             theme,
             telemetry,
@@ -749,9 +750,9 @@ impl RootView {
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
             app_history_scroll: UniformListScrollHandle::new(),
+            history_replay_scroll: ScrollHandle::new(),
             sidebar_scroll: ScrollHandle::new(),
             processes_scroll: processes_view::ProcessesScrollState::default(),
-            dashboard_scroll: ScrollHandle::new(),
             system_health_scroll: ScrollHandle::new(),
             cpu_details_scroll: ScrollHandle::new(),
             telemetry,
@@ -791,12 +792,13 @@ impl RootView {
                     .unwrap_or(false)
                     .then_some(window_surface::WindowSurface::Settings),
             ),
-            first_run: first_run::FirstRunUiState::default(),
-            first_run_requests: HashMap::new(),
+            first_run: FirstRunController::default(),
             settings_slider: None,
             graph_points_slider: None,
             run_error: None,
             details_section: ProcessDetailsSection::default(),
+            details_facet: ProcessInsightFacet::Network,
+            details_insight_offset: 0,
             process_insights: process_insights_ui::ProcessInsightsLifecycle::default(),
             process_batch_history: ProcessBatchHistory::default(),
             local_feedback_toast: None,

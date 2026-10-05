@@ -11,6 +11,7 @@ use super::super::{
 };
 use super::dispatch::UpdateDispatch;
 use super::window_events::{close_latest_window, restore_latest_window};
+use taskmanager_application::ProcessInsightFacet;
 
 /// Immutable facts derived before the message mutates interaction state.
 pub(super) struct UpdatePrelude {
@@ -107,6 +108,11 @@ impl IcedApp {
             prelude.focus_cycle,
             restore_target,
         );
+        let focus = if prelude.focus_cycle.is_some() || prelude.focus_requested.is_some() {
+            focus.chain(crate::focus::reveal::reveal_focused(None).discard())
+        } else {
+            focus
+        };
         let mut tasks = vec![reveal, focus, activation];
         tasks.extend(dispatch.tasks);
         Task::batch(tasks)
@@ -138,6 +144,7 @@ impl IcedApp {
             return;
         }
         self.process_presentation.details_section = DetailsSection::default();
+        self.process_presentation.insights_facet = ProcessInsightFacet::Network;
         self.process_presentation.env_filter.clear();
         self.seed_process_perf_history_from_provider();
     }

@@ -1,6 +1,7 @@
 //! Read-mostly history contention and lock-latency regression.
 
 use super::*;
+use crate::HistoryRetention;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -65,7 +66,8 @@ fn same_domain_writers_commit_in_order_and_hide_in_flight_watermarks() {
         release: Mutex::new(release_rx),
         records: Mutex::new(Vec::new()),
     });
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(8));
     let ingestor = ingestor.with_record_sink(sink.clone());
 
     let first_ingestor = ingestor.clone();
@@ -192,7 +194,8 @@ fn concurrent_readers_and_writer_profile_short_lock_hold_times() {
     /// Per-tick write latency ceiling (same allowance).
     const WRITE_LATENCY_LIMIT: Duration = Duration::from_millis(50);
 
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(600);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(600));
     let stop = Arc::new(AtomicBool::new(false));
     let mut readers = Vec::new();
     for _ in 0..READERS {

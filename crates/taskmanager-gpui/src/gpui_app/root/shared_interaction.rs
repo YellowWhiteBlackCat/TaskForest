@@ -62,6 +62,7 @@ impl RootView {
             | PlatformEffect::ProcessInsights(_)
             | PlatformEffect::ProcessNetworkEscalation
             | PlatformEffect::ServiceLogStream(_)
+            | PlatformEffect::ObserveDesktopAppearance
             | PlatformEffect::DesktopNotification(_)
             | PlatformEffect::DirectoryUsage(_)
             | PlatformEffect::GpuEngineRows(_)

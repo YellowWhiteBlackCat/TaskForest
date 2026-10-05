@@ -632,10 +632,13 @@ mod memory_inventory_lane {
                     "slots used/total leads the inventory"
                 );
                 assert_eq!(rows[1].0, "ChannelA-DIMM0");
-                assert_eq!(rows[1].1, "PART-A · 16.0 GiB · 5200 MT/s");
+                assert_eq!(
+                    rows[1].1,
+                    "PART-A · 16.0 GiB · 5200 MT/s · ExampleWorks · SODIMM · DDR5"
+                );
                 // No locator: the slot-indexed label; a record with no
                 // readable facts keeps its row with the shared dash.
-                assert_eq!(rows[2].0, format!("{} 2", i18n::t("system.memory_module")));
+                assert_eq!(rows[2].0, format!("{} 2", i18n::t("system.slot")));
                 assert_eq!(rows[2].1, MISSING_VALUE);
             }
             other => panic!("accepted payload must project rows, got {other:?}"),

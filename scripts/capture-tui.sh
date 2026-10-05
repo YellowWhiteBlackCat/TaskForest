@@ -90,7 +90,13 @@ case "$CAPTURE_DEVICE" in
 esac
 case "$CAPTURE_SCENE" in
   "") ;;
-  system-npu) CAPTURE_PAGE=system ;;
+  keyboard-help|keyboard-help-end) CAPTURE_PAGE=performance ;;
+  system-npu|system-hardware|system-dashboard|history-60m) CAPTURE_PAGE=system ;;
+  process-selection|process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-search-highlight|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) CAPTURE_PAGE=applications ;;
+  startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;
+  services-search-highlight|service-details-logs) CAPTURE_PAGE=services ;;
+  application-history-replay) CAPTURE_PAGE=app-history ;;
+  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2
@@ -348,6 +354,16 @@ start_capture_host() {
 
 start_capture_host || exit 1
 
+case "$CAPTURE_SCENE" in
+  history-replay|application-history-replay)
+    mkdir -p "$RUNTIME_DIR/config/taskmanager"
+    printf '{"history_persistence":true}\n' >"$RUNTIME_DIR/config/taskmanager/config.json"
+    history_kind=system
+    [ "$CAPTURE_SCENE" != application-history-replay ] || history_kind=application
+    timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$RUNTIME_DIR/data/taskmanager/history" --kind "$history_kind"
+    ;;
+esac
+
 # Software GL keeps the nested capture reliable: on hosts whose GPU context
 # is degraded (KWin "atomic commit failed" storms), EGL initialization hangs
 # and windows never map or present. llvmpipe renders the same frame; pixel
@@ -359,7 +375,13 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
-NIRI_PGID="$(process_group "$NIRI_PID")"
+# setsid establishes the owned group after fork; wait for that transition.
+for _ in $(seq 1 20); do
+  NIRI_PGID="$(process_group "$NIRI_PID")"
+  [ "$NIRI_PGID" = "$NIRI_PID" ] && break
+  kill -0 "$NIRI_PID" 2>/dev/null || break
+  sleep 0.05
+done
 [ "$NIRI_PGID" = "$NIRI_PID" ] || {
   printf 'nested Niri did not obtain a private process group\n' >&2
   exit 1

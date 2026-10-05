@@ -30,6 +30,108 @@ fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
 }
 
 #[test]
+fn normal_system_health_selectors_and_dense_cards_keep_one_measured_body() {
+    use crate::app::{FocusTarget, Message};
+    use crate::ui::system_dashboard::SystemDashboardMessage;
+    use crate::ui::system_table::system_page;
+    use iced::advanced::layout::{Layout, Limits};
+    use iced::advanced::renderer::Headless;
+    use iced::advanced::widget::operation::{Focusable, Scrollable};
+    use iced::advanced::widget::{Id, Operation, Tree};
+    use iced::{Pixels, Rectangle, Size, Vector};
+    use taskmanager_application::{AppPage, system_timeline::SystemPageSection};
+    use taskmanager_assets::embedded_fonts;
+    use taskmanager_shell::fixture::health::seed_shell_health;
+    use taskmanager_shell::presentation::health_review::HealthReviewSection;
+    #[derive(Default)]
+    struct Bounds {
+        selectors: Vec<Rectangle>,
+        bodies: Vec<Rectangle>,
+    }
+    impl Operation for Bounds {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+            operate(self);
+        }
+        fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, _: &mut dyn Focusable) {
+            if HealthReviewSection::ALL.into_iter().any(|section| {
+                id == Some(&Id::from(crate::focus::focus_id(
+                    FocusTarget::SystemHealthSection(section),
+                )))
+            }) {
+                self.selectors.push(bounds);
+            }
+        }
+        fn scrollable(
+            &mut self,
+            id: Option<&Id>,
+            bounds: Rectangle,
+            _: Rectangle,
+            _: Vector,
+            _: &mut dyn Scrollable,
+        ) {
+            if id == Some(&Id::new("system-health-scroll")) {
+                self.bodies.push(bounds);
+            }
+        }
+    }
+    set_language(En);
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("fonts");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("renderer");
+    for (width, height) in [
+        (480.0, 360.0),
+        (720.0, 480.0),
+        (1280.0, 720.0),
+        (1600.0, 360.0),
+        (480.0, 960.0),
+        (1920.0, 1080.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        seed_shell_health(&mut app.shell);
+        let _ = app.update(Message::SelectPage(AppPage::System));
+        let _ = app.update(Message::SystemDashboard(
+            SystemDashboardMessage::SelectSection(SystemPageSection::Health),
+        ));
+        for section in HealthReviewSection::ALL {
+            let _ = app.update(Message::SystemDashboard(
+                SystemDashboardMessage::SelectHealthSection(section),
+            ));
+            assert_eq!(app.system_health_section, section);
+            let mut view = system_page(&app);
+            let mut tree = Tree::new(&view);
+            let node = view.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &Limits::new(Size::ZERO, Size::new(width, height)),
+            );
+            let mut bounds = Bounds::default();
+            view.as_widget_mut()
+                .operate(&mut tree, Layout::new(&node), &renderer, &mut bounds);
+            assert_eq!(bounds.bodies.len(), 1);
+            let body = bounds.bodies[0];
+            assert!(body.height > 0.0 && body.y + body.height <= height + 0.5);
+            assert_eq!(bounds.selectors.len(), 3);
+            for selector in bounds.selectors {
+                assert!(selector.width > 0.0 && selector.height > 0.0);
+                assert!(selector.x >= -0.5 && selector.x + selector.width <= width + 0.5);
+                assert!(selector.y + selector.height <= body.y + 0.5);
+            }
+        }
+    }
+}
+
+#[test]
 fn health_rows_cover_every_domain_with_fixture_values() {
     set_language(En);
     let shell = demo_app();

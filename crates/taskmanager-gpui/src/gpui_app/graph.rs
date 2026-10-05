@@ -103,6 +103,8 @@ pub struct GraphOpts {
     pub stroke_width: f32,
     /// Value scale (e.g. 100.0 for utilization %, or a max throughput/temp).
     pub max: f32,
+    /// Lower value bound; signed persisted measurements retain their coordinate range.
+    pub min: f32,
     // ── opt-in refinements (all default OFF; no effect unless toggled) ──────
     /// When true, replace the flat `fill_alpha` wash with a vertical gradient
     /// (line color @ ~0.35 alpha at the top of the area → transparent at the
@@ -129,12 +131,26 @@ pub struct GraphOpts {
     /// product's rendering quality bar (Win11 TM / Mission Center smooth
     /// unconditionally; there is no "angular lines" mode to expose).
     pub smooth: bool,
-    /// Number of newest samples to project into this graph.
+    /// Renderer sample capacity (2..=600). Live preferences arrive already
+    /// validated by GraphSettings; persisted review uses its complete series.
     pub data_points: usize,
     /// When true, animate the graph refresh transition.
     pub sliding: bool,
     /// Monotonic data revision used to restart the refresh animation.
     pub animation_epoch: u64,
+}
+
+impl GraphOpts {
+    fn normalized(&self, value: f32) -> f32 {
+        let floor = if self.min.is_finite() { self.min } else { 0.0 };
+        let ceiling = if self.max.is_finite() {
+            self.max.max(floor)
+        } else {
+            floor
+        };
+        let span = (f64::from(ceiling) - f64::from(floor)).max(1e-6);
+        ((f64::from(value) - f64::from(floor)) / span).clamp(0.0, 1.0) as f32
+    }
 }
 
 impl Default for GraphOpts {
@@ -146,6 +162,7 @@ impl Default for GraphOpts {
             vlines: 6,
             stroke_width: 1.5,
             max: 100.0,
+            min: 0.0,
             // All refinements OFF → existing callers render exactly as before.
             gradient_fill: false,
             ref_lines: false,
@@ -176,6 +193,11 @@ impl GraphOpts {
     }
 }
 
+/// Capacity for a rendered series; preference validation belongs to GraphSettings.
+pub(super) fn graph_capacity(data_points: usize) -> usize {
+    data_points.clamp(2, MAX_GRAPH_DATA_POINTS)
+}
+
 /// The graph-element variant of the slice-tail limit helper: callers often pre-limit
 /// (the Performance layout does, for its summary row), so when the window
 /// already fits the samples are reused as-is — the old unconditional
@@ -187,7 +209,7 @@ impl GraphOpts {
 /// and no per-frame copy happens. Only a series longer than the configured
 /// window pays the tail-slice.
 pub fn latest_samples_rc(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
-    let limit = GraphSettings::clamp_data_points(data_points);
+    let limit = graph_capacity(data_points);
     if samples.len() <= limit {
         samples
     } else {
@@ -199,14 +221,14 @@ pub fn latest_samples_rc(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
 /// Without it, translating the curve would only reveal blank space on the
 /// right — the “shrinking back” artifact the first implementation showed.
 fn graph_slide_supported(samples: &[f32], data_points: usize) -> bool {
-    samples.len() > GraphSettings::clamp_data_points(data_points)
+    samples.len() > graph_capacity(data_points)
 }
 
 /// Horizontal distance one sample slot occupies in a `data_points`-wide
 /// graph. The slide moves exactly one of these slots; the settled frame
 /// matches the static map (`width / (capacity - 1)`).
 fn graph_slide_spacing(bounds: Bounds<Pixels>, data_points: usize) -> Pixels {
-    let capacity = GraphSettings::clamp_data_points(data_points).max(1);
+    let capacity = graph_capacity(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     px(f32::from(bounds.size.width) / denom)
 }
@@ -225,7 +247,7 @@ fn sample_x_slide(
     data_points: usize,
     progress: f32,
 ) -> Pixels {
-    let capacity = GraphSettings::clamp_data_points(data_points).max(1);
+    let capacity = graph_capacity(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     let slot = f32::from(width) / denom;
     px(f32::from(left) + (index as f32 - progress.clamp(0.0, 1.0)) * slot)
@@ -540,7 +562,7 @@ pub(crate) fn build_graph_dynamic_geometry(
                     GraphXMapping::Slide => sample_x_slide(left, w, index, opts.data_points, 0.0),
                 };
                 // `.max(1e-6)` guards a caller-supplied `opts.max == 0.0`.
-                let yv = (value / opts.max.max(1e-6)).clamp(0.0, 1.0);
+                let yv = opts.normalized(value);
                 point(x, bottom - h * yv)
             })
             .collect::<Vec<_>>();

@@ -6,16 +6,13 @@
 //! the responsive Properties body. The test-only worker exercises the same
 //! capacity-one latest-request semantics without a native provider.
 
+use taskmanager_application::ProjectedProcessInsights;
 use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 
-mod view;
+pub(crate) mod view;
 
+pub use view::ProcessInsightsLabels;
 pub(crate) use view::render_process_insights;
-pub use view::{
-    ProcessInsightsLabels, ProcessInsightsLayout, process_insights_capture_fixture,
-    process_insights_layout,
-};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProcessInsightsErrorKind {
@@ -33,37 +30,13 @@ pub struct ProcessInsightsError {
     pub last_success_ms: Option<u64>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum ProcessInsightsState {
-    Loading { identity: ProcessLiveKey },
-    Ready(Box<ProcessTelemetrySnapshot>),
-    Error(ProcessInsightsError),
-}
-
 /// Borrowed renderer input. The root lifecycle owns request correlation and
 /// terminal state; the view receives only the phase payload it can paint.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ProcessInsightsRenderState<'a> {
     Loading,
-    Ready(&'a ProcessTelemetrySnapshot),
+    Projection(&'a ProjectedProcessInsights),
     Error(&'a ProcessInsightsError),
-}
-
-pub(crate) fn state_from_snapshot(snapshot: ProcessTelemetrySnapshot) -> ProcessInsightsState {
-    use taskmanager_core::core::device_state::DeviceStatus;
-
-    let kind = match snapshot.state.status {
-        DeviceStatus::Healthy => return ProcessInsightsState::Ready(Box::new(snapshot)),
-        DeviceStatus::Stale => ProcessInsightsErrorKind::ProcessUnavailable,
-        DeviceStatus::PermissionDenied => ProcessInsightsErrorKind::PermissionDenied,
-        DeviceStatus::MissingTool => ProcessInsightsErrorKind::ProviderUnavailable,
-        DeviceStatus::Unsupported => ProcessInsightsErrorKind::Unsupported,
-    };
-    ProcessInsightsState::Error(ProcessInsightsError {
-        identity: ProcessLiveKey::from_identity(snapshot.identity),
-        kind,
-        last_success_ms: snapshot.state.last_success_ms,
-    })
 }
 
 #[cfg(test)]

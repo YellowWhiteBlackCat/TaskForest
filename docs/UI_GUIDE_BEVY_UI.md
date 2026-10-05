@@ -2,11 +2,21 @@
 
 > **Role**: Implementation guide — widget patterns, rendering, interaction. For architecture decisions see [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md).
 
-本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.19 的数据驱动 ECS 架构范式与交互纪律。
+本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.20 的数据驱动 ECS 架构范式与交互纪律。
 跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
+
+保存视图由应用页原生按钮进入，typed 命令只声明预设资源、shell、列选择、配置与剪贴板。
+共享 shell 模型负责预设身份及转移；配置发布成功后恢复已保存行，失败由状态反馈说明。
+应用页表格从实测内容槽扣除边缘安全带，再按完整行高确定虚拟窗口；紧凑时次要标题与计数组整体退让。
+进程树通过应用页原生按钮进入统一 modal：标题及展开/收起动作固定，完整树行由单一 bounded body 滚动。
+事件中心从告警页原生入口进入，以 shell 事件历史为唯一事实源；筛选仅改变呈现，导出保留完整历史，清空走 shell 命令。
+检查面复用单一 modal 预算：标题与完整动作固定，剩余空间只分配给滚动 body，边缘保留 inset。
 
 ## 1. 核心思维：纯数据驱动的 ECS 哲学
 
+- **显式访问范围**：业务 observer/system 使用具体的资源、查询、事件、`Commands` 或
+  `SystemParam`，禁止接收整个 `World`，禁止用 `DeferredWorld`、组件 hook、排队闭包或
+  服务定位器绕过范围声明。详见 [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md) 的边界铁律。
 - **告别命令式回调思维**：Bevy UI 不是基于 DOM 或对象树的命令式界面，而是纯正的
   ECS（实体-组件-系统）图。界面中的每一个元素都是一个 `Entity`，其属性与行为
   完全由挂载的 `Component`（如 `Node`、`Text`、`Button`、`NavTarget`）决定。
@@ -24,10 +34,13 @@
   `scripts/quality/bevy_bsn_guard.py` 拒收（页面级全局事件观察者除外）。
   异步就绪的表现补全（图标位图）用 `apply_scene(bsn! { ... })` 声明。
 
+- 导航方向由原生按钮触发 typed 事件。布局系统只声明方向资源、窗口和 chrome 标记查询；
+  根 workspace 与页内容分配独立槽，竖向 rail 自有滚动，方向切换不改变路由或遥测。
+
 ## 2. 交互与拾取机制（核心避坑守则）
 
 - **拾取穿透铁律（`Pickable::IGNORE`）**：
-  - 在 Bevy 0.19 中，`bevy_picking` 默认对所有 UI 节点生效；
+  - 在 Bevy 0.20 中，`bevy_picking` 默认对所有 UI 节点生效；
   - 当一个实体携带 `Button` 组件且其内部拥有子节点（如 `Text` 标签或 `ImageNode`
     图标）时，指针点击会默认命中子实体。由于子实体没有 `Button` 组件，
     `button_on_pointer_click` 会忽略该点击，导致**“点击按钮毫无反应”**；

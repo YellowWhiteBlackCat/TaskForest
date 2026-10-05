@@ -1,4 +1,5 @@
 use super::*;
+use crate::presentation::smart::smart_section_visible;
 use taskmanager_application::AppAction;
 use taskmanager_application::MsrReadoutSession;
 use taskmanager_core::SystemLoadAverage;
@@ -465,13 +466,24 @@ fn smart_availability_keys_cover_every_variant() {
 }
 
 #[test]
-fn smart_section_hidden_when_provider_cannot_supply_readings() {
+fn smart_section_preserves_actionable_failures_without_fabricating_readings() {
     let mut disk = DiskMetrics::default();
     assert!(
         !smart_section_visible(&disk),
         "unavailable provider with no fields must hide the SMART section"
     );
     disk.smart_availability = SmartAvailability::PermissionDenied;
+    assert!(smart_section_visible(&disk));
+    assert_eq!(
+        effective_smart_status(&disk),
+        DeviceStatus::PermissionDenied
+    );
+    assert!(!has_smart_fields(&disk));
+    disk.smart_availability = SmartAvailability::MissingTool;
+    assert!(smart_section_visible(&disk));
+    assert_eq!(effective_smart_status(&disk), DeviceStatus::MissingTool);
+    assert!(!has_smart_fields(&disk));
+    disk.smart_availability = SmartAvailability::Unsupported;
     assert!(!smart_section_visible(&disk));
     disk.smart_temperature_c = Some(40.0);
     assert!(smart_section_visible(&disk), "a real reading must show");

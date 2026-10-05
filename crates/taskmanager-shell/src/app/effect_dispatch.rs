@@ -4,8 +4,8 @@
 //! module so the file stays under the source-line ceiling.
 use super::{ProcessControlKind, ShellApp};
 use taskmanager_application::{
-    PlatformClient, PlatformEffect, ProcessControlRequest, ServiceControlRequest,
-    SessionControlRequest, ShellUiActionIntent,
+    DesktopAppearanceRequest, PlatformClient, PlatformEffect, PlatformEventBatch,
+    ProcessControlRequest, ServiceControlRequest, SessionControlRequest, ShellUiActionIntent,
 };
 use taskmanager_application::{
     SmartControlRequest, request_submission_failure, service_submission_failure,
@@ -79,6 +79,9 @@ pub fn queue_effect_result(
 ) -> Result<Vec<RequestId>, SubmissionErrorKind> {
     let now_ms = submission_time_ms();
     let results = match &effect {
+        PlatformEffect::ObserveDesktopAppearance => {
+            vec![platform.submit_desktop_appearance(DesktopAppearanceRequest::Observe, now_ms)]
+        }
         PlatformEffect::Refresh(request) => platform.request_refresh(*request, now_ms),
         PlatformEffect::EndTask(target) => {
             // Record the accepted submission so a later EndTaskCompleted can
@@ -201,17 +204,24 @@ pub fn queue_effect_result(
         }
         PlatformEffect::ProcessInsights(target) => {
             match platform.submit_process_insights(target.clone(), now_ms) {
-                Ok(submission) => vec![
-                    submission.network,
-                    submission.gpu,
-                    submission.resources,
-                    submission.isolation,
-                    submission.threads,
-                    // The optional open-files facet rides the same submission;
-                    // collecting its result keeps a lane-absent error visible
-                    // in the status line instead of silently dropped.
-                    submission.open_files,
-                ],
+                Ok(submission) => {
+                    app.apply_platform_batch(PlatformEventBatch {
+                        process_insight_projections: vec![submission.projection],
+                        ..PlatformEventBatch::default()
+                    });
+                    vec![
+                        submission.network,
+                        submission.gpu,
+                        submission.resources,
+                        submission.isolation,
+                        submission.threads,
+                        // The optional open-files facet rides the same submission;
+                        // collecting its result keeps a lane-absent error visible
+                        // in the status line instead of silently dropped.
+                        submission.open_files,
+                        submission.environment,
+                    ]
+                }
                 Err(error) => {
                     app.report_process_insights_submission_error(error);
                     vec![]

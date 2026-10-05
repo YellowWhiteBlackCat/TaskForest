@@ -1,8 +1,11 @@
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::FilesystemHealthSnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::SensorQuantity;
+use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
+use taskmanager_telemetry_store::{HistoryRetention, TelemetryStore};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
 #[path = "tests/dashboard.rs"]
@@ -20,10 +23,9 @@ const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 use super::{
     CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
     ProcessBatchAction, ProcessDetailsSection, ProcessItem, ServiceId, SystemHealthCaptureOutcome,
-    SystemSection, SystemSnapshot, TopPage,
+    SystemSnapshot, TopPage,
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
-use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_application::i18n;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
@@ -423,6 +425,8 @@ fn telemetry_paused_capture_waits_for_live_data_and_requires_paused_projection()
 fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SystemAbout));
     assert!(!evidence.system_about_requested());
+    assert!(!evidence.schedule_system_about_presentation());
+    assert!(!evidence.mark_system_about_presented(true));
 
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
@@ -439,6 +443,11 @@ fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
     evidence.mark_system_about_ready(true);
     assert!(evidence.scenario_ready());
     assert!(!evidence.system_about_requested());
+    assert!(evidence.schedule_system_about_presentation());
+    assert!(!evidence.schedule_system_about_presentation());
+    assert!(!evidence.mark_system_about_presented(false));
+    assert!(evidence.mark_system_about_presented(true));
+    assert!(!evidence.mark_system_about_presented(true));
 }
 
 #[test]
@@ -478,7 +487,7 @@ fn first_run_capture_waits_for_live_data_and_uses_fixed_fixture_values() {
     );
     assert!(evidence.first_run_requested());
 
-    let info = CaptureEvidence::first_run_fixture_info();
+    let info = setup_script_info();
     assert_eq!(
         info.path,
         std::path::Path::new("/usr/share/taskforest/setup/99-taskforest.rules")
@@ -653,7 +662,7 @@ fn health_scenarios_wait_for_exact_visible_fixture_state() {
         );
         assert!(outcome.ready());
         assert_eq!(page, TopPage::System);
-        assert_eq!(dashboard.section, SystemSection::Health);
+        assert_eq!(dashboard.section, SystemPageSection::Health);
         let selected_disk = &snapshot.disks[0];
         assert!(
             evidence
@@ -698,6 +707,10 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
             .iter()
             .any(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
     );
+    assert!(!evidence.scenario_ready());
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(32));
+    assert!(evidence.seed_dynamic_capture_history(&store.system_history, &ingestor, 10_000));
     assert!(evidence.scenario_ready());
     assert!(!evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
 }
@@ -729,29 +742,31 @@ fn process_memory_capture_fixture_keeps_pss_and_swap_separate() {
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
     let mut processes = Vec::new();
-
+    assert!(matches!(
+        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
+        Some(CaptureProcessAction::Properties(
+            _,
+            ProcessDetailsSection::Overview
+        ))
+    ));
+    let process = processes.first().expect("properties process");
+    assert_eq!(process.current_memory_bytes(), Some(315 * 1024 * 1024));
+    assert_eq!(process.current_memory_pss_bytes(), Some(240 * 1024 * 1024));
+    assert_eq!(process.current_memory_uss_bytes(), Some(192 * 1024 * 1024));
+    assert_eq!(process.current_swap_bytes(), Some(64 * 1024 * 1024));
+    assert!(
+        !evidence.scenario_ready(),
+        "the semantic action alone cannot certify pixels"
+    );
+    assert!(evidence.schedule_process_properties_presentation(true));
+    evidence.mark_process_properties_presented(true);
+    assert!(evidence.scenario_ready());
     assert!(
         evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-            .is_none()
+            .is_some()
     );
-    assert!(evidence.process_memory_pss_swap_requested());
-    assert_eq!(processes.len(), 3);
-    let browser = processes
-        .iter()
-        .find(|process| process.name == "capture-browser")
-        .expect("PSS capture fixture must contain the browser row");
-    assert_eq!(browser.current_memory_bytes(), Some(768 * 1024 * 1024));
-    assert_eq!(browser.current_memory_pss_bytes(), Some(410 * 1024 * 1024));
-    assert_eq!(browser.current_swap_bytes(), Some(96 * 1024 * 1024));
-
-    let before = processes.len();
-    assert!(
-        evidence
-            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-            .is_none()
-    );
-    assert_eq!(processes.len(), before, "fixture refresh must stay bounded");
+    assert_eq!(processes.len(), 1, "fixture refresh stays bounded");
 }
 
 #[test]
@@ -834,7 +849,8 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
 
     let mut processes = Vec::new();
     evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(32);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(32));
     let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let live_graph = LiveGraphHistory::from_store(store.clone(), 32);
     assert!(evidence.seed_gpu_engine_inventory_history(
@@ -876,28 +892,30 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
 }
 
 #[test]
-fn system_npu_capture_waits_for_fixture_layout_and_visible_scroll_before_marker() {
-    let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SystemNpu));
-    let mut snapshot = SystemSnapshot::default();
-    let mut processes = Vec::new();
-    evidence.on_snapshot(&mut snapshot);
-    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
+fn system_inventory_capture_waits_for_fixture_layout_and_visible_scroll_before_marker() {
+    for scenario in [CaptureScenario::SystemNpu, CaptureScenario::SystemHardware] {
+        let mut evidence = CaptureEvidence::for_test(Some(scenario));
+        let mut snapshot = SystemSnapshot::default();
+        let mut processes = Vec::new();
+        evidence.on_snapshot(&mut snapshot);
+        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
 
-    let fixture = evidence
-        .system_hardware_npu_fixture()
-        .expect("system NPU capture installs the typed NPU fixture");
-    assert!(fixture.is_success());
-    evidence.mark_system_npu_fixture_ready(true);
-    assert!(evidence.system_npu_layout_requested());
-    assert!(evidence.schedule_system_npu_scroll());
-    assert!(!evidence.schedule_system_npu_scroll());
-    evidence.mark_system_npu_scroll_applied(false);
-    assert!(evidence.system_npu_layout_requested());
+        let fixture = evidence
+            .system_hardware_npu_fixture()
+            .expect("system NPU capture installs the typed NPU fixture");
+        assert!(fixture.is_success());
+        evidence.mark_system_inventory_fixture_ready(true);
+        assert!(evidence.system_inventory_layout_requested());
+        assert!(evidence.schedule_system_inventory_scroll());
+        assert!(!evidence.schedule_system_inventory_scroll());
+        evidence.mark_system_inventory_scroll_applied(false);
+        assert!(evidence.system_inventory_layout_requested());
 
-    assert!(evidence.schedule_system_npu_scroll());
-    evidence.mark_system_npu_scroll_applied(true);
-    assert!(evidence.scenario_ready());
-    assert!(!evidence.system_npu_layout_requested());
+        assert!(evidence.schedule_system_inventory_scroll());
+        evidence.mark_system_inventory_scroll_applied(true);
+        assert!(evidence.scenario_ready());
+        assert!(!evidence.system_inventory_layout_requested());
+    }
 }
 
 /// The capture-evidence route runs the production shell, where the privileged

@@ -15,7 +15,7 @@
 //! stable-English-for-capture convention as the capture fixture.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
@@ -77,11 +77,11 @@ fn format_engine_line(engine: &ProcessGpuEngineUsage, labels: &ProcessInsightsLa
 /// explicit typed message when the source is unavailable, denied, or empty.
 pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    gpu: &ProcessGpuSnapshot,
     labels: &ProcessInsightsLabels,
     width: f32,
 ) -> Div {
-    let engines = &snapshot.gpu.engines;
+    let engines = &gpu.engines;
     if engines.state.status != DeviceStatus::Healthy {
         return super::card(theme, TITLE, width).child(
             div()

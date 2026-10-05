@@ -105,7 +105,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
 #[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
-    assert_eq!(pairs.len(), 26);
+    assert_eq!(pairs.len(), 27);
     let value = |field: ProcessDetailsField| {
         pairs
             .iter()
@@ -119,6 +119,7 @@ fn property_pairs_mirror_the_neutral_vm() {
         ProcessDetailsField::Memory,
         ProcessDetailsField::Pss,
         ProcessDetailsField::Uss,
+        ProcessDetailsField::Swap,
         ProcessDetailsField::Shared,
         ProcessDetailsField::AnonHugePages,
         ProcessDetailsField::Threads,
@@ -200,7 +201,7 @@ fn overview_exactly_the_property_rows_minus_command_and_exe() {
         .map(|(f, _, _)| *f)
         .filter(|f| !matches!(f, ProcessDetailsField::Cmdline | ProcessDetailsField::Exe))
         .collect();
-    assert_eq!(overview.len(), 24);
+    assert_eq!(overview.len(), 25);
     assert_eq!(overview.first(), Some(&ProcessDetailsField::Name));
 }
 
@@ -237,4 +238,18 @@ fn process_ancestor_lineage_renders_in_property_pairs_and_handles_root() {
         Some(MISSING_VALUE),
         "root process without ancestors renders the honest dash"
     );
+}
+
+#[test]
+fn command_identity_mismatch_renders_masquerading_warning() {
+    use taskmanager_shell::presentation::command_identity_summary;
+
+    let mut item = fixture();
+    item.cmdline = "fake_argv0 --arg".to_string();
+    let summary = command_identity_summary(&item);
+    assert!(
+        summary.is_some(),
+        "must generate command identity mismatch summary"
+    );
+    assert!(summary.unwrap().contains("sample"));
 }

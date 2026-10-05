@@ -3,9 +3,15 @@
 //! Extracted from [`super`] so the state + update module stays the entry point.
 
 use std::path::PathBuf;
+use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::saved_views::default_built_in_presets;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_shell::queue_effect;
 use taskmanager_theme::{LightDark, Skin};
 
 use super::*;
@@ -20,11 +26,6 @@ use taskmanager_core::core::metrics::CpuScalarObservations;
 use taskmanager_core::core::metrics::GpuEngine;
 use taskmanager_core::core::metrics::GpuScalarObservations;
 use taskmanager_core::core::metrics::ScalarObservationGroup;
-use taskmanager_core::core::npu::NpuDevice;
-use taskmanager_core::core::npu::NpuEngineKind;
-use taskmanager_core::core::npu::NpuEngineUsage;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::npu::NpuMemoryReport;
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::power::BatteryScalarObservations;
 use taskmanager_core::core::power::PowerSupplySnapshot;
@@ -95,13 +96,17 @@ impl IcedApp {
                 crate::font_catalog::system(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
-            saved_views: crate::saved_views::default_built_in_presets(),
+            nav_orientation: NavOrientation::default(),
+            saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),
-            first_run: crate::ui::first_run::FirstRunUiState::default(),
-            first_run_requests: std::collections::HashMap::new(),
-            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
+            first_run: FirstRunController::default(),
+            observed_appearance: None,
+            system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
+            system_section: SystemPageSection::Hardware,
+            system_health_section: HealthReviewSection::All,
+            system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
@@ -111,6 +116,7 @@ impl IcedApp {
             ),
             process_column_sizing: ProcessColumnSizing::default(),
             service_log_export: super::service_log::IcedServiceLogExportRuntime::default(),
+            diagnostics: super::diagnostics::IcedDiagnosticRuntime::default(),
             service_details: service_details::ServiceDetailsState::default(),
             performance: super::performance_state::PerformanceState::default(),
             window_time: super::window_time::WindowTimeCache::default(),
@@ -122,11 +128,15 @@ impl IcedApp {
             a11y_revision: 0,
             a11y_snapshot: None,
         };
-        // The boot observation is the dialog's trigger (GPUI parity): it is
-        // submitted through the platform channel before the first frame, and
-        // its correlated answer on the tick lane decides visibility. A
-        // missing platform folds the honest hidden state with no notice.
+        // Optional setup observes quietly; an explicit Settings entry owns visibility.
         app.begin_first_run_observation();
+        if let Some(platform) = app.runtime.platform_mut() {
+            queue_effect(
+                &mut app.shell,
+                platform,
+                PlatformEffect::ObserveDesktopAppearance,
+            );
+        }
         // The shared catalog is pinned to this frontend's language at the
         // runtime edges — `load_config` for real launches and the demo boot
         // closure in run.rs — never in the constructors, so parallel headless
@@ -159,16 +169,20 @@ impl IcedApp {
                 crate::font_catalog::bundled_only(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
-            saved_views: crate::saved_views::default_built_in_presets(),
+            nav_orientation: NavOrientation::default(),
+            saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
             saved_view_feedback: None,
             alerts_page: alerts::AlertsPageState::default(),
             // The demo has no platform client, so the boot observation is
             // skipped: the dialog stays hidden (there is no asset answer to
             // wait for and none is fabricated).
-            first_run: crate::ui::first_run::FirstRunUiState::default(),
-            first_run_requests: std::collections::HashMap::new(),
-            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
+            first_run: FirstRunController::default(),
+            observed_appearance: None,
+            system_dashboard_window: SystemHistoryWindow::FifteenMinutes,
+            system_section: SystemPageSection::Hardware,
+            system_health_section: HealthReviewSection::All,
+            system_dashboard_first_metric: 0,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
@@ -178,6 +192,7 @@ impl IcedApp {
             ),
             process_column_sizing: ProcessColumnSizing::default(),
             service_log_export: super::service_log::IcedServiceLogExportRuntime::default(),
+            diagnostics: super::diagnostics::IcedDiagnosticRuntime::default(),
             service_details: service_details::ServiceDetailsState::default(),
             performance: super::performance_state::PerformanceState::default(),
             window_time: super::window_time::WindowTimeCache::default(),
@@ -224,6 +239,11 @@ impl IcedApp {
         // active page — the target selector below has to win on page semantics.
         let mut config = Config::default();
         let mut overridden = false;
+        if crate::capture::persisted_history_requested() {
+            config.history_persistence = true;
+            overridden = true;
+        }
+
         if let Some(locale) = locale {
             // The demo boot deliberately skips `load_config` (no host I/O),
             // so the capture locale rides the production pipeline one level
@@ -256,58 +276,7 @@ impl IcedApp {
     }
 }
 
-/// Apply one fixed capture target and its page-local facts. System and NPU
-/// captures receive a deterministic NPU inventory; other targets preserve
-/// the unobserved state.
-fn apply_capture_target(app: &mut IcedApp, target: &str) {
-    if target == "service-details" {
-        app.shell.application.active_page = AppPage::Services;
-        let _ = app.open_service_details_for_effect(0);
-    } else if target == crate::capture::HEALTH_TARGET {
-        // The health modal is a renderer-local surface. Ride the same reducer
-        // the toolbar trigger dispatches (`Message::OpenHealth`) so the
-        // capture target cannot invent a second opening path, and leave the
-        // active page on Performance: the surface is the target, not a page.
-        let _ = app.update(Message::OpenHealth);
-    } else if let Some(page) = capture_page_from_name(target) {
-        app.shell.application.active_page = page;
-        if page == AppPage::System {
-            seed_capture_npu_fixture(app);
-        }
-    } else if let Some(device) = capture_device_from_name(target) {
-        if matches!(device, PerfDevice::Npu(_)) {
-            seed_capture_npu_fixture(app);
-        }
-        app.performance.selected_device = device;
-    }
-}
-
-fn seed_capture_npu_fixture(app: &mut IcedApp) {
-    let observed_at_ms = 7_000;
-    let inventory = NpuInventorySnapshot::discovered(
-        vec![NpuDevice {
-            device_id: DeviceId::new("accel0"),
-            brand: Some("Intel AI Boost".into()),
-            driver: Some("intel_vpu".into()),
-            utilization_pct: ScalarObservation::available(38.0, observed_at_ms),
-            engines: vec![NpuEngineUsage {
-                kind: NpuEngineKind::Matrix,
-                utilization_pct: ScalarObservation::available(61.0, observed_at_ms),
-            }],
-            memory: NpuMemoryReport {
-                dedicated_total_bytes: ScalarObservation::available(0, observed_at_ms),
-                shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
-                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, observed_at_ms),
-            },
-            ..Default::default()
-        }],
-        observed_at_ms,
-    );
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::NpuInventory(Some(inventory)),
-    );
-}
+pub(super) use super::capture_state::{apply_capture_target, capture_page_from_name};
 
 /// Enrich the no-I/O demo only for real pixel capture. The ordinary
 /// `IcedApp::demo()` fixture remains intentionally small for loading-state
@@ -650,32 +619,10 @@ fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
     }
 }
 
-fn capture_device_from_name(name: &str) -> Option<PerfDevice> {
-    match name {
-        "cpu" => Some(PerfDevice::Cpu),
-        "memory" => Some(PerfDevice::Memory),
-        "disk" => Some(PerfDevice::Disk(0)),
-        "network" => Some(PerfDevice::Network(0)),
-        "gpu" => Some(PerfDevice::Gpu(0)),
-        "npu" => Some(PerfDevice::Npu(0)),
-        "battery" => Some(PerfDevice::Battery(0)),
-        "fan" => Some(PerfDevice::Fan(0)),
-        _ => None,
-    }
-}
-
-fn capture_page_from_name(name: &str) -> Option<AppPage> {
-    match name {
-        "applications" => Some(AppPage::Applications),
-        "services" => Some(AppPage::Services),
-        "startup" => Some(AppPage::Startup),
-        "users" => Some(AppPage::Users),
-        "system" => Some(AppPage::System),
-        "app-history" => Some(AppPage::AppHistory),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 #[path = "../../tests/gui/app/constructors_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/app/capture_semantics_tests.rs"]
+mod capture_semantics_tests;

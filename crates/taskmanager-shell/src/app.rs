@@ -2,6 +2,10 @@
 
 use std::sync::Arc;
 
+use crate::system_timeline::project_timeline;
+use taskmanager_application::system_timeline::{
+    SystemHistoryWindow, TimelineSeries, TimelineState,
+};
 use taskmanager_application::{
     AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CommandContext, CommandScope,
     ConfirmationKind, ContainerRollupEvent, DesktopNotificationRequest,
@@ -31,6 +35,7 @@ use selection::VisibleProcessesMemo;
 
 mod batch_fold;
 mod confirmation_gates;
+mod diagnostics;
 mod direct_track;
 mod effect_dispatch;
 mod effects;
@@ -358,6 +363,7 @@ pub struct ShellApp {
     /// Single renderer-neutral live graph store. Its private paired writer is
     /// fed only from application-correlated outcomes below.
     pub history: LiveGraphHistory,
+    system_timeline: TimelineState,
     /// Bounded evidence for alert-threshold suggestions and the SMART detail
     /// trend. It intentionally owns no general live graph series.
     pub alert_suggestions: AlertSuggestionWindow,
@@ -407,6 +413,16 @@ impl ShellApp {
     #[must_use]
     pub const fn projection(&self) -> &SystemProjectionStore {
         &self.data
+    }
+
+    /// The shared application window over this composition's authoritative host rings.
+    #[must_use]
+    pub fn system_timeline_series(&self, window: SystemHistoryWindow) -> TimelineSeries {
+        project_timeline(
+            &self.system_timeline,
+            &self.history.store().system_history,
+            window,
+        )
     }
 
     /// Cache the runtime's read-only capability inventory. This is a named

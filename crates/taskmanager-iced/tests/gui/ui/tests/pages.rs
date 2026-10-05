@@ -22,6 +22,7 @@ use crate::ui::applications::{
 };
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
+use taskmanager_shell::PageHelp;
 use taskmanager_shell::presentation::{bytes, duration};
 
 use taskmanager_application::CommandId;

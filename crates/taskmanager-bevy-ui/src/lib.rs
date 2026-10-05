@@ -1,7 +1,7 @@
 //! Bevy UI fourth frontend — peer surface to the GPUI/Iced/TUI frontends
 //! ([docs/BEVY_UI_FRONTEND.md](../../docs/BEVY_UI_FRONTEND.md)).
 //!
-//! This crate renders the same neutral shell projections with Bevy 0.19's
+//! This crate renders the same neutral shell projections with Bevy 0.20's
 //! official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` — composing
 //! static structure declaratively with `bsn!` and binding dynamic state
 //! through observers and required components. It owns these seams:
@@ -54,30 +54,38 @@ compile_error!(
      vendor-specific TaskForest artifacts are not supported"
 );
 
+pub(crate) mod about_modal;
 pub mod app;
 pub mod bindings;
 pub mod capabilities;
+pub(crate) mod capture;
 pub mod confirmation;
 pub mod demo_fixture;
 pub mod drain;
+pub(crate) mod event_center;
 pub mod export;
 pub mod feature_coverage;
+pub(crate) mod first_run_modal;
 pub(crate) mod focus_visible;
 pub mod functional;
 pub mod icons;
 pub mod input;
 pub mod input_contract;
 pub mod menu_modal;
+pub(crate) mod navigation;
 pub mod pages;
 pub mod palette;
 pub mod runtime;
+pub(crate) mod saved_views;
 pub mod semantic;
 pub mod snapshot_export;
+pub(crate) mod system_information_modal;
 pub(crate) mod text_selection;
 pub(crate) mod tooltip;
 pub(crate) mod tray;
 pub mod widgets;
 mod window;
+pub(crate) mod window_surface;
 
 #[cfg(test)]
 #[path = "../tests/headless/visual_parity.rs"]

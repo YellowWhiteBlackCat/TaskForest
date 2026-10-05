@@ -12,6 +12,7 @@ use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
 
 use super::{
@@ -38,6 +39,12 @@ fn shell_with_selection() -> ShellApp {
     });
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     shell
+}
+
+impl ClipboardPort {
+    pub(crate) fn get_text(&self) -> Option<&str> {
+        self.contents.as_deref()
+    }
 }
 
 #[test]
@@ -95,6 +102,16 @@ fn copy_selection_or_row_prioritizes_text_selection_over_row_summary() {
 
     let copied = copy_selection_or_row(&mut state, &mut clipboard, &mut shell);
     assert!(copied);
+    assert!(
+        clipboard.get_text().is_none(),
+        "queueing cannot claim a completed write"
+    );
+    let mut written = Vec::new();
+    super::flush_clipboard(&mut clipboard, &mut shell, |text| {
+        written.push(text.to_owned());
+        Ok(())
+    });
+    assert_eq!(written, ["Selected"]);
     assert_eq!(clipboard.get_text(), Some("Selected"));
     let notice = shell.feedback_notice().expect("feedback recorded");
     assert_eq!(notice.source(), FeedbackSource::Clipboard);
@@ -104,6 +121,7 @@ fn copy_selection_or_row_prioritizes_text_selection_over_row_summary() {
     state.clear();
     let copied_row = copy_selection_or_row(&mut state, &mut clipboard, &mut shell);
     assert!(copied_row);
+    super::flush_clipboard(&mut clipboard, &mut shell, |_text| Ok(()));
     assert_eq!(
         clipboard.get_text(),
         shell.selected_row_summary().as_deref()
@@ -170,4 +188,18 @@ fn text_selection_picking_mounts_and_despawns_highlight() {
         .iter(world)
         .count();
     assert_eq!(highlighted, 0, "highlight component removed");
+}
+
+#[test]
+fn rejected_clipboard_output_remains_a_failure_and_never_becomes_last_copied_text() {
+    let mut shell = ShellApp::new();
+    let mut clipboard = ClipboardPort::default();
+    clipboard.request_text("private descriptor", "Setup");
+    super::flush_clipboard(&mut clipboard, &mut shell, |_text| {
+        Err("clipboard unavailable".into())
+    });
+    assert!(clipboard.get_text().is_none());
+    let notice = shell.feedback_notice().expect("write failure");
+    assert_eq!(notice.severity(), FeedbackSeverity::Error);
+    assert!(notice.text().contains("clipboard unavailable"));
 }

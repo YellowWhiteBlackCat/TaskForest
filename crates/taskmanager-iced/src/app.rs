@@ -14,6 +14,14 @@
 //! loop), `focus_state` (the focus command policy).
 
 use std::time::{Duration, Instant};
+use taskmanager_application::ProcessInsightFacet;
+use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::saved_views::{SavedViewPreset, SavedViewTransferFeedback};
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
@@ -22,12 +30,10 @@ use taskmanager_core::core::config::Config;
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::setup::SetupScriptAction;
 
-use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_platform_contract::RequestId;
+use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
     ProcessStatusFilter, ShellApp, SortCol,
@@ -39,11 +45,13 @@ mod accessors;
 mod affinity;
 pub(crate) mod alerts;
 pub(crate) mod appearance;
+mod capture_fixtures;
 mod capture_state;
 mod column_menu;
 mod config_sync;
 mod configuration_state;
 mod constructors;
+mod diagnostics;
 mod focus_state;
 mod focus_targets;
 pub(crate) mod history_replay;
@@ -62,6 +70,7 @@ mod projection;
 mod projection_caches;
 mod refresh;
 mod runtime;
+mod saved_views;
 mod scroll;
 mod selectors;
 mod service_details;
@@ -69,6 +78,7 @@ mod service_log;
 mod service_menu;
 mod settings;
 mod settings_types;
+mod sidebar;
 mod snapshot_export;
 mod startup_menu;
 mod subscription;
@@ -169,7 +179,9 @@ pub enum Message {
     /// A process row was right-clicked. The message carries the exact live
     /// identity captured by the rendered row; a later refresh cannot retarget
     /// the menu or its actions to a PID-reuse impostor.
-    OpenProcessRowMenu { identity: ProcessLiveKey },
+    OpenProcessRowMenu {
+        identity: ProcessLiveKey,
+    },
     /// Close the Applications-row context menu.
     CloseProcessRowMenu,
     /// Apply one action from the Applications-row context menu.
@@ -188,7 +200,10 @@ pub enum Message {
     /// frontend-local drag session for that column at its current rendered
     /// width. The edge's `mouse_area` captures the press, so the sort click
     /// underneath never fires.
-    BeginProcessColumnDrag { column: SortCol, start_width: f32 },
+    BeginProcessColumnDrag {
+        column: SortCol,
+        start_width: f32,
+    },
     /// The pointer moved while a process-column drag session is open. Fed by
     /// the raw pointer subscription mounted only while a session exists; the
     /// reducer derives the live width from the session's anchor.
@@ -202,7 +217,10 @@ pub enum Message {
     /// widen/narrow controls) share this transition; each stepper step also
     /// commits the override set to the persisted configuration token. Purely
     /// frontend-local: no shell effect, clamped to the sizing domain on store.
-    ResizeProcessColumn { column: SortCol, width: f32 },
+    ResizeProcessColumn {
+        column: SortCol,
+        width: f32,
+    },
     /// A Services row was right-clicked. `visual_index` keeps the shared
     /// selection highlight aligned with the rendered table; `source_index`
     /// freezes the provider-order identity used by the action path.
@@ -218,10 +236,14 @@ pub enum Message {
     /// Select a service row and open its log stream. The row index is resolved
     /// against provider order by the Services page before this message is
     /// published.
-    OpenServiceLogFor { index: usize },
+    OpenServiceLogFor {
+        index: usize,
+    },
     /// Select a service row and open its dependency/lifecycle details modal.
     /// The dependency query is submitted through the shared typed effect lane.
-    OpenServiceDetailsFor { index: usize },
+    OpenServiceDetailsFor {
+        index: usize,
+    },
     /// Retry the dependency query for the open service-details modal.
     RefreshServiceDetails,
     /// Toggle paused/running for the details modal's merged log panel.
@@ -279,6 +301,8 @@ pub enum Message {
     AuthorizeRaplPower,
     /// Authorize or refresh CPU MSR readouts via MSR helper.
     AuthorizeMsrReadouts,
+    /// Execute a currently offered, identity-frozen permission-center action.
+    AuthorizePrivilege(PrivilegeAction),
     /// End-task was requested (shows the confirmation bar).
     RequestEndTask,
     /// Request a batch process-control action (Suspend / Resume / Kill /
@@ -301,7 +325,9 @@ pub enum Message {
     CloseUserRowMenu,
     /// A Startup row was right-clicked. The visual index is resolved to the
     /// provider-issued entry identity before any menu action is submitted.
-    OpenStartupRowMenu { visual_index: usize },
+    OpenStartupRowMenu {
+        visual_index: usize,
+    },
     /// Close the Startup-row context menu.
     CloseStartupRowMenu,
     /// Request enable (true) / disable (false) of the currently selected
@@ -310,7 +336,10 @@ pub enum Message {
     RequestStartupControl(bool),
     /// Request Startup enable/disable for an exact provider-order entry from
     /// the row context menu. This keeps sorting from retargeting the action.
-    RequestStartupControlFor { index: usize, enabled: bool },
+    RequestStartupControlFor {
+        index: usize,
+        enabled: bool,
+    },
     /// Confirm a gated startup Enable/Disable (mirrors GPUI's confirm dialog).
     /// The shell's `request_startup_control` only sets the pending slot; this
     /// message emits the actual StartupControl effect.
@@ -319,6 +348,8 @@ pub enum Message {
     Focus(FocusTarget),
     /// A real Iced frame was requested by the evidence runner.
     Frame(Instant),
+    /// The current capture control was measured through the real widget tree.
+    CaptureFocusPresented(bool),
     /// The native window changed size; this drives the frontend-local
     /// responsive layout breakpoint and never crosses into the shell.
     WindowResized(iced::Size),
@@ -340,7 +371,10 @@ pub enum Message {
     /// The Users/session inventory table viewport moved.
     UsersScrolled(iced::widget::scrollable::Viewport),
     /// A service row action was requested; opens the shared confirmation bar.
-    RequestServiceAction { index: usize, action: ServiceAction },
+    RequestServiceAction {
+        index: usize,
+        action: ServiceAction,
+    },
     /// The pending service-control confirmation was confirmed.
     ConfirmServiceControl,
     /// Reveal the selected process's executable in the platform file manager.
@@ -369,13 +403,20 @@ pub enum Message {
     CollapseAllProcessTree,
     /// Jump to an exact process incarnation in Applications view and
     /// highlight it.
-    JumpToProcess { identity: ProcessLiveKey },
+    JumpToProcess {
+        identity: ProcessLiveKey,
+    },
     /// Copy text to system clipboard with a status label.
-    CopyTextToClipboard { label: String, text: String },
+    CopyTextToClipboard {
+        label: String,
+        text: String,
+    },
     /// The process-properties environment table's key filter changed.
     EnvironmentFilterChanged(String),
     /// Open the startup entry executable or desktop file in file manager.
-    OpenStartupLocation { index: usize },
+    OpenStartupLocation {
+        index: usize,
+    },
     /// Switch performance graph history resolution data points.
     SelectPerformanceGraphPoints(u32),
     /// Accept the Insights network escalation pill: request the system-wide
@@ -384,8 +425,19 @@ pub enum Message {
     /// Switch the process-details modal's section tab (Overview /
     /// Performance / Command / Insights).
     SelectDetailsSection(DetailsSection),
+    SelectInsightsFacet(ProcessInsightFacet),
+    RefreshProcessInsights,
     /// Open the frontend-local settings modal.
     OpenSettings,
+    OpenSidebarEditor,
+    SetSidebarDeviceVisibility {
+        key: String,
+        visible: bool,
+    },
+    MoveSidebarDevice {
+        key: String,
+        delta: isize,
+    },
     /// Close the frontend-local settings modal.
     CloseSettings,
     /// One settings control changed (persisted + applied to the theme).
@@ -398,6 +450,8 @@ pub enum Message {
     SystemThemeChanged(iced::theme::Mode),
     /// Open the frontend-local about/system-information modal.
     OpenAbout,
+    OpenSystemInformation,
+    OpenRepository,
     /// Open the frontend-local system-health modal.
     OpenHealth,
     /// Open the frontend-local containers modal.
@@ -409,12 +463,11 @@ pub enum Message {
     /// [`ShellApp::request_directory_usage`] effect lane.
     ToggleDirectoryUsageScan,
     /// Open the SMART detail dialog for one observed disk.
-    OpenDiskSmart { index: usize },
-    /// Request a SMART self-test on the observed disk at `index`.
-    RequestSmartSelfTest {
+    OpenDiskSmart {
         index: usize,
-        kind: SmartSelfTestKind,
     },
+    /// Arm a self-test for the exact identity painted by the activating control.
+    RequestSmartSelfTest(SmartSelfTestIntent),
     /// Confirm the pending SMART self-test request.
     ConfirmSmartSelfTest,
     /// Toggle the expanded state of the GPU engines breakdown panel.
@@ -428,18 +481,22 @@ pub enum Message {
     /// (G-16, GPUI about-parity). Served by the iced clipboard task; the
     /// footer feedback mirrors the export line's lifecycle.
     CopyAboutDetails,
+    CopySystemInformation,
     /// Export the current snapshot into the working directory.
     ExportSnapshot,
     /// Request a current-window PNG screenshot capture.
     RequestCurrentWindowCapture,
     /// Apply a saved process view preset.
     ApplySavedView(u64),
+    OpenSavedViews,
+    ToggleNavigation,
     /// Save current Applications view configuration as a custom preset.
     SaveCurrentProcessView,
     /// Export user saved views to JSON on clipboard.
     ExportSavedViews,
     /// Import user saved views from JSON on clipboard.
     ImportSavedViews,
+    SavedViewsClipboardRead(Option<String>),
     /// Delete a user-saved view preset.
     DeleteSavedView(u64),
     /// Toggle performance history replay panel.
@@ -458,10 +515,8 @@ pub enum Message {
     ExportAlertEvents,
     /// Frontend-local Alerts page message (route open/close + rule toggle).
     Alerts(AlertsMessage),
-    /// Frontend-local first-run dialog intents (GPUI first-run parity). The
-    /// dialog's state machine and renderer live in `ui::first_run`; the
-    /// typed intents feed the surface wiring that owns the observation and
-    /// setup-script submission lane.
+    /// Optional setup intents delegate to the application controller; the
+    /// surface slot owns visibility and `ui::first_run` owns rendering.
     FirstRun(FirstRunMessage),
     /// Frontend-local System-page dashboard segment message (history-window
     /// selection; the segment renderer lives in `ui::system_dashboard`).
@@ -472,6 +527,8 @@ pub enum Message {
     CopyProcessJson,
     /// Generate and copy redacted system diagnostics report.
     GenerateDiagnosticsReport,
+    ConfirmDiagnosticsExport,
+    RetryDiagnostics,
     /// Open the Run New Task modal.
     OpenRunTask,
     /// Close the Run New Task modal.
@@ -500,24 +557,24 @@ pub struct IcedApp {
     /// Run New Task state.
     pub(crate) run_task: crate::ui::overlays::run_task::RunTaskState,
     /// User process view presets.
-    pub(crate) saved_views: Vec<crate::saved_views::SavedViewPreset>,
+    pub(crate) nav_orientation: NavOrientation,
+    pub(crate) saved_views: Vec<SavedViewPreset>,
     pub(crate) next_saved_view_id: u64,
-    pub(crate) saved_view_feedback: Option<crate::saved_views::SavedViewTransferFeedback>,
+    pub(crate) saved_view_feedback: Option<SavedViewTransferFeedback>,
     /// Frontend-local Alerts-page route (an Iced-local
     /// route outside the shared `AppPage` set, GPUI Containers-page style).
     pub(crate) alerts_page: alerts::AlertsPageState,
-    /// Frontend-local first-run dialog state (GPUI first-run parity). The
-    /// state machine and renderer live in `ui::first_run`; the composition
-    /// lane in `app::update::first_run` folds correlated platform answers
-    /// into it and drives the `LocalSurface::FirstRun` slot.
-    pub(crate) first_run: crate::ui::first_run::FirstRunUiState,
-    /// Pending first-run setup-script submissions, correlated by request id
-    /// (the drained batch's answers and typed failures consume from here).
-    pub(crate) first_run_requests: std::collections::HashMap<RequestId, SetupScriptAction>,
+    /// Application-owned optional-setup facts and correlated action state.
+    /// The independent local surface slot owns explicit review visibility.
+    pub(crate) first_run: FirstRunController,
+    pub(crate) observed_appearance: Option<DesktopAppearance>,
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
-    pub(crate) system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow,
+    pub(crate) system_dashboard_window: SystemHistoryWindow,
+    pub(crate) system_section: SystemPageSection,
+    pub(crate) system_health_section: HealthReviewSection,
+    pub(crate) system_dashboard_first_metric: usize,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.
     history_runtime: history_replay::IcedHistoryRuntime,
@@ -539,6 +596,7 @@ pub struct IcedApp {
     pub(crate) process_column_sizing: update::columns::ProcessColumnSizing,
     /// Named client of the app-host's process-wide diagnostic writer.
     service_log_export: service_log::IcedServiceLogExportRuntime,
+    diagnostics: diagnostics::IcedDiagnosticRuntime,
     /// Renderer-local service-details data. Its open target is carried by the
     /// `LocalSurface::ServiceDetails` payload.
     pub(crate) service_details: service_details::ServiceDetailsState,

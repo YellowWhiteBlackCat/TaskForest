@@ -210,7 +210,7 @@ interaction	mc05-tui-visibility-filter	tui	P0-MC-05	lib	runtime::tests::settings
 interaction	mc05-tui-density	tui	P0-MC-05	lib	ui::tests::visibility::every_page_paints_visible_body_rows_at_reference_and_minimum_sizes	success|responsive	-	success	
 interaction	mc05-tui-chart-cursor	tui	P0-MC-05	lib	runtime::tests::chart_cursor::arrows_move_the_chart_cursor_and_paint_the_hover_readout	success|keyboard	-	success	
 interaction	mc06-tui-ctrl-pause	tui	P0-MC-06	lib	runtime::tests::keys_navigation::control_hold_pauses_telemetry_through_the_shared_policy	success|keyboard|lifecycle	-	success	
-interaction	mc06-tui-about	tui	P0-MC-06	lib	ui::about::tests::about_overlay_renders_hardware_facts_and_version	success|cancel	-	success	
+interaction	mc06-tui-about	tui	P0-MC-06	lib	ui::about::tests::about_reviews_application_metadata_and_keeps_system_information_separate	success|cancel	-	success	
 interaction	mc06-tui-modal-cancel	tui	P0-MC-06	lib	runtime::tests::control_feedback::esc_key_dismisses_open_modal_before_feedback_notice	cancel|failure	-	cancel	
 interaction	mc06-tui-modal-focus	tui	P0-MC-06	lib	runtime::tests::overlays::local_overlay_toggles_are_mutually_exclusive_and_modal	focus|keyboard|cancel	-	focus	
 interaction	mc06-tui-confirm-cancel	tui	P0-MC-06	lib	runtime::tests::process_batch::batch_confirmation_n_dismisses_without_an_effect	cancel	-	cancel	

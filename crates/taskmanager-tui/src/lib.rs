@@ -22,23 +22,29 @@ compile_error!(
      vendor-specific TaskForest artifacts are not supported"
 );
 
+mod alert_editor;
 mod bindings;
 mod capabilities;
 mod clipboard;
 mod column_prefs;
 mod command_palette;
 mod demo;
-mod diagnostic_report;
+mod diagnostic_bundle;
 mod feature_coverage;
+mod first_run;
 mod functional;
+mod health_review;
 mod history_runtime;
+mod information;
 mod menus;
 mod preferences;
 mod process_view;
 mod runtime;
+mod saved_views;
 mod selection;
 mod selectors;
 pub(crate) mod service_log;
+mod sidebar;
 mod snapshot_export;
 mod startup_control;
 mod surface;
@@ -59,10 +65,6 @@ pub use functional::functional_declaration;
 pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
 
 pub use demo::demo_app;
-pub use diagnostic_report::{
-    DEFAULT_DIAGNOSTIC_FILENAME, DiagnosticExportError, default_diagnostic_path,
-    render_diagnostic_report,
-};
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
@@ -102,21 +104,19 @@ pub fn run_cli(binary_name: &'static str) {
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use taskmanager_application::first_run::FirstRunController;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
-    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, ManagedAlertRule, ManagedAlertRuleEdit,
-    ManagedAlertRuleEditOutcome, Modifiers, SurfaceKind, source_notice,
+    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
 };
 use taskmanager_application::{
     AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
     RefreshRequest, i18n::t,
 };
 use taskmanager_cli::{FrontendHandlers, run};
-use taskmanager_core::core::alerts::{
-    AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
-    import_alert_rules_json,
-};
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -176,12 +176,17 @@ pub struct TuiApp {
     pub export_dir: Option<PathBuf>,
     /// Typed lifecycle plus the app-host's non-blocking export client.
     snapshot_export: snapshot_export::TuiSnapshotExportRuntime,
+    diagnostics: diagnostic_bundle::TuiDiagnosticRuntime,
+    first_run: FirstRunController,
     /// Read-only durable-history lifecycle and replay capability.
     history_runtime: history_runtime::TuiHistoryRuntime,
     /// Frontend-local Performance resource selector (select-a-device detail
     /// model). Default [`PerfDevice::Cpu`]; only mutated by the Performance-page
     /// digit-key handler in `runtime::handle_key`.
     pub perf_device: PerfDevice,
+    pub(crate) performance_device_key: Option<String>,
+    pub(crate) nav_orientation: NavOrientation,
+    pub(crate) saved_views: saved_views::SavedViewsState,
     /// Frontend-local vertical-scroll intent for the inline selected-process
     /// detail/insights panel on the Applications page. The panel content (frozen
     /// identity rows + the bounded ProcessInsights cards) can exceed the fixed
@@ -215,9 +220,14 @@ pub struct TuiApp {
     /// Stored as navigation intent and clamped by the current projection and
     /// terminal height during paint.
     pub system_scroll: usize,
+    pub(crate) system_section: SystemPageSection,
+    pub(crate) system_history_window: SystemHistoryWindow,
+    pub(crate) memory_capture_scroll_pending: bool,
     /// Alert-rule selection index in the health overlay. Clamped against the
     /// projection's managed-rules count during access.
     pub health_rule_selection: usize,
+    pub(crate) alert_import_mode: Option<AlertRuleImportMode>,
+    pub(crate) health_review: health_review::HealthReviewState,
     /// The locale-neutral category/app/type expansion keys whose headers are
     /// currently expanded on the Applications page. Toggled by activating a
     /// header (Enter / Right). Re-seeded for the canonical category tree when
@@ -339,15 +349,25 @@ impl TuiApp {
             settings_draft: preferences::SettingsDraftLifecycle::default(),
             export_dir: None,
             snapshot_export: snapshot_export::TuiSnapshotExportRuntime::default(),
+            diagnostics: diagnostic_bundle::TuiDiagnosticRuntime::default(),
+            first_run: FirstRunController::default(),
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,
+            performance_device_key: None,
+            nav_orientation: NavOrientation::default(),
+            saved_views: saved_views::SavedViewsState::default(),
             detail_scroll: 0,
             cpu_core_scroll: 0,
             cpu_detail_scroll: 0,
             gpu_engine_scroll: 0,
             chart_cursor: None,
             system_scroll: 0,
+            system_section: SystemPageSection::Hardware,
+            system_history_window: SystemHistoryWindow::FifteenMinutes,
+            memory_capture_scroll_pending: false,
             health_rule_selection: 0,
+            alert_import_mode: None,
+            health_review: health_review::HealthReviewState::default(),
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
@@ -374,6 +394,8 @@ impl TuiApp {
     /// per-pid tree state is pruned against the new live set so exited pids
     /// cannot leak into a later pid reuse.
     pub fn apply_platform_batch(&mut self, batch: PlatformEventBatch) {
+        let outcome = self.first_run.fold_batch(&batch);
+        self.apply_first_run_completion(outcome);
         let process_revision_before = self.shell.projection().process_revision;
         let selected_application_anchor = self.selected_application_row_anchor();
         let selected_inventory_anchor = self.selected_inventory_row_anchor();
@@ -581,7 +603,9 @@ impl TuiApp {
         if self.about_open() {
             self.dismiss_local_surface_kind(TuiSurfaceKind::About);
         } else {
-            self.open_local_surface(TuiSurface::About);
+            self.open_local_surface(TuiSurface::About(
+                crate::information::AboutTargetView::default(),
+            ));
         }
     }
 
@@ -591,101 +615,10 @@ impl TuiApp {
             self.dismiss_local_surface_kind(TuiSurfaceKind::Health);
         } else {
             self.health_rule_selection = 0;
+            self.alert_import_mode = None;
+            self.health_review = health_review::HealthReviewState::default();
             self.open_local_surface(TuiSurface::Health);
         }
-    }
-
-    /// Apply one semantic edit to the canonical managed alert-rule set.
-    pub fn edit_alert_rules(
-        &mut self,
-        edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.shell.edit_alert_rules(edit)
-    }
-
-    pub fn add_alert_rule(
-        &mut self,
-        rule: AlertRule,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
-    }
-
-    pub fn remove_alert_rule(
-        &mut self,
-        rule_id: String,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
-    }
-
-    pub fn export_alert_rules(&self) -> Result<String, AlertRuleTransferError> {
-        let entries: Vec<AlertRuleTransferEntry> = self
-            .projection()
-            .alert_center
-            .managed_rules()
-            .iter()
-            .map(AlertRuleTransferEntry::from)
-            .collect();
-        export_alert_rules_json(&entries)
-    }
-
-    pub fn import_alert_rules(
-        &mut self,
-        json: &str,
-        mode: AlertRuleImportMode,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        let entries = import_alert_rules_json(json)?;
-        let rules: Vec<ManagedAlertRule> =
-            entries.into_iter().map(ManagedAlertRule::from).collect();
-        self.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
-    }
-
-    /// The currently selected rule index in the health overlay. Clamped against
-    /// the current managed-rules count.
-    #[must_use]
-    pub fn health_rule_selection(&self) -> usize {
-        let count = self.projection().alert_center.managed_rules().len();
-        if count == 0 {
-            0
-        } else {
-            self.health_rule_selection.min(count - 1)
-        }
-    }
-
-    /// Move the health overlay's alert-rule selection cursor by `delta`.
-    pub fn health_rule_move(&mut self, delta: isize) {
-        let count = self.projection().alert_center.managed_rules().len();
-        if count == 0 {
-            self.health_rule_selection = 0;
-            return;
-        }
-        let current = self.health_rule_selection();
-        self.health_rule_selection = current.saturating_add_signed(delta).min(count - 1);
-    }
-
-    /// Toggle the currently selected managed alert rule in the health overlay.
-    pub fn toggle_selected_alert_rule(&mut self) -> bool {
-        let index = self.health_rule_selection();
-        let rules = self.projection().alert_center.managed_rules();
-        if let Some(managed) = rules.get(index) {
-            let rule_id = managed.rule.id.clone();
-            let _ = self.edit_alert_rules(ManagedAlertRuleEdit::Toggle { rule_id });
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Toggle a managed alert rule by ID.
-    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
-        self.edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: rule_id.into(),
-        })
-        .is_ok_and(|outcome| outcome.changed())
-    }
-
-    /// Clear the recorded alert event history in the canonical alert center.
-    pub fn clear_alert_event_history(&mut self) {
-        self.shell.clear_alert_event_history();
     }
 
     /// Toggle the containers overlay, closing every other modal first.

@@ -22,12 +22,12 @@ use taskmanager_shell::presentation::sandbox_details_summary;
 mod helpers;
 pub(crate) use helpers::*;
 
+use iced::Element;
 use iced::widget::{column, text};
-use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    ProcessInsightFacetState, ProcessInsightUnavailable, ProjectedProcessInsights,
-    project_process_resources,
+    ProcessInsightFacet, ProcessInsightFacetState, ProcessInsightUnavailable,
+    ProjectedProcessInsights, project_process_resources,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::{IsolationKind, LimitValue};
@@ -45,10 +45,6 @@ use crate::focus;
 /// counter, a cold-start rate gap, an unreadable readlink). Never a fabricated
 /// `0`/`0.0%`.
 const DASH: &str = MISSING_VALUE;
-/// Cap on rows rendered per facet sub-section. The modal itself scrolls, so
-/// this only keeps one busy process from dominating the panel.
-const MAX_FACET_ROWS: usize = 8;
-
 /// Build the per-process insights block (heading + eight facet sub-sections)
 /// for the open details overlay. The block always renders: when no projection
 /// for this frozen target has arrived yet every facet shows the honest
@@ -57,26 +53,27 @@ pub(super) fn insights_block<'a>(
     theme_snapshot: &'a Theme,
     shell: &ShellApp,
     target: &FrozenProcessIdentity,
+    facet: ProcessInsightFacet,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let projection = shell
         .projection()
         .process_insights
         .as_ref()
         .filter(|projection| &projection.target == target);
-    column![
-        section_title(theme_snapshot, t("prop.insights")),
-        threads_section(theme_snapshot, projection),
-        open_files_section(theme_snapshot, projection),
-        network_section(theme_snapshot, projection),
-        gpu_devices_section(theme_snapshot, projection),
-        gpu_engines_section(theme_snapshot, projection),
-        resources_section(theme_snapshot, projection),
-        isolation_section(theme_snapshot, projection),
-        environment_section(theme_snapshot, projection),
-    ]
-    .spacing(8)
-    .width(Length::Fill)
-    .into()
+    match facet {
+        ProcessInsightFacet::Network => network_section(theme_snapshot, projection),
+        ProcessInsightFacet::Gpu => column![
+            gpu_devices_section(theme_snapshot, projection),
+            gpu_engines_section(theme_snapshot, projection)
+        ]
+        .spacing(8)
+        .into(),
+        ProcessInsightFacet::Resources => resources_section(theme_snapshot, projection),
+        ProcessInsightFacet::Isolation => isolation_section(theme_snapshot, projection),
+        ProcessInsightFacet::Threads => threads_section(theme_snapshot, projection),
+        ProcessInsightFacet::OpenFiles => open_files_section(theme_snapshot, projection),
+        ProcessInsightFacet::Environment => environment_section(theme_snapshot, projection),
+    }
 }
 
 /// The network facet: per-process Received / Sent throughput plus a bounded
@@ -134,14 +131,8 @@ fn network_section<'a>(
                     t("proc_insights.no_connections"),
                 ));
             } else {
-                for connection in network.connections.iter().take(MAX_FACET_ROWS) {
+                for connection in network.connections.iter() {
                     rows.push(muted_text(theme_snapshot, format_connection(connection)));
-                }
-                if network.connections.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", network.connections.len() - MAX_FACET_ROWS),
-                    ));
                 }
             }
             (heading, rows)
@@ -226,7 +217,7 @@ fn gpu_devices_section<'a>(
                 )
             } else {
                 let mut rows = Vec::new();
-                for device in gpu.devices.iter().take(MAX_FACET_ROWS) {
+                for device in gpu.devices.iter() {
                     rows.push(kv_row(
                         theme_snapshot,
                         device.device_id.clone(),
@@ -243,12 +234,7 @@ fn gpu_devices_section<'a>(
                         ));
                     }
                 }
-                if gpu.devices.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", gpu.devices.len() - MAX_FACET_ROWS),
-                    ));
-                }
+
                 (t("common.gpu").to_string(), rows)
             }
         }
@@ -520,19 +506,14 @@ pub(crate) fn environment_section<'a>(
                 )
             } else {
                 let mut rows = Vec::new();
-                for entry in environment.entries.iter().take(MAX_FACET_ROWS) {
+                for entry in environment.entries.iter() {
                     rows.push(kv_row(
                         theme_snapshot,
                         entry.key.clone(),
                         entry.value.clone(),
                     ));
                 }
-                if environment.entries.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", environment.entries.len() - MAX_FACET_ROWS),
-                    ));
-                }
+
                 (heading, rows)
             }
         }
@@ -570,15 +551,10 @@ fn threads_section<'a>(
                 )
             } else {
                 let mut rows = vec![thread_header(theme_snapshot)];
-                for vm in thread_rows_vm(&threads.threads, MAX_FACET_ROWS) {
+                for vm in thread_rows_vm(&threads.threads, usize::MAX) {
                     rows.push(thread_row(vm));
                 }
-                if threads.threads.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", threads.threads.len() - MAX_FACET_ROWS),
-                    ));
-                }
+
                 (heading, rows)
             }
         }
@@ -636,15 +612,10 @@ fn open_files_section<'a>(
                 )
             } else {
                 let mut rows = Vec::new();
-                for line in open_file_rows(&open_files.entries, MAX_FACET_ROWS) {
+                for line in open_file_rows(&open_files.entries, usize::MAX) {
                     rows.push(text(line).size(f32::from(tokens::FONT_12)).into());
                 }
-                if open_files.entries.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", open_files.entries.len() - MAX_FACET_ROWS),
-                    ));
-                }
+
                 (heading, rows)
             }
         }
@@ -687,7 +658,7 @@ fn gpu_engines_section<'a>(
                 )
             } else {
                 let mut rows = Vec::new();
-                for engine in engines.iter().take(MAX_FACET_ROWS) {
+                for engine in engines.iter() {
                     rows.push(
                         text(format_engine_usage(
                             &engine.name,
@@ -699,12 +670,7 @@ fn gpu_engines_section<'a>(
                         .into(),
                     );
                 }
-                if engines.len() > MAX_FACET_ROWS {
-                    rows.push(muted_text(
-                        theme_snapshot,
-                        format!("… +{} more", engines.len() - MAX_FACET_ROWS),
-                    ));
-                }
+
                 (heading, rows)
             }
         }

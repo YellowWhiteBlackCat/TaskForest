@@ -1,6 +1,6 @@
 //! Fail-closed single-writer ownership of one history directory.
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -19,8 +19,15 @@ static OWNER_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoryWriterClaimStatus {
     Absent,
-    Live { pid: u32 },
-    Stale { pid: u32 },
+    /// The OS proves another handle owns the writer lock. Its payload may be
+    /// unreadable under mandatory locking, so no PID is inferred.
+    Held,
+    Live {
+        pid: u32,
+    },
+    Stale {
+        pid: u32,
+    },
     Ambiguous,
 }
 
@@ -111,7 +118,8 @@ pub(super) fn acquire_root_lock(
     }
 }
 
-/// Probe writer liveness without acquiring or replacing the claim.
+/// Observe ownership without claiming a writer or changing its payload.
+/// A bounded shared read lease protects the free-file claim inspection.
 #[must_use]
 pub fn probe_root_lock(root: &Path, holder_is_gone: fn(u32) -> bool) -> HistoryWriterClaimStatus {
     let path = root.join(LOCK_FILE);
@@ -122,6 +130,11 @@ pub fn probe_root_lock(root: &Path, holder_is_gone: fn(u32) -> bool) -> HistoryW
         }
         Err(_) => return HistoryWriterClaimStatus::Ambiguous,
     };
+    match file.try_lock_shared() {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => return HistoryWriterClaimStatus::Held,
+        Err(TryLockError::Error(_)) => return HistoryWriterClaimStatus::Ambiguous,
+    }
     let Ok(claim) = read_claim_fail_closed(&mut file, &path) else {
         return HistoryWriterClaimStatus::Ambiguous;
     };

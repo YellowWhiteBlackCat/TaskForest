@@ -6,8 +6,9 @@ use std::rc::Rc;
 use crate::OptCallback1;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, ClickEvent, Context, ElementId, Entity, FocusHandle, InteractiveElement, IntoElement,
-    KeyDownEvent, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div, px,
+    App, Bounds, ClickEvent, Context, ElementId, Entity, FocusHandle, InteractiveElement,
+    IntoElement, KeyDownEvent, ParentElement, Pixels, RenderOnce, ScrollHandle,
+    StatefulInteractiveElement, Styled, Window, canvas, div, point, px,
 };
 use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
@@ -24,6 +25,8 @@ pub enum SwitchEvent {
 pub struct SwitchState {
     focus_handle: FocusHandle,
     on: bool,
+    scroll_parent: Option<ScrollHandle>,
+    painted_bounds: Option<Bounds<Pixels>>,
 }
 
 impl SwitchState {
@@ -32,12 +35,23 @@ impl SwitchState {
         Self {
             focus_handle: cx.focus_handle(),
             on: false,
+            scroll_parent: None,
+            painted_bounds: None,
         }
     }
 
     /// The focus handle backing this switch.
     pub fn focus_handle(&self) -> &FocusHandle {
         &self.focus_handle
+    }
+
+    /// Attach the scroll viewport that owns keyboard visibility of this control.
+    pub fn set_scroll_parent(&mut self, parent: ScrollHandle) {
+        self.scroll_parent = Some(parent);
+    }
+    /// Actual prepaint bounds of the mounted control.
+    pub fn painted_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.painted_bounds
     }
 
     /// Current switch position.
@@ -104,6 +118,35 @@ impl RenderOnce for Switch {
         let palette = self.palette;
         let on_change = self.on_change.clone();
         let state = self.state.clone();
+        let measured = self.state.clone();
+        let measurement = canvas(
+            move |bounds, window, cx| {
+                measured.update(cx, |state, _cx| {
+                    state.painted_bounds = Some(bounds);
+                    if state.focus_handle.is_focused(window)
+                        && let Some(parent) = &state.scroll_parent
+                    {
+                        let viewport = parent.bounds();
+                        if viewport.size.height > px(0.0) {
+                            let delta = if bounds.top() < viewport.top() {
+                                viewport.top() - bounds.top()
+                            } else if bounds.bottom() > viewport.bottom() {
+                                viewport.bottom() - bounds.bottom()
+                            } else {
+                                px(0.0)
+                            };
+                            if delta != px(0.0) {
+                                parent.set_offset(parent.offset() + point(px(0.0), delta));
+                                window.refresh();
+                            }
+                        }
+                    }
+                });
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0();
 
         // gpui `TabStopMap` reads the TRACKED handle's own `tab_stop` field,
         // not the element-level `.tab_stop()` style (which only updates the
@@ -141,6 +184,8 @@ impl RenderOnce for Switch {
 
         div()
             .id(id)
+            .relative()
+            .child(measurement)
             .debug_selector(|| "tm-switch".into())
             .track_focus(&focus_handle)
             .flex()

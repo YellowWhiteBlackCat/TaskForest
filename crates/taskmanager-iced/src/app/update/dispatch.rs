@@ -88,7 +88,9 @@ fn route(message: Message) -> MessageDomain {
         | Message::FocusSearch
         | Message::CloseSearch
         | Message::ServicesSearchChanged(_)
-        | Message::SelectDetailsSection(_)) => MessageDomain::Navigation(message),
+        | Message::SelectDetailsSection(_)
+        | Message::SelectInsightsFacet(_)
+        | Message::RefreshProcessInsights) => MessageDomain::Navigation(message),
 
         // Column-sizing messages are frontend-local process-table state
         // (drag overrides, no shell effect), reduced by `update::columns`.
@@ -134,7 +136,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::RequestStartupControl(_)
         | Message::RequestStartupControlFor { .. }
         | Message::ConfirmStartupControl
-        | Message::RequestSmartSelfTest { .. }
+        | Message::RequestSmartSelfTest(_)
         | Message::ConfirmSmartSelfTest
         | Message::OpenProcessLocation
         | Message::SearchProcessOnline) => MessageDomain::Control(message),
@@ -149,8 +151,13 @@ fn route(message: Message) -> MessageDomain {
         | Message::SelectProcessAffinityECores
         | Message::ApplyProcessAffinity
         | Message::OpenSettings
+        | Message::OpenSidebarEditor
+        | Message::ToggleNavigation
+        | Message::OpenSavedViews
         | Message::CloseSettings
         | Message::OpenAbout
+        | Message::OpenSystemInformation
+        | Message::OpenRepository
         | Message::OpenHealth
         | Message::OpenContainers
         | Message::OpenDiskSmart { .. }
@@ -162,7 +169,10 @@ fn route(message: Message) -> MessageDomain {
         | Message::SubmitRunTask) => MessageDomain::Surface(message),
 
         message @ (Message::SelectPerformanceGraphPoints(_)
+        | Message::SetSidebarDeviceVisibility { .. }
+        | Message::MoveSidebarDevice { .. }
         | Message::SettingsChanged(_)
+        | Message::AuthorizePrivilege(_)
         // SystemThemeChanged is reduced by `app::appearance` in the run.rs
         // update closure before dispatch; this arm only satisfies exhaustive routing.
         | Message::SystemThemeChanged(_)
@@ -184,22 +194,27 @@ fn route(message: Message) -> MessageDomain {
         message @ (Message::CopyTextToClipboard { .. }
         | Message::OpenStartupLocation { .. }
         | Message::CopyAboutDetails
+        | Message::CopySystemInformation
         | Message::ExportSnapshot
         | Message::RequestCurrentWindowCapture
         | Message::ApplySavedView(_)
         | Message::SaveCurrentProcessView
         | Message::ExportSavedViews
         | Message::ImportSavedViews
+        | Message::SavedViewsClipboardRead(_)
         | Message::DeleteSavedView(_)
         | Message::CopyProcessTsv
         | Message::CopyProcessJson
-        | Message::GenerateDiagnosticsReport) => MessageDomain::Transfer(message),
+        | Message::GenerateDiagnosticsReport
+        | Message::ConfirmDiagnosticsExport
+        | Message::RetryDiagnostics) => MessageDomain::Transfer(message),
 
         message @ (Message::ClearAlertEvents | Message::ExportAlertEvents | Message::Alerts(_)) => {
             MessageDomain::Alerts(message)
         }
 
         message @ (Message::Frame(_)
+        | Message::CaptureFocusPresented(_)
         | Message::ApplicationsScrolled(_)
         | Message::AppHistoryScrolled(_)
         | Message::PerformanceRailScrolled(_)

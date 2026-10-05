@@ -17,6 +17,9 @@ feature declaration against: it returns the selected adapter's static
 route/provider registration. It is declaration data, never an OS read; runtime
 availability stays with the capability catalog snapshot.
 
+`NativeAppHost::production` selects native user-data paths; `from_paths` composes
+an isolated host from explicit locations and a cached time observation. Neither
+constructor performs storage work.
 `NativeAppHost` lazily owns one shared `ConfigCoordinator`. Cloned hosts and
 additional windows receive independent `ConfigClient` cursors backed by that
 same worker; no frontend receives a `ConfigStore` or performs config file I/O.

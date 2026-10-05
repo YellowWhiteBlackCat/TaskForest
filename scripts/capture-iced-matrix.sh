@@ -419,7 +419,15 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
-NIRI_PGID="$(process_group "$NIRI_PID")"
+for _ in $(seq 1 40); do
+  observed_group="$(process_group "$NIRI_PID")"
+  if [ "$observed_group" = "$NIRI_PID" ]; then
+    NIRI_PGID="$observed_group"
+    break
+  fi
+  kill -0 "$NIRI_PID" 2>/dev/null || break
+  sleep 0.05
+done
 [ "$NIRI_PGID" = "$NIRI_PID" ] || {
   printf 'nested Niri did not obtain a private process group\n' >&2
   exit 1
@@ -497,9 +505,24 @@ capture_one() {
   local page=performance
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
-  service-details) page=services ;;
+  application-history-replay) page=app-history ;;
+  system-hardware|system-dashboard|history-60m|sensor-center|storage-health) page=system ;;
+  service-details|service-details-logs|services-search-highlight) page=services ;;
+  process-selection|saved-view-presets) page=applications ;;
+  process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) page=applications ;;
+  startup-impact|startup-failure-evidence|startup-boot-markers) page=startup ;;
+  about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm|system-about|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|history-replay|battery-fan-performance|battery-live-performance|device-hotplug|sidebar-edit|settings-permission-center|event-center) page=performance ;;
   esac
   mkdir -p "$scenario_dir" "$config_home" "$data_home" "$cache_home" "$state_home"
+  case "$device" in
+    history-replay|application-history-replay)
+      mkdir -p "$config_home/taskmanager"
+      printf '{"history_persistence":true}\n' >"$config_home/taskmanager/config.json"
+      local history_kind=system
+      [ "$device" != application-history-replay ] || history_kind=application
+      timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$data_home/taskmanager/history" --kind "$history_kind"
+      ;;
+  esac
 
   # Two attempts per scenario: the nested-Wayland session occasionally shows
   # late-session resource flakiness (a launch that produces no window and no

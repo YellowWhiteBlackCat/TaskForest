@@ -26,13 +26,12 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::{Add, HookContext};
+use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
@@ -57,6 +56,7 @@ use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene}
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod menu;
+mod paint;
 mod scene;
 
 use scene::sessions_body_scene;
@@ -257,7 +257,6 @@ fn sorted_direction(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> Op
 // ---- world types: markers, events, per-page resources ----
 
 #[derive(Clone, Component, Default)]
-#[component(on_insert = bind_sessions_page)]
 pub(crate) struct SessionsPageRoot;
 
 #[derive(Clone, Component, Default)]
@@ -271,9 +270,6 @@ pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) SessionId);
 
 #[derive(Clone, Component, Default)]
 pub(crate) struct SessionsSortHeader(pub(crate) Option<InfoSortCol>);
-
-#[derive(Resource)]
-struct SessionsPageBound;
 
 #[derive(Resource)]
 struct SessionsRenderState {
@@ -296,7 +292,7 @@ pub(crate) struct SessionSelectionMoved(pub(crate) isize);
 // ---- render adapters (bsn!) ----
 
 /// Content-region scene for the Sessions page. The body's dynamic content is
-/// painted by [`paint_sessions`] — the single render authority for the rows.
+/// painted by the typed paint system — the single render authority for the rows.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Sessions.title();
     let waiting = t("common.waiting_inventory").to_owned();
@@ -310,13 +306,13 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         }
         SessionsPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Text(waiting)
                 SessionsStatusLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -324,7 +320,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                     row_gap: Val::Px(space_2()),
                 }
                 SessionsBody
-            ),
+
         ]
     }
 }
@@ -361,7 +357,7 @@ fn on_session_disconnect_button_activated(
     {
         crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
-        commands.queue(paint_sessions);
+        commands.trigger(paint::RepaintRequested);
     }
 }
 
@@ -391,90 +387,32 @@ fn on_session_lock_button_activated(
     {
         crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
-        commands.queue(paint_sessions);
+        commands.trigger(paint::RepaintRequested);
     }
 }
 
 // ---- observers and the single paint path ----
 
-/// The one authoritative repaint; see `paint_services` in the template page.
-fn paint_sessions(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let revision = world
-        .non_send::<FrontendTrack>()
-        .shell
-        .projection()
-        .sessions_revision;
-    let mut selection = world.resource::<SessionSelection>().clone();
-    let (scene, line) = {
-        let shell = &world.non_send::<FrontendTrack>().shell;
-        let rows = session_rows(shell);
-        if let Some(target) = &selection.target
-            && !rows.iter().any(|row| &row.target == target)
-        {
-            // A target that left the inventory deselects honestly.
-            selection.target = None;
-        }
-        (
-            sessions_body_scene(shell, &palette, &selection),
-            status_line_text(shell, rows.len()),
-        )
-    };
-    world
-        .resource_mut::<SessionsRenderState>()
-        .rendered_revision = Some(revision);
-    world.resource_mut::<SessionSelection>().target = selection.target;
-    // A childless container has no `Children` component in this bevy, so the
-    // join must be optional — the first paint finds an empty body.
-    let mut body_query = world.query_filtered::<(Entity, Option<&Children>), With<SessionsBody>>();
-    let Some((body, children)) = body_query.iter(world).next() else {
-        return;
-    };
-    let stale: Vec<Entity> = children
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    let fresh = commands.spawn_scene(scene).id();
-    commands.entity(body).add_one_related::<ChildOf>(fresh);
-    let mut line_query = world.query_filtered::<&mut Text, With<SessionsStatusLine>>();
-    if let Ok(mut text) = line_query.single_mut(world) {
-        text.0 = line;
-    }
-}
-
-/// Initial/mount paint: the body container just came to exist, so the first
-/// (and every remount) row projection can bind to it.
-fn on_sessions_body_added(_added: On<Add, SessionsBody>, mut commands: Commands) {
-    commands.queue(paint_sessions);
-}
-
-/// Insert hook: bind the page's observers once; the initial paint rides the
-/// body-added observer registered below.
-fn bind_sessions_page(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if world.get_resource_mut::<SessionsPageBound>().is_some() {
-        return;
-    }
-    let mut commands = world.commands();
-    commands.insert_resource(SessionsPageBound);
-    commands.init_resource::<SessionSelection>();
-    commands.insert_resource(SessionsRenderState {
+/// The one authoritative repaint; see `paint::paint` in the template page.
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<SessionSelection>();
+    app.insert_resource(SessionsRenderState {
         rendered_revision: None,
     });
-    commands.add_observer(on_sessions_projection_folded);
-    commands.add_observer(on_sessions_sort_clicked);
-    commands.add_observer(on_sessions_row_clicked);
-    commands.add_observer(on_sessions_selection_moved);
-    commands.add_observer(on_session_disconnect_button_activated);
-    commands.add_observer(on_session_lock_button_activated);
-    // The initial paint rides the body's own insertion: the hook runs while
-    // the page scene is still spawning (its children apply later in the same
-    // command queue), so painting here would find no body yet. The observer
-    // fires exactly when the body entity comes to exist — and again on every
-    // route-back remount.
-    commands.add_observer(on_sessions_body_added);
+    app.init_resource::<paint::PaintState>();
+    app.add_observer(paint::on_repaint_requested);
+    app.add_observer(on_sessions_projection_folded);
+    app.add_observer(on_sessions_sort_clicked);
+    app.add_observer(on_sessions_row_clicked);
+    app.add_observer(on_sessions_selection_moved);
+    app.add_observer(on_session_disconnect_button_activated);
+    app.add_observer(on_session_lock_button_activated);
+    app.add_observer(on_sessions_body_added);
+    paint::register(app);
+}
+
+fn on_sessions_body_added(_event: On<Add<SessionsBody>>, mut commands: Commands) {
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Fold repaint with the idle gate (sessions-domain revision only).
@@ -488,7 +426,7 @@ fn on_sessions_projection_folded(
     if rendered.rendered_revision == Some(revision) {
         return;
     }
-    commands.queue(paint_sessions);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Header-sort tail: the shell's existing sort entry owns the decision.
@@ -498,7 +436,7 @@ fn on_sessions_sort_clicked(
     mut commands: Commands,
 ) {
     track.shell.set_info_sort(InfoTable::Users, click.event().0);
-    commands.queue(paint_sessions);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Row-click tail. The visual row resolves to its target through the shell's
@@ -513,7 +451,7 @@ fn on_sessions_row_clicked(
         return;
     };
     selection.target = Some(session.id.clone());
-    commands.queue(paint_sessions);
+    commands.trigger(paint::RepaintRequested);
 }
 
 /// Keyboard-selection tail: sort-stable target id, clamped cursor.
@@ -532,7 +470,7 @@ fn on_sessions_selection_moved(
         return;
     };
     selection.target = Some(session.id.clone());
-    commands.queue(paint_sessions);
+    commands.trigger(paint::RepaintRequested);
 }
 
 #[cfg(test)]

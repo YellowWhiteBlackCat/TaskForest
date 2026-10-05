@@ -164,6 +164,9 @@ impl ShellApp {
     pub fn report_effect_queued(&mut self, effect: &PlatformEffect) {
         let text = match effect {
             PlatformEffect::Refresh(_) => "Refresh queued".into(),
+            PlatformEffect::ObserveDesktopAppearance => {
+                "Desktop appearance observation queued".into()
+            }
             PlatformEffect::EndTask(target) => {
                 format!("End task queued for {} ({})", target.name, target.pid)
             }

@@ -4,33 +4,29 @@ use std::collections::HashSet;
 use taskmanager_application::AlertEvaluation;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::ManagedAlertRuleEditOutcome;
+use taskmanager_application::system_timeline::{
+    SystemHistoryWindow, SystemPageSection, TimelineSelection,
+};
 use taskmanager_core::core::alerts::AlertRuleTransferError;
 
 mod panels;
 pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
 mod readouts;
-pub mod saved_view_transfer;
+use taskmanager_shell::saved_views::{
+    SavedViewPreset, SavedViewTransferFeedback, default_built_in_presets,
+};
 mod view;
 mod widget;
 pub use view::{DashboardViewProps, render_dashboard, render_system_header};
 pub use widget::{DashboardWidgetProps, render_widget};
 
 use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::timeline::{HistoryWindow, TimelineSelection, TimelineState};
+use crate::gpui_app::timeline::TimelineGraphCache;
 use taskmanager_application::DesktopNotificationRequest;
-use taskmanager_application::i18n;
 use taskmanager_application::i18n::alert_severity_label;
 use taskmanager_core::core::{Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity};
 use taskmanager_shell::SortDir;
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SystemSection {
-    #[default]
-    Dashboard,
-    Hardware,
-    Health,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DashboardPanel {
@@ -121,161 +117,31 @@ impl EventCenterState {
 }
 
 #[derive(Clone, Debug)]
-pub struct SavedViewPreset {
-    pub id: u64,
-    name_key: Option<&'static str>,
-    custom_name: String,
-    pub built_in: bool,
-    pub filter: ProcessStatusFilter,
-    pub sort_col: SortCol,
-    pub sort_asc: bool,
-    pub hidden_cols: HashSet<SortCol>,
-}
-
-impl SavedViewPreset {
-    fn built_in(
-        id: u64,
-        name_key: &'static str,
-        filter: ProcessStatusFilter,
-        sort_col: SortCol,
-        sort_asc: bool,
-    ) -> Self {
-        Self {
-            id,
-            name_key: Some(name_key),
-            custom_name: String::new(),
-            built_in: true,
-            filter,
-            sort_col,
-            sort_asc,
-            hidden_cols: HashSet::new(),
-        }
-    }
-
-    pub fn display_name(&self) -> String {
-        self.name_key
-            .map(i18n::t)
-            .unwrap_or(self.custom_name.as_str())
-            .to_string()
-    }
-
-    pub(crate) fn restored(
-        name: String,
-        filter: ProcessStatusFilter,
-        sort_col: SortCol,
-        sort_asc: bool,
-        hidden_cols: HashSet<SortCol>,
-    ) -> Self {
-        Self {
-            id: 0,
-            name_key: None,
-            custom_name: name,
-            built_in: false,
-            filter,
-            sort_col,
-            sort_asc,
-            hidden_cols,
-        }
-    }
-
-    pub(crate) fn is_user_saved(&self) -> bool {
-        !self.built_in && self.name_key.is_none()
-    }
-
-    pub(crate) fn user_name(&self) -> Option<&str> {
-        self.is_user_saved().then_some(self.custom_name.as_str())
-    }
-
-    /// Apply the preset to the live window. The hidden-column set is
-    /// GPUI-local chrome state; filter + sort route through the
-    /// shell-owned process-viewing reducers (the same authority the Apps
-    /// page's pills and headers write).
-    pub fn apply_to(&self, view: &mut RootView) {
-        view.set_process_status_filter(self.filter);
-        view.set_process_sort(
-            self.sort_col,
-            if self.sort_asc {
-                SortDir::Asc
-            } else {
-                SortDir::Desc
-            },
-        );
-        view.processes_state.hidden_cols = self.hidden_cols.clone();
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct DashboardState {
-    pub section: SystemSection,
-    pub history_window: HistoryWindow,
+    pub section: SystemPageSection,
+    pub history_window: SystemHistoryWindow,
     pub history_selection: TimelineSelection,
-    pub timeline: TimelineState,
+    pub history_first_metric: usize,
+    pub timeline: TimelineGraphCache,
     pub events: EventCenterState,
     pub saved_views: Vec<SavedViewPreset>,
-    pub saved_view_transfer_feedback: Option<saved_view_transfer::SavedViewTransferFeedback>,
-    next_saved_view_id: u64,
+    pub saved_view_transfer_feedback: Option<SavedViewTransferFeedback>,
+    pub(super) next_saved_view_id: u64,
 }
 
 impl DashboardState {
     pub fn new() -> Self {
         Self {
-            section: SystemSection::Dashboard,
-            history_window: HistoryWindow::FifteenMinutes,
+            section: SystemPageSection::Dashboard,
+            history_window: SystemHistoryWindow::FifteenMinutes,
             history_selection: TimelineSelection::default(),
-            timeline: TimelineState::default(),
+            history_first_metric: 0,
+            timeline: TimelineGraphCache::default(),
             events: EventCenterState::default(),
-            saved_views: vec![
-                SavedViewPreset::built_in(
-                    1,
-                    "saved_views.cpu_hotspots",
-                    ProcessStatusFilter::All,
-                    SortCol::Cpu,
-                    false,
-                ),
-                SavedViewPreset::built_in(
-                    2,
-                    "saved_views.running_tree",
-                    ProcessStatusFilter::Running,
-                    SortCol::Cpu,
-                    false,
-                ),
-                SavedViewPreset::built_in(
-                    3,
-                    "saved_views.memory_heavy",
-                    ProcessStatusFilter::All,
-                    SortCol::Memory,
-                    false,
-                ),
-            ],
+            saved_views: default_built_in_presets(),
             saved_view_transfer_feedback: None,
             next_saved_view_id: 4,
         }
-    }
-
-    /// Snapshot the live window as a new user preset. The viewing inputs are
-    /// passed by value (not as a `&RootView`) so the caller's entity update
-    /// closure can read them through the shell accessors without fighting
-    /// the `&mut self.dashboard` receiver borrow.
-    pub fn save_current_view(
-        &mut self,
-        filter: ProcessStatusFilter,
-        sort_col: SortCol,
-        sort_asc: bool,
-        hidden_cols: HashSet<SortCol>,
-    ) {
-        let id = self.next_saved_view_id;
-        self.next_saved_view_id = self.next_saved_view_id.wrapping_add(1);
-        self.saved_views.push(SavedViewPreset {
-            id,
-            name_key: None,
-            custom_name: i18n::t("saved_views.custom_name")
-                .replace("{index}", &(id - 3).to_string()),
-            built_in: false,
-            filter,
-            sort_col,
-            sort_asc,
-            hidden_cols,
-        });
     }
 
     pub fn add_capture_saved_view(&mut self) {
@@ -292,28 +158,6 @@ impl DashboardState {
             sort_asc: false,
             hidden_cols: HashSet::new(),
         });
-    }
-
-    /// Replace only user-created presets. Built-ins are retained exactly once;
-    /// capture fixtures and any future keyed presets are not persisted.
-    pub(crate) fn restore_user_saved_views(&mut self, presets: Vec<SavedViewPreset>) {
-        self.saved_views.retain(|preset| preset.built_in);
-        let mut next_id = self
-            .saved_views
-            .iter()
-            .map(|preset| preset.id)
-            .max()
-            .unwrap_or(0)
-            .saturating_add(1);
-        for mut preset in presets {
-            if !preset.is_user_saved() {
-                continue;
-            }
-            preset.id = next_id;
-            next_id = next_id.saturating_add(1);
-            self.saved_views.push(preset);
-        }
-        self.next_saved_view_id = next_id;
     }
 }
 
@@ -379,7 +223,16 @@ impl RootView {
     }
 
     fn apply_saved_view(&mut self, preset: &SavedViewPreset) {
-        preset.apply_to(self);
+        self.set_process_status_filter(preset.filter);
+        self.set_process_sort(
+            preset.sort_col,
+            if preset.sort_asc {
+                SortDir::Asc
+            } else {
+                SortDir::Desc
+            },
+        );
+        self.processes_state.hidden_cols = preset.hidden_cols.clone();
         self.dismiss_window_surface(
             crate::gpui_app::root::WindowSurfaceKind::DashboardPanel,
             crate::gpui_app::root::WindowSurfaceDismissReason::Completed,

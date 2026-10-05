@@ -15,6 +15,7 @@ use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_ev
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
@@ -83,6 +84,125 @@ fn quit_key_exits_the_loop_cleanly() {
     );
     assert!(outcome.is_ok());
     assert!(app.should_quit(), "'q' must set the shared quit flag");
+}
+
+#[test]
+fn health_rule_keys_edit_the_selected_rule_and_import_only_when_explicitly_armed() {
+    use ratatui::crossterm::event::KeyCode;
+    let mut app = crate::demo_app();
+    app.toggle_health();
+    let initial = app.projection().alert_center.managed_rules().to_vec();
+    for character in ['n', 'u', 'f', 'l', 'v'] {
+        apply_terminal_event(
+            &mut app,
+            key(KeyCode::Char(character), KeyEventKind::Press),
+            TEST_FRAME,
+        );
+    }
+    let rules = app.projection().alert_center.managed_rules();
+    assert_eq!(rules.len(), initial.len() + 1);
+    let rule = &rules.last().expect("normal key created rule").rule;
+    assert_eq!(rule.threshold, 86.0);
+    assert_eq!(rule.for_duration, Duration::from_secs(6));
+    assert_eq!(rule.hysteresis, 4.0);
+    assert_eq!(rule.severity, AlertSeverity::Critical);
+    let json = app.export_alert_rules().expect("complete transfer");
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('d'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.projection().alert_center.managed_rules(), initial);
+    apply_terminal_event(&mut app, Event::Paste(json.clone()), TEST_FRAME);
+    assert_eq!(
+        app.projection().alert_center.managed_rules(),
+        initial,
+        "unarmed paste is inert"
+    );
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('r'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    apply_terminal_event(&mut app, Event::Paste(json), TEST_FRAME);
+    assert_eq!(
+        app.projection().alert_center.managed_rules().len(),
+        initial.len() + 1
+    );
+    let before = app.projection().alert_center.managed_rules().to_vec();
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('r'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    apply_terminal_event(&mut app, Event::Paste("invalid json".into()), TEST_FRAME);
+    assert_eq!(app.projection().alert_center.managed_rules(), before);
+    assert!(app.alert_import_mode.is_none());
+}
+
+#[test]
+fn health_review_keys_visit_integrity_and_sensor_groups_then_arm_an_exact_self_test() {
+    set_language(Language::En);
+    use crate::health_review::HealthReviewMode;
+    use ratatui::crossterm::event::KeyCode;
+    use taskmanager_core::core::smart::SmartSelfTestKind;
+    use taskmanager_shell::fixture::health::seed_shell_health;
+    let mut app = crate::demo_app();
+    seed_shell_health(&mut app.shell);
+    app.toggle_health();
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('w'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::Storage);
+    let groups = crate::ui::health_review::groups(&app);
+    assert_eq!(groups.len(), 4);
+    for index in 1..groups.len() {
+        apply_terminal_event(
+            &mut app,
+            key(KeyCode::Down, KeyEventKind::Press),
+            TEST_FRAME,
+        );
+        assert_eq!(app.health_review.selected, index);
+    }
+    apply_terminal_event(&mut app, key(KeyCode::Up, KeyEventKind::Press), TEST_FRAME);
+    assert_eq!(
+        app.health_review.selected, 2,
+        "moving back from the final group works"
+    );
+    apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('s'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::Sensors);
+    let groups = crate::ui::health_review::groups(&app);
+    assert_eq!(groups.len(), 4);
+    assert!(groups.iter().any(|group| {
+        group
+            .rows
+            .iter()
+            .any(|row| row.value.contains("Unavailable"))
+    }));
+    let disk = app.projection().snapshot.as_ref().expect("snapshot").disks[0].clone();
+    let reaction = apply_terminal_event(
+        &mut app,
+        key(KeyCode::Char('x'), KeyEventKind::Press),
+        TEST_FRAME,
+    );
+    assert!(
+        reaction.effect.is_none(),
+        "arming does not submit a platform command"
+    );
+    assert!(!app.health_open(), "confirmation owns subsequent input");
+    let pending = app
+        .shell
+        .pending_smart_self_test()
+        .expect("normal confirmation");
+    assert_eq!(pending.device_id.as_str(), disk.device_id);
+    assert_eq!(pending.device_generation, disk.device_generation);
+    assert_eq!(pending.kind, SmartSelfTestKind::Extended);
 }
 
 #[test]
@@ -772,4 +892,91 @@ fn capture_marker_records_the_typed_demo_frame_identity() {
         text.contains("TUI_CAPTURE_MARKER event=frame_ready page=applications"),
         "marker must carry the live page the captured frame shows: {text:?}"
     );
+}
+
+#[test]
+fn saved_views_bracketed_paste_is_owned_only_after_native_import_key() {
+    use ratatui::crossterm::event::KeyCode;
+    use taskmanager_shell::saved_views::export_saved_views_json;
+    let mut app = crate::demo_app();
+    app.toggle_settings();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE));
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE));
+    let json = export_saved_views_json(&app.saved_views.rows).expect("payload");
+    apply_terminal_event(&mut app, Event::Paste(json.clone()), TEST_FRAME);
+    assert_eq!(app.saved_views.rows.len(), 4);
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(6), KeyModifiers::NONE));
+    apply_terminal_event(&mut app, Event::Paste(json), TEST_FRAME);
+    assert_eq!(app.saved_views.rows.len(), 5);
+    assert!(
+        app.shell.query.is_empty(),
+        "saved-view paste cannot become a process search"
+    );
+}
+
+#[test]
+fn native_navigation_key_and_rail_click_share_the_painted_page_order_and_protect_edges() {
+    use ratatui::crossterm::event::{KeyCode, MouseEvent};
+    use taskmanager_ui_contract::navigation::NavOrientation;
+    let mut app = crate::demo_app();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(app.nav_orientation, NavOrientation::Vertical);
+    for (width, height) in [
+        (54, 16),
+        (80, 24),
+        (120, 36),
+        (180, 20),
+        (54, 50),
+        (200, 60),
+    ] {
+        let area = Rect::new(0, 0, width, height);
+        let plan = TuiFramePlan::build(&app, area);
+        let (rail_x, rail_y) = (0..height)
+            .flat_map(|row| (0..width).map(move |column| (column, row)))
+            .find(|&(column, row)| {
+                plan.hit_target(column, row)
+                    == Some(crate::ui::TuiHitTarget::NavigationPage(
+                        AppPage::Performance,
+                    ))
+            })
+            .expect("painted rail target");
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                crate::ui::render_with_plan(frame, &app, crate::TuiTheme::default(), &plan)
+            })
+            .expect("paint");
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(text.contains("F7"), "normal visible toggle hint");
+        for (index, page) in AppPage::ALL.into_iter().enumerate() {
+            let reaction = apply_terminal_event_with_plan(
+                &mut app,
+                Event::Mouse(MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: rail_x,
+                    row: rail_y + index as u16,
+                    modifiers: KeyModifiers::NONE,
+                }),
+                &plan,
+            );
+            assert!(reaction.dirty);
+            assert_eq!(app.page(), page);
+        }
+    }
+    app.toggle_settings();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(
+        app.nav_orientation,
+        NavOrientation::Vertical,
+        "modal owns the key"
+    );
+    app.close_local_overlays();
+    super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
+    assert_eq!(app.nav_orientation, NavOrientation::Horizontal);
 }

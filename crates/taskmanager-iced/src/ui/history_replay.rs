@@ -12,7 +12,8 @@ use std::rc::Rc;
 use iced::widget::{canvas, column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
+use taskmanager_core::core::history::{HistoryMetric, HistoryWindow};
+use taskmanager_shell::presentation::history_replay::row_heading;
 
 use taskmanager_theme::tokens;
 
@@ -31,22 +32,6 @@ fn history_window_label(window: HistoryWindow) -> &'static str {
         HistoryWindow::TwentyFourHours => "perf.replay.window.24h",
         HistoryWindow::SevenDays => "perf.replay.window.7d",
     })
-}
-
-/// Human heading for one series: the metric slug plus its device/core scope,
-/// stable across locales so tests and captures can key on it (GPUI
-/// `row_heading` parity — never a debug format).
-#[must_use]
-pub(crate) fn row_heading(key: &HistorySeriesKey) -> String {
-    let mut heading = key.metric().slug().to_owned();
-    if let Some(device) = key.device() {
-        heading.push_str(" · ");
-        heading.push_str(device.as_str());
-    }
-    if let Some(core) = key.core_index() {
-        heading.push_str(&format!(" · core {core}"));
-    }
-    heading
 }
 
 /// Peak formatting keeps the persisted unit-free axis honest (GPUI parity):
@@ -169,6 +154,7 @@ pub fn render_history_replay<'a>(
             .color(muted),
         );
     }
+    let mut body = column![].spacing(8).width(Length::Fill);
     if !state.is_loading() && state.rows().is_empty() {
         panel = panel.push(
             text(t("perf.replay.empty"))
@@ -222,9 +208,18 @@ pub fn render_history_replay<'a>(
             .width(Length::Fill)
             .height(Length::Fixed(72.0));
 
-            panel = panel.push(column![summary, graph_elem].spacing(4).width(Length::Fill));
+            body = body.push(column![summary, graph_elem].spacing(4).width(Length::Fill));
         }
     }
 
-    container(panel).padding(8).width(Length::Fill).into()
+    panel = panel.push(
+        iced::widget::scrollable(body)
+            .width(Length::Fill)
+            .height(Length::Fill),
+    );
+    container(panel)
+        .padding(8)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }

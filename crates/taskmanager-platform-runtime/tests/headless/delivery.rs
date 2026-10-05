@@ -950,6 +950,11 @@ fn stale_terminal_publications_do_not_stop_the_lane() {
             .recv_timeout(Duration::from_secs(10))
             .expect("the lane must keep serving requests after stale publications");
     }
+    // The provider signal precedes the publisher's terminal claim. Observe
+    // the completed claims before checking their counters or event absence.
+    crate::wait_for!("both stale terminal claims to finish", || {
+        (catalog.scheduling_snapshot().stale_terminal_publications == 2).then_some(())
+    });
     assert_eq!(
         served.load(std::sync::atomic::Ordering::SeqCst),
         2,

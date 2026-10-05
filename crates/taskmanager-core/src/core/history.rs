@@ -1,4 +1,4 @@
-//! Cross-layer vocabulary for persisted telemetry history (roadmap #4, R1).
+//! Typed persisted telemetry facts and portable series identity.
 //!
 //! These types are the shared language between three layers: the correlated
 //! ingestion seam (`taskmanager-telemetry-store`) emits
@@ -173,12 +173,12 @@ impl ApplicationHistoryIdentity {
             Self::VerifiedLauncher(value) => ("launcher", value),
             Self::UnverifiedProcessName(value) => ("process", value),
         };
-        format!("{kind}:{}", encode_scope(value))
+        encode_scope(&format!("{kind}:{value}"))
     }
 
     fn from_file_token(token: &str) -> Option<Self> {
-        let (kind, encoded) = token.split_once(':')?;
-        let value = decode_scope(encoded)?;
+        let decoded = decode_scope(token)?;
+        let (kind, value) = decoded.split_once(':')?;
         match kind {
             "launcher" => Self::verified_launcher(value),
             "process" => Self::unverified_process_name(value),
@@ -288,8 +288,8 @@ impl HistorySeriesKey {
     }
 
     /// Filesystem stem for this key. Existing system/device/core series retain
-    /// the v1 three-part shape; application series add a fourth typed scope.
-    /// This keeps old files canonical while adding one unambiguous namespace.
+    /// a portable three-part shape; application series add a fourth typed scope.
+    /// Filename encoding preserves the complete current identity on every platform.
     #[must_use]
     pub fn file_stem(&self) -> String {
         let device = self
@@ -351,13 +351,17 @@ impl HistorySeriesKey {
     }
 }
 
-/// Percent-encode everything outside the unreserved filename set so any device
-/// id round-trips through a file name (and `%` itself is always encoded).
+/// Encode scopes for every supported filesystem. Uppercase bytes stay escaped
+/// so distinct identities cannot collide on case-insensitive filesystems;
+/// underscores are escaped so they cannot become the series separator.
 fn encode_scope(value: &str) -> String {
+    if value == "-" {
+        return "%2D".to_owned();
+    }
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-' => {
+            b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-' => {
                 out.push(byte as char);
             }
             _ => out.push_str(&format!("%{byte:02X}")),

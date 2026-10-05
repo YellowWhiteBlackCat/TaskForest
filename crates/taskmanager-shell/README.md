@@ -14,6 +14,24 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 
 ## Key modules
 
+- `src/saved_views.rs` owns saved process-view identity, built-ins, typed filter/sort/columns,
+  strict JSON transfer and config projection shared by all four frontends. Native controls
+  adapt this model; persisted schema and transfer limits belong to core config.
+
+- `src/presentation/about.rs` owns the common build-metadata projection and copied
+  details. Product identity, license and repository remain owned by neutral assets.
+- `src/presentation/system_information.rs` groups cached OS, kernel, desktop and
+  hardware facts, omits unavailable rows and preserves complete copied values.
+- `src/presentation/health_review.rs` projects complete filesystem integrity,
+  sensor measurements and generation-matched SMART reports. Unknown counts and
+  denied observations remain unavailable. `fixture/health.rs` owns the shared
+  deterministic health inputs and seeds the normal storage/SMART fold.
+
+- `src/app/diagnostics.rs` freezes observed snapshot/process inventory, services, startup
+  and diagnostic facts into one sanitized application plan. Missing required observations
+  fail as unavailable; unobserved optional inventories remain null. Shared presentation
+  owns the preview summary and privacy-safe typed failure text.
+
 - `src/app/batch_fold.rs` is a typestate batch scheduler. Its compile-time
   phases are failure seed → independent domain systems → revision advancement
   → alert watermark → failure feedback; a caller cannot skip or reorder them.
@@ -93,6 +111,9 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   compatibility row-key API.
 - `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral projections, including the
   product-first GPU display identity that keeps hardware names separate from driver names.
+- `src/presentation/privilege_center.rs` folds helper capability/request states once for all
+  four renderers. Authorization is offered only when the catalog exposes a usable request
+  seam; GPU actions retain the observed device identity.
 - GPU history retains typed utilization/scalar/engine query windows. The shared chart-metric
   selection model in `presentation/gpu_chart_metric.rs` owns the
   telemetry-store
@@ -103,6 +124,10 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   store's `gpu_metric_point_series_for`: the same `GpuChartMetric::value` fold the gate uses,
   consumed by Iced/TUI through the shell history and by GPUI's direct track through its own
   `LiveGraphHistory` view of the same store — no frontend keeps a second sampling fold.
+
+The System timeline adapter implements the application read port over the
+authoritative telemetry rings. Window, gap and summary rules stay in application;
+frontends receive immutable projections and hold only native rendering caches.
 
 ## Contract and verification
 
@@ -140,12 +165,13 @@ src/app/session_control.rs          session control state
 src/app/system_telemetry.rs         system telemetry fold
 src/app/on_demand.rs  local_keys.rs  row_summary.rs
 src/presentation.rs                 renderer-neutral presentation helpers
+src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
-├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs
+├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs  smart.rs
 src/viewmodel.rs                    product-first view-model projections
 src/history.rs                      correlated outcomes → telemetry store mapping
 src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions
 src/process_filter.rs               process filter predicates
 src/memory.rs                       memory presentation helpers
-src/fixture/ (cpu_topology inventory)  deterministic demo/capture/test seam
+src/fixture/ (cpu_topology dashboard_history inventory process_insights setup smbios_memory) deterministic demo/capture/test seam
 ```

@@ -18,9 +18,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
-use bevy::ecs::resource::Resource;
-use bevy::ecs::system::Commands;
-use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent,
     px,
@@ -29,8 +27,13 @@ use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
+
+pub(crate) mod dashboard;
+mod hardware;
+use hardware::hardware_fact_rows;
 
 pub(crate) mod thermal;
 pub(crate) use thermal::thermal_zone_rows;
@@ -38,15 +41,22 @@ pub(crate) use thermal::thermal_zone_rows;
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
+use crate::widgets::controls::detail_row_scene;
+use crate::widgets::layout::SystemDashboardBudget;
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::ComputedNode;
+use bevy::ui_widgets::ScrollArea;
+use dashboard::{SystemDashboardState, SystemDashboardToolbar};
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::npu::NpuEngineKind;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
-use taskmanager_shell::presentation::kernel_error_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
+
+pub(crate) mod diagnostic_modal;
 
 /// The page's single body container. Painted exclusively by
 /// [`paint_system`], which the root's on-insert hook binds.
@@ -57,39 +67,19 @@ pub(crate) struct SystemBody;
 #[derive(Component, Clone, Default)]
 pub(crate) struct SystemStatusLine;
 
+#[derive(Component, Clone, Default)]
+pub(crate) struct SystemActions;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct MemoryInventoryAnchor;
+
 /// The page's root: mounting it binds the paint observers.
 #[derive(Component, Clone, Default)]
-#[component(on_insert = bind_system_page)]
 pub(crate) struct SystemPageRoot;
 
-#[derive(Resource, Default)]
-struct SystemPageBound;
-
-/// Bind the paint observers to the app, once per world. The body's own Add
-/// is the first-paint trigger (the root's insert fires before the body
-/// exists); the fold observer is the only later refresh.
-fn bind_system_page(
-    mut world: bevy::ecs::world::DeferredWorld<'_>,
-    _context: bevy::ecs::lifecycle::HookContext,
-) {
-    if world.get_resource::<SystemPageBound>().is_some() {
-        return;
-    }
-    let mut commands = world.commands();
-    commands.insert_resource(SystemPageBound);
-    commands.add_observer(on_body_added);
-    commands.add_observer(on_projection_folded);
-}
-
-/// First paint: the body container just landed.
-fn on_body_added(_added: On<Add, SystemBody>, mut commands: Commands) {
-    commands.queue(paint_system);
-}
-
-/// The drain fold is the page's only later data-refresh trigger.
-fn on_projection_folded(_fold: On<ShellProjectionFolded>, mut commands: Commands) {
-    commands.queue(paint_system);
-}
+pub(crate) mod health;
+pub(crate) mod paint;
+pub(crate) use paint::register;
 
 // ---- pure projection ------------------------------------------------------
 
@@ -140,8 +130,20 @@ pub(crate) fn clean_memory_size(total_memory_mb: u64) -> String {
     bytes(total_memory_mb.saturating_mul(1024 * 1024))
 }
 
+/// Semantic section of an already-projected System fact.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SystemFactGroup {
+    OperatingSystem,
+    Cpu,
+    Memory,
+    MemoryInventory,
+    Hardware,
+    Npu,
+}
+
 /// One label→value fact row. The value is already final display text.
 pub(crate) struct SystemFactRow {
+    pub(crate) group: SystemFactGroup,
     pub(crate) label: String,
     pub(crate) value: String,
 }
@@ -172,116 +174,20 @@ pub(crate) fn system_fact_rows(
     smbios: Option<&SmbiosMemorySnapshot>,
     npu: Option<&NpuInventorySnapshot>,
 ) -> Vec<SystemFactRow> {
-    let mut rows: Vec<SystemFactRow> = Vec::new();
-    let dash = missing_value();
-    let Some(hardware) = hardware else {
-        return rows;
-    };
-    rows.push(SystemFactRow {
-        label: t("system.hostname").to_owned(),
-        value: optional(hardware.hostname.as_deref()),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.os").to_owned(),
-        value: joined(hardware.os_name.as_deref(), hardware.os_version.as_deref()),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.kernel").to_owned(),
-        value: joined(
-            hardware.kernel_version.as_deref(),
-            hardware.kernel_build.as_deref(),
-        ),
-    });
-    if let Some(errors) = kernel_error_summary(hardware) {
-        rows.push(SystemFactRow {
-            label: t("system.kernel_errors").to_owned(),
-            value: errors,
-        });
-    }
-    if let Some(count) = hardware.kernel_modules_count {
-        rows.push(SystemFactRow {
-            label: t("system.kernel_modules").to_owned(),
-            value: count.to_string(),
-        });
-    }
-    rows.push(SystemFactRow {
-        label: t("system.model").to_owned(),
-        value: joined(
-            hardware.product_name.as_deref(),
-            hardware.product_version.as_deref(),
-        ),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.firmware").to_owned(),
-        value: optional(hardware.firmware_vendor.as_deref()),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.field.cpu").to_owned(),
-        value: optional(hardware.cpu_brand.as_deref()),
-    });
-    let cores = hardware
-        .cpu_cores
-        .map_or_else(|| dash.clone(), |cores| cores.to_string());
-    rows.push(SystemFactRow {
-        label: t("system.field.cores").to_owned(),
-        value: cores,
-    });
-    if let Some(memory) = hardware.total_memory_mb {
-        rows.push(SystemFactRow {
-            label: t("system.section.memory").to_owned(),
-            value: clean_memory_size(memory),
-        });
-    }
-    if let Some(virt) = hardware.virt.as_deref() {
-        rows.push(SystemFactRow {
-            label: t("system.field.virt").to_owned(),
-            value: virt.to_owned(),
-        });
-    }
-    rows.push(SystemFactRow {
-        label: t("system.desktop_environment").to_owned(),
-        value: joined(
-            hardware.desktop_environment.as_deref(),
-            hardware.desktop_environment_version.as_deref(),
-        ),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.windowing_system").to_owned(),
-        value: joined(
-            hardware.windowing_system.as_deref(),
-            hardware.window_manager.as_deref(),
-        ),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.field.init_system").to_owned(),
-        value: optional(hardware.init_system.as_deref()),
-    });
-    if let Some(manager) = hardware.package_manager.as_deref() {
-        let value = hardware.package_manager_version.as_deref().map_or_else(
-            || manager.to_owned(),
-            |version| format!("{manager} {version}"),
-        );
-        rows.push(SystemFactRow {
-            label: t("system.package_manager").to_owned(),
-            value,
-        });
-    }
-    rows.push(SystemFactRow {
-        label: t("system.field.shell").to_owned(),
-        value: optional(hardware.shell.as_deref()),
-    });
-    rows.push(SystemFactRow {
-        label: t("system.field.locale").to_owned(),
-        value: optional(hardware.locale.as_deref()),
-    });
+    let mut rows = hardware.map(hardware_fact_rows).unwrap_or_default();
     if let Some(smbios) = smbios {
-        for (label, value) in smbios_memory_inventory_rows(smbios) {
-            rows.push(SystemFactRow { label, value });
+        for (label, value) in smbios_memory_inventory_rows(smbios, UnitPreferences::default()) {
+            rows.push(SystemFactRow {
+                group: SystemFactGroup::MemoryInventory,
+                label,
+                value,
+            });
         }
     }
     if let Some(npu) = npu.filter(|inv| inv.is_success()) {
         for dev in &npu.devices {
             rows.push(SystemFactRow {
+                group: SystemFactGroup::Npu,
                 label: format!("{} {}", t("npu.title"), dev.device_id.as_str()),
                 value: dev
                     .brand
@@ -289,6 +195,7 @@ pub(crate) fn system_fact_rows(
                     .unwrap_or_else(|| t("npu.device_title").to_owned()),
             });
             rows.push(SystemFactRow {
+                group: SystemFactGroup::Npu,
                 label: format!("{} · {}", t("npu.title"), t("common.utilization")),
                 value: dev
                     .utilization_pct
@@ -307,6 +214,7 @@ pub(crate) fn system_fact_rows(
                     NpuEngineKind::Unknown => t("npu.engine_unknown"),
                 };
                 rows.push(SystemFactRow {
+                    group: SystemFactGroup::Npu,
                     label: format!("{} · {label}", t("npu.title")),
                     value: engine
                         .utilization_pct
@@ -322,6 +230,7 @@ pub(crate) fn system_fact_rows(
                 (t("npu.sram"), &dev.memory.sram_total_bytes),
             ] {
                 rows.push(SystemFactRow {
+                    group: SystemFactGroup::Npu,
                     label: format!("{} · {label}", t("npu.title")),
                     value: observation
                         .current_value()
@@ -355,19 +264,18 @@ fn status_line_text(
 // ---- render adapters ------------------------------------------------------
 
 pub(crate) fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<> {
-    // Delegates to the shared bounded key/value row: same single-line
-    // contract (NoWrap + clip) as the performance rail — one row grammar
-    // across pages, never a page-local spelling.
+    // Inspection facts keep complete values in the owned wrapped row grammar.
     let value = row.value.clone();
     let text_val = row.value.clone();
     let label = row.label.clone();
     let value_scene = Box::new(bsn! {
         Text(text_val)
         TextRole(Role::Body)
-        TextLayout { linebreak: LineBreak::NoWrap }
+        TextLayout { linebreak: LineBreak::WordBoundary }
+        Node { width: percent(100), min_width: px(0.0) }
         crate::text_selection::SelectableText(label, value)
     }) as Box<dyn bevy::scene::Scene>;
-    crate::widgets::controls::stat_row_scene(row.label.clone(), value_scene, palette)
+    detail_row_scene(row.label.clone(), value_scene, palette)
 }
 
 fn kpi_tile_scene(
@@ -388,21 +296,21 @@ fn kpi_tile_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Caption) ),
-            (
+             Text(title) TextRole(Role::Caption) --
+
                 Node {
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(value) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
-            (
+                Children [  Text(value) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::NoWrap }  ]
+            --
+
                 Node {
                     width: percent(100),
                     overflow: Overflow::clip_x(),
                 }
-                Children [ ( Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ) ]
-            ),
+                Children [  Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+
         ]
     }
 }
@@ -424,8 +332,8 @@ pub(crate) fn section_card_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Body) ),
-            { rows },
+             Text(title) TextRole(Role::Body) --
+            { rows }
         ]
     }
 }
@@ -449,7 +357,7 @@ fn system_body_scene(
             }
             BackgroundColor({ palette.panel_fill })
             Children [
-                ( Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body) ),
+                 Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body)
             ]
         }) as Box<dyn bevy::scene::Scene>;
     }
@@ -527,47 +435,35 @@ fn system_body_scene(
             row_gap: Val::Px(space_8()),
         }
         Children [
-            { tiles },
+            { tiles }
         ]
     };
 
-    let mut os_rows: Vec<Box<dyn bevy::scene::Scene>> = Vec::new();
-    let mut cpu_rows: Vec<Box<dyn bevy::scene::Scene>> = Vec::new();
-    let mut mem_rows: Vec<Box<dyn bevy::scene::Scene>> = Vec::new();
-    let mut hw_rows: Vec<Box<dyn bevy::scene::Scene>> = Vec::new();
-
-    for (index, row) in rows.iter().enumerate() {
-        let r = Box::new(fact_row_scene(row, palette)) as Box<dyn bevy::scene::Scene>;
-        match index % 4 {
-            0 => os_rows.push(r),
-            1 => cpu_rows.push(r),
-            2 => mem_rows.push(r),
-            _ => hw_rows.push(r),
-        }
-    }
-
-    let mut cards = vec![
-        Box::new(section_card_scene(
-            t("common.operating_system").to_owned(),
-            os_rows,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(section_card_scene(
-            t("system.field.cpu").to_owned(),
-            cpu_rows,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(section_card_scene(
-            t("common.memory").to_owned(),
-            mem_rows,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(section_card_scene(
-            t("common.hardware").to_owned(),
-            hw_rows,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-    ];
+    let mut cards = [
+        (SystemFactGroup::OperatingSystem, "common.operating_system"),
+        (SystemFactGroup::Cpu, "system.field.cpu"),
+        (SystemFactGroup::Memory, "common.memory"),
+        (SystemFactGroup::Hardware, "common.hardware"),
+        (SystemFactGroup::Npu, "npu.title"),
+        (SystemFactGroup::MemoryInventory, "system.memory_inventory"),
+    ]
+    .into_iter()
+    .filter_map(|(group, title)| {
+        let group_rows = rows
+            .iter()
+            .filter(|row| row.group == group)
+            .map(|row| Box::new(fact_row_scene(row, palette)) as Box<dyn Scene>)
+            .collect::<Vec<_>>();
+        (!group_rows.is_empty()).then(|| {
+            let card = section_card_scene(t(title).to_owned(), group_rows, palette);
+            if group == SystemFactGroup::MemoryInventory {
+                Box::new(bsn! { MemoryInventoryAnchor @{card} }) as Box<dyn Scene>
+            } else {
+                Box::new(card) as Box<dyn Scene>
+            }
+        })
+    })
+    .collect::<Vec<_>>();
 
     if let Some(thermal_card) = thermal::thermal_zone_card_scene(&thermal_rows, palette) {
         cards.push(thermal_card);
@@ -582,7 +478,7 @@ fn system_body_scene(
             row_gap: Val::Px(space_8()),
         }
         Children [
-            { cards },
+            { cards }
         ]
     };
 
@@ -593,8 +489,8 @@ fn system_body_scene(
             row_gap: Val::Px(space_12()),
         }
         Children [
-            ( { tiles_row } ),
-            ( { cards_grid } ),
+             @{ tiles_row } --
+             @{ cards_grid }
         ]
     })
 }
@@ -602,8 +498,31 @@ fn system_body_scene(
 /// Content-region scene for the System page. The body container starts empty;
 /// [`paint_system`] is its only author.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
+    let dashboard = dashboard::button(
+        t("dashboard.title").to_owned(),
+        dashboard::DashboardControl::Section(SystemPageSection::Dashboard),
+        false,
+        _context.palette,
+    );
     let title = Page::System.title();
+    let health = dashboard::button(
+        t("health.system_health_alerts").into(),
+        dashboard::DashboardControl::Section(SystemPageSection::Health),
+        false,
+        _context.palette,
+    );
     let waiting = t("common.waiting_inventory").to_owned();
+    let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
+    let about = crate::about_modal::action_scene(
+        t("about.title"),
+        crate::about_modal::AboutCommand::Open,
+        _context.palette,
+    );
+    let system_information = crate::about_modal::action_scene(
+        t("about.system_information"),
+        crate::about_modal::AboutCommand::SystemInformation,
+        _context.palette,
+    );
     bsn! {
         Node {
             width: percent(100),
@@ -614,80 +533,27 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         }
         SystemPageRoot
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+             Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } SystemActions
+             Children [ @{ dashboard } -- @{ health } -- @{ diagnostic } -- @{ about } -- @{ system_information } ] --
+
                 Text(waiting)
                 SystemStatusLine
                 TextRole(Role::Caption)
-            ),
-            (
+            --
+             Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column } SystemDashboardToolbar Children [] --
+
                 Node {
                     width: percent(100),
-                    height: Val::Auto,
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                    overflow: Overflow::scroll_y(),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
+                    padding: UiRect::bottom(px(space_8())),
                 }
-                SystemBody
-            ),
+                SystemBody ScrollArea
+
         ]
-    }
-}
-
-// ---- the single body author ------------------------------------------------
-
-pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let (hardware, smbios, npu, sensors, summary, status) = {
-        let shell = &world.non_send::<FrontendTrack>().shell;
-        let smbios = match shell.smbios_memory_state() {
-            SmbiosMemoryState::Ready(ready) => Some(ready.snapshot.clone()),
-            _ => None,
-        };
-        let projection = shell.projection();
-        let npu = projection.npu_inventory.clone();
-        let hardware = projection.hardware.clone();
-        let sensors = projection.sensors.clone();
-        let summary = system_summary_model(projection);
-        let status = status_line_text(
-            hardware.as_ref(),
-            smbios.as_ref(),
-            npu.as_ref(),
-            sensors.as_ref(),
-        );
-        (hardware, smbios, npu, sensors, summary, status)
-    };
-    let scene = system_body_scene(
-        hardware.as_ref(),
-        smbios.as_ref(),
-        npu.as_ref(),
-        sensors.as_ref(),
-        &summary,
-        &palette,
-    );
-    let mut body_query = world.query_filtered::<bevy::ecs::entity::Entity, With<SystemBody>>();
-    let Some(body) = body_query.iter(world).next() else {
-        return;
-    };
-    let stale: Vec<bevy::ecs::entity::Entity> = world
-        .get::<bevy::ecs::hierarchy::Children>(body)
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    // Synchronous World mutation, not queued commands: a same-frame second
-    // paint must observe the previous paint's result or it would double the
-    // body (the same lesson the History page learned).
-    for entity in stale {
-        let _ = world.despawn(entity);
-    }
-    let fresh = match world.spawn_scene(scene) {
-        Ok(entity) => entity.id(),
-        Err(_) => return,
-    };
-    world
-        .entity_mut(body)
-        .add_one_related::<bevy::ecs::hierarchy::ChildOf>(fresh);
-    let mut lines = world.query_filtered::<&mut Text, With<SystemStatusLine>>();
-    if let Ok(mut line) = lines.single_mut(world) {
-        line.0 = status;
     }
 }
 

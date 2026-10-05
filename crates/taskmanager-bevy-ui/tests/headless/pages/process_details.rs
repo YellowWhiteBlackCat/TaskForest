@@ -450,6 +450,97 @@ fn isolation_summary_renders_the_linux_namespace_audit() {
 }
 
 #[test]
+fn isolation_summary_renders_posix_capabilities() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        capabilities: Some(ProcessCapabilities::from_masks(
+            DeviceState::healthy(1),
+            Some(0),
+            Some(1 << 21),
+            Some(1 << 21),
+            Some(0),
+            Some(0),
+        )),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    assert!(
+        summary.contains(t("proc_insights.capabilities")),
+        "the security summary must contain capabilities label: {summary}"
+    );
+    assert!(
+        summary.contains("CAP_SYS_ADMIN")
+            || summary.contains("critical")
+            || summary.contains("elevated"),
+        "the security summary must reflect effective capabilities: {summary}"
+    );
+}
+
+#[test]
+fn format_thread_line_renders_runqueue_and_wait_diagnostics() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{
+        ProcessThreadInfo, ProcessThreads, ThreadState, ThreadWaitKind,
+    };
+
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let threads = ProcessThreads {
+        state: DeviceState::healthy(1),
+        threads: vec![thread],
+    };
+    let text = super::threads_summary(&threads, super::InsightDetail::Summary);
+    assert!(text.contains("2.5ms"));
+    assert!(text.contains(" D "));
+}
+
+#[test]
+fn isolation_summary_renders_seccomp_filter() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        seccomp_mode: Some(2),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    assert!(summary.contains(t("proc_insights.seccomp")));
+}
+
+#[test]
+fn process_details_renders_command_identity_mismatch() {
+    use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+
+    let mut item = ProcessItem::new(42, "worker");
+    item.apply_metadata_observations(ProcessMetadataObservations::current(
+        ProcessOwner::opaque("root"),
+        Some(std::path::PathBuf::from("/usr/bin/real_binary")),
+        100,
+    ));
+    item.cmdline = "fake_cmdline --arg".to_string();
+
+    let view = projection(&shell_with(item));
+    let mismatch = view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc_insights.command_identity"));
+    assert!(mismatch.is_some(), "must render command identity mismatch");
+    assert!(mismatch.unwrap().value.contains("real_binary"));
+}
+
+#[test]
 fn threads_summary_empty_and_populated_with_gap_honesty() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{
@@ -458,7 +549,7 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
 
     let empty = ProcessThreads::default();
     assert_eq!(
-        super::threads_summary(&empty),
+        super::threads_summary(&empty, super::InsightDetail::Summary),
         t("proc_insights.no_threads")
     );
 
@@ -508,7 +599,7 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
         ],
     };
 
-    let summary = super::threads_summary(&populated);
+    let summary = super::threads_summary(&populated, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "4");
     assert_eq!(lines[1], "101  worker-pool  R  2.5s  25.0%");
@@ -527,7 +618,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
 
     let empty = ProcessOpenFiles::default();
     assert_eq!(
-        super::open_files_summary(&empty, None),
+        super::open_files_summary(&empty, None, super::InsightDetail::Summary),
         t("proc_insights.no_open_files")
     );
 
@@ -562,7 +653,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
         unreadable_count: 1,
     };
 
-    let summary = super::open_files_summary(&files, None);
+    let summary = super::open_files_summary(&files, None, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], format!("4 · 1 {}", t("proc_insights.unreadable")));
     assert_eq!(lines[1], "0 [file] -> /dev/null [deleted]");
@@ -620,7 +711,7 @@ fn open_files_summary_renders_fd_limit_saturation() {
         ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
     let proj = project_process_resources(&snapshot);
 
-    let summary = super::open_files_summary(&files, Some(&proj));
+    let summary = super::open_files_summary(&files, Some(&proj), super::InsightDetail::Summary);
     let first_line = summary.lines().next().unwrap();
     assert_eq!(first_line, "2 / 1024 (0%) [max 4096]");
 }
@@ -673,7 +764,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         connection_counters: None,
     };
 
-    let summary = super::network_summary(&normal);
+    let summary = super::network_summary(&normal, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "2 · RX 1.0 MiB/s · TX 512.0 KiB/s");
     assert_eq!(
@@ -698,7 +789,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         connection_counters: None,
     };
 
-    let esc_summary = super::network_summary(&escalating);
+    let esc_summary = super::network_summary(&escalating, super::InsightDetail::Summary);
     assert!(esc_summary.contains("0 · RX — · TX —"));
     assert!(esc_summary.contains(t("proc_insights.network_requires_escalation")));
     assert!(esc_summary.contains(t("proc_insights.enable_network_capture")));
@@ -711,7 +802,7 @@ fn environment_summary_formats_entries_and_truncation() {
 
     let empty = ProcessEnvironment::default();
     assert_eq!(
-        super::environment_summary(&empty),
+        super::environment_summary(&empty, super::InsightDetail::Summary),
         t("prop.environment_empty")
     );
 
@@ -739,7 +830,7 @@ fn environment_summary_formats_entries_and_truncation() {
         truncated_count: 15,
     };
 
-    let summary = super::environment_summary(&env);
+    let summary = super::environment_summary(&env, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "4 · +15");
     assert_eq!(lines[1], "PATH=/usr/bin");
@@ -758,7 +849,10 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
     };
 
     let empty = ProcessGpuSnapshot::default();
-    assert_eq!(super::gpu_summary(&empty), t("proc_insights.no_gpu"));
+    assert_eq!(
+        super::gpu_summary(&empty, super::InsightDetail::Summary),
+        t("proc_insights.no_gpu")
+    );
 
     let gpu = ProcessGpuSnapshot {
         state: DeviceState::healthy(1000),
@@ -795,7 +889,7 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
         },
     };
 
-    let summary = super::gpu_summary(&gpu);
+    let summary = super::gpu_summary(&gpu, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(
         lines[0],

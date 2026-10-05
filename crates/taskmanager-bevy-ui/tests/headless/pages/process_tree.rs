@@ -9,6 +9,7 @@ use taskmanager_core::core::process::{
     ProcessApplicationIdentity, ProcessMetadataObservation, process_category,
 };
 use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::ShellApp;
 
 /// Fixture accepted-snapshot timestamp matching the observations below, whose
 /// `last_success_ms` is 1.
@@ -251,4 +252,80 @@ fn tree_rows_carry_typed_aggregates_without_zero_fallback() {
     let process_row = &rows[2];
     assert!(process_row.cpu.is_none());
     assert!(process_row.memory.is_none());
+}
+
+#[test]
+fn native_expand_and_collapse_preserve_all_live_tree_identities_and_selection() {
+    use crate::app::Route;
+    use crate::window::tests::scripted_frontend_app;
+    use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+    let mut app = scripted_frontend_app();
+    app.update();
+    {
+        let mut track = app.world_mut().non_send_mut::<FrontendTrack>();
+        track.shell = ShellApp::new();
+        seed_shell_process_tree(&mut track.shell).expect("tree root");
+    }
+    app.world_mut().resource_mut::<Route>().page = crate::app::Page::Processes;
+    app.world_mut().trigger(crate::app::RouteChanged);
+    app.update();
+    app.update();
+    let open = app
+        .world_mut()
+        .query::<(Entity, &TreeWindowControl)>()
+        .iter(app.world())
+        .find(|(_, control)| control.0)
+        .map(|(entity, _)| entity)
+        .expect("normal tree entry");
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity: open });
+    app.update();
+    app.update();
+    let selected = app.world().non_send::<FrontendTrack>().shell.selected;
+    for action in [
+        TreeExpansionCommand::ExpandAll,
+        TreeExpansionCommand::CollapseAll,
+        TreeExpansionCommand::ExpandAll,
+    ] {
+        let entity = {
+            let world = app.world_mut();
+            world
+                .query::<(Entity, &TreeExpansionControl)>()
+                .iter(world)
+                .find(|(_, control)| control.0 == action)
+                .map(|(entity, _)| entity)
+                .expect("native tree button")
+        };
+        app.world_mut()
+            .trigger(bevy::ui_widgets::Activate { entity });
+        app.update();
+        app.update();
+        let track = app.world().non_send::<FrontendTrack>();
+        let projection = track.shell.projection();
+        let rows = project_items(
+            projection.processes_slice(),
+            &track.process_tree_expansion,
+            projection.processes_observed_at_ms,
+        );
+        assert_eq!(track.shell.selected, selected);
+        if action == TreeExpansionCommand::ExpandAll {
+            let mut identities: Vec<_> = rows
+                .iter()
+                .filter_map(|row| row.item.map(|item| item.pid))
+                .collect();
+            identities.sort_unstable();
+            assert_eq!(identities, (90_000..=90_006).collect::<Vec<_>>());
+            assert!(rows.iter().any(|row| row.depth >= 3));
+            assert!(rows.iter().all(|row| !row.has_children || row.expanded));
+        } else {
+            assert!(rows.iter().all(|row| row.item.is_none()));
+        }
+        let visible_count = rows.len();
+        let world = app.world_mut();
+        assert_eq!(
+            world.query::<&ProcessTreeRowMarker>().iter(world).count(),
+            visible_count,
+            "actual mounted hierarchy follows expansion"
+        );
+    }
 }

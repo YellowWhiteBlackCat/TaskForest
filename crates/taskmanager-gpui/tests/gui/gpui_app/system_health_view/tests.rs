@@ -2,18 +2,19 @@ use gpui::{
     AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, Window, px, size,
 };
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::fixture::health::{HealthFixture, health_fixture};
 
 use crate::gpui_app::root::responsive::{PageLayoutBudget, SystemPageBudget};
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_theme::Theme;
 
 use super::{
-    SmartSelfTestConfirmationRequest, SystemHealthCallbacks, SystemHealthCaptureFixture,
-    capture_english_text, capture_fixture, render_system_health,
+    SmartSelfTestConfirmationRequest, SystemHealthCallbacks, capture_english_text,
+    render_system_health,
 };
 
 struct FixtureView {
-    fixture: SystemHealthCaptureFixture,
+    fixture: HealthFixture,
     theme: Theme,
     layout: SystemPageBudget,
 }
@@ -39,7 +40,7 @@ impl Render for FixtureView {
 
 #[test]
 fn confirmation_request_is_typed_and_contains_no_execution_plan() {
-    let fixture = capture_fixture();
+    let fixture = health_fixture();
     let request = SmartSelfTestConfirmationRequest {
         device_id: fixture.selected_disk.device_id.clone().into(),
         device_generation: fixture.selected_disk.device_generation,
@@ -54,9 +55,9 @@ fn confirmation_request_is_typed_and_contains_no_execution_plan() {
 /// The isolated #12/#13 surface completes layout and paint at both design
 /// viewports without invoking a collector, filesystem read, or SMART command.
 #[gpui::test]
-async fn capture_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppContext) {
+async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| FixtureView {
-        fixture: capture_fixture(),
+        fixture: health_fixture(),
         theme: Theme::dark(),
         layout: SystemPageBudget::from_page_layout(PageLayoutBudget::for_viewport(size(
             px(1180.0),

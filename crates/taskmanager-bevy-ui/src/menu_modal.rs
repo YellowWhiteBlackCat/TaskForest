@@ -310,7 +310,7 @@ fn menu_overlay_scene<Ctx: ActionMenuContext>(
         MenuModalScrim
         MenuModalOverlay
         Children [
-            (
+
                 Node {
                     width: px(360.0),
                     height: Val::Auto,
@@ -320,9 +320,9 @@ fn menu_overlay_scene<Ctx: ActionMenuContext>(
                 }
                 BackgroundColor({ palette.panel_fill })
                 Children [
-                    ( { card } ),
+                     @{ card }
                 ]
-            ),
+
         ]
     }) as Box<dyn Scene>
 }

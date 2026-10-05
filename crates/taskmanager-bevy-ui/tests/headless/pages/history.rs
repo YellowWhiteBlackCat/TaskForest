@@ -164,7 +164,7 @@ fn cpu_memory_and_process_history_are_bounded_at_the_render_boundary() {
     for metric in [&row.cpu, &row.memory, &row.process_count] {
         let metric = metric.as_ref().expect("all three metrics are projected");
         assert_eq!(metric.samples.len(), MAX_RENDERED_HISTORY_POINTS);
-        assert_eq!(metric.samples[0], 100.0);
+        assert_eq!(metric.samples[0], 0.0, "the oldest real zero stays visible");
         assert_eq!(metric.samples.last().copied(), Some(699.0));
     }
 }
@@ -319,6 +319,7 @@ fn the_disabled_page_states_itself_exactly_once() {
     // The paint path (bound by the page's on-insert hook) reads these two
     // resources; the window composition always has them.
     app.insert_resource(crate::pages::history::HistoryProjectionResource::default());
+    crate::pages::history::scene::register(&mut app);
     app.insert_resource(crate::window::WindowPalette {
         inner: crate::palette::ui_palette(&Theme::dark()),
     });

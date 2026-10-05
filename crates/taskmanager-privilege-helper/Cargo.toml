@@ -1,8 +1,8 @@
 [package]
 name = "taskmanager-privilege-helper"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 authors = ["TaskForest"]
 license = "Apache-2.0"
 description = "Privileged helper binary: reads the Intel iGPU perf PMU and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023)."

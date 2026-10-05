@@ -9,10 +9,24 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 use super::super::{IcedApp, Message, PerfDevice};
 use super::dispatch::UpdateDispatch;
 use taskmanager_platform_contract::CapabilityId;
+use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 
 impl IcedApp {
     pub(super) fn reduce_performance_message(&mut self, message: Message) -> UpdateDispatch {
         let effect = match message {
+            Message::SetSidebarDeviceVisibility { key, visible } => {
+                self.set_sidebar_device_visibility(&key, visible);
+                None
+            }
+            Message::MoveSidebarDevice { key, delta } => {
+                self.move_sidebar_device(&key, delta);
+                None
+            }
+            Message::AuthorizePrivilege(action) => PrivilegeCenterInputs::from_shell(&self.shell)
+                .rows()
+                .into_iter()
+                .find_map(|row| row.action.filter(|current| *current == action))
+                .map(|action| action.effect()),
             Message::SelectPerformanceGraphPoints(points) => {
                 let mut config = self.config_draft();
                 config.graph_data_points = points;
@@ -98,9 +112,35 @@ impl IcedApp {
             // Frontend-local dashboard window selection (no shell effect):
             // the pills only re-project the System-page dashboard segment.
             Message::SystemDashboard(
+                crate::ui::system_dashboard::SystemDashboardMessage::Previous,
+            ) => {
+                self.system_dashboard_first_metric =
+                    self.system_dashboard_first_metric.saturating_sub(1);
+                None
+            }
+            Message::SystemDashboard(crate::ui::system_dashboard::SystemDashboardMessage::Next) => {
+                self.system_dashboard_first_metric =
+                    self.system_dashboard_first_metric.saturating_add(1).min(3);
+                None
+            }
+            Message::SystemDashboard(
+                crate::ui::system_dashboard::SystemDashboardMessage::SelectHealthSection(section),
+            ) => {
+                self.system_health_section = section;
+                None
+            }
+            Message::SystemDashboard(
+                crate::ui::system_dashboard::SystemDashboardMessage::SelectSection(section),
+            ) => {
+                self.system_section = section;
+                self.system_dashboard_first_metric = 0;
+                None
+            }
+            Message::SystemDashboard(
                 crate::ui::system_dashboard::SystemDashboardMessage::SelectWindow(window),
             ) => {
                 self.system_dashboard_window = window;
+                self.system_dashboard_first_metric = 0;
                 None
             }
             _ => None,

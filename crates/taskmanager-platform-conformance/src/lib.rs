@@ -14,6 +14,7 @@ mod escalation;
 mod identity;
 mod process;
 mod smoke;
+pub mod smoke_budget;
 mod source;
 
 pub use capability::{assert_capability_surface_matches_catalog, assert_fresh_surface_descriptors};

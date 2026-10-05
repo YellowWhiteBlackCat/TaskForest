@@ -1,4 +1,5 @@
 use super::*;
+use crate::HistoryRetention;
 
 fn partial_state(observed_at_ms: u64) -> DeviceState {
     DeviceState {
@@ -20,7 +21,8 @@ fn battery(id: String, observed_at_ms: u64) -> BatteryInfo {
 
 #[test]
 fn partial_battery_identity_churn_is_bounded_and_gaps_retained_histories() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let attempted = MAX_DYNAMIC_HISTORY_IDENTITIES + 24;
     let mut rejected = 0_usize;
 
@@ -88,7 +90,8 @@ fn fan(id: String, observed_at_ms: u64) -> SensorReading {
 
 #[test]
 fn partial_sensor_identity_churn_is_bounded_across_related_scalar_families() {
-    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let (store, ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(4));
     let attempted = MAX_DYNAMIC_HISTORY_IDENTITIES + 24;
     let mut rejected = 0_usize;
 

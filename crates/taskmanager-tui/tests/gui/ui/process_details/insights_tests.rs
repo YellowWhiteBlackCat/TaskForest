@@ -26,6 +26,15 @@ use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::missing_value;
 
+fn fixture_identity(app: &crate::TuiApp, pid: u32) -> ProcessLiveKey {
+    app.projection()
+        .process_insights
+        .as_ref()
+        .filter(|projection| projection.target.pid == pid)
+        .and_then(|projection| projection.target.live_key())
+        .unwrap_or_else(|| ProcessLiveKey::new(pid, 1).expect("fixture identity"))
+}
+
 /// Compact preview row bounds asserted by the headless preview tests. The
 /// production renderer always passes its own limit, so these bounded wrappers
 /// live with the tests that exercise them.
@@ -116,6 +125,24 @@ fn format_thread_row_keeps_missing_cpu_honest() {
     assert!(gap_line.contains("R"));
 }
 
+#[test]
+fn format_thread_row_renders_runqueue_and_wait_diagnostics() {
+    let thread = ProcessThreadInfo {
+        tid: 4244,
+        comm: "io-worker".into(),
+        state: ThreadState::UninterruptibleSleep,
+        cpu_time_secs: Some(1.0),
+        cpu_percent: Some(2.0),
+        wchan: Some("futex_wait_queue_me".into()),
+        run_queue_wait_ns: Some(2_500_000),
+        wait_kind: Some(ThreadWaitKind::KernelLock),
+    };
+    let line = format_thread_row(&thread);
+    assert!(line.contains("[futex_wait_queue_me]"));
+    assert!(line.contains("2.5ms"));
+    assert!(line.contains(" D "));
+}
+
 /// Honesty: a descriptor whose readlink failed keeps its row with the typed
 /// unreadable marker, never a blank target or a fabricated path.
 #[test]
@@ -133,11 +160,25 @@ fn format_open_file_row_keeps_unreadable_target_honest() {
         deleted: false,
     };
     assert!(format_open_file_row(&readable, "unreadable").contains("/dev/null"),);
+    assert!(
+        format_open_file_row(&readable, "unreadable").contains("[file]"),
+        "must classify handle type"
+    );
     let denied = format_open_file_row(&unreadable, "unreadable");
     assert!(
         denied.ends_with("unreadable"),
         "an unreadable fd must surface the typed marker, got: {denied}"
     );
+
+    let deleted = OpenFileEntry {
+        fd: 3,
+        kind: OpenFileKind::File,
+        target: Some("/tmp/deleted.txt".into()),
+        deleted: true,
+    };
+    let del_line = format_open_file_row(&deleted, "unreadable");
+    assert!(del_line.contains("[file]"), "must classify handle type");
+    assert!(del_line.contains("[deleted]"), "must mark deleted fd");
 }
 
 /// Honesty: a cold-start engine (no current usage) must render an explicit
@@ -517,7 +558,11 @@ fn insights_lines_renders_environment_and_gpu_facets() {
         &mut app.shell,
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection.clone()))),
     );
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 100));
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 100),
+    ));
     assert!(text.contains("Loading process insights"), "{text}");
 
     // 2. Unavailable environment renders honest permission denied
@@ -528,7 +573,11 @@ fn insights_lines_renders_environment_and_gpu_facets() {
         &mut app.shell,
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection.clone()))),
     );
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 100));
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 100),
+    ));
     assert!(text.contains("Permission denied"), "{text}");
 
     // 3. Current environment (empty) renders "No environment variables observed"
@@ -537,7 +586,11 @@ fn insights_lines_renders_environment_and_gpu_facets() {
         &mut app.shell,
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection.clone()))),
     );
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 100));
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 100),
+    ));
     assert!(text.contains("No environment variables observed"), "{text}");
 
     // 4. Current environment (populated) and enhanced GPU with device_id and engines
@@ -578,7 +631,11 @@ fn insights_lines_renders_environment_and_gpu_facets() {
         &mut app.shell,
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
     );
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 100));
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 100),
+    ));
     assert!(text.contains("Environment variables 2"), "{text}");
     assert!(text.contains("VAR_A=val_a"), "{text}");
     assert!(text.contains("VAR_B=val_b"), "{text}");
@@ -911,7 +968,11 @@ fn insights_lines_renders_capabilities_with_warning_markers() {
         &mut app.shell,
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
     );
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 200));
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 200),
+    ));
 
     assert!(
         text.contains("Resource group"),
@@ -932,42 +993,5 @@ fn insights_lines_renders_capabilities_with_warning_markers() {
     assert!(text.contains("cpu"), "safe controller must render: {text}");
 }
 
-#[test]
-fn insights_lines_renders_cpu_affinity_when_observed() {
-    use taskmanager_application::ProcessAffinityReady;
-
-    let _guard = en();
-    let target = FrozenProcessIdentity::from_authoritative_parts(300, "aff-proc", 1000, 1000)
-        .expect("valid target");
-    let revision = ProcessInsightsRevision::new(1);
-    let mut tracker = ProcessInsightsProjection::default();
-    tracker.begin(target.clone(), revision);
-    let projection = tracker.snapshot().expect("snapshot exists");
-
-    let mut app = crate::demo_app();
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
-    );
-
-    // Seed affinity ready state
-    let ready = ProcessAffinityReady {
-        target,
-        cpus: vec![0, 1, 2, 3],
-        request_id: RequestId::new(1).expect("valid request id"),
-    };
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::ProcessAffinity(Some(ready)),
-    );
-
-    let text = render_text(insights_lines(&app, TuiTheme::default(), 300));
-    assert!(
-        text.contains("Affinity"),
-        "must render Affinity label: {text}"
-    );
-    assert!(
-        text.contains("CPUs 0, 1, 2, 3") || text.contains("4 /") || text.contains("All"),
-        "must render CPUs list: {text}"
-    );
-}
+#[path = "insights_tests/security.rs"]
+mod security;

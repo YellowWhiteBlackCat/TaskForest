@@ -1,8 +1,9 @@
 //! Typed capture preparation for the System > Health surface.
 
-use crate::gpui_app::dashboard::{DashboardState, SystemSection};
+use crate::gpui_app::dashboard::DashboardState;
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::FilesystemHealthSnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -12,6 +13,7 @@ use taskmanager_core::core::{
 };
 
 use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome};
+use taskmanager_shell::fixture::health::health_fixture;
 
 impl CaptureEvidence {
     /// Prepare strict Health-page evidence only after the normal telemetry and
@@ -33,9 +35,9 @@ impl CaptureEvidence {
             return SystemHealthCaptureOutcome::default();
         }
 
-        let fixture = crate::gpui_app::system_health_view::capture_fixture();
+        let fixture = health_fixture();
         *page = TopPage::System;
-        dashboard.section = SystemSection::Health;
+        dashboard.section = SystemPageSection::Health;
         snapshot.disks = vec![fixture.selected_disk.clone()];
         *filesystems = fixture.filesystems;
         *sensors = fixture.sensors;
@@ -58,7 +60,7 @@ impl CaptureEvidence {
             None
         };
 
-        let page_ready = *page == TopPage::System && dashboard.section == SystemSection::Health;
+        let page_ready = *page == TopPage::System && dashboard.section == SystemPageSection::Health;
         let target_ready = match self.scenario {
             Some(CaptureScenario::StorageHealth) => {
                 confirmation.is_none()

@@ -2,22 +2,26 @@
 
 use gpui::Context;
 use taskmanager_application::TelemetryRefreshPolicyChange;
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
 use taskmanager_core::core::DiagnosticBundleError;
 use taskmanager_core::core::DiagnosticBundleErrorKind;
 use taskmanager_core::core::process::ProcessCategory;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
+use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::seed_direct_track_fact;
+use taskmanager_shell::fixture::setup::setup_script_info;
+use taskmanager_shell::fixture::smbios_memory::seed_direct_memory_inventory;
 
 use super::super::{
-    CaptureEvidence, CaptureProcessAction, DiagnosticBundleUiState, ProcessDetailsSection,
-    RootView, SelectedDevice, TopPage, WindowSurfaceKind,
+    CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
+    WindowSurfaceKind,
 };
-use crate::gpui_app::dashboard::SystemSection;
-use crate::gpui_app::first_run::FirstRunPhase;
+
+use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::process_category_projection::category_expansion_key;
 
 pub(super) fn apply_platform_batch(
@@ -74,19 +78,16 @@ fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut 
             CaptureProcessAction::Properties(identity, section) => {
                 view.open_process_details(identity, section);
             }
-            CaptureProcessAction::Insights { identity, state } => {
+            CaptureProcessAction::Insights(identity) => {
                 view.open_process_details(identity, ProcessDetailsSection::Insights);
-                if let Some(target) = view.frozen_process(identity) {
-                    view.process_insights.install_capture_state(target, state);
+                view.select_process_insight_facet(view.capture_evidence.properties_insight_facet());
+                if let Some(projection) = view
+                    .process_properties_target()
+                    .cloned()
+                    .and_then(process_insights_projection)
+                {
+                    view.process_insights.install_capture_projection(projection);
                 }
-                let ready = view.process_properties_identity() == Some(identity)
-                    && view.details_section == ProcessDetailsSection::Insights
-                    && view
-                        .processes()
-                        .iter()
-                        .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
-                    && view.process_insights.is_ready_for(identity);
-                view.capture_evidence.mark_process_insights_ready(ready);
             }
         }
     }
@@ -123,11 +124,16 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.apps_group_expanded_requested() {
         configure_category_apps(view);
+        view.set_process_query("capture-browser");
+        crate::gpui_app::processes_view::rows::expand_all(view);
         let (rows, _, _) = view.processes_projection();
-        let expanded = rows
-            .iter()
-            .any(|row| row.depth == 0 && row.has_children && !row.collapsed)
-            && rows.iter().any(|row| row.depth >= 1);
+        let expanded = rows.iter().any(|row| row.depth >= 3)
+            && rows
+                .iter()
+                .filter(|row| row.process_identity.is_some())
+                .count()
+                == 3
+            && rows.iter().all(|row| !row.has_children || !row.collapsed);
         view.capture_evidence
             .mark_apps_group_expanded_ready(expanded);
     }
@@ -147,7 +153,7 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.system_about_requested() {
         view.page = TopPage::System;
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         view.show_system_about();
         view.capture_evidence.mark_system_about_ready(
             view.window_surface_kind() == Some(WindowSurfaceKind::SystemAbout),
@@ -155,22 +161,16 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.about_requested() {
         view.page = TopPage::System;
-        view.dashboard.section = SystemSection::Hardware;
+        view.dashboard.section = SystemPageSection::Hardware;
         view.show_about();
         view.capture_evidence
             .mark_about_ready(view.window_surface_kind() == Some(WindowSurfaceKind::About));
     }
     if view.capture_evidence.first_run_requested() {
-        view.first_run.info = Some(CaptureEvidence::first_run_fixture_info());
-        view.first_run.phase = FirstRunPhase::Available;
+        view.first_run = FirstRunController::from_observation(Some(setup_script_info()));
         view.show_first_run();
         view.capture_evidence
             .mark_first_run_ready(view.first_run_open());
-    }
-    if view.capture_evidence.process_memory_pss_swap_requested() {
-        view.page = TopPage::Apps;
-        view.set_process_sort(SortCol::Memory, SortDir::Desc);
-        view.processes_state.hidden_cols.remove(&SortCol::Swap);
     }
 }
 
@@ -194,7 +194,8 @@ fn apply_inventory_capture(
         services_updated || view.capture_evidence.service_inventory_capture_requested();
     if let Some(service) = view.sync_capture_service_system(service_capture_update) {
         view.page = TopPage::Services;
-        view.open_service_details(service);
+        view.open_service_details(service.clone());
+        super::super::capture::service_logs::seed(view, &service);
         view.capture_evidence
             .mark_service_details_ready(view.service_details_target().is_some());
     }
@@ -235,6 +236,7 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     // enabled.
     let _ = view.capture_evidence.seed_msr_readout(&mut view.shell);
     if let Some(snapshot) = view.capture_evidence.system_hardware_npu_fixture() {
+        seed_direct_memory_inventory(&mut view.shell);
         seed_direct_track_fact(&mut view.shell, DirectTrackSeedFact::NpuInventory(snapshot));
         let revision = view.projection().system_revision;
         let snapshot = view.projection().npu_inventory.clone();
@@ -247,7 +249,24 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
                     .any(|device| device.device_id.as_str() == "accel:capture-npu0")
         });
         view.capture_evidence
-            .mark_system_npu_fixture_ready(installed);
+            .mark_system_inventory_fixture_ready(installed);
+    }
+    if view.capture_evidence.active_alert_capture_enabled() {
+        let mut snapshot = view.system_snapshot().clone();
+        let mut active = Vec::new();
+        for elapsed in [0, 10_000] {
+            snapshot.timestamp_ms = snapshot.timestamp_ms.saturating_add(elapsed);
+            active = view
+                .shell
+                .evaluate_alerts(&snapshot, snapshot.timestamp_ms)
+                .active;
+        }
+        let ready = !active.is_empty();
+        let revision = view.shell.accept_alert_evaluation(active.clone());
+        view.materialize_active_alerts(revision, active);
+        if ready {
+            view.capture_evidence.mark_active_alert_ready();
+        }
     }
     let timestamp_ms = view.system_snapshot().timestamp_ms;
     if view.capture_evidence.seed_gpu_engine_inventory_history(
@@ -285,6 +304,7 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
                 Some(DiagnosticBundleUiState::Failed(_))
             ));
     }
+    view.prepare_dashboard_capture_history();
     let panel = view.capture_evidence.on_dashboard_state(
         &mut view.dashboard,
         &view.telemetry.system_history,

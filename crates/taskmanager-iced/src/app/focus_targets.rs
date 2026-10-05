@@ -3,14 +3,15 @@
 //! budget. The stable operation IDs (`iced-…`) are the single identity each
 //! focusable widget registers with Iced's focus traversal.
 
-use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+use taskmanager_application::{AppPage, ProcessInsightFacet, RefreshRequest};
 use taskmanager_core::core::services::ServiceAction;
+use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_shell::SortCol;
 
 use super::DetailsSection;
 use super::selectors::PerfDevice;
-use crate::ui::system_table::ResourceHistoryWindow;
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::ProcessStatusFilter;
 
@@ -19,6 +20,8 @@ use taskmanager_shell::ProcessStatusFilter;
 pub enum FocusTarget {
     /// The current modal close action.
     ModalClose,
+    DiagnosticConfirm,
+    DiagnosticRetry,
     /// A row in one of the renderer-local typed tables.
     TableRow {
         page: AppPage,
@@ -89,6 +92,8 @@ pub enum FocusTarget {
     ProcessNetworkEscalation,
     /// One process-details modal section tab.
     DetailsTab(DetailsSection),
+    DetailsFacet(ProcessInsightFacet),
+    DetailsRefresh,
     /// The Applications Suspend-process action (shell batch path).
     SuspendProcess,
     /// The Applications Resume-process action (shell batch path).
@@ -136,6 +141,11 @@ pub enum FocusTarget {
     UserRowMenuClose,
     /// The toolbar settings trigger.
     SettingsTrigger,
+    SidebarEditTrigger,
+    SidebarDeviceControl {
+        index: usize,
+        action: u8,
+    },
     /// The toolbar containers trigger.
     ContainersTrigger,
     /// The toolbar health trigger.
@@ -218,6 +228,9 @@ pub enum FocusTarget {
     DirectoryUsageCancel,
     /// The About modal's copy-details clipboard action (G-16).
     AboutCopyDetails,
+    AboutRepository,
+    AboutSystemInformation,
+    SystemInformationCopy,
     /// The per-engine GPU utilization session toggle on the GPU device panel
     /// (the typed `telemetry.gpu.engines` lane).
     GpuEngineRowsToggle,
@@ -238,6 +251,9 @@ pub enum FocusTarget {
     ServiceDetailsLogRefresh,
     /// Saved views preset buttons and actions.
     SavedViewPreset(u64),
+    SavedViewsTrigger,
+    NavigationToggle,
+    SavedViewRemove(u64),
     SavedViewSaveCurrent,
     SavedViewExport,
     SavedViewImport,
@@ -246,7 +262,11 @@ pub enum FocusTarget {
     HistoryReplayWindow(HistoryWindow),
     HistoryReplayRefresh,
     /// Resource history window choice (1m, 5m, 15m, 60m).
-    ResourceHistoryWindow(ResourceHistoryWindow),
+    SystemHistoryWindow(SystemHistoryWindow),
+    SystemSection(SystemPageSection),
+    SystemHealthSection(HealthReviewSection),
+    SystemDashboardPrevious,
+    SystemDashboardNext,
     /// Alert center modal controls.
     AlertCenterClear,
     AlertCenterExport,
@@ -268,8 +288,12 @@ pub enum FocusTarget {
     AlertsExport,
     /// Import alert rules action button on the Alerts page.
     AlertsImport,
+    AlertsAdd,
+    AlertsImportReplace,
+    AlertsEdit(usize, u8),
     /// One first-run dialog descriptor copy stop (location / run command /
     /// revert command rows, indices 0..=2).
+    FirstRunOpen,
     FirstRunCopy(u8),
     /// One first-run dialog action pill (documentation / view / run / revert /
     /// restart / retry, indices 0..=5).
@@ -278,8 +302,10 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 165] = [
+    pub const ALL: [Self; 195] = [
         Self::ModalClose,
+        Self::DiagnosticConfirm,
+        Self::DiagnosticRetry,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
         Self::PageTab(AppPage::Services),
@@ -312,6 +338,14 @@ impl FocusTarget {
         Self::DetailsTab(DetailsSection::Performance),
         Self::DetailsTab(DetailsSection::Command),
         Self::DetailsTab(DetailsSection::Insights),
+        Self::DetailsRefresh,
+        Self::DetailsFacet(ProcessInsightFacet::Network),
+        Self::DetailsFacet(ProcessInsightFacet::Gpu),
+        Self::DetailsFacet(ProcessInsightFacet::Resources),
+        Self::DetailsFacet(ProcessInsightFacet::Isolation),
+        Self::DetailsFacet(ProcessInsightFacet::Threads),
+        Self::DetailsFacet(ProcessInsightFacet::OpenFiles),
+        Self::DetailsFacet(ProcessInsightFacet::Environment),
         Self::SuspendProcess,
         Self::ResumeProcess,
         Self::KillProcess,
@@ -345,6 +379,11 @@ impl FocusTarget {
         Self::UserRowMenuLock,
         Self::UserRowMenuClose,
         Self::SettingsTrigger,
+        Self::SidebarEditTrigger,
+        Self::SidebarDeviceControl {
+            index: 0,
+            action: 0,
+        },
         Self::ContainersTrigger,
         Self::HealthTrigger,
         Self::AboutTrigger,
@@ -402,6 +441,9 @@ impl FocusTarget {
         Self::GpuEnginesExpandToggle,
         Self::DirectoryUsageCancel,
         Self::AboutCopyDetails,
+        Self::AboutRepository,
+        Self::AboutSystemInformation,
+        Self::SystemInformationCopy,
         Self::GpuEngineRowsToggle,
         Self::ServiceLogFollow,
         Self::ServiceLogPause,
@@ -416,16 +458,27 @@ impl FocusTarget {
         Self::ServiceDetailsLogCopy,
         Self::ServiceDetailsLogRefresh,
         Self::SavedViewPreset(1),
+        Self::SavedViewsTrigger,
+        Self::NavigationToggle,
+        Self::SavedViewRemove(4),
         Self::SavedViewSaveCurrent,
         Self::SavedViewExport,
         Self::SavedViewImport,
         Self::HistoryReplayToggle,
         Self::HistoryReplayWindow(HistoryWindow::OneHour),
         Self::HistoryReplayRefresh,
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::OneMinute),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::FiveMinutes),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::FifteenMinutes),
-        Self::ResourceHistoryWindow(ResourceHistoryWindow::SixtyMinutes),
+        Self::SystemDashboardPrevious,
+        Self::SystemDashboardNext,
+        Self::SystemSection(SystemPageSection::Dashboard),
+        Self::SystemSection(SystemPageSection::Hardware),
+        Self::SystemSection(SystemPageSection::Health),
+        Self::SystemHealthSection(HealthReviewSection::All),
+        Self::SystemHealthSection(HealthReviewSection::Storage),
+        Self::SystemHealthSection(HealthReviewSection::Sensors),
+        Self::SystemHistoryWindow(SystemHistoryWindow::OneMinute),
+        Self::SystemHistoryWindow(SystemHistoryWindow::FiveMinutes),
+        Self::SystemHistoryWindow(SystemHistoryWindow::FifteenMinutes),
+        Self::SystemHistoryWindow(SystemHistoryWindow::SixtyMinutes),
         Self::AlertCenterClear,
         Self::AlertCenterExport,
         Self::ProcessMenuCopyTsv,
@@ -438,6 +491,10 @@ impl FocusTarget {
         Self::AlertsRuleToggle(0),
         Self::AlertsExport,
         Self::AlertsImport,
+        Self::AlertsAdd,
+        Self::AlertsImportReplace,
+        Self::AlertsEdit(0, 0),
+        Self::FirstRunOpen,
         Self::FirstRunCopy(0),
         Self::FirstRunCopy(1),
         Self::FirstRunCopy(2),

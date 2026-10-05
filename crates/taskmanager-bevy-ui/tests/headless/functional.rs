@@ -41,16 +41,18 @@ fn functional_declaration_is_complete_and_explicit() {
             route: "services.log-panel.export",
         }))
     );
-    // No Bevy UI diagnostic surface exists, so the intent stays a typed
-    // absence rather than an AcceptedDifference that names a report route the
-    // shape never mounts.
     assert!(matches!(
         report
             .iter()
             .find(|(intent, _)| *intent == ProductIntent::DiagnosticBundle)
             .map(|(_, status)| status),
-        Some(FunctionalStatus::Declared(
-            SurfaceDecision::Unsupported { .. }
-        ))
+        Some(FunctionalStatus::Declared(SurfaceDecision::Local { .. }))
+    ));
+    assert!(matches!(
+        report
+            .iter()
+            .find(|(intent, _)| *intent == ProductIntent::FirstRunSetup)
+            .map(|(_, status)| status),
+        Some(FunctionalStatus::Declared(SurfaceDecision::Local { .. }))
     ));
 }

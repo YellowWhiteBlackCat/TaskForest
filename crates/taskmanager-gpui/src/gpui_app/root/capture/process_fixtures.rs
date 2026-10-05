@@ -10,9 +10,11 @@ use taskmanager_core::core::process::{
 use taskmanager_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupEntry,
-    StartupFailedUnit, StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason,
-    StartupScope, StartupSource,
+    StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_shell::fixture::process_insights::seed_process_properties_observations;
+use taskmanager_shell::fixture::process_tree::append_process_tree;
+use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
 const CAPTURE_CHROME_ICON: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#4285f4"/><path d="M8 8h7A7 7 0 0 0 3 3z" fill="#ea4335"/><path d="M8 8 4.5 14A7 7 0 0 0 15 8z" fill="#fbbc05"/><circle cx="8" cy="8" r="3" fill="#34a853"/></svg>"##;
 const CAPTURE_FIREFOX_ICON: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#ff7139"/><path d="M13 4c-2-2-5-2-7 0 1 0 2 1 2 2-2-1-4 0-5 2 0 3 2 5 5 5 3 0 5-2 5-5 0-2-1-3-2-4 1 0 2 0 2 0z" fill="#20123a"/></svg>"##;
@@ -55,26 +57,7 @@ fn attach_capture_metadata(process: &mut ProcessItem, user: &str, executable: Op
 }
 
 pub(super) fn prepare_process_tree(processes: &mut Vec<ProcessItem>) {
-    processes.retain(|process| !(90_000..=90_006).contains(&process.pid));
-    let mut root = ProcessItem::new(90_000, "capture-app");
-    root.apply_scalar_observations(ProcessScalarObservations {
-        start_token: ScalarObservation::available(9_000_000, 1),
-        ..Default::default()
-    });
-    processes.push(root);
-    for offset in 1..=6 {
-        let mut process = ProcessItem::new(90_000 + offset, format!("capture-worker-{offset}"));
-        process.parent_pid = Some(if offset <= 2 {
-            90_000
-        } else {
-            90_000 + offset - 2
-        });
-        process.apply_scalar_observations(ProcessScalarObservations {
-            start_token: ScalarObservation::available(9_000_000 + u64::from(offset), 1),
-            ..Default::default()
-        });
-        processes.push(process);
-    }
+    append_process_tree(processes);
 }
 
 pub(super) fn prepare_apps_group_expanded(processes: &mut Vec<ProcessItem>) {
@@ -93,6 +76,7 @@ pub(super) fn prepare_apps_group_expanded(processes: &mut Vec<ProcessItem>) {
         let mut process = ProcessItem::new(pid, "capture-browser");
         process.cmdline = "/usr/bin/capture-browser --group-capture".into();
         process.status = status.into();
+        process.parent_pid = (offset > 0).then_some(BASE_PID);
         process.apply_scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(9_300_000 + u64::from(pid), 1),
             cpu_percentage: ScalarObservation::available(cpu, 1),
@@ -257,63 +241,6 @@ pub(super) fn prepare_process_batch(processes: &mut Vec<ProcessItem>) {
     }
 }
 
-pub(super) fn prepare_process_memory_pss_swap(processes: &mut Vec<ProcessItem>) {
-    const BASE_PID: u32 = 93_001;
-    processes.retain(|process| !(BASE_PID..BASE_PID.saturating_add(4)).contains(&process.pid));
-    for (offset, (name, user, rss, pss, swap, cpu, status)) in [
-        (
-            "capture-browser",
-            "capture-user",
-            768 * 1024 * 1024,
-            410 * 1024 * 1024,
-            96 * 1024 * 1024,
-            38.0,
-            "Running",
-        ),
-        (
-            "capture-editor",
-            "capture-user",
-            512 * 1024 * 1024,
-            292 * 1024 * 1024,
-            0,
-            21.5,
-            "Sleeping",
-        ),
-        (
-            "capture-worker",
-            "capture-service",
-            256 * 1024 * 1024,
-            144 * 1024 * 1024,
-            32 * 1024 * 1024,
-            8.5,
-            "Running",
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let pid = BASE_PID + u32::try_from(offset).unwrap_or(0);
-        let threads = 4 + u32::try_from(offset).unwrap_or(0);
-        let mut process = ProcessItem::new(pid, name);
-        process.cmdline = format!("/usr/bin/{name} --capture");
-        process.status = status.into();
-        process.apply_scalar_observations(ProcessScalarObservations {
-            start_token: ScalarObservation::available(8_000_000 + u64::from(pid), 1),
-            cpu_percentage: ScalarObservation::available(cpu, 1),
-            memory_bytes: ScalarObservation::available(rss, 1),
-            memory_pss_bytes: ScalarObservation::available(pss, 1),
-            swap_bytes: ScalarObservation::available(swap, 1),
-            disk_read_bytes_per_sec: ScalarObservation::available(12 * 1024, 1),
-            disk_write_bytes_per_sec: ScalarObservation::available(8 * 1024, 1),
-            threads: ScalarObservation::available(threads, 1),
-            ..ProcessScalarObservations::default()
-        });
-        process.cpu_history = vec![cpu - 4.0, cpu - 1.0, cpu];
-        attach_capture_metadata(&mut process, user, None);
-        processes.push(process);
-    }
-}
-
 pub(super) fn prepare_apps_zero_gray(processes: &mut Vec<ProcessItem>) {
     const BASE_PID: u32 = 93_101;
     processes.retain(|process| !(BASE_PID..BASE_PID.saturating_add(2)).contains(&process.pid));
@@ -371,7 +298,9 @@ pub(super) fn prepare_apps_zero_gray(processes: &mut Vec<ProcessItem>) {
     }
 }
 
-pub(super) fn prepare_process_insights(processes: &mut Vec<ProcessItem>) -> Option<ProcessLiveKey> {
+pub(super) fn prepare_process_properties(
+    processes: &mut Vec<ProcessItem>,
+) -> Option<ProcessLiveKey> {
     const PID: u32 = 4242;
     processes.retain(|process| process.pid != PID);
     let mut process = ProcessItem::new(PID, "capture-telemetry-worker");
@@ -386,6 +315,7 @@ pub(super) fn prepare_process_insights(processes: &mut Vec<ProcessItem>) -> Opti
         start_time_secs: ScalarObservation::available(1_703_000_001, 1),
         ..Default::default()
     });
+    seed_process_properties_observations(&mut process);
     attach_capture_metadata(&mut process, "capture-user", None);
     processes.push(process);
     ProcessLiveKey::from_parts(PID, 987_654)
@@ -448,41 +378,7 @@ pub(super) fn prepare_startup_failure_evidence(
 ) {
     prepare_startup_impact(entries);
     *baseline = None;
-    *evidence = Some(StartupBootEvidenceSnapshot {
-        state: DeviceState::healthy(10),
-        failed_units_state: DeviceState::healthy(10),
-        critical_chain_state: DeviceState::healthy(10),
-        failed_units_failure: None,
-        critical_chain_failure: None,
-        failed_units: vec![
-            failed_unit("taskforest-g.service"),
-            failed_unit("taskforest-i.service"),
-            failed_unit("taskforest.service"),
-        ],
-        critical_chain: vec![
-            chain_node("dbus.socket", 0, 6),
-            chain_node("graphical-session.target", 6, 0),
-        ],
-    });
-}
-
-fn failed_unit(unit: &str) -> StartupFailedUnit {
-    StartupFailedUnit {
-        unit: unit.to_owned(),
-        load_state: "loaded".into(),
-        active_state: "failed".into(),
-        sub_state: "failed".into(),
-        description: "capture fixture failed unit".into(),
-    }
-}
-
-pub(super) fn prepare_process_histories(process: &mut ProcessItem) {
-    process.cpu_history = (0..60).map(|i| 12.0 + (i % 12) as f32 * 2.0).collect();
-    process.mem_history = (0..60)
-        .map(|i| 240_000_000.0 + (i % 15) as f32 * 8_000_000.0)
-        .collect();
-    process.disk_read_history = (0..60).map(|i| (i % 10) as f32 * 900_000.0).collect();
-    process.disk_write_history = (0..60).map(|i| (i % 8) as f32 * 500_000.0).collect();
+    *evidence = Some(startup_failure_evidence(10));
 }
 
 /// Startup waterfall + roadmap #5 comparison-markers fixture: keeps the

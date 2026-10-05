@@ -10,14 +10,14 @@ use taskmanager_shell::SortDir;
 
 use gpui::{AppContext, SharedString, TestAppContext};
 
-use crate::gpui_app::dashboard::SavedViewPreset;
-use crate::gpui_app::dashboard::saved_view_transfer::filter_from_token;
 use crate::gpui_app::root::ProcessesState;
 use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE,
     WINDOW_DECORATIONS_SYSTEM,
 };
+use taskmanager_shell::saved_views::SavedViewPreset;
+use taskmanager_shell::saved_views::{filter_from_token, preset_from_config};
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
 use taskmanager_theme::{Skin, Theme};
 
@@ -216,7 +216,14 @@ fn custom_preset() -> SavedViewPreset {
 #[test]
 fn custom_presets_roundtrip_without_serializing_builtins_or_capture_fixture() {
     let mut source = DashboardState::default();
-    source.restore_user_saved_views(vec![custom_preset()]);
+    let presets = [custom_preset()];
+    let configs: Vec<_> = presets.iter().filter_map(preset_to_config).collect();
+    restore_saved_views(
+        &mut source.saved_views,
+        &mut source.next_saved_view_id,
+        &configs,
+    )
+    .expect("restore");
     source.add_capture_saved_view();
     let configs = saved_views_to_config(&source);
     assert_eq!(configs.len(), 1);
@@ -224,7 +231,12 @@ fn custom_presets_roundtrip_without_serializing_builtins_or_capture_fixture() {
     let json = serde_json::to_string(&configs).unwrap();
     let decoded: Vec<ProcessViewPresetConfig> = serde_json::from_str(&json).unwrap();
     let mut restored = DashboardState::default();
-    restore_saved_views(&mut restored, &decoded);
+    restore_saved_views(
+        &mut restored.saved_views,
+        &mut restored.next_saved_view_id,
+        &decoded,
+    )
+    .expect("restore");
 
     assert_eq!(restored.saved_views.len(), 4);
     let custom = restored.saved_views.last().unwrap();

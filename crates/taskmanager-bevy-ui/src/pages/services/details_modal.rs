@@ -11,7 +11,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
@@ -61,18 +60,18 @@ fn fact_row_scene(label: &str, value: &str, _palette: &UiPalette) -> Box<dyn Sce
             padding: UiRect::vertical(Val::Px(space_4())),
         }
         Children [
-            (
+
                 Node { width: px(120.0), flex_shrink: 0.0 }
                 Children [
-                    ( Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } )
+                     Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
-            ),
-            (
+            --
+
                 Node { flex_grow: 1.0 }
                 Children [
-                    ( Text({ value.to_owned() }) TextRole(Role::Body) )
+                     Text({ value.to_owned() }) TextRole(Role::Body)
                 ]
-            ),
+
         ]
     })
 }
@@ -108,8 +107,8 @@ pub(crate) fn service_details_modal_scene(
         }
         BackgroundColor({ palette.panel_fill })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
-            (
+             Text(title) TextRole(Role::Heading) --
+
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -117,10 +116,10 @@ pub(crate) fn service_details_modal_scene(
                     margin: UiRect::vertical(Val::Px(space_8())),
                 }
                 Children [
-                    { rows },
+                    { rows }
                 ]
-            ),
-            (
+            --
+
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
@@ -128,16 +127,16 @@ pub(crate) fn service_details_modal_scene(
                     margin: UiRect::top(Val::Px(space_8())),
                 }
                 Children [
-                    (
+
                         Text({ t("common.close").to_owned() })
                         TextRole(Role::Body)
                         ControlVisual(ControlTone::Surface, true)
                         Button
                         on(on_close_button_activated)
                         ServiceDetailsCloseButton
-                    ),
+
                 ]
-            ),
+
         ]
     }) as Box<dyn Scene>;
 
@@ -153,7 +152,7 @@ pub(crate) fn service_details_modal_scene(
         BackgroundColor({ scrim })
         ServiceDetailsOverlay
         Children [
-            ( { panel } ),
+             @{ panel }
         ]
     }) as Box<dyn Scene>
 }
@@ -202,45 +201,17 @@ pub(crate) fn on_service_details_requested(
 }
 
 pub(crate) fn on_service_details_repaint_required(
-    _repaint: On<ServiceDetailsRepaintRequired>,
-    mut commands: Commands,
+    _event: On<ServiceDetailsRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_service_details_modal);
-}
-
-pub(crate) fn paint_service_details_modal(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let state = world.resource::<ServiceDetailsModalState>();
-    let scene = state
-        .target
-        .as_ref()
-        .map(|service| service_details_modal_scene(service, &palette));
-
-    let roots: Vec<Entity> = world
-        .query_filtered::<Entity, With<AppShellRoot>>()
-        .iter(world)
-        .collect();
-    let Some(&root) = roots.first() else {
-        return;
-    };
-
-    let overlays: Vec<Entity> = world
-        .query_filtered::<Entity, With<ServiceDetailsOverlay>>()
-        .iter(world)
-        .collect();
-    let mut commands = world.commands();
-    for entity in overlays {
-        commands.entity(entity).despawn();
-    }
-
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(root).add_one_related::<ChildOf>(entity);
-    }
+    dirty.0 = true;
 }
 
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<ServiceDetailsModalState>();
+    paint::register(app);
     app.add_observer(on_service_details_requested);
     app.add_observer(on_service_details_repaint_required);
 }
+
+mod paint;

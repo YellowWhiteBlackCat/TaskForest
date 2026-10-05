@@ -76,7 +76,7 @@ fn bound_entries_match_the_help_overlay_row_composition() {
     let rows = crate::ui::help::help_rows();
     assert_eq!(
         rows.len(),
-        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len()
+        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
     );
 }
 
@@ -325,13 +325,11 @@ fn about_overlay_footer_paints_the_surface_hint_vocabulary_bytes() {
         .expect("lang test guard");
     set_language(Language::En);
 
-    let expected: String = surface_hint_pairs(
-        TuiSurfaceScope::StatusOverlay,
-        TuiSurfaceAction::ToggleAbout,
-    )
-    .into_iter()
-    .map(|(token, label)| format!("{token}{label}"))
-    .collect();
+    let expected: String =
+        surface_hint_pairs(TuiSurfaceScope::About, TuiSurfaceAction::ToggleAbout)
+            .into_iter()
+            .map(|(token, label)| format!("{token}{label}"))
+            .collect();
     let mut app = crate::demo_app();
     app.toggle_about();
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).expect("test terminal");

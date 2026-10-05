@@ -1,8 +1,8 @@
 [package]
 name = "taskmanager-accessibility-linux"
-version = "0.2.0-rc3"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.99.0"
 license = "Apache-2.0"
 description = "Linux AT-SPI accessibility bridge for TaskForest (accesskit_unix adapter over the semantic contract)"
 

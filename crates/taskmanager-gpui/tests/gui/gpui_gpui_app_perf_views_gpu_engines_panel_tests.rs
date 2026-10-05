@@ -8,6 +8,7 @@ use taskmanager_platform_contract::{CapabilityStatus, RequestId};
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsPresentation, present_gpu_engine_rows,
 };
+use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::gpui_app::perf_views::gpu_page::engine_grid::present_gpu_engine_mini_grid;
@@ -86,7 +87,8 @@ fn mc04_gpu_panel_case_ready_session_renders_only_the_matching_session_payload()
             usage_pct: 7.0,
         },
     ];
-    let (store, _ingestor) = TelemetryStore::shared_with_correlated_ingestion(1);
+    let (store, _ingestor) =
+        TelemetryStore::shared_with_correlated_ingestion(HistoryRetention::uniform(1));
     let grid = present_gpu_engine_mini_grid(
         &store.system_history,
         &metrics,

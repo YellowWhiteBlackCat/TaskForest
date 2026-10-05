@@ -34,12 +34,14 @@ mod config_store;
 mod control;
 mod device_lifecycle;
 pub mod diagnostic_bundle;
-mod diagnostics;
+pub mod diagnostics;
+pub mod first_run;
 /// Toolkit-neutral history-series decimation kernels (LTTB run selection and
 /// the stride max-envelope) — the single source every frontend's replay and
 /// pixel-budgeted downsampling delegates to.
 pub mod history_decimation;
 mod history_replay;
+mod history_replay_samples;
 /// Self-contained i18n (embedded locale catalogs + `t`). Lives in this shared
 /// crate so every frontend (gpui/tui/iced/bevy) imports the same catalog
 /// directly from `taskmanager_application::i18n`.
@@ -47,6 +49,7 @@ pub mod i18n;
 mod interaction;
 mod managed_alert_rules;
 mod path_contract;
+mod performance_history_projection;
 mod persistent_app_history;
 
 mod platform;
@@ -73,6 +76,7 @@ mod router;
 mod service_lifecycle;
 pub mod snapshot_export;
 mod source_status;
+pub mod system_timeline;
 mod telemetry_refresh_policy;
 pub mod window_capture;
 
@@ -139,6 +143,7 @@ pub use interaction::{
 pub use managed_alert_rules::{
     AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
 };
+pub use performance_history_projection::PerformanceHistoryProjection;
 pub use persistent_app_history::{
     MAX_PERSISTED_APPLICATION_IDENTITIES, PersistentApplicationHistoryRecorder,
     PersistentApplicationRecordReport,

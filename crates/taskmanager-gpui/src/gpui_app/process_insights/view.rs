@@ -4,9 +4,11 @@ use super::{ProcessInsightsErrorKind, ProcessInsightsRenderState};
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_application::NetworkEscalationState;
 use taskmanager_application::process_details_vm::render_environment_value;
-use taskmanager_core::core::ProcessNetworkSnapshot;
+use taskmanager_application::{NetworkEscalationState, ProcessInsightFacet};
+use taskmanager_core::core::{
+    ProcessEnvironment, ProcessGpuSnapshot, ProcessIsolation, ProcessNetworkSnapshot,
+};
 use taskmanager_shell::presentation::capabilities_summary;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
@@ -18,9 +20,9 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 
-use taskmanager_application::{ProjectedProcessResources, project_process_resources};
+use taskmanager_application::ProjectedProcessResources;
 use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::process_telemetry::{LimitValue, ProcessTelemetrySnapshot};
+use taskmanager_core::core::process_telemetry::LimitValue;
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
@@ -29,14 +31,14 @@ use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
-mod fixture;
+mod controls;
+mod facets;
 mod formatting;
 mod gpu_engines;
 mod labels;
 mod open_files;
 mod threads;
 
-pub use fixture::process_insights_capture_fixture;
 pub(super) use formatting::format_connection;
 use formatting::{format_bytes, format_limit, format_pair, format_rate, isolation_label};
 pub use labels::ProcessInsightsLabels;
@@ -81,104 +83,46 @@ pub(super) fn insight_row(
     row
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ProcessInsightsLayout {
-    pub columns: u8,
-    pub card_width: f32,
-}
-
-pub fn process_insights_layout(available_width: f32) -> ProcessInsightsLayout {
-    let width = available_width.max(240.0);
-    if width >= 680.0 {
-        ProcessInsightsLayout {
-            columns: 2,
-            card_width: (width - 8.0) / 2.0,
-        }
-    } else {
-        ProcessInsightsLayout {
-            columns: 1,
-            card_width: width,
-        }
-    }
-}
-
 /// Responsive render-only body suitable for embedding in Process Properties.
 /// `available_width` is the dialog content width, not the full window width.
-pub(crate) fn render_process_insights(
-    theme: &Theme,
-    state: ProcessInsightsRenderState<'_>,
-    labels: &ProcessInsightsLabels,
-    available_width: f32,
-    net_escalation: NetworkEscalationState,
-    entity: gpui::Entity<crate::gpui_app::root::RootView>,
-    units: UnitPreferences,
-) -> Div {
-    let layout = process_insights_layout(available_width);
+pub(crate) struct ProcessInsightsViewProps<'a> {
+    pub theme: &'a Theme,
+    pub state: ProcessInsightsRenderState<'a>,
+    pub labels: &'a ProcessInsightsLabels,
+    pub available_width: f32,
+    pub net_escalation: NetworkEscalationState,
+    pub entity: gpui::Entity<crate::gpui_app::root::RootView>,
+    pub units: UnitPreferences,
+    pub facet: ProcessInsightFacet,
+    pub first: usize,
+}
+
+pub(crate) fn render_process_insights(props: ProcessInsightsViewProps<'_>) -> Div {
+    let theme = props.theme;
+    let state = props.state;
+    let labels = props.labels;
+    let available_width = props.available_width;
+    let width = available_width.max(240.0);
     let root = div()
         .w_full()
         .min_w(px(0.0))
         .flex()
         .flex_col()
-        .gap(definite_length(tokens::SPACE_8));
+        .gap(definite_length(tokens::SPACE_8))
+        .child(controls::facet_controls(theme, &props.entity, props.facet));
     match state {
-        ProcessInsightsRenderState::Loading => root.child(message_panel(
-            theme,
-            labels.loading,
-            theme.fg_dim,
-            layout.card_width,
-        )),
+        ProcessInsightsRenderState::Loading => {
+            root.child(message_panel(theme, labels.loading, theme.fg_dim, width))
+        }
         ProcessInsightsRenderState::Error(error) => root.child(message_panel(
             theme,
             error_label(error.kind, labels),
             theme.gpu,
-            layout.card_width,
+            width,
         )),
-        ProcessInsightsRenderState::Ready(snapshot) => root.child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .items_start()
-                .gap(definite_length(tokens::SPACE_8))
-                .min_w(px(0.0))
-                .child(network_card(
-                    theme,
-                    snapshot,
-                    labels,
-                    layout.card_width,
-                    net_escalation,
-                    entity.clone(),
-                    units,
-                ))
-                .child(gpu_card(theme, snapshot, labels, layout.card_width, units))
-                .child(gpu_engines::gpu_engines_card(
-                    theme,
-                    snapshot,
-                    labels,
-                    layout.card_width,
-                ))
-                .child(resource_card(
-                    theme,
-                    project_process_resources(&snapshot.resources),
-                    labels,
-                    layout.card_width,
-                    units,
-                ))
-                .child(isolation_card(theme, snapshot, labels, layout.card_width))
-                .child(open_files::open_files_card(
-                    theme,
-                    snapshot,
-                    labels,
-                    layout.card_width,
-                ))
-                .child(threads::threads_card(
-                    theme,
-                    snapshot,
-                    labels,
-                    layout.card_width,
-                ))
-                .child(environment_card(theme, snapshot, labels, layout.card_width)),
-        ),
+        ProcessInsightsRenderState::Projection(projection) => {
+            root.child(facets::render_projection(&props, projection))
+        }
     }
 }
 
@@ -223,15 +167,16 @@ fn metric_row(theme: &Theme, label: &str, value: String) -> Div {
 }
 
 fn network_card(
-    theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
-    labels: &ProcessInsightsLabels,
+    props: &ProcessInsightsViewProps<'_>,
+    network: &ProcessNetworkSnapshot,
     width: f32,
-    net_escalation: NetworkEscalationState,
-    entity: gpui::Entity<crate::gpui_app::root::RootView>,
-    units: UnitPreferences,
+    first: usize,
 ) -> Div {
-    let network = &snapshot.network;
+    let theme = props.theme;
+    let labels = props.labels;
+    let units = props.units;
+    let net_escalation = props.net_escalation;
+    let entity = props.entity.clone();
     let availability = status_label(network.traffic_state.status, labels);
     let mut connections = div()
         .mt(length(tokens::SPACE_7))
@@ -249,7 +194,7 @@ fn network_card(
                 .child(labels.no_connections.to_string()),
         );
     } else {
-        let (shown, hidden) = capped_card_rows(network.connections.len());
+        let (shown, hidden) = capped_card_rows(network.connections.len().saturating_sub(first));
         connections = connections.child(
             div()
                 .text_size(font_size(tokens::FONT_11))
@@ -260,20 +205,23 @@ fn network_card(
                     network.connections.len()
                 )),
         );
-        connections = connections.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(definite_length(tokens::SPACE_3))
-                .children(network.connections.iter().take(shown).map(|connection| {
-                    div()
-                        .min_w(px(0.0))
-                        .text_size(font_size(tokens::FONT_10))
-                        .font(mono_font_with_fallback(theme))
-                        .whitespace_normal()
-                        .child(format_connection(connection))
-                })),
-        );
+        connections =
+            connections.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(definite_length(tokens::SPACE_3))
+                    .children(network.connections.iter().skip(first).take(shown).map(
+                        |connection| {
+                            div()
+                                .min_w(px(0.0))
+                                .text_size(font_size(tokens::FONT_10))
+                                .font(mono_font_with_fallback(theme))
+                                .whitespace_normal()
+                                .child(format_connection(connection))
+                        },
+                    )),
+            );
         if hidden > 0 {
             connections =
                 connections.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
@@ -317,7 +265,14 @@ fn escalation_row(
     if !escalatable {
         return div();
     }
-    let entity = entity.clone();
+    escalation_control(theme, net_escalation, entity)
+}
+
+fn escalation_control(
+    theme: &Theme,
+    net_escalation: NetworkEscalationState,
+    entity: gpui::Entity<crate::gpui_app::root::RootView>,
+) -> Div {
     let (label, active) = match net_escalation {
         NetworkEscalationState::Closed => ("Enable per-process network", false),
         NetworkEscalationState::Loading(_) => ("Waiting for authorization…", true),
@@ -346,25 +301,25 @@ fn escalation_row(
 
 fn gpu_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    gpu: &ProcessGpuSnapshot,
     labels: &ProcessInsightsLabels,
     width: f32,
     units: UnitPreferences,
 ) -> Div {
     let mut content = card(theme, labels.gpu, width);
-    if snapshot.gpu.devices.is_empty() {
+    if gpu.devices.is_empty() {
         return content.child(
             div()
                 .text_size(font_size(tokens::FONT_11))
                 .text_color(hsla(theme.fg_dim))
-                .child(if snapshot.gpu.state.status == DeviceStatus::Healthy {
+                .child(if gpu.state.status == DeviceStatus::Healthy {
                     labels.no_gpu.to_string()
                 } else {
-                    status_label(snapshot.gpu.state.status, labels).to_string()
+                    status_label(gpu.state.status, labels).to_string()
                 }),
         );
     }
-    for device in &snapshot.gpu.devices {
+    for device in &gpu.devices {
         content = content.child(
             div()
                 .mb(length(tokens::SPACE_7))
@@ -451,11 +406,10 @@ fn resource_card(
 
 fn isolation_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    isolation: &ProcessIsolation,
     labels: &ProcessInsightsLabels,
     width: f32,
 ) -> Div {
-    let isolation = &snapshot.isolation;
     let identity = isolation
         .kind
         .as_ref()
@@ -535,11 +489,11 @@ fn isolation_card(
 
 pub(crate) fn environment_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    environment: &ProcessEnvironment,
     labels: &ProcessInsightsLabels,
     width: f32,
+    first: usize,
 ) -> Div {
-    let environment = &snapshot.environment;
     if environment.state.status != DeviceStatus::Healthy {
         return card(theme, labels.environment, width).child(
             div()
@@ -573,7 +527,7 @@ pub(crate) fn environment_card(
             .text_color(hsla(theme.fg_dim))
             .child(header),
     );
-    let (shown, hidden) = capped_card_rows(environment.entries.len());
+    let (shown, hidden) = capped_card_rows(environment.entries.len().saturating_sub(first));
     content = content.child(
         div()
             .flex()
@@ -583,8 +537,9 @@ pub(crate) fn environment_card(
                 environment
                     .entries
                     .iter()
-                    .take(shown)
                     .enumerate()
+                    .skip(first)
+                    .take(shown)
                     .map(|(i, entry)| {
                         let value = render_environment_value(&entry.key, &entry.value);
                         KeyValueRow::new(&entry.key, value, theme.palette())
@@ -630,3 +585,7 @@ mod cap_tests;
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_environment_tests.rs"]
 mod environment_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_isolation_tests.rs"]
+mod isolation_tests;

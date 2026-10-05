@@ -17,7 +17,9 @@
 
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskmanager_application::project_process_resources;
-use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessTelemetrySnapshot};
+use taskmanager_core::core::process_telemetry::{
+    OpenFileEntry, ProcessOpenFiles, ProcessResourceSnapshot,
+};
 use taskmanager_shell::presentation::format_open_files_saturation;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -53,11 +55,12 @@ fn format_open_file(entry: &OpenFileEntry, unreadable: &str) -> String {
 /// typed message when the source is unavailable, denied, or empty.
 pub(in crate::gpui_app::process_insights::view) fn open_files_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    open_files: &ProcessOpenFiles,
+    resources: Option<&ProcessResourceSnapshot>,
     labels: &ProcessInsightsLabels,
     width: f32,
+    first: usize,
 ) -> Div {
-    let open_files = &snapshot.open_files;
     if open_files.state.status != DeviceStatus::Healthy {
         return super::card(theme, labels.open_files, width).child(
             div()
@@ -75,14 +78,16 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                 .child(labels.no_open_files.to_string()),
         );
     }
-    let projected_resources = project_process_resources(&snapshot.resources);
+    let projected_resources = resources.map(project_process_resources);
     let count = open_files.entries.len() as u64;
-    let saturation = format_open_files_saturation(
-        count,
-        projected_resources.open_files_soft_limit,
-        projected_resources.open_files_hard_limit,
-        labels.unlimited,
-    );
+    let saturation = projected_resources.as_ref().and_then(|resources| {
+        format_open_files_saturation(
+            count,
+            resources.open_files_soft_limit,
+            resources.open_files_hard_limit,
+            labels.unlimited,
+        )
+    });
     let count_label = saturation.unwrap_or_else(|| open_files.entries.len().to_string());
     let header = if open_files.unreadable_count > 0 {
         format!(
@@ -93,7 +98,8 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
         format!("{} · {}", labels.open_files, count_label)
     };
     let header_color = if projected_resources
-        .is_near_soft_open_files_limit(count, 90.0)
+        .as_ref()
+        .and_then(|resources| resources.is_near_soft_open_files_limit(count, 90.0))
         .unwrap_or(false)
     {
         theme.warning
@@ -106,15 +112,20 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
             .text_color(hsla(header_color))
             .child(header),
     );
-    let (shown, hidden) = super::capped_card_rows(open_files.entries.len());
-    content =
-        content.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(definite_length(tokens::SPACE_3))
-                .children(open_files.entries.iter().take(shown).enumerate().map(
-                    |(index, entry)| {
+    let (shown, hidden) = super::capped_card_rows(open_files.entries.len().saturating_sub(first));
+    content = content.child(
+        div()
+            .flex()
+            .flex_col()
+            .gap(definite_length(tokens::SPACE_3))
+            .children(
+                open_files
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .skip(first)
+                    .take(shown)
+                    .map(|(index, entry)| {
                         // The selector token comes from the same typed
                         // predicate `format_open_file` renders, so a render
                         // test can prove this row's own typed unreadable
@@ -131,9 +142,9 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                             .whitespace_normal()
                             .child(format_open_file(entry, labels.unreadable));
                         super::insight_row(row, "open-file", index, token)
-                    },
-                )),
-        );
+                    }),
+            ),
+    );
     if hidden > 0 {
         content = content.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
     }

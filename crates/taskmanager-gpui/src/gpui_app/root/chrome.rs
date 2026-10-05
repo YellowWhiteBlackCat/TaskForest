@@ -9,10 +9,12 @@
 //! the window title, and the per-platform window controls (CSD fallback path).
 
 use super::{Hover, RootView};
+use crate::gpui_app::process_insights::view::ProcessInsightsViewProps;
 use gpui::{
     Context, Div, Entity, InteractiveElement, MouseButton, ParentElement, Rgba, Styled, div, px,
 };
 use taskmanager_application::NetworkEscalationState;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::command_identity_summary;
@@ -313,7 +315,7 @@ fn details_section_tabs(
     row
 }
 
-/// One Properties-dialog 60-second history graph: the row's display metadata
+/// One Properties-dialog bounded recent-history graph: the row's display metadata
 /// (label, current/peak/unit strings), the raw sample series, the sparkline
 /// color, and the cross-frame graph cache.
 struct PropHistoryGraphProps<'a> {
@@ -372,7 +374,7 @@ fn prop_history_graph(props: PropHistoryGraphProps<'_>) -> Div {
                     div()
                         .text_size(font_size(tokens::FONT_11))
                         .text_color(hsla(t.fg_dim))
-                        .child(i18n::t("prop.last_60_seconds")),
+                        .child(i18n::t("prop.recent_samples")),
                 ),
         )
         .child(
@@ -418,7 +420,7 @@ fn vm_display(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) -> Strin
 
 /// The Overview section's field order (label keys + VM fields) — the single
 /// list `details_overview` renders.
-const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 17] = [
+const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 18] = [
     (ProcessDetailsField::Name, "common.name"),
     (ProcessDetailsField::Pid, "proc.pid"),
     (ProcessDetailsField::ParentPid, "prop.parent_pid"),
@@ -431,6 +433,7 @@ const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 17] = [
     (ProcessDetailsField::Threads, "common.threads"),
     (ProcessDetailsField::Pss, "proc.pss"),
     (ProcessDetailsField::Uss, "proc.uss"),
+    (ProcessDetailsField::Swap, "proc.swap"),
     (ProcessDetailsField::Shared, "proc.shared"),
     (ProcessDetailsField::AnonHugePages, "proc.anon_huge_pages"),
     (ProcessDetailsField::SchedPolicy, "proc.sched_policy"),
@@ -575,6 +578,8 @@ pub(crate) struct DetailsPanelProps<'a> {
     pub(crate) item: &'a ProcessItem,
     pub(crate) histories: &'a super::ProcessHistories,
     pub(crate) active: ProcessDetailsSection,
+    pub(crate) facet: ProcessInsightFacet,
+    pub(crate) first: usize,
     pub(crate) insights: ProcessInsightsRenderState<'a>,
     pub(crate) available_width: f32,
     pub(crate) net_escalation: NetworkEscalationState,
@@ -592,6 +597,8 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
         item,
         histories,
         active,
+        facet,
+        first,
         insights,
         available_width,
         net_escalation,
@@ -606,15 +613,17 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
             details_performance(t, item, histories, local_time_rules, graph_cache)
         }
         ProcessDetailsSection::Command => details_command(t, item, local_time_rules),
-        ProcessDetailsSection::Insights => render_process_insights(
-            t,
-            insights,
-            &process_insights_labels(),
+        ProcessDetailsSection::Insights => render_process_insights(ProcessInsightsViewProps {
+            theme: t,
+            state: insights,
+            labels: &process_insights_labels(),
             available_width,
             net_escalation,
-            entity.clone(),
+            entity: entity.clone(),
             units,
-        ),
+            facet,
+            first,
+        }),
     };
     div()
         .flex()

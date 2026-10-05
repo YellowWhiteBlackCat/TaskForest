@@ -102,11 +102,15 @@ fn visible_networks<'a>(app: &TuiApp, networks: &'a [NetworkMetrics]) -> Vec<&'a
     };
     let mut result = Vec::with_capacity(networks.len());
     for network in networks {
-        if visible.allows(network.adapter_type()) {
-            result.push(network);
+        let key = format!("network:{}", network.device_id);
+        if app.sidebar_render_visible(
+            &key,
+            app.prefs.show[3] && visible.allows(network.adapter_type()),
+        ) {
+            result.push((key, network));
         }
     }
-    result
+    app.order_sidebar_rows(result)
 }
 
 #[derive(Clone, Copy)]

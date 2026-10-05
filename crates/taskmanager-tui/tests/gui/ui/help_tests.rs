@@ -58,7 +58,7 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
         .count();
     assert_eq!(
         rows.len(),
-        shared_count + 5 + crate::command_palette::TUI_LOCAL_COMMANDS.len()
+        shared_count + 5 + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
     );
 }
 
@@ -66,12 +66,14 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
 fn overlay_renders_title_shortcuts_and_close_hint() {
     let mut app = demo_app();
     app.toggle_help();
-    let text = frame_text(&app, 120, 36);
+    let mut text = frame_text(&app, 120, 36);
+    app.help_scroll_by(200);
+    text.push_str(&frame_text(&app, 120, 36));
     assert!(text.contains("Keyboard reference"));
     // A real shared shortcut is listed.
     assert!(text.contains("Ctrl+F"));
     // Terminal-only binding is listed.
-    assert!(text.contains("Cycle sort column"));
+    assert!(text.contains("Cycle sort column"), "{text}");
     // TUI-local overlay bindings are listed too.
     assert!(text.contains("Settings"));
     assert!(text.contains("Containers"));
@@ -92,8 +94,8 @@ fn help_overlay_scrolls_its_two_column_listing_on_a_short_terminal() {
     let text = frame_text(&app, 80, 20);
     assert!(text.contains("Keyboard reference"));
     assert!(
-        text.contains("Quit TaskForest"),
-        "first terminal row visible"
+        text.contains(help_rows()[0].shortcut),
+        "the first declared shortcut is visible"
     );
 
     // Scrolling past the listing bottom keeps a bounded, non-panicking
@@ -102,6 +104,10 @@ fn help_overlay_scrolls_its_two_column_listing_on_a_short_terminal() {
     let text = frame_text(&app, 80, 20);
     assert!(text.contains("Keyboard reference"), "overlay still renders");
     assert!(text.contains("F1 / ? / Esc"), "footer hint still visible");
+    assert!(
+        text.contains("Quit TaskForest"),
+        "the terminal shortcut remains reachable after scrolling"
+    );
 }
 
 #[test]

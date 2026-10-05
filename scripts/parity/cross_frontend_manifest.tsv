@@ -132,7 +132,7 @@ facet	loading-state	gpui	ready		loading	pending	-	-
 facet	loading-state	iced	ready		loading	pending	-	-	
 facet	loading-state	tui	ready		loading	behavior	runtime::tests::process_properties::insights_tab_shows_collecting_when_no_projection_is_seeded	tui	
 facet	loading-state	bevy	ready		loading	pending	-	-	
-facet	typed-unavailable	gpui	ready		unavailable	behavior	gpui_app::process_insights::tests::typed_state_preserves_unavailable_as_an_error_not_zero	gpui	
+facet	typed-unavailable	gpui	ready		unavailable	behavior	gpui_app::root::process_insights_ui::tests::partial_current_and_distinct_unavailable_reasons_are_not_flattened	gpui	
 facet	typed-unavailable	iced	ready		unavailable	behavior	ui::insights::tests::facet_unavailable_text_maps_typed_reasons	iced	
 facet	typed-unavailable	tui	ready		unavailable	behavior	runtime::tests::process_properties::insights_tab_renders_typed_escalation_reason_and_hint_never_debug	tui	
 facet	typed-unavailable	bevy	ready		unavailable	behavior	pages::processes::details::tests::selected_projection_uses_the_shared_vm_and_keeps_insights_typed	bevy	

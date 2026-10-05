@@ -279,19 +279,19 @@ mod process_frame_layout_tests {
     use ratatui::layout::Rect;
     use taskmanager_application::{AppAction, AppPage};
 
-    use crate::demo_app;
     use crate::ui::frame_plan::{
-        TuiFocusControl, TuiFocusOrder, TuiFocusTarget, TuiFramePlan, TuiHitTarget,
-        frame_chrome_layout,
+        FrameChromePage, TuiFocusControl, TuiFocusOrder, TuiFocusTarget, TuiFramePlan,
+        TuiHitTarget, frame_chrome_layout,
     };
     use crate::ui::process_table::process_table_layout;
     use crate::ui::table_hit::table_hit_support::table_panel_projection;
+    use crate::{FocusPanel, demo_app};
 
     #[test]
     fn applications_hit_projection_uses_the_painted_frame_bands() {
         let frame = Rect::new(0, 0, 120, 40);
-        let chrome = frame_chrome_layout(frame);
-        let page = process_table_layout(chrome.body);
+        let chrome = frame_chrome_layout(frame, FrameChromePage::Standard);
+        let page = process_table_layout(chrome.body, FocusPanel::Table);
 
         assert_eq!(page.search.y + page.search.height, page.table.y);
         assert_eq!(page.table.y + page.table.height, page.details.y);

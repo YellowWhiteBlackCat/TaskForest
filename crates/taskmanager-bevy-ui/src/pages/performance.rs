@@ -9,11 +9,8 @@
 //!   current projection. Every value that can change later sits behind a
 //!   self-describing marker (`DynText`, `SparkStrip`, `DynBlock`,
 //!   `CurveGate`) naming the fact it renders.
-//! - **bind**: the root's `on_insert` hook registers this page's observer on
-//!   `crate::drain::ShellProjectionFolded` exactly once per `World`
-//!   (guarded by a resource), keeping the page module self-contained — no
-//!   shared-file edit, and unmounted frames do zero work because the markers
-//!   no longer exist.
+//! - **bind**: composition registers typed page observers once. Unmounted
+//!   frames have no marked components to update.
 //! - **refresh**: `refresh_on_fold` re-reads the shell through
 //!   `crate::app::ShellTrack` only when the drain actually folded batches,
 //!   rewrites texts in place (equality-guarded so identical facts are not
@@ -32,16 +29,15 @@
 //! is `metrics::observed_percentage` — no shared percent entry exists (the TUI keeps
 //! its own copy in `ui/units.rs`), so this page owns one with the same shape.
 
+use crate::navigation::{NavigationState, RAIL_WIDTH};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent, px,
@@ -58,6 +54,7 @@ use taskmanager_core::core::metrics::{
 };
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
@@ -73,13 +70,18 @@ use crate::widgets::chart::{
     CHART_LINE_THICKNESS_PX, ChartSurface, MAX_CHART_POINTS, line_segments, polyline_scene,
     segment_layout,
 };
-use crate::widgets::controls::ControlVisual;
 use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod device_curves;
+pub(crate) mod replay;
 pub(crate) mod scene;
+mod selection;
+pub(crate) mod sidebar_editor;
 
 mod metrics;
+
+use crate::pages::history::control::PerformancePresentation;
 
 use bevy::math::Rot2;
 use bevy::ui::UiTransform;
@@ -97,11 +99,13 @@ use scene::blocks::block_scene;
 // template mechanism (template-then-patch); every spawned instance carries
 // an explicit value.
 
-/// Root of the mounted Performance page. Its `on_insert` hook binds the
-/// refresh observer, so mounting the page is what activates its data path.
+/// Root of the mounted Performance page; typed observers update its markers.
 #[derive(Component, Clone, Default)]
-#[component(on_insert = bind_refresh_observer)]
 pub(crate) struct PerformancePageRoot;
+
+/// Bounded device-fact viewport beneath fixed graph and selector controls.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct PerformanceDeviceBody;
 
 /// The compact GPUI-style selector state. It is frontend-local presentation
 /// state: the shell remains the authority for facts, while the selected curve
@@ -142,7 +146,7 @@ impl PerformanceDeviceTarget {
     /// Top-level devices have a corresponding system curve. Per-disk/battery focus
     /// intentionally returns `None` until the device-specific hero chart lands;
     /// selecting it still produces a real, visible local selection state.
-    fn curve(&self) -> Option<SystemCurve> {
+    pub(crate) fn curve(&self) -> Option<SystemCurve> {
         match self {
             Self::Cpu => Some(SystemCurve::Cpu),
             Self::Memory => Some(SystemCurve::Memory),
@@ -171,12 +175,6 @@ pub(crate) struct PerformanceDeviceButton(pub(crate) PerformanceDeviceTarget);
 /// hero card without rebuilding any telemetry subtree.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CurveCard(pub(crate) SystemCurve);
-
-#[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PerformanceFocusChanged(pub(crate) SystemCurve);
-
-#[derive(Event, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PerformanceDeviceFocusChanged(pub(crate) PerformanceDeviceTarget);
 
 /// The current responsive mode is layout state, not shell data. It changes
 /// only when the primary window crosses the shared breakpoint and controls
@@ -241,12 +239,6 @@ type WideNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceWideNav>
 type CompactNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactNav>>;
 type CompactPillsQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactDevicePills>>;
 type OptionalCoreGridQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceOptionalCoreGrid>>;
-
-/// Once-per-`World` guard so remounts never stack duplicate observers (two
-/// observers on one trigger would run before either's spawn commands apply
-/// and could double-spawn blocks).
-#[derive(Resource, Default)]
-struct RefreshObserverBound;
 
 /// One rewritable text node. The field names the fact it renders, so the
 /// refresh observer is a flat query with no hierarchy walks.
@@ -314,6 +306,9 @@ pub(crate) enum SummaryField {
 pub(crate) enum DynField {
     Summary(SummaryField),
     CurveCaption(SystemCurve),
+    BatteryCaption(String),
+    SmartStatus(String),
+    SmartGuidance(String),
     Cpu(CpuField),
     /// One device block's joined fact line, keyed by the stable device id.
     Device {
@@ -439,44 +434,46 @@ pub(crate) fn request_smart_self_test(
 
 // ---- dynamic refresh: the ShellProjectionFolded observer ----
 
-/// `on_insert` hook for [`PerformancePageRoot`]: register the page's refresh
-/// observer once per `World`. Registration happens in a queued exclusive
-/// command so the check-and-bind pair is atomic against remounts.
-fn bind_refresh_observer(mut world: DeferredWorld, _context: HookContext) {
-    world.commands().queue(|world: &mut World| {
-        if world.get_resource::<RefreshObserverBound>().is_some() {
-            return;
-        }
-        world.init_resource::<PerformanceFocus>();
-        world.init_resource::<PerformanceDeviceFocus>();
-        world.insert_resource(RefreshObserverBound);
-        world.add_observer(refresh_on_fold);
-        world.add_observer(sync_focus_changed);
-        world.add_observer(sync_device_focus_changed);
-    });
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<PerformanceFocus>();
+    app.init_resource::<PerformanceDeviceFocus>();
+    app.add_observer(refresh_on_fold);
+    selection::register(app);
+    device_curves::register(app);
+    sidebar_editor::register(app);
 }
 
-/// Bevy 0.19's official button widget emits `Activate` for pointer and
+/// Bevy 0.20's official button widget emits `Activate` for pointer and
 /// keyboard activation. Resolve the typed marker, update the local focus and
 /// publish one presentation event; no shell effect or telemetry request is
 /// involved.
 fn focus_button_activated(
     activate: On<Activate>,
     buttons: Query<&PerformanceFocusButton>,
+    track: ShellTrack,
     mut focus: ResMut<PerformanceFocus>,
-    mut commands: Commands,
+    mut device_focus: ResMut<PerformanceDeviceFocus>,
 ) {
     let Ok(button) = buttons.get(activate.event().entity) else {
         return;
     };
-    if focus.0 == button.0 {
-        return;
+    let target = match button.0 {
+        SystemCurve::Cpu | SystemCurve::Npu => Some(PerformanceDeviceTarget::Cpu),
+        SystemCurve::Memory => Some(PerformanceDeviceTarget::Memory),
+        SystemCurve::Network => network_devices(track.shell())
+            .and_then(|devices| devices.first())
+            .map(|device| PerformanceDeviceTarget::Network(device.device_id.to_string())),
+        SystemCurve::Gpu => gpu_devices(track.shell())
+            .and_then(|devices| devices.first())
+            .map(|device| PerformanceDeviceTarget::Gpu(device.device_id.clone())),
+    };
+    if let Some(target) = target {
+        device_focus.0 = target;
     }
     focus.0 = button.0;
-    commands.trigger(PerformanceFocusChanged(button.0));
 }
 
-/// Bevy 0.19's official button widget emits `Activate` for the compact
+/// Bevy 0.20's official button widget emits `Activate` for the compact
 /// device pills as well. Top-level device targets share the existing curve
 /// focus so the selector and hero card stay in one local presentation state;
 /// disk targets remain selectable without pretending a disk hero chart exists.
@@ -485,7 +482,6 @@ fn device_button_activated(
     buttons: Query<&PerformanceDeviceButton>,
     mut device_focus: ResMut<PerformanceDeviceFocus>,
     mut curve_focus: ResMut<PerformanceFocus>,
-    mut commands: Commands,
 ) {
     let button = buttons
         .get(activate.entity)
@@ -497,61 +493,10 @@ fn device_button_activated(
         return;
     }
     device_focus.0 = button.0.clone();
-    commands.trigger(PerformanceDeviceFocusChanged(button.0.clone()));
     if let Some(curve) = button.0.curve()
         && curve_focus.0 != curve
     {
         curve_focus.0 = curve;
-        commands.trigger(PerformanceFocusChanged(curve));
-    }
-}
-
-/// Apply the selector's active surface and hero-card allocation in place.
-/// This is a bounded presentation update: the scene tree remains stable and
-/// all telemetry text/chart markers keep their existing entities.
-fn sync_focus_changed(
-    _changed: On<PerformanceFocusChanged>,
-    focus: Res<PerformanceFocus>,
-    mut buttons: Query<(&PerformanceFocusButton, &mut ControlVisual)>,
-    mut cards: Query<(&CurveCard, &mut Node)>,
-) {
-    for (button, mut visual) in &mut buttons {
-        visual.1 = button.0 == focus.0;
-    }
-    for (card, mut node) in &mut cards {
-        node.flex_grow = if card.0 == focus.0 { 2.0 } else { 1.0 };
-        node.display = if card.0 == focus.0 {
-            Display::Flex
-        } else {
-            Display::None
-        };
-    }
-}
-
-/// Apply the selected device token to every compact pill and update the main view.
-fn sync_device_focus_changed(
-    _changed: On<PerformanceDeviceFocusChanged>,
-    focus: Res<PerformanceDeviceFocus>,
-    mut buttons: Query<(&PerformanceDeviceButton, &mut ControlVisual)>,
-    mut categories: Query<(&DeviceViewCategory, &mut Node), Without<PerformanceDeviceButton>>,
-) {
-    for (button, mut visual) in &mut buttons {
-        visual.1 = button.0 == focus.0;
-    }
-    let target_kind = match &focus.0 {
-        PerformanceDeviceTarget::Cpu => DeviceCategoryKind::Cpu,
-        PerformanceDeviceTarget::Memory => DeviceCategoryKind::Memory,
-        PerformanceDeviceTarget::Disk(_) => DeviceCategoryKind::Disk,
-        PerformanceDeviceTarget::Network(_) => DeviceCategoryKind::Network,
-        PerformanceDeviceTarget::Gpu(_) => DeviceCategoryKind::Gpu,
-        PerformanceDeviceTarget::Battery(_) => DeviceCategoryKind::Battery,
-    };
-    for (cat, mut node) in &mut categories {
-        node.display = if cat.0 == target_kind {
-            Display::Flex
-        } else {
-            Display::None
-        };
     }
 }
 
@@ -560,7 +505,9 @@ fn sync_device_focus_changed(
 /// subtree is rebuilt when a window crosses the breakpoint.
 pub(crate) fn sync_performance_layout(
     windows: Query<&Window, bevy::ecs::query::With<PrimaryWindow>>,
+    navigation: Option<Res<NavigationState>>,
     sidebar: Option<Res<PerformanceSidebarVisible>>,
+    replay: Option<Res<PerformancePresentation>>,
     mut state: ResMut<PerformanceLayoutState>,
     mut rails: ParamSet<(
         DeviceRailQuery<'_, '_>,
@@ -571,11 +518,22 @@ pub(crate) fn sync_performance_layout(
         OptionalCoreGridQuery<'_, '_>,
     )>,
 ) {
-    let width = windows.iter().next().map_or(1180.0, Window::width);
+    let width = windows.iter().next().map_or(1180.0, Window::width)
+        - if navigation
+            .as_ref()
+            .is_some_and(|navigation| navigation.0 == NavOrientation::Vertical)
+        {
+            RAIL_WIDTH
+        } else {
+            0.0
+        };
     let height = windows.iter().next().map_or(780.0, Window::height);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;
-    let sidebar_on = sidebar.is_none_or(|s| s.0);
+    let replay_on = replay
+        .as_deref()
+        .is_some_and(|presentation| *presentation == PerformancePresentation::Replay);
+    let sidebar_on = sidebar.is_none_or(|s| s.0) && !replay_on;
     let display = match mode {
         PerformanceLayoutMode::Wide if sidebar_on => Display::Flex,
         _ => Display::None,
@@ -658,6 +616,7 @@ fn refresh_on_fold(
     track: ShellTrack,
     palette: Res<WindowPalette>,
     focus: Res<PerformanceFocus>,
+    device_focus: Res<PerformanceDeviceFocus>,
     mut surface: PerformanceRefreshQueries,
     mut commands: Commands,
 ) {
@@ -673,7 +632,13 @@ fn refresh_on_fold(
         &mut surface.transforms,
         &mut commands,
     );
-    sync_card_gates(shell, focus.0, &surface.gates, &mut surface.nodes);
+    sync_card_gates(
+        shell,
+        focus.0,
+        device_focus.0.curve().is_some(),
+        &surface.gates,
+        &mut surface.nodes,
+    );
     sync_blocks(
         shell,
         &palette.inner,
@@ -779,6 +744,7 @@ fn sync_strips(
 fn sync_card_gates(
     shell: &ShellApp,
     focus: SystemCurve,
+    show: bool,
     gates: &Query<(Entity, &CurveGate)>,
     nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
 ) {
@@ -788,7 +754,7 @@ fn sync_card_gates(
         SystemCurve::default()
     };
     for (entity, gate) in gates.iter() {
-        let wanted = if curve_wanted(shell, gate.0) && gate.0 == active {
+        let wanted = if show && curve_wanted(shell, gate.0) && gate.0 == active {
             Display::Flex
         } else {
             Display::None
@@ -850,3 +816,7 @@ mod device_rows_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_thermal.rs"]
 mod thermal_status_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_selection.rs"]
+mod selection_tests;

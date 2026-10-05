@@ -367,6 +367,25 @@ fn set_expansion(view: &mut RootView, toggle: &Toggle, expanded: bool) {
     }
 }
 
+/// Use the normal structural reducer until every currently visible branch is open.
+pub(crate) fn expand_all(view: &mut RootView) {
+    loop {
+        let toggles: Vec<_> = view
+            .processes_projection()
+            .0
+            .iter()
+            .filter(|row| row.has_children && row.collapsed)
+            .map(|row| row.toggle.clone())
+            .collect();
+        if toggles.is_empty() {
+            return;
+        }
+        for toggle in toggles {
+            set_expansion(view, &toggle, true);
+        }
+    }
+}
+
 fn toggle_expansion(view: &mut RootView, toggle: &Toggle) {
     let expanded = match toggle {
         Toggle::Tree(identity) => !view.processes_state.collapsed.contains(identity),

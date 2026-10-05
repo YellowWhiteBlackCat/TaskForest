@@ -23,17 +23,27 @@ fn read_only_probe_distinguishes_absent_live_stale_and_ambiguous_claims() {
         ALIVE,
     )
     .expect("open live owner");
-    assert!(matches!(
+    assert_eq!(
         probe_root_lock(&root, ALIVE),
-        HistoryWriterClaimStatus::Live { pid } if pid == std::process::id()
-    ));
-    assert!(matches!(
+        HistoryWriterClaimStatus::Held
+    );
+    assert_eq!(
         probe_root_lock(&root, |_| true),
-        HistoryWriterClaimStatus::Stale { pid } if pid == std::process::id()
-    ));
+        HistoryWriterClaimStatus::Held,
+        "the held OS lock overrides a mistaken PID-liveness verdict"
+    );
     drop(store);
 
     std::fs::create_dir_all(&root).expect("restore history root");
+    std::fs::write(root.join("history.lock"), "4000000000:17").expect("free claim");
+    assert_eq!(
+        probe_root_lock(&root, ALIVE),
+        HistoryWriterClaimStatus::Live { pid: 4000000000 }
+    );
+    assert_eq!(
+        probe_root_lock(&root, |_| true),
+        HistoryWriterClaimStatus::Stale { pid: 4000000000 }
+    );
     std::fs::write(root.join("history.lock"), "not-a-claim").expect("write malformed claim");
     assert_eq!(
         probe_root_lock(&root, ALIVE),
@@ -92,9 +102,9 @@ fn a_parseable_stale_pid_is_recovered_and_replaced_by_a_live_claim() {
             |_pid| true,
         )
         .expect("provably dead PID is recoverable");
-        assert_ne!(
-            std::fs::read_to_string(&lock).expect("read replacement claim"),
-            stale_claim
+        assert_eq!(
+            probe_root_lock(&root, ALIVE),
+            HistoryWriterClaimStatus::Held
         );
         match PersistentHistoryStore::open(
             &root,
@@ -108,6 +118,10 @@ fn a_parseable_stale_pid_is_recovered_and_replaced_by_a_live_claim() {
             }
         }
         drop(owner);
+        assert!(
+            !lock.exists(),
+            "release proves the stale claim was rewritten to this owner's token"
+        );
         cleanup(&root);
     }
 }
@@ -129,9 +143,9 @@ fn a_stranded_claim_from_this_process_is_retaken_by_a_winning_try_lock() {
         ALIVE,
     )
     .expect("a claim stranded by this process is retaken through the file lock");
-    assert_ne!(
-        std::fs::read_to_string(&lock).expect("read replacement claim"),
-        stranded
+    assert_eq!(
+        probe_root_lock(&root, ALIVE),
+        HistoryWriterClaimStatus::Held
     );
     match PersistentHistoryStore::open(
         &root,
@@ -145,6 +159,10 @@ fn a_stranded_claim_from_this_process_is_retaken_by_a_winning_try_lock() {
         }
     }
     drop(owner);
+    assert!(
+        !lock.exists(),
+        "release proves the stranded token was replaced"
+    );
     cleanup(&root);
 }
 
@@ -233,7 +251,9 @@ fn old_owner_drop_does_not_remove_a_replacement_claim() {
     .expect("open owner");
     let lock = root.join("history.lock");
     let replacement = "424242:replacement-owner";
-    std::fs::write(&lock, replacement).expect("replace owner claim externally");
+    let incoming = root.join("incoming-claim");
+    std::fs::write(&incoming, replacement).expect("external replacement payload");
+    std::fs::rename(&incoming, &lock).expect("atomically replace the directory entry");
 
     drop(store);
     assert_eq!(

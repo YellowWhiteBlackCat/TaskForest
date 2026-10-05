@@ -19,10 +19,20 @@
 //! feedback line. A quiet frame costs one key comparison — never polling
 //! work, never a stale announcement.
 
+use crate::first_run_modal::SetupState;
+use crate::window_surface::{WindowSurface, WindowSurfaceState};
 use bevy::app::{App, PostUpdate};
+use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{NonSend, ResMut};
+use bevy::ecs::system::{NonSend, Res, ResMut};
+use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::first_run::FirstRunUiState;
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::diagnostics::{
+    diagnostic_failure_message, diagnostic_redaction_summary,
+};
+use taskmanager_shell::presentation::system_information::copy_all_text;
 use taskmanager_ui_contract::{
     ModalInput, ProcessRowInput, SemanticSnapshot, SemanticSnapshotBuilder, SemanticSnapshotError,
 };
@@ -60,7 +70,11 @@ struct SnapshotKey {
 /// Build the shared snapshot from the folded shell. Pure; the system below is
 /// its only applier and headless tests call it directly. Validation errors
 /// surface typed — a broken tree must never be published.
-pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, SemanticSnapshotError> {
+pub(crate) fn build_snapshot(
+    shell: &ShellApp,
+    surface: Option<&WindowSurface>,
+    setup: Option<&FirstRunUiState>,
+) -> Result<SemanticSnapshot, SemanticSnapshotError> {
     let revision = shell.projection().process_revision;
     let mut builder = SemanticSnapshotBuilder::new(revision).application_name("TaskForestB");
 
@@ -135,7 +149,66 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
     };
     builder = builder.status_announcement(status);
 
-    if let Some(view) = shell
+    if let Some(WindowSurface::Diagnostic(state)) = surface {
+        let description = match state {
+            DiagnosticBundleUiState::Preview(plan) => diagnostic_redaction_summary(plan.preview()),
+            DiagnosticBundleUiState::Writing(_) => t("diagnostics.writing").to_owned(),
+            DiagnosticBundleUiState::Complete(path) => {
+                t("diagnostics.complete").replace("{path}", &path.display().to_string())
+            }
+            DiagnosticBundleUiState::Failed(error) => diagnostic_failure_message(error),
+        };
+        builder = builder.modal(ModalInput {
+            id: "diagnostic-bundle".into(),
+            name: t("diagnostics.title").into(),
+            description: Some(description),
+        });
+    } else if let Some(surface) = surface {
+        let (id, name, description) = match surface {
+            WindowSurface::ProcessTree => {
+                ("process-tree", "Process tree", "Process hierarchy".into())
+            }
+            WindowSurface::EventCenter => {
+                ("event-center", t("events.title"), t("events.empty").into())
+            }
+            WindowSurface::SavedViews => (
+                "saved-views",
+                t("saved_views.title"),
+                t("saved_views.help").to_owned(),
+            ),
+            WindowSurface::SidebarDevices => (
+                "sidebar-devices",
+                "Edit devices",
+                "Device visibility and order".to_owned(),
+            ),
+            WindowSurface::About => (
+                "about",
+                t("about.title"),
+                env!("CARGO_PKG_VERSION").to_owned(),
+            ),
+            WindowSurface::SystemInformation(facts) => (
+                "system-information",
+                t("system_about.title"),
+                copy_all_text(facts),
+            ),
+            WindowSurface::FirstRun => (
+                "first-run",
+                t("first_run.title"),
+                setup.and_then(|state| state.info.as_ref()).map_or_else(
+                    || t("first_run.discovering").to_owned(),
+                    |info| info.run_command.clone(),
+                ),
+            ),
+            WindowSurface::Diagnostic(_) => {
+                ("diagnostic-bundle", t("diagnostics.title"), String::new())
+            }
+        };
+        builder = builder.modal(ModalInput {
+            id: id.into(),
+            name: name.into(),
+            description: Some(description),
+        });
+    } else if let Some(view) = shell
         .pending_confirmation()
         .and_then(PendingConfirmationView::from_pending)
     {
@@ -152,6 +225,8 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
 fn sync_semantic_snapshot(
     track: NonSend<FrontendTrack>,
     mut state: ResMut<SemanticSnapshotResource>,
+    surface: Option<Res<WindowSurfaceState>>,
+    setup: Option<Res<SetupState>>,
 ) {
     let shell = &track.shell;
     let key = SnapshotKey {
@@ -163,10 +238,17 @@ fn sync_semantic_snapshot(
         selected: shell.selected,
         feedback: shell.feedback_text().to_owned(),
     };
-    if state.last_key.as_ref() == Some(&key) {
+    if state.last_key.as_ref() == Some(&key)
+        && !surface.as_ref().is_some_and(|surface| surface.is_changed())
+        && !setup.as_ref().is_some_and(|setup| setup.is_changed())
+    {
         return;
     }
-    state.snapshot = match build_snapshot(shell) {
+    state.snapshot = match build_snapshot(
+        shell,
+        surface.as_ref().and_then(|surface| surface.0.as_ref()),
+        setup.as_ref().map(|setup| setup.0.view()),
+    ) {
         Ok(snapshot) => Some(snapshot),
         // A validation error is a contract bug in this module: keep the last
         // good snapshot (stale last-good beats a broken publication).

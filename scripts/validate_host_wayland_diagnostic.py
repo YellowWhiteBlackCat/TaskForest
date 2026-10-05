@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import math
 import re
 import struct
@@ -307,8 +308,13 @@ def reject_skeleton_text(text: str) -> None:
 
 
 def ocr_text(path: Path) -> str:
+    # Each validator reads one image at a time. A single OpenMP worker keeps
+    # the bounded OCR step from oversubscribing concurrent capture processes.
+    environment = os.environ.copy()
+    environment.update(OMP_THREAD_LIMIT="1", OMP_NUM_THREADS="1")
     result = subprocess.run(
         ["tesseract", str(path), "stdout", "--psm", "11"],
+        env=environment,
         check=True,
         text=True,
         capture_output=True,

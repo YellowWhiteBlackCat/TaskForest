@@ -34,6 +34,7 @@ use taskmanager_theme::Theme;
 
 use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
 use crate::app::FrontendTrack;
+use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
 use crate::input::PendingEffects;
 use crate::window::{FeedbackLine, FrontendWindowPlugin};
 use taskmanager_application::PendingConfirmation;
@@ -325,6 +326,105 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
     assert!(
         !feedback[0].is_empty(),
         "the drain publishes the submission outcome to the feedback line"
+    );
+}
+
+#[test]
+fn prearmed_gate_mounts_after_the_window_shell_at_startup() {
+    for scenario in [
+        "process-force-kill",
+        "process-tree-confirm",
+        "process-batch-confirm",
+        "smart-self-test-confirm",
+    ] {
+        let mut app = window_app();
+        let expected = {
+            let mut track = app.world_mut().non_send_mut::<FrontendTrack>();
+            track.shell = demo_shell();
+            seed_capture_confirmation_scenario(&mut track.shell, scenario);
+            PendingConfirmationView::from_pending(
+                track.shell.pending_confirmation().expect("seeded gate"),
+            )
+            .expect("renderable gate")
+        };
+        app.update();
+        let world = app.world_mut();
+        let armed = world
+            .query::<&ArmedConfirmation>()
+            .single(world)
+            .expect("startup mounts exactly one confirmation");
+        assert_eq!(armed.0.as_ref(), Some(&expected), "{scenario}");
+        let _ = button_entity(&mut app, "confirm");
+        let _ = button_entity(&mut app, "dismiss");
+    }
+}
+
+#[test]
+fn capture_confirmation_scenarios_arm_expected_gates() {
+    for (scenario, expected_kind) in [
+        ("process-force-kill", ConfirmationKind::ProcessBatch),
+        ("process-tree-confirm", ConfirmationKind::ProcessBatch),
+        ("process-batch-confirm", ConfirmationKind::ProcessBatch),
+        ("smart-self-test-confirm", ConfirmationKind::SmartSelfTest),
+    ] {
+        let mut shell = demo_shell();
+        seed_capture_confirmation_scenario(&mut shell, scenario);
+        assert_eq!(
+            shell.application.interaction.confirmation_kind(),
+            Some(expected_kind),
+            "scenario {scenario} must arm {expected_kind:?}"
+        );
+        if scenario == "process-tree-confirm" {
+            let intent = shell
+                .pending_batch()
+                .expect("tree confirmation has a frozen intent");
+            assert_eq!(intent.targets.len(), 7);
+            assert_eq!(intent.targets.last().expect("root").pid, 90_000);
+        }
+    }
+}
+
+#[test]
+fn capture_system_sensor_alert_scenarios_seed_fixtures() {
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "system-npu");
+    assert!(shell.projection().npu_inventory.is_some());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "sensor-center");
+    assert!(shell.projection().sensors.is_some());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "active-alert");
+    assert!(!shell.projection().alert_active.is_empty());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "event-center");
+    assert!(!shell.projection().alert_center.event_history().is_empty());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "apps-identity-matrix");
+    assert!(
+        shell
+            .projection()
+            .processes
+            .as_ref()
+            .is_some_and(|p| p.iter().any(|proc| proc.cmdline.contains("chrome")))
+    );
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "battery-fan-performance");
+    assert!(shell.projection().power_supplies.is_some());
+    assert!(shell.projection().sensors.is_some());
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "device-hotplug");
+    assert!(
+        shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .is_some_and(|s| s.disks.iter().any(|d| d.name.contains("sdb")))
     );
 }
 

@@ -54,22 +54,45 @@ pub(super) fn project_timeline(
     evidence: Option<&StartupBootEvidenceSnapshot>,
 ) -> Option<TimelineProjection> {
     let timeline: BootTimeline = boot_timeline_rows(evidence?)?;
-    let mut rows: Vec<TimelineRow> = timeline
-        .segments
+    let mut rows: Vec<TimelineRow> = evidence?
+        .failed_units
         .iter()
-        .map(|segment| {
-            let fraction = timeline.fraction_of_total(segment);
-            let cells = (fraction * TIMELINE_BAR_CELLS as f32)
-                .round()
-                .max(TIMELINE_MIN_BAR_CELLS as f32) as usize;
-            TimelineRow {
-                bar_cells: cells.min(TIMELINE_BAR_CELLS),
-                label: segment.unit.clone(),
-                detail: format!("{} ms", segment.duration_ms),
-                dim: false,
-            }
+        .map(|unit| TimelineRow {
+            bar_cells: 0,
+            label: unit.unit.clone(),
+            detail: format!(
+                "{} / {} / {}",
+                unit.load_state, unit.active_state, unit.sub_state
+            ),
+            dim: false,
         })
         .collect();
+    if let Some(failure) = &evidence?.failed_units_failure {
+        rows.push(TimelineRow {
+            bar_cells: 0,
+            label: t("startup.failed_units").to_owned(),
+            detail: format!("{failure:?}"),
+            dim: true,
+        });
+    }
+    rows.extend(
+        timeline
+            .segments
+            .iter()
+            .map(|segment| {
+                let fraction = timeline.fraction_of_total(segment);
+                let cells = (fraction * TIMELINE_BAR_CELLS as f32)
+                    .round()
+                    .max(TIMELINE_MIN_BAR_CELLS as f32) as usize;
+                TimelineRow {
+                    bar_cells: cells.min(TIMELINE_BAR_CELLS),
+                    label: segment.unit.clone(),
+                    detail: format!("{} ms", segment.duration_ms),
+                    dim: false,
+                }
+            })
+            .collect::<Vec<_>>(),
+    );
     if timeline.untimed_count > 0 {
         rows.push(TimelineRow {
             bar_cells: 0,
@@ -112,6 +135,12 @@ pub(super) fn render_boot_timeline(
         .rows
         .iter()
         .map(|row| {
+            if row.bar_cells == 0 && !row.dim {
+                return Line::from(vec![
+                    Span::styled(format!(" {} ", row.label), Style::new().fg(theme.danger)),
+                    Span::styled(row.detail.clone(), Style::new().fg(theme.dim)),
+                ]);
+            }
             let (label_color, detail_color, bar_color) = if row.dim {
                 (theme.dim, theme.dim, theme.dim)
             } else {

@@ -14,7 +14,9 @@ import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 FRONTEND_PACKAGES = {
     "gpui": "taskmanager-gpui",
@@ -45,6 +47,7 @@ FRONTEND_SCRIPTS = {
         "scripts/capture_publish.py",
         "scripts/capture-reclaim.sh",
         "scripts/validate_tui_evidence.py",
+        "scripts/validate_capture_evidence.py",
     ),
     "iced": (
         "scripts/capture-iced.sh",
@@ -56,6 +59,8 @@ FRONTEND_SCRIPTS = {
         "scripts/capture-reclaim.sh",
         "scripts/capture_iced_scenarios.tsv",
         "scripts/validate_iced_matrix.py",
+        "scripts/validate_capture_evidence.py",
+        "scripts/validate_tui_evidence.py",
     ),
     "bevy": (
         "scripts/capture-bevy.sh",
@@ -66,12 +71,18 @@ FRONTEND_SCRIPTS = {
         "scripts/capture-reclaim.sh",
         "scripts/capture_bevy_scenarios.tsv",
         "scripts/validate_bevy_matrix.py",
+        "scripts/validate_capture_evidence.py",
+        "scripts/validate_tui_evidence.py",
         "scripts/accept-bevy-interactions.sh",
     ),
 }
 ROOT_FILES = (
+    "Cargo.toml",
+    "Cargo.lock",
+    ".cargo/config.toml",
     "locales/en.json",
     "locales/zh.json",
+    "scripts/capture_history_fixtures.py",
 )
 
 
@@ -192,12 +203,21 @@ def source_paths(root: Path, frontend: str) -> list[Path]:
 def write_manifest(root: Path, frontend: str, output: Path) -> int:
     paths = source_paths(root, frontend)
     lines = [f"{digest(path)}  {path.relative_to(root).as_posix()}" for path in paths]
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"frontend source scope: {frontend} ({len(lines)} files)")
     return 0
 
 
 def self_test() -> int:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        source = root / "source.rs"
+        source.write_text("pub fn current() {}\n", encoding="utf-8")
+        output = root / "clean-target" / "frontend-source-manifests" / "gpui.txt"
+        with patch(__name__ + ".source_paths", return_value=[source]):
+            assert write_manifest(root, "gpui", output) == 0
+            assert output.read_text(encoding="utf-8") == f"{digest(source)}  source.rs\n"
     assert FRONTEND_PACKAGES["gpui"] == "taskmanager-gpui"
     assert FRONTEND_PACKAGES["tui"] != FRONTEND_PACKAGES["iced"]
     assert FRONTEND_PACKAGES["bevy"] == "taskmanager-bevy-ui"

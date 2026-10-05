@@ -45,13 +45,14 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, FlexDirection, Node, Overflow, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ValueChange};
-use taskmanager_application::i18n::{Language, current_language, set_language};
-use taskmanager_application::{AppAction, TelemetryInterval};
+use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ScrollArea, ValueChange};
+use taskmanager_application::i18n::{Language, current_language, set_language, t};
+use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInterval};
 use taskmanager_core::config::Config;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -64,6 +65,19 @@ use taskmanager_application::ConfigSubmitError;
 use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::appearance::PreferredColorScheme;
+
+mod choices;
+use choices::{capacity_entries, language_entries, refresh_entries, theme_entries};
+
+mod privilege_center;
+use privilege_center::privileges_section_scene;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsHeading;
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsBody;
+#[derive(Component, Clone, Default)]
+pub(crate) struct SettingsFooter;
 
 /// The telemetry refresh-cadence choices (ms), in display order — the same
 /// four steps the TUI settings form exposes.
@@ -111,6 +125,8 @@ pub(crate) fn theme_for_mode_and_contrast(mode: LightDark, hc: HighContrast) -> 
 /// Dynamic presentation theme preferences for the Bevy desktop shell.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ThemePreferences {
+    /// Current measured zeros may use the muted resource-cell color.
+    pub(crate) gray_zero_values: bool,
     /// Explicit mode choice, or `None` to follow the system desktop preference.
     pub(crate) mode: Option<LightDark>,
     /// Explicit skin choice, or `None` to follow default GNOME skin.
@@ -196,6 +212,8 @@ pub(crate) enum SettingsField {
     Language(Language),
     Refresh(TelemetryInterval),
     HistoryCapacity(usize),
+    HistoryPersistence(bool),
+    GrayZeroValues(bool),
     #[default]
     PauseTelemetry,
 }
@@ -215,11 +233,7 @@ where
     let mut config_guard = runtime.shared.lock_config();
     let client = config_guard.as_mut()?;
 
-    if client.snapshot().is_none() {
-        let _ = client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT);
-    } else {
-        let _ = client.drain();
-    }
+    let _ = client.drain();
 
     let current = client.snapshot().cloned()?;
     let mut updated = (*current).clone();
@@ -244,6 +258,7 @@ pub(crate) fn apply_persisted_config(
     track: &mut FrontendTrack,
 ) {
     if let Some(prefs) = prefs {
+        prefs.gray_zero_values = config.gray_zero_values;
         if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
             prefs.mode = None;
         } else if config.mode.eq_ignore_ascii_case("Light") {
@@ -429,6 +444,27 @@ fn settings_choice_observer(
                 cfg.graph_data_points = u32::try_from(capacity).unwrap_or(u32::MAX);
             });
         }
+        SettingsField::HistoryPersistence(enabled) => {
+            let submitted = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.history_persistence = enabled;
+            });
+            if let Err(error) = submitted.unwrap_or(Err(ConfigSubmitError::NotReady)) {
+                track.shell.report_notice(
+                    FeedbackSource::Settings,
+                    FeedbackSeverity::Error,
+                    FeedbackLifecycle::TIMED_LONG,
+                    t("settings.config_not_queued").replace("{error}", &error.to_string()),
+                );
+            }
+        }
+        SettingsField::GrayZeroValues(enabled) => {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
+                prefs.gray_zero_values = enabled;
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.gray_zero_values = enabled;
+            });
+        }
         SettingsField::PauseTelemetry => {
             // Guarded so a repeated activation is a no-op, not a double flip.
             if track.shell.paused() != change.event().value {
@@ -464,77 +500,6 @@ fn apply_theme(mode: LightDark, palette: &mut WindowPalette, clear: Option<&mut 
 
 // ---- view model rows (pure projections of the authorities) ----
 
-fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
-    vec![
-        ChoiceEntry {
-            label: "System".to_owned(),
-            choice: SettingsChoice(SettingsField::SystemMode),
-            selected: mode.is_none(),
-        },
-        ChoiceEntry {
-            label: "Light".to_owned(),
-            choice: SettingsChoice(SettingsField::Theme(LightDark::Light)),
-            selected: mode == Some(LightDark::Light),
-        },
-        ChoiceEntry {
-            label: "Dark".to_owned(),
-            choice: SettingsChoice(SettingsField::Theme(LightDark::Dark)),
-            selected: mode == Some(LightDark::Dark),
-        },
-    ]
-}
-
-fn language_entries(language: Language) -> Vec<ChoiceEntry> {
-    [(Language::En, "English"), (Language::Zh, "中文")]
-        .into_iter()
-        .map(|(value, label)| ChoiceEntry {
-            label: label.to_owned(),
-            choice: SettingsChoice(SettingsField::Language(value)),
-            selected: language == value,
-        })
-        .collect()
-}
-
-fn refresh_entries(interval: TelemetryInterval) -> Vec<ChoiceEntry> {
-    let selected = refresh_choice_index(interval);
-    REFRESH_CHOICES_MS
-        .iter()
-        .enumerate()
-        .map(|(index, millis)| ChoiceEntry {
-            label: refresh_label(*millis),
-            choice: SettingsChoice(SettingsField::Refresh(interval_for_millis(*millis))),
-            selected: selected == Some(index),
-        })
-        .collect()
-}
-
-fn capacity_entries(capacity: usize) -> Vec<ChoiceEntry> {
-    let selected = capacity_choice_index(capacity);
-    CAPACITY_CHOICES
-        .iter()
-        .enumerate()
-        .map(|(index, samples)| ChoiceEntry {
-            label: samples.to_string(),
-            choice: SettingsChoice(SettingsField::HistoryCapacity(*samples)),
-            selected: selected == Some(index),
-        })
-        .collect()
-}
-
-/// The `TelemetryInterval` for one offered cadence step. The ladder lives
-/// inside the policy's clamp window, so `clamped` never deviates from the
-/// requested step.
-fn interval_for_millis(millis: u64) -> TelemetryInterval {
-    TelemetryInterval::clamped(Duration::from_millis(millis))
-}
-
-fn refresh_label(millis: u64) -> String {
-    format!(
-        "{} s",
-        f64::from(u32::try_from(millis).unwrap_or(u32::MAX)) / 1000.0
-    )
-}
-
 // ---- render adapters ----
 
 /// Content-region scene for the Settings page.
@@ -545,7 +510,17 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let language = current_language();
     let mode = palette_mode(context.palette);
     let hc = context.palette.high_contrast;
+    let persistence = context.history.status != ApplicationHistoryStatus::Disabled;
     let rows: Vec<Box<dyn Scene>> = vec![
+        toggle_row(
+            t("settings.gray_zero_values"),
+            ChoiceEntry {
+                label: t("settings.gray_zero_values").to_owned(),
+                choice: SettingsChoice(SettingsField::GrayZeroValues(!context.gray_zero_values)),
+                selected: context.gray_zero_values,
+            },
+            t("settings.gray_zero_values_hint"),
+        ),
         radio_row(
             "Theme",
             theme_entries(mode),
@@ -586,6 +561,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             &format!("{capacity} samples"),
         ),
         toggle_row(
+            t("settings.history_persistence"),
+            ChoiceEntry {
+                label: t("settings.history_persistence").to_owned(),
+                choice: SettingsChoice(SettingsField::HistoryPersistence(!persistence)),
+                selected: persistence,
+            },
+            if persistence { "enabled" } else { "disabled" },
+        ),
+        toggle_row(
             "Telemetry updates",
             ChoiceEntry {
                 label: "paused".to_owned(),
@@ -595,6 +579,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             if paused { "paused" } else { "live" },
         ),
     ];
+    let mut rows = rows;
+    rows.insert(0, privileges_section_scene(context.shell, context.palette));
     bsn! {
         Node {
             width: percent(100),
@@ -605,14 +591,27 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            ( Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ),
-            { rows },
-            (
-                Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
-                TextRole(Role::Caption)
-            ),
-            { EntityScene(page_observer(request_projection_refresh)) },
-            { EntityScene(page_observer(settings_choice_observer)) },
+            Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+            SettingsHeading
+            Children [ Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ] --
+            Node {
+                width: percent(100), flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0),
+                flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()),
+                overflow: Overflow::scroll_y(),
+            }
+            ScrollArea
+            SettingsBody
+            Children [ { rows } ] --
+
+                Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+                SettingsFooter
+                Children [
+                    Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")
+                    TextRole(Role::Caption)
+                ]
+            --
+            { EntityScene(page_observer(request_projection_refresh)) }--
+            { EntityScene(page_observer(settings_choice_observer)) }
         ]
     }
 }
@@ -630,10 +629,10 @@ fn radio_row(label: &str, entries: Vec<ChoiceEntry>, value: &str) -> Box<dyn Sce
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { width: px(160.0), height: Val::Auto } Children [
-                ( Text(label) TextRole(Role::Caption) ),
-            ] ),
-            (
+             Node { width: px(160.0), height: Val::Auto } Children [
+                 Text(label) TextRole(Role::Caption)
+            ] --
+
                 Node {
                     height: Val::Auto,
                     flex_direction: FlexDirection::Row,
@@ -642,8 +641,8 @@ fn radio_row(label: &str, entries: Vec<ChoiceEntry>, value: &str) -> Box<dyn Sce
                 }
                 RadioGroup
                 Children [ { choice_widgets(entries) } ]
-            ),
-            ( Text(value) TextRole(Role::Caption) ),
+            --
+             Text(value) TextRole(Role::Caption)
         ]
     })
 }
@@ -661,11 +660,11 @@ fn toggle_row(label: &str, entry: ChoiceEntry, value: &str) -> Box<dyn Scene> {
             column_gap: Val::Px(space_8()),
         }
         Children [
-            ( Node { width: px(160.0), height: Val::Auto } Children [
-                ( Text(label) TextRole(Role::Caption) ),
-            ] ),
-            { choice_widgets(vec![entry]) },
-            ( Text(value) TextRole(Role::Caption) ),
+             Node { width: px(160.0), height: Val::Auto } Children [
+                 Text(label) TextRole(Role::Caption)
+            ] --
+            { choice_widgets(vec![entry]) }--
+             Text(value) TextRole(Role::Caption)
         ]
     })
 }
@@ -685,7 +684,12 @@ fn choice_widgets(entries: Vec<ChoiceEntry>) -> Vec<Box<dyn Scene>> {
                 selected,
             } = entry;
             let SettingsChoice(field) = choice;
-            let boolean = matches!(field, SettingsField::PauseTelemetry);
+            let boolean = matches!(
+                field,
+                SettingsField::PauseTelemetry
+                    | SettingsField::HistoryPersistence(_)
+                    | SettingsField::GrayZeroValues(_)
+            );
             match (boolean, selected) {
                 (true, true) => Box::new(checked_checkbox_shape(label, field)) as Box<dyn Scene>,
                 (true, false) => Box::new(unchecked_checkbox_shape(label, field)),
@@ -707,7 +711,7 @@ fn checked_radio_shape(label: String, field: SettingsField) -> impl Scene + use<
         Checked
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -722,7 +726,7 @@ fn unchecked_radio_shape(label: String, field: SettingsField) -> impl Scene + us
         RadioButton
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -738,7 +742,7 @@ fn checked_checkbox_shape(label: String, field: SettingsField) -> impl Scene + u
         Checked
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }
@@ -753,7 +757,7 @@ fn unchecked_checkbox_shape(label: String, field: SettingsField) -> impl Scene +
         Checkbox
         SettingsChoice(field)
         Children [
-            ( Text(label) TextRole(Role::Body) ),
+             Text(label) TextRole(Role::Body)
         ]
     }
 }

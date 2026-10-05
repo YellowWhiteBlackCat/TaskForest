@@ -3,7 +3,7 @@
 ## Role
 
 Fourth product frontend: renders the shared neutral shell projections with
-Bevy 0.19's official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` —
+Bevy 0.20's official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` —
 with a hard 100% `bsn!` (Bevy Scene Notation) authoring contract: every
 production UI tree, including dynamic children and state surfaces, is composed
 as a `Scene` and mounted with `spawn_scene`; observers and required components
@@ -24,9 +24,8 @@ curves, sidebar mini-graphs, and the memory composition bar through one
 gap-aware adapter), and the semantic accessibility channel (ui-contract
 `SemanticSnapshot` plus `bevy_a11y` nodes published through the
 `accesskit_unix` bridge on Linux). Remaining open surface is declared, never
-hidden: per-row process trends, multi-select process verbs, notification
-history, GPU-engine detail cards, service log streaming, settings persistence
-across sessions, the tray seam, and multi-window composition.
+hidden: backend capability absence is shown as typed unavailable state;
+per-row process trends and multi-window composition remain separate surfaces.
 Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
@@ -40,9 +39,24 @@ adopted — theme tokens are the only skin authority.
   shell page always follows the visible page), the Dialog-scope Enter
   mapping, the per-inventory action-menu open chords, the `PendingEffects`
   effect bridge to the drain, and the one-shot quit forward.
+- `src/window_surface.rs` owns the single About/system-information/setup/diagnostic surface.
+  State notifications coalesce before layout; header and complete action groups
+  stay fixed around one bounded, scrollable body.
+- `src/first_run_modal.rs` projects the application setup controller: silent
+  startup discovery, explicit Settings entry, typed native actions and metadata copy.
+- `src/about_modal.rs` reviews shared application build metadata, opens the repository
+  and switches to independent system information or diagnostics.
+- `src/system_information_modal.rs` freezes shared groups from the cached projection,
+  scrolls complete values and copies exactly the displayed review.
+- `src/text_selection.rs` queues text output for Bevy's native clipboard;
+  success feedback requires a completed system write. Linux uses the strict
+  Wayland `bevy_clipboard` patch; Windows/macOS retain upstream native output.
 - `src/confirmation.rs` — the shell's armed destructive-action gate rendered
   as one modal under the app shell root, with typed confirm/dismiss paths
   and republished gate transitions.
+- `src/focus_visible.rs` binds actual widget Tab navigation to toolkit focus,
+  paints one keyboard ring and reveals focused controls through the owned scroll area.
+  Settings zero dimming uses the persisted config field and leaves missing values distinct.
 - `src/semantic.rs` — the accessibility seam: the ui-contract
   `SemanticSnapshot` (revision-keyed) plus accessibility row nodes.
 - `src/window.rs` — the bsn! app shell (route-aware shell + nav rail + content slot),
@@ -54,13 +68,32 @@ adopted — theme tokens are the only skin authority.
 - `src/palette.rs` — the theme-token → bevy adapter; the only place tokens
   become bevy colors/type metrics.
 - `src/pages.rs` + `src/pages/` — nine mounted page modules, one file each
-  (`content(&PageContext) -> impl Scene`), plus the mounted `process_tree.rs`
-  projection and `history.rs` connector adapter: the M1
+  (`content(&PageContext) -> impl Scene`), plus the `process_tree.rs` owned inspection
+  and `history.rs` connector adapter: the measured
   process table, performance summary/curves/device blocks, the three
   read-only inventory tables (services/startup/sessions), settings, and the
   alert center. Includes `pages/processes/properties_modal.rs` delivering full
-  multi-field process inspection (identity, paths, memory, IO, parent/threads)
-  with scrim dismiss and escape handling.
+  identity-bound Overview, Performance, Command and Insights tabs. Its model
+  resolves canonical live keys independently of table filtering; measured
+  charts preserve missing samples, and complete facet lists scroll in one
+  bounded body between fixed selectors and actions.
+- `src/pages/alerts/editor.rs` mounts canonical rule creation, field edits,
+  enabled state, removal and clipboard import/export. Rules and events scroll
+  beneath fixed page actions; edits always reduce through the shared shell.
+- System Health selects shared storage and sensor groups inside the measured
+  System body. SMART controls freeze disk generation before activation and arm
+  the shared confirmation; replaced targets cannot redirect a stale control.
+- Performance device editing exposes concrete show/hide and order controls,
+  persists through the shared config coordinator and blocks page keys while open.
+- Performance preserves device selection across mounting. Disk throughput/activity
+  and battery charge/power curves use identity-scoped history and measured widths;
+  complete device groups scroll beneath fixed selectors and leave a bottom inset.
+- `src/pages/history/control.rs` routes both review surfaces through one history
+  controller and native session. Performance review has pinned actions around
+  a bounded body; application review admits complete metric cards in its own
+  bounded body. Settings enables/disables that session through canonical config.
+- `src/widgets/history_controls.rs` owns window, refresh and return-to-live
+  controls; `pages/performance/replay.rs` scales curves to measured chart bounds.
 - `src/widgets.rs` + `src/widgets/` — the owned component layer: table/chart
   projection cores, bsn! render adapters, controls, and the action menu supporting
   both pointer click and keyboard navigation.
@@ -69,14 +102,34 @@ adopted — theme tokens are the only skin authority.
 - `src/runtime.rs` — the process-wide platform client via the app-host
   `OnceLock` cache pattern.
 
+Diagnostic commands open, confirm, retry and close the shared sanitized review lifecycle.
+The native window injects its diagnostic client; capture never creates a writer. The
+modal consumes all keyboard input, exposes scroll keys, and reserves title/actions
+around one bounded body viewport. Applications derive table capacity from its measured slot;
+complete process trees share the modal budget and native expand/collapse controls.
+
 ## Boundary
+
+Systems and observers declare specific resources and component queries. The
+[frontend charter](../../docs/BEVY_UI_FRONTEND.md) forbids unrestricted world
+access; composition registers the access sets and coalesced paint systems.
+Properties reserve title, identity, wrapping selectors and complete footer actions.
+The remaining body owns scrolling and an eight-pixel final inset; labels and
+values occupy separate bounded rows. Charts retain their readable floor;
+all facts remain reachable at short and narrow sizes. Refresh binds the frozen
+live key, coalesces pending requests and publishes typed independent availability.
+System Dashboard selects the shared time windows over long host rings. Component
+budgets admit whole metric groups; native paging and a measured chart pass preserve
+their bounds, and insufficient space has an explicit resize state.
+System actions stay fixed above one native scroll area. Facts carry typed section
+groups; a successful SMBIOS or NPU lane remains visible while static hardware is unavailable.
 
 Dependency whitelist is charter law: `taskmanager-application`,
 `taskmanager-app-host`, `taskmanager-core`, `taskmanager-platform-contract`,
 `taskmanager-shell`, `taskmanager-theme`, `taskmanager-ui-contract`,
-`taskmanager-assets` and exactly-locked `bevy =0.19.1` (features `bevy_ui`,
+`taskmanager-assets` and exactly-locked `bevy =0.20.0-rc.2` (features `bevy_ui`,
 `bevy_ui_widgets`, `bevy_scene` — the bsn! macro — plus the
-render/asset/window closure; Linux adds `wayland` only) — never
+render/asset/window closure and `system_clipboard`; Linux adds `wayland` only) — never
 `platform-runtime` or a platform crate. Bevy types never cross this crate's
 public API. The two Worlds never merge: the platform client is
 acquired once per process through the app-host `OnceLock` cache pattern
@@ -95,7 +148,7 @@ spawning is forbidden in production code. ECS systems may update typed
 components on scene-owned entities, wire events/focus, or despawn and replace
 a bounded subtree with another `bsn!` scene. Headless fixtures and Bevy's own
 plugin internals are not production UI authoring routes.
-For scene polymorphism, follow Bevy 0.19's boundary: fixed composition uses
+For scene polymorphism, follow Bevy 0.20's boundary: fixed composition uses
 `impl Scene`, homogeneous lists use `Vec<S>`, and `Vec<Box<dyn Scene>>` is
 reserved for runtime-filtered or heterogeneous children. Every boxed value
 still comes from a `bsn!` Scene adapter; boxing is a type-erasure tool, not a
@@ -121,6 +174,7 @@ Verify with `cargo check --locked -p taskmanager-bevy-ui --tests`,
 `bash scripts/accept-bevy-interactions.sh`, and
 `cargo clippy --locked -p taskmanager-bevy-ui --tests`. The 100% Scene law is
 also enforced by `python3 scripts/quality/bevy_bsn_guard.py --mode enforce`;
+`python3 scripts/quality/bevy_world_access_guard.py` checks resource access;
 real pixels require
 `bash scripts/capture-bevy.sh` in a live Wayland compositor; its validator is
 fail-closed on app_id, PID/window identity, PNG, markers, source provenance
@@ -132,6 +186,6 @@ highlight, virtual-table-window and chart math, page/widget scene assembly
 on `MinimalPlugins`, plus the drain→summary-line wiring without a
 compositor); real-window pixel evidence belongs to the capture flow defined
 in [`docs/QUALITY_GATES.md`](../../docs/QUALITY_GATES.md). Check the shared
-workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.19 version across
+workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.20 version across
 this crate and `taskmanager-platform-runtime`
 (`cargo tree -p taskmanager-bevy-ui -d`).

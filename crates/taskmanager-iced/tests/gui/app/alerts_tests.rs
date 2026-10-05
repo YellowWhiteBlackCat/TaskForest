@@ -608,3 +608,44 @@ fn remove_rule_message_applies_and_reports_notice() {
     assert_eq!(warn_notice.source(), FeedbackSource::Interaction);
     assert_eq!(warn_notice.severity(), FeedbackSeverity::Warning);
 }
+
+#[test]
+fn rule_control_messages_create_edit_and_remove_the_current_identity() {
+    use crate::app::alerts::editor::RuleAdjustment;
+    let mut app = crate::IcedApp::demo();
+    let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
+    let original = app.alerts_rules().len();
+    let _ = app.update(Message::Alerts(AlertsMessage::AddDefaultRule));
+    let id = app.alerts_rules().last().expect("added").rule.id.clone();
+    assert_eq!(app.alerts_rules().len(), original + 1);
+    for adjustment in [
+        RuleAdjustment::Threshold(1),
+        RuleAdjustment::Duration(1),
+        RuleAdjustment::Hysteresis(-1),
+        RuleAdjustment::Severity,
+    ] {
+        let _ = app.update(Message::Alerts(AlertsMessage::AdjustRule {
+            rule_id: id.clone(),
+            adjustment,
+        }));
+    }
+    let managed = app.alerts_rules().last().expect("edited");
+    assert_eq!(managed.rule.threshold, 86.0);
+    assert_eq!(managed.rule.for_duration, std::time::Duration::from_secs(6));
+    assert_eq!(managed.rule.hysteresis, 4.0);
+    assert_eq!(managed.rule.severity, AlertSeverity::Critical);
+    let _ = app.update(Message::Alerts(AlertsMessage::RemoveRule {
+        rule_id: id.clone(),
+    }));
+    let before = app.alerts_rules().to_vec();
+    let _ = app.update(Message::Alerts(AlertsMessage::AdjustRule {
+        rule_id: id,
+        adjustment: RuleAdjustment::Threshold(1),
+    }));
+    assert_eq!(
+        app.alerts_rules(),
+        before,
+        "a stale control cannot edit another rule"
+    );
+    assert_eq!(app.alerts_rules().len(), original);
+}

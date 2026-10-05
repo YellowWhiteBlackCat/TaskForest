@@ -13,16 +13,16 @@
 
 use std::sync::Arc;
 
+use crate::app::{FrontendTrack, Route, RouteChanged, SharedRuntimeHandle};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::{Add, HookContext};
+use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, ResMut};
-use bevy::ecs::world::{DeferredWorld, World};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, Val, percent, px,
@@ -32,10 +32,12 @@ use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
     HistoryFrontendSession,
 };
+use taskmanager_application::history_decimation::gap_preserving_envelope;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     ApplicationHistoryCapability, ApplicationHistoryMetricSeries, ApplicationHistoryProjection,
-    ApplicationHistoryStatus, HistoryReplayController, MAX_HISTORY_REPLAY_POINTS,
+    ApplicationHistoryStatus, HistoryReplayCompletionDisposition, HistoryReplayController,
+    MAX_HISTORY_REPLAY_POINTS, PerformanceHistoryProjection,
 };
 use taskmanager_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 
@@ -48,10 +50,10 @@ use taskmanager_application::ApplicationHistoryUnavailableReason;
 use taskmanager_application::HistoryReplayRequest;
 use taskmanager_core::core::history::HistoryRecordSink;
 
+pub(crate) mod control;
 pub(crate) mod scene;
 
 #[derive(Clone, Component, Default)]
-#[component(on_insert = scene::bind_history_page)]
 pub(crate) struct HistoryPageRoot;
 
 #[derive(Clone, Component, Default)]
@@ -201,11 +203,10 @@ impl HistoryPageModel {
 }
 
 /// Keep the render-side envelope bounded even if a future application
-/// projection violates its current worker bound. The newest points are the
-/// useful side of a live history window; no values are synthesized.
+/// projection violates its current worker bound. Preserve the complete
+/// selected window and explicit gaps rather than keeping only a recent tail.
 fn bounded_samples(samples: &[f32]) -> Arc<[f32]> {
-    let start = samples.len().saturating_sub(MAX_RENDERED_HISTORY_POINTS);
-    Arc::from(&samples[start..])
+    gap_preserving_envelope(samples, MAX_RENDERED_HISTORY_POINTS).into()
 }
 
 /// Format a scalar without converting unavailable, negative-count, or
@@ -397,6 +398,28 @@ impl HistoryRuntime {
             .application_history_projection(self.capability())
     }
 
+    pub(crate) fn performance_projection(&self) -> PerformanceHistoryProjection {
+        self.controller
+            .performance_history_projection(self.capability())
+    }
+    pub(crate) fn available(&self) -> bool {
+        matches!(self.resources, HistoryResources::Active(_))
+    }
+    pub(crate) fn select_window(&mut self, window: HistoryWindow) {
+        if self.available()
+            && let Ok(request) = self.controller.select_window(window)
+        {
+            self.submit(request);
+        }
+    }
+    pub(crate) fn refresh(&mut self) {
+        if self.available()
+            && let Ok(request) = self.controller.refresh()
+        {
+            self.submit(request);
+        }
+    }
+
     /// Drain only non-blocking completion lanes. The returned flag is an ECS
     /// change fact for the projection system; idle frames do no scene work.
     pub(crate) fn drain(&mut self) -> bool {
@@ -425,9 +448,9 @@ impl HistoryRuntime {
         }
         if let HistoryResources::Active(session) = &mut self.resources {
             let completions = session.replay.drain();
-            changed |= !completions.is_empty();
             for completion in completions {
-                let _ = self.controller.complete(completion);
+                changed |= self.controller.complete(completion)
+                    == HistoryReplayCompletionDisposition::Applied;
             }
         }
         changed
@@ -484,25 +507,54 @@ pub(crate) struct ApplicationHistoryChanged;
 
 /// Mainline integration system: drain the app-host read lane and publish an
 /// immutable projection snapshot into the Bevy world.
+#[derive(SystemParam)]
+pub(crate) struct HistoryTargets<'w> {
+    projection: ResMut<'w, HistoryProjectionResource>,
+    performance: ResMut<'w, control::PerformanceHistoryProjectionResource>,
+    presentation: ResMut<'w, control::PerformancePresentation>,
+    route: Option<Res<'w, Route>>,
+}
+
 pub(crate) fn drain_history_system(
     mut runtime: NonSendMut<HistoryRuntime>,
-    mut track: NonSendMut<crate::app::FrontendTrack>,
-    mut projection: ResMut<HistoryProjectionResource>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut targets: HistoryTargets,
+    handle: Option<Res<SharedRuntimeHandle>>,
     mut commands: Commands,
 ) {
-    let changed = runtime.drain();
-    track
-        .shell
-        .set_history_persistence_sink(runtime.record_sink());
-    if !changed {
-        return;
+    let before = runtime.capability();
+    if let Some(handle) = handle {
+        let mut config = handle.shared.lock_config();
+        if let Some(client) = config.as_mut() {
+            let _ = client.drain();
+            if let Some(snapshot) = client.snapshot()
+                && runtime.requested != snapshot.history_persistence
+            {
+                runtime.request(snapshot.history_persistence);
+            }
+        }
     }
-    let next = runtime.projection();
-    if projection.0 == next {
-        return;
+    let changed = runtime.drain() || before != runtime.capability();
+    if changed {
+        track
+            .shell
+            .set_history_persistence_sink(runtime.record_sink());
+        targets.projection.0 = runtime.projection();
+        targets.performance.0 = runtime.performance_projection();
+        commands.trigger(ApplicationHistoryChanged);
+        commands.trigger(control::PerformanceHistoryChanged);
+        if targets
+            .route
+            .as_ref()
+            .is_some_and(|route| route.page == crate::app::Page::Settings)
+        {
+            commands.trigger(RouteChanged);
+        }
     }
-    projection.0 = next;
-    commands.trigger(ApplicationHistoryChanged);
+    if !runtime.available() && *targets.presentation != control::PerformancePresentation::Live {
+        *targets.presentation = control::PerformancePresentation::Live;
+        commands.trigger(control::PerformanceHistoryChanged);
+    }
 }
 
 #[cfg(test)]

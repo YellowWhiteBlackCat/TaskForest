@@ -21,18 +21,17 @@
 //! The frontend plugin below owns only the app shell, route, observers, and
 //! page scene. The window launcher owns Bevy's `DefaultPlugins`; headless
 //! tests add the explicit headless infrastructure composition. Keeping those two
-//! compositions separate is important in Bevy 0.19 because `AssetPlugin`,
+//! compositions separate is important in Bevy 0.20 because `AssetPlugin`,
 //! `ScenePlugin`, and input plugins are singleton infrastructure.
 
 use std::process::ExitCode;
 use std::time::Duration;
 
 use bevy::DefaultPlugins;
-use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup, Update};
+use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup};
 use bevy::asset::{Assets, Handle};
 use bevy::camera::{Camera2d, ClearColor};
 use bevy::ecs::component::Component;
-use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, Has, Or, With};
@@ -40,26 +39,35 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::scene::{CommandsSceneExt, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
 use bevy::ui::Pressed;
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent,
-};
+use bevy::ui::prelude::BackgroundColor;
 use bevy::ui::widget::Text;
-use bevy::window::{Window, WindowPlugin, WindowResolution};
+use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
-use taskmanager_assets::product;
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+mod capture_marker;
+mod capture_state;
+use capture_marker::emit_capture_marker;
+use capture_state::{initialize_capture_state, is_demo, is_production};
 
-use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
-use crate::demo_fixture::demo_shell;
+use taskmanager_assets::product;
+use taskmanager_theme::Theme;
+
+pub(crate) mod chrome;
+use chrome::app_shell_scene;
+mod appearance;
+use appearance::demo_theme_from_env;
+
+use crate::app::{AppShellPlugin, Route};
+use crate::capture::{capture_page, capture_scenario_target, capture_window_resolution};
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
-use crate::palette::{self, UiPalette, space_8, space_12};
+use crate::pages::settings::ThemePreferences;
+use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
+use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
 use taskmanager_app_host::acquire_single_instance;
@@ -123,7 +131,13 @@ pub(crate) struct AppShellRoot;
 pub(crate) struct DemoMode;
 
 #[derive(Resource, Default)]
-struct CaptureMarkerState(bool);
+struct CaptureMarkerState {
+    emitted: bool,
+    history_open_requested: bool,
+    data_presented: bool,
+    hardware_scroll_requested: bool,
+    tree_scroll_requested: bool,
+}
 
 /// Build and run the live windowed frontend to completion.
 pub(crate) fn run(shared: &'static SharedRuntime) -> ExitCode {
@@ -135,69 +149,6 @@ pub(crate) fn run(shared: &'static SharedRuntime) -> ExitCode {
 /// explicit no-I/O fixture and the platform drain is omitted.
 pub(crate) fn run_demo(shared: &'static SharedRuntime) -> ExitCode {
     run_with_mode(shared, true)
-}
-
-/// The light reference skin the capture gate has always rendered, and the
-/// fallback whenever no appearance override is present.
-fn reference_demo_theme() -> Theme {
-    Theme::build(
-        Skin::Gnome,
-        LightDark::Light,
-        HighContrast::Off,
-        ResolvedFonts::system_for(Skin::Gnome),
-    )
-}
-
-/// Parse the shared testing/developer appearance override GPUI owns
-/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
-/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
-/// `None` for an unset or syntactically invalid value. This is the SAME
-/// vocabulary (and env name) GPUI's
-/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
-/// vocabulary would let the capture harness and the frontends drift.
-fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
-    let (skin_token, mode_token) = value.split_once('-')?;
-    let skin = match skin_token.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match mode_token.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
-}
-
-/// Resolve the demo/capture theme. The override is a FALLBACK: an explicit
-/// appearance preference (the persisted config, in production) always wins and
-/// the demo path has none, so `TM_SKIN` is the only input here. An unset or
-/// invalid value resolves the unchanged light reference skin.
-fn resolve_demo_theme(value: Option<&str>, high_contrast: bool) -> Theme {
-    let Some((skin, mode)) = value.and_then(parse_tm_skin) else {
-        return reference_demo_theme();
-    };
-    Theme::build(
-        skin,
-        mode,
-        if high_contrast {
-            HighContrast::On
-        } else {
-            HighContrast::Off
-        },
-        ResolvedFonts::system_for(skin),
-    )
-}
-
-/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override for the demo/capture boot.
-fn demo_theme_from_env() -> Theme {
-    let value = std::env::var("TM_SKIN").ok();
-    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
-    resolve_demo_theme(value.as_deref(), high_contrast)
 }
 
 fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
@@ -255,16 +206,28 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         runtime: shared,
         palette,
     });
-    if !demo {
-        app.add_systems(
-            Startup,
-            crate::pages::settings::restore_persisted_preferences,
-        );
+    let history_capture = demo
+        && capture_scenario_target().is_some_and(|target| {
+            matches!(target, "history-replay" | "application-history-replay")
+        });
+    if !demo || history_capture {
         app.insert_non_send(production_history_runtime());
         app.add_systems(
             PreUpdate,
             crate::pages::history::drain_history_system.before(crate::drain::drain_system),
         );
+    }
+    if !demo {
+        app.add_systems(
+            Startup,
+            crate::pages::settings::restore_persisted_preferences,
+        );
+        if let Ok(client) = NativeAppHost::production().diagnostic_bundle_client() {
+            let mut diagnostic = DiagnosticRuntime::default();
+            diagnostic.install(client);
+            app.insert_resource(diagnostic);
+        }
+
         let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
         app.insert_resource(crate::tray::TrayResource::new(tray_controller, tray_rx));
     } else {
@@ -275,7 +238,13 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     }
     if demo {
         app.init_resource::<CaptureMarkerState>();
-        app.add_systems(Update, emit_capture_marker);
+        app.add_systems(
+            PostUpdate,
+            emit_capture_marker
+                .after(crate::pages::performance::device_curves::paint_curves)
+                .after(crate::pages::performance::replay::paint_charts)
+                .after(crate::pages::system::dashboard::paint_charts),
+        );
     }
     match app.run() {
         AppExit::Success => ExitCode::SUCCESS,
@@ -283,110 +252,10 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     }
 }
 
-fn emit_capture_marker(
-    route: Res<Route>,
-    contents: Query<&crate::app::PageContent>,
-    mut marker: ResMut<CaptureMarkerState>,
-) {
-    if marker.0 || contents.iter().all(|content| content.page != route.page) {
-        return;
-    }
-    let page = capture_page_name(route.page);
-    println!("BEVY_CAPTURE_MARKER event=frame_ready mode=demo page={page}");
-    println!("BEVY_CAPTURE_MARKER event=target_ready mode=demo page={page}");
-    marker.0 = true;
-}
-
-fn capture_page_name(page: crate::app::Page) -> &'static str {
-    if capture_wants_service_logs() {
-        return "service-logs";
-    }
-    match page {
-        crate::app::Page::Processes => "applications",
-        crate::app::Page::Performance => "performance",
-        crate::app::Page::Services => "services",
-        crate::app::Page::System => "system",
-        crate::app::Page::Startup => "startup",
-        crate::app::Page::Sessions => "users",
-        crate::app::Page::Alerts => "alerts",
-        crate::app::Page::Settings => "settings",
-        crate::app::Page::AppHistory => "app-history",
-        crate::app::Page::Containers => "containers",
-    }
-}
-
-/// The capture scenario that renders the Services page with the log panel
-/// open over a seeded fixture feed. Production routing is untouched: the
-/// env var exists only inside the demo capture composition.
-fn capture_wants_service_logs() -> bool {
-    std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|value| value.trim() == "service-logs")
-}
-
-/// Capture fixture: open the log stream for the first demo service and
-/// pre-fill the feed with a bounded, deterministic journal excerpt. The
-/// scenario renders the real panel over this state; production never runs it.
-fn seed_service_log_fixture(shell: &mut ShellApp) {
-    use taskmanager_core::core::services::{
-        ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
-        ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
-    };
-    let Some(service) = shell.sorted_services().first().cloned() else {
-        return;
-    };
-    let service_id = service.id.clone();
-    let _ = shell.open_service_log_for(service_id.clone());
-    let lines: &[&str] = &[
-        "Started Network Manager.",
-        "Reached target Network.",
-        "wlan0: link becomes ready",
-        "Starting Network Manager Script Dispatcher Service...",
-        "Started Network Manager Script Dispatcher Service.",
-        "dhcp: lease renewed (3600s)",
-        "wlan0: Gained IPv6LL",
-        "device (wlan0): state change: activated -> deactivating",
-        "device (wlan0): state change: deactivating -> disconnected",
-        "wlan0: link is not ready",
-        "device (wlan0): state change: disconnected -> prepare",
-        "device (wlan0): supplicant interface state: scanning -> authenticating",
-        "device (wlan0): supplicant interface state: authenticating -> associating",
-        "device (wlan0): supplicant interface state: associating -> 4way_handshake",
-        "device (wlan0): supplicant interface state: 4way_handshake -> completed",
-        "wlan0: link becomes ready",
-        "device (wlan0): state change: config -> activated",
-        "dhcp: request granted",
-        "address added: 192.168.1.42/24",
-        "route added: default via 192.168.1.1",
-    ];
-    let base_micros = crate::drain::unix_now_ms().saturating_sub(60_000) * 1_000;
-    let entries: Vec<ServiceLogEntry> = lines
-        .iter()
-        .enumerate()
-        .map(|(index, message)| ServiceLogEntry {
-            cursor: format!("demo:{index:04}"),
-            realtime_timestamp_micros: Some(base_micros + index as u64 * 1_500_000),
-            priority: Some(6),
-            level: ServiceLogLevel::Unknown,
-            message: (*message).to_owned(),
-        })
-        .collect();
-    let query = ServiceLogQuery {
-        service_id: service_id.clone(),
-        level: ServiceLogLevelFilter::All,
-        time: ServiceLogTimeFilter::All,
-        after_cursor: None,
-    };
-    let snapshot = ServiceLogStreamSnapshot {
-        query: query.clone(),
-        state: ServiceLogStreamState::from_query_entries(&query, entries),
-    };
-    if let Some(open) = shell.service_log.as_mut() {
-        open.feed.apply_at(snapshot, crate::drain::unix_now_ms());
-    }
-}
-
 /// Compose the history connector at the native edge. The config preference is
 /// read once at startup through the bounded app-host client; disabled history
-/// does not launch a writer, replay worker, or frontend connector.
+/// does not launch a writer or replay worker. The inert connector permits a
+/// later canonical Settings change to enable persistence without restarting.
 fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
     let host = NativeAppHost::production();
     let enabled = host
@@ -401,38 +270,8 @@ fn production_history_runtime() -> crate::pages::history::HistoryRuntime {
         .unwrap_or(false);
     let mut runtime = crate::pages::history::HistoryRuntime::default();
     runtime.request(enabled);
-    if enabled {
-        runtime.install_connector(host.history_frontend_connector());
-    }
+    runtime.install_connector(host.history_frontend_connector());
     runtime
-}
-
-fn capture_page() -> Option<crate::app::Page> {
-    let value = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
-    match value.trim().to_ascii_lowercase().as_str() {
-        "applications" | "processes" => Some(crate::app::Page::Processes),
-        "performance" => Some(crate::app::Page::Performance),
-        "services" => Some(crate::app::Page::Services),
-        "service-logs" => Some(crate::app::Page::Services),
-        "system" => Some(crate::app::Page::System),
-        "startup" => Some(crate::app::Page::Startup),
-        "users" | "sessions" => Some(crate::app::Page::Sessions),
-        "alerts" => Some(crate::app::Page::Alerts),
-        "settings" => Some(crate::app::Page::Settings),
-        "app-history" | "history" => Some(crate::app::Page::AppHistory),
-        "containers" => Some(crate::app::Page::Containers),
-        _ => None,
-    }
-}
-
-fn capture_window_resolution() -> WindowResolution {
-    let raw = std::env::var("TM_BEVY_WINDOW_SIZE").unwrap_or_default();
-    let (width, height) = raw
-        .split_once('x')
-        .and_then(|(width, height)| Some((width.parse::<u32>().ok()?, height.parse::<u32>().ok()?)))
-        .filter(|(width, height)| *width >= 720 && *height >= 480)
-        .unwrap_or((1180, 780));
-    WindowResolution::new(width, height)
 }
 
 /// Wires the frontend-owned seams and app shell into one bevy `App`.
@@ -447,31 +286,50 @@ impl Plugin for FrontendWindowPlugin {
             shared: self.runtime,
         });
         app.insert_non_send(crate::app::FrontendTrack {
-            shell: if app.world().contains_resource::<DemoMode>() {
-                let mut shell = demo_shell();
-                if capture_wants_service_logs() {
-                    seed_service_log_fixture(&mut shell);
-                }
-                shell
-            } else {
-                ShellApp::new()
-            },
-            initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
+            shell: ShellApp::new(),
+            initial_refresh_submitted: false,
             process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         });
         app.insert_resource(WindowPalette {
             inner: self.palette.clone(),
         });
+        if std::env::var("TM_BEVY_CAPTURE_PAGE").is_ok_and(|v| v.trim() == "sidebar-hidden") {
+            app.insert_resource(crate::pages::performance::PerformanceSidebarVisible(false));
+        }
+        crate::pages::history::control::register(app);
+        crate::pages::performance::replay::register(app);
         // The route always has an immutable history projection available;
         // production adds the non-send connector runtime below, while
         // headless compositions remain honestly Disabled.
         app.init_resource::<HistoryProjectionResource>();
         app.init_resource::<PerformanceLayoutState>().add_systems(
             PostUpdate,
-            (sync_performance_layout, sync_control_visuals).chain(),
+            (
+                sync_performance_layout,
+                sync_control_visuals,
+                crate::widgets::table::paint_zero_values,
+            )
+                .chain(),
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
+        crate::window_surface::register(app);
+        crate::saved_views::register(app);
+        crate::event_center::register(app);
+        crate::about_modal::register(app);
+        crate::system_information_modal::register(app);
+        crate::first_run_modal::register(app);
+        crate::pages::system::diagnostic_modal::register(app);
+        crate::pages::system::dashboard::register(app);
+        crate::pages::system::register(app);
+        crate::pages::services::register(app);
+        crate::pages::alerts::editor::register(app);
+        crate::pages::startup::register(app);
+        crate::pages::sessions::register(app);
+        crate::pages::process_tree::register(app);
+        crate::pages::processes::layout::register(app);
+        crate::pages::performance::register(app);
+        crate::pages::history::scene::register(app);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);
@@ -501,15 +359,16 @@ impl Plugin for FrontendWindowPlugin {
         app.add_systems(
             Startup,
             (
+                initialize_capture_state,
                 register_embedded_fonts,
                 crate::icons::build_icon_plates,
                 spawn_app_shell,
             )
-                .chain(),
+                .chain()
+                .before(crate::confirmation::init_capture_confirmation),
         );
-        if !app.world().contains_resource::<DemoMode>() {
-            app.add_systems(PreUpdate, drain::drain_system);
-        }
+        app.add_systems(PreUpdate, drain::drain_system.run_if(is_production));
+        app.add_systems(PreUpdate, drain::drain_demo_effects.run_if(is_demo));
     }
 }
 
@@ -555,7 +414,7 @@ fn role_font_source(fonts: &PlaceholderFonts, role: Role) -> FontSource {
 /// lands. Runs for the startup shell, every page remount, and every future
 /// widget insert — the single place typography becomes bevy values.
 fn style_text_role(
-    trigger: On<Add, TextRole>,
+    trigger: On<Add<TextRole>>,
     mut texts: Query<(&TextRole, &mut TextFont, &mut TextColor)>,
     palette: Res<WindowPalette>,
     fonts: Res<PlaceholderFonts>,
@@ -644,91 +503,6 @@ fn rewrite_feedback_line(
                 feedback.event().0.clone()
             };
         }
-    }
-}
-
-/// The full app shell as one declarative scene: the product navigation strip
-/// over the routed page's content. One chrome shape for every route — the
-/// same strip grammar GPUI renders — with the summary/feedback caption band
-/// kept only where no page-local status surface exists.
-fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn Scene> {
-    let strip: Box<dyn Scene> = Box::new(nav_strip_scene(route, palette));
-    if route == Page::Performance {
-        // GPUI chrome parity: the Performance page fills the whole window
-        // under the strip with no extra status band.
-        return Box::new(bsn! {
-            Node {
-                width: percent(100),
-                height: percent(100),
-                flex_direction: FlexDirection::Column,
-            }
-            BackgroundColor({ palette.window_clear })
-            AppShellRoot
-            Children [
-                ( { strip } ),
-                (
-                    Node {
-                        width: percent(100),
-                        height: percent(100),
-                        flex_grow: 1.0,
-                        justify_content: JustifyContent::FlexStart,
-                        align_items: AlignItems::Stretch,
-                        padding: UiRect::all(Val::Px(space_8())),
-                    }
-                    BackgroundColor({ palette.content_bg })
-                    ContentSlot
-                ),
-            ]
-        });
-    }
-    Box::new(standard_app_shell_scene(palette, summary, strip))
-}
-
-fn standard_app_shell_scene(
-    palette: &UiPalette,
-    summary: String,
-    strip: Box<dyn Scene>,
-) -> impl Scene + use<> {
-    let radius = palette.panel_radius_px;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            flex_direction: FlexDirection::Column,
-        }
-        BackgroundColor({ palette.window_clear })
-        AppShellRoot
-        Children [
-            ( { strip } ),
-            (
-                // The shell's status band: capability summary and the drain's
-                // typed feedback, caption-sized so it informs without adding
-                // a second chrome layer.
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexEnd,
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                }
-                Children [
-                    ( Text(summary) SummaryLine TextRole(Role::Caption) ),
-                    ( Text("") FeedbackLine TextRole(Role::Caption) ),
-                ]
-            ),
-            (
-                Node {
-                    width: percent(100),
-                    height: percent(100),
-                    flex_grow: 1.0,
-                    justify_content: JustifyContent::FlexStart,
-                    align_items: AlignItems::Stretch,
-                    padding: UiRect::all(Val::Px(space_8())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
-                }
-                BackgroundColor({ palette.content_bg })
-                ContentSlot
-            ),
-        ]
     }
 }
 
