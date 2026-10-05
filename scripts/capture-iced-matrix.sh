@@ -419,7 +419,15 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
-NIRI_PGID="$(process_group "$NIRI_PID")"
+for _ in $(seq 1 40); do
+  observed_group="$(process_group "$NIRI_PID")"
+  if [ "$observed_group" = "$NIRI_PID" ]; then
+    NIRI_PGID="$observed_group"
+    break
+  fi
+  kill -0 "$NIRI_PID" 2>/dev/null || break
+  sleep 0.05
+done
 [ "$NIRI_PGID" = "$NIRI_PID" ] || {
   printf 'nested Niri did not obtain a private process group\n' >&2
   exit 1

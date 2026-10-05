@@ -7,6 +7,7 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::ui::process_details::process_details_support::render_process_details;
@@ -243,6 +244,7 @@ fn properties_target(pid: u32) -> ProcessPropertiesTarget {
         .expect("demo process exists")
         .clone();
     ProcessPropertiesTarget {
+        facet: ProcessInsightFacet::Network,
         item,
         section: ProcessDetailsSection::default(),
         scroll: 0,

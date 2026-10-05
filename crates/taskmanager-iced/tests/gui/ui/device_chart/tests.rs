@@ -35,6 +35,14 @@ fn hover_chart(hover: bool) -> DeviceChart {
 #[test]
 fn device_readout_text_formats_the_hovered_sample_in_the_graph_unit() {
     assert_eq!(
+        device_readout_text(
+            DeviceMetricScale::Bytes { use_base2: true },
+            &[315.0 * 1_048_576.0],
+            0
+        ),
+        Some("315.0 MiB".to_owned())
+    );
+    assert_eq!(
         device_readout_text(DeviceMetricScale::Percent, &[10.0, 42.0], 1),
         Some("42%".to_string())
     );

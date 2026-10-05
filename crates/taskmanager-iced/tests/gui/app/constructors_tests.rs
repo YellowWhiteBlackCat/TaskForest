@@ -316,6 +316,18 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
         app.shell.application.interaction.confirmation_kind(),
         Some(ConfirmationKind::ProcessBatch)
     );
+    let intent = app
+        .shell
+        .pending_batch()
+        .expect("tree confirmation has a frozen intent");
+    assert_eq!(intent.targets.len(), 7);
+    assert_eq!(intent.targets.last().expect("root").pid, 90_000);
+    assert!(
+        intent
+            .targets
+            .iter()
+            .all(|target| target.authoritative_start_token().is_some())
+    );
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-batch-confirm");

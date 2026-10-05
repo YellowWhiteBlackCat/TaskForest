@@ -7,7 +7,7 @@
 //! capture preparation never invokes a destructive action.
 
 use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState};
-use crate::gpui_app::process_insights::process_insights_capture_fixture;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 
 use taskmanager_core::core::NpuInventorySnapshot;
@@ -40,6 +40,7 @@ mod fixtures;
 mod gpu_history;
 mod marker;
 mod process_fixtures;
+mod properties;
 mod scenarios;
 mod state;
 mod system_health;
@@ -52,9 +53,8 @@ use marker::{emit_marker, emit_theme_marker};
 use process_fixtures::{
     prepare_apps_group_expanded, prepare_apps_identity_matrix, prepare_apps_search_highlight,
     prepare_apps_zero_gray, prepare_diagnostic_process, prepare_process_batch,
-    prepare_process_histories, prepare_process_insights, prepare_process_memory_pss_swap,
-    prepare_process_tree, prepare_startup_boot_markers, prepare_startup_failure_evidence,
-    prepare_startup_impact,
+    prepare_process_properties, prepare_process_tree, prepare_startup_boot_markers,
+    prepare_startup_failure_evidence, prepare_startup_impact,
 };
 pub use scenarios::CaptureScenario;
 pub(super) use state::{
@@ -65,6 +65,14 @@ pub(super) use state::{
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
+    pub(crate) fn properties_insight_facet(&self) -> ProcessInsightFacet {
+        match self.scenario {
+            Some(CaptureScenario::ProcessGpuDetails) => ProcessInsightFacet::Gpu,
+            Some(CaptureScenario::ProcessResourceLimits) => ProcessInsightFacet::Resources,
+            Some(CaptureScenario::ProcessIsolation) => ProcessInsightFacet::Isolation,
+            _ => ProcessInsightFacet::Network,
+        }
+    }
     pub(crate) fn dashboard_history_fixture_requested(&self) -> bool {
         self.is_enabled()
             && self.telemetry_ready()
@@ -218,34 +226,24 @@ impl CaptureEvidence {
             self.mark_scenario_ready();
             return None;
         }
-        if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance)
-            && self.scenario_ready()
+        if self
+            .scenario
+            .is_some_and(CaptureScenario::is_process_properties)
         {
-            if let Some(identity) = self.scenario_process_identity
-                && let Some(process) = processes
-                    .iter_mut()
-                    .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
-            {
-                prepare_process_histories(process);
+            let identity = prepare_process_properties(processes)?;
+            self.scenario_process_identity = Some(identity);
+            if !self.telemetry_ready() {
+                return None;
             }
-            return None;
-        }
-        // The strict insights fixture uses a synthetic identity. Keep that
-        // identity in every refreshed process list until the screenshot is
-        // taken; otherwise the normal 2 s process refresh removes it and the
-        // Properties dialog correctly auto-closes before pixel capture.
-        if self.scenario_ready()
-            && self
-                .scenario
-                .is_some_and(CaptureScenario::is_process_insights)
-        {
-            let identity = prepare_process_insights(processes)?;
-            debug_assert_eq!(self.scenario_process_identity, Some(identity));
-            return None;
-        }
-        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready() {
-            prepare_process_memory_pss_swap(processes);
-            return None;
+            return match self.scenario {
+                Some(CaptureScenario::ProcessPropertiesPerformance) => Some(
+                    CaptureProcessAction::Properties(identity, ProcessDetailsSection::Performance),
+                ),
+                Some(CaptureScenario::ProcessMemoryPssSwap) => Some(
+                    CaptureProcessAction::Properties(identity, ProcessDetailsSection::Overview),
+                ),
+                _ => Some(CaptureProcessAction::Insights(identity)),
+            };
         }
         if self.scenario == Some(CaptureScenario::AppsZeroGray) && self.scenario_ready() {
             prepare_apps_zero_gray(processes);
@@ -305,12 +303,6 @@ impl CaptureEvidence {
             return Some(CaptureProcessAction::ApplicationSelection(root_identity));
         }
 
-        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) {
-            prepare_process_memory_pss_swap(processes);
-            self.mark_scenario_ready();
-            return None;
-        }
-
         if self.scenario == Some(CaptureScenario::AppsZeroGray) {
             prepare_apps_zero_gray(processes);
             self.mark_scenario_ready();
@@ -325,21 +317,6 @@ impl CaptureEvidence {
         if self.scenario == Some(CaptureScenario::AppsIdentityMatrix) {
             prepare_apps_identity_matrix(processes);
             return None;
-        }
-
-        if self
-            .scenario
-            .is_some_and(CaptureScenario::is_process_insights)
-        {
-            if !self.telemetry_ready() {
-                return None;
-            }
-            let identity = prepare_process_insights(processes)?;
-            self.scenario_process_identity = Some(identity);
-            return Some(CaptureProcessAction::Insights {
-                identity,
-                state: process_insights_capture_fixture(),
-            });
         }
 
         if self.scenario == Some(CaptureScenario::ProcessTreeConfirm) {
@@ -389,21 +366,6 @@ impl CaptureEvidence {
                 })
             })
             .or_else(|| processes.iter().find(|process| process.pid > 1))?;
-        if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance) {
-            let identity = ProcessLiveKey::from_process(process)?;
-            if let Some(process) = processes
-                .iter_mut()
-                .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
-            {
-                prepare_process_histories(process);
-            }
-            self.scenario_process_identity = Some(identity);
-            self.mark_scenario_ready();
-            return Some(CaptureProcessAction::Properties(
-                identity,
-                ProcessDetailsSection::Performance,
-            ));
-        }
         if self.scenario != Some(CaptureScenario::ProcessForceKill) {
             return None;
         }
@@ -696,10 +658,6 @@ impl CaptureEvidence {
         *page = TopPage::Performance;
         self.mark_scenario_ready();
         true
-    }
-
-    pub fn process_memory_pss_swap_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready()
     }
 
     pub fn on_dynamic_device_state(

@@ -3,6 +3,8 @@
 //! reasons), extracted from [`super`] so the insights module stays under the
 //! source-size budget. Moved verbatim; the assertions are unchanged.
 
+const PREVIEW_CAP: usize = 8;
+
 use super::*;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process_telemetry::ConnectionState;
@@ -45,7 +47,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     // The facet's row fold enumerates one row per projected thread (same
     // order), and the gap thread's own row keeps both dashes. The cap bounds
     // the materialized rows instead of dropping the trailing ones silently.
-    let rows = thread_rows_vm(&[warm.clone(), gap.clone()], MAX_FACET_ROWS);
+    let rows = thread_rows_vm(&[warm.clone(), gap.clone()], PREVIEW_CAP);
     assert_eq!(rows.len(), 2, "one row per projected thread");
     assert_eq!(
         (
@@ -69,7 +71,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         ("4243", "reaper", "R", "—", "—"),
         "the gap thread row must keep the typed dashes, never 0.0s/0.0%"
     );
-    let many: Vec<ProcessThreadInfo> = (0..MAX_FACET_ROWS + 3)
+    let many: Vec<ProcessThreadInfo> = (0..PREVIEW_CAP + 3)
         .map(|index| ProcessThreadInfo {
             tid: 5_000 + index as u32,
             comm: format!("worker-{index}"),
@@ -77,8 +79,8 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         })
         .collect();
     assert_eq!(
-        thread_rows_vm(&many, MAX_FACET_ROWS).len(),
-        MAX_FACET_ROWS,
+        thread_rows_vm(&many, PREVIEW_CAP).len(),
+        PREVIEW_CAP,
         "the facet cap must bound the materialized thread rows"
     );
 }
@@ -97,7 +99,7 @@ fn thread_rows_vm_renders_runqueue_and_wait_diagnostics() {
         run_queue_wait_ns: Some(2_500_000),
         wait_kind: Some(process_telemetry::ThreadWaitKind::KernelLock),
     };
-    let rows = thread_rows_vm(&[thread], MAX_FACET_ROWS);
+    let rows = thread_rows_vm(&[thread], PREVIEW_CAP);
     assert_eq!(rows[0].wait, "lock 2.5ms");
     assert_eq!(rows[0].state, "D");
 }
@@ -128,7 +130,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
     // The facet's row fold enumerates one row per projected descriptor (same
     // order): the readable descriptor keeps its target and the unresolved
     // readlink keeps its typed marker. The cap bounds the materialized rows.
-    let rows = open_file_rows(&[readable.clone(), unreadable.clone()], MAX_FACET_ROWS);
+    let rows = open_file_rows(&[readable.clone(), unreadable.clone()], PREVIEW_CAP);
     assert_eq!(rows.len(), 2, "one row per projected descriptor");
     assert!(rows[0].contains("/dev/null") && rows[0].starts_with("fd 0"));
     assert!(
@@ -145,7 +147,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         target: Some("/tmp/deleted.log".to_string()),
         deleted: true,
     };
-    let deleted_rows = open_file_rows(&[deleted_entry], MAX_FACET_ROWS);
+    let deleted_rows = open_file_rows(&[deleted_entry], PREVIEW_CAP);
     assert!(
         deleted_rows[0].contains("[deleted]"),
         "deleted descriptor is marked"
@@ -154,7 +156,7 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         deleted_rows[0].contains("[file]"),
         "deleted descriptor classifies handle type"
     );
-    let many: Vec<OpenFileEntry> = (0..MAX_FACET_ROWS + 3)
+    let many: Vec<OpenFileEntry> = (0..PREVIEW_CAP + 3)
         .map(|index| OpenFileEntry {
             fd: index as u32,
             kind: OpenFileKind::File,
@@ -163,8 +165,8 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         })
         .collect();
     assert_eq!(
-        open_file_rows(&many, MAX_FACET_ROWS).len(),
-        MAX_FACET_ROWS,
+        open_file_rows(&many, PREVIEW_CAP).len(),
+        PREVIEW_CAP,
         "the facet cap must bound the materialized descriptor rows"
     );
 }

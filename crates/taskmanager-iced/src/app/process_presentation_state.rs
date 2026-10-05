@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::SortCol;
 
@@ -17,6 +18,7 @@ pub(crate) struct ProcessPresentationState {
     pub(crate) hidden_columns: HashSet<SortCol>,
     pub(crate) services_query: String,
     pub(crate) details_section: DetailsSection,
+    pub(crate) insights_facet: ProcessInsightFacet,
 }
 
 impl ProcessPresentationState {
@@ -31,6 +33,7 @@ impl ProcessPresentationState {
             hidden_columns: HashSet::new(),
             services_query: String::new(),
             details_section: DetailsSection::default(),
+            insights_facet: ProcessInsightFacet::Network,
         }
     }
 }

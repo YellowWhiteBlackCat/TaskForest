@@ -5,9 +5,11 @@
 //! observations create gaps rather than joining across missing data.
 
 use bevy::ecs::component::Component;
-use bevy::ecs::hierarchy::Children;
-use bevy::math::Rot2;
-use bevy::scene::{Scene, bsn};
+use bevy::ecs::entity::Entity;
+use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::world::World;
+use bevy::math::{Rot2, Vec2};
+use bevy::scene::{Scene, WorldSceneExt, bsn};
 use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
 
 /// Hard upper bound used by the performance chart surface.
@@ -227,3 +229,33 @@ pub(crate) fn polyline_scene(
 #[cfg(test)]
 #[path = "../../tests/headless/chart.rs"]
 mod tests;
+
+/// Last successfully painted logical chart size, shared by inspection surfaces.
+#[derive(Component, Clone, Default)]
+pub(crate) struct CurveMeasurement(pub(crate) Option<(f32, f32)>);
+
+/// Replace a measured curve through the owned scene adapter. Failed scene
+/// publication cannot certify a rendered curve for capture readiness.
+pub(crate) fn paint_curve_at_size(
+    world: &mut World,
+    entity: Entity,
+    size: Vec2,
+    samples: &[f32],
+    ceiling: f32,
+    color: bevy::color::Color,
+) -> bool {
+    let old = world
+        .get::<Children>(entity)
+        .map(|children| children.iter().copied().collect::<Vec<_>>())
+        .unwrap_or_default();
+    for child in old {
+        let _ = world.despawn(child);
+    }
+    let segments = line_segments_scaled(samples, size.x, size.y, samples.len(), ceiling);
+    let Ok(fresh) = world.spawn_scene(polyline_scene(&segments, color)) else {
+        return false;
+    };
+    let child = fresh.id();
+    world.entity_mut(entity).add_one_related::<ChildOf>(child);
+    true
+}

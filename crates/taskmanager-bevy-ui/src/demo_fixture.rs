@@ -11,10 +11,12 @@
 //! `demo_app` starts with one honest sample and the sequence below is
 //! appended only inside the capture composition.
 
-use taskmanager_application::{
-    AppAction, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
-    ProcessInsightsRevision,
+use taskmanager_shell::fixture::process_insights::{
+    process_insights_projection, seed_process_properties_history,
 };
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+
+use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::alerts::{
@@ -183,26 +185,8 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             }
         }
         "process-tree-confirm" => {
-            let process = shell
-                .projection()
-                .processes
-                .as_ref()
-                .and_then(|p| p.first())
-                .cloned();
-            if let Some(process) = process
-                && let Some(target) = FrozenProcessIdentity::from_process(&process)
-            {
-                let intent = ProcessBatchIntent {
-                    action: ProcessBatchAction::EndProcessTree,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets: vec![target],
-                };
-                let _ = shell
-                    .application
-                    .interaction
-                    .reduce(InteractionEvent::ArmConfirmation(
-                        PendingConfirmation::ProcessBatch(intent),
-                    ));
+            if let Some(root) = seed_shell_process_tree(shell) {
+                shell.request_process_tree_end(root);
             }
         }
         "process-batch-confirm" => {
@@ -247,6 +231,8 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
         | "process-isolation"
         | "process-properties-performance"
         | "process-memory-pss-swap" => {
+            let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+            seed_process_properties_history(shell);
             let process = shell
                 .projection()
                 .processes
@@ -257,15 +243,13 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 && let Some(target) = FrozenProcessIdentity::from_process(&process)
             {
                 shell.set_row_selection(ProcessRowId::from_process(&process), Some(&process));
-                let revision = ProcessInsightsRevision::new(1);
-                let mut tracker = ProcessInsightsProjection::default();
-                tracker.begin(target, revision);
-                if let Some(projection) = tracker.snapshot() {
+                if let Some(projection) = process_insights_projection(target) {
                     seed_projection_fact(
                         shell,
                         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
                     );
                 }
+                let _ = shell.apply_action(AppAction::OpenProperties);
             }
         }
         "services-search-highlight" => {

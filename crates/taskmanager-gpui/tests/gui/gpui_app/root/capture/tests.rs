@@ -26,7 +26,6 @@ use super::{
     SystemSnapshot, TopPage,
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
-use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_application::i18n;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
@@ -739,29 +738,31 @@ fn process_memory_capture_fixture_keeps_pss_and_swap_separate() {
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
     let mut processes = Vec::new();
-
+    assert!(matches!(
+        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
+        Some(CaptureProcessAction::Properties(
+            _,
+            ProcessDetailsSection::Overview
+        ))
+    ));
+    let process = processes.first().expect("properties process");
+    assert_eq!(process.current_memory_bytes(), Some(315 * 1024 * 1024));
+    assert_eq!(process.current_memory_pss_bytes(), Some(240 * 1024 * 1024));
+    assert_eq!(process.current_memory_uss_bytes(), Some(192 * 1024 * 1024));
+    assert_eq!(process.current_swap_bytes(), Some(64 * 1024 * 1024));
+    assert!(
+        !evidence.scenario_ready(),
+        "the semantic action alone cannot certify pixels"
+    );
+    assert!(evidence.schedule_process_properties_presentation(true));
+    evidence.mark_process_properties_presented(true);
+    assert!(evidence.scenario_ready());
     assert!(
         evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-            .is_none()
+            .is_some()
     );
-    assert!(evidence.process_memory_pss_swap_requested());
-    assert_eq!(processes.len(), 3);
-    let browser = processes
-        .iter()
-        .find(|process| process.name == "capture-browser")
-        .expect("PSS capture fixture must contain the browser row");
-    assert_eq!(browser.current_memory_bytes(), Some(768 * 1024 * 1024));
-    assert_eq!(browser.current_memory_pss_bytes(), Some(410 * 1024 * 1024));
-    assert_eq!(browser.current_swap_bytes(), Some(96 * 1024 * 1024));
-
-    let before = processes.len();
-    assert!(
-        evidence
-            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-            .is_none()
-    );
-    assert_eq!(processes.len(), before, "fixture refresh must stay bounded");
+    assert_eq!(processes.len(), 1, "fixture refresh stays bounded");
 }
 
 #[test]

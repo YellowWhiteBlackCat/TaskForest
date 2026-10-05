@@ -105,7 +105,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
 #[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
-    assert_eq!(pairs.len(), 26);
+    assert_eq!(pairs.len(), 27);
     let value = |field: ProcessDetailsField| {
         pairs
             .iter()
@@ -119,6 +119,7 @@ fn property_pairs_mirror_the_neutral_vm() {
         ProcessDetailsField::Memory,
         ProcessDetailsField::Pss,
         ProcessDetailsField::Uss,
+        ProcessDetailsField::Swap,
         ProcessDetailsField::Shared,
         ProcessDetailsField::AnonHugePages,
         ProcessDetailsField::Threads,
@@ -200,7 +201,7 @@ fn overview_exactly_the_property_rows_minus_command_and_exe() {
         .map(|(f, _, _)| *f)
         .filter(|f| !matches!(f, ProcessDetailsField::Cmdline | ProcessDetailsField::Exe))
         .collect();
-    assert_eq!(overview.len(), 24);
+    assert_eq!(overview.len(), 25);
     assert_eq!(overview.first(), Some(&ProcessDetailsField::Name));
 }
 

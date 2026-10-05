@@ -11,7 +11,6 @@ use taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS;
 use taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED;
 use taskmanager_core::core::startup::segment_deltas;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
-use taskmanager_test_support::fixture_start_token;
 
 #[test]
 fn process_and_service_capture_actions_are_typed_and_non_destructive() {
@@ -23,14 +22,24 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
             .name("capture-process".into())
             .build(),
     ];
+    let mut snapshot = SystemSnapshot::default();
+    properties.on_snapshot(&mut snapshot);
     assert_eq!(
         properties.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
         Some(CaptureProcessAction::Properties(
-            ProcessLiveKey::from_parts(42, fixture_start_token(42)).expect("fixture identity"),
+            ProcessLiveKey::from_parts(4242, 987_654).expect("fixture identity"),
             ProcessDetailsSection::Performance
         ))
     );
-    assert_eq!(processes[0].cpu_history.len(), 60);
+    assert_eq!(
+        processes
+            .iter()
+            .find(|process| process.pid == 4242)
+            .expect("fixture")
+            .cpu_history
+            .len(),
+        60
+    );
     let mut tree = CaptureEvidence::for_test(Some(CaptureScenario::ProcessTreeConfirm));
     let action = tree
         .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
@@ -80,7 +89,7 @@ fn insights_scenarios_wait_for_exact_dialog_state_and_never_create_control_inten
         let action = evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
             .expect("strict insights scenario should prepare a render fixture");
-        let CaptureProcessAction::Insights { identity, state } = action else {
+        let CaptureProcessAction::Insights(identity) = action else {
             panic!("insights captures must not create a process-control intent")
         };
         assert_eq!(
@@ -92,17 +101,28 @@ fn insights_scenarios_wait_for_exact_dialog_state_and_never_create_control_inten
                 .iter()
                 .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
         );
-        assert!(matches!(state, ProcessInsightsState::Ready(_)));
         assert!(!evidence.scenario_ready());
-        evidence.mark_process_insights_ready(false);
+        assert!(!evidence.schedule_process_properties_presentation(false));
         assert!(!evidence.scenario_ready());
-        evidence.mark_process_insights_ready(true);
+        evidence.mark_process_properties_presented(true);
+        assert!(
+            !evidence.scenario_ready(),
+            "an unscheduled frame cannot certify the surface"
+        );
+        assert!(evidence.schedule_process_properties_presentation(true));
+        assert!(
+            !evidence.scenario_ready(),
+            "preparation must wait for actual frames"
+        );
+        evidence.mark_process_properties_presented(true);
         assert!(evidence.scenario_ready());
         processes.clear();
         assert!(
-            evidence
-                .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
-                .is_none()
+            matches!(
+                evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
+                Some(CaptureProcessAction::Insights { .. })
+            ),
+            "each accepted refresh restores the same fixture and open review"
         );
         assert!(
             processes

@@ -6,7 +6,7 @@ use crate::app::NavTarget;
 use crate::pages::settings::privilege_center::PrivilegeControl;
 use crate::pages::system::{SystemActions, SystemBody, SystemStatusLine};
 use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
-use bevy::ecs::query::Has;
+use bevy::ecs::query::{Has, With};
 use bevy::image::TextureAtlasLayout;
 use bevy::math::UVec2;
 use bevy::picking::DefaultPickingPlugins;
@@ -297,6 +297,144 @@ fn normal_dashboard_windows_and_paging_preserve_measured_whole_curve_groups() {
         app.world_mut().trigger(Activate { entity });
         for _ in 0..6 {
             app.update();
+        }
+    }
+}
+
+#[test]
+fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bounds() {
+    use crate::demo_fixture::seed_capture_confirmation_scenario;
+    use crate::input::ShellInteractionApplied;
+    use crate::pages::processes::properties_modal::{
+        ProcessPropertiesBody, ProcessPropertiesFacet, ProcessPropertiesFooter,
+        ProcessPropertiesPanel, ProcessPropertiesPresentation, ProcessPropertiesScrollHint,
+        ProcessPropertiesSection, ProcessPropertiesTab,
+    };
+    use taskmanager_application::ProcessInsightFacet;
+    pin_english();
+    for (width, height) in [
+        (480, 360),
+        (720, 480),
+        (1280, 720),
+        (1600, 360),
+        (480, 960),
+        (1920, 1080),
+    ] {
+        let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
+        let mut app = system_layout_app(width, height, client);
+        let mut shell = demo_app();
+        seed_capture_confirmation_scenario(&mut shell, "process-memory-pss-swap");
+        let frozen = shell
+            .process_properties_target()
+            .expect("normal frozen entry")
+            .clone();
+        app.world_mut().non_send_mut::<FrontendTrack>().shell = shell;
+        app.world_mut().resource_mut::<Route>().page = Page::Processes;
+        app.world_mut().trigger(ShellInteractionApplied);
+        for _ in 0..8 {
+            app.update();
+        }
+        for section in ProcessPropertiesSection::ALL {
+            let entity = app
+                .world_mut()
+                .query::<(Entity, &ProcessPropertiesTab)>()
+                .iter(app.world())
+                .find(|(_, tab)| tab.0 == section)
+                .map(|(entity, _)| entity)
+                .expect("normal tab");
+            app.world_mut().trigger(Activate { entity });
+            for _ in 0..6 {
+                app.update();
+            }
+            assert_eq!(
+                app.world()
+                    .resource::<ProcessPropertiesPresentation>()
+                    .section,
+                section
+            );
+            assert_eq!(
+                app.world()
+                    .non_send::<FrontendTrack>()
+                    .shell
+                    .process_properties_target(),
+                Some(&frozen)
+            );
+            let world = app.world_mut();
+            let mut bounds = world.query::<(
+                &ComputedNode,
+                &UiGlobalTransform,
+                Has<ProcessPropertiesPanel>,
+                Has<ProcessPropertiesBody>,
+                Has<ProcessPropertiesFooter>,
+            )>();
+            let panel = bounds
+                .iter(world)
+                .find(|(_, _, panel, _, _)| *panel)
+                .map(|(node, transform, _, _, _)| (node.size(), transform.translation))
+                .expect("panel");
+            let body = bounds
+                .iter(world)
+                .find(|(_, _, _, body, _)| *body)
+                .map(|(node, transform, _, _, _)| (node.size(), transform.translation))
+                .expect("body");
+            let footer = bounds
+                .iter(world)
+                .find(|(_, _, _, _, footer)| *footer)
+                .map(|(node, transform, _, _, _)| (node.size(), transform.translation))
+                .expect("footer");
+            assert!(
+                body.0.x > 0.0 && body.0.y > 0.0,
+                "readable body at {width}x{height}"
+            );
+            assert!(
+                panel.1.x - panel.0.x / 2.0 >= -0.5
+                    && panel.1.x + panel.0.x / 2.0 <= width as f32 + 0.5
+            );
+            assert!(
+                panel.1.y - panel.0.y / 2.0 >= -0.5
+                    && panel.1.y + panel.0.y / 2.0 <= height as f32 + 0.5
+            );
+            assert!(
+                body.1.y + body.0.y / 2.0 <= footer.1.y - footer.0.y / 2.0 + 0.5,
+                "fixed footer after body"
+            );
+            assert!(
+                footer.1.y + footer.0.y / 2.0 <= panel.1.y + panel.0.y / 2.0 - 4.0,
+                "bottom inset"
+            );
+            let (hint_node, hint_text) = app
+                .world_mut()
+                .query_filtered::<(&ComputedNode, &Text), With<ProcessPropertiesScrollHint>>()
+                .single(app.world())
+                .expect("visible scroll hint");
+            assert!(hint_node.size().x > 0.0 && hint_node.size().y >= 14.0);
+            assert_eq!(hint_text.0, t("proc_insights.scroll_hint"));
+            if section == ProcessPropertiesSection::Insights {
+                for facet in [
+                    ProcessInsightFacet::Network,
+                    ProcessInsightFacet::Gpu,
+                    ProcessInsightFacet::Resources,
+                    ProcessInsightFacet::Isolation,
+                ] {
+                    let entity = app
+                        .world_mut()
+                        .query::<(Entity, &ProcessPropertiesFacet)>()
+                        .iter(app.world())
+                        .find(|(_, button)| button.0 == facet)
+                        .map(|(entity, _)| entity)
+                        .expect("normal facet");
+                    app.world_mut().trigger(Activate { entity });
+                    for _ in 0..4 {
+                        app.update();
+                    }
+                    assert_eq!(
+                        app.world()
+                            .resource::<ProcessPropertiesPresentation>()
+                            .facet,
+                        facet
+                    );
+                }
+            }
         }
     }
 }

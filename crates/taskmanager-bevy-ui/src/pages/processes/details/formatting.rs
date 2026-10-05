@@ -1,29 +1,49 @@
 //! Formatter helpers for Bevy Process Insights cards.
 
 use taskmanager_application::process_details_vm::render_environment_variable;
-use taskmanager_application::{ProjectedProcessResources, i18n::t, project_process_resources};
+use taskmanager_application::{ProjectedProcessResources, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_core::core::process_telemetry::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, IsolationKind, LimitValue,
+    ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, IsolationKind,
     ProcessEnvironment, ProcessGpuSnapshot, ProcessIsolation, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreadInfo, ProcessThreads,
 };
-use taskmanager_shell::presentation::capabilities_summary;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, format_open_files_saturation};
+use taskmanager_shell::presentation::{capabilities_summary, process_resource_rows};
 
-pub(crate) fn threads_summary(threads: &ProcessThreads) -> String {
+#[derive(Clone, Copy)]
+pub(crate) enum InsightDetail {
+    Summary,
+    Complete,
+}
+impl InsightDetail {
+    fn limit(self, summary: usize) -> usize {
+        match self {
+            Self::Summary => summary,
+            Self::Complete => usize::MAX,
+        }
+    }
+}
+
+pub(crate) fn threads_summary(threads: &ProcessThreads, detail: InsightDetail) -> String {
     if threads.threads.is_empty() {
         return t("proc_insights.no_threads").to_owned();
     }
     let mut lines = vec![threads.threads.len().to_string()];
-    for thread in threads.threads.iter().take(3) {
-        lines.push(format_thread_row(thread));
+    for thread in threads.threads.iter().take(detail.limit(3)) {
+        let mut row = format_thread_row(thread);
+        if matches!(detail, InsightDetail::Complete)
+            && let Some(wait) = &thread.wchan
+        {
+            row.push_str(&format!(" · {} {wait}", t("proc_insights.thread_wait")));
+        }
+        lines.push(row);
     }
-    if threads.threads.len() > 3 {
+    if threads.threads.len() > detail.limit(3) {
         lines.push("…".to_owned());
     }
     lines.join("\n")
@@ -62,6 +82,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
 pub(crate) fn open_files_summary(
     files: &ProcessOpenFiles,
     resources: Option<&ProjectedProcessResources>,
+    detail: InsightDetail,
 ) -> String {
     if files.entries.is_empty() && files.unreadable_count == 0 {
         return t("proc_insights.no_open_files").to_owned();
@@ -85,7 +106,7 @@ pub(crate) fn open_files_summary(
         return header;
     }
     let mut lines = vec![header];
-    for entry in files.entries.iter().take(3) {
+    for entry in files.entries.iter().take(detail.limit(3)) {
         let target = entry
             .target
             .as_deref()
@@ -97,13 +118,13 @@ pub(crate) fn open_files_summary(
             entry.resolved_kind(),
         ));
     }
-    if files.entries.len() > 3 {
+    if files.entries.len() > detail.limit(3) {
         lines.push("…".to_owned());
     }
     lines.join("\n")
 }
 
-pub(crate) fn network_summary(network: &ProcessNetworkSnapshot) -> String {
+pub(crate) fn network_summary(network: &ProcessNetworkSnapshot, detail: InsightDetail) -> String {
     let rx = network.rx_bytes_per_sec.map_or_else(
         || MISSING_VALUE.to_owned(),
         |value| format!("{}/s", bytes(value)),
@@ -114,7 +135,7 @@ pub(crate) fn network_summary(network: &ProcessNetworkSnapshot) -> String {
     );
     let mut lines = vec![format!("{} · RX {rx} · TX {tx}", network.connections.len())];
 
-    for connection in network.connections.iter().take(3) {
+    for connection in network.connections.iter().take(detail.limit(3)) {
         let rtt = connection
             .rtt_ms
             .filter(|value| value.is_finite() && *value >= 0.0)
@@ -135,7 +156,7 @@ pub(crate) fn network_summary(network: &ProcessNetworkSnapshot) -> String {
             rtt,
         ));
     }
-    if network.connections.len() > 3 {
+    if network.connections.len() > detail.limit(3) {
         lines.push("…".to_owned());
     }
     if let Some(counters) = network.connection_counters.as_ref()
@@ -175,7 +196,7 @@ fn format_endpoint(endpoint: &ConnectionEndpoint) -> String {
     }
 }
 
-pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot) -> String {
+pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot, detail: InsightDetail) -> String {
     let devices = gpu.devices.len();
     let engines = gpu.engines.engines.len();
     if devices == 0 && engines == 0 {
@@ -184,7 +205,7 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot) -> String {
     let header = format!("{devices} · {engines} {}", t("proc_insights.gpu_engines"));
     let mut lines = vec![header];
 
-    for device in gpu.devices.iter().take(2) {
+    for device in gpu.devices.iter().take(detail.limit(2)) {
         let util = device
             .utilization_pct
             .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}%"));
@@ -200,11 +221,11 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot) -> String {
             vram
         ));
     }
-    if gpu.devices.len() > 2 {
+    if gpu.devices.len() > detail.limit(2) {
         lines.push("…".to_owned());
     }
 
-    for engine in gpu.engines.engines.iter().take(3) {
+    for engine in gpu.engines.engines.iter().take(detail.limit(3)) {
         let usage = engine
             .usage_pct
             .current_value()
@@ -222,7 +243,7 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot) -> String {
             .unwrap_or_else(|| MISSING_VALUE.to_owned());
         lines.push(format!("{}  {}  {}", engine.name, usage, cumulative));
     }
-    if gpu.engines.engines.len() > 3 {
+    if gpu.engines.engines.len() > detail.limit(3) {
         lines.push("…".to_owned());
     }
 
@@ -245,79 +266,19 @@ fn format_engine_cycles(cycles: u64) -> String {
 }
 
 pub(crate) fn resources_summary(resources: &ProcessResourceSnapshot) -> String {
-    let projection = project_process_resources(resources);
-    let memory = match (projection.memory_usage_bytes, projection.memory_limit) {
-        (Some(used), Some(LimitValue::Value(limit))) => {
-            Some(format!("{} / {}", bytes(used), bytes(limit)))
-        }
-        (Some(used), Some(LimitValue::Unlimited)) => Some(format!("{} / ∞", bytes(used))),
-        (Some(used), None) => Some(bytes(used)),
-        (None, Some(LimitValue::Value(limit))) => Some(format!("— / {}", bytes(limit))),
-        (None, Some(LimitValue::Unlimited)) => Some("— / ∞".to_owned()),
-        (None, None) => None,
-    };
-    let memory = projection
-        .memory_limit
-        .and_then(|limit| limit.usage_percent(projection.memory_usage_bytes))
-        .map_or(memory.clone(), |percent| {
-            memory.map(|value| format!("{value} ({percent:.0}%)"))
-        });
-    let cpu_quota = match (
-        projection.cpu_time_quota_micros,
-        projection.cpu_time_period_micros,
-    ) {
-        (Some(LimitValue::Unlimited), _) => Some("CPU ∞".to_owned()),
-        (Some(LimitValue::Value(quota)), Some(period)) if period > 0 => Some(format!(
-            "CPU {:.0}%",
-            (quota as f64 / period as f64) * 100.0
-        )),
-        (Some(LimitValue::Value(quota)), _) => Some(format!("CPU {quota}µs")),
-        (None, _) => None,
-    };
-    let pids = match (projection.process_count, projection.process_limit) {
-        (Some(count), Some(LimitValue::Value(limit))) => {
-            Some(format!("{count} / {limit} {}", t("proc_insights.pids")))
-        }
-        (Some(count), Some(LimitValue::Unlimited)) => {
-            Some(format!("{count} / ∞ {}", t("proc_insights.pids")))
-        }
-        (Some(count), None) => Some(format!("{count} {}", t("proc_insights.pids"))),
-        (None, Some(LimitValue::Value(limit))) => {
-            Some(format!("— / {limit} {}", t("proc_insights.pids")))
-        }
-        (None, Some(LimitValue::Unlimited)) => Some(format!("— / ∞ {}", t("proc_insights.pids"))),
-        (None, None) => None,
-    };
-    let pids = projection
-        .process_limit
-        .and_then(|limit| limit.usage_percent(projection.process_count))
-        .map_or(pids.clone(), |percent| {
-            pids.map(|value| format!("{value} ({percent:.0}%)"))
-        });
-    let resource_group = projection.resource_group.map(ToOwned::to_owned);
-
-    let mut parts = Vec::new();
-    if let Some(mem) = memory {
-        parts.push(mem);
-    }
-    if let Some(cpu) = cpu_quota {
-        parts.push(cpu);
-    }
-    if let Some(p) = pids {
-        parts.push(p);
-    }
-    if let Some(group) = resource_group {
-        parts.push(group);
-    }
-
-    if parts.is_empty() {
+    let values = process_resource_rows(resources)
+        .into_iter()
+        .map(|(_, value)| value)
+        .filter(|value| value != MISSING_VALUE)
+        .collect::<Vec<_>>();
+    if values.is_empty() {
         MISSING_VALUE.to_owned()
     } else {
-        parts.join(" · ")
+        values.join(" · ")
     }
 }
 
-pub(crate) fn isolation_summary(isolation: &ProcessIsolation) -> String {
+pub(crate) fn isolation_rows(isolation: &ProcessIsolation) -> Vec<(String, String)> {
     let kind = match isolation.kind {
         Some(IsolationKind::Docker) => "Docker",
         Some(IsolationKind::Podman) => "Podman",
@@ -330,61 +291,79 @@ pub(crate) fn isolation_summary(isolation: &ProcessIsolation) -> String {
         Some(IsolationKind::OtherContainer) => "Container",
         None => t("proc_insights.host_process"),
     };
-    let base = match &isolation.container_id {
-        Some(id) if !id.is_empty() => format!("{kind} · {id}"),
-        _ => kind.to_owned(),
+    let boolean = |value: Option<bool>| {
+        value.map(|value| t(if value { "common.yes" } else { "common.no" }).to_owned())
     };
-    let base = match isolation.sandboxed {
-        Some(true) => format!("{base} · {}", t("proc_insights.sandboxed")),
-        Some(false) => format!("{base} · not sandboxed"),
-        None => base,
-    };
-    let mut security = Vec::new();
-    if let Some(profile) = isolation.security_profile.as_deref() {
-        security.push(format!(
-            "{}: {profile}",
-            t("proc_insights.security_profile")
-        ));
-    }
-    if let Some(mode) = isolation.seccomp_mode {
-        security.push(format!("{}: {mode}", t("proc_insights.seccomp")));
-    }
-    if let Some(enabled) = isolation.no_new_privs {
-        security.push(format!(
-            "{}: {}",
-            t("proc_insights.no_new_privs"),
-            t(if enabled { "common.yes" } else { "common.no" })
-        ));
-    }
-    if let Some(scope) = isolation.yama_ptrace_scope {
-        security.push(format!("{}: {scope}", t("proc_insights.ptrace_scope")));
-    }
-    if let Some(capabilities) = isolation.capabilities.as_ref() {
-        security.push(format!(
-            "{}: {}",
-            t("proc_insights.capabilities"),
-            capabilities_summary(capabilities),
-        ));
-    }
-    if let Some(namespaces) = isolation.namespaces.as_ref() {
-        security.push(format!(
-            "{}: {}",
-            t("proc_insights.namespaces"),
-            namespaces_summary(namespaces),
-        ));
-    }
+    let mut rows: Vec<(String, String)> = [
+        ("proc_insights.isolation", Some(kind.to_owned())),
+        ("proc_insights.container_id", isolation.container_id.clone()),
+        ("proc_insights.sandboxed", boolean(isolation.sandboxed)),
+        (
+            "proc_insights.security_profile",
+            isolation.security_profile.clone(),
+        ),
+        (
+            "proc_insights.seccomp",
+            isolation.seccomp_mode.map(|mode| mode.to_string()),
+        ),
+        (
+            "proc_insights.no_new_privs",
+            boolean(isolation.no_new_privs),
+        ),
+        (
+            "proc_insights.ptrace_scope",
+            isolation.yama_ptrace_scope.map(|scope| scope.to_string()),
+        ),
+        (
+            "proc_insights.capabilities",
+            isolation.capabilities.as_ref().map(capabilities_summary),
+        ),
+        (
+            "proc_insights.namespaces",
+            isolation.namespaces.as_ref().map(namespaces_summary),
+        ),
+    ]
+    .into_iter()
+    .map(|(label, value)| {
+        (
+            t(label).to_owned(),
+            value
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| MISSING_VALUE.to_owned()),
+        )
+    })
+    .collect();
     if let Some(details) = sandbox_details_summary(isolation) {
-        security.push(format!("{}: {details}", t("proc_insights.sandbox_details")));
+        rows.push((t("proc_insights.sandbox_details").to_owned(), details));
     }
-    if security.is_empty() {
-        base
-    } else {
-        format!("{base} · {}", security.join(" · "))
-    }
+    rows
 }
 
-pub(crate) fn environment_summary(environment: &ProcessEnvironment) -> String {
-    if environment.entries.is_empty() {
+pub(crate) fn isolation_summary(isolation: &ProcessIsolation) -> String {
+    isolation_rows(isolation)
+        .into_iter()
+        .enumerate()
+        .filter(|(_, (_, value))| value != MISSING_VALUE)
+        .map(|(index, (label, value))| match index {
+            0 | 1 => value,
+            2 => {
+                if isolation.sandboxed == Some(true) {
+                    label
+                } else {
+                    "not sandboxed".to_owned()
+                }
+            }
+            _ => format!("{label}: {value}"),
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+pub(crate) fn environment_summary(
+    environment: &ProcessEnvironment,
+    detail: InsightDetail,
+) -> String {
+    if environment.entries.is_empty() && environment.working_directory.is_none() {
         return t("prop.environment_empty").to_owned();
     }
     let header = if environment.truncated_count == 0 {
@@ -397,10 +376,19 @@ pub(crate) fn environment_summary(environment: &ProcessEnvironment) -> String {
         )
     };
     let mut lines = vec![header];
-    for entry in environment.entries.iter().take(3) {
+    if matches!(detail, InsightDetail::Complete)
+        && let Some(directory) = &environment.working_directory
+    {
+        lines.push(format!(
+            "{}: {}",
+            t("prop.working_directory"),
+            directory.display()
+        ));
+    }
+    for entry in environment.entries.iter().take(detail.limit(3)) {
         lines.push(render_environment_variable(&entry.key, &entry.value));
     }
-    if environment.entries.len() > 3 || environment.truncated_count > 0 {
+    if environment.entries.len() > detail.limit(3) || environment.truncated_count > 0 {
         lines.push("…".to_owned());
     }
     lines.join("\n")

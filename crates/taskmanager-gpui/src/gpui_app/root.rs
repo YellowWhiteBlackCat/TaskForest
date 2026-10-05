@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_telemetry_store::HistoryRetention;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
@@ -383,6 +384,8 @@ pub struct RootView {
     /// Active section in the process Properties dialog. RootView owns this UI
     /// state; `root::chrome` renders stateless Overview/Performance/Command views.
     pub details_section: ProcessDetailsSection,
+    pub details_facet: ProcessInsightFacet,
+    pub details_insight_offset: usize,
     /// Exact target/request-correlated lifecycle for independently scheduled
     /// process-insight facets. Application owns facet correlation; this
     /// component accepts only the matching shared projection and cannot keep
@@ -795,6 +798,8 @@ impl RootView {
             graph_points_slider: None,
             run_error: None,
             details_section: ProcessDetailsSection::default(),
+            details_facet: ProcessInsightFacet::Network,
+            details_insight_offset: 0,
             process_insights: process_insights_ui::ProcessInsightsLifecycle::default(),
             process_batch_history: ProcessBatchHistory::default(),
             local_feedback_toast: None,

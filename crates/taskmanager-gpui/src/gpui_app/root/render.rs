@@ -180,6 +180,23 @@ impl Render for RootView {
                 });
             });
         }
+        let properties_ready = self.process_properties_capture_ready();
+        if self
+            .capture_evidence
+            .schedule_process_properties_presentation(properties_ready)
+        {
+            let root = cx.entity().downgrade();
+            window.on_next_frame(move |window, cx| {
+                let _ = root.update(cx, |_view, cx| cx.notify());
+                window.on_next_frame(move |_window, cx| {
+                    let _ = root.update(cx, |view, _cx| {
+                        let ready = view.process_properties_capture_ready();
+                        view.capture_evidence
+                            .mark_process_properties_presented(ready);
+                    });
+                });
+            });
+        }
         let presentation = self.presentation_snapshot();
         let ui_size = presentation.appearance.ui_size;
         // All FONT_* tokens resolve from this root-relative scale, including

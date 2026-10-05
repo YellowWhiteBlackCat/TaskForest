@@ -68,6 +68,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DetailsTab(section) => {
             format!("iced-details-tab-{}", section.key())
         }
+        FocusTarget::DetailsFacet(facet) => format!("iced-details-facet-{facet:?}"),
+        FocusTarget::DetailsRefresh => "iced-details-refresh".to_owned(),
         FocusTarget::SuspendProcess => "iced-suspend-process".to_owned(),
         FocusTarget::ResumeProcess => "iced-resume-process".to_owned(),
         FocusTarget::KillProcess => "iced-kill-process".to_owned(),

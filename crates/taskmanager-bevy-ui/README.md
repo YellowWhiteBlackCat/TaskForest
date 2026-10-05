@@ -70,8 +70,10 @@ adopted — theme tokens are the only skin authority.
   process table, performance summary/curves/device blocks, the three
   read-only inventory tables (services/startup/sessions), settings, and the
   alert center. Includes `pages/processes/properties_modal.rs` delivering full
-  multi-field process inspection (identity, paths, memory, IO, parent/threads)
-  with scrim dismiss and escape handling.
+  identity-bound Overview, Performance, Command and Insights tabs. Its model
+  resolves canonical live keys independently of table filtering; measured
+  charts preserve missing samples, and complete facet lists scroll in one
+  bounded body between fixed selectors and actions.
 - `src/pages/history/control.rs` routes both review surfaces through one history
   controller and native session. Performance review has pinned actions around
   a bounded body; application review admits complete metric cards in its own
@@ -92,6 +94,11 @@ modal consumes all keyboard input, exposes scroll keys, and reserves title/actio
 around one bounded body viewport.
 
 ## Boundary
+Properties reserve title, identity, wrapping selectors and complete footer actions.
+The remaining body owns scrolling and an eight-pixel final inset; labels and
+values occupy separate bounded rows. Charts retain their readable floor;
+all facts remain reachable at short and narrow sizes. Refresh binds the frozen
+live key, coalesces pending requests and publishes typed independent availability.
 System Dashboard selects the shared time windows over long host rings. Component
 budgets admit whole metric groups; native paging and a measured chart pass preserve
 their bounds, and insufficient space has an explicit resize state.

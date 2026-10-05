@@ -9,7 +9,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Wrap};
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField};
 use taskmanager_application::{AppPage, i18n::t};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::units::UnitPreferences;
 
 use super::highlight;
@@ -569,7 +569,9 @@ fn render_resolved_details(
     // The insight cards project the shared per-process insight projection
     // (last-wins for the frozen target). Bounded: the terminal clips the
     // panel, so the renderer only appends the cards for the selected pid.
-    lines.extend(insights_lines(app, theme, process.pid));
+    if let Some(identity) = ProcessLiveKey::from_process(process) {
+        lines.extend(insights_lines(app, theme, identity));
+    }
     // Short-terminal scroll: the detail + insights content can exceed the
     // fixed 18-row panel, so the paragraph scrolls by the clamped user intent
     // (Ctrl+Up / Ctrl+Down on the Applications page). The wrap-aware height

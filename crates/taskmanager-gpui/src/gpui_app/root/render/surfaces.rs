@@ -198,6 +198,8 @@ fn render_process_properties(
             item: &item,
             histories: &histories,
             active: view.details_section,
+            facet: view.details_facet,
+            first: view.details_insight_offset,
             insights: view.process_insights.render_state(),
             available_width: insights_width,
             net_escalation: *view.shell.network_escalation_state(),
@@ -213,7 +215,13 @@ fn render_process_properties(
         window,
         cx,
         px(dialog_width),
-        i18n::t("dialog.properties"),
+        format!(
+            "{} · {} · PID {}",
+            i18n::t("dialog.properties"),
+            view.process_properties_target()
+                .map_or(item.name.as_str(), |target| target.name.as_str()),
+            item.pid
+        ),
         on_close,
         content,
     ))

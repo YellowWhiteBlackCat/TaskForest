@@ -6,6 +6,7 @@ use iced::Task;
 use taskmanager_application::AppPage;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_shell::QuitReason;
+use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 
 use super::super::{IcedApp, LocalSurfaceKind, Message};
 use crate::app::viewport_state::ViewportRegion;
@@ -67,6 +68,19 @@ impl IcedApp {
                                 self.shell.smbios_memory_state(),
                                 SmbiosMemoryState::Ready(_)
                             )
+                    } else if let CaptureDataTarget::ProcessProperties(scenario) =
+                        self.capture.data_target
+                    {
+                        process_properties_capture_data_ready(&self.shell, scenario)
+                            && (scenario != "process-properties-performance"
+                                || self.process_perf_history().is_some_and(|history| {
+                                    history
+                                        .cpu_samples()
+                                        .iter()
+                                        .filter(|value| value.is_finite())
+                                        .count()
+                                        >= 2
+                                }))
                     } else if self.shell.page() == AppPage::AppHistory {
                         !self.application_history_projection().rows.is_empty()
                     } else {

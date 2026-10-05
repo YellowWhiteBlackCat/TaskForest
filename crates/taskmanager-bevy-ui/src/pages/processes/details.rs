@@ -85,9 +85,7 @@ pub(crate) enum InsightCardAction {
     NetworkEscalation,
 }
 
-/// A compact card summary. The full bounded facet lists remain a later
-/// expansion of this component; this first slice makes every facet visible
-/// without growing the page beyond the real window's first viewport.
+/// Compact inline summaries; the properties surface owns complete facet lists.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct InsightCard {
     pub(crate) title: String,
@@ -198,7 +196,7 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
             let has_escalation = snapshot.traffic_failure == Some(FailureKind::RequiresEscalation);
             InsightCard {
                 title: t("proc_insights.network_throughput").to_owned(),
-                value: network_summary(snapshot),
+                value: network_summary(snapshot, InsightDetail::Summary),
                 action: if has_escalation {
                     Some(InsightCardAction::NetworkEscalation)
                 } else {
@@ -224,7 +222,7 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
         },
         Some(ProcessInsightFacetState::Current(files)) => InsightCard {
             title: t("proc_insights.open_files").to_owned(),
-            value: open_files_summary(files, projected_resources.as_ref()),
+            value: open_files_summary(files, projected_resources.as_ref(), InsightDetail::Summary),
             action: None,
         },
     };
@@ -233,7 +231,7 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
             title: t("proc_insights.threads").to_owned(),
             value: facet_value(
                 projection.map(|value| &value.threads),
-                threads_summary,
+                |value| threads_summary(value, InsightDetail::Summary),
                 &collecting,
             ),
             action: None,
@@ -242,7 +240,11 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
         network_card,
         InsightCard {
             title: t("common.gpu").to_owned(),
-            value: facet_value(projection.map(|value| &value.gpu), gpu_summary, &collecting),
+            value: facet_value(
+                projection.map(|value| &value.gpu),
+                |value| gpu_summary(value, InsightDetail::Summary),
+                &collecting,
+            ),
             action: None,
         },
         InsightCard {
@@ -267,7 +269,7 @@ fn insight_cards(projection: Option<&ProjectedProcessInsights>) -> Vec<InsightCa
             title: t("prop.environment").to_owned(),
             value: facet_value(
                 projection.map(|value| &value.environment),
-                environment_summary,
+                |value| environment_summary(value, InsightDetail::Summary),
                 &collecting,
             ),
             action: None,
@@ -287,7 +289,7 @@ fn facet_value<T>(
     }
 }
 
-fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
+pub(super) fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
     match reason {
         ProcessInsightUnavailable::Provider(
             FailureKind::PermissionDenied | FailureKind::RequiresEscalation,

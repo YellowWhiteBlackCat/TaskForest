@@ -363,6 +363,13 @@ fn insights_tab_renders_thread_list_when_projection_is_present() {
         crate::ProcessDetailsSection::Insights
     );
 
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('5'),
+            KeyModifiers::NONE,
+        ),
+    );
     // The Threads facet renders the worker's tid + comm inside the Insights
     // tab body. (The other facets — network/gpu/resources/isolation/open_files
     // — remain Pending and honestly render their own "Loading" gap; only the
@@ -792,7 +799,11 @@ fn network_connections_surface_renders_socket_inventory_and_rtt() {
         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
     );
 
-    let lines = crate::ui::process_details::insights_lines(&app, TuiTheme::default(), target.pid);
+    let lines = crate::ui::process_details::insights_lines(
+        &app,
+        TuiTheme::default(),
+        target.live_key().expect("live identity"),
+    );
     let text = lines
         .iter()
         .map(|l| l.to_string())
@@ -801,3 +812,6 @@ fn network_connections_surface_renders_socket_inventory_and_rtt() {
     assert!(text.contains("TCP"), "must render TCP transport: {text}");
     assert!(text.contains("15.4 ms"), "must render RTT: {text}");
 }
+
+#[path = "process_properties/identity.rs"]
+mod identity;

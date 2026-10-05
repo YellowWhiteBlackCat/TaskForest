@@ -2,6 +2,7 @@ use super::*;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_core::core::{
     DeviceStatus, FailureKind, ProcessGpuEngineUsage, ProcessGpuEngines, ScalarObservation,
 };
@@ -92,7 +93,7 @@ impl Render for EngineCardView {
 
 fn draw_frame(cx: &mut TestAppContext, snapshot: ProcessTelemetrySnapshot) {
     let theme = Theme::dark();
-    let card = gpu_engines_card(&theme, &snapshot, &labels(), 480.0);
+    let card = gpu_engines_card(&theme, &snapshot.gpu, &labels(), 480.0);
     let window = cx.add_window(|_w, _cx| EngineCardView { card });
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();

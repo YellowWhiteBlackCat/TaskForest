@@ -48,7 +48,7 @@ impl Render for EnvironmentCardView {
 fn draw_frame(cx: &mut TestAppContext, snapshot: ProcessTelemetrySnapshot) {
     cx.update(init);
     let theme = Theme::dark();
-    let card = environment_card(&theme, &snapshot, &labels(), 480.0);
+    let card = environment_card(&theme, &snapshot.environment, &labels(), 480.0, 0);
     let window = cx.add_window(|_w, _cx| EnvironmentCardView { card });
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();

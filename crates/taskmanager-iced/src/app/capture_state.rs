@@ -1,6 +1,7 @@
 //! Capture-only marker lifecycle and target preparation for the Iced frontend.
 
 use std::path::PathBuf;
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
@@ -21,6 +22,7 @@ use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use super::capture_fixtures::*;
 pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_from_name};
 use super::{DetailsSection, IcedApp, LocalSurface, Message, PerfDevice};
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum CapturePresentationFrame {
@@ -38,6 +40,7 @@ pub(super) enum CaptureDataTarget {
     ApplicationHistory,
     MemoryInventory,
     SystemDashboard,
+    ProcessProperties(&'static str),
 }
 
 pub(super) struct CaptureState {
@@ -67,6 +70,21 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
         "system-dashboard" | "history-60m" => CaptureDataTarget::SystemDashboard,
+        "process-properties-performance" => {
+            CaptureDataTarget::ProcessProperties("process-properties-performance")
+        }
+        "process-memory-pss-swap" => {
+            CaptureDataTarget::ProcessProperties("process-memory-pss-swap")
+        }
+        "process-network-details" => {
+            CaptureDataTarget::ProcessProperties("process-network-details")
+        }
+        "process-gpu-details" => CaptureDataTarget::ProcessProperties("process-gpu-details"),
+        "process-resource-limits" => {
+            CaptureDataTarget::ProcessProperties("process-resource-limits")
+        }
+        "process-isolation" => CaptureDataTarget::ProcessProperties("process-isolation"),
+
         _ => CaptureDataTarget::General,
     };
     if apply_capture_surface_and_process(app, target) {
@@ -145,6 +163,12 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Insights);
+        app.process_presentation.insights_facet = match target {
+            "process-gpu-details" => ProcessInsightFacet::Gpu,
+            "process-resource-limits" => ProcessInsightFacet::Resources,
+            "process-isolation" => ProcessInsightFacet::Isolation,
+            _ => ProcessInsightFacet::Network,
+        };
     } else if target == "process-memory-pss-swap" {
         app.shell.application.active_page = AppPage::Applications;
         seed_capture_process_details(app, DetailsSection::Overview);
@@ -187,19 +211,8 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         }
     } else if target == "process-tree-confirm" {
         app.shell.application.active_page = AppPage::Applications;
-        if let Some(target_proc) = seed_capture_process_target(app) {
-            let intent = ProcessBatchIntent {
-                action: ProcessBatchAction::EndProcessTree,
-                scope: ProcessGroupScope::PidAdjacency,
-                targets: vec![target_proc],
-            };
-            let _ = app
-                .shell
-                .application
-                .interaction
-                .reduce(InteractionEvent::ArmConfirmation(
-                    PendingConfirmation::ProcessBatch(intent),
-                ));
+        if let Some(root) = seed_shell_process_tree(&mut app.shell) {
+            app.shell.request_process_tree_end(root);
         }
     } else if target == "process-batch-confirm" {
         app.shell.application.active_page = AppPage::Applications;

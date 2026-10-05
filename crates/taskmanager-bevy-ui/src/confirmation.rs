@@ -301,6 +301,32 @@ pub(crate) struct ConfirmChoice;
 #[derive(Component, Clone, Default)]
 pub(crate) struct DismissChoice;
 
+/// A capture must show the frozen gate and both usable choices after layout.
+pub(crate) fn capture_ready(world: &mut bevy::ecs::world::World) -> bool {
+    use bevy::ui::ComputedNode;
+
+    let pending = world
+        .get_non_send::<FrontendTrack>()
+        .and_then(|track| track.shell.pending_confirmation())
+        .and_then(PendingConfirmationView::from_pending);
+    let Some(pending) = pending else { return false };
+    let mounted = world
+        .query::<(&ArmedConfirmation, &ComputedNode)>()
+        .iter(world)
+        .any(|(armed, node)| {
+            armed.0.as_ref() == Some(&pending) && node.size().x > 0.0 && node.size().y > 0.0
+        });
+    let confirm = world
+        .query_filtered::<&ComputedNode, With<ConfirmChoice>>()
+        .iter(world)
+        .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
+    let dismiss = world
+        .query_filtered::<&ComputedNode, With<DismissChoice>>()
+        .iter(world)
+        .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
+    mounted && confirm && dismiss
+}
+
 /// Observer: mount/despawn the overlay under the app shell root so it stacks
 /// above the routed page and survives page remounts.
 fn on_confirmation_changed(

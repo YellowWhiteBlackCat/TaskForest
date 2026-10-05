@@ -4,7 +4,7 @@
 //! focusable widget registers with Iced's focus traversal.
 
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
-use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_application::{AppPage, ProcessInsightFacet, RefreshRequest};
 use taskmanager_core::core::services::ServiceAction;
 
 use taskmanager_shell::SortCol;
@@ -91,6 +91,8 @@ pub enum FocusTarget {
     ProcessNetworkEscalation,
     /// One process-details modal section tab.
     DetailsTab(DetailsSection),
+    DetailsFacet(ProcessInsightFacet),
+    DetailsRefresh,
     /// The Applications Suspend-process action (shell batch path).
     SuspendProcess,
     /// The Applications Resume-process action (shell batch path).
@@ -287,7 +289,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 175] = [
+    pub const ALL: [Self; 183] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -323,6 +325,14 @@ impl FocusTarget {
         Self::DetailsTab(DetailsSection::Performance),
         Self::DetailsTab(DetailsSection::Command),
         Self::DetailsTab(DetailsSection::Insights),
+        Self::DetailsRefresh,
+        Self::DetailsFacet(ProcessInsightFacet::Network),
+        Self::DetailsFacet(ProcessInsightFacet::Gpu),
+        Self::DetailsFacet(ProcessInsightFacet::Resources),
+        Self::DetailsFacet(ProcessInsightFacet::Isolation),
+        Self::DetailsFacet(ProcessInsightFacet::Threads),
+        Self::DetailsFacet(ProcessInsightFacet::OpenFiles),
+        Self::DetailsFacet(ProcessInsightFacet::Environment),
         Self::SuspendProcess,
         Self::ResumeProcess,
         Self::KillProcess,

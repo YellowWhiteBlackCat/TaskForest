@@ -14,6 +14,7 @@
 //! loop), `focus_state` (the focus command policy).
 
 use std::time::{Duration, Instant};
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::appearance::DesktopAppearance;
@@ -417,6 +418,8 @@ pub enum Message {
     /// Switch the process-details modal's section tab (Overview /
     /// Performance / Command / Insights).
     SelectDetailsSection(DetailsSection),
+    SelectInsightsFacet(ProcessInsightFacet),
+    RefreshProcessInsights,
     /// Open the frontend-local settings modal.
     OpenSettings,
     /// Close the frontend-local settings modal.

@@ -2,7 +2,6 @@
 
 use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
-use crate::gpui_app::process_insights::ProcessInsightsState;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::startup::BootTimeline;
@@ -13,10 +12,7 @@ pub enum CaptureProcessAction {
     ApplicationSelection(ProcessLiveKey),
     Batch(ProcessBatchIntent),
     Properties(ProcessLiveKey, ProcessDetailsSection),
-    Insights {
-        identity: ProcessLiveKey,
-        state: ProcessInsightsState,
-    },
+    Insights(ProcessLiveKey),
 }
 
 #[derive(Debug, Default)]
@@ -169,6 +165,7 @@ pub(crate) struct CaptureEvidence {
     /// submitting the current-window provider request, then becomes terminal.
     pub(super) window_capture_schedule: WindowCaptureSchedule,
     pub(super) system_about_presentation: SurfacePresentation,
+    pub(super) process_properties_presentation: SurfacePresentation,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.

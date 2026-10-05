@@ -20,7 +20,8 @@
 //! (full modals swallow every key; the panel is a partial owner).
 
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
-use taskmanager_application::AppPage;
+use taskmanager_application::{AppPage, ProcessInsightFacet};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::InputDispatch;
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
@@ -109,6 +110,20 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 app.process_properties_scroll_by(1);
                 None
             }
+            ratatui::crossterm::event::KeyCode::Char(number @ '1'..='7') if !ctrl => {
+                if let Some(target) = app.process_properties_mut()
+                    && target.section == crate::ProcessDetailsSection::Insights
+                    && let Some(facet) =
+                        ProcessInsightFacet::ALL.get((number as usize) - ('1' as usize))
+                {
+                    target.facet = *facet;
+                    target.scroll = 0;
+                }
+                None
+            }
+            ratatui::crossterm::event::KeyCode::Char('r') if !ctrl => {
+                app.shell.request_properties_process_insights()
+            }
             // Per-process network escalation trigger (G-04b): `e` on the
             // Insights tab fires the shared one-shot escalation request when
             // — and only when — the projected network facet reports the typed
@@ -119,10 +134,12 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 if !ctrl
                     && app.process_properties().is_some_and(|target| {
                         target.section == crate::ProcessDetailsSection::Insights
-                            && crate::ui::process_details::network_requires_escalation(
-                                app,
-                                target.item.pid,
-                            )
+                            && target.facet == ProcessInsightFacet::Network
+                            && ProcessLiveKey::from_process(&target.item).is_some_and(|identity| {
+                                crate::ui::process_details::network_requires_escalation(
+                                    app, identity,
+                                )
+                            })
                     }) =>
             {
                 return InputDispatch::Effect(Box::new(

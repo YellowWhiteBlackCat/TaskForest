@@ -88,7 +88,9 @@ fn route(message: Message) -> MessageDomain {
         | Message::FocusSearch
         | Message::CloseSearch
         | Message::ServicesSearchChanged(_)
-        | Message::SelectDetailsSection(_)) => MessageDomain::Navigation(message),
+        | Message::SelectDetailsSection(_)
+        | Message::SelectInsightsFacet(_)
+        | Message::RefreshProcessInsights) => MessageDomain::Navigation(message),
 
         // Column-sizing messages are frontend-local process-table state
         // (drag overrides, no shell effect), reduced by `update::columns`.

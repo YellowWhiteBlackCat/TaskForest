@@ -165,5 +165,5 @@ src/history.rs                      correlated outcomes → telemetry store mapp
 src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions
 src/process_filter.rs               process filter predicates
 src/memory.rs                       memory presentation helpers
-src/fixture/ (cpu_topology dashboard_history inventory smbios_memory) deterministic demo/capture/test seam
+src/fixture/ (cpu_topology dashboard_history inventory process_insights setup smbios_memory) deterministic demo/capture/test seam
 ```

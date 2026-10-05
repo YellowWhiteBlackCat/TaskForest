@@ -9,6 +9,7 @@ use crate::{
     ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
     SessionMenuTarget, TuiApp, TuiSurface, TuiSurfaceKind,
 };
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
@@ -339,6 +340,7 @@ impl TuiApp {
         self.shell.close_search();
         self.focus_panel = crate::FocusPanel::Table;
         self.process_properties_view = Some(ProcessPropertiesTarget {
+            facet: ProcessInsightFacet::Network,
             item,
             section: ProcessDetailsSection::default(),
             scroll: 0,

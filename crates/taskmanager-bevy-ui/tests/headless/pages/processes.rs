@@ -989,7 +989,7 @@ fn process_properties_modal_opens_and_dismisses_via_button_and_escape() {
             |mut track: NonSendMut<FrontendTrack>, mut commands: Commands| {
                 let _ = track.shell.apply_action(AppAction::OpenProperties);
                 assert!(track.shell.process_properties_target().is_some());
-                republish(&track.shell, &mut commands);
+                republish(&mut commands);
             },
         )
         .expect("open properties");
@@ -1046,7 +1046,7 @@ fn process_properties_modal_opens_and_dismisses_via_button_and_escape() {
         .run_system_once(
             |mut track: NonSendMut<FrontendTrack>, mut commands: Commands| {
                 let _ = track.shell.apply_action(AppAction::OpenProperties);
-                republish(&track.shell, &mut commands);
+                republish(&mut commands);
             },
         )
         .expect("re-open properties");

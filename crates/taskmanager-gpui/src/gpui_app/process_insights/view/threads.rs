@@ -19,7 +19,7 @@
 
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskmanager_core::core::process_telemetry::ThreadWaitKind;
-use taskmanager_core::core::process_telemetry::{ProcessTelemetrySnapshot, ProcessThreadInfo};
+use taskmanager_core::core::process_telemetry::{ProcessThreadInfo, ProcessThreads};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
@@ -94,11 +94,11 @@ fn format_thread(thread: &ProcessThreadInfo) -> String {
 /// when the source is unavailable, denied, or empty.
 pub(in crate::gpui_app::process_insights::view) fn threads_card(
     theme: &Theme,
-    snapshot: &ProcessTelemetrySnapshot,
+    threads: &ProcessThreads,
     labels: &ProcessInsightsLabels,
     width: f32,
+    first: usize,
 ) -> Div {
-    let threads = &snapshot.threads;
     if threads.state.status != DeviceStatus::Healthy {
         return super::card(theme, labels.threads, width).child(
             div()
@@ -137,7 +137,7 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
                 labels.thread_cpu_percent
             )),
     );
-    let (shown, hidden) = super::capped_card_rows(threads.threads.len());
+    let (shown, hidden) = super::capped_card_rows(threads.threads.len().saturating_sub(first));
     content = content.child(
         div()
             .flex()
@@ -147,8 +147,9 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
                 threads
                     .threads
                     .iter()
-                    .take(shown)
                     .enumerate()
+                    .skip(first)
+                    .take(shown)
                     .map(|(index, thread)| {
                         // The selector token comes from the same typed
                         // predicate `format_thread` renders for its CPU

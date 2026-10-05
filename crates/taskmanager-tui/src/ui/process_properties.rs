@@ -7,7 +7,7 @@
 //! facts imported directly from `taskmanager-core`. The modal
 //! freezes the selected [`ProcessItem`] at open time so a list refresh cannot
 //! redirect the view; the Insights tab additionally reads the live
-//! `process_insights` projection (last-wins for the frozen target pid),
+//! `process_insights` projection matched to the frozen process incarnation,
 //! rendering honest typed states (Pending / Unavailable / Current) — never
 //! fabricated values.
 //!
@@ -22,10 +22,11 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_application::{ProcessInsightFacet, i18n::t};
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_shell::presentation::process_insight_facet_label;
 use taskmanager_shell::presentation::value_with_peak;
 
 use super::containers::Modal;
@@ -111,6 +112,7 @@ pub struct ProcessPropertiesTarget {
     pub item: ProcessItem,
     pub section: ProcessDetailsSection,
     pub scroll: usize,
+    pub facet: ProcessInsightFacet,
 }
 
 /// Render the Process Properties modal centred over `area`.  Test-only entry:
@@ -143,24 +145,47 @@ pub(super) fn render_process_properties_at(
     )
     .render(frame, popup);
 
-    let [tab_row, body] =
-        Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).areas(inner);
+    let facet_height = u16::from(target.section == ProcessDetailsSection::Insights);
+    let [tab_row, facet_row, body] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(facet_height),
+        Constraint::Min(1),
+    ])
+    .areas(inner);
+    if facet_height > 0 {
+        frame.render_widget(
+            Paragraph::new(format!(
+                "{} · {}",
+                process_insight_facet_label(target.facet),
+                t("prop.insight_controls")
+            )),
+            facet_row,
+        );
+    }
 
     frame.render_widget(tab_row_line(focus.properties_tab(), theme), tab_row);
 
-    let lines = match target.section {
-        ProcessDetailsSection::Overview => {
-            let mut item = target.item.clone();
-            item.populate_ancestor_lineage(app.shell.projection().processes_slice());
-            overview_lines(&item, &app.local_time_rules, theme)
+    let current = ProcessLiveKey::from_process(&target.item)
+        .and_then(|identity| app.shell.process_by_identity(identity));
+    let lines = if let Some(current) = current {
+        match target.section {
+            ProcessDetailsSection::Overview => {
+                let mut item = current.clone();
+                item.populate_ancestor_lineage(app.shell.projection().processes_slice());
+                overview_lines(&item, &app.local_time_rules, theme)
+            }
+            ProcessDetailsSection::Performance => {
+                performance_lines(current, &app.local_time_rules, theme)
+            }
+            ProcessDetailsSection::Command => command_lines(current, &app.local_time_rules, theme),
+            ProcessDetailsSection::Insights => {
+                ProcessLiveKey::from_process(current).map_or_else(Vec::new, |identity| {
+                    super::process_details::modal_insights_lines(app, theme, identity, target.facet)
+                })
+            }
         }
-        ProcessDetailsSection::Performance => {
-            performance_lines(&target.item, &app.local_time_rules, theme)
-        }
-        ProcessDetailsSection::Command => command_lines(&target.item, &app.local_time_rules, theme),
-        ProcessDetailsSection::Insights => {
-            super::process_details::modal_insights_lines(app, theme, target.item.pid)
-        }
+    } else {
+        vec![Line::from(t("feedback.process_gone"))]
     };
     // Short-terminal scroll: a tab body can exceed the modal's bounded body
     // area, so the paragraph scrolls by the clamped user intent (Up / Down or
@@ -227,6 +252,8 @@ fn overview_pairs(
         (t("common.user"), text(ProcessDetailsField::User)),
         (t("common.status"), text(ProcessDetailsField::Status)),
         (t("common.threads"), text(ProcessDetailsField::Threads)),
+        (t("common.memory"), text(ProcessDetailsField::Memory)),
+        (t("proc.swap"), text(ProcessDetailsField::Swap)),
         (t("proc.pss"), text(ProcessDetailsField::Pss)),
         (t("proc.uss"), text(ProcessDetailsField::Uss)),
         (t("proc.shared"), text(ProcessDetailsField::Shared)),
@@ -260,11 +287,9 @@ fn overview_lines(
         .collect()
 }
 
-/// Performance tab: the VM's current value plus the 60-sample peak for each
+/// Performance tab: the VM's current value plus the recent-window peak for each
 /// resource series (mirrors GPUI `details_performance`'s current/peak
-/// headers). The GPUI dialog draws one sparkline graph per series; a
-/// bounded terminal cannot fit four graphs comfortably, so this tab renders
-/// the same current/peak numbers as honest typed text rows instead. Peaks
+/// headers), followed by four bounded terminal trends. Peaks
 /// reuse the shared shell fold (`presentation::peak_of`, max finite sample
 /// floored by the live reading) — a series with NO current reading and NO
 /// history renders the shared dash, never a fabricated `0.0`.
@@ -312,9 +337,21 @@ fn performance_lines(
         .map(|(label, value)| kv(label, value, theme))
         .collect();
     lines.push(Line::from(Span::styled(
-        t("prop.last_60_seconds"),
+        t("prop.recent_samples"),
         Style::new().fg(theme.dim),
     )));
+    for (label, samples) in [
+        (t("common.cpu"), item.cpu_history.as_slice()),
+        (t("common.memory"), item.mem_history.as_slice()),
+        (t("proc.disk_read"), item.disk_read_history.as_slice()),
+        (t("proc.disk_write"), item.disk_write_history.as_slice()),
+    ] {
+        lines.push(kv(
+            label,
+            super::sparkline::history_trend_in(theme.terminal.glyphs, samples),
+            theme,
+        ));
+    }
     lines
 }
 

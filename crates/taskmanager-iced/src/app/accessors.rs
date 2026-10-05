@@ -7,12 +7,92 @@
 use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::perf_history::ProcessPerfHistory;
+use taskmanager_application::{
+    i18n::t,
+    process_details_vm::{ProcessDetailsField, detail_value, process_details_rows_with_local_time},
+};
 use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
+use taskmanager_shell::presentation::{MISSING_VALUE, peak_of, value_with_peak};
 use taskmanager_theme::FontAvailability;
 use taskmanager_ui_contract::SemanticSnapshot;
 
 impl IcedApp {
+    /// Current and peak property captions derived before renderer composition.
+    pub(crate) fn process_performance_captions(
+        &self,
+        identity: ProcessLiveKey,
+        samples: [&[f32]; 4],
+    ) -> [String; 4] {
+        let process = self.shell.process_by_identity(identity);
+        let rows = process.map(|process| {
+            process_details_rows_with_local_time(
+                process,
+                &UnitPreferences::default(),
+                &self.local_time_rules,
+            )
+        });
+        let caption = |field, label: &'static str, samples: &[f32], current, family, rate| {
+            let peak = peak_of(samples, current).map(|peak| {
+                if field == ProcessDetailsField::Cpu {
+                    format!("{peak:.1}%")
+                } else {
+                    format_quantity_f64(f64::from(peak), family, rate, &UnitPreferences::default())
+                }
+            });
+            format!(
+                "{} {}",
+                t(label),
+                value_with_peak(
+                    rows.as_ref()
+                        .map(|rows| detail_value(rows, field).text_or(MISSING_VALUE).to_owned()),
+                    peak
+                )
+            )
+        };
+        let cpu_caption = caption(
+            ProcessDetailsField::Cpu,
+            "common.cpu",
+            samples[0],
+            process.and_then(|p| p.current_cpu_percentage()),
+            QuantityFamily::Memory,
+            false,
+        );
+        let memory_caption = caption(
+            ProcessDetailsField::Memory,
+            "common.memory",
+            samples[1],
+            process
+                .and_then(|p| p.current_memory_bytes())
+                .map(|v| v as f32),
+            QuantityFamily::Memory,
+            false,
+        );
+        let read_caption = caption(
+            ProcessDetailsField::DiskReadRate,
+            "proc.disk_read",
+            samples[2],
+            process
+                .and_then(|p| p.current_disk_read_bytes_per_sec())
+                .map(|v| v as f32),
+            QuantityFamily::Drive,
+            true,
+        );
+        let write_caption = caption(
+            ProcessDetailsField::DiskWriteRate,
+            "proc.disk_write",
+            samples[3],
+            process
+                .and_then(|p| p.current_disk_write_bytes_per_sec())
+                .map(|v| v as f32),
+            QuantityFamily::Drive,
+            true,
+        );
+
+        [cpu_caption, memory_caption, read_caption, write_caption]
+    }
+
     /// The view reads this to decide the search cursor rendering.
     #[must_use]
     pub fn is_demo(&self) -> bool {
@@ -361,6 +441,24 @@ impl IcedApp {
             &process.disk_read_history,
             &process.disk_write_history,
         );
+        // Provider windows already contain this snapshot's current point.
+        // Sampling it again would evict the oldest point without advancing time.
+        self.performance.last_sampled_snapshot_ms = [
+            &process.cpu_history,
+            &process.mem_history,
+            &process.disk_read_history,
+            &process.disk_write_history,
+        ]
+        .into_iter()
+        .any(|samples| samples.iter().any(|value| value.is_finite()))
+        .then(|| {
+            self.shell
+                .projection()
+                .snapshot
+                .as_ref()
+                .map(|snapshot| snapshot.timestamp_ms)
+        })
+        .flatten();
     }
 }
 

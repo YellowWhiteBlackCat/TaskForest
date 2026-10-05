@@ -494,16 +494,28 @@ impl CaptureEvidence {
         }
     }
 
-    pub fn mark_process_insights_ready(&mut self, dialog_ready: bool) {
-        if self
-            .scenario
-            .is_some_and(CaptureScenario::is_process_insights)
-            && self.telemetry_ready()
-            && self.ui_data_ready()
-            && dialog_ready
-            && !self.scenario_ready()
+    pub(crate) fn schedule_process_properties_presentation(&mut self, ready: bool) -> bool {
+        if !self.is_enabled()
+            || !self
+                .scenario
+                .is_some_and(CaptureScenario::is_process_properties)
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
+            || !ready
+            || self.process_properties_presentation != SurfacePresentation::Waiting
         {
+            return false;
+        }
+        self.process_properties_presentation = SurfacePresentation::Scheduled;
+        true
+    }
+    pub(crate) fn mark_process_properties_presented(&mut self, ready: bool) {
+        if ready && self.process_properties_presentation == SurfacePresentation::Scheduled {
+            self.process_properties_presentation = SurfacePresentation::Presented;
             self.mark_scenario_ready();
+            super::super::marker::emit_marker("surface_presented", self.scenario);
+        } else if !ready && self.process_properties_presentation == SurfacePresentation::Scheduled {
+            self.process_properties_presentation = SurfacePresentation::Waiting;
         }
     }
 

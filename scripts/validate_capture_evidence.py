@@ -566,22 +566,24 @@ def png_chunk(kind: bytes, payload: bytes) -> bytes:
 
 
 def require_modal_presentation(name: str, scenario: str, markers: str) -> None:
-    if scenario == "system-about":
+    if scenario in {"system-about", "process-properties-performance", "process-memory-pss-swap",
+                    "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation"}:
         token = f"CAPTURE_MARKER event=surface_presented scenario={scenario}"
         if token not in markers:
             raise EvidenceError(f"{name}: missing modal frame presentation marker {token}")
 
 
 def self_test() -> None:
-    ready_only = "CAPTURE_MARKER event=scenario_ready scenario=system-about"
-    for markers in (ready_only, ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=about"):
-        try:
-            require_modal_presentation("system-about", "system-about", markers)
-        except EvidenceError:
-            pass
-        else:
-            raise EvidenceError("a semantic-ready or foreign modal marker certified unpresented pixels")
-    require_modal_presentation("system-about", "system-about", ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=system-about")
+    for scenario in ("system-about", "process-properties-performance", "process-memory-pss-swap", "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation"):
+        ready_only = f"CAPTURE_MARKER event=scenario_ready scenario={scenario}"
+        for markers in (ready_only, ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=about"):
+            try:
+                require_modal_presentation(scenario, scenario, markers)
+            except EvidenceError:
+                pass
+            else:
+                raise EvidenceError("a semantic-ready or foreign modal marker certified unpresented pixels")
+        require_modal_presentation(scenario, scenario, ready_only + f"\nCAPTURE_MARKER event=surface_presented scenario={scenario}")
     require_modal_presentation("standard", "standard", "")
     raw_scanline = b"\x00\x10\x20\x30"
     png = (

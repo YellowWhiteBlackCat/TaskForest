@@ -5,6 +5,7 @@
 //! (`tests/service_control.rs`).
 use super::super::*;
 use std::sync::{Arc, Mutex};
+use taskmanager_application::ProcessInsightUnavailable;
 use taskmanager_application::{
     AppPage, CommandLaunchRequest, DirectoryUsageRequest, GpuEngineRowsRequest, IntegrationFacets,
     MsrReadoutRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
@@ -26,6 +27,7 @@ use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::storage::StorageDeviceTarget;
 use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityRequest, CapabilitySnapshot, EventEnvelope, EventPort,
     EventPortError, RequestEnvelope, RequestPort, SubmissionError,
@@ -84,31 +86,56 @@ fn recorded<T: Clone>(recorder: &RecordingRequests<T>) -> Vec<T> {
         .clone()
 }
 
-/// The optional open-files insight facet's submission result must reach the
-/// shell's error reporter like the five required facets — an absent lane is
-/// honest status-line material, never a silently dropped error.
+/// Every unavailable independent domain is published immediately, without waiting for events.
 #[test]
-fn process_insights_collects_the_optional_open_files_result_too() {
-    // No process insight facets at all: every submission result must be
-    // reported in order, so the LAST reported error is the optional
-    // open-files facet — proving the dispatch arm collects it. Before the
-    // fix the arm dropped `open_files`, and the last error was `threads`.
+fn process_insights_publish_all_submission_outcomes_before_any_provider_reply() {
     let mut client = client_with(PlatformFacets::default());
     let mut app = crate::demo_app();
     app.application.active_page = AppPage::Applications;
     let target = selected_demo_identity(&mut app);
-
     queue_effect(
         &mut app,
         &mut client,
-        PlatformEffect::ProcessInsights(target),
+        PlatformEffect::ProcessInsights(target.clone()),
     );
-
-    assert!(
-        app.feedback_text().contains("process.insights.open_files"),
-        "the open-files submission error must be the last one reported, got: {}",
-        app.feedback_text()
+    let projection = app
+        .projection()
+        .process_insights
+        .as_ref()
+        .expect("submission is visible");
+    assert_eq!(projection.target, target);
+    let unsupported =
+        ProcessInsightUnavailable::Submission(SubmissionErrorKind::UnsupportedCapability);
+    use taskmanager_application::ProcessInsightFacetState;
+    assert_eq!(
+        projection.network,
+        ProcessInsightFacetState::Unavailable(unsupported)
     );
+    assert_eq!(
+        projection.gpu,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert_eq!(
+        projection.resources,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert_eq!(
+        projection.isolation,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert_eq!(
+        projection.threads,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert_eq!(
+        projection.open_files,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert_eq!(
+        projection.environment,
+        ProcessInsightFacetState::Unavailable(unsupported)
+    );
+    assert!(app.feedback_text().contains("process.insights.environment"));
 }
 
 fn client_with(facets: PlatformFacets) -> PlatformClient {

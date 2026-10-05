@@ -270,6 +270,24 @@ fn emit_capture_marker(world: &mut World) {
         return;
     }
     match capture_scenario_target() {
+        Some(
+            "process-force-kill"
+            | "process-tree-confirm"
+            | "process-batch-confirm"
+            | "smart-self-test-confirm",
+        ) if !crate::confirmation::capture_ready(world) => {
+            return;
+        }
+        Some(
+            scenario @ ("process-properties-performance"
+            | "process-memory-pss-swap"
+            | "process-network-details"
+            | "process-gpu-details"
+            | "process-resource-limits"
+            | "process-isolation"),
+        ) if !crate::pages::processes::properties_modal::capture_ready(world, scenario) => {
+            return;
+        }
         Some("system-dashboard" | "history-60m")
             if !crate::pages::system::dashboard::presented(world) =>
         {
@@ -361,6 +379,12 @@ fn emit_capture_marker(world: &mut World) {
                 | "system-hardware"
                 | "system-dashboard"
                 | "history-60m"
+                | "process-properties-performance"
+                | "process-memory-pss-swap"
+                | "process-network-details"
+                | "process-gpu-details"
+                | "process-resource-limits"
+                | "process-isolation"
         )
     ) && !world.resource::<CaptureMarkerState>().data_presented
     {
@@ -507,7 +531,8 @@ impl Plugin for FrontendWindowPlugin {
                 crate::icons::build_icon_plates,
                 spawn_app_shell,
             )
-                .chain(),
+                .chain()
+                .before(crate::confirmation::init_capture_confirmation),
         );
         if !app.world().contains_resource::<DemoMode>() {
             app.add_systems(PreUpdate, drain::drain_system);

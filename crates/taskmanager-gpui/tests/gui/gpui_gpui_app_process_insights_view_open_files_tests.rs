@@ -4,6 +4,7 @@ use gpui::{
 };
 use taskmanager_core::ProcessResourceSnapshot;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_core::core::process_telemetry::{
     OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations, ResourceObservation,
 };
@@ -87,7 +88,14 @@ struct OpenFilesCardView {
 }
 impl Render for OpenFilesCardView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        open_files_card(&Theme::dark(), &self.snapshot, &labels(), 480.0)
+        open_files_card(
+            &Theme::dark(),
+            &self.snapshot.open_files,
+            Some(&self.snapshot.resources),
+            &labels(),
+            480.0,
+            0,
+        )
     }
 }
 

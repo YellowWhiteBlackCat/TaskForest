@@ -1,6 +1,8 @@
 //! Fixtures and helpers for Iced capture scenes.
 
-use taskmanager_application::{AppPage, ProcessInsightsProjection, ProcessInsightsRevision};
+use crate::keys::IcedKey;
+use taskmanager_application::AppPage;
+use taskmanager_application::{KeyCode, Modifiers};
 use taskmanager_core::SystemSnapshot;
 use taskmanager_core::core::alerts::{
     Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
@@ -27,10 +29,12 @@ use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
+use taskmanager_shell::fixture::process_insights::process_insights_projection;
+use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
-use taskmanager_shell::{ProcessRowId, ShellApp};
+use taskmanager_shell::{ProcessRowId, ShellApp, ShellKeyEvent};
 
-use super::{DetailsSection, IcedApp, PerfDevice};
+use super::{DetailsSection, IcedApp, Message, PerfDevice};
 
 pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
     if target == "smart-missing-tool" {
@@ -155,8 +159,12 @@ pub(super) fn seed_capture_multiple_process_targets(app: &IcedApp) -> Vec<Frozen
 }
 
 pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSection) {
+    seed_process_properties_history(&mut app.shell);
     if let Some(target) = seed_capture_process_target(app) {
-        let _ = app.shell.open_process_properties_for(target.clone());
+        let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+            KeyCode::Enter,
+            Modifiers::NONE,
+        ))));
         app.process_presentation.details_section = section;
         if section == DetailsSection::Insights {
             seed_capture_insights_fixture(app, &target);
@@ -165,10 +173,7 @@ pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSe
 }
 
 pub(super) fn seed_capture_insights_fixture(app: &mut IcedApp, target: &FrozenProcessIdentity) {
-    let revision = ProcessInsightsRevision::new(1);
-    let mut tracker = ProcessInsightsProjection::default();
-    tracker.begin(target.clone(), revision);
-    if let Some(projection) = tracker.snapshot() {
+    if let Some(projection) = process_insights_projection(target.clone()) {
         seed_projection_fact(
             &mut app.shell,
             ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),

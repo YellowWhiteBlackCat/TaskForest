@@ -6,20 +6,17 @@
 
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp, TuiSurface};
+use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
-use taskmanager_application::{
-    AppAction, AppPage, InteractionEvent, PendingConfirmation, ProcessInsightsProjection,
-    ProcessInsightsRevision,
-};
+use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::ScalarObservationGroup;
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
 };
@@ -29,19 +26,23 @@ use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+use taskmanager_shell::fixture::process_insights::process_insights_projection;
+use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
+use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
-use taskmanager_shell::fixture::{
-    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
-};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 mod fixtures;
+mod history;
 pub(crate) use fixtures::seed_fan_capture_sensors;
 use fixtures::{
     demo_boot_evidence, demo_directory_usage, seed_alert_event_history_fixture,
     seed_capture_identity_matrix, seed_capture_storage_scenario, seed_demo_npu_inventory,
     seed_gpu_capture_history, seed_service_log_fixture,
 };
+use history::seed_demo_history;
 
 impl TuiApp {
     /// A deterministic full-surface demo frame: the shared demo snapshot plus
@@ -124,106 +125,6 @@ pub(crate) const DEMO_HISTORY_FRAMES: usize = 36;
 /// exactly on the canonical projection values — the newest history sample can
 /// never disagree with the snapshot the frame renders. This is deterministic
 /// fixture data (like the GPU scene's five-frame seed), not a live collection.
-fn seed_demo_history(app: &mut TuiApp) {
-    let Some(base) = app.projection().snapshot.clone() else {
-        return;
-    };
-    let last_frame = DEMO_HISTORY_FRAMES.saturating_sub(1);
-    for frame_index in 1..DEMO_HISTORY_FRAMES {
-        let index = frame_index as f64;
-        let settle = 1.0 - index / f64::from(last_frame as u32);
-        // Three non-harmonic phases so no two channels draw the same wave.
-        let wave = |period: f64, phase: f64| {
-            (0.5 - 0.5 * (std::f64::consts::TAU * index / period + phase).cos()) * settle
-        };
-        let mut frame = base.clone();
-        frame.timestamp_ms = base.timestamp_ms.saturating_add(frame_index as u64 * 1_000);
-
-        // CPU: per-core utilization swings proportionally to its own base
-        // (busy cores breathe more), the global readout on its own phase.
-        let mut cpu_observations = frame.cpu.scalar_observations().clone();
-        if let Some(cores) = cpu_observations.core_usage_group.current_observations() {
-            let varied: Vec<f32> = cores
-                .iter()
-                .filter_map(|core| core.current_value())
-                .map(|base_value| {
-                    let base = f64::from(*base_value);
-                    let amplitude = 3.0 + base * 0.25;
-                    let varied = base + amplitude * wave(12.0, 0.0);
-                    varied.clamp(0.5, 99.0) as f32
-                })
-                .collect();
-            cpu_observations.core_usage_group =
-                ScalarObservationGroup::available(varied, frame.timestamp_ms);
-        }
-        if let Some(global) = cpu_observations.global_usage_pct.current_value() {
-            let varied = f64::from(*global) + 14.0 * wave(17.0, 0.9);
-            cpu_observations.global_usage_pct =
-                ScalarObservation::available(varied.clamp(1.0, 99.0) as f32, frame.timestamp_ms);
-        }
-        frame.cpu.apply_scalar_observations(cpu_observations);
-
-        // Memory: the used share breathes on a slow phase; the available lane
-        // follows the same bounded total so the gauge stays honest.
-        let memory = &mut frame.memory;
-        let mut scalar = *memory.scalar_observations();
-        let optional = memory.optional_observations().clone();
-        if let (Some(total), Some(used)) = (
-            scalar.total_bytes.current_value().copied(),
-            scalar.used_bytes.current_value().copied(),
-        ) {
-            let headroom = total.saturating_sub(1);
-            let used_varied = (used.min(headroom) as f64
-                + (64.0 * 1024.0 * 1024.0) * wave(19.0, 1.7))
-            .clamp(1024.0, headroom as f64);
-            let used_bytes = (used_varied as u64).min(headroom);
-            scalar.used_bytes = ScalarObservation::available(used_bytes, frame.timestamp_ms);
-            scalar.available_bytes =
-                ScalarObservation::available(total - used_bytes, frame.timestamp_ms);
-        }
-        if let Some(swap_used) = scalar.swap_used_bytes.current_value() {
-            let varied = *swap_used as f64 + (96.0 * 1024.0 * 1024.0) * wave(9.0, 2.4);
-            scalar.swap_used_bytes =
-                ScalarObservation::available(varied.max(0.0) as u64, frame.timestamp_ms);
-        }
-        memory.apply_observations(scalar, optional);
-
-        // Disk and NIC main lanes breathe on their own phases so the device
-        // trend rows and throughput summaries draw a shape, not a flat line.
-        for disk in &mut frame.disks {
-            let mut scalar = *disk.scalar_observations();
-            if let Some(read) = scalar.read_bytes_per_sec.current_value() {
-                let varied = *read as f64 * (0.65 + 0.7 * wave(11.0, 0.4));
-                scalar.read_bytes_per_sec =
-                    ScalarObservation::available(varied.max(0.0) as u64, frame.timestamp_ms);
-            }
-            if let Some(write) = scalar.write_bytes_per_sec.current_value() {
-                let varied = *write as f64 * (0.65 + 0.7 * wave(8.0, 1.1));
-                scalar.write_bytes_per_sec =
-                    ScalarObservation::available(varied.max(0.0) as u64, frame.timestamp_ms);
-            }
-            disk.apply_scalar_observations(scalar);
-        }
-        for network in &mut frame.networks {
-            let mut scalar = *network.scalar_observations();
-            let wireless = network.wireless_observations().clone();
-            if let Some(rx) = scalar.rx_bytes_per_sec.current_value() {
-                let varied = *rx as f64 * (0.55 + 0.9 * wave(13.0, 2.0));
-                scalar.rx_bytes_per_sec =
-                    ScalarObservation::available(varied.max(0.0) as u64, frame.timestamp_ms);
-            }
-            if let Some(tx) = scalar.tx_bytes_per_sec.current_value() {
-                let varied = *tx as f64 * (0.55 + 0.9 * wave(10.0, 0.2));
-                scalar.tx_bytes_per_sec =
-                    ScalarObservation::available(varied.max(0.0) as u64, frame.timestamp_ms);
-            }
-            network.apply_observations(network.adapter_type(), scalar, wireless);
-        }
-
-        record_demo_history_frame(&mut app.shell, &frame, None, None);
-    }
-}
-
 /// Capture-only page and source-failure overrides. Normal demo launches keep
 /// the complete healthy fixture; the evidence runner opts in through env vars
 /// so a real terminal frame can prove the degraded list treatment.
@@ -407,6 +308,26 @@ fn capture_device(name: &str) -> Option<PerfDevice> {
 
 /// Deterministic full-surface demo frame (containers included).
 #[must_use]
+pub(crate) fn properties_capture_ready(app: &TuiApp) -> bool {
+    let Ok(scene) = std::env::var("TM_TUI_CAPTURE_SCENE") else {
+        return true;
+    };
+    if matches!(
+        scene.as_str(),
+        "process-properties-performance"
+            | "process-memory-pss-swap"
+            | "process-network-details"
+            | "process-gpu-details"
+            | "process-resource-limits"
+            | "process-isolation"
+    ) {
+        app.process_properties().is_some()
+            && process_properties_capture_data_ready(&app.shell, &scene)
+    } else {
+        true
+    }
+}
+
 pub(crate) fn persisted_history_capture_requested() -> bool {
     std::env::var("TM_TUI_CAPTURE_SCENE").is_ok_and(|scene| {
         matches!(
@@ -421,6 +342,17 @@ pub fn demo_app() -> TuiApp {
 }
 
 pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
+    if matches!(
+        scene,
+        "process-properties-performance"
+            | "process-memory-pss-swap"
+            | "process-network-details"
+            | "process-gpu-details"
+            | "process-resource-limits"
+            | "process-isolation"
+    ) {
+        seed_process_properties_history(&mut app.shell);
+    }
     match scene {
         "process-force-kill" => {
             app.shell.application.active_page = AppPage::Applications;
@@ -441,19 +373,8 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "process-tree-confirm" => {
             app.shell.application.active_page = AppPage::Applications;
-            if let Some(target) = seed_capture_process_target(app) {
-                let intent = ProcessBatchIntent {
-                    action: ProcessBatchAction::EndProcessTree,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets: vec![target],
-                };
-                let _ =
-                    app.shell
-                        .application
-                        .interaction
-                        .reduce(InteractionEvent::ArmConfirmation(
-                            PendingConfirmation::ProcessBatch(intent),
-                        ));
+            if let Some(root) = seed_shell_process_tree(&mut app.shell) {
+                app.shell.request_process_tree_end(root);
             }
         }
         "process-batch-confirm" => {
@@ -563,6 +484,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
                 app.process_properties_view = Some(ProcessPropertiesTarget {
+                    facet: ProcessInsightFacet::Network,
                     item,
                     section: ProcessDetailsSection::Performance,
                     scroll: 0,
@@ -582,9 +504,10 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
                 app.process_properties_view = Some(ProcessPropertiesTarget {
+                    facet: ProcessInsightFacet::Network,
                     item,
                     section: ProcessDetailsSection::Overview,
-                    scroll: 0,
+                    scroll: 7,
                 });
                 let _ = app.shell.open_process_properties_for(identity);
             }
@@ -605,15 +528,18 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 && let Some(identity) = FrozenProcessIdentity::from_process(&item)
             {
                 app.process_properties_view = Some(ProcessPropertiesTarget {
+                    facet: match scene {
+                        "process-gpu-details" => ProcessInsightFacet::Gpu,
+                        "process-resource-limits" => ProcessInsightFacet::Resources,
+                        "process-isolation" => ProcessInsightFacet::Isolation,
+                        _ => ProcessInsightFacet::Network,
+                    },
                     item,
                     section: ProcessDetailsSection::Insights,
                     scroll: 0,
                 });
                 let _ = app.shell.open_process_properties_for(identity.clone());
-                let revision = ProcessInsightsRevision::new(1);
-                let mut tracker = ProcessInsightsProjection::default();
-                tracker.begin(identity, revision);
-                if let Some(projection) = tracker.snapshot() {
+                if let Some(projection) = process_insights_projection(identity) {
                     seed_projection_fact(
                         &mut app.shell,
                         ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),

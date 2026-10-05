@@ -6,7 +6,7 @@ use crate::widgets::layout::SystemDashboardBudget;
 use crate::{
     palette::{UiPalette, space_4, space_8},
     widgets::{
-        chart::{line_segments_scaled, polyline_scene},
+        chart::{CurveMeasurement, paint_curve_at_size},
         controls::{ControlTone, ControlVisual},
     },
     window::{Role, TextRole},
@@ -18,14 +18,14 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        hierarchy::{ChildOf, Children},
+        hierarchy::Children,
         observer::On,
         query::With,
         resource::Resource,
         system::{Commands, Query, ResMut},
         world::World,
     },
-    scene::{Scene, WorldSceneExt, bsn, on},
+    scene::{Scene, bsn, on},
     text::{LineBreak, TextLayout},
     ui::{
         UiSystems,
@@ -86,8 +86,6 @@ pub(crate) struct SystemDashboardCurve {
     ceiling: f32,
     color: bevy::color::Color,
 }
-#[derive(Component, Clone, Default)]
-struct CurveSize(Option<(f32, f32)>);
 
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<SystemDashboardState>()
@@ -182,7 +180,7 @@ pub(crate) fn body(
         let mut parts: Vec<Box<dyn Scene>> = vec![Box::new(bsn! { Text({t(metric.label_key()).to_owned()}) TextRole(Role::Body) })];
         parts.push(Box::new(bsn! { Text(stats) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::WordBoundary } Node { width: percent(100), min_width: px(0.0) } }));
         if budget.chart_height > 0.0 {
-            parts.push(Box::new(bsn! { Node { width: percent(100), height: px(budget.chart_height), flex_shrink: 0.0, overflow: Overflow::clip() } SystemDashboardCurve { metric, samples, ceiling, color } CurveSize::default() }));
+            parts.push(Box::new(bsn! { Node { width: percent(100), height: px(budget.chart_height), flex_shrink: 0.0, overflow: Overflow::clip() } SystemDashboardCurve { metric, samples, ceiling, color } CurveMeasurement::default() }));
         }
         parts.push(Box::new(bsn! { Text({coverage(series, metric)}) TextRole(Role::Caption) }));
         Box::new(bsn! {
@@ -220,7 +218,12 @@ fn resize(world: &mut World) {
 }
 pub(crate) fn paint_charts(world: &mut World) {
     let charts = world
-        .query::<(Entity, &ComputedNode, &SystemDashboardCurve, &CurveSize)>()
+        .query::<(
+            Entity,
+            &ComputedNode,
+            &SystemDashboardCurve,
+            &CurveMeasurement,
+        )>()
         .iter(world)
         .filter_map(|(entity, node, chart, last)| {
             let size = node.size() * node.inverse_scale_factor();
@@ -229,31 +232,23 @@ pub(crate) fn paint_charts(world: &mut World) {
         })
         .collect::<Vec<_>>();
     for (entity, size, curve) in charts {
-        let old = world
-            .get::<Children>(entity)
-            .map(|children| children.iter().copied().collect::<Vec<_>>())
-            .unwrap_or_default();
-        for child in old {
-            let _ = world.despawn(child);
-        }
-        let segments = line_segments_scaled(
+        if !paint_curve_at_size(
+            world,
+            entity,
+            size,
             &curve.samples,
-            size.x,
-            size.y,
-            curve.samples.len(),
             curve.ceiling,
-        );
-        if let Ok(fresh) = world.spawn_scene(polyline_scene(&segments, curve.color)) {
-            let child = fresh.id();
-            world.entity_mut(entity).add_one_related::<ChildOf>(child);
+            curve.color,
+        ) {
+            continue;
         }
-        if let Some(mut last) = world.get_mut::<CurveSize>(entity) {
+        if let Some(mut last) = world.get_mut::<CurveMeasurement>(entity) {
             last.0 = Some((size.x, size.y));
         }
     }
 }
 pub(crate) fn presented(world: &mut World) -> bool {
-    let mut charts = world.query::<(&SystemDashboardCurve, &CurveSize, &ComputedNode)>();
+    let mut charts = world.query::<(&SystemDashboardCurve, &CurveMeasurement, &ComputedNode)>();
     let mut count = 0;
     let mut seen = Vec::new();
     for (curve, measured, node) in charts.iter(world) {

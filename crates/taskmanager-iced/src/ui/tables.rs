@@ -8,7 +8,7 @@ use iced::{Element, Length};
 use std::rc::Rc;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppPage, RefreshRequest};
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
 use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
 
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
@@ -709,12 +709,19 @@ pub(super) fn confirm_batch_bar<'a>(
             let target = &intent.targets[0];
             format!("{action_label} {} ({})?", target.name, target.pid)
         }
-        count => format!(
-            "{action_label} {} ({}) +{} more?",
-            intent.targets[0].name,
-            intent.targets[0].pid,
-            count - 1
-        ),
+        count => {
+            let target = if intent.action == ProcessBatchAction::EndProcessTree {
+                &intent.targets[count - 1]
+            } else {
+                &intent.targets[0]
+            };
+            format!(
+                "{action_label} {} ({}) +{} more?",
+                target.name,
+                target.pid,
+                count - 1
+            )
+        }
     };
     if intent.targets.is_empty() {
         row![cancel].spacing(8).padding(4).into()

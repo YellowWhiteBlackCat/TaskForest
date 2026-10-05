@@ -330,6 +330,36 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
 }
 
 #[test]
+fn prearmed_gate_mounts_after_the_window_shell_at_startup() {
+    for scenario in [
+        "process-force-kill",
+        "process-tree-confirm",
+        "process-batch-confirm",
+        "smart-self-test-confirm",
+    ] {
+        let mut app = window_app();
+        let expected = {
+            let mut track = app.world_mut().non_send_mut::<FrontendTrack>();
+            track.shell = demo_shell();
+            seed_capture_confirmation_scenario(&mut track.shell, scenario);
+            PendingConfirmationView::from_pending(
+                track.shell.pending_confirmation().expect("seeded gate"),
+            )
+            .expect("renderable gate")
+        };
+        app.update();
+        let world = app.world_mut();
+        let armed = world
+            .query::<&ArmedConfirmation>()
+            .single(world)
+            .expect("startup mounts exactly one confirmation");
+        assert_eq!(armed.0.as_ref(), Some(&expected), "{scenario}");
+        let _ = button_entity(&mut app, "confirm");
+        let _ = button_entity(&mut app, "dismiss");
+    }
+}
+
+#[test]
 fn capture_confirmation_scenarios_arm_expected_gates() {
     for (scenario, expected_kind) in [
         ("process-force-kill", ConfirmationKind::ProcessBatch),
@@ -344,6 +374,13 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
             Some(expected_kind),
             "scenario {scenario} must arm {expected_kind:?}"
         );
+        if scenario == "process-tree-confirm" {
+            let intent = shell
+                .pending_batch()
+                .expect("tree confirmation has a frozen intent");
+            assert_eq!(intent.targets.len(), 7);
+            assert_eq!(intent.targets.last().expect("root").pid, 90_000);
+        }
     }
 }
 

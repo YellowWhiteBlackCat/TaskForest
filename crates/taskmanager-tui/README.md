@@ -74,6 +74,13 @@ explicit fixture rule rather than reading the terminal host.
 `TuiInputScope` for keyboard and pointer routing. Confirmations and process-properties
 visibility remain owned by the shared application `InteractionState`; the TUI's optional
 process-properties view model is a render cache only and cannot make that surface visible.
+Properties freeze identity and resolve current canonical facts by live key.
+Their Performance tab shows current values, peaks and four bounded history
+trends through the terminal component's Unicode or ASCII repertoire; missing
+history remains collecting and recording gaps remain visible.
+Their Insights tab uses 1–7 to select complete facets and `r` to refresh that
+same target; denied or partial network traffic exposes typed authorization.
+Only the bounded body scrolls, and PID reuse never redirects an open review.
 Opening a new surface replaces the prior owner, and stale typed dismiss events are no-ops.
 Search, Help and Suggestions are branches of the shared shell's one
 `ShellInputMode`, so the terminal cannot carry contradictory keyboard owners.

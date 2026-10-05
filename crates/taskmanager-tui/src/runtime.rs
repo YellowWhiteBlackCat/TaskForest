@@ -11,6 +11,7 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
@@ -261,7 +262,9 @@ fn submit_alert_notifications(app: &mut ShellApp, platform: &mut PlatformClient)
 /// current projection did not ask for.
 fn inline_network_escalation_ready(app: &TuiApp) -> bool {
     app.selected_detail_process().is_some_and(|process| {
-        crate::ui::process_details::network_requires_escalation(app, process.pid)
+        ProcessLiveKey::from_process(&process).is_some_and(|identity| {
+            crate::ui::process_details::network_requires_escalation(app, identity)
+        })
     })
 }
 

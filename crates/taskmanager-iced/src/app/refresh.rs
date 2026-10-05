@@ -224,7 +224,14 @@ impl IcedApp {
     }
 
     fn request_selected_process_insights(&mut self) -> Option<PlatformEffect> {
-        let identity = self.shell.selected_process_identity();
+        let identity = if let Some(target) = self.shell.process_properties_target() {
+            target
+                .live_key()
+                .filter(|key| self.shell.process_by_identity(*key).is_some())
+                .map(|_| target.clone())
+        } else {
+            self.shell.selected_process_identity()
+        };
         match identity {
             Some(identity)
                 if self.process_presentation.last_insights_target.as_ref() != Some(&identity) =>

@@ -10,6 +10,7 @@
 //! never source text.
 
 use super::super::*;
+use taskmanager_application::ProcessInsightFacet;
 
 use std::collections::HashSet;
 
@@ -309,6 +310,7 @@ fn tui_local_properties_modal_publishes_and_releases_the_dialog() {
     let identity = FrozenProcessIdentity::from_authoritative_parts(4242, "editor", 7_500, 9_000)
         .expect("fixture identity");
     app.process_properties_view = Some(ProcessPropertiesTarget {
+        facet: ProcessInsightFacet::Network,
         item,
         section: ProcessDetailsSection::Overview,
         scroll: 0,

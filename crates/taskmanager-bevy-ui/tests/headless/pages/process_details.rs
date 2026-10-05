@@ -500,7 +500,7 @@ fn format_thread_line_renders_runqueue_and_wait_diagnostics() {
         state: DeviceState::healthy(1),
         threads: vec![thread],
     };
-    let text = super::threads_summary(&threads);
+    let text = super::threads_summary(&threads, super::InsightDetail::Summary);
     assert!(text.contains("2.5ms"));
     assert!(text.contains(" D "));
 }
@@ -549,7 +549,7 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
 
     let empty = ProcessThreads::default();
     assert_eq!(
-        super::threads_summary(&empty),
+        super::threads_summary(&empty, super::InsightDetail::Summary),
         t("proc_insights.no_threads")
     );
 
@@ -599,7 +599,7 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
         ],
     };
 
-    let summary = super::threads_summary(&populated);
+    let summary = super::threads_summary(&populated, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "4");
     assert_eq!(lines[1], "101  worker-pool  R  2.5s  25.0%");
@@ -618,7 +618,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
 
     let empty = ProcessOpenFiles::default();
     assert_eq!(
-        super::open_files_summary(&empty, None),
+        super::open_files_summary(&empty, None, super::InsightDetail::Summary),
         t("proc_insights.no_open_files")
     );
 
@@ -653,7 +653,7 @@ fn open_files_summary_empty_unreadable_and_populated() {
         unreadable_count: 1,
     };
 
-    let summary = super::open_files_summary(&files, None);
+    let summary = super::open_files_summary(&files, None, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], format!("4 · 1 {}", t("proc_insights.unreadable")));
     assert_eq!(lines[1], "0 [file] -> /dev/null [deleted]");
@@ -711,7 +711,7 @@ fn open_files_summary_renders_fd_limit_saturation() {
         ProcessResourceSnapshot::from_observations(DeviceState::healthy(1000), obs, vec![]);
     let proj = project_process_resources(&snapshot);
 
-    let summary = super::open_files_summary(&files, Some(&proj));
+    let summary = super::open_files_summary(&files, Some(&proj), super::InsightDetail::Summary);
     let first_line = summary.lines().next().unwrap();
     assert_eq!(first_line, "2 / 1024 (0%) [max 4096]");
 }
@@ -764,7 +764,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         connection_counters: None,
     };
 
-    let summary = super::network_summary(&normal);
+    let summary = super::network_summary(&normal, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "2 · RX 1.0 MiB/s · TX 512.0 KiB/s");
     assert_eq!(
@@ -789,7 +789,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         connection_counters: None,
     };
 
-    let esc_summary = super::network_summary(&escalating);
+    let esc_summary = super::network_summary(&escalating, super::InsightDetail::Summary);
     assert!(esc_summary.contains("0 · RX — · TX —"));
     assert!(esc_summary.contains(t("proc_insights.network_requires_escalation")));
     assert!(esc_summary.contains(t("proc_insights.enable_network_capture")));
@@ -802,7 +802,7 @@ fn environment_summary_formats_entries_and_truncation() {
 
     let empty = ProcessEnvironment::default();
     assert_eq!(
-        super::environment_summary(&empty),
+        super::environment_summary(&empty, super::InsightDetail::Summary),
         t("prop.environment_empty")
     );
 
@@ -830,7 +830,7 @@ fn environment_summary_formats_entries_and_truncation() {
         truncated_count: 15,
     };
 
-    let summary = super::environment_summary(&env);
+    let summary = super::environment_summary(&env, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "4 · +15");
     assert_eq!(lines[1], "PATH=/usr/bin");
@@ -849,7 +849,10 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
     };
 
     let empty = ProcessGpuSnapshot::default();
-    assert_eq!(super::gpu_summary(&empty), t("proc_insights.no_gpu"));
+    assert_eq!(
+        super::gpu_summary(&empty, super::InsightDetail::Summary),
+        t("proc_insights.no_gpu")
+    );
 
     let gpu = ProcessGpuSnapshot {
         state: DeviceState::healthy(1000),
@@ -886,7 +889,7 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
         },
     };
 
-    let summary = super::gpu_summary(&gpu);
+    let summary = super::gpu_summary(&gpu, super::InsightDetail::Summary);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(
         lines[0],

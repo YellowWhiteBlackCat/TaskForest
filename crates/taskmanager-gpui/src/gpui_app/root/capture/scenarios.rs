@@ -179,6 +179,14 @@ impl CaptureScenario {
         }
     }
 
+    pub(crate) fn is_process_properties(self) -> bool {
+        self.is_process_insights()
+            || matches!(
+                self,
+                Self::ProcessPropertiesPerformance | Self::ProcessMemoryPssSwap
+            )
+    }
+
     pub(super) fn is_process_insights(self) -> bool {
         matches!(
             self,

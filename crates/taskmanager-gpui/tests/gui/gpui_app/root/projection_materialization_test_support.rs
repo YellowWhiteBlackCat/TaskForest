@@ -1,5 +1,4 @@
 use super::super::RootView;
-use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_application::StartupEvidenceUnavailable;
 use taskmanager_core::core::Alert;
 use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
@@ -8,7 +7,6 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_core::core::power::PowerSupplySnapshot;
 use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process_telemetry::ContainerRollup;
 use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_core::core::services::ServiceItem;
@@ -21,21 +19,6 @@ use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 
 impl RootView {
-    pub fn replace_process_insights_for_test(&mut self, state: ProcessInsightsState) {
-        let identity = match &state {
-            ProcessInsightsState::Loading { identity } => Some(*identity),
-            ProcessInsightsState::Ready(snapshot) => {
-                ProcessLiveKey::from_identity(snapshot.identity)
-            }
-            ProcessInsightsState::Error(error) => error.identity,
-        };
-        if let Some(identity) = identity
-            && let Some(target) = self.frozen_process(identity)
-        {
-            self.process_insights.install_capture_state(target, state);
-        }
-    }
-
     pub fn replace_containers_for_test(&mut self, containers: ContainerRollup) {
         let revision = self.materialized.containers.revision.saturating_add(1);
         self.materialized.replace_containers(revision, containers);

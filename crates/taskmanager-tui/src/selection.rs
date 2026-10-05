@@ -751,10 +751,17 @@ impl TuiApp {
             self.last_insights_target = None;
             return None;
         }
-        let Some(identity) = process
-            .as_ref()
-            .and_then(FrozenProcessIdentity::from_process)
-        else {
+        let identity = if let Some(target) = self.shell.process_properties_target() {
+            target
+                .live_key()
+                .filter(|key| self.shell.process_by_identity(*key).is_some())
+                .map(|_| target.clone())
+        } else {
+            process
+                .as_ref()
+                .and_then(FrozenProcessIdentity::from_process)
+        };
+        let Some(identity) = identity else {
             self.last_insights_target = None;
             return None;
         };

@@ -8,10 +8,10 @@ use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
 use taskmanager_core::core::DiagnosticBundleError;
 use taskmanager_core::core::DiagnosticBundleErrorKind;
 use taskmanager_core::core::process::ProcessCategory;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
+use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_direct_memory_inventory;
@@ -78,19 +78,16 @@ fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut 
             CaptureProcessAction::Properties(identity, section) => {
                 view.open_process_details(identity, section);
             }
-            CaptureProcessAction::Insights { identity, state } => {
+            CaptureProcessAction::Insights(identity) => {
                 view.open_process_details(identity, ProcessDetailsSection::Insights);
-                if let Some(target) = view.frozen_process(identity) {
-                    view.process_insights.install_capture_state(target, state);
+                view.select_process_insight_facet(view.capture_evidence.properties_insight_facet());
+                if let Some(projection) = view
+                    .process_properties_target()
+                    .cloned()
+                    .and_then(process_insights_projection)
+                {
+                    view.process_insights.install_capture_projection(projection);
                 }
-                let ready = view.process_properties_identity() == Some(identity)
-                    && view.details_section == ProcessDetailsSection::Insights
-                    && view
-                        .processes()
-                        .iter()
-                        .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
-                    && view.process_insights.is_ready_for(identity);
-                view.capture_evidence.mark_process_insights_ready(ready);
             }
         }
     }
@@ -169,11 +166,6 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
         view.show_first_run();
         view.capture_evidence
             .mark_first_run_ready(view.first_run_open());
-    }
-    if view.capture_evidence.process_memory_pss_swap_requested() {
-        view.page = TopPage::Apps;
-        view.set_process_sort(SortCol::Memory, SortDir::Desc);
-        view.processes_state.hidden_cols.remove(&SortCol::Swap);
     }
 }
 

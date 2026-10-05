@@ -113,6 +113,30 @@ impl ShellApp {
         Some(PlatformEffect::ProcessInsights(identity))
     }
 
+    /// Refresh the open Properties target, independently of table selection.
+    #[must_use]
+    pub fn request_properties_process_insights(&mut self) -> Option<PlatformEffect> {
+        let target = self.process_properties_target()?.clone();
+        if self
+            .projection()
+            .process_insights
+            .as_ref()
+            .is_some_and(|projection| projection.target == target && projection.is_collecting())
+        {
+            return None;
+        }
+        let key = target.live_key()?;
+        if !self
+            .projection()
+            .processes_slice()
+            .iter()
+            .any(|process| ProcessLiveKey::from_process(process) == Some(key))
+        {
+            return None;
+        }
+        Some(PlatformEffect::ProcessInsights(target))
+    }
+
     /// Freeze the selected process identity and submit one semantic signal.
     /// The renderer chooses the menu label; this shared seam keeps signal
     /// dispatch identity-safe and gives every frontend the same completion
