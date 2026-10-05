@@ -52,7 +52,9 @@ use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 
 mod capture_marker;
+mod capture_state;
 use capture_marker::emit_capture_marker;
+use capture_state::{initialize_capture_state, is_demo, is_production};
 
 use taskmanager_assets::product;
 use taskmanager_theme::Theme;
@@ -62,11 +64,7 @@ use appearance::demo_theme_from_env;
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
 use crate::capture::{
-    capture_page, capture_perf_device_target, capture_scenario_target, capture_wants_service_logs,
-    capture_window_resolution,
-};
-use crate::demo_fixture::{
-    demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
+    capture_page, capture_perf_device_target, capture_scenario_target, capture_window_resolution,
 };
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
@@ -79,13 +77,10 @@ use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
-use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
-use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 
 /// The resolved token palette, injected as a resource for spawn systems.
 #[derive(Resource)]
@@ -232,9 +227,9 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
             crate::pages::settings::restore_persisted_preferences,
         );
         if let Ok(client) = NativeAppHost::production().diagnostic_bundle_client() {
-            app.world_mut()
-                .resource_mut::<DiagnosticRuntime>()
-                .install(client);
+            let mut diagnostic = DiagnosticRuntime::default();
+            diagnostic.install(client);
+            app.insert_resource(diagnostic);
         }
 
         let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
@@ -294,26 +289,8 @@ impl Plugin for FrontendWindowPlugin {
             shared: self.runtime,
         });
         app.insert_non_send(crate::app::FrontendTrack {
-            shell: if app.world().contains_resource::<DemoMode>() {
-                let mut shell = demo_shell();
-                if capture_wants_service_logs() {
-                    seed_service_log_fixture(&mut shell);
-                }
-                seed_capture_confirmation_fixture(&mut shell);
-                if matches!(
-                    capture_scenario_target(),
-                    Some("system-dashboard" | "history-60m")
-                ) {
-                    let _ = seed_shell_system_dashboard_history(&mut shell, 7_200_000);
-                }
-                if capture_scenario_target() == Some("system-hardware") {
-                    seed_shell_memory_inventory(&mut shell);
-                }
-                shell
-            } else {
-                ShellApp::new()
-            },
-            initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
+            shell: ShellApp::new(),
+            initial_refresh_submitted: false,
             process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         });
         app.insert_resource(WindowPalette {
@@ -355,17 +332,13 @@ impl Plugin for FrontendWindowPlugin {
         crate::first_run_modal::register(app);
         crate::pages::system::diagnostic_modal::register(app);
         crate::pages::system::dashboard::register(app);
-        if let Some(target @ ("system-dashboard" | "history-60m")) = capture_scenario_target() {
-            let mut state = app
-                .world_mut()
-                .resource_mut::<crate::pages::system::dashboard::SystemDashboardState>();
-            state.section = SystemPageSection::Dashboard;
-            state.window = if target == "history-60m" {
-                SystemHistoryWindow::SixtyMinutes
-            } else {
-                SystemHistoryWindow::FifteenMinutes
-            };
-        }
+        crate::pages::system::register(app);
+        crate::pages::services::register(app);
+        crate::pages::startup::register(app);
+        crate::pages::sessions::register(app);
+        crate::pages::process_tree::register(app);
+        crate::pages::performance::register(app);
+        crate::pages::history::scene::register(app);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
         app.add_observer(style_text_role);
@@ -378,14 +351,6 @@ impl Plugin for FrontendWindowPlugin {
             app.add_plugins(bevy::a11y::AccessibilityPlugin);
         }
         app.add_plugins(AppShellPlugin);
-        if matches!(
-            capture_scenario_target(),
-            Some("settings-zero-gray" | "apps-zero-gray")
-        ) {
-            app.world_mut()
-                .resource_mut::<ThemePreferences>()
-                .gray_zero_values = true;
-        }
         crate::icons::register(app);
         crate::confirmation::register(app);
         crate::pages::processes::affinity::register(app);
@@ -403,6 +368,7 @@ impl Plugin for FrontendWindowPlugin {
         app.add_systems(
             Startup,
             (
+                initialize_capture_state,
                 register_embedded_fonts,
                 crate::icons::build_icon_plates,
                 spawn_app_shell,
@@ -410,11 +376,8 @@ impl Plugin for FrontendWindowPlugin {
                 .chain()
                 .before(crate::confirmation::init_capture_confirmation),
         );
-        if !app.world().contains_resource::<DemoMode>() {
-            app.add_systems(PreUpdate, drain::drain_system);
-        } else {
-            app.add_systems(PreUpdate, drain::drain_demo_effects);
-        }
+        app.add_systems(PreUpdate, drain::drain_system.run_if(is_production));
+        app.add_systems(PreUpdate, drain::drain_demo_effects.run_if(is_demo));
     }
 }
 

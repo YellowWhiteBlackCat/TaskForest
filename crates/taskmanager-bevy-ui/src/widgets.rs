@@ -20,6 +20,7 @@ pub mod controls;
 pub(crate) mod history_controls;
 pub mod layout;
 pub mod menu;
+pub(crate) mod scene_paint;
 pub mod table;
 
 #[cfg(test)]

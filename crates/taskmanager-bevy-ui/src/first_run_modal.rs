@@ -17,8 +17,7 @@ use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, Query, Res};
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
@@ -83,43 +82,44 @@ fn sync_setup_entry(
     commands.entity(root).add_one_related::<ChildOf>(entry);
 }
 
-fn on_command(command: On<FirstRunCommand>, mut commands: Commands) {
-    let command = command.event().clone();
-    commands.queue(move |world: &mut World| apply_command(world, command));
+#[derive(SystemParam)]
+struct SetupCommandAccess<'w, 's> {
+    surface: Res<'w, WindowSurfaceState>,
+    setup: Res<'w, SetupState>,
+    pending: ResMut<'w, PendingEffects>,
+    clipboard: Option<ResMut<'w, ClipboardPort>>,
+    bodies: Query<'w, 's, (&'static ComputedNode, &'static mut ScrollPosition), With<ModalBody>>,
+    commands: Commands<'w, 's>,
 }
-fn apply_command(world: &mut World, command: FirstRunCommand) {
+fn on_command(command: On<FirstRunCommand>, mut access: SetupCommandAccess) {
+    let command = command.event().clone();
     if matches!(command, FirstRunCommand::Open) {
-        world.trigger(WindowSurfaceCommand::FirstRun);
+        access.commands.trigger(WindowSurfaceCommand::FirstRun);
         return;
     }
-    if !matches!(
-        world.resource::<WindowSurfaceState>().0,
-        Some(WindowSurface::FirstRun)
-    ) {
+    if !matches!(access.surface.0, Some(WindowSurface::FirstRun)) {
         return;
     }
     match command {
         FirstRunCommand::Open => {}
-        FirstRunCommand::Close => {
-            world.trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::FirstRun))
-        }
-        FirstRunCommand::Action(action) => {
-            world
-                .resource_mut::<PendingEffects>()
-                .0
-                .push(PlatformEffect::SetupScript(SetupScriptRequest { action }));
-        }
+        FirstRunCommand::Close => access
+            .commands
+            .trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::FirstRun)),
+        FirstRunCommand::Action(action) => access
+            .pending
+            .0
+            .push(PlatformEffect::SetupScript(SetupScriptRequest { action })),
         FirstRunCommand::Documentation => {
-            world
-                .resource_mut::<PendingEffects>()
+            access
+                .pending
                 .0
                 .push(PlatformEffect::OpenUrl(UrlOpenRequest {
                     url: REPOSITORY_URL.into(),
                 }))
         }
         FirstRunCommand::Copy(field) => {
-            let payload = world
-                .resource::<SetupState>()
+            let payload = access
+                .setup
                 .0
                 .view()
                 .info
@@ -131,16 +131,13 @@ fn apply_command(world: &mut World, command: FirstRunCommand) {
                     _ => None,
                 });
             if let Some(payload) = payload
-                && let Some(mut clipboard) = world.get_resource_mut::<ClipboardPort>()
+                && let Some(clipboard) = access.clipboard.as_mut()
             {
                 clipboard.request_text(payload, t("first_run.title"));
             }
         }
         FirstRunCommand::Scroll(delta) => {
-            for (node, mut scroll) in world
-                .query_filtered::<(&ComputedNode, &mut ScrollPosition), With<ModalBody>>()
-                .iter_mut(world)
-            {
+            for (node, mut scroll) in &mut access.bodies {
                 let maximum = ((node.content_size().y - node.size().y)
                     * node.inverse_scale_factor())
                 .max(0.0);
@@ -149,6 +146,7 @@ fn apply_command(world: &mut World, command: FirstRunCommand) {
         }
     }
 }
+
 fn activate(activate: On<Activate>, controls: Query<&SetupControl>, mut commands: Commands) {
     if let Ok(control) = controls.get(activate.entity) {
         commands.trigger(control.0.clone());

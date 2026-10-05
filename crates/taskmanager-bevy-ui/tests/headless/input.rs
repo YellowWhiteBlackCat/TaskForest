@@ -81,6 +81,12 @@ fn input_app(shell: ShellApp) -> App {
         InputFocusPlugin,
     ));
     app.add_plugins(AppShellPlugin);
+    crate::pages::services::register(&mut app);
+    crate::pages::startup::register(&mut app);
+    crate::pages::sessions::register(&mut app);
+    crate::pages::performance::register(&mut app);
+    crate::pages::process_tree::register(&mut app);
+    crate::pages::history::scene::register(&mut app);
     app.insert_resource(WindowPalette {
         inner: crate::palette::ui_palette(&Theme::dark()),
     });

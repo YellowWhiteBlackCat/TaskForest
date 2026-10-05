@@ -19,6 +19,13 @@
 
 ## 基座与边界铁律
 
+- **业务系统必须声明访问范围**：页面、命令归约、绘制、弹窗、图表与捕获验证只接受明确的
+  `Res` / `ResMut`、`NonSend` / `NonSendMut`、`Query`、`Commands`、事件或聚合这些参数的
+  `SystemParam`。禁止接收或保存整个 `World`、`DeferredWorld`、`UnsafeWorldCell`，也禁止
+  用 `commands.queue(|world| ...)`、组件 hook 或服务定位器把全世界访问藏在回调中。
+  状态变更经 typed observer/system 同步更新其明确拥有的资源；实体变更由 `Commands` 提交。
+  Bevy 应用的组合入口只负责注册资源、系统与插件；业务不能通过 `App::world()` /
+  `App::world_mut()` 借回整个世界。测试夹具可操作测试 App，但不能成为生产业务入口。
 - Bevy 锁定 `=0.20.0-rc.2`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
   保持单一 workspace 解析；升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、

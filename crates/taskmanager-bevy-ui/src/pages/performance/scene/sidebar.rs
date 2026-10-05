@@ -383,14 +383,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 Box::new(device_row_with_accessory_scene(
                     title,
                     sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
-                    marked_text_scene(
-                        caption,
-                        Role::Mono,
-                        DynField::Device {
-                            section: Section::Battery,
-                            device: key,
-                        },
-                    ),
+                    marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
                     false,
                     palette,
                 )),

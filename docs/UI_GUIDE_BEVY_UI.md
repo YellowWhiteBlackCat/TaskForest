@@ -7,6 +7,9 @@
 
 ## 1. 核心思维：纯数据驱动的 ECS 哲学
 
+- **显式访问范围**：业务 observer/system 使用具体的资源、查询、事件、`Commands` 或
+  `SystemParam`，禁止接收整个 `World`，禁止用 `DeferredWorld`、组件 hook、排队闭包或
+  服务定位器绕过范围声明。详见 [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md) 的边界铁律。
 - **告别命令式回调思维**：Bevy UI 不是基于 DOM 或对象树的命令式界面，而是纯正的
   ECS（实体-组件-系统）图。界面中的每一个元素都是一个 `Entity`，其属性与行为
   完全由挂载的 `Component`（如 `Node`、`Text`、`Button`、`NavTarget`）决定。

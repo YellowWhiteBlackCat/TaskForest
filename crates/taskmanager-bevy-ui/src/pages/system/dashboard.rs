@@ -1,12 +1,13 @@
 //! System dashboard controls and native measured curves over the shared read model.
 
-use super::{SystemBody, paint_system};
+use super::SystemBody;
+use super::paint::SystemPaint;
 use crate::icons::icon_scene;
 use crate::widgets::layout::SystemDashboardBudget;
 use crate::{
     palette::{UiPalette, space_4, space_8},
     widgets::{
-        chart::{CurveMeasurement, paint_curve_at_size},
+        chart::{CurveMeasurement, CurvePaintAccess, paint_curve_at_size},
         controls::{ControlTone, ControlVisual},
     },
     window::{Role, TextRole},
@@ -22,8 +23,7 @@ use bevy::{
         observer::On,
         query::With,
         resource::Resource,
-        system::{Commands, Query, ResMut},
-        world::World,
+        system::{Query, ResMut},
     },
     scene::{Scene, bsn, on},
     text::{LineBreak, TextLayout},
@@ -95,7 +95,8 @@ fn activate(
     event: On<Activate>,
     controls: Query<&DashboardControlButton>,
     mut state: ResMut<SystemDashboardState>,
-    mut commands: Commands,
+    mut bodies: Query<&mut ScrollPosition, With<SystemBody>>,
+    mut paint: ResMut<SystemPaint>,
 ) {
     let Ok(control) = controls.get(event.entity) else {
         return;
@@ -113,15 +114,10 @@ fn activate(
         DashboardControl::Next => state.first_metric = state.first_metric.saturating_add(1).min(3),
     }
     state.layout = None;
-    commands.queue(|world: &mut World| {
-        for mut scroll in world
-            .query_filtered::<&mut ScrollPosition, With<SystemBody>>()
-            .iter_mut(world)
-        {
-            scroll.0.y = 0.0;
-        }
-        paint_system(world);
-    });
+    for mut scroll in &mut bodies {
+        scroll.0.y = 0.0;
+    }
+    paint.dirty = true;
 }
 pub(crate) fn button(
     label: String,
@@ -198,60 +194,60 @@ pub(crate) fn body(
     };
     bsn! { Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } Children [{cards} -- {notice}] }
 }
-fn resize(world: &mut World) {
-    if world.resource::<SystemDashboardState>().section != SystemPageSection::Dashboard {
+fn resize(
+    mut state: ResMut<SystemDashboardState>,
+    bodies: Query<&ComputedNode, With<SystemBody>>,
+    mut paint: ResMut<SystemPaint>,
+) {
+    if state.section != SystemPageSection::Dashboard {
         return;
     }
-    let size = world
-        .query_filtered::<&ComputedNode, With<SystemBody>>()
-        .iter(world)
+    let size = bodies
+        .iter()
         .next()
         .map(|node| node.size() * node.inverse_scale_factor());
     let Some(size) = size.filter(|size| size.x > 0.0 && size.y > 0.0) else {
         return;
     };
-    if world.resource::<SystemDashboardState>().layout == Some((size.x, size.y)) {
-        return;
+    if state.layout != Some((size.x, size.y)) {
+        state.layout = Some((size.x, size.y));
+        paint.dirty = true;
     }
-    world.resource_mut::<SystemDashboardState>().layout = Some((size.x, size.y));
-    paint_system(world);
 }
-pub(crate) fn paint_charts(world: &mut World) {
-    let charts = world
-        .query::<(
-            Entity,
-            &ComputedNode,
-            &SystemDashboardCurve,
-            &CurveMeasurement,
-        )>()
-        .iter(world)
-        .filter_map(|(entity, node, chart, last)| {
-            let size = node.size() * node.inverse_scale_factor();
-            (size.x > 0.0 && size.y > 0.0 && last.0 != Some((size.x, size.y)))
-                .then(|| (entity, size, chart.clone()))
-        })
-        .collect::<Vec<_>>();
-    for (entity, size, curve) in charts {
-        if !paint_curve_at_size(
-            world,
-            entity,
-            size,
-            &curve.samples,
-            curve.ceiling,
-            curve.color,
-        ) {
-            continue;
-        }
-        if let Some(mut last) = world.get_mut::<CurveMeasurement>(entity) {
+pub(crate) fn paint_charts(
+    mut charts: Query<(
+        Entity,
+        &ComputedNode,
+        &SystemDashboardCurve,
+        &mut CurveMeasurement,
+    )>,
+    mut access: CurvePaintAccess,
+) {
+    for (entity, node, curve, mut last) in &mut charts {
+        let size = node.size() * node.inverse_scale_factor();
+        if size.x > 0.0
+            && size.y > 0.0
+            && last.0 != Some((size.x, size.y))
+            && paint_curve_at_size(
+                &mut access,
+                entity,
+                size,
+                &curve.samples,
+                curve.ceiling,
+                curve.color,
+            )
+        {
             last.0 = Some((size.x, size.y));
         }
     }
 }
-pub(crate) fn presented(world: &mut World) -> bool {
-    let mut charts = world.query::<(&SystemDashboardCurve, &CurveMeasurement, &ComputedNode)>();
+
+pub(crate) fn presented(
+    charts: &Query<(&SystemDashboardCurve, &CurveMeasurement, &ComputedNode)>,
+) -> bool {
     let mut count = 0;
     let mut seen = Vec::new();
-    for (curve, measured, node) in charts.iter(world) {
+    for (curve, measured, node) in charts.iter() {
         count += 1;
         if seen.contains(&curve.metric) {
             return false;

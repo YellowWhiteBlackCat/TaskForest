@@ -27,8 +27,9 @@ use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::ComputedNode;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
     UiRect, Val, percent, px,
@@ -302,27 +303,32 @@ pub(crate) struct ConfirmChoice;
 pub(crate) struct DismissChoice;
 
 /// A capture must show the frozen gate and both usable choices after layout.
-pub(crate) fn capture_ready(world: &mut bevy::ecs::world::World) -> bool {
-    use bevy::ui::ComputedNode;
-
-    let pending = world
-        .get_non_send::<FrontendTrack>()
+#[derive(SystemParam)]
+pub(crate) struct ConfirmationCapture<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    gates: Query<'w, 's, (&'static ArmedConfirmation, &'static ComputedNode)>,
+    confirm: Query<'w, 's, &'static ComputedNode, With<ConfirmChoice>>,
+    dismiss: Query<'w, 's, &'static ComputedNode, With<DismissChoice>>,
+}
+pub(crate) fn capture_ready(access: &ConfirmationCapture) -> bool {
+    let pending = access
+        .track
+        .as_ref()
         .and_then(|track| track.shell.pending_confirmation())
         .and_then(PendingConfirmationView::from_pending);
-    let Some(pending) = pending else { return false };
-    let mounted = world
-        .query::<(&ArmedConfirmation, &ComputedNode)>()
-        .iter(world)
-        .any(|(armed, node)| {
-            armed.0.as_ref() == Some(&pending) && node.size().x > 0.0 && node.size().y > 0.0
-        });
-    let confirm = world
-        .query_filtered::<&ComputedNode, With<ConfirmChoice>>()
-        .iter(world)
+    let Some(pending) = pending else {
+        return false;
+    };
+    let mounted = access.gates.iter().any(|(armed, node)| {
+        armed.0.as_ref() == Some(&pending) && node.size().x > 0.0 && node.size().y > 0.0
+    });
+    let confirm = access
+        .confirm
+        .iter()
         .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
-    let dismiss = world
-        .query_filtered::<&ComputedNode, With<DismissChoice>>()
-        .iter(world)
+    let dismiss = access
+        .dismiss
+        .iter()
         .any(|node| node.size().x > 0.0 && node.size().y > 0.0);
     mounted && confirm && dismiss
 }
@@ -476,7 +482,8 @@ pub(crate) fn register(app: &mut bevy::app::App) {
 }
 
 pub(crate) fn init_capture_confirmation(
-    track: Option<bevy::ecs::system::NonSend<crate::app::FrontendTrack>>,
+    track: Option<NonSend<FrontendTrack>>,
+    mut setup: ResMut<SetupState>,
     mut commands: Commands,
 ) {
     let Some(track) = track else { return };
@@ -493,11 +500,8 @@ pub(crate) fn init_capture_confirmation(
         } else if target == "system-about" {
             commands.trigger(SystemInformationCommand::Open);
         } else if target == "first-run" {
-            commands.queue(|world: &mut bevy::ecs::world::World| {
-                world.resource_mut::<SetupState>().0 =
-                    FirstRunController::from_observation(Some(setup_script_info()));
-                world.trigger(FirstRunCommand::Open);
-            });
+            setup.0 = FirstRunController::from_observation(Some(setup_script_info()));
+            commands.trigger(FirstRunCommand::Open);
         } else if target == "diagnostic-preview" {
             commands.trigger(DiagnosticCommand::Open);
         } else if target == "diagnostic-failure" {

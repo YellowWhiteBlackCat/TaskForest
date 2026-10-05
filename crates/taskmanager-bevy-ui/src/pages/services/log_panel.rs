@@ -17,7 +17,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextColor, TextLayout};
@@ -604,57 +603,18 @@ pub(crate) fn on_services_fold_log_gate(
 /// Repaint trigger → world painter: the queue bridge every repaint path
 /// converges on (open, controls, close, fold fingerprint changes).
 pub(crate) fn on_log_panel_repaint_required(
-    _repaint: On<LogPanelRepaintRequired>,
-    mut commands: Commands,
+    _event: On<LogPanelRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_log_panel);
+    dirty.0 = true;
 }
-
-/// Mount-time first paint: the slot spawns after the page's insert hook has
-/// bound the observers, so a pre-seeded lifecycle (capture fixture, route-back
-/// remount) still renders its panel without waiting for a fold.
 pub(crate) fn on_log_panel_slot_added(
-    _added: On<bevy::ecs::lifecycle::Add<ServicesLogPanelSlot>>,
-    mut commands: Commands,
+    _event: On<bevy::ecs::lifecycle::Add<ServicesLogPanelSlot>>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_log_panel);
+    dirty.0 = true;
 }
-
-/// The one panel painter (world form, queued like `paint_services`).
-pub(crate) fn paint_log_panel(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let fingerprint = world
-        .non_send::<FrontendTrack>()
-        .shell
-        .service_log
-        .as_ref()
-        .map(|open| log_fingerprint(Some(open)));
-    let scene = {
-        let track = world.non_send::<FrontendTrack>();
-        track
-            .shell
-            .service_log
-            .as_ref()
-            .map(|_| service_log_panel_scene(&track.shell, &palette))
-    };
-    let slot = world
-        .query_filtered::<Entity, With<ServicesLogPanelSlot>>()
-        .iter(world)
-        .next();
-    let Some(slot) = slot else {
-        return;
-    };
-    let stale: Vec<Entity> = world
-        .get::<bevy::ecs::hierarchy::Children>(slot)
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    let mut commands = world.commands();
-    for entity in stale {
-        commands.entity(entity).despawn();
-    }
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(slot).add_one_related::<ChildOf>(entity);
-    }
-    world.resource_mut::<ServicesLogRenderState>().rendered = fingerprint;
+pub(crate) fn register(app: &mut bevy::app::App) {
+    paint::register(app);
 }
+mod paint;

@@ -3,6 +3,8 @@
 use crate::app::{FrontendTrack, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::input::{PendingEffects, ShellInteractionApplied};
+use crate::widgets::chart::CurveMeasurement;
+use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, WindowPalette};
 use bevy::app::{App, PostUpdate, Startup};
 use bevy::ecs::{
@@ -14,15 +16,15 @@ use bevy::ecs::{
     query::With,
     resource::Resource,
     schedule::IntoScheduleConfigs,
-    system::{Commands, NonSendMut, Query, ResMut},
-    world::World,
+    system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam},
 };
-use bevy::scene::WorldSceneExt;
-use bevy::ui::{ScrollPosition, UiSystems};
+use bevy::scene::CommandsSceneExt;
+use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
 use bevy::ui_widgets::Activate;
 use taskmanager_application::{PlatformEffect, ProcessInsightFacet, i18n::t};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ShellApp;
+use view::ProcessPropertiesCurve;
 
 mod insights;
 mod model;
@@ -249,19 +251,27 @@ pub(crate) fn on_properties_dismiss_activated(
     republish(&mut commands);
     commands.trigger(ShellInteractionApplied);
 }
-fn paint(world: &mut World) {
-    if !world.resource::<PropertiesPaint>().dirty {
+#[derive(SystemParam)]
+struct PropertiesRender<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    state: Res<'w, ProcessPropertiesPresentation>,
+    paint: ResMut<'w, PropertiesPaint>,
+    palette: Res<'w, WindowPalette>,
+    bodies: Query<'w, 's, &'static ScrollPosition, With<ProcessPropertiesBody>>,
+    overlays: Query<'w, 's, Entity, With<ProcessPropertiesOverlay>>,
+    roots: Query<'w, 's, Entity, With<AppShellRoot>>,
+    commands: Commands<'w, 's>,
+}
+fn paint(mut render: PropertiesRender) {
+    if !render.paint.dirty {
         return;
     }
-    world.resource_mut::<PropertiesPaint>().dirty = false;
-    let next = {
-        let state = world.resource::<ProcessPropertiesPresentation>();
-        let Some(track) = world.get_non_send::<FrontendTrack>() else {
-            return;
-        };
-        view_model(&track.shell, state.section, state.facet)
+    render.paint.dirty = false;
+    let Some(track) = render.track.as_ref() else {
+        return;
     };
-    let unchanged = match (&world.resource::<PropertiesPaint>().shown, &next) {
+    let next = view_model(&track.shell, render.state.section, render.state.facet);
+    let unchanged = match (&render.paint.shown, &next) {
         (None, None) => true,
         (Some(a), Some(b)) => a.same_rendered(b),
         _ => false,
@@ -269,44 +279,41 @@ fn paint(world: &mut World) {
     if unchanged {
         return;
     }
-    let scroll = if world
-        .resource::<PropertiesPaint>()
+    let scroll = if render
+        .paint
         .shown
         .as_ref()
         .zip(next.as_ref())
         .is_some_and(|(a, b)| a.target == b.target && a.section == b.section && a.facet == b.facet)
     {
-        world
-            .query_filtered::<&ScrollPosition, With<ProcessPropertiesBody>>()
-            .iter(world)
-            .next()
-            .cloned()
-            .unwrap_or_default()
+        render.bodies.iter().next().cloned().unwrap_or_default()
     } else {
         ScrollPosition::default()
     };
-    let overlays = world
-        .query_filtered::<Entity, With<ProcessPropertiesOverlay>>()
-        .iter(world)
-        .collect::<Vec<_>>();
-    for entity in overlays {
-        let _ = world.despawn(entity);
+    for entity in &render.overlays {
+        render.commands.entity(entity).despawn();
     }
-    world.resource_mut::<PropertiesPaint>().shown = next.clone();
-    let Some(view) = next else { return };
-    let Some(root) = world
-        .query_filtered::<Entity, With<AppShellRoot>>()
-        .iter(world)
-        .next()
-    else {
+    render.paint.shown = next.clone();
+    let Some(view) = next else {
         return;
     };
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    if let Ok(overlay) = world.spawn_scene(view::properties_modal_scene(&view, &palette, scroll)) {
-        let entity = overlay.id();
-        world.entity_mut(root).add_one_related::<ChildOf>(entity);
-    }
+    let Some(root) = render.roots.iter().next() else {
+        return;
+    };
+    let entity = render
+        .commands
+        .spawn_scene(view::properties_modal_scene(
+            &view,
+            &render.palette.inner,
+            scroll,
+        ))
+        .id();
+    render
+        .commands
+        .entity(root)
+        .add_one_related::<ChildOf>(entity);
 }
+
 fn startup(
     track: ShellTrack,
     mut state: ResMut<ProcessPropertiesPresentation>,
@@ -329,7 +336,10 @@ pub(crate) fn register(app: &mut App) {
         .add_observer(on_applied)
         .add_systems(
             PostUpdate,
-            (paint, view::paint_curves).chain().after(UiSystems::Layout),
+            (
+                paint.in_set(ScenePaint).before(UiSystems::Prepare),
+                view::paint_curves.after(UiSystems::Layout),
+            ),
         );
 }
 #[cfg(test)]
@@ -337,13 +347,30 @@ pub(crate) fn register(app: &mut App) {
 mod tests;
 
 /// Capture follows the mounted normal tab/facet controls and the painted data.
-pub(crate) fn capture_ready(world: &mut World, scenario: &str) -> bool {
-    use crate::widgets::chart::CurveMeasurement;
-    use bevy::ui::ComputedNode;
+#[derive(SystemParam)]
+pub(crate) struct PropertiesCapture<'w, 's> {
+    track: Option<NonSend<'w, FrontendTrack>>,
+    state: Res<'w, ProcessPropertiesPresentation>,
+    paint: Res<'w, PropertiesPaint>,
+    tabs: Query<'w, 's, (Entity, &'static ProcessPropertiesTab)>,
+    facets: Query<'w, 's, (Entity, &'static ProcessPropertiesFacet)>,
+    bodies: Query<'w, 's, &'static ComputedNode, With<ProcessPropertiesBody>>,
+    curves: Query<
+        'w,
+        's,
+        (
+            &'static ProcessPropertiesCurve,
+            &'static CurveMeasurement,
+            &'static ComputedNode,
+        ),
+    >,
+    commands: Commands<'w, 's>,
+}
+pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> bool {
     use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
-    use view::ProcessPropertiesCurve;
-    if !world
-        .get_non_send::<FrontendTrack>()
+    if !access
+        .track
+        .as_ref()
         .is_some_and(|track| process_properties_capture_data_ready(&track.shell, scenario))
     {
         return false;
@@ -372,49 +399,46 @@ pub(crate) fn capture_ready(world: &mut World, scenario: &str) -> bool {
         ),
         _ => return false,
     };
-    if world.resource::<ProcessPropertiesPresentation>().section != section {
-        let button = world
-            .query::<(Entity, &ProcessPropertiesTab)>()
-            .iter(world)
+    if access.state.section != section {
+        let button = access
+            .tabs
+            .iter()
             .find(|(_, button)| button.0 == section)
             .map(|(entity, _)| entity);
         if let Some(entity) = button {
-            world.trigger(Activate { entity });
+            access.commands.trigger(Activate { entity });
         }
         return false;
     }
-    if world.resource::<ProcessPropertiesPresentation>().facet != facet {
-        let button = world
-            .query::<(Entity, &ProcessPropertiesFacet)>()
-            .iter(world)
+    if access.state.facet != facet {
+        let button = access
+            .facets
+            .iter()
             .find(|(_, button)| button.0 == facet)
             .map(|(entity, _)| entity);
         if let Some(entity) = button {
-            world.trigger(Activate { entity });
+            access.commands.trigger(Activate { entity });
         }
         return false;
     }
-    if !world
-        .resource::<PropertiesPaint>()
+    if !access
+        .paint
         .shown
         .as_ref()
         .is_some_and(|view| view.section == section && view.facet == facet && view.live)
     {
         return false;
     }
-    if !world
-        .query_filtered::<&ComputedNode, With<ProcessPropertiesBody>>()
-        .iter(world)
+    if !access
+        .bodies
+        .iter()
         .any(|node| node.size().x > 0.0 && node.size().y > 0.0)
     {
         return false;
     }
     if section == ProcessPropertiesSection::Performance {
         let mut metrics = Vec::new();
-        for (curve, measured, node) in world
-            .query::<(&ProcessPropertiesCurve, &CurveMeasurement, &ComputedNode)>()
-            .iter(world)
-        {
+        for (curve, measured, node) in access.curves.iter() {
             if measured.0.is_none()
                 || node.size().x <= 0.0
                 || node.size().y <= 0.0

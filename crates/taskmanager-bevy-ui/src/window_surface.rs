@@ -11,9 +11,9 @@ use crate::pages::settings::ThemePreferences;
 use crate::pages::startup::menu::StartupMenuCtx;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{UiPalette, space_8, space_24};
+use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::app::{App, PostUpdate};
-use bevy::ecs::change_detection::Mut;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -22,10 +22,9 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, ResMut};
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::input::keyboard::KeyCode;
-use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::UiSystems;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, FlexWrap, JustifyContent, Node,
@@ -107,19 +106,38 @@ pub(crate) fn register(app: &mut App) {
         .init_resource::<SurfacePaint>()
         .add_observer(on_command)
         .add_observer(request_paint)
-        .add_systems(PostUpdate, paint_surface.before(UiSystems::Prepare));
+        .add_systems(
+            PostUpdate,
+            paint_surface.in_set(ScenePaint).before(UiSystems::Prepare),
+        );
 }
-fn on_command(command: On<WindowSurfaceCommand>, mut commands: Commands) {
-    let command = *command.event();
-    commands.queue(move |world: &mut World| match command {
-        WindowSurfaceCommand::About => show(world, WindowSurface::About),
+#[derive(SystemParam)]
+pub(crate) struct SurfaceAccess<'w> {
+    pub(crate) state: ResMut<'w, WindowSurfaceState>,
+    pub(crate) diagnostic: Option<ResMut<'w, DiagnosticRuntime>>,
+    pub(crate) track: Option<NonSendMut<'w, FrontendTrack>>,
+    process_menu: Option<ResMut<'w, MenuModal<ProcessMenuCtx>>>,
+    service_menu: Option<ResMut<'w, MenuModal<ServiceMenuCtx>>>,
+    startup_menu: Option<ResMut<'w, MenuModal<StartupMenuCtx>>>,
+    session_menu: Option<ResMut<'w, MenuModal<SessionMenuCtx>>>,
+}
+fn on_command(
+    command: On<WindowSurfaceCommand>,
+    mut access: SurfaceAccess,
+    prefs: Option<Res<ThemePreferences>>,
+    setup: Option<Res<SetupState>>,
+    mut commands: Commands,
+) {
+    match *command.event() {
+        WindowSurfaceCommand::About => show(&mut access, &mut commands, WindowSurface::About),
         WindowSurfaceCommand::SystemInformation => {
-            let appearance = world
-                .get_resource::<ThemePreferences>()
+            let appearance = prefs
+                .as_ref()
                 .and_then(|prefs| prefs.observed_appearance)
                 .unwrap_or_default();
-            let facts = world
-                .get_non_send::<FrontendTrack>()
+            let facts = access
+                .track
+                .as_ref()
                 .map(|track| {
                     groups(
                         track
@@ -132,118 +150,138 @@ fn on_command(command: On<WindowSurfaceCommand>, mut commands: Commands) {
                     )
                 })
                 .unwrap_or_default();
-            show(world, WindowSurface::SystemInformation(facts));
+            show(
+                &mut access,
+                &mut commands,
+                WindowSurface::SystemInformation(facts),
+            );
         }
         WindowSurfaceCommand::FirstRun
-            if world
-                .get_resource::<SetupState>()
+            if setup
+                .as_ref()
                 .is_some_and(|state| state.0.view().info.is_some()) =>
         {
-            show(world, WindowSurface::FirstRun)
+            show(&mut access, &mut commands, WindowSurface::FirstRun);
         }
         WindowSurfaceCommand::FirstRun => {}
-        WindowSurfaceCommand::Close(kind) => close(world, kind),
-    });
-}
-fn close_menu<Ctx: ActionMenuContext>(world: &mut World) {
-    if world.get_resource::<MenuModal<Ctx>>().is_none() {
-        return;
+        WindowSurfaceCommand::Close(kind) => close(&mut access, &mut commands, kind),
     }
-    world.resource_scope(|world, mut menu: Mut<MenuModal<Ctx>>| {
-        let mut track = world.non_send_mut::<FrontendTrack>();
-        let _ = menu.drive(&mut track.shell, KeyCode::Escape, &mut Vec::new());
-    });
-    world.trigger(MenuModalChanged::<Ctx>(false, PhantomData));
 }
-pub(crate) fn show(world: &mut World, surface: WindowSurface) {
-    if let Some(mut runtime) = world.get_resource_mut::<DiagnosticRuntime>() {
+fn close_menu<Ctx: ActionMenuContext>(
+    menu: Option<&mut MenuModal<Ctx>>,
+    track: Option<&mut FrontendTrack>,
+    commands: &mut Commands,
+) {
+    if let Some(menu) = menu {
+        if let Some(track) = track {
+            let _ = menu.drive(&mut track.shell, KeyCode::Escape, &mut Vec::new());
+        }
+        commands.trigger(MenuModalChanged::<Ctx>(false, PhantomData));
+    }
+}
+pub(crate) fn show(access: &mut SurfaceAccess, commands: &mut Commands, surface: WindowSurface) {
+    if let Some(runtime) = access.diagnostic.as_mut() {
         runtime.close();
     }
-    close_menu::<ProcessMenuCtx>(world);
-    close_menu::<ServiceMenuCtx>(world);
-    close_menu::<StartupMenuCtx>(world);
-    close_menu::<SessionMenuCtx>(world);
-    if let Some(mut track) = world.get_non_send_mut::<FrontendTrack>() {
+    close_menu(
+        access.process_menu.as_deref_mut(),
+        access.track.as_deref_mut(),
+        commands,
+    );
+    close_menu(
+        access.service_menu.as_deref_mut(),
+        access.track.as_deref_mut(),
+        commands,
+    );
+    close_menu(
+        access.startup_menu.as_deref_mut(),
+        access.track.as_deref_mut(),
+        commands,
+    );
+    close_menu(
+        access.session_menu.as_deref_mut(),
+        access.track.as_deref_mut(),
+        commands,
+    );
+    if let Some(track) = access.track.as_mut() {
         track.shell.dismiss_overlay();
         track.shell.close_service_log();
         track.shell.dismiss_informational_overlay();
         track.shell.close_search();
     }
-    world.resource_mut::<WindowSurfaceState>().0 = Some(surface);
-    world.trigger(WindowSurfaceChanged);
-    world.trigger(ShellInteractionApplied);
+    access.state.0 = Some(surface);
+    commands.trigger(WindowSurfaceChanged);
+    commands.trigger(ShellInteractionApplied);
 }
-pub(crate) fn close(world: &mut World, expected: WindowSurfaceKind) {
-    if world
-        .resource::<WindowSurfaceState>()
+pub(crate) fn close(
+    access: &mut SurfaceAccess,
+    commands: &mut Commands,
+    expected: WindowSurfaceKind,
+) {
+    if !access
+        .state
         .0
         .as_ref()
-        .map(WindowSurface::kind)
-        != Some(expected)
+        .is_some_and(|surface| surface.kind() == expected)
     {
         return;
     }
-    if let Some(mut runtime) = world.get_resource_mut::<DiagnosticRuntime>() {
+    if let Some(runtime) = access.diagnostic.as_mut() {
         runtime.close();
     }
-    world.resource_mut::<WindowSurfaceState>().0 = None;
-    world.trigger(WindowSurfaceChanged);
+    access.state.0 = None;
+    commands.trigger(WindowSurfaceChanged);
 }
 fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePaint>) {
     paint.dirty = true;
 }
-fn paint_surface(world: &mut World) {
-    let root = world
-        .query_filtered::<Entity, With<AppShellRoot>>()
-        .single(world)
-        .ok();
-    let Some(root) = root else {
+#[derive(SystemParam)]
+struct SurfaceRender<'w, 's> {
+    state: Res<'w, WindowSurfaceState>,
+    paint: ResMut<'w, SurfacePaint>,
+    palette: Option<Res<'w, WindowPalette>>,
+    setup: Option<Res<'w, SetupState>>,
+    roots: Query<'w, 's, Entity, With<AppShellRoot>>,
+    overlays: Query<'w, 's, Entity, With<WindowSurfaceOverlay>>,
+    commands: Commands<'w, 's>,
+}
+fn paint_surface(mut render: SurfaceRender) {
+    let Ok(root) = render.roots.single() else {
         return;
     };
-    let overlays: Vec<_> = world
-        .query_filtered::<Entity, With<WindowSurfaceOverlay>>()
-        .iter(world)
-        .collect();
-    let surface = world.resource::<WindowSurfaceState>().0.clone();
-    if !world.resource::<SurfacePaint>().dirty && !(surface.is_some() && overlays.is_empty()) {
+    if !render.paint.dirty && !(render.state.0.is_some() && render.overlays.is_empty()) {
         return;
     }
-    let Some(palette) = world
-        .get_resource::<WindowPalette>()
-        .map(|palette| palette.inner.clone())
-    else {
+    let Some(palette) = render.palette.as_ref().map(|palette| &palette.inner) else {
         return;
     };
-    let scene: Option<Box<dyn Scene>> = match &surface {
-        Some(WindowSurface::About) => Some(Box::new(crate::about_modal::surface_scene(&palette))),
+    let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+        Some(WindowSurface::About) => Some(Box::new(crate::about_modal::surface_scene(palette))),
         Some(WindowSurface::SystemInformation(facts)) => Some(Box::new(
-            crate::system_information_modal::surface_scene(facts, &palette),
+            crate::system_information_modal::surface_scene(facts, palette),
         )),
-        Some(WindowSurface::FirstRun) => world.get_resource::<SetupState>().map(|setup| {
+        Some(WindowSurface::FirstRun) => render.setup.as_ref().map(|setup| {
             Box::new(crate::first_run_modal::surface_scene(
                 setup.0.view(),
-                &palette,
+                palette,
             )) as Box<dyn Scene>
         }),
         Some(WindowSurface::Diagnostic(state)) => Some(Box::new(
-            crate::pages::system::diagnostic_modal::overlay_scene(state, &palette),
+            crate::pages::system::diagnostic_modal::overlay_scene(state, palette),
         )),
         None => None,
     };
-    for entity in overlays {
-        world.despawn(entity);
+    for entity in &render.overlays {
+        render.commands.entity(entity).despawn();
     }
     if let Some(scene) = scene {
-        let overlay = match world.spawn_scene(scene) {
-            Ok(overlay) => overlay.id(),
-            Err(error) => {
-                eprintln!("taskforest-b: product surface could not mount: {error}");
-                return;
-            }
-        };
-        world.entity_mut(root).add_one_related::<ChildOf>(overlay);
+        let overlay = render.commands.spawn_scene(scene).id();
+        render
+            .commands
+            .entity(root)
+            .add_one_related::<ChildOf>(overlay);
     }
-    world.resource_mut::<SurfacePaint>().dirty = false;
+    render.paint.dirty = false;
 }
 
 /// Header and complete action rows are mandatory; the body alone consumes

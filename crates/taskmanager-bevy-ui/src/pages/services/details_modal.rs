@@ -11,7 +11,6 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
@@ -202,45 +201,17 @@ pub(crate) fn on_service_details_requested(
 }
 
 pub(crate) fn on_service_details_repaint_required(
-    _repaint: On<ServiceDetailsRepaintRequired>,
-    mut commands: Commands,
+    _event: On<ServiceDetailsRepaintRequired>,
+    mut dirty: ResMut<paint::PaintState>,
 ) {
-    commands.queue(paint_service_details_modal);
-}
-
-pub(crate) fn paint_service_details_modal(world: &mut World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let state = world.resource::<ServiceDetailsModalState>();
-    let scene = state
-        .target
-        .as_ref()
-        .map(|service| service_details_modal_scene(service, &palette));
-
-    let roots: Vec<Entity> = world
-        .query_filtered::<Entity, With<AppShellRoot>>()
-        .iter(world)
-        .collect();
-    let Some(&root) = roots.first() else {
-        return;
-    };
-
-    let overlays: Vec<Entity> = world
-        .query_filtered::<Entity, With<ServiceDetailsOverlay>>()
-        .iter(world)
-        .collect();
-    let mut commands = world.commands();
-    for entity in overlays {
-        commands.entity(entity).despawn();
-    }
-
-    if let Some(scene) = scene {
-        let entity = commands.spawn_scene(scene).id();
-        commands.entity(root).add_one_related::<ChildOf>(entity);
-    }
+    dirty.0 = true;
 }
 
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<ServiceDetailsModalState>();
+    paint::register(app);
     app.add_observer(on_service_details_requested);
     app.add_observer(on_service_details_repaint_required);
 }
+
+mod paint;

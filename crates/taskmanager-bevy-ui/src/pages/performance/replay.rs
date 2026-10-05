@@ -7,21 +7,21 @@ use crate::pages::history::control::{
 use crate::palette::{UiPalette, space_8};
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 use crate::widgets::history_controls::{action_scene, toolbar_scene};
+use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::{
     component::Component,
     entity::Entity,
     hierarchy::{ChildOf, Children},
-    lifecycle::HookContext,
+    lifecycle::Add,
     observer::On,
     query::With,
     resource::Resource,
     schedule::IntoScheduleConfigs,
-    system::{Query, Res, ResMut},
-    world::{DeferredWorld, World},
+    system::{Commands, Query, Res, ResMut},
 };
-use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
 use bevy::ui::{
@@ -41,14 +41,13 @@ use taskmanager_shell::presentation::{history_replay::row_heading, missing_value
 #[derive(Component, Clone, Default)]
 pub(crate) struct PerformanceLiveBody;
 #[derive(Component, Clone, Default)]
-#[component(on_insert = mark_mounted)]
 pub(crate) struct PerformanceReplayRoot;
 #[derive(Component, Clone, Default)]
 pub(crate) struct PerformanceHistoryEntry;
 #[derive(Component, Clone, Default)]
-struct ReplayChart(Arc<[f32]>);
+pub(crate) struct ReplayChart(Arc<[f32]>);
 #[derive(Component, Clone, Default)]
-struct ChartSize(Option<(f32, f32)>);
+pub(crate) struct ChartSize(Option<(f32, f32)>);
 #[derive(Resource, Default)]
 struct PaintDirty(bool);
 #[derive(Component, Clone, Default)]
@@ -57,20 +56,23 @@ pub(crate) struct PerformanceReplayBody;
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<PaintDirty>()
         .add_observer(changed)
-        .add_systems(PostUpdate, paint.before(UiSystems::Prepare))
+        .add_observer(mark_mounted)
+        .add_systems(
+            PostUpdate,
+            paint.in_set(ScenePaint).before(UiSystems::Prepare),
+        )
         .add_systems(
             PostUpdate,
             (
-                visibility.before(UiSystems::Prepare),
+                visibility.in_set(ScenePaint).before(UiSystems::Prepare),
                 paint_charts.after(UiSystems::Layout),
             ),
         );
 }
-fn mark_mounted(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if let Some(mut dirty) = world.get_resource_mut::<PaintDirty>() {
-        dirty.0 = true;
-    }
+fn mark_mounted(_event: On<Add<PerformanceReplayRoot>>, mut dirty: ResMut<PaintDirty>) {
+    dirty.0 = true;
 }
+
 fn changed(_event: On<PerformanceHistoryChanged>, mut dirty: ResMut<PaintDirty>) {
     dirty.0 = true;
 }
@@ -160,74 +162,64 @@ fn visibility(
         }
     }
 }
-fn paint(world: &mut World) {
-    if !world.resource::<PaintDirty>().0 {
+fn paint(
+    mut dirty: ResMut<PaintDirty>,
+    model: Res<PerformanceHistoryProjectionResource>,
+    palette: Res<WindowPalette>,
+    roots: Query<(Entity, Option<&Children>), With<PerformanceReplayRoot>>,
+    mut commands: Commands,
+) {
+    if !dirty.0 || roots.is_empty() {
         return;
     }
-    let roots = world
-        .query_filtered::<Entity, With<PerformanceReplayRoot>>()
-        .iter(world)
-        .collect::<Vec<_>>();
-    if roots.is_empty() {
-        return;
-    }
-    world.resource_mut::<PaintDirty>().0 = false;
-    let model = world
-        .resource::<PerformanceHistoryProjectionResource>()
-        .0
-        .clone();
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    for root in roots {
-        let old = world
-            .get::<Children>(root)
-            .map(|children| children.iter().copied().collect::<Vec<_>>())
-            .unwrap_or_default();
-        for child in old {
-            let _ = world.despawn(child);
+    dirty.0 = false;
+    for (root, children) in &roots {
+        if let Some(children) = children {
+            for child in children.iter() {
+                commands.entity(*child).despawn();
+            }
         }
-        if let Ok(fresh) = world.spawn_scene(review_scene(&model, &palette)) {
-            let entity = fresh.id();
-            world.entity_mut(root).add_one_related::<ChildOf>(entity);
-        }
+        let entity = commands
+            .spawn_scene(review_scene(&model.0, &palette.inner))
+            .id();
+        commands.entity(root).add_one_related::<ChildOf>(entity);
     }
 }
-pub(crate) fn paint_charts(world: &mut World) {
-    let charts = world
-        .query::<(Entity, &ComputedNode, &ReplayChart, &ChartSize)>()
-        .iter(world)
-        .filter_map(|(entity, node, chart, last)| {
-            let size = node.size() * node.inverse_scale_factor();
-            if size.x <= 0.0 || size.y <= 0.0 || last.0 == Some((size.x, size.y)) {
-                None
-            } else {
-                Some((entity, size, Arc::clone(&chart.0)))
+pub(crate) fn paint_charts(
+    mut charts: Query<(
+        Entity,
+        &ComputedNode,
+        &ReplayChart,
+        &mut ChartSize,
+        Option<&Children>,
+    )>,
+    palette: Res<WindowPalette>,
+    mut commands: Commands,
+) {
+    for (entity, node, chart, mut last, children) in &mut charts {
+        let size = node.size() * node.inverse_scale_factor();
+        if size.x <= 0.0 || size.y <= 0.0 || last.0 == Some((size.x, size.y)) {
+            continue;
+        }
+        if let Some(children) = children {
+            for child in children.iter() {
+                commands.entity(*child).despawn();
             }
-        })
-        .collect::<Vec<_>>();
-    let accent = world.resource::<WindowPalette>().inner.accent;
-    for (entity, size, samples) in charts {
-        let old = world
-            .get::<Children>(entity)
-            .map(|children| children.iter().copied().collect::<Vec<_>>())
-            .unwrap_or_default();
-        for child in old {
-            let _ = world.despawn(child);
         }
-        let segments = line_segments(&samples, size.x, size.y, MAX_CHART_POINTS);
-        if let Ok(fresh) = world.spawn_scene(polyline_scene(&segments, accent)) {
-            let child = fresh.id();
-            world.entity_mut(entity).add_one_related::<ChildOf>(child);
-        }
-        if let Some(mut last) = world.get_mut::<ChartSize>(entity) {
-            last.0 = Some((size.x, size.y));
-        }
+        let segments = line_segments(&chart.0, size.x, size.y, MAX_CHART_POINTS);
+        let child = commands
+            .spawn_scene(polyline_scene(&segments, palette.inner.accent))
+            .id();
+        commands.entity(entity).add_one_related::<ChildOf>(child);
+        last.0 = Some((size.x, size.y));
     }
 }
 
-pub(crate) fn charts_presented(world: &mut World) -> bool {
-    let mut charts = world.query::<(&ReplayChart, &ChartSize, Option<&Children>)>();
+pub(crate) fn charts_presented(
+    charts: &Query<(&ReplayChart, &ChartSize, Option<&Children>)>,
+) -> bool {
     let mut count = 0;
-    for (_, size, children) in charts.iter(world) {
+    for (_, size, children) in charts.iter() {
         count += 1;
         if size.0.is_none() || children.is_none_or(|children| children.is_empty()) {
             return false;

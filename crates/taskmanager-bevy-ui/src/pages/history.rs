@@ -18,12 +18,11 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::{Add, HookContext};
+use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, Val, percent, px,
@@ -55,7 +54,6 @@ pub(crate) mod control;
 pub(crate) mod scene;
 
 #[derive(Clone, Component, Default)]
-#[component(on_insert = scene::bind_history_page)]
 pub(crate) struct HistoryPageRoot;
 
 #[derive(Clone, Component, Default)]

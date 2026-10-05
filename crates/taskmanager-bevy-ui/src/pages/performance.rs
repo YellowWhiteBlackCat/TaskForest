@@ -9,11 +9,8 @@
 //!   current projection. Every value that can change later sits behind a
 //!   self-describing marker (`DynText`, `SparkStrip`, `DynBlock`,
 //!   `CurveGate`) naming the fact it renders.
-//! - **bind**: the root's `on_insert` hook registers this page's observer on
-//!   `crate::drain::ShellProjectionFolded` exactly once per `World`
-//!   (guarded by a resource), keeping the page module self-contained — no
-//!   shared-file edit, and unmounted frames do zero work because the markers
-//!   no longer exist.
+//! - **bind**: composition registers typed page observers once. Unmounted
+//!   frames have no marked components to update.
 //! - **refresh**: `refresh_on_fold` re-reads the shell through
 //!   `crate::app::ShellTrack` only when the drain actually folded batches,
 //!   rewrites texts in place (equality-guarded so identical facts are not
@@ -36,12 +33,10 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
-use bevy::ecs::world::{DeferredWorld, World};
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent, px,
@@ -100,10 +95,8 @@ use scene::blocks::block_scene;
 // template mechanism (template-then-patch); every spawned instance carries
 // an explicit value.
 
-/// Root of the mounted Performance page. Its `on_insert` hook binds the
-/// refresh observer, so mounting the page is what activates its data path.
+/// Root of the mounted Performance page; typed observers update its markers.
 #[derive(Component, Clone, Default)]
-#[component(on_insert = bind_refresh_observer)]
 pub(crate) struct PerformancePageRoot;
 
 /// The compact GPUI-style selector state. It is frontend-local presentation
@@ -245,12 +238,6 @@ type CompactNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompa
 type CompactPillsQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactDevicePills>>;
 type OptionalCoreGridQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceOptionalCoreGrid>>;
 
-/// Once-per-`World` guard so remounts never stack duplicate observers (two
-/// observers on one trigger would run before either's spawn commands apply
-/// and could double-spawn blocks).
-#[derive(Resource, Default)]
-struct RefreshObserverBound;
-
 /// One rewritable text node. The field names the fact it renders, so the
 /// refresh observer is a flat query with no hierarchy walks.
 #[derive(Component, Clone, Default)]
@@ -317,6 +304,7 @@ pub(crate) enum SummaryField {
 pub(crate) enum DynField {
     Summary(SummaryField),
     CurveCaption(SystemCurve),
+    BatteryCaption(String),
     Cpu(CpuField),
     /// One device block's joined fact line, keyed by the stable device id.
     Device {
@@ -442,21 +430,12 @@ pub(crate) fn request_smart_self_test(
 
 // ---- dynamic refresh: the ShellProjectionFolded observer ----
 
-/// `on_insert` hook for [`PerformancePageRoot`]: register the page's refresh
-/// observer once per `World`. Registration happens in a queued exclusive
-/// command so the check-and-bind pair is atomic against remounts.
-fn bind_refresh_observer(mut world: DeferredWorld, _context: HookContext) {
-    world.commands().queue(|world: &mut World| {
-        if world.get_resource::<RefreshObserverBound>().is_some() {
-            return;
-        }
-        world.init_resource::<PerformanceFocus>();
-        world.init_resource::<PerformanceDeviceFocus>();
-        world.insert_resource(RefreshObserverBound);
-        world.add_observer(refresh_on_fold);
-        world.add_observer(sync_focus_changed);
-        world.add_observer(sync_device_focus_changed);
-    });
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<PerformanceFocus>();
+    app.init_resource::<PerformanceDeviceFocus>();
+    app.add_observer(refresh_on_fold);
+    app.add_observer(sync_focus_changed);
+    app.add_observer(sync_device_focus_changed);
 }
 
 /// Bevy 0.20's official button widget emits `Activate` for pointer and

@@ -8,11 +8,12 @@ use super::{
     on_properties_dismiss_activated, on_refresh, on_tab,
 };
 use crate::palette::{UiPalette, space_4, space_8, space_12};
-use crate::widgets::chart::{CurveMeasurement, paint_curve_at_size};
+use crate::widgets::chart::{CurveMeasurement, CurvePaintAccess, paint_curve_at_size};
 use crate::widgets::controls::{ControlTone, ControlVisual, detail_row_scene};
 use crate::window::{Role, TextRole};
 use bevy::color::Color;
-use bevy::ecs::{component::Component, entity::Entity, hierarchy::Children, world::World};
+use bevy::ecs::system::Query;
+use bevy::ecs::{component::Component, entity::Entity, hierarchy::Children};
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
@@ -172,32 +173,30 @@ pub(super) fn properties_modal_scene(
         ]
     }
 }
-pub(super) fn paint_curves(world: &mut World) {
-    let pending = world
-        .query::<(
-            Entity,
-            &ComputedNode,
-            &ProcessPropertiesCurve,
-            &CurveMeasurement,
-        )>()
-        .iter(world)
-        .filter_map(|(entity, node, curve, last)| {
-            let size = node.size() * node.inverse_scale_factor();
-            (size.x > 0.0 && size.y > 0.0 && last.0 != Some((size.x, size.y)))
-                .then(|| (entity, size, curve.clone()))
-        })
-        .collect::<Vec<_>>();
-    for (entity, size, curve) in pending {
-        if paint_curve_at_size(
-            world,
-            entity,
-            size,
-            &curve.samples,
-            curve.ceiling,
-            curve.color,
-        ) && let Some(mut measured) = world.get_mut::<CurveMeasurement>(entity)
+pub(super) fn paint_curves(
+    mut curves: Query<(
+        Entity,
+        &ComputedNode,
+        &ProcessPropertiesCurve,
+        &mut CurveMeasurement,
+    )>,
+    mut access: CurvePaintAccess,
+) {
+    for (entity, node, curve, mut last) in &mut curves {
+        let size = node.size() * node.inverse_scale_factor();
+        if size.x > 0.0
+            && size.y > 0.0
+            && last.0 != Some((size.x, size.y))
+            && paint_curve_at_size(
+                &mut access,
+                entity,
+                size,
+                &curve.samples,
+                curve.ceiling,
+                curve.color,
+            )
         {
-            measured.0 = Some((size.x, size.y));
+            last.0 = Some((size.x, size.y));
         }
     }
 }

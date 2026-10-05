@@ -710,6 +710,9 @@ pub(super) fn dyn_field_text(shell: &ShellApp, field: &DynField) -> String {
     match field {
         DynField::Summary(field) => summary_value(shell, *field),
         DynField::CurveCaption(curve) => curve_caption(shell, *curve),
+        DynField::BatteryCaption(device) => batteries(shell)
+            .and_then(|rows| rows.iter().find(|battery| &battery.id == device))
+            .map_or_else(missing_value, battery_caption),
         DynField::Cpu(field) => cpu_field_text(shell, *field),
         DynField::Device { section, device } => device_line(shell, *section, device),
         DynField::Segment(kind) => segment_value(shell, *kind),

@@ -17,17 +17,19 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::message::MessageReader;
+use bevy::ecs::message::MessageWriter;
 use bevy::ecs::query::{Changed, Has, Or, With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
+use bevy::ecs::system::SystemParam;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
-use bevy::ecs::world::World;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::keyboard::{Key, KeyCode};
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin};
 use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::picking::hover::PickingInteraction;
+use bevy::ui::{CalculatedClip, ComputedNode, UiGlobalTransform};
 use bevy::ui::{Node, Outline, Val};
 use bevy::ui_widgets::ScrollIntoView;
 use bevy::ui_widgets::{Button, Checkbox, RadioButton};
@@ -35,6 +37,7 @@ use bevy::window::PrimaryWindow;
 
 use crate::confirmation::ConfirmationOverlay;
 use crate::pages::processes::properties_modal::ProcessPropertiesOverlay;
+use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, WindowPalette};
 
 /// The most recent origin capable of changing focus in the window.
@@ -194,39 +197,45 @@ fn reveal_keyboard_focus(
     }
 }
 
-/// Capture uses normal Tab messages and waits for the actual painted control.
-pub(crate) fn capture_ready(world: &mut World, switch: bool) -> bool {
-    use bevy::ui::{CalculatedClip, ComputedNode, UiGlobalTransform};
+type FocusControlQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static ComputedNode,
+        &'static UiGlobalTransform,
+        Option<&'static CalculatedClip>,
+        Has<Checkbox>,
+        Has<FocusRing>,
+        Has<FocusRingVisible>,
+    ),
+>;
 
-    let focused = world.resource::<InputFocus>().get();
-    if let Some(entity) = focused
-        && (!switch || world.get::<Checkbox>(entity).is_some())
-        && world.get::<FocusRing>(entity).is_some()
+/// Capture uses normal Tab messages and waits for the actual painted control.
+#[derive(SystemParam)]
+pub(crate) struct FocusCapture<'w, 's> {
+    focus: Res<'w, InputFocus>,
+    controls: FocusControlQuery<'w, 's>,
+    windows: Query<'w, 's, Entity, With<PrimaryWindow>>,
+    keyboard: MessageWriter<'w, KeyboardInput>,
+}
+pub(crate) fn capture_ready(access: &mut FocusCapture, switch: bool) -> bool {
+    if let Some(entity) = access.focus.get()
+        && let Ok((node, transform, clip, checkbox, ring, ring_visible)) =
+            access.controls.get(entity)
+        && (!switch || checkbox)
+        && ring
     {
-        let Some(node) = world.get::<ComputedNode>(entity) else {
-            return false;
-        };
-        let Some(transform) = world.get::<UiGlobalTransform>(entity) else {
-            return false;
-        };
         let half = node.outlined_node_size() * 0.5;
-        let visible = world.get::<CalculatedClip>(entity).is_none_or(|clip| {
+        let visible = clip.is_none_or(|clip| {
             clip.contains_point(transform.translation - half)
                 && clip.contains_point(transform.translation + half)
         });
-        return world.get::<FocusRingVisible>(entity).is_some()
-            && node.size().x > 0.0
-            && node.size().y > 0.0
-            && visible;
+        return ring_visible && node.size().x > 0.0 && node.size().y > 0.0 && visible;
     }
-    let Some(window) = world
-        .query_filtered::<Entity, With<PrimaryWindow>>()
-        .iter(world)
-        .next()
-    else {
+    let Some(window) = access.windows.iter().next() else {
         return false;
     };
-    world.write_message(KeyboardInput {
+    access.keyboard.write(KeyboardInput {
         key_code: KeyCode::Tab,
         logical_key: Key::Tab,
         state: ButtonState::Pressed,
@@ -236,7 +245,6 @@ pub(crate) fn capture_ready(world: &mut World, switch: bool) -> bool {
     });
     false
 }
-
 /// System observing keyboard activity: any keyboard press transitions the modality to [`InputModality::Keyboard`].
 pub(crate) fn focus_visible_keyboard_system(
     mut modality: ResMut<InputModalityState>,
@@ -272,7 +280,9 @@ pub(crate) fn register(app: &mut App) {
     }
     app.add_systems(
         PostUpdate,
-        (decorate_groups, decorate_controls, paint_focus_ring).chain(),
+        (decorate_groups, decorate_controls, paint_focus_ring)
+            .chain()
+            .after(ScenePaint),
     );
     app.add_systems(
         PostUpdate,

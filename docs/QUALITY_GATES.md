@@ -1,7 +1,6 @@
 # TaskForest 质量门禁
 
-本文定义当前公开仓库的验证层级。门禁证明行为、边界和发布构造，不使用内部评分、截图数量
-或主机回执替代产品验证。
+本文定义当前公开仓库的验证层级。门禁证明行为、边界和发布构造，不使用内部评分、截图数量或主机回执替代产品验证。
 
 ## 1. 合并门
 
@@ -21,8 +20,7 @@
 | CORE-04 functional matrix | 验证每个产品意图在 GPUI/Iced/TUI/Bevy 都有显式 surface decision |
 | capability delivery registry | 拒绝参考层把语义合同能力声明为已挂载组件（`Reference`）；语义合同须声明 `Ported`，集合只按挂载证据增长 |
 
-CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 1.99.0；
-`Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
+CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 1.99.0；`Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
 Windows 原生边界以及 macOS 编译/库测试在每次 PR 与 main push 的 portability workflow 中阻塞运行；
 macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能替代原生 API 或设备证据。
 
@@ -46,8 +44,7 @@ bash scripts/quality/local-gates.sh extended
 ```
 
 - `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
-- `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build 和
-  平台无关形态矩阵，以及 Linux release/package smoke；
+- `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build、平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
 
 **范围隔离**：并行前端线共用一个工作区时，追加 `--scope <core|bevy|gpui|iced|tui>`
@@ -69,6 +66,9 @@ scoped 下随 standard 直接运行）。
 
 Windows 开发机使用 `scripts/windows/local-gates.sh`，通过 Git Bash 调用同一组可移植门禁；
 Windows telemetry、测试和 helper 不使用 PowerShell 或其他命令解释器采集系统事实。
+
+Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick 与 CI 中检查：
+生产源码不得接收整世界或通过 App、hook、排队闭包绕过显式参数；范围见 [Bevy 章程](BEVY_UI_FRONTEND.md)。
 
 ## 3. 公开仓库门禁
 

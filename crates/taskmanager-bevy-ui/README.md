@@ -97,6 +97,10 @@ modal consumes all keyboard input, exposes scroll keys, and reserves title/actio
 around one bounded body viewport.
 
 ## Boundary
+
+Systems and observers declare specific resources and component queries. The
+[frontend charter](../../docs/BEVY_UI_FRONTEND.md) forbids unrestricted world
+access; composition registers the access sets and coalesced paint systems.
 Properties reserve title, identity, wrapping selectors and complete footer actions.
 The remaining body owns scrolling and an eight-pixel final inset; labels and
 values occupy separate bounded rows. Charts retain their readable floor;
@@ -158,6 +162,7 @@ Verify with `cargo check --locked -p taskmanager-bevy-ui --tests`,
 `bash scripts/accept-bevy-interactions.sh`, and
 `cargo clippy --locked -p taskmanager-bevy-ui --tests`. The 100% Scene law is
 also enforced by `python3 scripts/quality/bevy_bsn_guard.py --mode enforce`;
+`python3 scripts/quality/bevy_world_access_guard.py` checks resource access;
 real pixels require
 `bash scripts/capture-bevy.sh` in a live Wayland compositor; its validator is
 fail-closed on app_id, PID/window identity, PNG, markers, source provenance

@@ -1,15 +1,13 @@
 //! Diagnostic review, input ownership and correlated background publication.
 
 use bevy::app::{App, PreUpdate};
-use bevy::ecs::change_detection::Mut;
 use bevy::ecs::component::Component;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, Query};
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Commands, Query, ResMut, SystemParam};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
@@ -21,17 +19,16 @@ use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
-use taskmanager_core::core::diagnostics::DiagnosticBundleError;
+use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_preview_text,
 };
 
-use crate::app::FrontendTrack;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
 use crate::window_surface::{
-    ModalBody, WindowSurface, WindowSurfaceChanged, WindowSurfaceKind, WindowSurfaceState, close,
-    modal_scene, show,
+    ModalBody, SurfaceAccess, WindowSurface, WindowSurfaceChanged, WindowSurfaceKind,
+    WindowSurfaceState, close, modal_scene, show,
 };
 
 #[derive(Event, Clone, Debug, Default)]
@@ -70,88 +67,100 @@ pub(crate) fn register(app: &mut App) {
         .add_systems(PreUpdate, drain);
 }
 
-fn on_command(command: On<DiagnosticCommand>, mut commands: Commands) {
-    let command = command.event().clone();
-    commands.queue(move |world: &mut World| apply_command(world, command));
+#[derive(SystemParam)]
+struct DiagnosticAccess<'w, 's> {
+    surface: SurfaceAccess<'w>,
+    bodies: Query<'w, 's, (&'static ComputedNode, &'static mut ScrollPosition), With<ModalBody>>,
+    commands: Commands<'w, 's>,
 }
-
-fn apply_command(world: &mut World, command: DiagnosticCommand) {
+fn on_command(command: On<DiagnosticCommand>, mut access: DiagnosticAccess) {
+    let command = command.event().clone();
     if matches!(command, DiagnosticCommand::Retry)
         && !matches!(
-            world.resource::<WindowSurfaceState>().diagnostic(),
+            access.surface.state.diagnostic(),
             Some(DiagnosticBundleUiState::Failed(_))
         )
     {
         return;
     }
-    if let DiagnosticCommand::Scroll(delta) = command {
-        let mut query =
-            world.query_filtered::<(&ComputedNode, &mut ScrollPosition), With<ModalBody>>();
-        for (node, mut scroll) in query.iter_mut(world) {
-            let maximum =
-                ((node.content_size().y - node.size().y) * node.inverse_scale_factor()).max(0.0);
-            scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
-        }
-        return;
-    }
     match command {
         DiagnosticCommand::Open | DiagnosticCommand::Retry => {
-            let state = DiagnosticBundleUiState::prepared(
-                world
-                    .non_send::<FrontendTrack>()
-                    .shell
-                    .projection()
-                    .prepare_diagnostic_bundle(None),
+            let plan = access
+                .surface
+                .track
+                .as_ref()
+                .map(|track| track.shell.projection().prepare_diagnostic_bundle(None))
+                .unwrap_or_else(|| {
+                    Err(DiagnosticBundleError::new(
+                        DiagnosticBundleErrorKind::Unavailable,
+                    ))
+                });
+            show(
+                &mut access.surface,
+                &mut access.commands,
+                WindowSurface::Diagnostic(DiagnosticBundleUiState::prepared(plan)),
             );
-            show(world, WindowSurface::Diagnostic(state));
         }
         DiagnosticCommand::Failure(error) => {
-            world.resource_mut::<DiagnosticRuntime>().close();
             show(
-                world,
+                &mut access.surface,
+                &mut access.commands,
                 WindowSurface::Diagnostic(DiagnosticBundleUiState::Failed(error)),
             );
         }
         DiagnosticCommand::Confirm => {
-            let timestamp = world
-                .non_send::<FrontendTrack>()
-                .shell
-                .projection()
-                .snapshot
+            let timestamp = access
+                .surface
+                .track
                 .as_ref()
+                .and_then(|track| track.shell.projection().snapshot.as_ref())
                 .map_or(0, |snapshot| snapshot.timestamp_ms);
             let target = DiagnosticBundleTarget::current_directory(format!(
                 "taskmanager-diagnostics-{timestamp}.json"
             ));
-            world.resource_scope(|world, mut runtime: Mut<DiagnosticRuntime>| {
-                if let Some(state) = world.resource_mut::<WindowSurfaceState>().diagnostic_mut() {
-                    state.confirm(runtime.0.as_mut(), target);
-                }
-            });
+            let runtime = access
+                .surface
+                .diagnostic
+                .as_mut()
+                .and_then(|runtime| runtime.0.as_mut());
+            if let Some(state) = access.surface.state.diagnostic_mut() {
+                state.confirm(runtime, target);
+            }
         }
-        DiagnosticCommand::Scroll(_) => {}
-        DiagnosticCommand::Close => {
-            world.resource_mut::<DiagnosticRuntime>().close();
-            close(world, WindowSurfaceKind::Diagnostic);
+        DiagnosticCommand::Scroll(delta) => {
+            for (node, mut scroll) in &mut access.bodies {
+                let maximum = ((node.content_size().y - node.size().y)
+                    * node.inverse_scale_factor())
+                .max(0.0);
+                scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
+            }
+            return;
         }
+        DiagnosticCommand::Close => close(
+            &mut access.surface,
+            &mut access.commands,
+            WindowSurfaceKind::Diagnostic,
+        ),
     }
-    world.trigger(WindowSurfaceChanged);
+    access.commands.trigger(WindowSurfaceChanged);
 }
-
-fn drain(world: &mut World) {
-    let completions = world
-        .resource_mut::<DiagnosticRuntime>()
+fn drain(
+    mut runtime: ResMut<DiagnosticRuntime>,
+    mut surface: ResMut<WindowSurfaceState>,
+    mut commands: Commands,
+) {
+    let completions = runtime
         .0
         .as_mut()
         .map_or_else(Vec::new, DiagnosticBundleSession::drain);
     let mut changed = false;
     for completion in completions {
-        if let Some(state) = world.resource_mut::<WindowSurfaceState>().diagnostic_mut() {
+        if let Some(state) = surface.diagnostic_mut() {
             changed |= state.complete(completion);
         }
     }
     if changed {
-        world.trigger(WindowSurfaceChanged);
+        commands.trigger(WindowSurfaceChanged);
     }
 }
 

@@ -319,6 +319,7 @@ fn the_disabled_page_states_itself_exactly_once() {
     // The paint path (bound by the page's on-insert hook) reads these two
     // resources; the window composition always has them.
     app.insert_resource(crate::pages::history::HistoryProjectionResource::default());
+    crate::pages::history::scene::register(&mut app);
     app.insert_resource(crate::window::WindowPalette {
         inner: crate::palette::ui_palette(&Theme::dark()),
     });

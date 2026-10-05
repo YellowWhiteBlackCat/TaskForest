@@ -12,12 +12,9 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
-use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
-use bevy::ecs::world::DeferredWorld;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{AlignItems, BorderRadius, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
@@ -338,7 +335,6 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
 
 /// Marker for the formal Applications route's hierarchy strip.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[component(on_insert = bind_tree_observer)]
 pub(crate) struct ProcessTreeSurface;
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -347,16 +343,9 @@ struct ProcessTreeRows;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ProcessTreeCountLine;
 
-#[derive(Resource, Default)]
-struct TreeObserverBound;
-
-fn bind_tree_observer(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if world.get_resource::<TreeObserverBound>().is_some() {
-        return;
-    }
-    world.commands().insert_resource(TreeObserverBound);
-    world.commands().add_observer(refresh_tree_on_fold);
-    world.commands().add_observer(refresh_tree_on_expansion);
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.add_observer(refresh_tree_on_fold);
+    app.add_observer(refresh_tree_on_expansion);
 }
 
 #[derive(Event)]

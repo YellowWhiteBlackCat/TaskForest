@@ -18,9 +18,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
-use bevy::ecs::resource::Resource;
-use bevy::ecs::system::Commands;
-use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent,
     px,
@@ -77,37 +75,10 @@ pub(crate) struct MemoryInventoryAnchor;
 
 /// The page's root: mounting it binds the paint observers.
 #[derive(Component, Clone, Default)]
-#[component(on_insert = bind_system_page)]
 pub(crate) struct SystemPageRoot;
 
-#[derive(Resource, Default)]
-struct SystemPageBound;
-
-/// Bind the paint observers to the app, once per world. The body's own Add
-/// is the first-paint trigger (the root's insert fires before the body
-/// exists); the fold observer is the only later refresh.
-fn bind_system_page(
-    mut world: bevy::ecs::world::DeferredWorld<'_>,
-    _context: bevy::ecs::lifecycle::HookContext,
-) {
-    if world.get_resource::<SystemPageBound>().is_some() {
-        return;
-    }
-    let mut commands = world.commands();
-    commands.insert_resource(SystemPageBound);
-    commands.add_observer(on_body_added);
-    commands.add_observer(on_projection_folded);
-}
-
-/// First paint: the body container just landed.
-fn on_body_added(_added: On<Add<SystemBody>>, mut commands: Commands) {
-    commands.queue(paint_system);
-}
-
-/// The drain fold is the page's only later data-refresh trigger.
-fn on_projection_folded(_fold: On<ShellProjectionFolded>, mut commands: Commands) {
-    commands.queue(paint_system);
-}
+pub(crate) mod paint;
+pub(crate) use paint::register;
 
 // ---- pure projection ------------------------------------------------------
 
@@ -576,129 +547,6 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                 SystemBody ScrollArea
 
         ]
-    }
-}
-
-// ---- the single body author ------------------------------------------------
-
-pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let (hardware, smbios, npu, sensors, summary, status) = {
-        let shell = &world.non_send::<FrontendTrack>().shell;
-        let smbios = match shell.smbios_memory_state() {
-            SmbiosMemoryState::Ready(ready) => Some(ready.snapshot.clone()),
-            _ => None,
-        };
-        let projection = shell.projection();
-        let npu = projection.npu_inventory.clone();
-        let hardware = projection.hardware.clone();
-        let sensors = projection.sensors.clone();
-        let summary = system_summary_model(projection);
-        let status = status_line_text(
-            hardware.as_ref(),
-            smbios.as_ref(),
-            npu.as_ref(),
-            sensors.as_ref(),
-        );
-        (hardware, smbios, npu, sensors, summary, status)
-    };
-    let status = if let Some(state) = world
-        .get_resource::<SystemDashboardState>()
-        .filter(|state| state.section == SystemPageSection::Dashboard)
-    {
-        let projection = world.non_send::<FrontendTrack>().shell.projection();
-        let count = projection
-            .processes
-            .as_ref()
-            .map_or_else(missing_value, |rows| rows.len().to_string());
-        format!(
-            "{} {} · {} {} · {}",
-            t("dashboard.processes"),
-            count,
-            t("dashboard.active_alerts"),
-            projection.alert_active.len(),
-            state.window.label()
-        )
-    } else {
-        status
-    };
-    let scene: Box<dyn Scene> = if world
-        .get_resource::<SystemDashboardState>()
-        .is_some_and(|state| state.section == SystemPageSection::Dashboard)
-    {
-        let size = world
-            .query_filtered::<&ComputedNode, With<SystemBody>>()
-            .iter(world)
-            .next()
-            .map(|node| node.size() * node.inverse_scale_factor())
-            .unwrap_or_default();
-        let state = world.resource::<SystemDashboardState>();
-        let series = world
-            .non_send::<FrontendTrack>()
-            .shell
-            .system_timeline_series(state.window);
-        Box::new(dashboard::body(
-            &series,
-            state,
-            SystemDashboardBudget::resolve(size.x, size.y),
-            &palette,
-        ))
-    } else {
-        Box::new(system_body_scene(
-            hardware.as_ref(),
-            smbios.as_ref(),
-            npu.as_ref(),
-            sensors.as_ref(),
-            &summary,
-            &palette,
-        ))
-    };
-    if let Some(state) = world.get_resource::<SystemDashboardState>() {
-        let toolbar = dashboard::toolbar(state, &palette);
-        if let Some(host) = world
-            .query_filtered::<bevy::ecs::entity::Entity, With<SystemDashboardToolbar>>()
-            .iter(world)
-            .next()
-        {
-            let old = world
-                .get::<Children>(host)
-                .map(|children| children.iter().copied().collect::<Vec<_>>())
-                .unwrap_or_default();
-            for child in old {
-                let _ = world.despawn(child);
-            }
-            if let Ok(fresh) = world.spawn_scene(toolbar) {
-                let child = fresh.id();
-                world
-                    .entity_mut(host)
-                    .add_one_related::<bevy::ecs::hierarchy::ChildOf>(child);
-            }
-        }
-    }
-    let mut body_query = world.query_filtered::<bevy::ecs::entity::Entity, With<SystemBody>>();
-    let Some(body) = body_query.iter(world).next() else {
-        return;
-    };
-    let stale: Vec<bevy::ecs::entity::Entity> = world
-        .get::<bevy::ecs::hierarchy::Children>(body)
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    // Synchronous World mutation, not queued commands: a same-frame second
-    // paint must observe the previous paint's result or it would double the
-    // body (the same lesson the History page learned).
-    for entity in stale {
-        let _ = world.despawn(entity);
-    }
-    let fresh = match world.spawn_scene(scene) {
-        Ok(entity) => entity.id(),
-        Err(_) => return,
-    };
-    world
-        .entity_mut(body)
-        .add_one_related::<bevy::ecs::hierarchy::ChildOf>(fresh);
-    let mut lines = world.query_filtered::<&mut Text, With<SystemStatusLine>>();
-    if let Ok(mut line) = lines.single_mut(world) {
-        line.0 = status;
     }
 }
 

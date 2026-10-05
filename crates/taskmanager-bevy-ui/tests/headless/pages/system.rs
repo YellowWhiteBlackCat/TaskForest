@@ -21,7 +21,7 @@ use taskmanager_shell::fixture;
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_theme::Theme;
 
-use super::{clean_memory_size, content, paint_system, system_fact_rows, system_summary_model};
+use super::{clean_memory_size, content, system_fact_rows, system_summary_model};
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::pages::history::HistoryProjectionResource;
@@ -136,8 +136,8 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.init_resource::<HistoryProjectionResource>();
-    // Mount the REAL page scene: the root's on-insert hook binds the paint
-    // pass, which authors the body container. The context borrows locals;
+    super::register(&mut app);
+    // Mount the real scene after registering its typed paint system. The context borrows locals;
     // the shell moves into the track right after the spawn.
     let shell = shell_with_hardware(Some(fixture_hardware()));
     let palette = crate::palette::ui_palette(&Theme::dark());
@@ -159,8 +159,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         initial_refresh_submitted: true,
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
-    // NO manual paint: the on-insert bind hook must author the body by
-    // itself, exactly as the windowed composition does.
+    // Mount notification must author the body through the scheduled system.
     app.update();
 
     let world = app.world_mut();
@@ -182,7 +181,9 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     // fact is still stated exactly once, never duplicated.
     app.world_mut().trigger(ShellProjectionFolded);
     app.update();
-    paint_system(app.world_mut());
+    app.world_mut().trigger(ShellProjectionFolded);
+    app.world_mut().trigger(ShellProjectionFolded);
+    app.update();
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
     let value_seen = texts
@@ -421,6 +422,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.init_resource::<HistoryProjectionResource>();
+    super::register(&mut app);
 
     let history = HistoryProjectionResource::default();
     let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
@@ -474,6 +476,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     thermal_app.init_resource::<HistoryProjectionResource>();
+    super::register(&mut thermal_app);
 
     let context2 = crate::app::PageContext {
         gray_zero_values: false,

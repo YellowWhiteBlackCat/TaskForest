@@ -7,9 +7,9 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Commands, Query, SystemParam};
 use bevy::math::{Rot2, Vec2};
-use bevy::scene::{Scene, WorldSceneExt, bsn};
+use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
 
 /// Hard upper bound used by the performance chart surface.
@@ -236,26 +236,33 @@ pub(crate) struct CurveMeasurement(pub(crate) Option<(f32, f32)>);
 
 /// Replace a measured curve through the owned scene adapter. Failed scene
 /// publication cannot certify a rendered curve for capture readiness.
+#[derive(SystemParam)]
+pub(crate) struct CurvePaintAccess<'w, 's> {
+    children: Query<'w, 's, &'static Children>,
+    commands: Commands<'w, 's>,
+}
+
 pub(crate) fn paint_curve_at_size(
-    world: &mut World,
+    access: &mut CurvePaintAccess,
     entity: Entity,
     size: Vec2,
     samples: &[f32],
     ceiling: f32,
     color: bevy::color::Color,
 ) -> bool {
-    let old = world
-        .get::<Children>(entity)
-        .map(|children| children.iter().copied().collect::<Vec<_>>())
-        .unwrap_or_default();
-    for child in old {
-        let _ = world.despawn(child);
+    if let Ok(children) = access.children.get(entity) {
+        for child in children.iter() {
+            access.commands.entity(*child).despawn();
+        }
     }
     let segments = line_segments_scaled(samples, size.x, size.y, samples.len(), ceiling);
-    let Ok(fresh) = world.spawn_scene(polyline_scene(&segments, color)) else {
-        return false;
-    };
-    let child = fresh.id();
-    world.entity_mut(entity).add_one_related::<ChildOf>(child);
+    let child = access
+        .commands
+        .spawn_scene(polyline_scene(&segments, color))
+        .id();
+    access
+        .commands
+        .entity(entity)
+        .add_one_related::<ChildOf>(child);
     true
 }

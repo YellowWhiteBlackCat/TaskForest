@@ -461,6 +461,12 @@ fi
 if maybe bevy-bsn-guard; then
     run_stage bevy-bsn-guard quick run_py scripts/quality/bevy_bsn_guard.py --mode enforce
 fi
+if maybe bevy-world-access-self; then
+    run_stage bevy-world-access-self quick run_py scripts/quality/bevy_world_access_guard.py --self-test
+fi
+if maybe bevy-world-access; then
+    run_stage bevy-world-access quick run_py scripts/quality/bevy_world_access_guard.py
+fi
 if maybe test-layout-self; then
     run_stage test-layout-self quick run_py scripts/quality/test_layout_guard.py --self-test
 fi

@@ -16,7 +16,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::Commands;
 use bevy::ecs::system::Query;
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Res, ResMut};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
@@ -39,42 +39,38 @@ pub(crate) enum SystemInformationCommand {
 pub(crate) fn register(app: &mut App) {
     app.add_observer(on_command);
 }
-fn on_command(event: On<SystemInformationCommand>, mut commands: Commands) {
+fn on_command(
+    event: On<SystemInformationCommand>,
+    state: Res<WindowSurfaceState>,
+    mut clipboard: ResMut<ClipboardPort>,
+    mut bodies: Query<(&ComputedNode, &mut ScrollPosition), With<ModalBody>>,
+    mut commands: Commands,
+) {
     let command = *event.event();
-    commands.queue(move |world: &mut World| {
-        if matches!(command, SystemInformationCommand::Open) {
-            world.trigger(WindowSurfaceCommand::SystemInformation);
-            return;
+    if matches!(command, SystemInformationCommand::Open) {
+        commands.trigger(WindowSurfaceCommand::SystemInformation);
+        return;
+    }
+    let Some(WindowSurface::SystemInformation(facts)) = &state.0 else {
+        return;
+    };
+    match command {
+        SystemInformationCommand::Open => {}
+        SystemInformationCommand::Close => commands.trigger(WindowSurfaceCommand::Close(
+            WindowSurfaceKind::SystemInformation,
+        )),
+        SystemInformationCommand::Copy => {
+            clipboard.request_text(copy_all_text(facts), t("system_about.title"))
         }
-        let Some(WindowSurface::SystemInformation(facts)) =
-            &world.resource::<WindowSurfaceState>().0
-        else {
-            return;
-        };
-        match command {
-            SystemInformationCommand::Open => {}
-            SystemInformationCommand::Close => world.trigger(WindowSurfaceCommand::Close(
-                WindowSurfaceKind::SystemInformation,
-            )),
-            SystemInformationCommand::Copy => {
-                let text = copy_all_text(facts);
-                world
-                    .resource_mut::<ClipboardPort>()
-                    .request_text(text, t("system_about.title"));
-            }
-            SystemInformationCommand::Scroll(delta) => {
-                for (node, mut scroll) in world
-                    .query_filtered::<(&ComputedNode, &mut ScrollPosition), With<ModalBody>>()
-                    .iter_mut(world)
-                {
-                    let maximum = ((node.content_size().y - node.size().y)
-                        * node.inverse_scale_factor())
-                    .max(0.0);
-                    scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
-                }
+        SystemInformationCommand::Scroll(delta) => {
+            for (node, mut scroll) in &mut bodies {
+                let maximum = ((node.content_size().y - node.size().y)
+                    * node.inverse_scale_factor())
+                .max(0.0);
+                scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
             }
         }
-    });
+    }
 }
 
 #[derive(Component, Clone, Default)]

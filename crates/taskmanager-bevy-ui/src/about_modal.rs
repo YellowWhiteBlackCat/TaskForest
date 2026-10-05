@@ -13,8 +13,7 @@ use bevy::ecs::component::Component;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::system::{Commands, Query};
-use bevy::ecs::world::World;
+use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
@@ -42,50 +41,39 @@ pub(crate) struct AboutControl(pub(crate) AboutCommand);
 pub(crate) fn register(app: &mut App) {
     app.add_observer(on_command);
 }
-fn on_command(command: On<AboutCommand>, mut commands: Commands) {
+fn on_command(
+    command: On<AboutCommand>,
+    state: Res<WindowSurfaceState>,
+    mut clipboard: Option<ResMut<ClipboardPort>>,
+    mut pending: Option<ResMut<PendingEffects>>,
+    mut commands: Commands,
+) {
+    let about_open = matches!(state.0, Some(WindowSurface::About));
     match command.event() {
         AboutCommand::Open => commands.trigger(WindowSurfaceCommand::About),
         AboutCommand::Close => {
             commands.trigger(WindowSurfaceCommand::Close(WindowSurfaceKind::About))
         }
-        AboutCommand::Copy => commands.queue(|world: &mut World| {
-            if !matches!(
-                world.resource::<WindowSurfaceState>().0,
-                Some(WindowSurface::About)
-            ) {
-                return;
+        AboutCommand::Copy if about_open => {
+            if let Some(clipboard) = clipboard.as_mut() {
+                clipboard.request_text(about_text(), t("about.title"));
             }
-            let payload = about_text();
-            if let Some(mut clipboard) = world.get_resource_mut::<ClipboardPort>() {
-                clipboard.request_text(payload, t("about.title"));
+        }
+        AboutCommand::Repository if about_open => {
+            if let Some(pending) = pending.as_mut() {
+                pending.0.push(PlatformEffect::OpenUrl(UrlOpenRequest {
+                    url: REPOSITORY_URL.into(),
+                }));
             }
-        }),
-        AboutCommand::Repository => commands.queue(|world: &mut World| {
-            if matches!(
-                world.resource::<WindowSurfaceState>().0,
-                Some(WindowSurface::About)
-            ) {
-                world
-                    .resource_mut::<PendingEffects>()
-                    .0
-                    .push(PlatformEffect::OpenUrl(UrlOpenRequest {
-                        url: REPOSITORY_URL.into(),
-                    }));
-            }
-        }),
+        }
         AboutCommand::SystemInformation => {
             commands.trigger(WindowSurfaceCommand::SystemInformation)
         }
-        AboutCommand::Diagnostics => commands.queue(|world: &mut World| {
-            if matches!(
-                world.resource::<WindowSurfaceState>().0,
-                Some(WindowSurface::About)
-            ) {
-                world.trigger(DiagnosticCommand::Open);
-            }
-        }),
+        AboutCommand::Diagnostics if about_open => commands.trigger(DiagnosticCommand::Open),
+        _ => {}
     }
 }
+
 fn activate(activate: On<Activate>, controls: Query<&AboutControl>, mut commands: Commands) {
     if let Ok(control) = controls.get(activate.entity) {
         commands.trigger(control.0);

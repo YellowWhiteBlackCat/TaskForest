@@ -1,6 +1,11 @@
 //! Bevy scene construction and observer painting for application history.
 
-use bevy::scene::WorldSceneExt;
+use crate::widgets::scene_paint::ScenePaint;
+use bevy::app::{App, PostUpdate};
+use bevy::ecs::schedule::IntoScheduleConfigs;
+use bevy::ecs::system::Query;
+use bevy::scene::CommandsSceneExt;
+use bevy::ui::UiSystems;
 
 use super::*;
 use crate::widgets::history_controls::toolbar_scene;
@@ -15,15 +20,16 @@ struct HistoryToolbar;
 
 // ---- Bevy 0.20 scene adapter ----
 
-#[derive(Resource)]
-struct HistoryPageBound;
+#[derive(Resource, Default)]
+struct HistoryPaint {
+    dirty: bool,
+}
 
 /// Build the route-ready page scene from one immutable application
 /// projection. Mainline route registration supplies the projection resource;
 /// this function never reaches into app-host or the process projection.
 /// The History page shell: title, status line, and the EMPTY body container.
-/// The body's only author is [`paint_history`] (bound by the root's
-/// on-insert hook) — a static initial body here would race the paint pass
+/// The body's only author is the coalesced [`paint_history`] system — a static initial body here would race the paint pass
 /// into a doubled surface, so the container starts empty by contract.
 pub(crate) fn content(
     projection: &ApplicationHistoryProjection,
@@ -240,79 +246,80 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
 
 // ---- observer lifecycle ----
 
-pub(super) fn bind_history_page(mut world: DeferredWorld<'_>, _context: HookContext) {
-    if world.get_resource_mut::<HistoryPageBound>().is_some() {
+pub(crate) fn register(app: &mut App) {
+    app.init_resource::<HistoryPaint>();
+    app.add_observer(on_history_body_added);
+    app.add_observer(on_history_changed);
+    app.add_systems(
+        PostUpdate,
+        paint_history.in_set(ScenePaint).before(UiSystems::Prepare),
+    );
+}
+fn on_history_body_added(_event: On<Add<HistoryBody>>, mut paint: ResMut<HistoryPaint>) {
+    paint.dirty = true;
+}
+fn on_history_changed(_event: On<ApplicationHistoryChanged>, mut paint: ResMut<HistoryPaint>) {
+    paint.dirty = true;
+}
+#[derive(SystemParam)]
+struct HistoryRender<'w, 's> {
+    projection: Res<'w, HistoryProjectionResource>,
+    palette: Res<'w, WindowPalette>,
+    paint: ResMut<'w, HistoryPaint>,
+    bodies: Query<'w, 's, (Entity, Option<&'static Children>), With<HistoryBody>>,
+    toolbars:
+        Query<'w, 's, (Entity, &'static mut Node, Option<&'static Children>), With<HistoryToolbar>>,
+    lines: Query<'w, 's, &'static mut Text, With<HistoryStatusLine>>,
+    commands: Commands<'w, 's>,
+}
+fn paint_history(mut render: HistoryRender) {
+    if !render.paint.dirty {
         return;
     }
-    let mut commands = world.commands();
-    commands.insert_resource(HistoryPageBound);
-    commands.add_observer(on_history_body_added);
-    commands.add_observer(on_history_changed);
-    commands.queue(paint_history);
-}
-
-fn on_history_body_added(_added: On<Add<HistoryBody>>, mut commands: Commands) {
-    commands.queue(paint_history);
-}
-
-fn on_history_changed(_changed: On<ApplicationHistoryChanged>, mut commands: Commands) {
-    commands.queue(paint_history);
-}
-
-fn paint_history(world: &mut World) {
-    let projection = world.resource::<HistoryProjectionResource>().0.clone();
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let model = HistoryPageModel::from_projection(&projection);
-    let scene = history_body_scene(&model, &palette);
-    let mut body_query = world.query_filtered::<(Entity, Option<&Children>), With<HistoryBody>>();
-    let Some((body, children)) = body_query.iter(world).next() else {
+    let Some((body, children)) = render.bodies.iter().next() else {
         return;
     };
-    let stale: Vec<Entity> = children
-        .map(|children| children.iter().copied().collect())
-        .unwrap_or_default();
-    // Synchronous World mutation, not queued commands: a same-frame second
-    // paint (bind hook + Add can both fire in one flush) must observe the
-    // previous paint's result, or each stale pass spawns a duplicate body.
-    for entity in stale {
-        let _ = world.despawn(entity);
+    render.paint.dirty = false;
+    let model = HistoryPageModel::from_projection(&render.projection.0);
+    let palette = &render.palette.inner;
+    if let Some(children) = children {
+        for child in children.iter() {
+            render.commands.entity(*child).despawn();
+        }
     }
-    let fresh = match world.spawn_scene(scene) {
-        Ok(entity) => entity.id(),
-        Err(_) => return,
-    };
-    world.entity_mut(body).add_one_related::<ChildOf>(fresh);
-    let toolbars = world
-        .query_filtered::<Entity, With<HistoryToolbar>>()
-        .iter(world)
-        .collect::<Vec<_>>();
-    for toolbar in toolbars {
-        let old = world
-            .get::<Children>(toolbar)
-            .map(|children| children.iter().copied().collect::<Vec<_>>())
-            .unwrap_or_default();
-        for entity in old {
-            let _ = world.despawn(entity);
+    let fresh = render
+        .commands
+        .spawn_scene(history_body_scene(&model, palette))
+        .id();
+    render
+        .commands
+        .entity(body)
+        .add_one_related::<ChildOf>(fresh);
+    for (toolbar, mut node, children) in &mut render.toolbars {
+        if let Some(children) = children {
+            for child in children.iter() {
+                render.commands.entity(*child).despawn();
+            }
         }
         let available = matches!(
             model.status,
             ApplicationHistoryStatus::Ready | ApplicationHistoryStatus::Collecting
         );
-        if let Some(mut node) = world.get_mut::<Node>(toolbar) {
-            node.display = if available {
-                Display::Flex
-            } else {
-                Display::None
-            };
-        }
-        if let Ok(fresh) = world.spawn_scene(toolbar_scene(model.selected_window, false, &palette))
-        {
-            let child = fresh.id();
-            world.entity_mut(toolbar).add_one_related::<ChildOf>(child);
-        }
+        node.display = if available {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        let fresh = render
+            .commands
+            .spawn_scene(toolbar_scene(model.selected_window, false, palette))
+            .id();
+        render
+            .commands
+            .entity(toolbar)
+            .add_one_related::<ChildOf>(fresh);
     }
-    let mut lines = world.query_filtered::<&mut Text, With<HistoryStatusLine>>();
-    if let Ok(mut line) = lines.single_mut(world) {
+    for mut line in &mut render.lines {
         line.0 = summary_text(&model);
     }
 }
