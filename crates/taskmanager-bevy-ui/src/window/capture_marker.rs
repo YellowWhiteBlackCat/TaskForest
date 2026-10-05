@@ -17,14 +17,19 @@ use crate::pages::performance::{
 };
 use crate::pages::process_tree::ProcessTreeRowMarker;
 use crate::pages::processes::properties_modal::PropertiesCapture;
+use crate::pages::processes::{ProcessRowsRoot, ProcessScrollIntent, ProcessScrollState};
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
+use crate::widgets::table::ZeroValueCell;
+use crate::window::WindowPalette;
 use crate::window_surface::{ModalBody, WindowSurface, WindowSurfaceState};
+use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
+use bevy::text::TextColor;
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_application::i18n::t;
@@ -67,6 +72,19 @@ pub(super) struct CaptureAccess<'w, 's> {
         (&'static ComputedNode, &'static UiGlobalTransform),
         With<MemoryInventoryAnchor>,
     >,
+    zero_cells: Query<
+        'w,
+        's,
+        (
+            &'static ZeroValueCell,
+            &'static Text,
+            &'static ComputedNode,
+            &'static TextColor,
+        ),
+    >,
+    process_roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
+    process_scroll: Option<Res<'w, ProcessScrollState>>,
+    palette: Res<'w, WindowPalette>,
     tree_rows: Query<
         'w,
         's,
@@ -177,6 +195,44 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
+        Some("apps-zero-gray") => {
+            let Some(scroll) = access
+                .process_scroll
+                .as_ref()
+                .filter(|scroll| scroll.viewport_rows > 0)
+            else {
+                return;
+            };
+            let desired = access
+                .track
+                .shell
+                .visible_processes()
+                .len()
+                .saturating_sub(scroll.viewport_rows);
+            if scroll.top != desired {
+                if let Ok(root) = access.process_roots.single() {
+                    access.commands.trigger(ProcessScrollIntent {
+                        entity: root,
+                        rows: isize::MAX,
+                    });
+                }
+                return;
+            }
+            if !access.zero_cells.iter().any(|(zero, text, node, color)| {
+                zero.0
+                    && text.0 == "0.0%"
+                    && node.size().x > 0.0
+                    && node.size().y > 0.0
+                    && color.0 == access.palette.inner.dim_color
+            }) {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+
         Some("apps-group-expanded") => {
             let projection = access.track.shell.projection();
             let rows = crate::pages::process_tree::project_items(
