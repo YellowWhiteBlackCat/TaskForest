@@ -438,3 +438,51 @@ fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bound
         }
     }
 }
+
+#[test]
+fn alert_rule_controls_and_scroll_body_fit_measured_product_viewports() {
+    use crate::pages::alerts::editor::RuleButton;
+    pin_english();
+    for (width, height) in [
+        (480, 360),
+        (720, 480),
+        (1280, 720),
+        (1600, 360),
+        (480, 960),
+        (980, 560),
+    ] {
+        let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
+        let mut app = system_layout_app(width, height, client);
+        app.world_mut().non_send_mut::<FrontendTrack>().shell = demo_app();
+        app.world_mut().resource_mut::<Route>().page = Page::Alerts;
+        for _ in 0..6 {
+            app.update();
+        }
+        let world = app.world_mut();
+        let mut buttons = world.query::<(&RuleButton, &ComputedNode, &UiGlobalTransform)>();
+        let controls: Vec<_> = buttons.iter(world).collect();
+        assert!(
+            controls.len() >= 4 + 5 * 10,
+            "normal rule editing controls must be mounted"
+        );
+        for (_button, node, transform) in controls {
+            let half = node.size() * 0.5;
+            assert!(node.size().x > 0.0 && node.size().y > 0.0);
+            assert!(
+                transform.translation.x - half.x >= -0.5
+                    && transform.translation.x + half.x <= width as f32 + 0.5,
+                "right edge protected at {width} × {height}"
+            );
+        }
+        let mut bodies =
+            world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ScrollArea>>();
+        let (node, transform) = bodies.single(world).expect("one bounded rule body");
+        let half = node.size() * 0.5;
+        assert!(node.size().y > 0.0);
+        assert!(
+            transform.translation.y - half.y >= -0.5
+                && transform.translation.y + half.y <= height as f32 + 0.5,
+            "body remains inside the bottom edge"
+        );
+    }
+}

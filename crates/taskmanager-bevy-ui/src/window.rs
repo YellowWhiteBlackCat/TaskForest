@@ -334,6 +334,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::pages::system::dashboard::register(app);
         crate::pages::system::register(app);
         crate::pages::services::register(app);
+        crate::pages::alerts::editor::register(app);
         crate::pages::startup::register(app);
         crate::pages::sessions::register(app);
         crate::pages::process_tree::register(app);

@@ -374,7 +374,13 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
-NIRI_PGID="$(process_group "$NIRI_PID")"
+# setsid establishes the owned group after fork; wait for that transition.
+for _ in $(seq 1 20); do
+  NIRI_PGID="$(process_group "$NIRI_PID")"
+  [ "$NIRI_PGID" = "$NIRI_PID" ] && break
+  kill -0 "$NIRI_PID" 2>/dev/null || break
+  sleep 0.05
+done
 [ "$NIRI_PGID" = "$NIRI_PID" ] || {
   printf 'nested Niri did not obtain a private process group\n' >&2
   exit 1

@@ -77,6 +77,9 @@ adopted — theme tokens are the only skin authority.
   resolves canonical live keys independently of table filtering; measured
   charts preserve missing samples, and complete facet lists scroll in one
   bounded body between fixed selectors and actions.
+- `src/pages/alerts/editor.rs` mounts canonical rule creation, field edits,
+  enabled state, removal and clipboard import/export. Rules and events scroll
+  beneath fixed page actions; edits always reduce through the shared shell.
 - `src/pages/history/control.rs` routes both review surfaces through one history
   controller and native session. Performance review has pinned actions around
   a bounded body; application review admits complete metric cards in its own

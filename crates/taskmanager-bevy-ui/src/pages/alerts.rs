@@ -33,12 +33,11 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, Res};
 use bevy::scene::{EntityScene, ResolveContext, ResolveSceneError, ResolvedScene, Scene, bsn};
-use bevy::ui::Checked;
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px,
-};
+use bevy::ui::Overflow;
+use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Checkbox, ValueChange};
+use bevy::ui_widgets::{ScrollArea, ValueChange};
+pub(crate) mod editor;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
     Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
@@ -48,7 +47,7 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, She
 
 use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, space_4, space_8};
+use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
 use taskmanager_shell::queue_effect;
 
@@ -237,29 +236,6 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule) -> String {
     )
 }
 
-/// Marker on the alert rule authoring section.
-#[derive(Component, Clone, Default)]
-pub(crate) struct AlertRuleAuthoringRoot;
-
-/// Marker for rule authoring intent targets.
-#[derive(Component, Clone, Default)]
-pub(crate) struct AlertRuleAuthoringMarker;
-
-/// One authoring line showing metric, threshold comparison, and severity.
-pub(crate) fn rule_authoring_line(
-    metric: AlertMetric,
-    threshold: f32,
-    severity: AlertSeverity,
-) -> String {
-    format!(
-        "{} · Condition: value ≥ {:.1}{} · Severity: {}",
-        metric_label(metric),
-        threshold,
-        metric_unit(metric),
-        severity_label(severity),
-    )
-}
-
 pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
     match metric {
         AlertMetric::CpuUsagePercent => "CPU Usage",
@@ -267,26 +243,6 @@ pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
         AlertMetric::DiskTemperatureC => "Disk Temperature",
         AlertMetric::SmartPercentUsed => "SMART Percent Used",
         AlertMetric::SmartCriticalWarning => "SMART Critical Warning",
-    }
-}
-
-fn rule_authoring_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
-    let line = rule_authoring_line(AlertMetric::CpuUsagePercent, 85.0, AlertSeverity::Warning);
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px({ space_4() }),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        AlertRuleAuthoringRoot
-        AlertRuleAuthoringMarker
-        Children [
-             Text(line) TextRole(Role::Body)
-        ]
     }
 }
 
@@ -338,8 +294,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             .collect()
     };
     let rule_rows = rule_rows(rules, context.palette);
-    let authoring_rows: Vec<Box<dyn Scene>> =
-        vec![Box::new(rule_authoring_scene(context.palette)) as Box<dyn Scene>];
+    let toolbar = editor::toolbar(context.palette);
     let events = projection.alert_center.event_history();
     let event_rows: Vec<Box<dyn Scene>> = if events.is_empty() {
         vec![Box::new(empty_events_scene()) as Box<dyn Scene>]
@@ -363,14 +318,20 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
              Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) --
              Text(summary) TextRole(Role::Caption) --
+            @{ toolbar } --
+            Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_shrink: 1.0, flex_direction: FlexDirection::Column, overflow: Overflow::clip() }
+            ScrollArea
+            Children [
+            Node { width: percent(100), flex_direction: FlexDirection::Column, row_gap: px(space_8()) }
+            Children [
              Text("Active alerts") TextRole(Role::Caption) --
             { active_rows }--
              Text("Rules") TextRole(Role::Caption) --
             { rule_rows }--
-             Text("Rule authoring") TextRole(Role::Caption) --
-            { authoring_rows }--
              Text("Event history") TextRole(Role::Caption) --
-            { event_rows }--
+            { event_rows }
+            ]
+            ] --
             { EntityScene(page_observer(alerts_fold_observer)) }--
             { EntityScene(page_observer(rule_toggle_observer)) }
         ]
@@ -420,67 +381,8 @@ fn active_row_scene(line: String) -> impl Scene + use<> {
 fn rule_rows(rules: &[ManagedAlertRule], palette: &UiPalette) -> Vec<Box<dyn Scene>> {
     rules
         .iter()
-        .map(|managed| {
-            let line = managed_rule_line(managed);
-            let rule_id = managed.rule.id.clone();
-            if managed.enabled {
-                Box::new(checked_rule_row(line, rule_id, palette)) as Box<dyn Scene>
-            } else {
-                Box::new(unchecked_rule_row(line, rule_id, palette)) as Box<dyn Scene>
-            }
-        })
+        .map(|managed| Box::new(editor::row(managed, palette)) as Box<dyn Scene>)
         .collect()
-}
-
-fn checked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-
-                Node {
-                    width: px(24.0),
-                    height: px(24.0),
-                    border_radius: BorderRadius::all(Val::Px(radius / 4.0)),
-                }
-                Checkbox
-                Checked
-                AlertRuleToggleTarget(rule_id)
-            --
-             Text(line) TextRole(Role::Body)
-        ]
-    }
-}
-
-fn unchecked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-
-                Node {
-                    width: px(24.0),
-                    height: px(24.0),
-                    border_radius: BorderRadius::all(Val::Px(radius / 4.0)),
-                }
-                Checkbox
-                AlertRuleToggleTarget(rule_id)
-            --
-             Text(line) TextRole(Role::Body)
-        ]
-    }
 }
 
 #[cfg(test)]
