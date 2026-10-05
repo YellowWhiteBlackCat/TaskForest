@@ -70,6 +70,28 @@ fn slot_with_name(status: i32, name: &str) -> NameQuerySlot {
 }
 
 #[test]
+fn overlapping_inline_name_preserves_the_complete_utf16_payload() {
+    let name = "\\Device\\HarddiskVolume3\\a-long-path-文件-🦀.log";
+    let payload: Vec<u16> = name.encode_utf16().collect();
+    assert!(payload.len() > POINTER_BYTES);
+    let mut slot = NameQuerySlot {
+        status: 0,
+        name_units: 0,
+        name: [0; MAX_NAME_UTF16_UNITS],
+    };
+    slot.name[0] = (payload.len() * 2) as u16;
+    slot.name[1] = slot.name[0];
+    let pointer = slot.name.as_ptr() as usize + 2 * POINTER_BYTES;
+    for (index, bytes) in pointer.to_le_bytes().as_chunks::<2>().0.iter().enumerate() {
+        slot.name[POINTER_BYTES / 2 + index] = u16::from_le_bytes([bytes[0], bytes[1]]);
+    }
+    slot.name[POINTER_BYTES..POINTER_BYTES + payload.len()].copy_from_slice(&payload);
+    compact_slot_name(&mut slot);
+    assert_eq!(slot.name_units, payload.len());
+    assert_eq!(decode_slot_name(&slot).as_deref(), Some(name));
+}
+
+#[test]
 fn utf16_ascii_comparison_ignores_case_and_rejects_mismatched_shapes() {
     let file_utf16: Vec<u8> = "File".encode_utf16().flat_map(u16::to_le_bytes).collect();
     assert!(utf16_bytes_eq_ascii_ignore_case(&file_utf16, b"File"));
