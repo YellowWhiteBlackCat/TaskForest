@@ -373,10 +373,10 @@ security.posix-capabilities	iced	ui::insights::tests::isolation_section_renders_
 security.posix-capabilities	bevy	pages::processes::details::tests::isolation_summary_renders_posix_capabilities	anchored	-	-
 security.sandbox-detection	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_sandbox_detection	anchored	-	-
 security.sandbox-detection	iced	ui::insights::tests::isolation_section_renders_sandbox_detection	anchored	-	-
-security.sandbox-detection	tui	ui::process_details::insights::tests::insights_lines_renders_sandbox_detection	anchored	-	-
+security.sandbox-detection	tui	ui::process_details::insights::tests::security::insights_lines_renders_sandbox_detection	anchored	-	-
 security.namespace-audit	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_namespace_audit	anchored	-	-
 security.namespace-audit	iced	ui::insights::tests::isolation_section_renders_namespace_audit	anchored	-	-
-security.namespace-audit	tui	ui::process_details::insights::tests::insights_lines_renders_namespace_audit	anchored	-	-
+security.namespace-audit	tui	ui::process_details::insights::tests::security::insights_lines_renders_namespace_audit	anchored	-	-
 # v0.2.0-rc4 Batch 1: Process Lifecycle & Scheduling
 process.scheduler-policy	gpui	gpui_app::root::chrome::tests::overview_and_command_rows_mirror_the_neutral_vm	anchored	-	-
 process.scheduler-policy	iced	ui::overlays::process_details::vm_parity_tests::property_pairs_mirror_the_neutral_vm	anchored	-	-
@@ -418,7 +418,7 @@ handles.deleted-file-watch	tui	ui::process_details::insights::tests::format_open
 handles.deleted-file-watch	bevy	pages::processes::details::tests::open_files_summary_empty_unreadable_and_populated	anchored	-	-
 security.seccomp-filter	gpui	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_seccomp_filter	anchored	-	-
 security.seccomp-filter	iced	ui::insights::tests::isolation_section_renders_seccomp_filter	anchored	-	-
-security.seccomp-filter	tui	ui::process_details::insights::tests::insights_lines_renders_seccomp_filter	anchored	-	-
+security.seccomp-filter	tui	ui::process_details::insights::tests::security::insights_lines_renders_seccomp_filter	anchored	-	-
 security.seccomp-filter	bevy	pages::processes::details::tests::isolation_summary_renders_seccomp_filter	anchored	-	-
 security.masquerading-detection	gpui	gpui_app::root::chrome::tests::command_identity_mismatch_renders_masquerading_warning	anchored	-	-
 security.masquerading-detection	iced	ui::overlays::process_details::vm_parity_tests::command_identity_mismatch_renders_masquerading_warning	anchored	-	-

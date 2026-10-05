@@ -82,3 +82,28 @@ fn explicit_native_actions_stay_pending_once_and_docs_use_the_url_port() {
         matches!(result.effect, Some(PlatformEffect::OpenUrl(request)) if request.url == REPOSITORY_URL)
     );
 }
+
+#[test]
+fn request_action_without_a_platform_folds_the_typed_failure_and_stays_shown() {
+    use taskmanager_application::first_run::FirstRunController;
+    use taskmanager_core::core::failure::FailureKind;
+    let mut app = IcedApp::new(None);
+    app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
+    let _ = app.update(Message::FirstRun(FirstRunMessage::Open));
+    let _ = app.update(Message::FirstRun(FirstRunMessage::RequestAction(
+        SetupScriptAction::Run,
+    )));
+    assert_eq!(
+        app.first_run.view().phase,
+        FirstRunPhase::Failed(FailureKind::TemporarilyUnavailable)
+    );
+    assert_eq!(
+        app.first_run.view().last_action,
+        Some(SetupScriptAction::Run)
+    );
+    assert!(!app.first_run.view().action_pending());
+    assert!(app.first_run.view().info.is_some());
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::FirstRun));
+    let _ = app.update(Message::FirstRun(FirstRunMessage::Close));
+    assert_eq!(app.local_surface_kind(), None);
+}

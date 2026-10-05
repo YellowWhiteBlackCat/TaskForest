@@ -199,3 +199,26 @@ fn native_boot_observes_desktop_appearance_once_and_information_uses_the_respons
             .any(|row| row.label_key == "system_about.color_scheme")
     );
 }
+
+#[test]
+fn copy_about_details_message_records_the_footer_feedback() {
+    use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
+    let mut app = crate::IcedApp::demo();
+    let _ = app.update(Message::OpenAbout);
+    let task = app.update(Message::CopyAboutDetails);
+    assert_eq!(
+        task.units(),
+        1,
+        "copy schedules one native clipboard action"
+    );
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::About));
+    let notice = app.shell.feedback_notice().expect("copy feedback");
+    assert_eq!(notice.source(), FeedbackSource::Clipboard);
+    assert_eq!(notice.severity(), FeedbackSeverity::Success);
+    assert_eq!(
+        notice.text(),
+        format!("{} · {}", t("hint.copied"), t("about.copy_details"))
+    );
+    let _ = app.update(Message::DismissOverlay);
+    assert!(app.local_surface_kind().is_none());
+}

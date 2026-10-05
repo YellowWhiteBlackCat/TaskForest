@@ -133,6 +133,9 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
 }
 
 fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
+    if apply_capture_alerts(app, target) {
+        return true;
+    }
     if target == "process-selection" {
         app.shell.application.active_page = AppPage::Applications;
         let index = (0..app.shell.visible_process_count())
@@ -167,11 +170,6 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.open_local_surface(LocalSurface::Containers);
     } else if target == "alerts" {
         app.open_local_surface(LocalSurface::AlertCenter);
-    } else if target == "active-alert" || target == "alert-rules-manager" {
-        if target == "active-alert" {
-            let _ = seed_shell_active_alert(&mut app.shell);
-        }
-        let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     } else if target == "first-run" {
         app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
         app.open_local_surface(LocalSurface::FirstRun);
@@ -427,5 +425,16 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
     } else {
         return false;
     }
+    true
+}
+
+fn apply_capture_alerts(app: &mut IcedApp, target: &str) -> bool {
+    if !matches!(target, "active-alert" | "alert-rules-manager") {
+        return false;
+    }
+    if target == "active-alert" {
+        let _ = seed_shell_active_alert(&mut app.shell);
+    }
+    let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     true
 }
