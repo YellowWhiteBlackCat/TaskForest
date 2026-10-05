@@ -457,6 +457,19 @@ fn nonflat_navigation_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch 
     if app.page() != AppPage::Applications {
         return InputDispatch::Unhandled;
     }
+    if key.modifiers == KeyModifiers::CONTROL {
+        match key.code {
+            KeyCode::Right => {
+                app.set_tree_expanded(true);
+                return InputDispatch::Consumed;
+            }
+            KeyCode::Left => {
+                app.set_tree_expanded(false);
+                return InputDispatch::Consumed;
+            }
+            _ => {}
+        }
+    }
     match key.code {
         KeyCode::Up => InputDispatch::consumed(app.move_nonflat_selection_oneshot(-1)),
         KeyCode::Down => InputDispatch::consumed(app.move_nonflat_selection_oneshot(1)),

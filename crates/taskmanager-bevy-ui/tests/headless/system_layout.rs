@@ -17,6 +17,7 @@ use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskmanager_application::{PlatformClient, SmbiosMemoryState, i18n::t};
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
@@ -741,5 +742,63 @@ fn native_navigation_toggle_keeps_route_and_content_within_the_remaining_viewpor
             app.world().resource::<NavigationState>().0,
             NavOrientation::Horizontal
         );
+    }
+}
+
+#[test]
+fn expanded_process_tree_reserves_actions_and_scrolls_complete_rows_inside_the_page() {
+    use crate::pages::process_tree::{
+        ProcessTreeSurface, ProcessTreeViewport, TreeExpansionCommand, TreeExpansionControl,
+    };
+    use bevy::ui_widgets::ScrollArea;
+    use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+    use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
+    use taskmanager_test_support::{pin_english, smbios_memory};
+    pin_english();
+    for (width, height) in [(480, 360), (720, 480), (1280, 720), (1600, 400), (720, 960)] {
+        let (client, _) = smbios_memory::platform(memory_inventory_snapshot());
+        let mut app = system_layout_app(width, height, client);
+        let mut shell = ShellApp::new();
+        seed_shell_process_tree(&mut shell).expect("root");
+        app.world_mut()
+            .non_send_mut::<crate::app::FrontendTrack>()
+            .shell = shell;
+        app.world_mut().resource_mut::<Route>().page = Page::Processes;
+        app.world_mut().trigger(crate::app::RouteChanged);
+        app.world_mut().trigger(TreeExpansionCommand::ExpandAll);
+        for _ in 0..6 {
+            app.update();
+        }
+        let world = app.world_mut();
+        let (surface, position) = world
+            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessTreeSurface>>()
+            .single(world)
+            .expect("tree surface");
+        let bottom = position.translation.y + surface.size().y / 2.0;
+        assert!(
+            bottom < height as f32,
+            "tree cannot consume the page footer"
+        );
+        let (viewport,position,_)=world.query_filtered::<(&ComputedNode,&UiGlobalTransform,&ScrollArea),With<ProcessTreeViewport>>().single(world).expect("bounded row viewport");
+        assert!(
+            viewport.size().x > 0.0 && viewport.size().y > 0.0,
+            "tree needs a readable body"
+        );
+        assert!(position.translation.y + viewport.size().y / 2.0 <= bottom);
+        let mut controls =
+            world.query::<(&TreeExpansionControl, &ComputedNode, &UiGlobalTransform)>();
+        assert_eq!(controls.iter(world).count(), 2);
+        for (_, node, position) in controls.iter(world) {
+            let half = node.size() / 2.0;
+            assert!(node.size().x > 0.0 && node.size().y > 0.0);
+            assert!(
+                position.translation.x - half.x >= 0.0
+                    && position.translation.x + half.x < width as f32
+            );
+            assert!(
+                position.translation.y + half.y < bottom,
+                "actions remain outside the scrolling body"
+            );
+        }
     }
 }

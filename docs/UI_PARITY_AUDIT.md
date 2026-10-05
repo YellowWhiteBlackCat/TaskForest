@@ -45,14 +45,14 @@
 | | `startup-boot-markers` | systemd-analyze 开机关键链时间轴 | Aligned | Aligned | Aligned |
 | 监控、告警与事件 | `active-alert` | 顶部活动告警横幅展开态 | Pending | Pending | Pending |
 | | `alert-rules-manager` | 自定义告警规则配置中心 | Pending | Pending | Pending |
-| | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Aligned | Aligned |
+| | `event-center` | 系统安全与审计事件追踪中心 | Aligned | Pending | Aligned |
 | | `saved-view-presets` | 保存、应用、删除、JSON 导入导出与跨会话恢复 | Aligned | Aligned | Aligned |
 | | `telemetry-paused` | 遥测全局暂停冻结状态水印 | Aligned | Aligned | Aligned |
 | 历史数据回放 | `history-replay` | 性能指标持久化历史窗口与趋势图 | Aligned | Aligned | Aligned |
 | | `history-60m` | 系统仪表盘 60 分钟全局历史趋势图 | Aligned | Aligned | Aligned |
 | | `application-history-replay` | 应用身份 CPU 趋势与内存/进程数峰值回溯 | Aligned | Aligned | Aligned |
 | 交互与显示形态 | `apps-search-highlight` | 进程搜索关键字高亮与命中过滤 | Aligned | Aligned | Aligned |
-| | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Aligned | Aligned |
+| | `apps-group-expanded` | 进程分组/进程树全部节点展开 | Aligned | Pending | Aligned |
 | | `apps-identity-matrix` | 进程身份校验与伪装报警状态 | Aligned | Aligned | Aligned |
 | | `apps-zero-gray` | 进程零值置灰与活动值对比渲染 | Aligned | Pending | Aligned |
 | | `settings-switch-focus` | 设置页焦点切换与高亮状态 | Pending | Pending | Aligned |

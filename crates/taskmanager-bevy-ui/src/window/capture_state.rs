@@ -13,6 +13,7 @@ use crate::window_surface::WindowSurfaceCommand;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
@@ -65,6 +66,9 @@ pub(super) fn initialize_capture_state(
             HealthReviewSection::Storage
         };
     }
+    if capture_scenario_target() == Some("apps-group-expanded") {
+        let _ = seed_shell_process_tree(&mut shell);
+    }
     track.shell = shell;
     track.initial_refresh_submitted = true;
     if let Some(target @ ("system-dashboard" | "history-60m")) = capture_scenario_target() {
@@ -82,6 +86,14 @@ pub(super) fn initialize_capture_state(
         preferences.gray_zero_values = true;
     }
     commands.trigger(crate::input::ShellInteractionApplied);
+    if capture_scenario_target() == Some("apps-group-expanded") {
+        commands.trigger(crate::pages::process_tree::TreeExpansionCommand::ExpandAll);
+    }
+    if capture_scenario_target() == Some("event-center") {
+        commands.trigger(crate::event_center::EventCommand(
+            crate::event_center::EventAction::Open,
+        ));
+    }
     if capture_scenario_target() == Some("vertical-nav") {
         commands.trigger(crate::navigation::ToggleNavigation);
     }

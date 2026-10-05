@@ -20,7 +20,9 @@ confirmation; only `y` after that confirmation can submit an end-task effect.
 
 The Applications page uses one hierarchy: Applications, Background and Uncategorized category
 headers; Applications then exposes PID-less selectable application roots before their recursive
-process trees, while the other categories expand directly to process rows. Legacy saved grouping
+process trees, while the other categories expand directly to process rows. Ctrl+Right expands the
+complete hierarchy; Ctrl+Left collapses it. The help columns scroll their measured wrapped rows,
+so all shortcuts stay reachable above the fixed close hint. Legacy saved grouping
 values are normalized at import and are not exposed as alternate modes.
 Terminal font size remains the terminal emulator's responsibility; TUI config writes preserve the
 desktop `ui_size` token.
@@ -37,6 +39,8 @@ Disk source failures retain SMART status and recovery guidance even with older r
 Battery review shows charge/power history, voltage and typed fan readings. Startup evidence
 puts failed unit identities before optional chain rows so the compact view keeps the failure group.
 Health exposes `p` for active warning facts and `e` for complete event transitions.
+The event review uses F2 to cycle all/activated/cleared filters, F5 to export the complete
+JSON history through OSC 52, and F8 to clear the shell-owned history.
 Up/Down selects whole observed groups; severity, thresholds and identity remain visible
 in compact terminals, and empty reviews keep their close and navigation controls.
 System `w` opens the shared dashboard; `1`–`4` select its real time window,

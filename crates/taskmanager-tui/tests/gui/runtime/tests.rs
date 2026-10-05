@@ -59,6 +59,8 @@ mod source_recovery;
 mod startup_control;
 #[path = "tests/surface_protocol.rs"]
 mod surface_protocol;
+#[path = "tests/tree_expansion.rs"]
+mod tree_expansion;
 
 #[path = "tests/appearance.rs"]
 mod appearance;

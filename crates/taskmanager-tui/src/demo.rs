@@ -581,8 +581,9 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Applications;
             app.shell.query = "zed".into();
         }
-        "apps-group-expanded" => {
-            app.shell.application.active_page = AppPage::Applications;
+        "apps-group-expanded" => capture::prepare_expanded_tree(app),
+        "keyboard-help" | "keyboard-help-end" => {
+            capture::prepare_help(app, scene == "keyboard-help-end")
         }
         "apps-zero-gray" => {
             app.shell.application.active_page = AppPage::Applications;

@@ -20,6 +20,7 @@ use bevy::ecs::{
     resource::Resource,
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
 };
+use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px, widget::Text};
 use bevy::ui_widgets::{Activate, Button};
@@ -71,7 +72,7 @@ pub(crate) fn button(
     action: SavedViewAction,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! { Node {min_height:px(palette.control_height_px),padding:UiRect::all(px(space_8()))} BackgroundColor({palette.content_bg}) Button SavedViewControl({action}) on(activate) Children [Text(label) TextRole(Role::Caption)] }
+    bsn! { Node {min_height:px(palette.control_height_px),padding:UiRect::all(px(space_8()))} BackgroundColor({palette.content_bg}) Button SavedViewControl({action}) on(activate) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE] }
 }
 pub(crate) fn scene(state: &SavedViewsState, palette: &UiPalette) -> impl Scene + use<> {
     let rows:Vec<Box<dyn Scene>>=review_rows(&state.rows).map(|preset| {

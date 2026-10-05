@@ -1,8 +1,26 @@
 //! Health-modal input owns its review, editing and transfer gestures.
 use crate::TuiApp;
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
-use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 pub(super) fn handle(app: &mut TuiApp, key: KeyEvent) {
+    if app.health_review.mode == crate::health_review::HealthReviewMode::Events {
+        match key.code {
+            KeyCode::F(2) => {
+                app.filter_event_history();
+                return;
+            }
+            KeyCode::F(5) => {
+                app.export_event_history_to(&mut std::io::stdout());
+                return;
+            }
+            KeyCode::F(8) => {
+                app.shell.clear_alert_event_history();
+                app.health_review.selected = 0;
+                return;
+            }
+            _ => {}
+        }
+    }
     if app.health_review.mode != crate::health_review::HealthReviewMode::Rules {
         match key.code {
             ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),

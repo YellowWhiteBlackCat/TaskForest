@@ -58,7 +58,7 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
         .count();
     assert_eq!(
         rows.len(),
-        shared_count + 5 + crate::command_palette::TUI_LOCAL_COMMANDS.len()
+        shared_count + 5 + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
     );
 }
 
@@ -66,12 +66,14 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
 fn overlay_renders_title_shortcuts_and_close_hint() {
     let mut app = demo_app();
     app.toggle_help();
-    let text = frame_text(&app, 120, 36);
+    let mut text = frame_text(&app, 120, 36);
+    app.help_scroll_by(200);
+    text.push_str(&frame_text(&app, 120, 36));
     assert!(text.contains("Keyboard reference"));
     // A real shared shortcut is listed.
     assert!(text.contains("Ctrl+F"));
     // Terminal-only binding is listed.
-    assert!(text.contains("Cycle sort column"));
+    assert!(text.contains("Cycle sort column"), "{text}");
     // TUI-local overlay bindings are listed too.
     assert!(text.contains("Settings"));
     assert!(text.contains("Containers"));

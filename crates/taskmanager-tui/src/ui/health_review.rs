@@ -50,6 +50,11 @@ pub(crate) fn groups(app: &TuiApp) -> Vec<HealthReviewGroup> {
             .alert_center
             .event_history()
             .iter()
+            .filter(|event| {
+                app.health_review
+                    .event_filter
+                    .is_none_or(|kind| kind == event.kind)
+            })
             .map(|event| {
                 let mut group = alert_group(
                     &event.alert,
@@ -126,7 +131,14 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, inner
     frame.render_widget(
         Paragraph::new(vec![
             Line::from("Up/Down groups · p Active · e Events"),
-            Line::from("w Storage · s Sensors · q Rules"),
+            Line::from(if app.health_review.mode == HealthReviewMode::Events {
+                format!(
+                    "F2 Filter {:?} · F5 Export · F8 Clear",
+                    app.health_review.event_filter
+                )
+            } else {
+                "w Storage · s Sensors · q Rules".into()
+            }),
             Line::from(format!(
                 "z Short test · x Extended test · h / Esc {}",
                 t("chrome.close")

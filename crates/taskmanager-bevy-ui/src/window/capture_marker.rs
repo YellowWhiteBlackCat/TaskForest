@@ -153,6 +153,55 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
+        Some("apps-group-expanded") => {
+            let projection = access.track.shell.projection();
+            let rows = crate::pages::process_tree::project_items(
+                projection.processes_slice(),
+                &access.track.process_tree_expansion,
+                projection.processes_observed_at_ms,
+            );
+            if rows.iter().filter(|row| row.item.is_some()).count() < 7
+                || !rows.iter().any(|row| row.depth >= 3)
+                || rows.iter().any(|row| row.has_children && !row.expanded)
+            {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("event-center") => {
+            if !matches!(access.window_surface.0, Some(WindowSurface::EventCenter))
+                || access
+                    .track
+                    .shell
+                    .projection()
+                    .alert_center
+                    .event_history()
+                    .len()
+                    < 2
+                || ![
+                    "events.title",
+                    "events.activated",
+                    "events.cleared",
+                    "common.export",
+                    "common.close",
+                ]
+                .iter()
+                .all(|key| {
+                    access.text.iter().any(|(text, node)| {
+                        text.0 == t(key) && node.size().x > 0.0 && node.size().y > 0.0
+                    })
+                })
+            {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
         Some("vertical-nav") => {
             if access.navigation.0 != NavOrientation::Vertical
                 || !access.nav_strip.iter().any(|node| {

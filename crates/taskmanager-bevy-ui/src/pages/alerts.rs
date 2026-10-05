@@ -38,6 +38,7 @@ use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, perce
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{ScrollArea, ValueChange};
 pub(crate) mod editor;
+use taskmanager_application::i18n::t;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
     Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
@@ -294,7 +295,13 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             .collect()
     };
     let rule_rows = rule_rows(rules, context.palette);
-    let toolbar = editor::toolbar(context.palette);
+    let rule_toolbar = editor::toolbar(context.palette);
+    let event_entry = crate::event_center::button(
+        t("events.title").into(),
+        crate::event_center::EventAction::Open,
+        context.palette,
+    );
+    let toolbar = bsn! {Node {width:percent(100),flex_direction:FlexDirection::Column,row_gap:px(space_8()),flex_shrink:0.0} Children [@{rule_toolbar} -- @{event_entry}]};
     let events = projection.alert_center.event_history();
     let event_rows: Vec<Box<dyn Scene>> = if events.is_empty() {
         vec![Box::new(empty_events_scene()) as Box<dyn Scene>]

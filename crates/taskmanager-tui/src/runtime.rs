@@ -99,8 +99,7 @@ pub fn run_demo() -> io::Result<()> {
 pub fn snapshot_text(width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
     let mut terminal = unwrap_infallible(Terminal::new(backend));
-    let mut app = crate::demo_app();
-    app.expanded_groups = crate::default_category_expansions();
+    let app = crate::demo_app();
     let theme = TuiTheme::from_params(app.theme_params);
     let _ = unwrap_infallible(terminal.draw(|frame| render(frame, &app, theme)));
     terminal.backend().to_string()
@@ -136,9 +135,7 @@ fn unwrap_infallible<T>(result: Result<T, Infallible>) -> T {
 fn run_interactive(demo: bool) -> io::Result<()> {
     let host = NativeAppHost::production();
     let mut app = if demo {
-        let mut app = crate::demo_app();
-        app.expanded_groups = crate::default_category_expansions();
-        app
+        crate::demo_app()
     } else {
         match host.config_client() {
             Ok(client) => TuiApp::new_with_config_client(client),

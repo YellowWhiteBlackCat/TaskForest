@@ -19,7 +19,9 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             return true;
         }
         match surface {
-            WindowSurface::SavedViews | WindowSurface::SidebarDevices => {
+            WindowSurface::EventCenter
+            | WindowSurface::SavedViews
+            | WindowSurface::SidebarDevices => {
                 if press.key_code == KeyCode::Escape {
                     self.commands
                         .trigger(WindowSurfaceCommand::Close(surface.kind()));

@@ -165,6 +165,9 @@ pub(crate) fn build_snapshot(
         });
     } else if let Some(surface) = surface {
         let (id, name, description) = match surface {
+            WindowSurface::EventCenter => {
+                ("event-center", t("events.title"), t("events.empty").into())
+            }
             WindowSurface::SavedViews => (
                 "saved-views",
                 t("saved_views.title"),

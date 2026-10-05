@@ -10,6 +10,8 @@
 //! (behavior unchanged — every method stays reachable on `TuiApp`, impl
 //! blocks may live in any module of the defining crate).
 
+mod expansion;
+
 use std::collections::HashSet;
 
 use taskmanager_application::{AppPage, PlatformEffect};

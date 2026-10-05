@@ -14,6 +14,7 @@ use bevy::ecs::{
     resource::Resource,
     system::{Commands, NonSendMut, Query, ResMut, SystemParam},
 };
+use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
@@ -267,7 +268,7 @@ fn button(label: String, action: RuleControl, palette: &UiPalette) -> impl Scene
     bsn! {
         Node { min_height: px(palette.control_height_px), max_width: percent(100), min_width: px(0.0), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 }
         Button RuleButton(action) ControlVisual(ControlTone::Surface, false) on(activate)
-        Children [ Text(label) TextLayout { linebreak: LineBreak::WordOrCharacter } TextRole(Role::Caption) ]
+        Children [ Text(label) TextLayout { linebreak: LineBreak::WordOrCharacter } TextRole(Role::Caption) Pickable::IGNORE ]
     }
 }
 pub(super) fn toolbar(palette: &UiPalette) -> impl Scene + use<> {
@@ -373,11 +374,11 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
     };
     let toggle: Box<dyn Scene> = if managed.enabled {
         Box::new(
-            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox Checked super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, true) Children [ Text(enabled) TextRole(Role::Caption) ] },
+            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox Checked super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, true) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
         )
     } else {
         Box::new(
-            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, false) Children [ Text(enabled) TextRole(Role::Caption) ] },
+            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, false) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
         )
     };
     bsn! {

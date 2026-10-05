@@ -62,6 +62,7 @@ pub(crate) mod capture;
 pub mod confirmation;
 pub mod demo_fixture;
 pub mod drain;
+pub(crate) mod event_center;
 pub mod export;
 pub mod feature_coverage;
 pub(crate) mod first_run_modal;

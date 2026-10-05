@@ -42,6 +42,7 @@ use taskmanager_shell::presentation::system_information::{SystemInformationGroup
 pub(crate) enum WindowSurfaceKind {
     SidebarDevices,
     SavedViews,
+    EventCenter,
     About,
     SystemInformation,
     FirstRun,
@@ -52,6 +53,7 @@ pub(crate) enum WindowSurfaceKind {
 pub(crate) enum WindowSurface {
     SidebarDevices,
     SavedViews,
+    EventCenter,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     FirstRun,
@@ -60,6 +62,7 @@ pub(crate) enum WindowSurface {
 impl WindowSurface {
     pub(crate) fn kind(&self) -> WindowSurfaceKind {
         match self {
+            Self::EventCenter => WindowSurfaceKind::EventCenter,
             Self::SavedViews => WindowSurfaceKind::SavedViews,
             Self::SidebarDevices => WindowSurfaceKind::SidebarDevices,
             Self::About => WindowSurfaceKind::About,
@@ -91,6 +94,7 @@ pub(crate) struct WindowSurfaceChanged;
 pub(crate) enum WindowSurfaceCommand {
     SidebarDevices,
     SavedViews,
+    EventCenter,
     About,
     SystemInformation,
     FirstRun,
@@ -139,6 +143,9 @@ fn on_command(
     mut commands: Commands,
 ) {
     match *command.event() {
+        WindowSurfaceCommand::EventCenter => {
+            show(&mut access, &mut commands, WindowSurface::EventCenter)
+        }
         WindowSurfaceCommand::SavedViews => {
             show(&mut access, &mut commands, WindowSurface::SavedViews)
         }
@@ -254,6 +261,7 @@ fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePain
 #[derive(SystemParam)]
 struct SurfaceRender<'w, 's> {
     sidebar: Res<'w, SidebarState>,
+    events: Option<Res<'w, crate::event_center::EventCenterState>>,
     saved_views: Option<Res<'w, crate::saved_views::SavedViewsState>>,
     track: Option<NonSend<'w, FrontendTrack>>,
     state: Res<'w, WindowSurfaceState>,
@@ -275,6 +283,12 @@ fn paint_surface(mut render: SurfaceRender) {
         return;
     };
     let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+        Some(WindowSurface::EventCenter) => render.track.as_ref().and_then(|track| {
+            render.events.as_ref().map(|events| {
+                Box::new(crate::event_center::scene(&track.shell, events, palette))
+                    as Box<dyn Scene>
+            })
+        }),
         Some(WindowSurface::SavedViews) => render
             .saved_views
             .as_ref()

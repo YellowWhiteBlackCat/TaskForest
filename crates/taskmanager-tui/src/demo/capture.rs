@@ -5,6 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use taskmanager_application::AppPage;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// A scene is ready only when its requested product state exists.
@@ -13,7 +14,9 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
     let Ok(scene) = std::env::var("TM_TUI_CAPTURE_SCENE") else {
         return true;
     };
-    if matches!(
+    if matches!(scene.as_str(), "keyboard-help" | "keyboard-help-end") {
+        app.help_open() && (scene != "keyboard-help-end" || app.help_scroll > 0)
+    } else if matches!(
         scene.as_str(),
         "process-properties-performance"
             | "process-memory-pss-swap"
@@ -111,6 +114,25 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                     && disk.media_removable() == Some(true)
             })
         })
+    } else if scene == "apps-group-expanded" {
+        let rows = app.process_rows_snapshot();
+        rows.iter()
+            .filter(|row| matches!(row, crate::process_view::ProcessRow::TreeNode { .. }))
+            .count()
+            >= 7
+            && rows.iter().all(|row| {
+                !matches!(
+                    row,
+                    crate::process_view::ProcessRow::Group {
+                        expanded: false,
+                        ..
+                    } | crate::process_view::ProcessRow::TreeNode {
+                        has_children: true,
+                        collapsed: true,
+                        ..
+                    }
+                )
+            })
     } else if scene == "keyboard-focus" {
         app.focus_panel == crate::FocusPanel::Details
             && app.shell.selected_process_identity().is_some()
@@ -152,5 +174,23 @@ pub(super) fn prepare_capture_settings(app: &mut TuiApp, field: usize, change: b
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
         prepare_capture_settings(app, field, false);
+    }
+}
+
+pub(super) fn prepare_expanded_tree(app: &mut TuiApp) {
+    app.shell.application.active_page = AppPage::Applications;
+    let _ = seed_shell_process_tree(&mut app.shell);
+    let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
+}
+
+pub(super) fn prepare_help(app: &mut TuiApp, end: bool) {
+    let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE));
+    if end {
+        for _ in 0..10 {
+            let _ = crate::runtime::handle_key(
+                app,
+                KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
+            );
+        }
     }
 }

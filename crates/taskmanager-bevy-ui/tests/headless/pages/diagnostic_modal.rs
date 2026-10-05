@@ -118,6 +118,7 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
     for kind in [
         WindowSurfaceKind::SidebarDevices,
         WindowSurfaceKind::SavedViews,
+        WindowSurfaceKind::EventCenter,
         WindowSurfaceKind::Diagnostic,
         WindowSurfaceKind::FirstRun,
         WindowSurfaceKind::About,
@@ -162,6 +163,9 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
             app.update();
             app.world_mut().non_send_mut::<FrontendTrack>().shell = fixture::demo_app();
             match kind {
+                WindowSurfaceKind::EventCenter => app.world_mut().trigger(
+                    crate::event_center::EventCommand(crate::event_center::EventAction::Open),
+                ),
                 WindowSurfaceKind::SavedViews => app
                     .world_mut()
                     .trigger(crate::window_surface::WindowSurfaceCommand::SavedViews),
@@ -231,6 +235,8 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
                     5
                 } else if kind == WindowSurfaceKind::SystemInformation {
                     3
+                } else if kind == WindowSurfaceKind::EventCenter {
+                    6
                 } else if kind == WindowSurfaceKind::SavedViews {
                     4
                 } else if kind == WindowSurfaceKind::SidebarDevices {
@@ -240,6 +246,14 @@ fn product_reviews_reserve_title_and_actions_around_one_scroll_body() {
                 }
             );
             for child in children {
+                if let Some(labels) = world.get::<Children>(*child) {
+                    for label in labels {
+                        let pickable = world
+                            .get::<bevy::picking::Pickable>(*label)
+                            .expect("button label passes pointer hits through");
+                        assert!(!pickable.is_hoverable && !pickable.should_block_lower);
+                    }
+                }
                 let node = world.get::<ComputedNode>(*child).expect("action geometry");
                 let transform = world
                     .get::<UiGlobalTransform>(*child)

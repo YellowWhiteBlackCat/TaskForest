@@ -90,6 +90,7 @@ case "$CAPTURE_DEVICE" in
 esac
 case "$CAPTURE_SCENE" in
   "") ;;
+  keyboard-help|keyboard-help-end) CAPTURE_PAGE=performance ;;
   system-npu|system-hardware|system-dashboard|history-60m) CAPTURE_PAGE=system ;;
   process-selection|process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-search-highlight|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) CAPTURE_PAGE=applications ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;

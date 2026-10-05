@@ -76,7 +76,7 @@ fn bound_entries_match_the_help_overlay_row_composition() {
     let rows = crate::ui::help::help_rows();
     assert_eq!(
         rows.len(),
-        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len()
+        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
     );
 }
 

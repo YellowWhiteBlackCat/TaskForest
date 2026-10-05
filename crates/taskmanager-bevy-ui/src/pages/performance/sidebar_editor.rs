@@ -12,6 +12,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
+use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px};
@@ -146,7 +147,7 @@ pub(crate) fn button(
 ) -> impl Scene + use<> {
     bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(px(space_8())) }
     BackgroundColor({palette.content_bg}) Button SidebarControl({action}) on(activate)
-    Children [ Text(label) TextRole(Role::Caption) ] }
+    Children [ Text(label) TextRole(Role::Caption) Pickable::IGNORE ] }
 }
 
 pub(crate) fn scene(

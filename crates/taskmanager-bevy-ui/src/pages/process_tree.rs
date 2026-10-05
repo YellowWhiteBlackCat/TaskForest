@@ -5,6 +5,7 @@
 //! render adapter is a small `bsn!` scene mounted in the formal Applications
 //! route; the flat table below it remains the search/sort reducer surface.
 
+use bevy::picking::Pickable;
 use std::collections::HashSet;
 
 use crate::widgets::controls::{ControlTone, ControlVisual};
@@ -16,9 +17,11 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::ui::prelude::{AlignItems, BorderRadius, Node, UiRect, Val, percent, px};
+use bevy::ui::prelude::{
+    AlignItems, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent, px,
+};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Button;
+use bevy::ui_widgets::{Button, ScrollArea};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
@@ -68,6 +71,25 @@ impl ProcessTreeExpansion {
         if !self.collapsed_processes.insert(identity) {
             self.collapsed_processes.remove(&identity);
         }
+    }
+
+    fn expand_all(&mut self, items: &[ProcessItem], observed_at_ms: u64) {
+        self.collapsed_processes.clear();
+        loop {
+            let keys: Vec<_> = project_items(items, self, observed_at_ms)
+                .into_iter()
+                .filter_map(|row| row.expansion_key)
+                .collect();
+            let before = self.expanded_groups.len();
+            self.expanded_groups.extend(keys);
+            if self.expanded_groups.len() == before {
+                break;
+            }
+        }
+    }
+    fn collapse_all(&mut self) {
+        self.expanded_groups.clear();
+        self.collapsed_processes.clear();
     }
 
     fn collapsed_set(&self) -> &HashSet<ProcessLiveKey> {
@@ -261,7 +283,7 @@ pub(crate) fn row_scene(row: &ProcessTreeRowView<'_>, palette: &UiPalette) -> im
         on(on_tree_row_activated)
         SemanticAddress({ semantic.0.clone() })
         Children [
-             Text(label) TextRole(Role::Body)
+             Text(label) TextRole(Role::Body) Pickable::IGNORE
         ]
     }
 }
@@ -270,6 +292,49 @@ pub(crate) fn row_scene(row: &ProcessTreeRowView<'_>, palette: &UiPalette) -> im
 /// unavailable-value dash, never a fabricated zero.
 fn metric_text(value: Option<String>) -> String {
     value.unwrap_or_else(|| MISSING_VALUE.to_owned())
+}
+
+#[derive(Event, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub(crate) enum TreeExpansionCommand {
+    #[default]
+    ExpandAll,
+    CollapseAll,
+}
+#[derive(Component, Clone, Default)]
+pub(crate) struct TreeExpansionControl(pub(crate) TreeExpansionCommand);
+fn tree_expansion_button(
+    label: &'static str,
+    action: TreeExpansionCommand,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    bsn! {Node {min_height:px(palette.control_height_px),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeExpansionControl({action}) on(on_tree_expansion_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
+}
+fn on_tree_expansion_activated(
+    event: On<bevy::ui_widgets::Activate>,
+    controls: Query<&TreeExpansionControl>,
+    mut commands: Commands,
+) {
+    if let Ok(control) = controls.get(event.entity) {
+        commands.trigger(control.0);
+    }
+}
+fn on_tree_expansion_command(
+    event: On<TreeExpansionCommand>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut commands: Commands,
+) {
+    match *event.event() {
+        TreeExpansionCommand::ExpandAll => {
+            let projection = track.shell.projection();
+            let items = projection.processes_slice().to_vec();
+            let observed_at_ms = projection.processes_observed_at_ms;
+            track
+                .process_tree_expansion
+                .expand_all(&items, observed_at_ms);
+        }
+        TreeExpansionCommand::CollapseAll => track.process_tree_expansion.collapse_all(),
+    }
+    commands.trigger(ProcessTreeExpansionChanged);
 }
 
 /// Compact tree strip mounted above the existing Applications table. The
@@ -289,10 +354,22 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let end_label = t("proc.end_process_tree").to_owned();
     let end_height = context.palette.control_height_px;
     let end_radius = context.palette.control_radius_px;
+    let expand = tree_expansion_button(
+        t("proc.expand_all"),
+        TreeExpansionCommand::ExpandAll,
+        context.palette,
+    );
+    let collapse = tree_expansion_button(
+        t("proc.collapse_all"),
+        TreeExpansionCommand::CollapseAll,
+        context.palette,
+    );
     bsn! {
         Node {
             width: percent(100),
-            height: px(context.palette.control_height_px * 4.0),
+            height: px(context.palette.control_height_px * 6.0),
+            max_height: percent(35),min_height:px(context.palette.control_height_px*3.0),
+            flex_shrink:0.0,
             flex_direction: bevy::ui::prelude::FlexDirection::Column,
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_8())),
@@ -302,12 +379,12 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
 
                 Node {
                     width: percent(100),
-                    flex_direction: bevy::ui::prelude::FlexDirection::Row,
+                    flex_direction: FlexDirection::Row,flex_wrap:FlexWrap::Wrap,flex_shrink:0.0,
                     justify_content: bevy::ui::prelude::JustifyContent::SpaceBetween,
                     align_items: bevy::ui::prelude::AlignItems::Center,
                 }
                 Children [
-                     Text(title) ProcessTreeCountLine TextRole(Role::Caption) --
+                     Text(title) ProcessTreeCountLine TextRole(Role::Caption) -- @{expand} -- @{collapse} --
 
                         Node {
                             height: px(end_height),
@@ -319,19 +396,23 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
                         Button
                         on(on_end_tree_activated)
                         Children [
-                             Text(end_label) TextRole(Role::Caption)
+                             Text(end_label) TextRole(Role::Caption) Pickable::IGNORE
                         ]
 
                 ]
             --
 
-                Node { flex_direction: bevy::ui::prelude::FlexDirection::Column }
+                Node { width:percent(100),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),overflow:Overflow::scroll_y(),flex_direction:FlexDirection::Column } ScrollArea ProcessTreeViewport
+                Children [Node {width:percent(100), flex_direction:FlexDirection::Column}
                 ProcessTreeRows
-                Children [{ row_scenes }]
+                Children [{ row_scenes }]]
 
         ]
     }
 }
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct ProcessTreeViewport;
 
 /// Marker for the formal Applications route's hierarchy strip.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -344,6 +425,7 @@ struct ProcessTreeRows;
 struct ProcessTreeCountLine;
 
 pub(crate) fn register(app: &mut bevy::app::App) {
+    app.add_observer(on_tree_expansion_command);
     app.add_observer(refresh_tree_on_fold);
     app.add_observer(refresh_tree_on_expansion);
 }
