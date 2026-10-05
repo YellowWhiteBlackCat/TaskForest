@@ -23,7 +23,9 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
         app.process_properties().is_some()
             && process_properties_capture_data_ready(&app.shell, &scene)
     } else if scene == "active-alert" {
-        !app.shell.projection().alert_active.is_empty()
+        app.health_open()
+            && app.health_review.mode == crate::health_review::HealthReviewMode::ActiveAlerts
+            && !app.shell.projection().alert_active.is_empty()
     } else if matches!(
         scene.as_str(),
         "battery-fan-performance" | "battery-live-performance"
@@ -72,6 +74,10 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                 .sensors
                 .as_ref()
                 .is_some_and(|snapshot| snapshot.readings.len() == 4)
+    } else if scene == "event-center" {
+        app.health_open()
+            && app.health_review.mode == crate::health_review::HealthReviewMode::Events
+            && !app.projection().alert_center.event_history().is_empty()
     } else if scene == "alert-rules-manager" {
         app.health_open()
             && !app

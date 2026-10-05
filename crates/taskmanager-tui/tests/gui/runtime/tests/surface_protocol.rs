@@ -177,6 +177,7 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
     overlap.sort_unstable();
     overlap.dedup();
     // About owns `a` to close; it masks the global affinity action.
+    // Health owns `e` to review events; the modal masks the bare-page command.
     // `t` (TUI-013) is deliberate: the service-log panel consumes its `t`
     // (cycle time filter) first while it owns input, and the registry's `t`
     // arm is scoped to the Performance·Disk page — the two can never route
@@ -184,7 +185,7 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
     assert_eq!(
         overlap,
         [
-            'a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'm', 'o', 'p', 'r', 't', 'w', 'x', 'y'
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'm', 'o', 'p', 'r', 't', 'w', 'x', 'y'
         ],
         "every chord declared in both layers must be listed here on purpose"
     );
@@ -385,4 +386,66 @@ fn about_protocol_routes_repository_and_independent_information_without_global_c
     app.toggle_about();
     assert!(press_char(&mut app, 'a').is_none());
     assert!(!app.about_open());
+}
+
+#[test]
+fn event_review_native_navigation_reaches_every_complete_transition_in_compact_view() {
+    use crate::health_review::HealthReviewMode;
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use taskmanager_core::core::alerts::AlertEventKind;
+    let mut app = crate::demo_app();
+    crate::demo::apply_capture_scene_override(&mut app, "event-center");
+    let events = app.projection().alert_center.event_history().to_vec();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.kind == AlertEventKind::Activated)
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| event.kind == AlertEventKind::Cleared)
+    );
+    for (index, event) in events.iter().enumerate() {
+        assert_eq!(app.health_review.selected, index);
+        let text = event_review_frame(&app, 54, 16);
+        assert!(text.contains(&format!("Event {}", event.id)), "{text}");
+        assert!(
+            text.contains(&format!("{:.1}", event.alert.value)),
+            "{text}"
+        );
+        assert!(text.contains(&event.alert.rule_id), "{text}");
+        assert!(text.contains("h / Esc Close"), "{text}");
+        let effect = handle_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+        assert!(effect.is_none());
+    }
+    assert_eq!(app.health_review.selected, events.len() - 1);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::ActiveAlerts);
+    let text = event_review_frame(&app, 54, 16);
+    assert!(text.contains("No observations"));
+    assert!(text.contains("h / Esc Close"));
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_review.mode, HealthReviewMode::Events);
+    assert_eq!(app.health_review.selected, 0);
+}
+
+fn event_review_frame(app: &crate::TuiApp, width: u16, height: u16) -> String {
+    use ratatui::{Terminal, backend::TestBackend};
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("language lock");
+    use taskmanager_application::i18n::{Language, set_language};
+    set_language(Language::En);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+    terminal
+        .draw(|frame| crate::ui::render(frame, app, crate::TuiTheme::default()))
+        .expect("review frame");
+    terminal.backend().to_string()
 }

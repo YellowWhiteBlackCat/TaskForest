@@ -6,6 +6,8 @@ pub(crate) enum HealthReviewMode {
     Rules,
     Storage,
     Sensors,
+    ActiveAlerts,
+    Events,
 }
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HealthReviewState {

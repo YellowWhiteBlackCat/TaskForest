@@ -419,6 +419,10 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         "active-alert" => {
             app.shell.application.active_page = AppPage::Performance;
             let _ = seed_shell_active_alert(&mut app.shell);
+            app.toggle_health();
+            let _ = app.run_surface_protocol_action(TuiSurfaceAction::SelectHealthReview(
+                HealthReviewMode::ActiveAlerts,
+            ));
         }
         "storage-health" | "sensor-center" => {
             seed_shell_health(&mut app.shell);
@@ -619,6 +623,9 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         "event-center" => {
             seed_alert_event_history_fixture(&mut app.shell);
             app.open_local_surface(TuiSurface::Health);
+            let _ = app.run_surface_protocol_action(TuiSurfaceAction::SelectHealthReview(
+                HealthReviewMode::Events,
+            ));
         }
         "settings-permission-center" => {
             app.open_local_surface(TuiSurface::Settings);

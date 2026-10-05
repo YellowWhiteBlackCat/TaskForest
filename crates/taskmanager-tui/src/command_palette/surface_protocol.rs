@@ -80,7 +80,17 @@ pub(crate) struct TuiSurfaceArm {
 /// their dispatch sites and must never appear here — the matrix pins the
 /// bare-lowercase-letter shape that enforces it. See the command-palette
 /// module header for the hard masking contract against the command layers.
-pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 35] = [
+pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 37] = [
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'p',
+        action: TuiSurfaceAction::SelectHealthReview(HealthReviewMode::ActiveAlerts),
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::HealthReview,
+        chord: 'e',
+        action: TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Events),
+    },
     TuiSurfaceArm {
         scope: TuiSurfaceScope::HealthReview,
         chord: 'w',

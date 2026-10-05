@@ -89,10 +89,10 @@ pub(super) fn render_health_overlay_at(
     }
     frame.render_widget(
         Paragraph::new(vec![
-            Line::from("Up/Down Select n Add d Remove m Metric v Severity"),
+            Line::from("n Add d Remove m Metric v Severity p Active"),
             Line::from("u/o Threshold · f/b Duration · g/l Hysteresis"),
-            Line::from("t Target y Export a Merge r Replace"),
-            Line::from("Enter Toggle h / Esc Close w Storage s Sensors"),
+            Line::from("t Target y Export a Merge r Replace e Events"),
+            Line::from("Up/Down Enter Toggle h / Esc Close w/s Health"),
         ])
         .style(Style::new().fg(theme.dim)),
         footer,

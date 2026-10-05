@@ -36,6 +36,9 @@ the secondary engine region. Only the standard engine region scrolls; the main c
 Disk source failures retain SMART status and recovery guidance even with older readings.
 Battery review shows charge/power history, voltage and typed fan readings. Startup evidence
 puts failed unit identities before optional chain rows so the compact view keeps the failure group.
+Health exposes `p` for active warning facts and `e` for complete event transitions.
+Up/Down selects whole observed groups; severity, thresholds and identity remain visible
+in compact terminals, and empty reviews keep their close and navigation controls.
 System `w` opens the shared dashboard; `1`–`4` select its real time window,
 arrows page complete metric groups, and `b` returns to hardware facts.
 The System viewport counts physical wrapped rows, so the final continuation remains

@@ -11,7 +11,7 @@ fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports()
     use crate::demo::apply_capture_scene_override;
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "active-alert");
-    assert!(!app.health_open());
+    assert!(app.health_open());
     let alert = app
         .shell
         .projection()
@@ -23,7 +23,9 @@ fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports()
     assert_eq!(alert.threshold, 90.0);
     for (width, height) in [(120, 36), (54, 16)] {
         let text = review_frame(&app, width, height);
-        assert!(text.contains("! alerts 1"), "{width}x{height}: {text}");
+        assert!(text.contains("Active alert"), "{width}x{height}: {text}");
+        assert!(text.contains("94.0% / 90.0%"), "{width}x{height}: {text}");
+        assert!(text.contains("Warning"), "{width}x{height}: {text}");
     }
 }
 
