@@ -158,6 +158,7 @@ def validate_markers(path: Path, device: str) -> None:
         if device in {"system-hardware", "system-dashboard", "history-60m"}
         else "applications"
         if device in {
+            "process-selection", "saved-view-presets",
             "process-details", "process-properties-performance", "process-insights",
             "process-command", "process-affinity", "process-end-confirm", "apps-search-highlight",
             "process-force-kill", "process-tree-confirm", "process-batch-confirm",
