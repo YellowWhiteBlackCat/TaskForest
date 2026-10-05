@@ -3,9 +3,9 @@
 # so the per-binary thread ceiling applies to `cargo nextest run -j 4` and
 # every `--profile` variant without repeating the key anywhere else.
 #
-#   - test-threads = 4: per-test-binary thread ceiling. Process concurrency
-#     (`-j 4`) is CLI-only in nextest, so every test invocation in scripts and CI
-#     passes `-j 4`; together the whole run stays at <= 4 binaries x 4 threads.
+#   - test-threads = 4: at most four concurrent test processes. `-j 4` is
+#     nextest's CLI spelling for the same scheduling limit; it does not launch
+#     four libtest threads inside each process. Tests may own bounded workers.
 #   - AGENTS.md documents this contract; do not scatter thread flags in
 #     individual scripts unless they match the values below.
 [profile.default]
@@ -38,6 +38,12 @@ test-threads = 4
 # failed", which is the exact failure this filter fixes; keep the filter
 # scoped to this binary id so a later rename cannot silently widen it.
 default-filter = 'not binary_id(taskmanager-platform-linux::bench/throughput)'
+
+[[profile.default.overrides]]
+# Preserve timing ceilings while keeping sibling tests out of the measurement.
+# This reserves the complete scheduler budget, without changing build profiles.
+filter = 'binary(performance)'
+threads-required = "num-test-threads"
 
 [profile.ci]
 # Stop scheduling work after the first failing test. This keeps PR and local
