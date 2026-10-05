@@ -7,10 +7,11 @@ use taskmanager_core::core::metrics::{
 };
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::sensors::SensorReading;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, gpu_display_identity, missing_value,
-    smart_section_visible, wifi_signal_quality_percent,
+    wifi_signal_quality_percent,
 };
 
 use super::super::UnitPrefs;

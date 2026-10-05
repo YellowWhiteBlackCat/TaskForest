@@ -562,7 +562,7 @@ where
         if demo
             && !capture_marked
             && !app.memory_capture_scroll_pending
-            && crate::demo::properties_capture_ready(app)
+            && crate::demo::capture::scene_capture_ready(app)
             && (!crate::demo::persisted_history_capture_requested()
                 || crate::ui::history_capture_frame_ready(app, &committed_plan))
             && let Some(path) = capture_marker

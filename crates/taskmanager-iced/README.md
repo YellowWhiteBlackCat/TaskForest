@@ -89,7 +89,8 @@ fallback path.
   switch/slider/select/search/segmented controls that route keyboard access through the focus shell; `src/focus.rs` owns
   keyboard-reachable activation shells and draws the shared `palette().ring` focus ring gated by the renderer-local
   input modality (`src/input_modality.rs`: only keyboard focus paints the ring, the same strict policy the GPUI root
-  tracker applies); `src/ui/virtual_list.rs` owns bounded table-window geometry, the sticky-header composition shell and
+  tracker applies); `src/focus/reveal.rs` measures the actual focused control and reveals it inside its nearest scroll
+  owner; `src/ui/virtual_list.rs` owns bounded table-window geometry, the sticky-header composition shell and
   the typed column vocabulary — the Applications table derives widths/alignment/hideability from the shared
   `PROCESS_COLUMNS` contract, and Services/Users/Startup keep local typed specs.
 - `src/ui/responsive.rs` is the frame-local layout budget chain (`LayoutProfile` × `VerticalSpace` → `PageLayoutBudget`

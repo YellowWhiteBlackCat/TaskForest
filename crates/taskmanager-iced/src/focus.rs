@@ -16,6 +16,7 @@ use taskmanager_application::AppPage;
 use taskmanager_application::RefreshRequest;
 use taskmanager_theme::Theme;
 
+pub(crate) mod reveal;
 mod widget;
 pub(crate) use widget::*;
 

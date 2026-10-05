@@ -21,13 +21,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
+use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
-    smart_section_visible,
 };
 use taskmanager_ui_contract::IconId;
 

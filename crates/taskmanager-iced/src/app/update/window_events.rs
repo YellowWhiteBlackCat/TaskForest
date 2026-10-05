@@ -3,12 +3,15 @@
 use crate::app::capture_state::{CaptureDataTarget, CapturePresentationFrame};
 use crate::ui::system_table::bound_system_body_to_end;
 use iced::Task;
-use taskmanager_application::AppPage;
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::{AppPage, KeyCode, Modifiers};
+use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_shell::QuitReason;
+use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
+use taskmanager_shell::presentation::effective_smart_status;
 
-use super::super::{IcedApp, LocalSurfaceKind, Message};
+use super::super::{IcedApp, IcedKey, LocalSurfaceKind, Message};
 use crate::app::viewport_state::ViewportRegion;
 
 pub(super) fn close_latest_window() -> Task<Message> {
@@ -43,7 +46,31 @@ impl IcedApp {
     /// single close task by that finish system.
     pub(super) fn handle_window_message(&mut self, message: Message) -> Option<Task<Message>> {
         match message {
+            Message::CaptureFocusPresented(visible) => {
+                if self.capture.focus_scheduled {
+                    self.capture.focus_presented = visible;
+                }
+                Some(Task::none())
+            }
             Message::Frame(now) => {
+                if let Some(target) = self.capture.focus_target
+                    && !self.capture.focus_scheduled
+                {
+                    self.capture.focus_scheduled = true;
+                    let id = crate::focus::focus_id(target);
+                    let keyboard = self.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+                        KeyCode::Tab,
+                        Modifiers::NONE,
+                    ))));
+                    return Some(
+                        keyboard
+                            .chain(iced::widget::operation::focus(id.clone()))
+                            .chain(
+                                crate::focus::reveal::reveal_focused(Some(id.into()))
+                                    .map(Message::CaptureFocusPresented),
+                            ),
+                    );
+                }
                 if self.capture.data_target == CaptureDataTarget::MemoryInventory
                     && matches!(
                         self.shell.smbios_memory_state(),
@@ -55,7 +82,52 @@ impl IcedApp {
                     return Some(bound_system_body_to_end());
                 }
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
-                    let ready = if self.capture.data_target == CaptureDataTarget::SystemDashboard {
+                    let ready = if self.capture.data_target == CaptureDataTarget::Focus {
+                        self.capture.focus_presented
+                    } else if self.capture.data_target == CaptureDataTarget::StartupFailure {
+                        self.shell.page() == AppPage::Startup
+                            && self
+                                .shell
+                                .projection()
+                                .startup_boot_evidence
+                                .as_ref()
+                                .is_some_and(|evidence| {
+                                    evidence.failed_units.len() >= 3
+                                        && evidence.critical_chain.len() >= 2
+                                })
+                    } else if self.capture.data_target == CaptureDataTarget::ActiveAlerts {
+                        self.alerts_page_open() && !self.shell.projection().alert_active.is_empty()
+                    } else if self.capture.data_target == CaptureDataTarget::AlertRules {
+                        self.alerts_page_open() && !self.alerts_rules().is_empty()
+                    } else if self.capture.data_target == CaptureDataTarget::Battery {
+                        self.shell
+                            .projection()
+                            .power_supplies
+                            .as_ref()
+                            .is_some_and(|power| {
+                                power.batteries.first().is_some_and(|battery| {
+                                    self.cached_battery_series(&battery.id).len() >= 2
+                                        && self.cached_battery_power_series(&battery.id).len() >= 2
+                                })
+                            })
+                    } else if let CaptureDataTarget::Smart(scenario) = self.capture.data_target {
+                        self.local_surface_kind() == Some(LocalSurfaceKind::DiskSmart)
+                            && self
+                                .shell
+                                .projection()
+                                .snapshot
+                                .as_ref()
+                                .is_some_and(|snapshot| {
+                                    snapshot.disks.first().is_some_and(|disk| {
+                                        effective_smart_status(disk)
+                                            == if scenario == "smart-missing-tool" {
+                                                DeviceStatus::MissingTool
+                                            } else {
+                                                DeviceStatus::PermissionDenied
+                                            }
+                                    })
+                                })
+                    } else if self.capture.data_target == CaptureDataTarget::SystemDashboard {
                         self.shell.page() == AppPage::System
                             && self
                                 .shell

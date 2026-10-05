@@ -32,6 +32,7 @@ mod network;
 pub mod privilege_center;
 mod process;
 mod service_exit;
+pub mod smart;
 mod storage;
 pub mod system_information;
 pub mod system_timeline;
@@ -838,15 +839,6 @@ pub fn has_smart_fields(disk: &DiskMetrics) -> bool {
         || disk.smart_available_spare_threshold_pct.is_some()
         || disk.smart_power_on_hours.is_some()
         || disk.smart_unsafe_shutdowns.is_some()
-}
-
-/// Whether a disk's SMART section should render at all. A provider that could
-/// not supply usable SMART telemetry (unsupported, unavailable, missing tool,
-/// or permission denied) yields no section: nothing to show beats an
-/// unavailable status row for a fact the host cannot read.
-#[must_use]
-pub fn smart_section_visible(disk: &DiskMetrics) -> bool {
-    has_smart_fields(disk) || disk.smart_availability == SmartAvailability::Available
 }
 
 #[cfg(test)]

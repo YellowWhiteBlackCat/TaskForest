@@ -11,7 +11,7 @@ use gpui::{
 use std::rc::Rc;
 use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 use taskmanager_shell::presentation::effective_smart_status;
-use taskmanager_shell::presentation::smart_section_visible;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::theme_binding::definite_length;

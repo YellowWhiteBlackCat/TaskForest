@@ -615,3 +615,7 @@ fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
 #[cfg(test)]
 #[path = "../../tests/gui/app/constructors_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/app/capture_semantics_tests.rs"]
+mod capture_semantics_tests;

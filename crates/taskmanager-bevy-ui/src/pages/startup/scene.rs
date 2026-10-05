@@ -380,7 +380,9 @@ pub(super) fn caption_line_scene(text: String) -> impl Scene + use<> {
     bsn! {
         Node { width: percent(100) }
         Children [
+             Node { width: percent(100), min_width: px(0) }
              Text(text) TextRole(Role::Caption)
+             TextLayout { linebreak: LineBreak::WordOrCharacter, ..TextLayout::default() }
         ]
     }
 }

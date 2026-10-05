@@ -5,7 +5,7 @@ use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;
-use taskmanager_shell::presentation::smart_section_visible;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::trend::window;
 
 pub(super) mod battery;

@@ -108,6 +108,11 @@ impl IcedApp {
             prelude.focus_cycle,
             restore_target,
         );
+        let focus = if prelude.focus_cycle.is_some() || prelude.focus_requested.is_some() {
+            focus.chain(crate::focus::reveal::reveal_focused(None).discard())
+        } else {
+            focus
+        };
         let mut tasks = vec![reveal, focus, activation];
         tasks.extend(dispatch.tasks);
         Task::batch(tasks)

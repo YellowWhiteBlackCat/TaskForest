@@ -11,10 +11,12 @@
 //! `demo_app` starts with one honest sample and the sequence below is
 //! appended only inside the capture composition.
 
+use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::process_insights::{
     process_insights_projection, seed_process_properties_history,
 };
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::DeviceGeneration;
@@ -161,6 +163,12 @@ pub(crate) fn seed_capture_confirmation_fixture(shell: &mut ShellApp) {
 
 pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario: &str) {
     match scenario.to_ascii_lowercase().as_str() {
+        "startup-failure-evidence" => {
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::StartupBootEvidence(Some(startup_failure_evidence(3_600_000))),
+            );
+        }
         "process-selection" => {
             let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
             let process = shell
@@ -345,17 +353,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             }
         }
         "active-alert" | "alert-rules-manager" => {
-            let alert = Alert {
-                instance_id: "cpu-high:all".into(),
-                rule_id: "cpu-high".into(),
-                target: "all".into(),
-                metric: AlertMetric::CpuUsagePercent,
-                severity: AlertSeverity::Warning,
-                value: 94.0,
-                threshold: 90.0,
-                active_since_ms: 1_700_000_000_000,
-            };
-            seed_projection_fact(shell, ProjectionSeedFact::ActiveAlerts(vec![alert]));
+            let _ = seed_shell_active_alert(shell);
         }
         "smart-missing-tool"
         | "smart-permission"

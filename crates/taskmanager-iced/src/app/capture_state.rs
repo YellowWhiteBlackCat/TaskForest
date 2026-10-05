@@ -6,9 +6,11 @@ use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
+use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
@@ -21,7 +23,10 @@ use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 use super::capture_fixtures::*;
 pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_from_name};
-use super::{DetailsSection, IcedApp, LocalSurface, Message, PerfDevice};
+use super::{
+    AlertsMessage, DetailsSection, FocusTarget, IcedApp, LocalSurface, Message, PerfDevice,
+    SettingsChange,
+};
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -40,6 +45,12 @@ pub(super) enum CaptureDataTarget {
     ApplicationHistory,
     MemoryInventory,
     SystemDashboard,
+    ActiveAlerts,
+    AlertRules,
+    Battery,
+    Smart(&'static str),
+    Focus,
+    StartupFailure,
     ProcessProperties(&'static str),
 }
 
@@ -49,6 +60,9 @@ pub(super) struct CaptureState {
     pub(super) presentation_frame: CapturePresentationFrame,
     pub(super) data_target: CaptureDataTarget,
     pub(super) scroll_requested: bool,
+    pub(super) focus_target: Option<FocusTarget>,
+    pub(super) focus_scheduled: bool,
+    pub(super) focus_presented: bool,
 }
 
 impl CaptureState {
@@ -59,6 +73,9 @@ impl CaptureState {
             presentation_frame: CapturePresentationFrame::WaitingForData,
             data_target: CaptureDataTarget::General,
             scroll_requested: false,
+            focus_target: None,
+            focus_scheduled: false,
+            focus_presented: false,
         }
     }
 }
@@ -70,6 +87,15 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
         "system-dashboard" | "history-60m" => CaptureDataTarget::SystemDashboard,
+        "active-alert" => CaptureDataTarget::ActiveAlerts,
+        "alert-rules-manager" => CaptureDataTarget::AlertRules,
+        "battery-fan-performance" | "battery-live-performance" => CaptureDataTarget::Battery,
+        "smart-missing-tool" => CaptureDataTarget::Smart("smart-missing-tool"),
+        "smart-permission" => CaptureDataTarget::Smart("smart-permission"),
+        "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" | "sidebar-edit" => {
+            CaptureDataTarget::Focus
+        }
+        "startup-failure-evidence" => CaptureDataTarget::StartupFailure,
         "process-properties-performance" => {
             CaptureDataTarget::ProcessProperties("process-properties-performance")
         }
@@ -139,8 +165,13 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.open_local_surface(LocalSurface::Settings);
     } else if target == "containers" {
         app.open_local_surface(LocalSurface::Containers);
-    } else if target == "alerts" || target == "active-alert" || target == "alert-rules-manager" {
+    } else if target == "alerts" {
         app.open_local_surface(LocalSurface::AlertCenter);
+    } else if target == "active-alert" || target == "alert-rules-manager" {
+        if target == "active-alert" {
+            let _ = seed_shell_active_alert(&mut app.shell);
+        }
+        let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     } else if target == "first-run" {
         app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
         app.open_local_surface(LocalSurface::FirstRun);
@@ -258,6 +289,9 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.open_process_columns_menu();
     } else if target == "keyboard-focus" || target == "vertical-nav" {
         app.shell.application.active_page = AppPage::Applications;
+        if target == "keyboard-focus" {
+            app.capture.focus_target = Some(FocusTarget::PageTab(AppPage::Applications));
+        }
     } else {
         return false;
     }
@@ -299,6 +333,12 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         || target == "startup-boot-markers"
     {
         app.shell.application.active_page = AppPage::Startup;
+        if target == "startup-failure-evidence" {
+            seed_projection_fact(
+                &mut app.shell,
+                ProjectionSeedFact::StartupBootEvidence(Some(startup_failure_evidence(3_600_000))),
+            );
+        }
     } else if target == "telemetry-paused" {
         app.shell.application.active_page = AppPage::Performance;
         let _ = app.shell.apply_action(AppAction::TogglePause);
@@ -320,6 +360,9 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
                 ProjectionSeedFact::Snapshot(Box::new(Some(s))),
             );
         }
+        if matches!(target, "smart-missing-tool" | "smart-permission") {
+            let _ = app.update(Message::OpenDiskSmart { index: 0 });
+        }
     } else if target == "gpu-engine-inventory" || target == "intel-gpu-telemetry" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.selected_device = PerfDevice::Gpu(0);
@@ -333,7 +376,17 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         }
     } else if target == "settings-zero-gray" || target == "settings-switch-focus" {
         app.open_local_surface(LocalSurface::Settings);
-        app.configuration.preferences_mut().gray_zero_values = true;
+        let _ = app.update(Message::SettingsChanged(SettingsChange::GrayZeroValues(
+            true,
+        )));
+        app.capture.focus_target = Some(FocusTarget::SettingsChoice {
+            section: if target == "settings-zero-gray" {
+                "zero-values"
+            } else {
+                "hc"
+            },
+            index: 0,
+        });
     } else if target == "history-replay" {
         app.shell.application.active_page = AppPage::Performance;
     } else if target == "application-history-replay" {
@@ -341,16 +394,7 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "battery-fan-performance" || target == "battery-live-performance" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.selected_device = PerfDevice::Battery(0);
-        seed_projection_fact(
-            &mut app.shell,
-            ProjectionSeedFact::PowerSupplies(Some(dynamic_power_fixture())),
-        );
-        if target == "battery-fan-performance" {
-            seed_projection_fact(
-                &mut app.shell,
-                ProjectionSeedFact::Sensors(Some(dynamic_sensor_fixture())),
-            );
-        }
+        seed_capture_dynamic_history(app);
     } else if target == "device-hotplug" {
         app.shell.application.active_page = AppPage::Performance;
         app.performance.sidebar_visible = true;
@@ -369,7 +413,11 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         }
     } else if target == "sidebar-edit" {
         app.shell.application.active_page = AppPage::Performance;
-        app.performance.sidebar_visible = true;
+        let _ = app.update(Message::OpenSettings);
+        app.capture.focus_target = Some(FocusTarget::SettingsChoice {
+            section: "device-memory",
+            index: 0,
+        });
     } else if target == "event-center" {
         app.shell
             .replace_alert_event_history(capture_event_fixture());

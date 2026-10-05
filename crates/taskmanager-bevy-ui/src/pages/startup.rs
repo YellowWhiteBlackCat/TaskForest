@@ -196,14 +196,26 @@ pub(crate) fn evidence_line(shell: &ShellApp) -> Option<String> {
     let chain = evidence.critical_chain.len();
     let failed = evidence.failed_units.len();
     (chain > 0 || failed > 0).then(|| {
-        format!(
+        let mut line = format!(
             "{}: {} {}, {} {}",
             t("startup.timeline"),
             chain,
             t("startup.critical_chain"),
             failed,
             t("startup.failed_units"),
-        )
+        );
+        if failed > 0 {
+            line.push_str(" · ");
+            line.push_str(
+                &evidence
+                    .failed_units
+                    .iter()
+                    .map(|unit| unit.unit.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+            );
+        }
+        line
     })
 }
 

@@ -137,6 +137,7 @@ boundaries are defined in `../../docs/ARCH.md` and
 
 ```text
 src/main.rs → surface.rs  terminal.rs        terminal host and surface authority
+src/demo/capture.rs                           scene readiness and normal settings input
 src/runtime/                                  event loop runtime
 │   └── keys.rs  modals.rs  navigation.rs  semantic.rs  seam.rs
 src/ui.rs                                     page rendering root

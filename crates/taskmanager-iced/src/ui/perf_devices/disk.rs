@@ -1,6 +1,7 @@
 //! Performance page Disk detail block, throughput chart and partition summary.
 
 use std::rc::Rc;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use super::*;
 use iced::Element;
@@ -9,7 +10,6 @@ use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot
 
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
-    smart_section_visible,
 };
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;

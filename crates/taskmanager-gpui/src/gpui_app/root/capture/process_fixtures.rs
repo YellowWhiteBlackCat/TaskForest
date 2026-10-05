@@ -10,11 +10,11 @@ use taskmanager_core::core::process::{
 use taskmanager_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupEntry,
-    StartupFailedUnit, StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason,
-    StartupScope, StartupSource,
+    StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
 use taskmanager_shell::fixture::process_insights::seed_process_properties_observations;
 use taskmanager_shell::fixture::process_tree::append_process_tree;
+use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
 const CAPTURE_CHROME_ICON: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#4285f4"/><path d="M8 8h7A7 7 0 0 0 3 3z" fill="#ea4335"/><path d="M8 8 4.5 14A7 7 0 0 0 15 8z" fill="#fbbc05"/><circle cx="8" cy="8" r="3" fill="#34a853"/></svg>"##;
 const CAPTURE_FIREFOX_ICON: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#ff7139"/><path d="M13 4c-2-2-5-2-7 0 1 0 2 1 2 2-2-1-4 0-5 2 0 3 2 5 5 5 3 0 5-2 5-5 0-2-1-3-2-4 1 0 2 0 2 0z" fill="#20123a"/></svg>"##;
@@ -377,32 +377,7 @@ pub(super) fn prepare_startup_failure_evidence(
 ) {
     prepare_startup_impact(entries);
     *baseline = None;
-    *evidence = Some(StartupBootEvidenceSnapshot {
-        state: DeviceState::healthy(10),
-        failed_units_state: DeviceState::healthy(10),
-        critical_chain_state: DeviceState::healthy(10),
-        failed_units_failure: None,
-        critical_chain_failure: None,
-        failed_units: vec![
-            failed_unit("taskforest-g.service"),
-            failed_unit("taskforest-i.service"),
-            failed_unit("taskforest.service"),
-        ],
-        critical_chain: vec![
-            chain_node("dbus.socket", 0, 6),
-            chain_node("graphical-session.target", 6, 0),
-        ],
-    });
-}
-
-fn failed_unit(unit: &str) -> StartupFailedUnit {
-    StartupFailedUnit {
-        unit: unit.to_owned(),
-        load_state: "loaded".into(),
-        active_state: "failed".into(),
-        sub_state: "failed".into(),
-        description: "capture fixture failed unit".into(),
-    }
+    *evidence = Some(startup_failure_evidence(10));
 }
 
 /// Startup waterfall + roadmap #5 comparison-markers fixture: keeps the

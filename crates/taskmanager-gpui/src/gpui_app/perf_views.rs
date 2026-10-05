@@ -10,6 +10,7 @@ use taskmanager_shell::presentation::GraphSummary;
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::power_w;
+use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::temperature_c;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui::theme_binding::definite_length;
@@ -76,7 +77,7 @@ use partition_stats::partition_panel;
 pub use smart_dialog::render_smart_dialog;
 use smart_status::status_footer;
 use taskmanager_shell::presentation::{
-    device_status_i18n_key, effective_smart_status, has_smart_fields, smart_section_visible,
+    device_status_i18n_key, effective_smart_status, has_smart_fields,
 };
 
 pub(crate) use gpu_page::{GpuChartLayout, GpuRenderState, gpu_percentage_readout, render_gpu};

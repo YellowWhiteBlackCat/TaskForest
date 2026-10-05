@@ -343,6 +343,8 @@ pub enum Message {
     Focus(FocusTarget),
     /// A real Iced frame was requested by the evidence runner.
     Frame(Instant),
+    /// The current capture control was measured through the real widget tree.
+    CaptureFocusPresented(bool),
     /// The native window changed size; this drives the frontend-local
     /// responsive layout breakpoint and never crosses into the shell.
     WindowResized(iced::Size),

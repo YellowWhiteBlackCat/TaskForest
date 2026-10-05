@@ -31,7 +31,9 @@ use taskmanager_core::core::services::{
 };
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
-use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::fixture::{
+    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+};
 use taskmanager_shell::{ProcessRowId, ShellApp, ShellKeyEvent};
 
 use super::{DetailsSection, IcedApp, Message, PerfDevice};
@@ -308,6 +310,41 @@ pub(super) fn capture_event_fixture() -> Vec<AlertEvent> {
             observed_at_ms: 3_560_000,
         },
     ]
+}
+
+pub(super) fn seed_capture_dynamic_history(app: &mut IcedApp) {
+    let Some(mut snapshot) = app.shell.projection().snapshot.clone() else {
+        return;
+    };
+    let mut power = dynamic_power_fixture();
+    let sensors = dynamic_sensor_fixture();
+    for index in 0..8 {
+        snapshot.timestamp_ms = snapshot.timestamp_ms.saturating_add(1_000);
+        power.timestamp_ms = snapshot.timestamp_ms;
+        for battery in &mut power.batteries {
+            battery.device_state = DeviceState::healthy(snapshot.timestamp_ms);
+            battery.apply_scalar_observations(BatteryScalarObservations {
+                capacity_pct: ScalarObservation::available(85 - index, snapshot.timestamp_ms),
+                voltage_uv: ScalarObservation::available(12_100_000, snapshot.timestamp_ms),
+                power_w: ScalarObservation::available(
+                    12.0 + index as f32 * 0.4,
+                    snapshot.timestamp_ms,
+                ),
+                cycle_count: ScalarObservation::available(142, snapshot.timestamp_ms),
+                ..Default::default()
+            });
+        }
+        record_demo_history_frame(&mut app.shell, &snapshot, Some(&power), Some(&sensors));
+    }
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::PowerSupplies(Some(power)),
+    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sensors(Some(sensors)));
 }
 
 pub(super) fn dynamic_power_fixture() -> PowerSupplySnapshot {

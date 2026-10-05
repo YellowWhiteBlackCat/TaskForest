@@ -6,6 +6,7 @@ use crate::pages::history::HistoryProjectionResource;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use bevy::ecs::query::With;
 use bevy::ecs::world::World;
+use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 
 pub(super) fn emit_capture_marker(world: &mut World) {
@@ -19,6 +20,25 @@ pub(super) fn emit_capture_marker(world: &mut World) {
         return;
     }
     match capture_scenario_target() {
+        Some("startup-failure-evidence") => {
+            if !world
+                .query::<(&Text, &ComputedNode)>()
+                .iter(world)
+                .any(|(text, node)| {
+                    node.size().x > 0.0
+                        && node.size().y > 0.0
+                        && [
+                            "taskforest-g.service",
+                            "taskforest-i.service",
+                            "taskforest.service",
+                        ]
+                        .iter()
+                        .all(|unit| text.0.contains(unit))
+                })
+            {
+                return;
+            }
+        }
         Some("keyboard-focus") if !crate::focus_visible::capture_ready(world, false) => {
             return;
         }

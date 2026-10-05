@@ -6,6 +6,49 @@ use ratatui::backend::TestBackend;
 use crate::{TuiApp, TuiSurfaceKind, TuiTheme, demo_app};
 use taskmanager_application::i18n::{Language, set_language};
 
+#[test]
+fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports() {
+    use crate::demo::apply_capture_scene_override;
+    let mut app = demo_app();
+    apply_capture_scene_override(&mut app, "active-alert");
+    assert!(!app.health_open());
+    let alert = app
+        .shell
+        .projection()
+        .alert_active
+        .first()
+        .expect("evaluated CPU alert");
+    assert_eq!(alert.rule_id, "cpu-high");
+    assert_eq!(alert.value, 94.0);
+    assert_eq!(alert.threshold, 90.0);
+    for (width, height) in [(120, 36), (54, 16)] {
+        let text = review_frame(&app, width, height);
+        assert!(text.contains("! alerts 1"), "{width}x{height}: {text}");
+    }
+}
+
+#[test]
+fn settings_capture_scenes_use_the_normal_keyboard_form_and_reveal_the_requested_row() {
+    use crate::demo::apply_capture_scene_override;
+    for (scene, field, label) in [
+        ("settings-zero-gray", 24, "Gray out zero"),
+        ("settings-switch-focus", 2, "High contrast"),
+        ("sidebar-edit", 9, "Show Memory"),
+    ] {
+        let mut app = demo_app();
+        apply_capture_scene_override(&mut app, scene);
+        assert!(app.settings_open());
+        assert_eq!(app.settings_form.field, field);
+        if field == 24 {
+            assert!(app.prefs.gray_zero && app.settings_form.gray_zero);
+        }
+        for (width, height) in [(120, 36), (54, 16)] {
+            let text = review_frame(&app, width, height);
+            assert!(text.contains(label), "{scene} {width}x{height}: {text}");
+        }
+    }
+}
+
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
     // (see ui::LANG_TEST_GUARD). The title/labels resolve through the

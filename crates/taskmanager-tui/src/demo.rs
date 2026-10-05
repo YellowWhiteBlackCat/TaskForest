@@ -25,15 +25,18 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
-use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
+use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
+pub(crate) mod capture;
+use capture::prepare_capture_settings;
 mod fixtures;
 mod history;
 pub(crate) use fixtures::seed_fan_capture_sensors;
@@ -306,28 +309,6 @@ fn capture_device(name: &str) -> Option<PerfDevice> {
     }
 }
 
-/// Deterministic full-surface demo frame (containers included).
-#[must_use]
-pub(crate) fn properties_capture_ready(app: &TuiApp) -> bool {
-    let Ok(scene) = std::env::var("TM_TUI_CAPTURE_SCENE") else {
-        return true;
-    };
-    if matches!(
-        scene.as_str(),
-        "process-properties-performance"
-            | "process-memory-pss-swap"
-            | "process-network-details"
-            | "process-gpu-details"
-            | "process-resource-limits"
-            | "process-isolation"
-    ) {
-        app.process_properties().is_some()
-            && process_properties_capture_data_ready(&app.shell, &scene)
-    } else {
-        true
-    }
-}
-
 pub(crate) fn persisted_history_capture_requested() -> bool {
     std::env::var("TM_TUI_CAPTURE_SCENE").is_ok_and(|scene| {
         matches!(
@@ -431,7 +412,11 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.memory_capture_scroll_pending = true;
         }
 
-        "storage-health" | "sensor-center" | "active-alert" | "alert-rules-manager" => {
+        "active-alert" => {
+            app.shell.application.active_page = AppPage::Performance;
+            let _ = seed_shell_active_alert(&mut app.shell);
+        }
+        "storage-health" | "sensor-center" | "alert-rules-manager" => {
             app.shell.application.active_page = AppPage::Performance;
             app.toggle_health();
         }
@@ -558,6 +543,14 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             app.shell.application.active_page = AppPage::Startup;
+            if scene == "startup-failure-evidence" {
+                seed_projection_fact(
+                    &mut app.shell,
+                    ProjectionSeedFact::StartupBootEvidence(Some(startup_failure_evidence(
+                        3_600_000,
+                    ))),
+                );
+            }
         }
         "service-details-logs" => {
             app.shell.application.active_page = AppPage::Services;
@@ -579,8 +572,11 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.prefs.gray_zero = true;
         }
         "settings-zero-gray" | "settings-switch-focus" => {
-            app.open_local_surface(crate::TuiSurface::Settings);
-            app.prefs.gray_zero = true;
+            prepare_capture_settings(
+                app,
+                if scene == "settings-zero-gray" { 24 } else { 2 },
+                scene == "settings-zero-gray",
+            );
         }
         "apps-identity-matrix" => {
             app.shell.application.active_page = AppPage::Applications;
@@ -623,8 +619,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.open_local_surface(TuiSurface::ColumnMenu { selection: 0 });
         }
         "sidebar-edit" => {
-            app.shell.application.active_page = AppPage::Performance;
-            app.select_perf_device(PerfDevice::Cpu);
+            prepare_capture_settings(app, 9, true);
         }
         "keyboard-focus" | "vertical-nav" => {
             app.shell.application.active_page = AppPage::Applications;

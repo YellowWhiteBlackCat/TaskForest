@@ -208,6 +208,7 @@ fn route(message: Message) -> MessageDomain {
         }
 
         message @ (Message::Frame(_)
+        | Message::CaptureFocusPresented(_)
         | Message::ApplicationsScrolled(_)
         | Message::AppHistoryScrolled(_)
         | Message::PerformanceRailScrolled(_)

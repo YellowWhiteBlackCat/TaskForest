@@ -136,12 +136,19 @@ fn disk_caption_renders_observed_smart_evidence_rows() {
         )),
         "reported availability must paint the shared SMART status: {availability_caption}"
     );
-    let mut missing_tool = DiskMetrics::default();
-    missing_tool.smart_availability = SmartAvailability::MissingTool;
-    assert!(
-        !super::metrics::disk_caption(&missing_tool).contains(t("disk.smart_status")),
-        "a hidden SMART section must not invent a status segment"
-    );
+    for unavailable in [
+        SmartAvailability::MissingTool,
+        SmartAvailability::PermissionDenied,
+    ] {
+        let mut disk = DiskMetrics::default();
+        disk.smart_availability = unavailable;
+        let caption = super::metrics::disk_caption(&disk);
+        assert!(caption.contains(t("disk.smart_status")));
+        assert!(
+            caption.contains(t(device_status_i18n_key(effective_smart_status(&disk)))),
+            "the actionable SMART failure must remain explicit: {caption}"
+        );
+    }
 
     // A disk whose provider supplied nothing keeps every SMART segment
     // absent; no fabricated `0%` spare row.
