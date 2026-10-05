@@ -33,6 +33,10 @@ impl IcedApp {
                 self.open_local_surface(LocalSurface::Settings);
                 None
             }
+            Message::OpenSidebarEditor => {
+                self.open_local_surface(LocalSurface::SidebarEditor);
+                None
+            }
             Message::CloseSettings => {
                 self.dismiss_local_surface_kind(LocalSurfaceKind::Settings);
                 None

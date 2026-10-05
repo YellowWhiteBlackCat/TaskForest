@@ -104,6 +104,10 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::UserRowMenuLock => "iced-user-row-menu-lock".to_owned(),
         FocusTarget::UserRowMenuClose => "iced-user-row-menu-close".to_owned(),
         FocusTarget::SettingsTrigger => "iced-settings-trigger".to_owned(),
+        FocusTarget::SidebarEditTrigger => "iced-sidebar-edit-trigger".to_owned(),
+        FocusTarget::SidebarDeviceControl { index, action } => {
+            format!("iced-sidebar-device-{index}-{action}")
+        }
         FocusTarget::ContainersTrigger => "iced-containers-trigger".to_owned(),
         FocusTarget::HealthTrigger => "iced-health-trigger".to_owned(),
         FocusTarget::AboutTrigger => "iced-about-trigger".to_owned(),

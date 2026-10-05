@@ -141,6 +141,11 @@ pub enum FocusTarget {
     UserRowMenuClose,
     /// The toolbar settings trigger.
     SettingsTrigger,
+    SidebarEditTrigger,
+    SidebarDeviceControl {
+        index: usize,
+        action: u8,
+    },
     /// The toolbar containers trigger.
     ContainersTrigger,
     /// The toolbar health trigger.
@@ -294,7 +299,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 190] = [
+    pub const ALL: [Self; 192] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -371,6 +376,11 @@ impl FocusTarget {
         Self::UserRowMenuLock,
         Self::UserRowMenuClose,
         Self::SettingsTrigger,
+        Self::SidebarEditTrigger,
+        Self::SidebarDeviceControl {
+            index: 0,
+            action: 0,
+        },
         Self::ContainersTrigger,
         Self::HealthTrigger,
         Self::AboutTrigger,

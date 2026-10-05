@@ -85,6 +85,12 @@ impl IcedApp {
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
                     let ready = if self.capture.data_target == CaptureDataTarget::Focus {
                         self.capture.focus_presented
+                    } else if self.capture.data_target == CaptureDataTarget::SidebarEditor {
+                        self.local_surface_kind() == Some(LocalSurfaceKind::SidebarEditor)
+                            && self
+                                .sidebar_entries()
+                                .iter()
+                                .any(|entry| entry.key == "memory")
                     } else if self.capture.data_target == CaptureDataTarget::Health {
                         self.system_section == SystemPageSection::Health
                             && self.shell.page() == AppPage::System

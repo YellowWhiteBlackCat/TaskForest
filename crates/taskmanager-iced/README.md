@@ -43,6 +43,9 @@ fallback path.
 - `src/app/configuration_state.rs` privately owns the coordinator cursor, applied revision, canonical draft, immutable
   presentation preferences, language and resolved Theme. One snapshot application replaces all five together; there are
   no independent draft/preference/theme writers.
+- `src/app/sidebar.rs` resolves concrete stable device keys through the core sidebar rules. Both rail layouts use its
+  ordered visibility projection; native editor messages submit the same persisted fields through the coordinator.
+  `src/ui/sidebar_editor.rs` keeps title/Close fixed around one bounded list and rejects stale or closed controls.
 - The named input, process-presentation, performance, capture and window-time components under `src/app/` split
   renderer-only ownership out of `IcedApp`. Window time is tick-injected and per-window; these components contain no
   shared request payload or provider fact.

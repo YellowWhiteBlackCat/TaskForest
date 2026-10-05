@@ -51,6 +51,7 @@ pub(super) enum CaptureDataTarget {
     Health,
     ActiveAlerts,
     AlertRules,
+    SidebarEditor,
     Battery,
     Smart(&'static str),
     Focus,
@@ -97,7 +98,8 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "battery-fan-performance" | "battery-live-performance" => CaptureDataTarget::Battery,
         "smart-missing-tool" => CaptureDataTarget::Smart("smart-missing-tool"),
         "smart-permission" => CaptureDataTarget::Smart("smart-permission"),
-        "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" | "sidebar-edit" => {
+        "sidebar-edit" => CaptureDataTarget::SidebarEditor,
+        "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" => {
             CaptureDataTarget::Focus
         }
         "startup-failure-evidence" => CaptureDataTarget::StartupFailure,
@@ -436,11 +438,7 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         }
     } else if target == "sidebar-edit" {
         app.shell.application.active_page = AppPage::Performance;
-        let _ = app.update(Message::OpenSettings);
-        app.capture.focus_target = Some(FocusTarget::SettingsChoice {
-            section: "device-memory",
-            index: 0,
-        });
+        let _ = app.update(Message::OpenSidebarEditor);
     } else if target == "event-center" {
         app.shell
             .replace_alert_event_history(capture_event_fixture());

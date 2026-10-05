@@ -75,6 +75,7 @@ mod service_log;
 mod service_menu;
 mod settings;
 mod settings_types;
+mod sidebar;
 mod snapshot_export;
 mod startup_menu;
 mod subscription;
@@ -425,6 +426,15 @@ pub enum Message {
     RefreshProcessInsights,
     /// Open the frontend-local settings modal.
     OpenSettings,
+    OpenSidebarEditor,
+    SetSidebarDeviceVisibility {
+        key: String,
+        visible: bool,
+    },
+    MoveSidebarDevice {
+        key: String,
+        delta: isize,
+    },
     /// Close the frontend-local settings modal.
     CloseSettings,
     /// One settings control changed (persisted + applied to the theme).

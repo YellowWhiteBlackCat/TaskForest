@@ -68,6 +68,7 @@ pub mod responsive;
 pub(crate) mod service_details;
 mod service_menu;
 mod settings;
+mod sidebar_editor;
 pub(crate) mod spinner;
 mod startup_menu;
 pub(crate) mod startup_table;
@@ -401,6 +402,7 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
     use crate::app::LocalSurface;
     Some(match app.local_surface()? {
         LocalSurface::Settings => settings::render(app),
+        LocalSurface::SidebarEditor => sidebar_editor::render(app),
         LocalSurface::About => about::render(app),
         LocalSurface::SystemInformation(facts) => system_information::render(app, facts),
         LocalSurface::Health => health::render(app),

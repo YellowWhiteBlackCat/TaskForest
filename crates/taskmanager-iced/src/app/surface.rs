@@ -20,6 +20,7 @@ use taskmanager_shell::presentation::system_information::SystemInformationGroup;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum LocalSurfaceKind {
     Settings,
+    SidebarEditor,
     About,
     SystemInformation,
     Health,
@@ -39,6 +40,7 @@ pub(crate) enum LocalSurfaceKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum LocalSurface {
     Settings,
+    SidebarEditor,
     About,
     SystemInformation(Vec<SystemInformationGroup>),
     Health,
@@ -64,6 +66,7 @@ impl LocalSurface {
     pub(crate) const fn kind(&self) -> LocalSurfaceKind {
         match self {
             Self::Settings => LocalSurfaceKind::Settings,
+            Self::SidebarEditor => LocalSurfaceKind::SidebarEditor,
             Self::About => LocalSurfaceKind::About,
             Self::SystemInformation(_) => LocalSurfaceKind::SystemInformation,
             Self::Health => LocalSurfaceKind::Health,

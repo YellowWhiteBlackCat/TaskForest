@@ -151,6 +151,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::SelectProcessAffinityECores
         | Message::ApplyProcessAffinity
         | Message::OpenSettings
+        | Message::OpenSidebarEditor
         | Message::CloseSettings
         | Message::OpenAbout
         | Message::OpenSystemInformation
@@ -166,6 +167,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::SubmitRunTask) => MessageDomain::Surface(message),
 
         message @ (Message::SelectPerformanceGraphPoints(_)
+        | Message::SetSidebarDeviceVisibility { .. }
+        | Message::MoveSidebarDevice { .. }
         | Message::SettingsChanged(_)
         | Message::AuthorizePrivilege(_)
         // SystemThemeChanged is reduced by `app::appearance` in the run.rs

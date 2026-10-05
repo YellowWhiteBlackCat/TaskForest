@@ -21,7 +21,6 @@ use super::{
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
 use iced::Length;
-use taskmanager_core::core::metrics::NetworkAdapterType;
 use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_theme::Theme;
 
@@ -376,7 +375,16 @@ fn performance_sidebar<'a>(
     // scrollable an unbounded height and the rail would overflow the panel
     // instead of scrolling inside it.
     let list = column![
-        text(t("sidebar.devices")).size(f32::from(tokens::FONT_14)),
+        row![
+            text(t("sidebar.devices")).size(f32::from(tokens::FONT_14)),
+            focus::ghost_button(
+                theme_snapshot,
+                FocusTarget::SidebarEditTrigger,
+                t("tooltip.sidebar_edit"),
+                Message::OpenSidebarEditor
+            )
+        ]
+        .spacing(8),
         rail
     ]
     .spacing(8)
@@ -424,91 +432,13 @@ pub(crate) fn chunk_count(item_count: usize, columns: usize) -> usize {
     item_count.div_ceil(columns.max(1))
 }
 
-/// Keep compact Performance device pills fully visible. A fixed column count
-/// is preferable to a horizontal scrollbar here: the selector is a small
-/// finite vocabulary, so wrapping the pills preserves every identity and
-/// keeps the scroll affordance reserved for detail content that can genuinely
-/// overflow.
-/// Build the same device-indexed navigation model as GPUI's sidebar. Dynamic
-/// rows are derived from the current snapshot order; the index is part of the
-/// frontend-local selection so two disks/NICs/GPUs can never collapse into one
-/// Iced page. The persisted per-family visibility preferences (GPUI Settings
-/// `devices` group) filter the rail: a hidden family drops out of the list
-/// entirely, and a selection whose device disappeared falls back to CPU on the
-/// next render.
+/// Concrete preferences and discovery share one device list for both rail layouts.
 pub(crate) fn available_perf_devices(app: &crate::IcedApp) -> Vec<PerfDevice> {
-    let prefs = app.preferences();
-    let mut devices = Vec::new();
-    if prefs.show_cpu {
-        devices.push(PerfDevice::Cpu);
-    }
-    if prefs.show_memory {
-        devices.push(PerfDevice::Memory);
-    }
-    if let Some(snapshot) = app.shell.projection().snapshot.as_ref() {
-        if prefs.show_disks {
-            devices.extend(
-                snapshot
-                    .disks
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| PerfDevice::Disk(index)),
-            );
-        }
-        if prefs.show_network {
-            let categories = network_visibility(prefs);
-            devices.extend(
-                snapshot
-                    .networks
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, network)| categories.allows(network.adapter_type()))
-                    .map(|(index, _)| PerfDevice::Network(index)),
-            );
-        }
-        if prefs.show_gpus {
-            devices.extend(
-                snapshot
-                    .gpu
-                    .iter()
-                    .enumerate()
-                    .map(|(index, _)| PerfDevice::Gpu(index)),
-            );
-        }
-    }
-    if let Some(npu) = app.shell.projection().npu_inventory.as_ref()
-        && npu.is_success()
-    {
-        devices.extend(
-            npu.devices
-                .iter()
-                .enumerate()
-                .map(|(index, _)| PerfDevice::Npu(index)),
-        );
-    }
-    // Battery / Fan have no visibility toggle in the GPUI Settings devices
-    // group (the ten toggles cover CPU/Memory/Disks/Network±subclasses/GPUs),
-    // so their rail entries stay unconditional, matching GPUI.
-    if let Some(power) = app.shell.projection().power_supplies.as_ref() {
-        devices.extend(
-            power
-                .batteries
-                .iter()
-                .enumerate()
-                .map(|(index, _)| PerfDevice::Battery(index)),
-        );
-    }
-    if let Some(sensors) = app.shell.projection().sensors.as_ref() {
-        devices.extend(
-            sensors
-                .readings
-                .iter()
-                .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
-                .enumerate()
-                .map(|(index, _)| PerfDevice::Fan(index)),
-        );
-    }
-    devices
+    app.sidebar_entries()
+        .into_iter()
+        .filter(|entry| entry.visible)
+        .map(|entry| entry.device)
+        .collect()
 }
 
 /// One quantity family's resolved unit pair (bytes-vs-bits, base-2-vs-base-10),
@@ -526,42 +456,6 @@ impl Default for UnitPrefs {
             use_bytes: true,
             use_base2: true,
         }
-    }
-}
-
-/// The resolved per-category network visibility (GPUI `sidebar::NetworkFilter`
-/// parity): Ethernet + the `other` bucket (loopback, unclassified) collapse
-/// onto the Wired/Other toggles the same way the GPUI sidebar filters them.
-#[derive(Clone, Copy)]
-struct NetworkVisibility {
-    wired: bool,
-    wireless: bool,
-    vpn: bool,
-    virtual_devices: bool,
-    other: bool,
-}
-
-impl NetworkVisibility {
-    const fn allows(self, adapter_type: NetworkAdapterType) -> bool {
-        match adapter_type {
-            NetworkAdapterType::Ethernet => self.wired,
-            NetworkAdapterType::WiFi => self.wireless,
-            NetworkAdapterType::Vpn => self.vpn,
-            NetworkAdapterType::Virtual => self.virtual_devices,
-            NetworkAdapterType::Unknown
-            | NetworkAdapterType::Loopback
-            | NetworkAdapterType::Other => self.other,
-        }
-    }
-}
-
-fn network_visibility(prefs: &crate::app::PresentationPreferences) -> NetworkVisibility {
-    NetworkVisibility {
-        wired: prefs.show_network_wired,
-        wireless: prefs.show_network_wireless,
-        vpn: prefs.show_network_vpn,
-        virtual_devices: prefs.show_network_virtual,
-        other: prefs.show_network_other,
     }
 }
 

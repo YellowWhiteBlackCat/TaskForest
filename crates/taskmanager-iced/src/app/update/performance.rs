@@ -14,6 +14,14 @@ use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 impl IcedApp {
     pub(super) fn reduce_performance_message(&mut self, message: Message) -> UpdateDispatch {
         let effect = match message {
+            Message::SetSidebarDeviceVisibility { key, visible } => {
+                self.set_sidebar_device_visibility(&key, visible);
+                None
+            }
+            Message::MoveSidebarDevice { key, delta } => {
+                self.move_sidebar_device(&key, delta);
+                None
+            }
             Message::AuthorizePrivilege(action) => PrivilegeCenterInputs::from_shell(&self.shell)
                 .rows()
                 .into_iter()
