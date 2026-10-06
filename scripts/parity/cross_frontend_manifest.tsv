@@ -50,11 +50,11 @@ facet	accesskit-actions	tui	ready		accessibility	behavior	runtime::tests::semant
 facet	accesskit-actions	bevy	ready		accessibility	behavior	semantic::tests::arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss	bevy	
 facet	theme-high-contrast	gpui	ready		theme	behavior	gpui_app::root::appearance::tests::set_high_contrast_toggles_theme_and_presentation	gpui	
 facet	theme-high-contrast	iced	ready		theme	behavior	theme::tests::high_contrast_mode_strengthens_iced_borders_and_text	iced	
-facet	theme-high-contrast	tui	ready		theme	pending	-	-	
+facet	theme-high-contrast	tui	ready		theme	behavior	theme::tests::high_contrast_token_forces_the_typed_high_contrast_axis	tui	
 facet	theme-high-contrast	bevy	ready		theme	behavior	palette::tests::high_contrast_theme_strengthens_bevy_palette_and_flags_hc	bevy	
 facet	theme-follow-system	gpui	ready		theme	behavior	gpui_app::root::appearance::tests::apply_system_color_scheme_follows_desktop_appearance_in_system_mode	gpui	
 facet	theme-follow-system	iced	ready		theme	behavior	app::appearance::tests::system_mode_follows_the_desktop_and_explicit_choices_do_not	iced	
-facet	theme-follow-system	tui	ready		theme	pending	-	-	
+facet	theme-follow-system	tui	ready		theme	behavior	theme::tests::system_mode_follows_the_observed_desktop_appearance	tui	
 facet	theme-follow-system	bevy	ready		theme	behavior	pages::settings::tests::system_mode_and_theme_preferences_follow_observed_appearance	bevy	
 facet	chart-fidelity	gpui	ready		chart	behavior	gpui_app::graph::tests::catmull_rom_straight_line_stays_collinear	gpui	
 facet	chart-fidelity	iced	ready		chart	behavior	perf_chart::tests::chart_program_classifies_partial_buffers_without_cross_fabrication	iced	
