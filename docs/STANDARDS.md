@@ -7,7 +7,10 @@
    crate**——`taskmanager-perf-ioctl`（perf_event_open）、`taskmanager-afpacket`（AF_PACKET）、
    `taskmanager-fd-bridge`（SCM_RIGHTS）、`taskmanager-windows-api`（最小 Windows
    performance/locale/Known Folder/exact-process/WTS/SCM、processor topology/cache、NIC
-   metadata API）。每个边界 crate：根带 `#![deny(unsafe_op_in_unsafe_fn)]`（非 `forbid`）、
+   metadata API）。safe-Rust 门禁扫描生产 `src` 树；`tests/` 下的独立集成测试二进制不属于
+   产品 crate 的 safe-Rust 面，其中的 `unsafe` 必须自文档化（例：
+   `crates/taskmanager-tui/tests/headless/perf_budget_alloc_tests.rs` 的计数分配器，无法放进
+   `forbid(unsafe_code)` 的库）。每个边界 crate：根带 `#![deny(unsafe_op_in_unsafe_fn)]`（非 `forbid`）、
    每个 `unsafe` 块带 `// SAFETY:` 注释、公开 API 不跨原始 OS handle/pointer（Unix 使用
    `OwnedFd`/`impl AsFd`，Windows 只出 typed 值）、指针加宽只用 `.cast()`（禁
    `as *const`/`as *mut`/`as RawFd`）、零 workspace 依赖。由

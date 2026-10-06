@@ -176,7 +176,8 @@ cursor 可并存）、未进入共享命令表的局部按键——属于渲染�
   文档视为缺陷。
 - 修改共享语义必须四端同批落地，或显式登记未落端与原因。
 - toolkit 特有的窗口、widget、scene 或事件类型必须停留在对应 frontend crate。共享层
-  不添加 GPUI、Iced、Ratatui 或 Bevy 类型。
+  不添加 GPUI、Iced、Ratatui 或 Bevy 类型；唯一例外是 `taskmanager-platform-runtime` 的
+  调度内核（[ADR-033](../adr/033-bevy-ecs-runtime-scheduling-kernel.md)）：仅内部用 `bevy_app`/`bevy_ecs`，不向前端暴露。
 - 产品用户意图的 owner、生命周期、目标身份和四端表面裁决由
   `taskmanager-ui-contract` 的 CORE-04 注册表统一声明；新增意图必须让每个目标前端显式
   选择 shared/local/accepted-difference/typed-unsupported，不能只添加一条表面路径。

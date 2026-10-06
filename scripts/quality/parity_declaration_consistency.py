@@ -38,11 +38,11 @@ condition::
     {
       "entries": [
         {
-          "frontend": "tui",
-          "intent": "DiagnosticBundle",
+          "frontend": "<gpui|iced|tui|bevy>",
+          "intent": "<ProductIntent>",
           "kind": "unsupported_but_implemented",
-          "reason": "TUI diagnostic export exists while the declaration still says Unsupported",
-          "remove_when": "functional.rs declares a supported route and the Unsupported test is removed"
+          "reason": "why the owner accepts the contradiction for now",
+          "remove_when": "the condition that must hold before the entry is deleted"
         }
       ]
     }
