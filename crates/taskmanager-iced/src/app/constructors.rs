@@ -541,7 +541,7 @@ fn capture_sensor_snapshot(
             // An unreadable zone from another hwmon device stays in the
             // traversal as the shared typed dash - the pixel frame must show
             // the honest absence, never a fabricated `0.0 °C`.
-            capture_unreadable_sensor_reading("hwmon:demo:nvme".into(), "temp1", "nvme"),
+            capture_unreadable_sensor_reading("hwmon:demo:nvme0".into(), "temp1", "nvme0"),
         ],
         ..Default::default()
     }

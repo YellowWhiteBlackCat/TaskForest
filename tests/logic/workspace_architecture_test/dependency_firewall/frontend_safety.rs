@@ -133,14 +133,59 @@ fn frontend_production_sources_own_no_history_storage_primitive() {
     }
 }
 
+/// Concatenate a frontend's production Rust sources, skipping capture-only
+/// modules. Capture plumbing (marker/manifest writes) is enabled exclusively
+/// by the capture runner and is not a runtime path, so the native-IO invariant
+/// applies to the shell the product actually runs.
+fn frontend_shell_sources(root: &std::path::Path) -> String {
+    fn visit(path: &std::path::Path, output: &mut String) {
+        let entries = fs::read_dir(path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry should be readable").path();
+            if path.is_dir() {
+                visit(&path, output);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                let is_capture_module = path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|stem| stem.starts_with("capture"));
+                if is_capture_module {
+                    continue;
+                }
+                output.push_str(&fs::read_to_string(&path).unwrap_or_else(|error| {
+                    panic!("failed to read Rust source {}: {error}", path.display())
+                }));
+                output.push('\n');
+            }
+        }
+    }
+    let mut output = String::new();
+    visit(root, &mut output);
+    output
+}
+
+fn without_line_comments(source: &str) -> String {
+    source
+        .lines()
+        .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn frontends_execute_no_native_commands_and_read_no_native_paths() {
     // Linux collection, parsing, and command execution is physically owned by
-    // taskmanager-platform-linux. Frontends may format provider data but must
-    // never read platform files or spawn native commands themselves.
+    // taskmanager-platform-linux. Every frontend shell may format provider data
+    // but must never read platform files or spawn native commands itself.
     let repository = repository();
-    let (gpui, tui) = frontend_sources(&repository);
-    for (name, code) in [("GPUI", gpui.as_str()), ("TUI", tui.as_str())] {
+    for (name, root) in [
+        ("GPUI", "crates/taskmanager-gpui/src/gpui_app"),
+        ("Iced", "crates/taskmanager-iced/src"),
+        ("TUI", "crates/taskmanager-tui/src"),
+        ("Bevy", "crates/taskmanager-bevy-ui/src"),
+    ] {
+        let code = without_line_comments(&frontend_shell_sources(&repository.join(root)));
         for forbidden in FORBIDDEN_NATIVE_IO_AND_COMMANDS {
             assert!(
                 !code.contains(forbidden),
@@ -148,10 +193,13 @@ fn frontends_execute_no_native_commands_and_read_no_native_paths() {
             );
         }
         assert!(
-            !contains_command_constructor(code),
+            !contains_command_constructor(&code),
             "{name} frontend selected a native command with an independent `Command::new` call"
         );
     }
+    let gpui = without_line_comments(&frontend_shell_sources(
+        &repository.join("crates/taskmanager-gpui/src/gpui_app"),
+    ));
     assert!(
         !gpui.contains("std::fs::"),
         "GPUI frontend must not perform filesystem I/O"
