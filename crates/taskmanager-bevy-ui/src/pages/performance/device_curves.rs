@@ -29,6 +29,7 @@ pub(crate) enum DeviceCurveKind {
     DiskActive,
     BatteryCharge,
     BatteryPower,
+    FanRpm,
 }
 
 #[derive(Component, Clone, Default)]
@@ -42,7 +43,7 @@ pub(crate) struct DeviceCurve {
 pub(crate) struct DeviceCurveRefresh(bool);
 
 #[derive(Component, Clone, Default)]
-pub(crate) struct DeviceCurveStatus(DeviceCurve);
+pub(crate) struct DeviceCurveStatus(pub(crate) DeviceCurve);
 
 impl DeviceCurve {
     pub(crate) fn samples(&self, shell: &ShellApp) -> Vec<f32> {
@@ -59,6 +60,7 @@ impl DeviceCurve {
             }
             DeviceCurveKind::BatteryCharge => history.battery_capacity_pct_for(&self.id),
             DeviceCurveKind::BatteryPower => history.battery_power_w_for(&self.id),
+            DeviceCurveKind::FanRpm => history.fan_rpm_for(&self.id),
         }
     }
 }
@@ -75,6 +77,7 @@ pub(super) fn scene(
         DeviceCurveKind::DiskActive => "disk.active_time",
         DeviceCurveKind::BatteryCharge => "battery.capacity",
         DeviceCurveKind::BatteryPower => "battery.power",
+        DeviceCurveKind::FanRpm => "fan.rpm",
     });
     let id = id.to_owned();
     let status = DeviceCurve {
@@ -143,6 +146,7 @@ pub(crate) fn paint_curves(
                             format!("{}/s", bytes(value.max(0.0) as u64))
                         }
                         DeviceCurveKind::BatteryPower => format!("{value:.1} W"),
+                        DeviceCurveKind::FanRpm => format!("{value:.0} RPM"),
                         _ => format!("{value:.0}%"),
                     };
                     format!(

@@ -123,6 +123,7 @@ pub(crate) enum DeviceCategoryKind {
     Network,
     Gpu,
     Battery,
+    Fan,
 }
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -140,17 +141,18 @@ pub(crate) enum PerformanceDeviceTarget {
     Network(String),
     Gpu(String),
     Battery(String),
+    Fan(String),
 }
 
 impl PerformanceDeviceTarget {
-    /// Top-level devices have a corresponding system curve. Per-disk/battery focus
+    /// Top-level devices have a corresponding system curve. Per-disk/battery/fan focus
     /// intentionally returns `None` until the device-specific hero chart lands;
     /// selecting it still produces a real, visible local selection state.
     pub(crate) fn curve(&self) -> Option<SystemCurve> {
         match self {
             Self::Cpu => Some(SystemCurve::Cpu),
             Self::Memory => Some(SystemCurve::Memory),
-            Self::Disk(_) | Self::Battery(_) => None,
+            Self::Disk(_) | Self::Battery(_) | Self::Fan(_) => None,
             Self::Network(_) => Some(SystemCurve::Network),
             Self::Gpu(_) => Some(SystemCurve::Gpu),
         }
@@ -289,6 +291,7 @@ pub(crate) enum Section {
     MemorySegments,
     Disk,
     Battery,
+    Fan,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -307,6 +310,7 @@ pub(crate) enum DynField {
     Summary(SummaryField),
     CurveCaption(SystemCurve),
     BatteryCaption(String),
+    FanCaption(String),
     SmartStatus(String),
     SmartGuidance(String),
     Cpu(CpuField),

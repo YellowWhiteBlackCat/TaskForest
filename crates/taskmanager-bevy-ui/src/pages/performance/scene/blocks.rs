@@ -3,12 +3,13 @@
 use super::*;
 use crate::pages::performance::device_curves::{self, DeviceCurveKind};
 use crate::pages::performance::metrics::{
-    batteries, battery_fact_line, disk_partition_view_models, disks, gpu_vram_view_model,
-    smart_source_guidance, smart_source_status,
+    batteries, battery_fact_line, disk_partition_view_models, disks, fan_fact_line, fans,
+    gpu_vram_view_model, smart_source_guidance, smart_source_status,
 };
 use crate::palette::space_2;
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::sensors::SensorReading;
 
 pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
     let identity = gpu_display_identity(gpu);
@@ -296,6 +297,30 @@ fn battery_block_scene(
     }
 }
 
+fn fan_block_scene(
+    fan: &SensorReading,
+    index: usize,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let title = if !fan.label().trim().is_empty() {
+        fan.label().trim().to_string()
+    } else {
+        format!("{} {index}", t("common.fan"))
+    };
+    let fact = fan_fact_line(fan);
+    let id = fan.id().to_owned();
+    let generation = fan.device_generation();
+    bsn! {
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        DynBlock(Section::Fan, { id.clone() })
+        Children [
+            Text(title) TextRole(Role::Body) --
+            Text(fact) TextRole(Role::Mono) DynText(DynField::Device { section: Section::Fan, device: { id.clone() } }) --
+            @device_curves::scene(DeviceCurveKind::FanRpm, &id, generation, palette)
+        ]
+    }
+}
+
 fn segment_row_scene(
     shell: &ShellApp,
     segment: &MemSegment,
@@ -367,6 +392,13 @@ pub(crate) fn block_scene(
             .map(|(idx, b)| {
                 Box::new(battery_block_scene(shell, b, idx, palette)) as Box<dyn Scene>
             }),
+        Section::Fan => fans(shell)?
+            .into_iter()
+            .enumerate()
+            .find(|(_, fan)| fan.id() == key)
+            .map(|(idx, fan)| {
+                Box::new(fan_block_scene(fan, idx, palette)) as Box<dyn Scene>
+            }),
     }
 }
 
@@ -377,6 +409,7 @@ fn section_title(section: Section) -> &'static str {
         Section::MemorySegments => t("mem.composition"),
         Section::Disk => t("common.disk"),
         Section::Battery => t("common.battery"),
+        Section::Fan => t("common.fan"),
     }
 }
 

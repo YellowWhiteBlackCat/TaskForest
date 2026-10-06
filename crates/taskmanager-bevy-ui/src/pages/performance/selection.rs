@@ -59,6 +59,7 @@ impl PerformanceDeviceTarget {
             Self::Network(_) => DeviceCategoryKind::Network,
             Self::Gpu(_) => DeviceCategoryKind::Gpu,
             Self::Battery(_) => DeviceCategoryKind::Battery,
+            Self::Fan(_) => DeviceCategoryKind::Fan,
         }
     }
 }

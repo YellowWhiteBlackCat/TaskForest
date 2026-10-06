@@ -4,6 +4,7 @@ use super::*;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::sensors::{SensorQuantity, SensorReading};
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;
@@ -130,6 +131,19 @@ pub(super) fn batteries(shell: &ShellApp) -> Option<&[BatteryInfo]> {
         .power_supplies
         .as_ref()
         .map(|ps| ps.batteries.as_slice())
+}
+
+/// The fan channels the sensor center reports (`FanSpeed` readings). A missing
+/// sensor snapshot is `None` (honest absence); a snapshot with no fan channel
+/// is an empty list — the Fan section then renders no block, never an idle fan.
+pub(super) fn fans(shell: &ShellApp) -> Option<Vec<&SensorReading>> {
+    shell.projection().sensors.as_ref().map(|sensors| {
+        sensors
+            .readings
+            .iter()
+            .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
+            .collect()
+    })
 }
 
 pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
@@ -378,6 +392,22 @@ pub(super) fn battery_caption(battery: &BatteryInfo) -> String {
     format!("{charge}{watts}")
 }
 
+/// One fan channel's joined fact line: RPM is the headline reading, with the
+/// same honest dash an unprobed channel renders (never a fabricated idle RPM).
+pub(super) fn fan_fact_line(fan: &SensorReading) -> String {
+    let rpm = fan
+        .current_number()
+        .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
+    format!("{} {rpm}", t("fan.rpm"))
+}
+
+/// A fan row's short caption (the RPM readout), for the sidebar's accessory
+/// text; an unread channel keeps the shared dash.
+pub(super) fn fan_caption(fan: &SensorReading) -> String {
+    fan.current_number()
+        .map_or_else(missing_value, |value| format!("{value:.0} RPM"))
+}
+
 /// Per-core usages, one readout per projected core with honest dashes for
 /// per-core gaps; no cores observed at all renders the plain dash.
 pub(super) fn core_summary(shell: &ShellApp) -> String {
@@ -522,6 +552,9 @@ pub(crate) fn section_keys(shell: &ShellApp, section: Section) -> Vec<String> {
         Section::Battery => batteries(shell).map_or_else(Vec::new, |devices| {
             devices.iter().map(|b| b.id.clone()).collect()
         }),
+        Section::Fan => fans(shell).map_or_else(Vec::new, |devices| {
+            devices.iter().map(|fan| fan.id().to_owned()).collect()
+        }),
     }
 }
 
@@ -661,6 +694,9 @@ pub(crate) fn device_line(shell: &ShellApp, section: Section, device: &str) -> S
         Section::Battery => batteries(shell)
             .and_then(|devices| devices.iter().find(|b| b.id == device))
             .map_or_else(missing_value, battery_fact_line),
+        Section::Fan => fans(shell)
+            .and_then(|devices| devices.into_iter().find(|fan| fan.id() == device))
+            .map_or_else(missing_value, fan_fact_line),
     }
 }
 
@@ -728,6 +764,9 @@ pub(super) fn dyn_field_text(shell: &ShellApp, field: &DynField) -> String {
         DynField::BatteryCaption(device) => batteries(shell)
             .and_then(|rows| rows.iter().find(|battery| &battery.id == device))
             .map_or_else(missing_value, battery_caption),
+        DynField::FanCaption(device) => fans(shell)
+            .and_then(|rows| rows.into_iter().find(|fan| fan.id() == device))
+            .map_or_else(missing_value, fan_caption),
         DynField::Cpu(field) => cpu_field_text(shell, *field),
         DynField::SmartStatus(device) => disks(shell)
             .and_then(|rows| rows.iter().find(|disk| &disk.device_id == device))
