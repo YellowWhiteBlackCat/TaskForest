@@ -136,7 +136,7 @@ facet	typed-unavailable	gpui	ready		unavailable	behavior	gpui_app::root::process
 facet	typed-unavailable	iced	ready		unavailable	behavior	ui::insights::tests::facet_unavailable_text_maps_typed_reasons	iced	
 facet	typed-unavailable	tui	ready		unavailable	behavior	runtime::tests::process_properties::insights_tab_renders_typed_escalation_reason_and_hint_never_debug	tui	
 facet	typed-unavailable	bevy	ready		unavailable	behavior	pages::processes::details::tests::selected_projection_uses_the_shared_vm_and_keeps_insights_typed	bevy	
-facet	partial-display	gpui	partial	per-facet degraded cards render only inside a Ready snapshot; the whole dialog stays Loading until the four core facets reach terminal states, and total failure folds into one typed Error panel (coarser than the per-facet streaming of iced/tui)	partial	pending	-	-	
+facet	partial-display	gpui	partial	per-facet degraded cards render only inside a Ready snapshot; the whole dialog stays Loading until the four core facets reach terminal states, and total failure folds into one typed Error panel (coarser than the per-facet streaming of iced/tui)	partial	behavior	gpui_app::root::process_insights_ui::tests::partial_current_and_distinct_unavailable_reasons_are_not_flattened	gpui	
 facet	partial-display	iced	ready		partial	behavior	ui::insights::tests::insights_sections_render_all_states_without_panic	iced	
 facet	partial-display	tui	ready		partial	behavior	runtime::tests::process_properties::insights_tab_renders_thread_list_when_projection_is_present	tui	
 facet	partial-display	bevy	ready		partial	behavior	pages::processes::details::tests::resources_summary_partial_observations_never_fabricate_missing_values	bevy	
