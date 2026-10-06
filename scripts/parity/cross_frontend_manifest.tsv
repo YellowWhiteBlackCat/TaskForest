@@ -64,9 +64,9 @@ facet	responsive-properties	gpui	ready		responsive	behavior	gpui_app::root::resp
 facet	responsive-properties	iced	ready		responsive	behavior	app::tests::compact_breakpoint_mirrors_gpui_responsive_policy	iced	
 facet	responsive-properties	tui	ready		responsive	behavior	ui::perf_gpu::tests::compact_layout_gives_all_non_fact_rows_to_the_primary_chart	tui	
 facet	responsive-properties	bevy	ready		responsive	behavior	widgets::layout::tests::performance_layout_switches_before_the_graph_becomes_unusable	bevy	
-facet	network-throughput	gpui	ready		network	pending	-	-	
-facet	network-throughput	iced	ready		network	pending	-	-	
-facet	network-throughput	tui	ready		network	pending	-	-	
+facet	network-throughput	gpui	ready		network	behavior	gpui_app::process_insights::view::network_tests::network_throughput_formats_observed_rates_and_keeps_absence_honest	gpui	
+facet	network-throughput	iced	ready		network	behavior	ui::insights::tests::network_section_renders_observed_throughput	iced	
+facet	network-throughput	tui	ready		network	behavior	runtime::tests::process_properties::network_connections_surface_renders_socket_inventory_and_rtt	tui	
 facet	network-throughput	bevy	ready		network	behavior	pages::processes::details::tests::network_summary_formats_rates_endpoints_and_escalation	bevy	
 facet	network-connections	gpui	ready		network	behavior	gpui_app::process_insights::tests::connection_readout_preserves_ip_labels_and_displays_local_endpoint_truth	gpui	
 facet	network-connections	iced	ready		network	behavior	ui::insights::tests::connection_tests::connection_readout_keeps_endpoints_and_family_aware_names	iced	
@@ -145,6 +145,6 @@ facet	gap-honesty	iced	ready		honesty	behavior	ui::insights::tests::engine_usage
 facet	gap-honesty	tui	ready		honesty	behavior	ui::process_details::insights::tests::format_thread_row_keeps_missing_cpu_honest	tui	
 facet	gap-honesty	bevy	ready		honesty	behavior	pages::processes::details::tests::threads_summary_empty_and_populated_with_gap_honesty	bevy	
 facet	capture-evidence	gpui	partial	deterministic capture fixture plus headless window-draw and GUI behavior tests exist, but no dedicated insights scene in the canonical capture matrix	capture-visual	behavior	gpui_app::process_insights::tests::capture_fixture_renders_at_reference_and_compact_sizes	gpui	
-facet	capture-evidence	iced	partial	headless unit renders and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	pending	-	-	
-facet	capture-evidence	tui	partial	TestBackend unit renders and honesty tests exist, dedicated capture scene pending live terminal harness	capture-visual	pending	-	-	
-facet	capture-evidence	bevy	partial	headless scene assembly and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	pending	-	-	
+facet	capture-evidence	iced	partial	headless unit renders and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	behavior	app::constructors::tests::dedicated_process_and_storage_capture_targets_use_the_normal_surfaces	iced	
+facet	capture-evidence	tui	partial	TestBackend unit renders and honesty tests exist, dedicated capture scene pending live terminal harness	capture-visual	behavior	runtime::tests::semantic_snapshot::dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table	tui	
+facet	capture-evidence	bevy	partial	headless scene assembly and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	behavior	confirmation::tests::capture_confirmation_scenarios_arm_expected_gates	bevy	

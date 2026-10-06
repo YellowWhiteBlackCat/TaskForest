@@ -565,3 +565,30 @@ fn isolation_section_renders_seccomp_filter() {
 
     let _section = isolation_section(&theme, Some(&projection));
 }
+
+#[test]
+fn network_section_renders_observed_throughput() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::ProcessNetworkSnapshot;
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+    projection.network = ProcessInsightFacetState::Current(ProcessNetworkSnapshot {
+        state: DeviceState::healthy(1),
+        connections: Vec::new(),
+        rx_bytes_per_sec: Some(1024),
+        tx_bytes_per_sec: Some(2048),
+        traffic_state: DeviceState::healthy(1),
+        traffic_failure: None,
+        traffic_provider: None,
+        connection_counters: None,
+    });
+
+    let _section = network_section(&theme, Some(&projection));
+}

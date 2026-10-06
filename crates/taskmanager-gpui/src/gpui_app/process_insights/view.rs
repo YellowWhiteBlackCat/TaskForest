@@ -593,3 +593,7 @@ mod isolation_tests;
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_resources_tests.rs"]
 mod resources_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_network_tests.rs"]
+mod network_tests;

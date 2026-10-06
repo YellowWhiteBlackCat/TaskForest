@@ -811,6 +811,14 @@ fn network_connections_surface_renders_socket_inventory_and_rtt() {
         .join("\n");
     assert!(text.contains("TCP"), "must render TCP transport: {text}");
     assert!(text.contains("15.4 ms"), "must render RTT: {text}");
+    assert!(
+        text.contains("RX 1.0 KiB/s"),
+        "must render the received throughput: {text}"
+    );
+    assert!(
+        text.contains("TX 2.0 KiB/s"),
+        "must render the sent throughput: {text}"
+    );
 }
 
 #[path = "process_properties/identity.rs"]
