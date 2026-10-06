@@ -165,6 +165,8 @@ application-history-replay	application-history-replay	1180x780	gnome-light
 application-history-replay-compact	application-history-replay	720x480	gnome-light
 battery-fan-performance	battery-fan-performance	1180x780	gnome-light
 battery-fan-performance-compact	battery-fan-performance	720x480	gnome-light
+fan-performance	fan-performance	1180x780	gnome-light
+fan-performance-compact	fan-performance	720x480	gnome-light
 battery-live-performance	battery-live-performance	1180x780	gnome-light
 battery-live-performance-compact	battery-live-performance	720x480	gnome-light
 device-hotplug	device-hotplug	1180x780	gnome-light

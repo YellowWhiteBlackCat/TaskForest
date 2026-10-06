@@ -385,7 +385,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
         "event-center" => {
             shell.replace_alert_event_history(capture_event_fixture());
         }
-        "battery-fan-performance" => {
+        "battery-fan-performance" | "fan-performance" => {
             dynamic_history::seed(shell);
             seed_projection_fact(
                 shell,
