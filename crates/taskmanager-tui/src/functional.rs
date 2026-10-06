@@ -65,8 +65,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
                      shared application engine while GPUI provides the preview/write bundle \
                      workflow",
         },
-        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not expose a compositor current-window PNG capture control",
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
+            route: "header.window-capture",
         },
         ProductIntent::FirstRunSetup => SurfaceDecision::Local {
             route: "first-run.wizard",

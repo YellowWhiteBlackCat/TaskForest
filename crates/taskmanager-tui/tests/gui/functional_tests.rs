@@ -243,22 +243,20 @@ fn diagnostic_bundle_decision_is_an_accepted_difference() {
 }
 
 #[test]
-fn unsupported_intents_are_explicit_and_have_honest_reasons() {
+fn current_window_capture_is_declared_as_a_local_surface() {
     let declaration = functional_declaration();
     let entry = declaration
         .entries
         .iter()
         .find(|entry| entry.intent == ProductIntent::CurrentWindowScreenshot)
         .unwrap_or_else(|| panic!("CurrentWindowScreenshot must be registered"));
-    match entry.decision {
-        SurfaceDecision::Unsupported { reason } => {
-            assert!(
-                !reason.trim().is_empty(),
-                "reason for CurrentWindowScreenshot must not be empty"
-            );
-        }
-        other => panic!("expected CurrentWindowScreenshot to be Unsupported, got {other:?}"),
-    }
+    assert_eq!(
+        entry.decision,
+        SurfaceDecision::Local {
+            route: "header.window-capture",
+        },
+        "CurrentWindowScreenshot is a real TUI surface backed by the shared platform capture"
+    );
 
     let first_run_entry = declaration
         .entries

@@ -181,6 +181,15 @@ fn run_interactive(demo: bool) -> io::Result<()> {
                 format!("Diagnostic bundle runtime unavailable: {error}"),
             ),
         }
+        match host.window_capture_client() {
+            Ok(client) => app.install_window_capture_client(client),
+            Err(error) => app.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                format!("Window capture runtime unavailable: {error}"),
+            ),
+        }
     }
     let mut platform = if demo {
         None
