@@ -592,3 +592,29 @@ fn network_section_renders_observed_throughput() {
 
     let _section = network_section(&theme, Some(&projection));
 }
+
+#[test]
+fn environment_section_renders_observed_entries() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+    use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+
+    let theme = Theme::default();
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().unwrap();
+    projection.environment = ProcessInsightFacetState::Current(ProcessEnvironment {
+        state: DeviceState::healthy(1),
+        working_directory: Some("/opt/app".into()),
+        entries: vec![ProcessEnvironmentEntry {
+            key: "PATH".into(),
+            value: "/usr/bin".into(),
+        }],
+        ..ProcessEnvironment::default()
+    });
+
+    let _section = environment_section(&theme, Some(&projection));
+}

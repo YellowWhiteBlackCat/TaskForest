@@ -1,6 +1,8 @@
 use super::*;
 use bevy::input::keyboard;
-use taskmanager_application::{AppAction, AppPage, CommandContext, CommandScope, FocusDirection};
+use taskmanager_application::{
+    AppAction, AppPage, CommandContext, CommandScope, FocusDirection, KeyCode,
+};
 use taskmanager_ui_contract::SemanticNodeId;
 
 fn modifiers(control: bool, alt: bool, shift: bool) -> InputModifiers {
@@ -10,6 +12,16 @@ fn modifiers(control: bool, alt: bool, shift: bool) -> InputModifiers {
         shift,
         platform: false,
     }
+}
+
+/// The fixed-key surface normalizes refresh (F5) and the pause-chord base
+/// (Space) onto the shared application vocabulary; unlisted keys stay local.
+#[test]
+fn shared_key_maps_refresh_and_space_onto_the_application_vocabulary() {
+    assert_eq!(shared_key(keyboard::KeyCode::F5), Some(KeyCode::F5));
+    assert_eq!(shared_key(keyboard::KeyCode::Space), Some(KeyCode::Space));
+    assert_eq!(shared_key(keyboard::KeyCode::F9), Some(KeyCode::F9));
+    assert_eq!(shared_key(keyboard::KeyCode::Numpad0), None);
 }
 
 #[test]

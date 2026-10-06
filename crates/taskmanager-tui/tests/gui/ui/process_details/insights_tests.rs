@@ -1009,31 +1009,35 @@ fn insights_lines_renders_resource_limits_with_quota_pids_and_cgroup() {
     let mut projection = tracker.snapshot().expect("snapshot exists");
 
     let now_ms = 1000;
-    projection.resources = ProcessInsightFacetState::Current(ProcessResourceSnapshot::from_observations(
-        DeviceState::healthy(now_ms),
-        ProcessResourceObservations {
-            resource_groups: ResourceObservation::current(
-                vec![ResourceGroupMembership {
-                    provider: ProviderId::borrowed("cgroup.test"),
-                    native_hierarchy_id: Some(0),
-                    capabilities: Vec::new(),
-                    native_locator: "/system.slice/worker.scope".into(),
-                }],
-                now_ms,
-            ),
-            memory_usage_bytes: ResourceObservation::current(256 * 1024 * 1024, now_ms),
-            memory_limit: ResourceObservation::current(
-                LimitValue::Value(1024 * 1024 * 1024),
-                now_ms,
-            ),
-            cpu_time_quota_micros: ResourceObservation::current(LimitValue::Value(150_000), now_ms),
-            cpu_time_period_micros: ResourceObservation::current(100_000, now_ms),
-            process_count: ResourceObservation::current(7, now_ms),
-            process_limit: ResourceObservation::current(LimitValue::Value(64), now_ms),
-            ..ProcessResourceObservations::default()
-        },
-        Vec::new(),
-    ));
+    projection.resources =
+        ProcessInsightFacetState::Current(ProcessResourceSnapshot::from_observations(
+            DeviceState::healthy(now_ms),
+            ProcessResourceObservations {
+                resource_groups: ResourceObservation::current(
+                    vec![ResourceGroupMembership {
+                        provider: ProviderId::borrowed("cgroup.test"),
+                        native_hierarchy_id: Some(0),
+                        capabilities: Vec::new(),
+                        native_locator: "/system.slice/worker.scope".into(),
+                    }],
+                    now_ms,
+                ),
+                memory_usage_bytes: ResourceObservation::current(256 * 1024 * 1024, now_ms),
+                memory_limit: ResourceObservation::current(
+                    LimitValue::Value(1024 * 1024 * 1024),
+                    now_ms,
+                ),
+                cpu_time_quota_micros: ResourceObservation::current(
+                    LimitValue::Value(150_000),
+                    now_ms,
+                ),
+                cpu_time_period_micros: ResourceObservation::current(100_000, now_ms),
+                process_count: ResourceObservation::current(7, now_ms),
+                process_limit: ResourceObservation::current(LimitValue::Value(64), now_ms),
+                ..ProcessResourceObservations::default()
+            },
+            Vec::new(),
+        ));
 
     let mut app = crate::demo_app();
     seed_projection_fact(
