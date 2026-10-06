@@ -174,6 +174,8 @@ interaction	bev-log-controls-move-state	bevy	-	lib	pages::services::service_logs
 interaction	bev-log-repaint-gate	bevy	-	lib	pages::services::service_logs_tests::the_repaint_gate_fires_only_when_a_rendered_fact_moves	render|lifecycle|success	-	render	
 interaction	bev-partition-rows	bevy	P0-MC-02	lib	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	projection|render|success	-	projection	
 interaction	bev-settings-preferences	bevy	P0-MC-05	lib	pages::settings::tests::settings_page_projects_the_live_authorities_into_rows	success	-	success	
+interaction	bev-battery-fan-history	bevy	P0-MC-01	lib	pages::performance::device_history_tests::battery_and_fan_blocks_paint_their_own_history_curve	projection|render|success	-	projection	
+interaction	bev-gpu-metric-selector	bevy	P0-MC-04	lib	pages::performance::device_history_tests::gpu_curve_metric_selection_drives_the_shared_graph	selection|success	-	selection	
 interaction	mc00-tui-page-sweep	tui	P0-MC-00	lib	ui::tests::acceptance_size_matrix::every_page_paints_body_rows_at_every_meets_floor_size	success|responsive	-	success	
 interaction	mc00-tui-nav-digits	tui	P0-MC-00	lib	runtime::tests::keys_navigation::performance_digit_keys_select_a_resource_without_colliding_with_pages	success|keyboard	-	success	
 interaction	mc00-tui-nav-routes	tui	P0-MC-00	lib	runtime::tests::keys_navigation::alt_page_chords_cover_the_four_middle_routes	success|keyboard	-	success	
