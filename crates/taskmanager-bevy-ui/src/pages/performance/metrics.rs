@@ -4,7 +4,6 @@ use super::*;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::power::BatteryInfo;
-use taskmanager_core::core::sensors::{SensorQuantity, SensorReading};
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;
@@ -13,8 +12,12 @@ use taskmanager_shell::presentation::trend::window;
 
 pub(super) mod battery;
 pub(super) mod cpu;
+mod fan;
+mod gpu;
 mod smart;
 pub(super) use battery::battery_fact_line;
+pub(super) use fan::{fan_caption, fan_fact_line, fans};
+pub(super) use gpu::gpu_fact_line;
 pub(super) use smart::{smart_source_guidance, smart_source_status};
 
 /// Percent readout. There is no shared percent formatter in
@@ -131,19 +134,6 @@ pub(super) fn batteries(shell: &ShellApp) -> Option<&[BatteryInfo]> {
         .power_supplies
         .as_ref()
         .map(|ps| ps.batteries.as_slice())
-}
-
-/// The fan channels the sensor center reports (`FanSpeed` readings). A missing
-/// sensor snapshot is `None` (honest absence); a snapshot with no fan channel
-/// is an empty list — the Fan section then renders no block, never an idle fan.
-pub(super) fn fans(shell: &ShellApp) -> Option<Vec<&SensorReading>> {
-    shell.projection().sensors.as_ref().map(|sensors| {
-        sensors
-            .readings
-            .iter()
-            .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
-            .collect()
-    })
 }
 
 pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
@@ -392,22 +382,6 @@ pub(super) fn battery_caption(battery: &BatteryInfo) -> String {
     format!("{charge}{watts}")
 }
 
-/// One fan channel's joined fact line: RPM is the headline reading, with the
-/// same honest dash an unprobed channel renders (never a fabricated idle RPM).
-pub(super) fn fan_fact_line(fan: &SensorReading) -> String {
-    let rpm = fan
-        .current_number()
-        .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
-    format!("{} {rpm}", t("fan.rpm"))
-}
-
-/// A fan row's short caption (the RPM readout), for the sidebar's accessory
-/// text; an unread channel keeps the shared dash.
-pub(super) fn fan_caption(fan: &SensorReading) -> String {
-    fan.current_number()
-        .map_or_else(missing_value, |value| format!("{value:.0} RPM"))
-}
-
 /// Per-core usages, one readout per projected core with honest dashes for
 /// per-core gaps; no cores observed at all renders the plain dash.
 pub(super) fn core_summary(shell: &ShellApp) -> String {
@@ -556,64 +530,6 @@ pub(crate) fn section_keys(shell: &ShellApp, section: Section) -> Vec<String> {
             devices.iter().map(|fan| fan.id().to_owned()).collect()
         }),
     }
-}
-
-/// One GPU block's joined fact line; each fact keeps its own dash-on-missing
-/// semantics (TUI `gpu_data` parity via the shared formatters).
-pub(super) fn gpu_fact_line(gpu: &GpuMetrics) -> String {
-    let mut values = vec![
-        observed_percentage(gpu.current_utilization_pct()),
-        gpu.current_temperature_c()
-            .filter(|value| value.is_finite())
-            .map_or_else(missing_value, temperature_c),
-        gpu.current_frequency_mhz()
-            .map_or_else(missing_value, |mhz| megahertz(mhz as f32)),
-        gpu.current_power_w()
-            .filter(|value| value.is_finite())
-            .map_or_else(missing_value, power_w),
-        gpu_memory_line(gpu),
-    ];
-    if let Some(connected) = gpu.display_connected {
-        values.push(format!(
-            "{} {}",
-            t("gpu.display_output"),
-            t(if connected { "common.yes" } else { "common.no" })
-        ));
-    }
-    if let Some(version) = gpu
-        .vbios_version
-        .as_deref()
-        .filter(|value| !value.is_empty())
-    {
-        values.push(format!("{} {version}", t("gpu.vbios_version")));
-    }
-    if let Some(api) = gpu.graphics_api.as_ref()
-        && let Some(version) = api
-            .mesa_version
-            .as_deref()
-            .filter(|value| !value.is_empty())
-    {
-        values.push(format!("{} {version}", t("gpu.mesa_version")));
-    }
-    if let Some(rpm) = gpu.current_fan_speed_rpm() {
-        values.push(format!("{} {rpm} RPM", t("fan.rpm")));
-    }
-    if let Some(pct) = gpu
-        .current_fan_speed_pct()
-        .filter(|value| value.is_finite())
-    {
-        values.push(format!("{} {pct:.0}%", t("fan.pwm")));
-    }
-    if let Some(bandwidth) = gpu
-        .memory_bandwidth_gbps
-        .filter(|value| value.is_finite() && *value > 0.0)
-    {
-        values.push(format!("{} {bandwidth:.1} GB/s", t("gpu.memory_bandwidth")));
-    }
-    if let Some(depth) = gpu.queue_depth {
-        values.push(format!("{} {depth}", t("gpu.queue_depth")));
-    }
-    values.join(" · ")
 }
 
 pub(super) fn nic_fact_line(nic: &NetworkMetrics) -> String {
@@ -767,6 +683,7 @@ pub(super) fn dyn_field_text(shell: &ShellApp, field: &DynField) -> String {
         DynField::FanCaption(device) => fans(shell)
             .and_then(|rows| rows.into_iter().find(|fan| fan.id() == device))
             .map_or_else(missing_value, fan_caption),
+        DynField::GpuMetricLabel(_) => t(shell.gpu_chart_metric_selected().label_key()).to_owned(),
         DynField::Cpu(field) => cpu_field_text(shell, *field),
         DynField::SmartStatus(device) => disks(shell)
             .and_then(|rows| rows.iter().find(|disk| &disk.device_id == device))

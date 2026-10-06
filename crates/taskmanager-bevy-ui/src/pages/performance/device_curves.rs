@@ -19,6 +19,9 @@ use bevy::ui::{ComputedNode, FlexDirection, Node, Overflow, UiSystems, percent, 
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::identity::DeviceGeneration;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::gpu_chart_metric::{
+    GpuChartMetricUnit, gpu_chart_metric_history,
+};
 use taskmanager_shell::presentation::{bytes, graph_summary};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -30,14 +33,15 @@ pub(crate) enum DeviceCurveKind {
     BatteryCharge,
     BatteryPower,
     FanRpm,
+    GpuMetric,
 }
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct DeviceCurve {
     pub(crate) kind: DeviceCurveKind,
     pub(crate) id: String,
-    generation: DeviceGeneration,
-    color: Color,
+    pub(crate) generation: DeviceGeneration,
+    pub(crate) color: Color,
 }
 #[derive(Resource, Default)]
 pub(crate) struct DeviceCurveRefresh(bool);
@@ -61,6 +65,10 @@ impl DeviceCurve {
             DeviceCurveKind::BatteryCharge => history.battery_capacity_pct_for(&self.id),
             DeviceCurveKind::BatteryPower => history.battery_power_w_for(&self.id),
             DeviceCurveKind::FanRpm => history.fan_rpm_for(&self.id),
+            DeviceCurveKind::GpuMetric => {
+                let metric = shell.gpu_chart_metric_selected();
+                gpu_chart_metric_history(history, &self.id, self.generation.get(), metric)
+            }
         }
     }
 }
@@ -78,6 +86,7 @@ pub(super) fn scene(
         DeviceCurveKind::BatteryCharge => "battery.capacity",
         DeviceCurveKind::BatteryPower => "battery.power",
         DeviceCurveKind::FanRpm => "fan.rpm",
+        DeviceCurveKind::GpuMetric => "gpu.chart_metric",
     });
     let id = id.to_owned();
     let status = DeviceCurve {
@@ -118,6 +127,14 @@ pub(crate) fn paint_curves(
         let samples = curve.samples(track.shell());
         let ceiling = match curve.kind {
             DeviceCurveKind::DiskActive | DeviceCurveKind::BatteryCharge => 100.0,
+            DeviceCurveKind::GpuMetric
+                if matches!(
+                    track.shell().gpu_chart_metric_selected().unit(),
+                    GpuChartMetricUnit::Percent
+                ) =>
+            {
+                100.0
+            }
             _ => {
                 samples
                     .iter()
@@ -147,6 +164,14 @@ pub(crate) fn paint_curves(
                         }
                         DeviceCurveKind::BatteryPower => format!("{value:.1} W"),
                         DeviceCurveKind::FanRpm => format!("{value:.0} RPM"),
+                        DeviceCurveKind::GpuMetric => {
+                            match track.shell().gpu_chart_metric_selected().unit() {
+                                GpuChartMetricUnit::Percent => format!("{value:.0}%"),
+                                GpuChartMetricUnit::Watts => format!("{value:.1} W"),
+                                GpuChartMetricUnit::Celsius => format!("{value:.0}\u{b0}C"),
+                                GpuChartMetricUnit::Megahertz => format!("{value:.0} MHz"),
+                            }
+                        }
                         _ => format!("{value:.0}%"),
                     };
                     format!(

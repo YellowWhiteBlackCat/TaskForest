@@ -1,15 +1,22 @@
 //! Dynamic GPU, network, memory, and section scene builders.
 
 use super::*;
-use crate::pages::performance::device_curves::{self, DeviceCurveKind};
+use crate::pages::performance::device_curves::{
+    self, DeviceCurve, DeviceCurveKind, DeviceCurveStatus,
+};
 use crate::pages::performance::metrics::{
     batteries, battery_fact_line, disk_partition_view_models, disks, fan_fact_line, fans,
     gpu_vram_view_model, smart_source_guidance, smart_source_status,
 };
 use crate::palette::space_2;
+use crate::widgets::chart::CurveMeasurement;
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::sensors::SensorReading;
+use taskmanager_shell::gpu_chart_metric_gate;
+use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricChoiceState;
+
+use super::super::gpu_metric::gpu_metric_button_activated;
 
 pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
     let identity = gpu_display_identity(gpu);
@@ -21,7 +28,83 @@ pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
     }
 }
 
-fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> {
+/// The shared GPU chart-metric selector (ADR-034): one button per vocabulary
+/// family in fixed order, the selected family carrying the active fill and
+/// unavailable families staying visible but dimmed. Activation drives the
+/// shell's single selection authority.
+fn gpu_metric_selector_scene(
+    shell: &ShellApp,
+    gpu: &GpuMetrics,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let gate = gpu_chart_metric_gate(Some(gpu));
+    let projection = shell.gpu_chart_metric_projection(&gate);
+    let mut buttons: Vec<Box<dyn Scene>> = Vec::new();
+    for choice in projection.choices.iter() {
+        let selected = matches!(
+            choice.state,
+            GpuChartMetricChoiceState::Selected | GpuChartMetricChoiceState::SelectedUnavailable
+        );
+        let available = !matches!(choice.state, GpuChartMetricChoiceState::Unavailable);
+        let fill = if selected {
+            palette.nav_active_bg
+        } else {
+            palette.content_bg
+        };
+        let label = t(choice.metric.label_key()).to_owned();
+        let metric = choice.metric;
+        buttons.push(Box::new(bsn! {
+            Node {
+                padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
+                border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+            }
+            BackgroundColor(fill)
+            Button GpuMetricButton({ metric }) on(gpu_metric_button_activated)
+            Children [ Text(label) TextRole(Role::Caption) ]
+        }) as Box<dyn Scene>);
+        let _ = available;
+    }
+    bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(space_4()),
+            flex_wrap: FlexWrap::Wrap,
+        }
+        Children [ { buttons } ]
+    }
+}
+
+/// The selectable middle graph: one curve bound to the shared selected family
+/// for this adapter. The label is a dynamic marker so a selection change
+/// rewrites it on the next fold; the curve reads the same shared window the
+/// selector gate derives from.
+fn gpu_metric_curve_scene(
+    shell: &ShellApp,
+    gpu: &GpuMetrics,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let id = gpu.device_id.clone();
+    let generation = gpu.device_generation;
+    let label = t(shell.gpu_chart_metric_selected().label_key()).to_owned();
+    let status = DeviceCurve {
+        kind: DeviceCurveKind::GpuMetric,
+        id: id.clone(),
+        generation,
+        color: palette.accent,
+    };
+    bsn! {
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        Children [
+            Text(label) TextRole(Role::Caption) DynText(DynField::GpuMetricLabel({ id.clone() })) --
+            Node { width: percent(100), height: px(64.0), flex_shrink: 0.0, overflow: Overflow::clip() }
+            DeviceCurve { kind: DeviceCurveKind::GpuMetric, id: { id.clone() }, generation: { generation }, color: { palette.accent } } CurveMeasurement(None) Children [] --
+            Text(t("perf.collecting_samples")) TextRole(Role::Caption) DeviceCurveStatus({ status })
+        ]
+    }
+}
+
+fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> {
     let mut details: Vec<Box<dyn Scene>> = Vec::new();
 
     if let Some(vram) = gpu_vram_view_model(gpu) {
@@ -128,6 +211,8 @@ fn gpu_block_scene(gpu: &GpuMetrics, palette: &UiPalette) -> impl Scene + use<> 
         Children [
              Text({ gpu_block_title(gpu) }) TextRole(Role::Body) --
              Text({ gpu_fact_line(gpu) }) TextRole(Role::Mono) DynText(field) --
+             @gpu_metric_selector_scene(shell, gpu, palette) --
+             @gpu_metric_curve_scene(shell, gpu, palette) --
             { details }
         ]
     }
@@ -297,11 +382,7 @@ fn battery_block_scene(
     }
 }
 
-fn fan_block_scene(
-    fan: &SensorReading,
-    index: usize,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
+fn fan_block_scene(fan: &SensorReading, index: usize, palette: &UiPalette) -> impl Scene + use<> {
     let title = if !fan.label().trim().is_empty() {
         fan.label().trim().to_string()
     } else {
@@ -368,7 +449,7 @@ pub(crate) fn block_scene(
         Section::Gpu => gpu_devices(shell)?
             .iter()
             .find(|gpu| gpu.device_id == key)
-            .map(|gpu| Box::new(gpu_block_scene(gpu, palette)) as Box<dyn Scene>),
+            .map(|gpu| Box::new(gpu_block_scene(shell, gpu, palette)) as Box<dyn Scene>),
         Section::Network => network_devices(shell)?
             .iter()
             .find(|nic| &*nic.device_id == key)
@@ -396,9 +477,7 @@ pub(crate) fn block_scene(
             .into_iter()
             .enumerate()
             .find(|(_, fan)| fan.id() == key)
-            .map(|(idx, fan)| {
-                Box::new(fan_block_scene(fan, idx, palette)) as Box<dyn Scene>
-            }),
+            .map(|(idx, fan)| Box::new(fan_block_scene(fan, idx, palette)) as Box<dyn Scene>),
     }
 }
 

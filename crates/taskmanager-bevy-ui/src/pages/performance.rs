@@ -58,6 +58,7 @@ use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
+use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 use taskmanager_shell::presentation::trend::{self, TrendSeries};
 use taskmanager_shell::presentation::{
     bytes, gpu_display_identity, graph_summary, megahertz, missing_value, power_w, temperature_c,
@@ -74,6 +75,7 @@ use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod device_curves;
+mod gpu_metric;
 pub(crate) mod replay;
 pub(crate) mod scene;
 mod selection;
@@ -172,6 +174,17 @@ pub(crate) struct PerformanceFocusButton(pub(crate) SystemCurve);
 /// Identity carried by a compact device selector button.
 #[derive(Component, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceDeviceButton(pub(crate) PerformanceDeviceTarget);
+
+/// Identity carried by one GPU chart-metric selector button. Activation drives
+/// the shared shell selection (ADR-034), never a frontend-local metric state.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct GpuMetricButton(pub(crate) GpuChartMetric);
+
+impl Default for GpuMetricButton {
+    fn default() -> Self {
+        Self(GpuChartMetric::DEFAULT)
+    }
+}
 
 /// Identity carried by one curve card so the focus observer can resize the
 /// hero card without rebuilding any telemetry subtree.
@@ -311,6 +324,7 @@ pub(crate) enum DynField {
     CurveCaption(SystemCurve),
     BatteryCaption(String),
     FanCaption(String),
+    GpuMetricLabel(String),
     SmartStatus(String),
     SmartGuidance(String),
     Cpu(CpuField),
@@ -442,6 +456,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<PerformanceFocus>();
     app.init_resource::<PerformanceDeviceFocus>();
     app.add_observer(refresh_on_fold);
+    gpu_metric::register(app);
     selection::register(app);
     device_curves::register(app);
     sidebar_editor::register(app);
@@ -824,3 +839,7 @@ mod thermal_status_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_selection.rs"]
 mod selection_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_device_history.rs"]
+mod device_history_tests;

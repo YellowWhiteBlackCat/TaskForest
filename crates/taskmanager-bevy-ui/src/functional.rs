@@ -68,9 +68,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::FirstRunSetup => SurfaceDecision::Local {
             route: "first-run.wizard",
         },
-        ProductIntent::GpuMetricInspection => SurfaceDecision::AcceptedDifference {
-            route: "performance.gpu.metric-summary",
-            reason: "Bevy renders the available GPU metric families together in its device cards instead of exposing a multi-level engine selector",
+        ProductIntent::GpuMetricInspection => SurfaceDecision::Local {
+            route: "performance.gpu.metric-selector",
         },
         ProductIntent::TransientFeedback => SurfaceDecision::AcceptedDifference {
             route: "root.feedback-line",

@@ -1,7 +1,9 @@
 //! Performance sidebar, CPU header, and responsive rail scenes.
 
 use super::*;
-use crate::pages::performance::metrics::{battery_caption, battery_sidebar_title, fan_caption, fans};
+use crate::pages::performance::metrics::{
+    battery_caption, battery_sidebar_title, fan_caption, fans,
+};
 use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
