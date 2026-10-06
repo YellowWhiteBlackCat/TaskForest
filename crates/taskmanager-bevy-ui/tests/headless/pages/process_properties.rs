@@ -182,6 +182,7 @@ fn opened_shell() -> ShellApp {
 fn complete_inspection_preserves_tail_entries_and_separates_resource_and_security_facts() {
     use super::insights::insight_rows;
     use taskmanager_application::ProcessInsightFacetState;
+    taskmanager_test_support::pin_english();
     let shell = opened_shell();
     let target = shell.process_properties_target().expect("target").clone();
     let mut projection =
