@@ -6,11 +6,13 @@
 //! Platform-caused failures must surface as typed `ProviderFailure` /
 //! `SourceOutcome` results — never as a process-wide panic. This guard makes
 //! that property compile-CI permanent across the workspace: every `src/`
-//! tree (app, UI crates, TUI, core, application, the three OS adapters, the
-//! composition runtime, the privileged helper, escalation, the afpacket/
-//! fd-bridge/perf-ioctl boundary crates, the platform contract/native/
-//! provider adapters, theme/icons/ui-contract/assets, accessibility, and the
-//! net launcher and process-control helper) is scanned.
+//! tree (the four frontends, the CLI/shell harness, app-host, core,
+//! application, history/telemetry stores, the OS adapters and composition
+//! runtime, the afpacket/fd-bridge/perf-ioctl/windows-api boundary crates,
+//! the platform contract/native/portable/provider adapters,
+//! theme/icons/ui/ui-contract/assets, accessibility, the privilege/escalation
+//! and net-launcher/process-control helpers, and the remaining helper and
+//! support crates) is scanned.
 //!
 //! The reference definition mirrors the `ui_component_boundary` firewall:
 //! line comments are stripped, test blocks (`#[cfg(test)] mod ...;` /
@@ -21,44 +23,59 @@
 //! Every production panic site left in the tree must appear in
 //! [`ALLOWED_PANIC_SITES`] with a reason. Today those are: UI-internal
 //! contract asserts whose invariants live inside the same struct (table
-//! column indices, the open-dashboard-panel render gate, gpui Element
-//! lifecycle `take()`s), the verified-infallible `serde_json` export, and
-//! the embedded-locale authoring-error fail-fast. Adding a NEW panic site
+//! column indices and gpui/iced Element lifecycle `take()`/child-tree
+//! accesses), authoring-time data fail-fast (the embedded locale catalog,
+//! the command spec table, and the iced demo-log seed), and the
+//! verified-infallible `serde_json` export. Adding a NEW panic site
 //! anywhere — or extending one of these without a reason — fails CI.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const SCAN_ROOTS: [&str; 30] = [
+const SCAN_ROOTS: [&str; 44] = [
     "src",
+    "crates/taskmanager-accessibility-linux/src",
+    "crates/taskmanager-afpacket/src",
     "crates/taskmanager-app-host/src",
     "crates/taskmanager-application/src",
+    "crates/taskmanager-assets/src",
+    "crates/taskmanager-bevy-ui/src",
+    "crates/taskmanager-cli/src",
     "crates/taskmanager-core/src",
+    "crates/taskmanager-escalation/src",
+    "crates/taskmanager-fd-bridge/src",
+    "crates/taskmanager-gpui/src",
+    "crates/taskmanager-history-store/src",
+    "crates/taskmanager-iced/src",
+    "crates/taskmanager-icons/src",
+    "crates/taskmanager-msr-helper/src",
+    "crates/taskmanager-net-launcher/src",
+    "crates/taskmanager-perf-ioctl/src",
+    "crates/taskmanager-platform-android/src",
     "crates/taskmanager-platform-conformance/src",
+    "crates/taskmanager-platform-contract/src",
     "crates/taskmanager-platform-linux/src",
     "crates/taskmanager-platform-macos/src",
-    "crates/taskmanager-platform-runtime/src",
-    "crates/taskmanager-platform-windows/src",
-    "crates/taskmanager-tui/src",
-    "crates/taskmanager-bevy-ui/src",
-    "crates/taskmanager-ui/src",
-    "crates/taskmanager-telemetry-store/src",
-    "crates/taskmanager-privilege-helper/src",
-    "crates/taskmanager-escalation/src",
-    "crates/taskmanager-afpacket/src",
-    "crates/taskmanager-fd-bridge/src",
-    "crates/taskmanager-perf-ioctl/src",
-    "crates/taskmanager-platform-contract/src",
     "crates/taskmanager-platform-native/src",
+    "crates/taskmanager-platform-ohos/src",
     "crates/taskmanager-platform-portable/src",
     "crates/taskmanager-platform-provider/src",
-    "crates/taskmanager-theme/src",
-    "crates/taskmanager-icons/src",
-    "crates/taskmanager-ui-contract/src",
-    "crates/taskmanager-assets/src",
-    "crates/taskmanager-accessibility-linux/src",
-    "crates/taskmanager-net-launcher/src",
+    "crates/taskmanager-platform-runtime/src",
+    "crates/taskmanager-platform-windows/src",
+    "crates/taskmanager-privilege-helper/src",
     "crates/taskmanager-process-control-helper/src",
+    "crates/taskmanager-rapl-helper/src",
+    "crates/taskmanager-setup-helper/src",
+    "crates/taskmanager-shell/src",
+    "crates/taskmanager-smbios-helper/src",
+    "crates/taskmanager-smbios-tables/src",
+    "crates/taskmanager-telemetry-store/src",
+    "crates/taskmanager-test-support/src",
+    "crates/taskmanager-theme/src",
+    "crates/taskmanager-tray-muda/src",
+    "crates/taskmanager-tui/src",
+    "crates/taskmanager-ui/src",
+    "crates/taskmanager-ui-contract/src",
     "crates/taskmanager-windows-api/src",
 ];
 
@@ -104,27 +121,12 @@ const ALLOWED_PANIC_SITES: &[(&str, &str, &str)] = &[
         "TableDelegate contract (same invariant as users_view)",
     ),
     (
-        "crates/taskmanager-gpui/src/gpui_app/dashboard/panels.rs",
-        "caller renders only an open dashboard panel",
-        "render-side gate: the caller renders the panel only when `state.panel` is Some",
-    ),
-    (
         "crates/taskmanager-ui/src/data/virtual_list.rs",
         "global_id.unwrap()",
         "gpui request_layout contract: the closure runs inside `with_global_id` with the id set",
     ),
     (
         "crates/taskmanager-ui/src/overlays/context_menu.rs",
-        "element must be set",
-        "gpui Element lifecycle: paint/prepaint consume the element exactly once",
-    ),
-    (
-        "crates/taskmanager-ui/src/overlays/context_menu.rs",
-        "trigger must be set",
-        "gpui Element lifecycle: the trigger is configured before painting",
-    ),
-    (
-        "crates/taskmanager-ui/src/overlays/dropdown_menu.rs",
         "element must be set",
         "gpui Element lifecycle: paint/prepaint consume the element exactly once",
     ),
@@ -139,13 +141,30 @@ const ALLOWED_PANIC_SITES: &[(&str, &str, &str)] = &[
         "gpui Element lifecycle: the trigger is configured before painting",
     ),
     (
+        "crates/taskmanager-iced/src/ui/components/popover.rs",
+        "anchor tree",
+        "iced Widget contract: `children()` declares exactly the anchor and panel trees, so \
+         `overlay`'s child iterator always yields two",
+    ),
+    (
+        "crates/taskmanager-iced/src/ui/components/popover.rs",
+        "panel tree",
+        "iced Widget contract (same invariant as `anchor tree`)",
+    ),
+    (
+        "crates/taskmanager-iced/src/app/service_details.rs",
+        "demo entries are non-empty",
+        "the demo seed passes a literal three-entry vector to ServiceLogEntries::new, which \
+         returns None only for an empty vector — authoring-time data, fail-fast is correct",
+    ),
+    (
         "crates/taskmanager-core/src/core/export/format.rs",
         "snapshot serialization is infallible",
         "serde_json maps non-finite floats to `null` (empirically verified) and the payload has \
          no map keys; to_string_pretty cannot fail",
     ),
     (
-        "src/cli/suggest.rs",
+        "crates/taskmanager-cli/src/cli/suggest.rs",
         "threshold object serialization is infallible",
         "serde_json Value::Object with plain-string keys and finite/null values (the alert engine \
          clamps thresholds to a finite sane range and from_samples drops non-finite input); \
@@ -328,10 +347,13 @@ fn panic_tokens(source: &str) -> Vec<(usize, String)> {
     found
 }
 
-fn is_allowed(path: &str, line: &str) -> bool {
+/// Index of the first `ALLOWED_PANIC_SITES` entry whose path and line
+/// fragments both match, or `None`. Matching against the ORIGINAL line keeps
+/// string-literal fragments (e.g. `"anchor tree"`) matchable.
+fn allowed_index(path: &str, line: &str) -> Option<usize> {
     ALLOWED_PANIC_SITES
         .iter()
-        .any(|(path_fragment, line_fragment, _)| {
+        .position(|(path_fragment, line_fragment, _)| {
             path.contains(path_fragment) && line.contains(line_fragment)
         })
 }
@@ -342,6 +364,7 @@ fn production_panic_surface_stays_closed() {
     // guessed from file names: every `#[cfg(test)] mod <name>;` (external
     // file) or `mod <name> {` block is production-excluded by declaration.
     let mut violations = Vec::new();
+    let mut used_allowlist = vec![false; ALLOWED_PANIC_SITES.len()];
     for root in SCAN_ROOTS {
         let root_path = repository().join(root);
         if !root_path.is_dir() {
@@ -373,8 +396,9 @@ fn production_panic_surface_stays_closed() {
                 // Allowlist matching runs against the ORIGINAL line (string
                 // literals intact); stripping preserves line numbering.
                 let original_line = original_lines.get(line - 1).copied().unwrap_or("");
-                if !is_allowed(&path, original_line) {
-                    violations.push(format!("{path}:{line}: {snippet}"));
+                match allowed_index(&path, original_line) {
+                    Some(index) => used_allowlist[index] = true,
+                    None => violations.push(format!("{path}:{line}: {snippet}")),
                 }
             }
         }
@@ -385,6 +409,24 @@ fn production_panic_surface_stays_closed() {
          fix them, or justify them in ALLOWED_PANIC_SITES in tests/logic/panic_surface_test.rs",
         violations.len(),
         violations.join("\n")
+    );
+
+    // A stale allowlist entry (its site was removed or its path/line fragment
+    // drifted) silently widens the exemption surface. Require every entry to
+    // match a real production panic line.
+    let stale: Vec<String> = ALLOWED_PANIC_SITES
+        .iter()
+        .zip(&used_allowlist)
+        .filter(|(_, used)| !**used)
+        .map(|((path_fragment, line_fragment, _), _)| format!("{path_fragment} :: {line_fragment}"))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "stale ALLOWED_PANIC_SITES entries that no longer match any production panic line \
+         ({}):\n{}\n\
+         remove them, or fix the path/line fragment, in tests/logic/panic_surface_test.rs",
+        stale.len(),
+        stale.join("\n")
     );
 }
 
