@@ -993,5 +993,66 @@ fn insights_lines_renders_capabilities_with_warning_markers() {
     assert!(text.contains("cpu"), "safe controller must render: {text}");
 }
 
+#[test]
+fn insights_lines_renders_resource_limits_with_quota_pids_and_cgroup() {
+    use taskmanager_core::core::identity::ProviderId;
+    use taskmanager_core::core::process_telemetry::ResourceObservation;
+    use taskmanager_core::core::process_telemetry::{
+        LimitValue, ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
+    };
+
+    let _guard = en();
+    let target = FrozenProcessIdentity::from_authoritative_parts(200, "res-proc", 1000, 1000)
+        .expect("valid target");
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, ProcessInsightsRevision::new(1));
+    let mut projection = tracker.snapshot().expect("snapshot exists");
+
+    let now_ms = 1000;
+    projection.resources = ProcessInsightFacetState::Current(ProcessResourceSnapshot::from_observations(
+        DeviceState::healthy(now_ms),
+        ProcessResourceObservations {
+            resource_groups: ResourceObservation::current(
+                vec![ResourceGroupMembership {
+                    provider: ProviderId::borrowed("cgroup.test"),
+                    native_hierarchy_id: Some(0),
+                    capabilities: Vec::new(),
+                    native_locator: "/system.slice/worker.scope".into(),
+                }],
+                now_ms,
+            ),
+            memory_usage_bytes: ResourceObservation::current(256 * 1024 * 1024, now_ms),
+            memory_limit: ResourceObservation::current(
+                LimitValue::Value(1024 * 1024 * 1024),
+                now_ms,
+            ),
+            cpu_time_quota_micros: ResourceObservation::current(LimitValue::Value(150_000), now_ms),
+            cpu_time_period_micros: ResourceObservation::current(100_000, now_ms),
+            process_count: ResourceObservation::current(7, now_ms),
+            process_limit: ResourceObservation::current(LimitValue::Value(64), now_ms),
+            ..ProcessResourceObservations::default()
+        },
+        Vec::new(),
+    ));
+
+    let mut app = crate::demo_app();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 200),
+    ));
+    assert!(text.contains("256.0 MiB"), "memory usage: {text}");
+    assert!(text.contains("CPU 150%"), "cpu quota: {text}");
+    assert!(text.contains("7 / 64"), "pid limits: {text}");
+    assert!(
+        text.contains("/system.slice/worker.scope"),
+        "cgroup locator: {text}"
+    );
+}
+
 #[path = "insights_tests/security.rs"]
 mod security;
