@@ -6,6 +6,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::setup::SetupScriptEvent;
 use taskmanager_platform_contract::{CapabilityId, EventSequence};
 use taskmanager_shell::fixture::setup::setup_script_info;
+use taskmanager_test_support::pin_english;
 use taskmanager_test_support::setup_script::platform;
 
 #[gpui::test]
@@ -87,6 +88,7 @@ async fn first_run_review_pins_actions_outside_the_real_scroll_owner(
 ) {
     use gpui::{ScrollHandle, VisualTestContext, size};
     use taskmanager_application::first_run::FirstRunController;
+    pin_english();
     for (width, height) in [
         (720.0, 480.0),
         (1280.0, 720.0),
