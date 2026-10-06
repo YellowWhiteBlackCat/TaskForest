@@ -112,6 +112,69 @@ def require_compact(rows: list[dict[str, str]], field: str, values: set[str], la
         raise CoverageError(f"{label} lacks compact 720x480 coverage: {missing}")
 
 
+def function_string_literals(path: Path, functions: tuple[str, ...]) -> set[str]:
+    """String literals inside the named `fn`s, used to recover the capture
+    router's recognized token set from the app source."""
+    source = path.read_text(encoding="utf-8")
+    tokens: set[str] = set()
+    for function in functions:
+        match = re.search(rf"fn {function}\b.*?\n\}}", source, re.S)
+        if match is None:
+            raise CoverageError(f"cannot locate fn {function} in {path}")
+        tokens |= set(re.findall(r'"([^"]+)"', match.group(0)))
+    return tokens
+
+
+def bevy_capture_router_tokens(path: Path) -> set[str]:
+    """Tokens the Bevy capture router accepts on `TM_BEVY_CAPTURE_PAGE`."""
+    tokens = function_string_literals(
+        path, ("capture_scenario_target", "capture_page", "capture_wants_service_logs")
+    )
+    if not tokens:
+        raise CoverageError(f"Bevy capture router has no tokens: {path}")
+    return tokens
+
+
+def iced_capture_router_tokens(root: Path) -> set[str]:
+    """Tokens the Iced capture router accepts on `TM_ICED_CAPTURE_DEVICE`."""
+    tokens = function_string_literals(
+        root / "crates/taskmanager-iced/src/app/capture_fixtures.rs",
+        ("capture_device_from_name", "capture_page_from_name"),
+    )
+    tokens |= function_string_literals(
+        root / "crates/taskmanager-iced/src/app/capture_state.rs",
+        (
+            "apply_capture_target",
+            "apply_capture_surface_and_process",
+            "apply_capture_hardware_and_perf",
+        ),
+    )
+    capture_source = root / "crates/taskmanager-iced/src/capture.rs"
+    tokens |= function_string_literals(capture_source, ("persisted_history_requested",))
+    tokens |= set(
+        re.findall(
+            r'const [A-Z0-9_]+: &str = "([^"]+)"',
+            capture_source.read_text(encoding="utf-8"),
+        )
+    )
+    if not tokens:
+        raise CoverageError("Iced capture router has no tokens")
+    return tokens
+
+
+def require_recognized_column(
+    rows: list[dict[str, str]], column: str, recognized: set[str], label: str
+) -> None:
+    """The capture driver passes one matrix column to the app router. A row
+    whose behavioral column is unrecognized would silently capture a different
+    surface, so check that column — not only the row label."""
+    unrecognized = sorted({row[column] for row in rows} - recognized)
+    if unrecognized:
+        raise CoverageError(
+            f"{label} capture {column} values are not recognized by the router: {unrecognized}"
+        )
+
+
 def validate(root: Path) -> dict[str, object]:
     gpui_matrix = read_tsv(root / "scripts/capture_scenarios.tsv")
     iced_matrix = read_tsv(root / "scripts/capture_iced_scenarios.tsv")
@@ -178,6 +241,12 @@ def validate(root: Path) -> dict[str, object]:
         (required_iced_pages - {"performance"}) | required_iced_devices,
         "Iced pages/devices",
     )
+    require_recognized_column(
+        iced_matrix,
+        "device",
+        iced_capture_router_tokens(root),
+        "Iced",
+    )
 
     required_bevy_pages = bevy_page_names(root / "crates/taskmanager-bevy-ui/src/app.rs")
     required_bevy_pages = {
@@ -189,6 +258,12 @@ def validate(root: Path) -> dict[str, object]:
     if missing_bevy_pages:
         raise CoverageError(f"Bevy pages lack Wayland coverage: {missing_bevy_pages}")
     require_compact(bevy_matrix, "page", required_bevy_pages, "Bevy pages")
+    require_recognized_column(
+        bevy_matrix,
+        "page",
+        bevy_capture_router_tokens(root / "crates/taskmanager-bevy-ui/src/capture.rs"),
+        "Bevy",
+    )
 
     tui_matrix = read_tsv(root / "scripts/capture_tui_scenarios.tsv")
     for frontend, rows in [("Iced", iced_matrix), ("Bevy", bevy_matrix), ("TUI", tui_matrix)]:
@@ -236,6 +311,17 @@ def self_test() -> int:
                 raise AssertionError("missing semantic scenario must be named") from error
         else:
             raise AssertionError("row count cannot replace semantic coverage")
+    recognized = {"cpu", "memory"}
+    require_recognized_column([{"device": "cpu"}, {"device": "memory"}], "device", recognized, "fixture")
+    try:
+        require_recognized_column(
+            [{"device": "cpu"}, {"device": "gpu"}], "device", recognized, "fixture"
+        )
+    except CoverageError as error:
+        if "gpu" not in str(error):
+            raise AssertionError("unrecognized column value must be named") from error
+    else:
+        raise AssertionError("an unrecognized capture column must fail closed")
     print("visual capture coverage self-test: PASS")
     return 0
 
