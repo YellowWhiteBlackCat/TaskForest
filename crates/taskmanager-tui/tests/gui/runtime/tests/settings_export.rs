@@ -905,6 +905,7 @@ fn normal_system_dashboard_keys_select_real_windows_and_keep_all_metric_groups_r
         SystemHistoryWindow, SystemPageSection, TimelineMetric,
     };
     use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+    pin_english();
     let mut app = demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::System));
     assert!(seed_shell_system_dashboard_history(
@@ -967,7 +968,8 @@ fn normal_system_dashboard_keys_select_real_windows_and_keep_all_metric_groups_r
         for metric in TimelineMetric::ALL {
             assert!(
                 content.contains(t(metric.label_key())),
-                "metric at {width}x{height}"
+                "metric {} at {width}x{height}",
+                metric.label_key()
             );
         }
         assert!(content.contains("60.0"));

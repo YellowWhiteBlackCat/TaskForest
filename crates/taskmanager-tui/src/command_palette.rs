@@ -107,6 +107,7 @@ pub enum PaletteLocalAction {
     OpenProcessAffinity,
     ToggleHistoryReplay,
     RefreshHistoryReplay,
+    CaptureWindow,
 }
 
 /// The typed direct-dispatch lane: what a TUI-local command DOES when its
@@ -154,6 +155,9 @@ pub(crate) enum TuiDirectAction {
     RequestSmartSelfTest,
     /// `d` on the Services page: open service dependencies browsing modal.
     BrowseServiceDependencies,
+    /// `S`: capture the current window to a PNG through the shared platform
+    /// capture backend (the active compositor window).
+    CaptureWindow,
 }
 
 /// Where (and under which modifier policy) a direct arm is armed. Declared as
@@ -229,7 +233,7 @@ pub(crate) struct TuiLocalCommand {
 
 /// The complete TUI-local binding registry.  The direct key router resolves
 /// every chord here — declaration and execution are one authority.
-pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 23] = [
+pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 24] = [
     TuiLocalCommand {
         binding: LocalBinding {
             shortcut: "w",
@@ -349,6 +353,17 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 23] = [
         direct: &[TuiDirectArm {
             scope: TuiDirectScope::Anywhere,
             action: TuiDirectAction::ExportDiagnosticReport,
+        }],
+    },
+    TuiLocalCommand {
+        binding: LocalBinding {
+            shortcut: "V",
+            label: "Capture current window",
+        },
+        palette_action: Some(PaletteLocalAction::CaptureWindow),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::CaptureWindow,
         }],
     },
     TuiLocalCommand {

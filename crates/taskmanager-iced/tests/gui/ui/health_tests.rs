@@ -558,7 +558,7 @@ mod thermal_zone_tests {
             .iter()
             .find(|row| !row.present)
             .expect("the capture fixture keeps an unreadable zone in the traversal");
-        assert_eq!(unreadable.label, "nvme");
+        assert_eq!(unreadable.label, "nvme0");
         assert_eq!(unreadable.value, missing_value());
         assert!(
             rows.iter().all(|row| !row.value.contains("0.0 °C")),

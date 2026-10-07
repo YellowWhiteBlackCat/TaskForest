@@ -677,20 +677,17 @@ if maybe parity-evidence; then
     # (`--feature-evidence` defaults to the committed file; a co-anchor is the
     # feature table's sixth column),
     # so a renamed feature anchor or co-anchor is dangling in the same pass.
-    # `--requirements` keeps the
-    # per-frontend P0-MC coverage report visible in the stage output/JSON
-    # without failing on an uncovered (frontend, requirement) pair -- today
-    # Bevy is 4/8 (D1 resolved as a partial mapping with a reasoned exemption
-    # for P0-MC-01/02/04/05; see scripts/parity/README.md) and the facet
-    # matcher is not a second vocabulary.  The deferred hard gate is
-    # `--require-requirement-coverage`; it stays deferred until the four
-    # exempt pairs are a first-class concept rather than a documented
-    # exemption, at which point this line adds the flag in the same change.
+    # `--requirements` + `--require-requirement-coverage` make the per-frontend
+    # P0-MC coverage a fail-closed 8/8 x 4 check: every frontend carries a real
+    # success-path anchor for all eight requirements. Bevy's P0-MC-01/04 closed
+    # with the Performance battery/fan-history and GPU metric-selector tests
+    # (see scripts/parity/README.md). A new uncovered pair now fails the gate.
     if scope_skip parity-evidence "merge-owner evidence surface" standard; then
         run_stage parity-evidence standard timeout --kill-after=30s 900s python3 scripts/parity/resolve_frontend_evidence.py \
             --nextest --scope auto \
             --interaction-matrix scripts/parity/cross_frontend_matrix.tsv \
             --requirements scripts/interaction_requirements.tsv \
+            --require-requirement-coverage \
             --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
     fi
 fi

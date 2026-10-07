@@ -56,7 +56,7 @@
   由 `sync_nav_strip_layout` 监听窗口宽度。宽度 < 800px 时自动置为 `Display::None`，
   平滑切换为纯图标导航，彻底消灭文字裁切乱码。
 - **性能页设备切片响应**：
-  - 各设备分区（`Cpu`, `Memory`, `Disk`, `Network`, `Gpu`, `Battery`）挂载
+  - 各设备分区（`Cpu`, `Memory`, `Disk`, `Network`, `Gpu`, `Battery`, `Fan`）挂载
     `DeviceViewCategory` 标记组件；
   - 侧栏设备按钮触发 `PerformanceDeviceFocusChanged` 后，系统遍历容器将匹配项置为
     `Display::Flex`，其余置为 `Display::None`，实现真正可切换的硬件看板。

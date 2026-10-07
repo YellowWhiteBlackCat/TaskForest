@@ -1,7 +1,9 @@
 //! Performance sidebar, CPU header, and responsive rail scenes.
 
 use super::*;
-use crate::pages::performance::metrics::{battery_caption, battery_sidebar_title};
+use crate::pages::performance::metrics::{
+    battery_caption, battery_sidebar_title, fan_caption, fans,
+};
 use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
@@ -406,6 +408,36 @@ pub(super) fn device_sidebar_scene(
                         title,
                         sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
                         marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
+                        false,
+                        palette,
+                    )),
+                )),
+            ));
+        }
+    }
+    if let Some(fan_devices) = fans(shell) {
+        for (index, fan) in fan_devices.iter().enumerate() {
+            let key = fan.id().to_owned();
+            let title = if fan.label().trim().is_empty() {
+                format!("{} {}", t("common.fan"), index)
+            } else {
+                fan.label().trim().to_owned()
+            };
+            let caption = fan_caption(fan);
+            let samples = shell.history.fan_rpm_for(fan.id());
+            rows.push((
+                PerformanceDeviceTarget::Fan(key.clone()),
+                Box::new(device_button_scene(
+                    PerformanceDeviceTarget::Fan(key.clone()),
+                    Box::new(device_row_with_accessory_scene(
+                        title,
+                        sidebar_activity_scene(
+                            IconId::Performance,
+                            &samples,
+                            palette.accent,
+                            palette,
+                        ),
+                        marked_text_scene(caption, Role::Mono, DynField::FanCaption(key)),
                         false,
                         palette,
                     )),

@@ -14,8 +14,8 @@
 subject_kind	subject_id	frontend	status	reason	contract_tag	evidence_kind	test_id_or_scenario	target_or_validator	platform
 facet	global-shortcut-f5	gpui	ready		keyboard	behavior	gpui_app::root::keyboard::tests::f5_refreshes_processes_without_panic	gpui	
 facet	global-shortcut-f5	iced	ready		keyboard	behavior	keys::tests::fixed_keys_map_onto_the_shared_vocabulary	iced	
-facet	global-shortcut-f5	tui	ready		keyboard	pending	-	-	
-facet	global-shortcut-f5	bevy	ready		keyboard	pending	-	-	
+facet	global-shortcut-f5	tui	ready		keyboard	behavior	runtime::tests::keys_navigation::crossterm_keys_normalize_into_shared_command_vocabulary	tui	
+facet	global-shortcut-f5	bevy	ready		keyboard	behavior	input_contract::tests::shared_key_maps_refresh_and_space_onto_the_application_vocabulary	bevy	
 facet	global-shortcut-f9	gpui	ready		keyboard	behavior	gpui_app::root::keyboard::tests::f9_toggles_sidebar_visibility	gpui	
 facet	global-shortcut-f9	iced	ready		keyboard	behavior	app::tests::visual_navigation::f9_toggles_the_performance_sidebar	iced	
 facet	global-shortcut-f9	tui	ready		keyboard	behavior	runtime::tests::page_navigation::f9_is_consumed_without_creating_a_terminal_sidebar	tui	
@@ -30,12 +30,12 @@ facet	global-shortcut-esc	tui	ready		cancel	behavior	runtime::tests::control_fee
 facet	global-shortcut-esc	bevy	ready		cancel	behavior	input::tests::escape_dismisses_the_gate_without_an_effect	bevy	
 facet	global-shortcut-ctrl-f	gpui	ready		keyboard	behavior	keyboard_behavior::mc03_apps_search_case_ctrl_f_focuses_search_and_tab_leaves_input	gpui	
 facet	global-shortcut-ctrl-f	iced	ready		keyboard	behavior	keys::tests::ctrl_chords_and_characters_route	iced	
-facet	global-shortcut-ctrl-f	tui	ready		keyboard	pending	-	-	
+facet	global-shortcut-ctrl-f	tui	ready		keyboard	behavior	runtime::tests::keys_navigation::crossterm_keys_normalize_into_shared_command_vocabulary	tui	
 facet	global-shortcut-ctrl-f	bevy	ready		keyboard	behavior	input_contract::tests::focus_traversal_and_process_shortcuts_honor_scope_and_text_input	bevy	
 facet	global-shortcut-ctrl-space	gpui	ready		keyboard	behavior	gpui_app::root::keyboard::tests::ctrl_space_toggles_telemetry_pause	gpui	
 facet	global-shortcut-ctrl-space	iced	ready		keyboard	behavior	app::tests::ctrl_space_toggles_the_manual_telemetry_pause_through_the_keyboard_lane	iced	
-facet	global-shortcut-ctrl-space	tui	ready		keyboard	pending	-	-	
-facet	global-shortcut-ctrl-space	bevy	ready		keyboard	pending	-	-	
+facet	global-shortcut-ctrl-space	tui	ready		keyboard	behavior	runtime::tests::keys_navigation::control_hold_pauses_telemetry_through_the_shared_policy	tui	
+facet	global-shortcut-ctrl-space	bevy	ready		keyboard	behavior	input_contract::tests::shared_key_maps_refresh_and_space_onto_the_application_vocabulary	bevy	
 facet	accesskit-mounted	gpui	ready		accessibility	behavior	gpui_app::root::a11y::tests::publish_accessibility_snapshot_advances_revision_and_updates_published_tree	gpui	
 facet	accesskit-mounted	iced	ready		accessibility	behavior	a11y::tests::demo_shell_projects_process_rows_graph_and_selection	iced	
 facet	accesskit-mounted	tui	ready		accessibility	behavior	runtime::tests::semantic_snapshot::process_rows_carry_typed_name_cpu_memory_and_selection_semantics	tui	
@@ -50,11 +50,11 @@ facet	accesskit-actions	tui	ready		accessibility	behavior	runtime::tests::semant
 facet	accesskit-actions	bevy	ready		accessibility	behavior	semantic::tests::arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss	bevy	
 facet	theme-high-contrast	gpui	ready		theme	behavior	gpui_app::root::appearance::tests::set_high_contrast_toggles_theme_and_presentation	gpui	
 facet	theme-high-contrast	iced	ready		theme	behavior	theme::tests::high_contrast_mode_strengthens_iced_borders_and_text	iced	
-facet	theme-high-contrast	tui	ready		theme	pending	-	-	
+facet	theme-high-contrast	tui	ready		theme	behavior	theme::tests::high_contrast_token_forces_the_typed_high_contrast_axis	tui	
 facet	theme-high-contrast	bevy	ready		theme	behavior	palette::tests::high_contrast_theme_strengthens_bevy_palette_and_flags_hc	bevy	
 facet	theme-follow-system	gpui	ready		theme	behavior	gpui_app::root::appearance::tests::apply_system_color_scheme_follows_desktop_appearance_in_system_mode	gpui	
 facet	theme-follow-system	iced	ready		theme	behavior	app::appearance::tests::system_mode_follows_the_desktop_and_explicit_choices_do_not	iced	
-facet	theme-follow-system	tui	ready		theme	pending	-	-	
+facet	theme-follow-system	tui	ready		theme	behavior	theme::tests::system_mode_follows_the_observed_desktop_appearance	tui	
 facet	theme-follow-system	bevy	ready		theme	behavior	pages::settings::tests::system_mode_and_theme_preferences_follow_observed_appearance	bevy	
 facet	chart-fidelity	gpui	ready		chart	behavior	gpui_app::graph::tests::catmull_rom_straight_line_stays_collinear	gpui	
 facet	chart-fidelity	iced	ready		chart	behavior	perf_chart::tests::chart_program_classifies_partial_buffers_without_cross_fabrication	iced	
@@ -64,53 +64,53 @@ facet	responsive-properties	gpui	ready		responsive	behavior	gpui_app::root::resp
 facet	responsive-properties	iced	ready		responsive	behavior	app::tests::compact_breakpoint_mirrors_gpui_responsive_policy	iced	
 facet	responsive-properties	tui	ready		responsive	behavior	ui::perf_gpu::tests::compact_layout_gives_all_non_fact_rows_to_the_primary_chart	tui	
 facet	responsive-properties	bevy	ready		responsive	behavior	widgets::layout::tests::performance_layout_switches_before_the_graph_becomes_unusable	bevy	
-facet	network-throughput	gpui	ready		network	pending	-	-	
-facet	network-throughput	iced	ready		network	pending	-	-	
-facet	network-throughput	tui	ready		network	pending	-	-	
+facet	network-throughput	gpui	ready		network	behavior	gpui_app::process_insights::view::network_tests::network_throughput_formats_observed_rates_and_keeps_absence_honest	gpui	
+facet	network-throughput	iced	ready		network	behavior	ui::insights::tests::network_section_renders_observed_throughput	iced	
+facet	network-throughput	tui	ready		network	behavior	runtime::tests::process_properties::network_connections_surface_renders_socket_inventory_and_rtt	tui	
 facet	network-throughput	bevy	ready		network	behavior	pages::processes::details::tests::network_summary_formats_rates_endpoints_and_escalation	bevy	
 facet	network-connections	gpui	ready		network	behavior	gpui_app::process_insights::tests::connection_readout_preserves_ip_labels_and_displays_local_endpoint_truth	gpui	
 facet	network-connections	iced	ready		network	behavior	ui::insights::tests::connection_tests::connection_readout_keeps_endpoints_and_family_aware_names	iced	
-facet	network-connections	tui	ready		network	pending	-	-	
+facet	network-connections	tui	ready		network	behavior	runtime::tests::process_properties::network_connections_surface_renders_socket_inventory_and_rtt	tui	
 facet	network-connections	bevy	ready		network	behavior	pages::processes::details::tests::network_summary_formats_rates_endpoints_and_escalation	bevy	
 facet	network-escalation	gpui	ready		network	behavior	gpui_app::process_insights::tests::escalation_pill_renders_for_requires_escalation_and_submits_on_click	gpui	
 facet	network-escalation	iced	ready		network	behavior	app::tests_parity::settings_and_appearance::network_escalation_request_queues_through_the_shared_effect	iced	
 facet	network-escalation	tui	ready		network	behavior	runtime::tests::process_properties::e_on_insights_tab_yields_the_shared_network_escalation_effect	tui	
 facet	network-escalation	bevy	ready		network	behavior	pages::processes::details::tests::network_summary_formats_rates_endpoints_and_escalation	bevy	
-facet	gpu-devices	gpui	ready		gpu	pending	-	-	
-facet	gpu-devices	iced	ready		gpu	pending	-	-	
+facet	gpu-devices	gpui	ready		gpu	behavior	gpui_app::process_insights::view::gpu_engines::tests::populated_engines_render_with_cold_start_gap	gpui	
+facet	gpu-devices	iced	ready		gpu	behavior	ui::insights::tests::engine_usage_keeps_a_cold_start_gap_honest	iced	
 facet	gpu-devices	tui	ready		gpu	behavior	ui::process_details::insights::tests::format_gpu_device_row_renders_device_id_and_vram	tui	
 facet	gpu-devices	bevy	ready		gpu	behavior	pages::processes::details::tests::gpu_summary_formats_devices_engines_and_cold_start_gap	bevy	
 facet	gpu-engines	gpui	ready		gpu	behavior	gpui_app::process_insights::view::gpu_engines::tests::populated_engines_render_with_cold_start_gap	gpui	
 facet	gpu-engines	iced	ready		gpu	behavior	ui::insights::tests::engine_usage_keeps_a_cold_start_gap_honest	iced	
 facet	gpu-engines	tui	ready		gpu	behavior	ui::process_details::insights::tests::format_engine_usage_line_keeps_cold_start_honest	tui	
 facet	gpu-engines	bevy	ready		gpu	behavior	pages::processes::details::tests::gpu_summary_formats_devices_engines_and_cold_start_gap	bevy	
-facet	resources-memory	gpui	ready		resources	pending	-	-	
+facet	resources-memory	gpui	ready		resources	behavior	gpui_app::process_insights::view::resources_tests::resource_card_renders_memory_cpu_quota_pids_and_cgroup_locator	gpui	
 facet	resources-memory	iced	ready		resources	behavior	ui::insights::tests::format_resource_pair_formats_honestly	iced	
-facet	resources-memory	tui	ready		resources	pending	-	-	
+facet	resources-memory	tui	ready		resources	behavior	ui::process_details::insights::tests::insights_lines_renders_resource_limits_with_quota_pids_and_cgroup	tui	
 facet	resources-memory	bevy	ready		resources	behavior	pages::processes::details::tests::resources_summary_exposes_memory_cpu_pids_and_cgroup_locator	bevy	
-facet	resources-cpu-quota	gpui	ready		resources	pending	-	-	
-facet	resources-cpu-quota	iced	ready		resources	pending	-	-	
-facet	resources-cpu-quota	tui	ready		resources	pending	-	-	
+facet	resources-cpu-quota	gpui	ready		resources	behavior	gpui_app::process_insights::view::resources_tests::resource_card_renders_memory_cpu_quota_pids_and_cgroup_locator	gpui	
+facet	resources-cpu-quota	iced	ready		resources	behavior	ui::insights::tests::format_resource_pair_formats_honestly	iced	
+facet	resources-cpu-quota	tui	ready		resources	behavior	ui::process_details::insights::tests::insights_lines_renders_resource_limits_with_quota_pids_and_cgroup	tui	
 facet	resources-cpu-quota	bevy	ready		resources	behavior	pages::processes::details::tests::resources_summary_handles_unlimited_quotas_and_limits	bevy	
-facet	resources-pid-limits	gpui	ready		resources	pending	-	-	
-facet	resources-pid-limits	iced	ready		resources	pending	-	-	
-facet	resources-pid-limits	tui	ready		resources	pending	-	-	
+facet	resources-pid-limits	gpui	ready		resources	behavior	gpui_app::process_insights::view::resources_tests::resource_card_renders_memory_cpu_quota_pids_and_cgroup_locator	gpui	
+facet	resources-pid-limits	iced	ready		resources	behavior	ui::insights::tests::format_resource_pair_formats_honestly	iced	
+facet	resources-pid-limits	tui	ready		resources	behavior	ui::process_details::insights::tests::insights_lines_renders_resource_limits_with_quota_pids_and_cgroup	tui	
 facet	resources-pid-limits	bevy	ready		resources	behavior	pages::processes::details::tests::resources_summary_exposes_memory_cpu_pids_and_cgroup_locator	bevy	
-facet	resources-cgroup-locator	gpui	ready		resources	pending	-	-	
-facet	resources-cgroup-locator	iced	ready		resources	pending	-	-	
-facet	resources-cgroup-locator	tui	ready		resources	pending	-	-	
+facet	resources-cgroup-locator	gpui	ready		resources	behavior	gpui_app::process_insights::view::resources_tests::resource_card_renders_memory_cpu_quota_pids_and_cgroup_locator	gpui	
+facet	resources-cgroup-locator	iced	ready		resources	behavior	ui::insights::tests::insights_sections_render_all_states_without_panic	iced	
+facet	resources-cgroup-locator	tui	ready		resources	behavior	ui::process_details::insights::tests::insights_lines_renders_resource_limits_with_quota_pids_and_cgroup	tui	
 facet	resources-cgroup-locator	bevy	ready		resources	behavior	pages::processes::details::tests::resources_summary_exposes_memory_cpu_pids_and_cgroup_locator	bevy	
-facet	isolation-kind	gpui	ready		isolation-domain	pending	-	-	
-facet	isolation-kind	iced	ready		isolation-domain	pending	-	-	
-facet	isolation-kind	tui	ready		isolation-domain	pending	-	-	
+facet	isolation-kind	gpui	ready		isolation-domain	behavior	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_namespace_audit	gpui	
+facet	isolation-kind	iced	ready		isolation-domain	behavior	ui::insights::tests::isolation_section_renders_namespace_audit	iced	
+facet	isolation-kind	tui	ready		isolation-domain	behavior	ui::process_details::insights::tests::security::insights_lines_renders_namespace_audit	tui	
 facet	isolation-kind	bevy	ready		isolation-domain	behavior	pages::processes::details::tests::isolation_summary_exposes_sandboxed_and_container_dimensions	bevy	
-facet	isolation-container-id	gpui	ready		isolation-domain	pending	-	-	
-facet	isolation-container-id	iced	ready		isolation-domain	pending	-	-	
-facet	isolation-container-id	tui	ready		isolation-domain	pending	-	-	
+facet	isolation-container-id	gpui	ready		isolation-domain	behavior	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_sandbox_detection	gpui	
+facet	isolation-container-id	iced	ready		isolation-domain	behavior	ui::insights::tests::isolation_section_renders_sandbox_detection	iced	
+facet	isolation-container-id	tui	ready		isolation-domain	behavior	ui::process_details::insights::tests::security::insights_lines_renders_sandbox_detection	tui	
 facet	isolation-container-id	bevy	ready		isolation-domain	behavior	pages::processes::details::tests::isolation_summary_exposes_sandboxed_and_container_dimensions	bevy	
-facet	isolation-sandboxed	gpui	ready		isolation-domain	pending	-	-	
-facet	isolation-sandboxed	iced	ready		isolation-domain	pending	-	-	
-facet	isolation-sandboxed	tui	ready		isolation-domain	pending	-	-	
+facet	isolation-sandboxed	gpui	ready		isolation-domain	behavior	gpui_app::process_insights::view::isolation_tests::isolation_card_renders_sandbox_detection	gpui	
+facet	isolation-sandboxed	iced	ready		isolation-domain	behavior	ui::insights::tests::isolation_section_renders_sandbox_detection	iced	
+facet	isolation-sandboxed	tui	ready		isolation-domain	behavior	ui::process_details::insights::tests::security::insights_lines_renders_sandbox_detection	tui	
 facet	isolation-sandboxed	bevy	ready		isolation-domain	behavior	pages::processes::details::tests::isolation_summary_exposes_sandboxed_and_container_dimensions	bevy	
 facet	threads-list	gpui	ready		threads	behavior	gpui_app::process_insights::view::threads::tests::populated_threads_render_with_missing_cpu_dash	gpui	
 facet	threads-list	iced	ready		threads	behavior	ui::insights::tests::thread_cpu_helpers_keep_a_missing_value_honest	iced	
@@ -121,22 +121,22 @@ facet	open-files-list	iced	ready		open-files	behavior	ui::insights::tests::open_
 facet	open-files-list	tui	ready		open-files	behavior	ui::process_details::insights::tests::open_files_preview_renders_count_unreadable_and_rows	tui	
 facet	open-files-list	bevy	ready		open-files	behavior	pages::processes::details::tests::open_files_summary_empty_unreadable_and_populated	bevy	
 facet	environment	gpui	ready		environment	behavior	gpui_app::process_insights::view::environment_tests::populated_environment_renders_rows	gpui	
-facet	environment	iced	ready		environment	pending	-	-	
+facet	environment	iced	ready		environment	behavior	ui::insights::tests::environment_section_renders_observed_entries	iced	
 facet	environment	tui	ready		environment	behavior	ui::process_details::insights::tests::insights_lines_renders_environment_and_gpu_facets	tui	
 facet	environment	bevy	ready		environment	behavior	pages::processes::details::tests::environment_summary_formats_entries_and_truncation	bevy	
 facet	request-lifecycle	gpui	ready		lifecycle	behavior	gpui_app::root::process_insights_ui::tests::lifecycle_rejects_wrong_target_late_and_duplicate_terminals	gpui	
-facet	request-lifecycle	iced	ready		lifecycle	pending	-	-	
+facet	request-lifecycle	iced	ready		lifecycle	behavior	app::tests::phase6_gaps::working_directory_is_collecting_until_the_typed_insight_arrives	iced	
 facet	request-lifecycle	tui	ready		lifecycle	behavior	runtime::tests::process_rows_snapshot::one_shot_motion_updates_cursor_identity_and_insights_target	tui	
-facet	request-lifecycle	bevy	ready		lifecycle	pending	-	-	
-facet	loading-state	gpui	ready		loading	pending	-	-	
-facet	loading-state	iced	ready		loading	pending	-	-	
+facet	request-lifecycle	bevy	ready		lifecycle	behavior	pages::processes::properties_modal::tests::independent_availability_and_mismatched_targets_remain_honest	bevy	
+facet	loading-state	gpui	ready		loading	behavior	gpui_app::process_insights::tests::independent_missing_and_pending_messages_paint_their_own_facet	gpui	
+facet	loading-state	iced	ready		loading	behavior	app::tests::phase6_gaps::working_directory_is_collecting_until_the_typed_insight_arrives	iced	
 facet	loading-state	tui	ready		loading	behavior	runtime::tests::process_properties::insights_tab_shows_collecting_when_no_projection_is_seeded	tui	
-facet	loading-state	bevy	ready		loading	pending	-	-	
+facet	loading-state	bevy	ready		loading	behavior	pages::processes::details::tests::selected_projection_uses_the_shared_vm_and_keeps_insights_typed	bevy	
 facet	typed-unavailable	gpui	ready		unavailable	behavior	gpui_app::root::process_insights_ui::tests::partial_current_and_distinct_unavailable_reasons_are_not_flattened	gpui	
 facet	typed-unavailable	iced	ready		unavailable	behavior	ui::insights::tests::facet_unavailable_text_maps_typed_reasons	iced	
 facet	typed-unavailable	tui	ready		unavailable	behavior	runtime::tests::process_properties::insights_tab_renders_typed_escalation_reason_and_hint_never_debug	tui	
 facet	typed-unavailable	bevy	ready		unavailable	behavior	pages::processes::details::tests::selected_projection_uses_the_shared_vm_and_keeps_insights_typed	bevy	
-facet	partial-display	gpui	partial	per-facet degraded cards render only inside a Ready snapshot; the whole dialog stays Loading until the four core facets reach terminal states, and total failure folds into one typed Error panel (coarser than the per-facet streaming of iced/tui)	partial	pending	-	-	
+facet	partial-display	gpui	partial	per-facet degraded cards render only inside a Ready snapshot; the whole dialog stays Loading until the four core facets reach terminal states, and total failure folds into one typed Error panel (coarser than the per-facet streaming of iced/tui)	partial	behavior	gpui_app::root::process_insights_ui::tests::partial_current_and_distinct_unavailable_reasons_are_not_flattened	gpui	
 facet	partial-display	iced	ready		partial	behavior	ui::insights::tests::insights_sections_render_all_states_without_panic	iced	
 facet	partial-display	tui	ready		partial	behavior	runtime::tests::process_properties::insights_tab_renders_thread_list_when_projection_is_present	tui	
 facet	partial-display	bevy	ready		partial	behavior	pages::processes::details::tests::resources_summary_partial_observations_never_fabricate_missing_values	bevy	
@@ -145,6 +145,6 @@ facet	gap-honesty	iced	ready		honesty	behavior	ui::insights::tests::engine_usage
 facet	gap-honesty	tui	ready		honesty	behavior	ui::process_details::insights::tests::format_thread_row_keeps_missing_cpu_honest	tui	
 facet	gap-honesty	bevy	ready		honesty	behavior	pages::processes::details::tests::threads_summary_empty_and_populated_with_gap_honesty	bevy	
 facet	capture-evidence	gpui	partial	deterministic capture fixture plus headless window-draw and GUI behavior tests exist, but no dedicated insights scene in the canonical capture matrix	capture-visual	behavior	gpui_app::process_insights::tests::capture_fixture_renders_at_reference_and_compact_sizes	gpui	
-facet	capture-evidence	iced	partial	headless unit renders and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	pending	-	-	
-facet	capture-evidence	tui	partial	TestBackend unit renders and honesty tests exist, dedicated capture scene pending live terminal harness	capture-visual	pending	-	-	
-facet	capture-evidence	bevy	partial	headless scene assembly and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	pending	-	-	
+facet	capture-evidence	iced	partial	headless unit renders and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	behavior	app::constructors::tests::dedicated_process_and_storage_capture_targets_use_the_normal_surfaces	iced	
+facet	capture-evidence	tui	partial	TestBackend unit renders and honesty tests exist, dedicated capture scene pending live terminal harness	capture-visual	behavior	runtime::tests::semantic_snapshot::dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table	tui	
+facet	capture-evidence	bevy	partial	headless scene assembly and honesty tests exist, dedicated matrix capture scene pending live capture harness	capture-visual	behavior	confirmation::tests::capture_confirmation_scenarios_arm_expected_gates	bevy	

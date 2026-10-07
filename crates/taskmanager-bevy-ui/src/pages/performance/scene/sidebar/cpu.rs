@@ -464,6 +464,19 @@ pub(crate) fn cpu_main_scene(
         ]
     };
 
+    let fan_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Fan)
+        Children [
+             @section_scene(Section::Fan, shell, palette)
+        ]
+    };
+
     bsn! {
         Node {
             width: percent(100),
@@ -492,7 +505,8 @@ pub(crate) fn cpu_main_scene(
             Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: UiRect::bottom(px(8.0)) }
             ScrollArea PerformanceDeviceBody Children [
                 @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
-                @{ network_container } -- @{ gpu_container } -- @{ battery_container }
+                @{ network_container } -- @{ gpu_container } -- @{ battery_container } --
+                @{ fan_container }
             ]
         ]
     }

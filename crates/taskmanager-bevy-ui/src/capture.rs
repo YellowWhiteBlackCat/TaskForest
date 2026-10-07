@@ -3,6 +3,7 @@
 use crate::app::Page;
 use crate::pages::performance::PerformanceDeviceTarget;
 use bevy::window::WindowResolution;
+use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_shell::ShellApp;
 
 pub(crate) fn capture_page_name(page: Page) -> &'static str {
@@ -77,6 +78,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "settings-switch-focus" => Some("settings-switch-focus"),
         "battery-fan-performance" => Some("battery-fan-performance"),
         "battery-live-performance" => Some("battery-live-performance"),
+        "fan-performance" => Some("fan-performance"),
         "device-hotplug" => Some("device-hotplug"),
         "sidebar-edit" => Some("sidebar-edit"),
         "saved-view-presets" => Some("saved-view-presets"),
@@ -129,6 +131,13 @@ pub(crate) fn performance_device_target(
             .batteries
             .first()
             .map(|battery| PerformanceDeviceTarget::Battery(battery.id.clone())),
+        "fan-performance" => projection
+            .sensors
+            .as_ref()?
+            .readings
+            .iter()
+            .find(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
+            .map(|reading| PerformanceDeviceTarget::Fan(reading.id().to_owned())),
         _ => None,
     }
 }
@@ -178,6 +187,7 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "history-replay"
         | "battery-fan-performance"
         | "battery-live-performance"
+        | "fan-performance"
         | "device-hotplug"
         | "sidebar-edit" => Some(Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => Some(Page::Services),

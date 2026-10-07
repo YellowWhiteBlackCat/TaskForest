@@ -141,6 +141,10 @@ fn execute_tui_local_direct(
             app.open_diagnostic_bundle();
             InputDispatch::Consumed
         }
+        TuiDirectAction::CaptureWindow => {
+            app.request_current_window_capture();
+            InputDispatch::Consumed
+        }
         TuiDirectAction::SelectPerfResource => {
             let Some(digit) = digit else {
                 return InputDispatch::Unhandled;

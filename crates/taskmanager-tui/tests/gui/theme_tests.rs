@@ -196,3 +196,76 @@ fn rebuilt_palette_follows_theme_params() {
     let hc = TuiTheme::from_params(high_contrast);
     assert_ne!(base.dim, hc.dim, "high contrast must brighten muted text");
 }
+
+/// The high-contrast token and an observed desktop preference both force the
+/// typed high-contrast axis on; the default stays off.
+#[test]
+fn high_contrast_token_forces_the_typed_high_contrast_axis() {
+    assert_eq!(
+        ThemeParams::from_config_tokens("GNOME", "Dark", false).high_contrast(),
+        HighContrast::Off
+    );
+    assert_eq!(
+        ThemeParams::from_config_tokens("GNOME", "Dark", true).high_contrast(),
+        HighContrast::On
+    );
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "GNOME",
+            "Dark",
+            false,
+            Some(DesktopAppearance {
+                family: DesktopFamily::Gnome,
+                color_scheme: PreferredColorScheme::Dark,
+                high_contrast: Some(true),
+            }),
+        )
+        .high_contrast(),
+        HighContrast::On,
+        "an observed desktop high-contrast preference forces the axis on"
+    );
+}
+
+/// `System` mode follows the observed desktop color scheme; an explicit choice
+/// ignores the observation.
+#[test]
+fn system_mode_follows_the_observed_desktop_appearance() {
+    let appearance = |color_scheme| {
+        Some(DesktopAppearance {
+            family: DesktopFamily::Gnome,
+            color_scheme,
+            high_contrast: None,
+        })
+    };
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "GNOME",
+            "System",
+            false,
+            appearance(PreferredColorScheme::Light),
+        )
+        .mode,
+        LightDark::Light
+    );
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "GNOME",
+            "System",
+            false,
+            appearance(PreferredColorScheme::Dark),
+        )
+        .mode,
+        LightDark::Dark
+    );
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "GNOME",
+            "Dark",
+            false,
+            appearance(PreferredColorScheme::Light),
+        )
+        .mode,
+        LightDark::Dark,
+        "an explicit choice ignores the observed appearance"
+    );
+}

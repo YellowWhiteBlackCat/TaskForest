@@ -255,6 +255,9 @@ impl TuiApp {
             Some(PaletteLocalAction::ExportDiagnosticReport) => {
                 self.open_diagnostic_bundle();
             }
+            Some(PaletteLocalAction::CaptureWindow) => {
+                self.request_current_window_capture();
+            }
             Some(PaletteLocalAction::OpenProcessAffinity)
                 if self.page() == AppPage::Applications =>
             {

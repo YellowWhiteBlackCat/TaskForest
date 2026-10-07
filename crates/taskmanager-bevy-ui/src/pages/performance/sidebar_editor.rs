@@ -38,6 +38,7 @@ impl PerformanceDeviceTarget {
             Self::Network(id) => format!("network:{id}"),
             Self::Gpu(id) => format!("gpu:{id}"),
             Self::Battery(id) => format!("battery:{id}"),
+            Self::Fan(id) => format!("fan:{id}"),
         }
     }
 }
@@ -68,6 +69,7 @@ impl SidebarState {
             }
             PerformanceDeviceTarget::Gpu(_) => self.0.show_gpus,
             PerformanceDeviceTarget::Battery(_) => true,
+            PerformanceDeviceTarget::Fan(_) => true,
         };
         visible_with_override(
             &target.sidebar_key(),
@@ -124,6 +126,18 @@ pub(crate) fn entries(shell: &ShellApp) -> Vec<(PerformanceDeviceTarget, String)
             (
                 PerformanceDeviceTarget::Battery(battery.id.clone()),
                 battery.display_name.clone(),
+            )
+        }));
+    }
+    if let Some(fans) = metrics::fans(shell) {
+        entries.extend(fans.iter().map(|fan| {
+            (
+                PerformanceDeviceTarget::Fan(fan.id().to_owned()),
+                if fan.label().trim().is_empty() {
+                    fan.id().to_owned()
+                } else {
+                    fan.label().trim().to_owned()
+                },
             )
         }));
     }

@@ -501,6 +501,7 @@ where
         cycle.ancillary_effect |= app.drain_history_replay_completions();
         cycle.ancillary_effect |= app.drain_snapshot_export_completions();
         cycle.ancillary_effect |= app.drain_diagnostic_bundle_completions();
+        cycle.ancillary_effect |= app.drain_window_capture_completions();
         if let Some(platform) = platform.as_deref_mut() {
             cycle.ancillary_effect |= app
                 .shell

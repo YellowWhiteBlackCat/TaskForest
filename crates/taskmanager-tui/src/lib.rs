@@ -51,6 +51,7 @@ mod surface;
 mod terminal;
 mod theme;
 mod ui;
+mod window_capture;
 
 pub use preferences::AppliedPrefs;
 
@@ -177,6 +178,7 @@ pub struct TuiApp {
     /// Typed lifecycle plus the app-host's non-blocking export client.
     snapshot_export: snapshot_export::TuiSnapshotExportRuntime,
     diagnostics: diagnostic_bundle::TuiDiagnosticRuntime,
+    window_capture: window_capture::TuiWindowCaptureRuntime,
     first_run: FirstRunController,
     /// Read-only durable-history lifecycle and replay capability.
     history_runtime: history_runtime::TuiHistoryRuntime,
@@ -350,6 +352,7 @@ impl TuiApp {
             export_dir: None,
             snapshot_export: snapshot_export::TuiSnapshotExportRuntime::default(),
             diagnostics: diagnostic_bundle::TuiDiagnosticRuntime::default(),
+            window_capture: window_capture::TuiWindowCaptureRuntime::default(),
             first_run: FirstRunController::default(),
             history_runtime: history_runtime::TuiHistoryRuntime::default(),
             perf_device: PerfDevice::Cpu,

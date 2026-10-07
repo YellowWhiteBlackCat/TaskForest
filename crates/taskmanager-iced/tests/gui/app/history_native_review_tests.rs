@@ -16,25 +16,25 @@ fn await_rows(app: &mut IcedApp, phase: &str) {
         app.drain_config_publications();
         app.drain_history_replay_completions();
         let projection = app.application_history_projection();
-        assert_ne!(
-            projection.status,
-            ApplicationHistoryStatus::Unavailable,
-            "{phase}: history startup unavailable: {:?}",
-            projection.unavailable_reason
-        );
         assert!(
             app.history_replay_state().failure().is_none(),
             "{phase}: query failed: {:?}",
             app.history_replay_state().failure()
         );
-        if !app.history_replay_state().rows().is_empty() && !app.history_replay_state().is_loading()
+        // The reader can report a transient `Unavailable` while the writer
+        // claims the store and the connector boots; poll through it and only
+        // fail at the deadline, with the typed reason.
+        if projection.status != ApplicationHistoryStatus::Unavailable
+            && !app.history_replay_state().rows().is_empty()
+            && !app.history_replay_state().is_loading()
         {
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "{phase}: the real query must complete: capability={:?}, loading={}, window={:?}, rows_window={:?}, rows={}",
-            app.application_history_projection().status,
+            "{phase}: the real query must complete: status={:?}, reason={:?}, loading={}, window={:?}, rows_window={:?}, rows={}",
+            projection.status,
+            projection.unavailable_reason,
             app.history_replay_state().is_loading(),
             app.history_replay_state().window(),
             app.history_replay_state().rows_window(),
@@ -46,7 +46,7 @@ fn await_rows(app: &mut IcedApp, phase: &str) {
 
 #[test]
 fn normal_history_settings_and_commands_use_real_queries_and_disable_discards_cached_curves() {
-    let root = crate::test_support::repo_temp_dir().join("iced-history-review");
+    let root = crate::test_support::temp_dir("history-review");
     let history = root.join("history");
     std::fs::create_dir_all(&history).expect("history directory");
     let now = u64::try_from(
