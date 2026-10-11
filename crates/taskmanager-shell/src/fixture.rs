@@ -348,6 +348,12 @@ pub fn demo_app() -> ShellApp {
 pub fn demo_direct_track() -> DirectTrackState {
     let demo = demo_app();
     let mut track = DirectTrackState::from_fixture_projection(demo.projection().clone());
+    track.report_notice(
+        FeedbackSource::Demo,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
+        t("status.demo_snapshot"),
+    );
     // The direct track owns its own request sessions (the projection copy does
     // not carry them), so seed the same synthetic readout through the shared
     // helper — one source of values for every frontend track.

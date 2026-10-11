@@ -44,6 +44,30 @@ fn demo_seeds_the_synthetic_thermal_status_readout() {
 }
 
 #[test]
+fn demo_notice_uses_the_shared_locale_in_both_shell_tracks() {
+    for (language, expected) in [
+        (i18n::Language::En, "Demo snapshot · no host actions"),
+        (i18n::Language::Zh, "演示快照 · 无主机操作"),
+    ] {
+        i18n::set_language(language);
+        let composed = demo_app();
+        assert_eq!(
+            composed.feedback_notice().map(|notice| notice.text()),
+            Some(expected),
+            "composed demo feedback must use the active shared locale"
+        );
+
+        let direct = demo_direct_track();
+        assert_eq!(
+            direct.feedback_notice().map(|notice| notice.text()),
+            Some(expected),
+            "direct-track demo feedback must use the same active locale"
+        );
+    }
+    i18n::set_language(i18n::Language::En);
+}
+
+#[test]
 fn direct_demo_contains_the_shared_product_projection() {
     let track = demo_direct_track();
     let projection = track.projection();
