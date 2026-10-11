@@ -42,6 +42,7 @@ mod effects;
 mod frame;
 mod gpu_chart_metric;
 mod input_mode;
+pub mod inventory_rows;
 mod inventory_source;
 mod lifecycle;
 mod local_keys;

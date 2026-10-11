@@ -36,6 +36,9 @@ pub mod saved_views;
 pub mod system_timeline;
 pub mod viewmodel;
 
+pub use app::inventory_rows::{
+    InventoryProjectionGeneration, InventoryRowAnchor, InventoryRowDomain, InventoryRowId,
+};
 pub use app::process_rows::{
     APP_TREE_EXPANSION_KEY_PREFIX, ProcessProjectionGeneration, ProcessRowAggregate,
     ProcessRowAnchor, ProcessRowId, ProcessTreeRow, app_tree_expansion_key,
