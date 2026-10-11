@@ -125,6 +125,7 @@ fn batch_menu_plan_tracks_the_highlighted_item() {
 fn session_and_startup_menu_plans_track_the_highlighted_item() {
     let mut app = demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
+    super::acceptance_support::install_demo_session_incarnations(&mut app);
     assert!(app.open_session_menu(), "the demo exposes a session menu");
     app.session_menu_move(1);
     assert_eq!(

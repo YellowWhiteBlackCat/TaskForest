@@ -28,12 +28,13 @@ use taskmanager_core::core::services::{
     ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState,
     ServiceLogTimeFilter, ServiceStatus,
 };
+use taskmanager_core::core::session::SessionIncarnation;
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::startup::StartupEntryId;
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_core::core::target::ServiceId;
 
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::fixture;
+use taskmanager_shell::fixture::{self, ProjectionSeedFact, seed_projection_fact};
 
 use super::{input_app, press, press_ctrl};
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
@@ -69,6 +70,18 @@ fn count_log_repaints(_repaint: On<LogPanelRepaintRequired>, mut signals: ResMut
 
 fn shell_of(app: &App) -> &ShellApp {
     &app.world().non_send::<FrontendTrack>().shell
+}
+
+fn fixture_with_session_identities(mut shell: ShellApp) -> ShellApp {
+    let mut sessions = shell.projection().sessions.clone().unwrap_or_default();
+    for (index, session) in sessions.iter_mut().enumerate() {
+        session.incarnation = Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: u64::try_from(index + 1).unwrap_or(1),
+        });
+    }
+    seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(sessions)));
+    shell
 }
 
 fn signals(app: &App) -> &AppliedSignals {
@@ -486,7 +499,10 @@ fn arm_2b_enter_opens_the_services_menu_from_the_first_sorted_row() {
 /// selection and their own frozen row types.
 #[test]
 fn arm_2b_enter_opens_the_startup_and_sessions_menus_for_their_selected_rows() {
-    let mut app = routed_app(fixture::demo_app(), Page::Startup);
+    let mut app = routed_app(
+        fixture_with_session_identities(fixture::demo_app()),
+        Page::Startup,
+    );
     let entries = sorted_startup_ids(&app);
     app.world_mut().resource_mut::<StartupSelection>().target =
         Some(StartupEntryId::new(&entries[1]));
@@ -504,7 +520,11 @@ fn arm_2b_enter_opens_the_startup_and_sessions_menus_for_their_selected_rows() {
     app.update();
     app.update();
     let sessions = sorted_session_ids(&app);
-    app.world_mut().resource_mut::<SessionSelection>().target = Some(SessionId::new(&sessions[0]));
+    let selected_identity = shell_of(&app)
+        .sorted_session_at(0)
+        .and_then(|session| session.identity())
+        .expect("the fixture row has a verified session identity");
+    app.world_mut().resource_mut::<SessionSelection>().target = Some(selected_identity);
     press(&mut app, KeyCode::KeyA, Some("a"));
     app.update();
     assert_eq!(
@@ -783,7 +803,10 @@ fn arm_3a_arrows_move_the_services_row_and_the_tail_shared_arm_moves_the_shell_c
 /// typed selection resources.
 #[test]
 fn arm_3a_arrows_move_the_startup_and_sessions_rows() {
-    let mut app = routed_app(fixture::demo_app(), Page::Startup);
+    let mut app = routed_app(
+        fixture_with_session_identities(fixture::demo_app()),
+        Page::Startup,
+    );
     let entries = sorted_startup_ids(&app);
     app.world_mut().resource_mut::<StartupSelection>().target =
         Some(StartupEntryId::new(&entries[0]));
@@ -803,7 +826,11 @@ fn arm_3a_arrows_move_the_startup_and_sessions_rows() {
     app.update();
     app.update();
     let sessions = sorted_session_ids(&app);
-    app.world_mut().resource_mut::<SessionSelection>().target = Some(SessionId::new(&sessions[0]));
+    let selected_identity = shell_of(&app)
+        .sorted_session_at(0)
+        .and_then(|session| session.identity())
+        .expect("the fixture row has a verified session identity");
+    app.world_mut().resource_mut::<SessionSelection>().target = Some(selected_identity);
     press(&mut app, KeyCode::ArrowDown, None);
     app.update();
     assert_eq!(
@@ -811,7 +838,7 @@ fn arm_3a_arrows_move_the_startup_and_sessions_rows() {
             .resource::<SessionSelection>()
             .target
             .as_ref()
-            .map(SessionId::as_str),
+            .map(|identity| identity.session_id.as_str()),
         Some(sessions[1].as_str()),
         "Sessions ArrowDown moves to the next session"
     );

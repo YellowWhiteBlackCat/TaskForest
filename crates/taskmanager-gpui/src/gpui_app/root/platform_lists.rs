@@ -10,7 +10,6 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 impl RootView {
@@ -44,27 +43,13 @@ impl RootView {
         }
     }
 
-    /// Queue a login-session action without invoking native tools on the UI thread.
-    pub(crate) fn request_session_control(
-        &mut self,
-        session_id: SessionId,
-        action: SessionControlAction,
-    ) {
-        let request_id = self.shell.begin_session_control();
-        self.submit_session_control_target(SessionControlTarget {
-            request_id,
-            session_id,
-            action,
-        });
-    }
-
     pub(crate) fn submit_session_control_target(&mut self, target: SessionControlTarget) {
         let request_id = target.request_id;
-        let session_id = target.session_id;
+        let identity = target.identity;
         let action = target.action;
         let request = SessionControlRequest {
             request_id,
-            session_id: session_id.clone(),
+            identity: identity.clone(),
             action,
         };
         let queued = self
@@ -82,7 +67,7 @@ impl RootView {
         {
             self.shell.feedback.record_session(SessionControlOutcome {
                 request_id,
-                session_id,
+                identity,
                 action,
                 result: Err(error),
             });
@@ -156,11 +141,17 @@ pub(crate) fn session_outcome_feedback(
     action: SessionControlAction,
     session_id: &str,
 ) -> ActionFeedback {
-    control_feedback(
-        result,
-        session_action_label(action),
-        &session_target(session_id),
-    )
+    let target = session_target(session_id);
+    let label = session_action_label(action);
+    match result {
+        Ok(()) => ActionFeedback::from_result_with_success_template(
+            &Ok(()),
+            label,
+            &target,
+            i18n::t("feedback.session_request_accepted"),
+        ),
+        Err(error) => control_feedback(Err(error), label, &target),
+    }
 }
 
 fn startup_action_label(enabled: bool) -> &'static str {

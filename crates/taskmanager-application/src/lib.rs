@@ -111,8 +111,9 @@ pub use config_store::{
     MAX_CONFIG_BYTES,
 };
 pub use control::{
-    ControlRequestId, LatestControlRequest, LatestServiceControlRequest, ServiceControlOutcome,
-    SessionControlOutcome, SessionControlRequest, StartupControlOutcome, StartupControlRequest,
+    ControlRequestId, LatestControlRequest, LatestServiceControlRequest,
+    LatestSessionControlRequest, ServiceControlOutcome, SessionControlOutcome,
+    SessionControlRequest, StartupControlOutcome, StartupControlRequest,
 };
 pub use device_lifecycle::{
     DeviceLifecycleApplyResult, DeviceLifecycleChange, DeviceLifecycleChangeKind,

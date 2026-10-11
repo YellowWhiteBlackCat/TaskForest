@@ -197,8 +197,8 @@ impl ShellApp {
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::SHORT,
                     format!(
-                        "Session {} {:?} completed",
-                        outcome.session_id, outcome.action
+                        "Session {} {:?} request accepted",
+                        outcome.identity.session_id, outcome.action
                     ),
                 ),
                 Err(error) => (
@@ -206,7 +206,7 @@ impl ShellApp {
                     FeedbackLifecycle::UntilReplaced,
                     format!(
                         "Session {} {:?} failed: {error:?}",
-                        outcome.session_id, outcome.action
+                        outcome.identity.session_id, outcome.action
                     ),
                 ),
             };

@@ -1063,6 +1063,7 @@
   "feedback.process_action_succeeded": "已对 PID {pid} 成功执行“{action}”",
   "feedback.process_action_failed": "对 PID {pid} 执行“{action}”失败：{reason}",
   "feedback.action_succeeded": "已成功执行“{action}”：{target}",
+  "feedback.session_request_accepted": "已接受对 {target} 的“{action}”请求",
   "feedback.action_failed": "执行“{action}”失败：{target}",
   "feedback.action_failed_detail": "对 {target} 执行“{action}”失败：{detail}",
   "feedback.permission_denied": "权限不足，可能需要管理员权限",

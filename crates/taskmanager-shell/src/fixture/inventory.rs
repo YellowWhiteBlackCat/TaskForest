@@ -84,6 +84,7 @@ pub(super) fn sessions() -> Vec<SessionItem> {
     vec![
         SessionItem {
             id: "2".into(),
+            incarnation: None,
             uid: 1000,
             user: "devuser".into(),
             seat: Some("seat0".into()),
@@ -93,6 +94,7 @@ pub(super) fn sessions() -> Vec<SessionItem> {
         },
         SessionItem {
             id: "9".into(),
+            incarnation: None,
             uid: 1000,
             user: "devuser".into(),
             seat: None,

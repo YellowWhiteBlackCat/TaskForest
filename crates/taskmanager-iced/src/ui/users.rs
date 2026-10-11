@@ -384,11 +384,11 @@ fn session_feedback_line<'a>(
     let text_value = match detail {
         Some(detail) => t("feedback.action_failed_detail")
             .replace("{action}", action)
-            .replace("{target}", outcome.session_id.as_str())
+            .replace("{target}", outcome.identity.session_id.as_str())
             .replace("{detail}", detail),
-        None => t("feedback.action_succeeded")
+        None => t("feedback.session_request_accepted")
             .replace("{action}", action)
-            .replace("{target}", outcome.session_id.as_str()),
+            .replace("{target}", outcome.identity.session_id.as_str()),
     };
     let color = match outcome.result {
         Ok(()) => crate::theme_binding::color(theme_snapshot.palette().success),

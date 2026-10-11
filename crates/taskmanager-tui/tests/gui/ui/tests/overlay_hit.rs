@@ -215,6 +215,7 @@ fn process_menu_click_routes_control_and_gated_rows_like_enter() {
 fn session_menu_row_click_arms_the_session_gate() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
+    super::acceptance_support::install_demo_session_incarnations(&mut app);
     assert!(
         app.open_session_menu(),
         "demo fixture exposes a session menu"

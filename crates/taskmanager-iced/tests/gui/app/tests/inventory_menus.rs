@@ -1,7 +1,7 @@
 use super::*;
 use taskmanager_application::PlatformEffect;
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 
@@ -71,6 +71,16 @@ fn service_and_startup_row_menus_preserve_provider_identity() {
 #[test]
 fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
     let mut app = IcedApp::demo();
+    let mut sessions = app.shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .get_mut(1)
+        .expect("the demo Users projection has a second session");
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 42,
+    });
+    let expected_identity = session.identity().expect("fixture identity");
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
     let _ = app.update(Message::SelectPage(AppPage::Users));
     let _ = app.update(Message::OpenUserRowMenu(1));
     let expected_id = app
@@ -90,6 +100,7 @@ fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
     else {
         panic!("the frozen Users menu should emit a session-control effect");
     };
-    assert_eq!(target.session_id, expected_id);
+    assert_eq!(target.identity.session_id, expected_id);
+    assert_eq!(target.identity, expected_identity);
     assert!(app.user_menu_session().is_none());
 }

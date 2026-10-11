@@ -40,3 +40,35 @@ fn service_control_rejects_out_of_order_wrong_target_and_wrong_action() {
     assert!(requests.accept(latest, &openrc, ServiceAction::Restart));
     assert_eq!(requests.pending(), None);
 }
+
+#[test]
+fn session_control_rejects_out_of_order_wrong_incarnation_and_wrong_action() {
+    use taskmanager_core::core::session::{SessionIdentity, SessionIncarnation};
+    use taskmanager_core::core::target::SessionId;
+
+    let identity = |created_monotonic_usec| {
+        SessionIdentity::new(
+            SessionId::new("session:stable"),
+            SessionIncarnation::LinuxLogind {
+                boot_id: "boot:1".into(),
+                created_monotonic_usec,
+            },
+        )
+        .expect("fixture identity")
+    };
+    let first = identity(10);
+    let replacement = identity(20);
+    let mut requests = LatestSessionControlRequest::default();
+    let old = requests.begin(first.clone(), SessionControlAction::Lock);
+    let latest = requests.begin(replacement.clone(), SessionControlAction::Disconnect);
+
+    assert!(!requests.accept(old, &first, SessionControlAction::Lock));
+    assert!(!requests.accept(latest, &first, SessionControlAction::Disconnect));
+    assert!(!requests.accept(latest, &replacement, SessionControlAction::Lock));
+    assert_eq!(
+        requests.pending(),
+        Some((latest, &replacement, SessionControlAction::Disconnect))
+    );
+    assert!(requests.accept(latest, &replacement, SessionControlAction::Disconnect));
+    assert_eq!(requests.pending(), None);
+}

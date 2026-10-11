@@ -10,13 +10,14 @@ use taskmanager_application::{
     AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CommandContext, CommandScope,
     ConfirmationKind, ContainerRollupEvent, DesktopNotificationRequest,
     DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DirectoryUsageEvent,
-    HardwareInventoryEvent, KeyCode, LatestControlRequest, LatestServiceControlRequest, Modifiers,
-    PendingConfirmation, PlatformEffect, PlatformEventBatch, PowerSupplyEvent,
-    ProcessAffinityEvent, ProcessEvent, ProjectedProcessInsights, ProjectedSystemTelemetry,
-    Reduction, RefreshRequest, SensorEvent, ServiceControlTarget, ServiceEvent, ServiceUpdate,
-    SessionControlConfirmation, SessionEvent, SmartEvent, SmartObservationProjection,
-    SmartProjectionApplyResult, StartupControlRequest, StartupEvent, StartupEvidenceUnavailable,
-    StorageHealthEvent, SurfaceKind, SurfaceTransition, TelemetryRefreshPolicy, reduce,
+    HardwareInventoryEvent, KeyCode, LatestControlRequest, LatestServiceControlRequest,
+    LatestSessionControlRequest, Modifiers, PendingConfirmation, PlatformEffect,
+    PlatformEventBatch, PowerSupplyEvent, ProcessAffinityEvent, ProcessEvent,
+    ProjectedProcessInsights, ProjectedSystemTelemetry, Reduction, RefreshRequest, SensorEvent,
+    ServiceControlTarget, ServiceEvent, ServiceUpdate, SessionControlConfirmation, SessionEvent,
+    SmartEvent, SmartObservationProjection, SmartProjectionApplyResult, StartupControlRequest,
+    StartupEvent, StartupEvidenceUnavailable, StorageHealthEvent, SurfaceKind, SurfaceTransition,
+    TelemetryRefreshPolicy, reduce,
 };
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::{
@@ -248,7 +249,7 @@ pub struct SystemProjectionStore {
     /// identity. Domain projections must use the narrower revisions above.
     pub refresh_count: u64,
     /// Latest-wins correlation for renderer-neutral login-session actions.
-    pub session_control_requests: LatestControlRequest,
+    pub session_control_requests: LatestSessionControlRequest,
     /// The last accepted session-control outcome, for point-of-action
     /// feedback in any frontend's action bar. Cleared when a new action is
     /// requested so stale feedback expires.

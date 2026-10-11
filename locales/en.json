@@ -1062,6 +1062,7 @@
   "feedback.process_action_succeeded": "{action} succeeded for PID {pid}",
   "feedback.process_action_failed": "{action} failed for PID {pid}: {reason}",
   "feedback.action_succeeded": "{action} succeeded: {target}",
+  "feedback.session_request_accepted": "{action} request accepted for {target}",
   "feedback.action_failed": "{action} failed: {target}",
   "feedback.action_failed_detail": "{action} failed for {target}: {detail}",
   "feedback.permission_denied": "Permission denied; administrator privileges may be required",

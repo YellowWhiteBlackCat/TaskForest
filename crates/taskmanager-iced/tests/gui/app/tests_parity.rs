@@ -24,7 +24,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::ProcessSignal;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -42,6 +42,15 @@ use taskmanager_theme::tokens::UiSize;
 #[test]
 fn user_row_menu_opens_selects_and_routes_actions() {
     let mut app = IcedApp::demo();
+    let mut sessions = app.shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .get_mut(1)
+        .expect("the demo Users projection has a second session");
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 42,
+    });
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
     let _ = app.update(Message::SelectPage(AppPage::Users));
     assert_eq!(app.user_menu_row(), None);
 
@@ -557,7 +566,10 @@ fn demo_constructor_exposes_shared_fixture_data_without_platform_io() {
     );
 
     let _ = app.update(Message::RequestSessionControl(SessionControlAction::Lock));
-    assert!(app.shell.feedback_text().contains("Demo mode"));
+    assert!(
+        app.shell.pending_session().is_none(),
+        "the selected-index Users action has no frozen identity and must fail closed"
+    );
 }
 
 #[test]

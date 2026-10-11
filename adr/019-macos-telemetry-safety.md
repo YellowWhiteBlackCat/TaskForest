@@ -51,7 +51,7 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 | services | **launchctl list 清单 + kickstart/kill/enable/disable 控制 + log show 日志快照** | 系统域守护进程需特权 → 诚实省略（用户域清单）；依赖图/流式日志 → Unsupported |
 | startup | **plist 解析 LaunchAgents/Daemons + Disabled 键回写控制** | /System/... 只读目录 → control_policy Unsupported |
 | **启动证据** | **`sysctl -n kern.boottime`（启动证据 + 开机墙钟时间戳）** | 分阶段启动耗时无等价物 → 不提供（不伪造 0ms） |
-| sessions | **who 会话清单 + id -u** | 会话控制（锁屏/断开）→ Unsupported |
+| sessions | **who 会话清单 + id -u** | `who` 的 TTY/显示登录时间不能证明 session incarnation；行只展示、不提供稳定身份锚。会话控制（锁屏/断开）→ Unsupported |
 | power | starship-battery | 循环次数 crate 不给 → Unavailable |
 | filesystem health | sysinfo 只读标志 | 错误计数/完整性 → 缺失 |
 | appearance | **defaults read AppleInterfaceStyle / AppleIncreaseContrast** | — |

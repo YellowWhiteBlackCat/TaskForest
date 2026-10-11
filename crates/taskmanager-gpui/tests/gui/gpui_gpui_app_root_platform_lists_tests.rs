@@ -28,4 +28,11 @@ fn session_actions_keep_distinct_labels() {
         session_action_label(SessionControlAction::Lock),
         &session_target("7"),
     );
+    let accepted = session_outcome_feedback(Ok(()), SessionControlAction::Lock, "7");
+    assert_eq!(
+        accepted.text(),
+        i18n::t("feedback.session_request_accepted")
+            .replace("{action}", session_action_label(SessionControlAction::Lock))
+            .replace("{target}", &session_target("7")),
+    );
 }

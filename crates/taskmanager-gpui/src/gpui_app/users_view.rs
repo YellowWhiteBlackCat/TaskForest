@@ -4,7 +4,7 @@
 //!
 //! Columns: Session(120) / User(140) / Seat(80) / TTY(80) / Remote(70) /
 //! Logon(140). An action bar offers Disconnect (`terminate-session`) and Lock
-//! (`lock-session`), disabled when no row is selected; transient feedback
+//! (`lock-session`) once a visible shared confirmation surface is available; transient feedback
 //! (success/failure) lands in a status line, reusing the shared
 //! [`crate::gpui_app::list_view::ActionFeedback`] / `feedback_status_line`
 //! scaffolding (same type services/startup use). Empty-state reads "No
@@ -13,7 +13,7 @@
 //! **State ownership:** each window's `RootView.users_table` owns the persistent
 //! `taskmanager_ui::data::table::Table` entity (scroll position / selection /
 //! focus handle); no process-global or thread-local widget state exists.
-//! Per-page state (selected session id + action feedback) lives on
+//! Per-page state (selected session identity + action feedback) lives on
 //! `RootView` (`selected_session` / the shell-owned typed feedback slot folded
 //! at render by `RootView::session_feedback`), threaded into
 //! [`render_users`] each render; the row projection is memoized on the
@@ -39,9 +39,8 @@ use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::SessionId;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -150,6 +149,16 @@ impl UsersDelegate {
     }
 }
 
+fn unique_session_identity(rows: &[SessionItem], session: &SessionItem) -> Option<SessionIdentity> {
+    let identity = session.identity()?;
+    (rows
+        .iter()
+        .filter(|row| row.identity().as_ref() == Some(&identity))
+        .count()
+        == 1)
+        .then_some(identity)
+}
+
 impl TableDelegate for UsersDelegate {
     fn columns_count(&self, _cx: &App) -> usize {
         self.columns.len()
@@ -200,8 +209,8 @@ impl TableDelegate for UsersDelegate {
     }
 
     /// Row context menu (Win11 parity): disconnect / lock the session.
-    /// Right-click selects the row first; both actions are direct (no
-    /// confirmation dialog), mirroring the session-control buttons.
+    /// Controls remain disabled until this frontend has a visible shared
+    /// confirmation presentation. Selection retains its exact verified identity.
     fn context_menu(
         &mut self,
         row_ix: usize,
@@ -212,9 +221,9 @@ impl TableDelegate for UsersDelegate {
             return PopupMenuState::new(Vec::new(), cx);
         };
         let root = self.root.clone();
-        let session_id = session.id.clone();
+        let selected_identity = unique_session_identity(&self.rows, &session);
         root.update(cx, |v, cx| {
-            v.selected_session = Some(session_id.clone());
+            v.selected_session = selected_identity;
             cx.notify();
         });
         let items = [
@@ -226,14 +235,8 @@ impl TableDelegate for UsersDelegate {
         ]
         .into_iter()
         .map(|(label, action)| {
-            let root = root.clone();
-            let session_id = session_id.clone();
-            MenuEntry::Item(MenuItem::new(label, move |_, cx| {
-                root.update(cx, |v, cx| {
-                    v.request_session_control(session_id.clone(), action);
-                    cx.notify();
-                });
-            }))
+            let _ = action;
+            MenuEntry::Item(MenuItem::new(label, |_, _| {}).disabled(true))
         })
         .collect();
         PopupMenuState::new(items, cx)
@@ -331,18 +334,21 @@ pub(crate) fn init_table_entity(
 ) -> Entity<TableState<UsersDelegate>> {
     let delegate = UsersDelegate::new(theme, cx.entity());
     let entity = cx.new(|new_cx| TableState::new(delegate, new_cx).row_selectable(true));
-    // Table → RootView bridges. SelectRow: clicking a row looks up the session
-    // id at that index and publishes it to selected_session. SortChanged: a
+    // Table → RootView bridges. SelectRow: clicking a row looks up the complete
+    // verified session identity and publishes it to selected_session. SortChanged: a
     // header sort click reports the widget's absolute post-cycle state, which
     // is applied VERBATIM to the shell-owned inventory-sort slot (single
     // authority) — the memo keys on it, so the row order follows on the next
     // projection build.
     cx.subscribe(&entity, |this, state_ent, ev: &TableEvent, cx| match ev {
         TableEvent::SelectRow(row_ix) => {
-            if let Some(s) = state_ent.read(cx).delegate().rows.get(*row_ix) {
-                this.selected_session = Some(s.id.clone());
-                cx.notify();
-            }
+            let state = state_ent.read(cx);
+            this.selected_session = state
+                .delegate()
+                .rows
+                .get(*row_ix)
+                .and_then(|session| unique_session_identity(&state.delegate().rows, session));
+            cx.notify();
         }
         TableEvent::SortChanged { col_ix, sort } => {
             let column = state_ent.read(cx).delegate().info_sort_column(*col_ix);
@@ -359,7 +365,7 @@ pub(crate) fn init_table_entity(
 
 /// Render the Users (sessions) page: action bar + sessions Table.
 ///
-/// `selected` is the live `RootView.selected_session` (session id). `feedback`
+/// `selected` is the live `RootView.selected_session` (complete session identity). `feedback`
 /// is the render-time fold of the shell-owned typed session outcome
 /// (`RootView::session_feedback`). `hovered` is the uniform hover slot root
 /// passes to every page render (consumed by the action bar's hover overlays).
@@ -369,7 +375,7 @@ pub struct UsersViewProps<'a> {
     pub theme: &'a Theme,
     pub rows: Rc<Vec<SessionItem>>,
     pub sources: &'a [SourceStatus],
-    pub selected: Option<&'a SessionId>,
+    pub selected: Option<&'a SessionIdentity>,
     pub feedback: Option<ActionFeedback>,
     pub hovered: Option<Hover>,
     pub search_query: &'a str,
@@ -399,9 +405,13 @@ pub fn render_users(
     let count = rows.len();
 
     // Map RootView.selected_session → row index in `rows` (None if absent).
-    let selected_row_ix = selected
-        .as_ref()
-        .and_then(|id| rows.iter().position(|s| s.id == *id));
+    let selected_row_ix = selected.as_ref().and_then(|identity| {
+        let mut matches = rows.iter().enumerate().filter_map(|(index, session)| {
+            (session.identity().as_ref() == Some(identity)).then_some(index)
+        });
+        let index = matches.next()?;
+        matches.next().is_none().then_some(index)
+    });
 
     let header = div()
         .flex()
@@ -486,18 +496,13 @@ pub fn render_users(
 
 // ── action bar (Disconnect / Lock) ───────────────────────────────────────────
 
-/// Build the Users action bar: Disconnect (`terminate-session`) / Lock
-/// (`lock-session`), each inert until a row is selected, plus a trailing status
-/// line. Disconnect queues a background session refresh, which clears a stale
-/// selection when its snapshot arrives; Lock leaves the session listed. Both
-/// land their typed outcome in the shell-owned feedback slot, folded at render
-/// by `RootView::session_feedback` and rendered (or falling back to a selection
-/// hint) via the shared [`list_view::feedback_status_line`]. Both actions are
-/// queued through the application port and never invoke native session tools
-/// on the UI thread.
+/// Build the Users action bar. Session controls stay disabled until GPUI has a
+/// visible shared confirmation presentation; no selected identity is sent to
+/// the platform from this bar. The typed feedback slot remains available for
+/// requests submitted by a future confirmed path.
 fn action_bar(
     theme: &Theme,
-    selected: Option<&SessionId>,
+    selected: Option<&SessionIdentity>,
     hovered: Option<&Hover>,
     feedback: Option<ActionFeedback>,
     cx: &mut Context<RootView>,
@@ -506,7 +511,7 @@ fn action_bar(
     // present. The feedback itself (success/failure color + text) is rendered
     // by the shared `list_view::feedback_status_line`, identical to the
     // services/startup action bars.
-    let hint = match selected.map(SessionId::as_str) {
+    let hint = match selected.map(|identity| identity.session_id.as_str()) {
         Some(id) => format!("{} {}", i18n::t("hint.selected_session"), id),
         None => i18n::t("hint.select_session").to_string(),
     };
@@ -516,13 +521,12 @@ fn action_bar(
     let entity = cx.entity();
 
     Toolbar::new()
-        // Submit disconnect through the native session-control port. Queue a
-        // refresh so the terminated session disappears without scanning here.
+        // This action remains inert until the shared session confirmation has
+        // a visible GPUI presentation.
         .child({
             let label = i18n::t("users.disconnect");
-            let enabled = selected.is_some();
+            let enabled = false;
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
             let ent_h = entity.clone();
             elements::tool_btn(
                 theme,
@@ -530,14 +534,7 @@ fn action_bar(
                 label,
                 enabled,
                 hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(id) = v.selected_session.clone() {
-                            v.request_session_control(id, SessionControlAction::Disconnect);
-                            cx.notify();
-                        }
-                    });
-                },
+                move |_win: &mut Window, _cx: &mut App| {},
                 move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
                     ent_h.update(cx, |v, cx| {
                         v.set_hover(
@@ -552,13 +549,11 @@ fn action_bar(
                 },
             )
         })
-        // Submit lock through the native session-control port. The session
-        // remains listed after locking.
+        // Lock stays disabled for the same confirmation-presentation gap.
         .child({
             let label = i18n::t("users.lock");
-            let enabled = selected.is_some();
+            let enabled = false;
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
             let ent_h = entity.clone();
             elements::tool_btn(
                 theme,
@@ -566,14 +561,7 @@ fn action_bar(
                 label,
                 enabled,
                 hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(id) = v.selected_session.clone() {
-                            v.request_session_control(id, SessionControlAction::Lock);
-                            cx.notify();
-                        }
-                    });
-                },
+                move |_win: &mut Window, _cx: &mut App| {},
                 move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
                     ent_h.update(cx, |v, cx| {
                         v.set_hover(

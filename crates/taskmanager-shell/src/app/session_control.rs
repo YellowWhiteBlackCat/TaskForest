@@ -2,39 +2,14 @@
 
 use super::ShellApp;
 use taskmanager_application::{
-    ConfirmationKind, PendingConfirmation, PlatformEffect, SessionControlConfirmation,
-    SessionControlTarget, StartupControlRequest,
+    ConfirmationKind, InteractionEvent, PendingConfirmation, PlatformEffect,
+    SessionControlConfirmation, StartupControlRequest, SurfaceDismissReason,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 impl ShellApp {
-    /// Capture the selected provider-issued session identity and produce a
-    /// renderer-neutral action. No frontend may derive a native target from a
-    /// display name or invoke a session tool directly.
-    #[must_use]
-    pub fn request_session_control(
-        &mut self,
-        action: SessionControlAction,
-    ) -> Option<PlatformEffect> {
-        let session_id = self
-            .data
-            .sessions
-            .as_deref()?
-            .get(self.selected)?
-            .id
-            .clone();
-        let request_id = self.data.session_control_requests.begin();
-        // A new action supersedes the previous outcome's feedback.
-        self.data.session_control_feedback = None;
-        Some(PlatformEffect::SessionControl(SessionControlTarget {
-            request_id,
-            session_id,
-            action,
-        }))
-    }
-
     /// Arm the shared session-control confirmation gate for an exact
     /// renderer-local row target (a session menu pick). The provider-issued
     /// identity, the action, and a fresh correlation id are frozen into
@@ -43,16 +18,20 @@ impl ShellApp {
     /// [`Self::request_startup_control_for`] (which also accepts an explicit
     /// row so frontends with sorted tables keep their visual cursor separate
     /// from the frozen target). Returns false when the row carries no
-    /// provider-issued identity.
+    /// provider-issued identity or when that identity is missing, duplicated,
+    /// or no longer present in the current projection.
     pub fn select_session_control(
         &mut self,
         session: &SessionItem,
         action: SessionControlAction,
     ) -> bool {
-        if session.id.as_str().is_empty() {
+        let Some(identity) = session.identity() else {
+            return false;
+        };
+        if !self.session_identity_is_current_unique(&identity) {
             return false;
         }
-        let request_id = self.data.session_control_requests.begin();
+        let request_id = self.data.session_control_requests.begin(identity, action);
         // A new action supersedes the previous outcome's feedback.
         self.data.session_control_feedback = None;
         self.arm_confirmation(PendingConfirmation::SessionControl(
@@ -69,11 +48,48 @@ impl ShellApp {
     /// [`PlatformEffect::SessionControl`] built from the frozen target and
     /// clear the gate. Returns `None` when no session action is pending
     /// (mirrors [`Self::confirm_startup_control`]). A refresh between arm and
-    /// confirm can never retarget the request — the frozen identity is what
-    /// the confirmation displayed.
+    /// confirm must still contain exactly one copy of the frozen identity;
+    /// otherwise the gate is dismissed without submitting.
     #[must_use]
     pub fn confirm_session_control(&mut self) -> Option<PlatformEffect> {
+        let pending = self.pending_session().map(|pending| {
+            (
+                pending.request_id,
+                pending.session.identity(),
+                pending.action,
+            )
+        });
+        let identity = pending
+            .as_ref()
+            .and_then(|(_, identity, _)| identity.as_ref());
+        if !identity.is_some_and(|identity| self.session_identity_is_current_unique(identity)) {
+            if self.confirmation_kind() == Some(ConfirmationKind::SessionControl) {
+                if let Some((request_id, Some(identity), action)) = pending {
+                    self.data
+                        .session_control_requests
+                        .accept(request_id, &identity, action);
+                }
+                let reduction = self
+                    .application
+                    .interaction
+                    .reduce(InteractionEvent::Dismiss(
+                        SurfaceDismissReason::TargetUnavailable,
+                    ));
+                self.apply_surface_transition(reduction.transition);
+            }
+            return None;
+        }
         self.confirm_confirmation(ConfirmationKind::SessionControl)
+    }
+
+    fn session_identity_is_current_unique(&self, identity: &SessionIdentity) -> bool {
+        let Some(sessions) = self.data.sessions.as_deref() else {
+            return false;
+        };
+        let mut matches = sessions
+            .iter()
+            .filter(|session| session.identity().as_ref() == Some(identity));
+        matches.next().is_some() && matches.next().is_none()
     }
 
     /// Capture the selected startup entry and produce a renderer-neutral

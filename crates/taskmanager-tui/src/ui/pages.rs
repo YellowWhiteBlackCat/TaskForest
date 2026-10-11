@@ -683,14 +683,14 @@ pub(super) fn render_users(
 /// while no outcome has been accepted.
 fn session_feedback_line(app: &TuiApp, theme: TuiTheme) -> Option<Line<'static>> {
     let outcome = app.shell.projection().session_control_feedback.as_ref()?;
-    let target = outcome.session_id.to_string();
+    let target = outcome.identity.session_id.to_string();
     let action = match outcome.action {
         SessionControlAction::Disconnect => t("users.disconnect"),
         SessionControlAction::Lock => t("users.lock"),
     };
     match &outcome.result {
         Ok(()) => Some(Line::from(Span::styled(
-            t("feedback.action_succeeded")
+            t("feedback.session_request_accepted")
                 .replace("{action}", action)
                 .replace("{target}", &target),
             Style::new().fg(theme.good),

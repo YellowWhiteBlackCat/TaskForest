@@ -178,6 +178,7 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
     app.data.sessions = Some(vec![
         SessionItem {
             id: "3".into(),
+            incarnation: None,
             uid: 1000,
             user: "root".into(),
             seat: None,
@@ -187,6 +188,7 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
         },
         SessionItem {
             id: "9".into(),
+            incarnation: None,
             uid: 1000,
             user: "alice".into(),
             seat: Some("seat1".into()),

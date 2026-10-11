@@ -6,9 +6,10 @@
 //! closed. Display names and row positions never become identity.
 
 use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionIdentity;
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::{StartupEntry, StartupEntryId};
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_core::core::target::ServiceId;
 
 use super::ShellApp;
 use super::sorting::{InfoSortCol, InfoTable, SortDir};
@@ -41,7 +42,7 @@ impl InventoryRowDomain {
 pub enum InventoryRowId {
     Service(ServiceId),
     Startup(StartupEntryId),
-    Session(SessionId),
+    Session(SessionIdentity),
 }
 
 impl InventoryRowId {
@@ -60,7 +61,7 @@ impl InventoryRowId {
     /// Recover a session row identity only from its provider-issued target.
     #[must_use]
     pub fn from_session(row: &SessionItem) -> Option<Self> {
-        (!row.id.as_str().is_empty()).then(|| Self::Session(row.id.clone()))
+        row.identity().map(Self::Session)
     }
 
     /// The owning inventory domain.
@@ -81,7 +82,7 @@ impl InventoryRowId {
         match self {
             Self::Service(id) => !id.as_str().is_empty(),
             Self::Startup(id) => !id.is_empty(),
-            Self::Session(id) => !id.as_str().is_empty(),
+            Self::Session(identity) => identity.is_valid(),
         }
     }
 }
@@ -171,7 +172,7 @@ impl ShellApp {
         domain: InventoryRowDomain,
         index: usize,
     ) -> Option<InventoryRowId> {
-        match domain {
+        let identity = match domain {
             InventoryRowDomain::Services => self
                 .sorted_service_at(index)
                 .and_then(InventoryRowId::from_service),
@@ -181,6 +182,12 @@ impl ShellApp {
             InventoryRowDomain::Sessions => self
                 .sorted_session_at(index)
                 .and_then(InventoryRowId::from_session),
+        }?;
+        if domain == InventoryRowDomain::Sessions {
+            self.reconcile_inventory_row_identity(&identity)
+                .map(|_| identity)
+        } else {
+            Some(identity)
         }
     }
 
@@ -192,13 +199,16 @@ impl ShellApp {
         index: usize,
     ) -> Option<InventoryRowAnchor> {
         let id = self.inventory_row_identity_at(domain, index)?;
-        InventoryRowAnchor::new(id, self.inventory_projection_generation(domain))
+        self.anchor_inventory_row(&id)
     }
 
     /// Bind a row identity already obtained from the current renderer-neutral
     /// row projection to that projection's geometry generation.
     #[must_use]
     pub fn anchor_inventory_row(&self, id: &InventoryRowId) -> Option<InventoryRowAnchor> {
+        if id.domain() == InventoryRowDomain::Sessions {
+            self.reconcile_inventory_row_identity(id)?;
+        }
         InventoryRowAnchor::new(
             id.clone(),
             self.inventory_projection_generation(id.domain()),

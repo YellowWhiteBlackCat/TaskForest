@@ -29,7 +29,11 @@ impl SystemProjectionStore {
         &mut self,
         outcome: SessionControlOutcome,
     ) -> Option<SessionControlOutcome> {
-        if !self.session_control_requests.accept(outcome.request_id) {
+        if !self.session_control_requests.accept(
+            outcome.request_id,
+            &outcome.identity,
+            outcome.action,
+        ) {
             return None;
         }
         self.session_control_feedback = Some(outcome.clone());
@@ -183,7 +187,10 @@ impl ShellApp {
                 format!("Service {:?} queued", target.action)
             }
             PlatformEffect::SessionControl(target) => {
-                format!("Session {} {:?} queued", target.session_id, target.action)
+                format!(
+                    "Session {} {:?} queued",
+                    target.identity.session_id, target.action
+                )
             }
             PlatformEffect::StartupControl(request) => format!(
                 "Startup {} queued",

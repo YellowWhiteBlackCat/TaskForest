@@ -26,8 +26,12 @@ impl IcedApp {
                 if self.user_menu_session().is_some() {
                     self.request_user_menu_action(action)
                 } else {
+                    // The Users action bar carries no frozen row identity and
+                    // Iced has no shared session confirmation surface for this
+                    // direct path. Keep it fail-closed; the row menu submits
+                    // only its frozen SessionItem through the shell gate.
                     self.close_context_menus();
-                    self.shell.request_session_control(action)
+                    None
                 }
             }
             Message::RequestProcessNetworkEscalation => {

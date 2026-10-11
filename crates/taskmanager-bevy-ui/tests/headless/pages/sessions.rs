@@ -3,11 +3,11 @@
 //! Headless behavior tests for the Sessions page (same two layers as the
 //! services page tests): the pure row view model projects through the shared
 //! sessions sort with an honest seat/tty summary (missing fields render the
-//! shared marker, never a fabricated empty), the id-keyed selection survives
+//! shared marker, never a fabricated empty), the identity-keyed selection survives
 //! re-sorts, the control-outcome feedback names action and target, and the
 //! wired `MinimalPlugins` page renders folded rows, repaints only on
 //! sessions-domain folds, routes header clicks through the shell's sort entry
-//! and resolves clicked/moved rows ONLY through `sorted_session_at`.
+//! and resolves clicked/moved rows only through the sorted shell projection.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -25,7 +25,9 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{
+    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
+};
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::{
@@ -54,6 +56,10 @@ use crate::window::tests::HeadlessFrontendPlugins;
 fn session_item(id: &str, user: &str, seat: Option<&str>, tty: Option<&str>) -> SessionItem {
     SessionItem {
         id: id.to_owned().into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: id.parse().unwrap_or(1),
+        }),
         uid: 1000,
         user: user.to_owned(),
         seat: seat.map(str::to_owned),
@@ -214,7 +220,8 @@ fn selected_row_target(app: &mut App) -> Option<String> {
         .query_filtered::<(&SessionsRowMarker, &BackgroundColor), ()>()
         .iter(app.world())
         .find(|(_, fill)| fill.0.to_srgba() == highlight)
-        .map(|(marker, _)| marker.1.to_string())
+        .and_then(|(marker, _)| marker.2.as_ref())
+        .map(|identity| identity.session_id.to_string())
 }
 
 // ---- pure: row model, seat/tty summary, feedback, selection ----
@@ -243,7 +250,7 @@ fn rows_project_through_the_shared_sessions_sort() {
     ]));
     let provider_order: Vec<String> = session_rows(&shell)
         .into_iter()
-        .map(|row| row.target.to_string())
+        .map(|row| row.id.to_string())
         .collect();
     assert_eq!(provider_order, ["5", "2", "9"]);
     shell.set_info_sort(InfoTable::Users, InfoSortCol::Name);
@@ -281,21 +288,34 @@ fn selection_is_id_keyed_and_survives_a_sort_flip() {
         session_item("5", "zoe", None, None),
         session_item("2", "ada", None, None),
     ]));
+    let identity = SessionIdentity {
+        session_id: SessionId::new("2"),
+        incarnation: SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: 2,
+        },
+    };
     let selection = SessionSelection {
-        target: Some(SessionId::new("2")),
+        target: Some(identity.clone()),
     };
     let rows = session_rows(&shell);
     assert_eq!(selected_row(&rows, &selection), Some(1));
     shell.set_info_sort(InfoTable::Users, InfoSortCol::Name);
     let rows = session_rows(&shell);
     assert_eq!(
-        selection.target.as_ref().map(SessionId::as_str),
+        selection
+            .target
+            .as_ref()
+            .map(|identity| identity.session_id.as_str()),
         Some("2"),
-        "the target id never drifts"
+        "the complete session identity never drifts"
     );
     assert_eq!(selected_row(&rows, &selection), Some(0));
     let gone = SessionSelection {
-        target: Some(SessionId::new("404")),
+        target: Some(SessionIdentity {
+            session_id: SessionId::new("404"),
+            incarnation: identity.incarnation,
+        }),
     };
     assert_eq!(selected_row(&rows, &gone), None);
 }
@@ -330,7 +350,13 @@ fn control_outcome(
 ) -> SessionControlOutcome {
     SessionControlOutcome {
         request_id: LatestControlRequest::default().begin(),
-        session_id: SessionId::new("7"),
+        identity: SessionIdentity {
+            session_id: SessionId::new("7"),
+            incarnation: SessionIncarnation::LinuxLogind {
+                boot_id: "fixture-boot".into(),
+                created_monotonic_usec: 7,
+            },
+        },
         action,
         result,
     }
@@ -341,7 +367,7 @@ fn feedback_line_names_action_and_target_for_both_outcomes() {
     let ok = control_outcome(SessionControlAction::Lock, Ok(()));
     assert_eq!(
         feedback_line_text(&ok),
-        t("feedback.action_succeeded")
+        t("feedback.session_request_accepted")
             .replace("{action}", t("users.lock"))
             .replace("{target}", "7")
     );
@@ -456,7 +482,7 @@ fn sort_click_projects_shared_order_and_keeps_selection_on_target() {
     assert_eq!(
         selected_row_target(&mut app).as_deref(),
         Some("2"),
-        "the selected target id survived the reorder"
+        "the selected target identity survived the reorder"
     );
 }
 
@@ -507,7 +533,7 @@ fn keyboard_moves_clamp_and_selection_clears_when_target_leaves() {
     assert_eq!(
         app.world().resource::<SessionSelection>().target,
         None,
-        "the selection resource stays id-keyed and honest"
+        "the selection resource stays identity-keyed and honest"
     );
 }
 

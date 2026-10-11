@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::session::classify_session_control_error;
 
 #[test]
 fn session_control_classification_preserves_typed_failures() {
@@ -12,6 +13,6 @@ fn session_control_classification_preserves_typed_failures() {
     );
     assert_eq!(
         classify_session_control_error("No such file or directory"),
-        ProviderFailure::TemporarilyUnavailable
+        ProviderFailure::Unsupported
     );
 }

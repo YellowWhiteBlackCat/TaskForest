@@ -42,7 +42,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::target::SessionId;
 
@@ -63,9 +63,11 @@ use scene::sessions_body_scene;
 
 // ---- pure core: row view model, seat/tty summary, copy ----
 
-/// One Users-table row: display material plus the provider session id.
+/// One Users-table row: display material plus the verified session identity,
+/// when the provider supplied unique lifecycle evidence.
 pub(crate) struct SessionRowModel {
-    pub(crate) target: SessionId,
+    pub(crate) id: SessionId,
+    pub(crate) identity: Option<SessionIdentity>,
     pub(crate) session: String,
     pub(crate) user: String,
     pub(crate) seat: String,
@@ -76,11 +78,12 @@ pub(crate) struct SessionRowModel {
 
 /// Project the table's whole material through the shared sort order.
 pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
-    shell
+    let mut rows = shell
         .sorted_sessions()
         .into_iter()
         .map(|session: &SessionItem| SessionRowModel {
-            target: session.id.clone(),
+            id: session.id.clone(),
+            identity: session.identity(),
             session: session.id.to_string(),
             user: session.user.clone(),
             seat: session_seat_text(session),
@@ -95,7 +98,34 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
                 .clone()
                 .unwrap_or_else(|| MISSING_VALUE.to_owned()),
         })
-        .collect()
+        .collect::<Vec<_>>();
+    let mut identity_counts = std::collections::HashMap::new();
+    for identity in rows.iter().filter_map(|row| row.identity.as_ref()) {
+        *identity_counts.entry(identity.clone()).or_insert(0usize) += 1;
+    }
+    for row in &mut rows {
+        if row
+            .identity
+            .as_ref()
+            .is_some_and(|identity| identity_counts.get(identity) != Some(&1))
+        {
+            row.identity = None;
+        }
+    }
+    rows
+}
+
+pub(crate) fn first_session_identity(shell: &ShellApp) -> Option<SessionIdentity> {
+    session_rows(shell).into_iter().find_map(|row| row.identity)
+}
+
+pub(crate) fn unique_session(shell: &ShellApp, identity: &SessionIdentity) -> Option<SessionItem> {
+    let mut matches = shell
+        .sorted_sessions()
+        .into_iter()
+        .filter(|session| session.identity().as_ref() == Some(identity));
+    let session = matches.next()?.clone();
+    matches.next().is_none().then_some(session)
 }
 
 /// Seat summary: the observed seat, or the shared missing-value marker — an
@@ -136,13 +166,13 @@ pub(crate) fn empty_state_text(sources: Option<&[SourceStatus]>) -> String {
 /// One accepted session-control outcome as display text (GPUI/TUI feedback
 /// parity: success and failure both name the action and the target).
 pub(crate) fn feedback_line_text(outcome: &SessionControlOutcome) -> String {
-    let target = outcome.session_id.to_string();
+    let target = outcome.identity.session_id.to_string();
     let action = match outcome.action {
         SessionControlAction::Disconnect => t("users.disconnect"),
         SessionControlAction::Lock => t("users.lock"),
     };
     match outcome.result {
-        Ok(()) => t("feedback.action_succeeded")
+        Ok(()) => t("feedback.session_request_accepted")
             .replace("{action}", action)
             .replace("{target}", &target),
         Err(error) => t("feedback.action_failed_detail")
@@ -167,13 +197,13 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
     }
 }
 
-// ---- pure core: id-keyed selection model ----
+// ---- pure core: incarnation-keyed selection model ----
 
-/// The page's selection state: the provider session id, never a row index.
-/// Action-menu target: disconnect/lock verbs read the id from here.
+/// The page's selection state: the provider session identity, never a row index.
+/// Action-menu targets read the full incarnation identity from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct SessionSelection {
-    pub(crate) target: Option<SessionId>,
+    pub(crate) target: Option<SessionIdentity>,
 }
 
 pub(crate) fn selected_row(
@@ -181,7 +211,12 @@ pub(crate) fn selected_row(
     selection: &SessionSelection,
 ) -> Option<usize> {
     let target = selection.target.as_ref()?;
-    rows.iter().position(|row| row.target == *target)
+    let mut matching = rows
+        .iter()
+        .enumerate()
+        .filter_map(|(index, row)| (row.identity.as_ref() == Some(target)).then_some(index));
+    let index = matching.next()?;
+    matching.next().is_none().then_some(index)
 }
 
 /// Clamp-move a row cursor: saturates at the first/last row; an empty table
@@ -266,7 +301,11 @@ pub(crate) struct SessionsBody;
 pub(crate) struct SessionsStatusLine;
 
 #[derive(Clone, Component, Default)]
-pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) SessionId);
+pub(crate) struct SessionsRowMarker(
+    pub(crate) usize,
+    pub(crate) SessionId,
+    pub(crate) Option<SessionIdentity>,
+);
 
 #[derive(Clone, Component, Default)]
 pub(crate) struct SessionsSortHeader(pub(crate) Option<InfoSortCol>);
@@ -345,12 +384,7 @@ fn on_session_disconnect_button_activated(
         return;
     }
     if let Some(target) = &selection.target
-        && let Some(session) = track
-            .shell
-            .sorted_sessions()
-            .into_iter()
-            .find(|s| &s.id == target)
-            .cloned()
+        && let Some(session) = unique_session(&track.shell, target)
         && track
             .shell
             .select_session_control(&session, SessionControlAction::Disconnect)
@@ -375,12 +409,7 @@ fn on_session_lock_button_activated(
         return;
     }
     if let Some(target) = &selection.target
-        && let Some(session) = track
-            .shell
-            .sorted_sessions()
-            .into_iter()
-            .find(|s| &s.id == target)
-            .cloned()
+        && let Some(session) = unique_session(&track.shell, target)
         && track
             .shell
             .select_session_control(&session, SessionControlAction::Lock)
@@ -447,10 +476,9 @@ fn on_sessions_row_clicked(
     mut selection: ResMut<SessionSelection>,
     mut commands: Commands,
 ) {
-    let Some(session) = track.shell().sorted_session_at(click.event().0) else {
-        return;
-    };
-    selection.target = Some(session.id.clone());
+    selection.target = session_rows(track.shell())
+        .get(click.event().0)
+        .and_then(|row| row.identity.clone());
     commands.trigger(paint::RepaintRequested);
 }
 
@@ -466,10 +494,7 @@ fn on_sessions_selection_moved(
     let Some(next) = moved_row(rows.len(), current, movement.event().0) else {
         return;
     };
-    let Some(session) = track.shell().sorted_session_at(next) else {
-        return;
-    };
-    selection.target = Some(session.id.clone());
+    selection.target = rows.get(next).and_then(|row| row.identity.clone());
     commands.trigger(paint::RepaintRequested);
 }
 

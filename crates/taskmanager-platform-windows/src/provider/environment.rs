@@ -14,8 +14,8 @@
 //! critical-chain concept, so the snapshot's failed-units list is honestly
 //! empty and the critical chain carries the single documented boot node with
 //! the measured boot duration. Sessions use WTS enumeration/logoff through
-//! the boundary; `Lock` maps to `LockWorkStation`, which locks the calling
-//! interactive session — the correct semantics for this desktop application.
+//! the boundary; `LockWorkStation` is called only after the requested WTS
+//! identity matches the current process session and its current LogonTime.
 
 #[cfg(windows)]
 use std::path::PathBuf;
@@ -635,10 +635,9 @@ pub struct WinStartupEvidenceProvider;
 /// their WTS station name.
 pub struct WinSessionInventoryProvider;
 
-/// Login-session control through WTS. `Disconnect` targets a specific WTS
-/// session; `Lock` maps to `LockWorkStation`, which locks the calling
-/// interactive session — the session this desktop application runs in — and
-/// therefore takes no session id.
+/// Login-session control through WTS. `Disconnect` is revalidated against the
+/// current WTS LogonTime before numeric-ID logoff. `Lock` is restricted to the
+/// exact current process session because `LockWorkStation` has no target ID.
 pub struct WinSessionControlProvider;
 
 fn map_windows_api_failure(error: WindowsApiError) -> ProviderFailure {
@@ -723,7 +722,7 @@ impl WinEnvironmentProviders {
             move |observed_at_ms| startup_evidence.observe(observed_at_ms),
             move |entry, enabled| startup_control.set_enabled(entry, enabled),
             move || session_inventory.refresh(),
-            move |session_id, action| session_control.control(session_id, action),
+            move |identity, action| session_control.control(identity, action),
         )
     }
 }

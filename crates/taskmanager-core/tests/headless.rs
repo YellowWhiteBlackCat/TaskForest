@@ -8,3 +8,5 @@ mod platform_boundary;
 mod public_contract;
 #[path = "headless/service_relations.rs"]
 mod service_relations;
+#[path = "headless/core_core_session_identity_tests.rs"]
+mod session_identity;

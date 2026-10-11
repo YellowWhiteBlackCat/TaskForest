@@ -4,6 +4,7 @@ use taskmanager_application::{
     SessionControlOutcome, SessionEvent,
 };
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::demo_app;
@@ -15,10 +16,12 @@ use taskmanager_theme::Theme;
 /// same way a real platform client delivers it) and return the shell.
 fn shell_with_feedback(ok: bool) -> (ShellApp, Theme) {
     let mut shell = demo_app();
+    let session = install_control_identity(&mut shell);
     shell.selected = 0;
+    assert!(shell.select_session_control(&session, SessionControlAction::Disconnect));
     let effect = shell
-        .request_session_control(SessionControlAction::Disconnect)
-        .expect("the demo fixture has a selectable session");
+        .confirm_session_control()
+        .expect("the armed session identity confirms");
     let PlatformEffect::SessionControl(target) = effect else {
         panic!("request must produce a session-control effect");
     };
@@ -33,7 +36,7 @@ fn shell_with_feedback(ok: bool) -> (ShellApp, Theme) {
         },
         SessionEvent::Control(SessionControlOutcome {
             request_id: target.request_id,
-            session_id: target.session_id,
+            identity: target.identity,
             action: target.action,
             result: if ok {
                 Ok(())
@@ -44,6 +47,20 @@ fn shell_with_feedback(ok: bool) -> (ShellApp, Theme) {
     ));
     shell.apply_platform_batch(batch);
     (shell, Theme::dark())
+}
+
+fn install_control_identity(shell: &mut ShellApp) -> SessionItem {
+    let mut sessions = shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .first_mut()
+        .expect("the demo fixture has a session");
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 43,
+    });
+    let session = session.clone();
+    seed_projection_fact(shell, ProjectionSeedFact::Sessions(Some(sessions)));
+    session
 }
 
 #[test]
@@ -76,8 +93,10 @@ fn session_feedback_line_renders_success_and_failure_typed_copy() {
 fn request_session_control_clears_stale_feedback_and_captures_the_target() {
     let (mut shell, _) = shell_with_feedback(true);
     assert!(shell.projection().session_control_feedback.is_some());
+    let session = install_control_identity(&mut shell);
     shell.selected = 0;
-    let effect = shell.request_session_control(SessionControlAction::Lock);
+    assert!(shell.select_session_control(&session, SessionControlAction::Lock));
+    let effect = shell.confirm_session_control();
     assert!(
         effect.is_some(),
         "the demo fixture has a selectable session"

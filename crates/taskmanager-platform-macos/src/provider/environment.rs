@@ -20,7 +20,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    DeviceState, FailureKind, ProviderId, SessionControlAction, SessionId, SessionItem,
+    DeviceState, FailureKind, ProviderId, SessionControlAction, SessionIdentity, SessionItem,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupEntry, StartupEntryId,
     StartupEntryLocator, StartupEvidenceFailure, StartupImpact, StartupImpactEvidence,
     StartupScope, StartupSource,
@@ -192,8 +192,10 @@ impl StartupControlProvider for MacStartupControlProvider {
     }
 }
 
-/// Sessions from `who` (bounded shell-out): user, tty, login timestamp and
-/// remote host are real; uid comes from `id -u` best-effort.
+/// Sessions from `who` (bounded shell-out): user, tty, displayed login time
+/// and remote host are real; uid comes from `id -u` best-effort. This safe
+/// source does not expose a revalidatable incarnation token, so rows remain
+/// display-only for stable selection and control.
 pub struct MacSessionInventoryProvider;
 
 fn run_capture(command: &mut std::process::Command) -> Option<String> {
@@ -243,6 +245,7 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
             });
             items.push(SessionItem {
                 id: format!("macos:session:{tty}").into(),
+                incarnation: None,
                 uid,
                 user,
                 seat: None,
@@ -358,7 +361,7 @@ pub struct PendingSessionControlProvider;
 impl SessionControlProvider for PendingSessionControlProvider {
     fn control(
         &mut self,
-        _session_id: &SessionId,
+        _identity: &SessionIdentity,
         _action: SessionControlAction,
     ) -> Result<(), ProviderFailure> {
         Err(ProviderFailure::Unsupported)

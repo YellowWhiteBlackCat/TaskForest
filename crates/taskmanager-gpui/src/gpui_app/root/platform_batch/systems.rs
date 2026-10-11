@@ -184,11 +184,13 @@ impl RootView {
                 .clone()
                 .unwrap_or_default(),
         );
-        if self
-            .selected_session
-            .as_ref()
-            .is_some_and(|id| !self.sessions().iter().any(|session| session.id == *id))
-        {
+        if self.selected_session.as_ref().is_some_and(|identity| {
+            self.sessions()
+                .iter()
+                .filter(|session| session.identity().as_ref() == Some(identity))
+                .count()
+                != 1
+        }) {
             self.selected_session = None;
         }
     }

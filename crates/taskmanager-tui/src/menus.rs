@@ -396,12 +396,27 @@ impl TuiApp {
         let Some(session) = self.sorted_session_at(self.selected) else {
             return false;
         };
-        if session.id.as_str().is_empty() {
+        let Some(identity) = session.identity() else {
             self.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                "This session row has no provider target",
+                "This session row has no verified provider identity",
+            );
+            return false;
+        };
+        let identity_count = self.projection().sessions.as_deref().map_or(0, |sessions| {
+            sessions
+                .iter()
+                .filter(|candidate| candidate.identity().as_ref() == Some(&identity))
+                .count()
+        });
+        if identity_count != 1 {
+            self.report_notice(
+                FeedbackSource::Interaction,
+                FeedbackSeverity::Warning,
+                FeedbackLifecycle::SHORT,
+                "This session row has an ambiguous provider identity",
             );
             return false;
         }
@@ -425,8 +440,8 @@ impl TuiApp {
     /// Consume the menu selection: arm the shared shell confirmation gate
     /// ([`taskmanager_shell::ShellApp::select_session_control`]) with the
     /// frozen row + chosen action. The platform request is only emitted by
-    /// [`Self::confirm_session_control`]. The frozen row's id is checked
-    /// against the current selection so a refresh cannot redirect the intent
+    /// [`Self::confirm_session_control`]. The frozen row's complete identity
+    /// is checked against the current selection so a refresh cannot redirect the intent
     /// to a different row (mirrors the startup menu's guard).
     pub fn session_menu_select(&mut self) {
         let Some(TuiSurface::SessionMenu(menu)) =
@@ -440,7 +455,21 @@ impl TuiApp {
             .unwrap_or(SessionControlAction::Disconnect);
         let still_selected = self
             .sorted_session_at(self.selected)
-            .is_some_and(|session| session.id == menu.session.id);
+            .is_some_and(|session| {
+                session.identity().is_some()
+                    && session.identity() == menu.session.identity()
+                    && self
+                        .projection()
+                        .sessions
+                        .as_deref()
+                        .is_some_and(|sessions| {
+                            sessions
+                                .iter()
+                                .filter(|candidate| candidate.identity() == menu.session.identity())
+                                .count()
+                                == 1
+                        })
+            });
         if !still_selected {
             self.report_notice(
                 FeedbackSource::Interaction,
@@ -455,7 +484,7 @@ impl TuiApp {
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                "This session row has no provider target",
+                "This session row has no verified provider identity",
             );
         }
     }

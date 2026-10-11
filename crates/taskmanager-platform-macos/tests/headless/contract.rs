@@ -36,7 +36,7 @@ use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
@@ -606,7 +606,12 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         client.submit_session_control(
             SessionControlRequest {
                 request_id: request_ids.begin(),
-                session_id: SessionId::new("contract.fixture.session"),
+                identity: SessionIdentity {
+                    session_id: SessionId::new("contract.fixture.session"),
+                    incarnation: SessionIncarnation::WindowsWts {
+                        logon_time_100ns: 1,
+                    },
+                },
                 action: SessionControlAction::Lock,
             },
             1,
@@ -734,7 +739,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         "session control outcome must embed the typed failure"
     );
     assert_eq!(
-        session_outcomes[0].session_id,
+        session_outcomes[0].identity.session_id,
         SessionId::new("contract.fixture.session")
     );
 }

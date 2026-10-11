@@ -233,6 +233,7 @@ fn enter_opens_the_declared_row_target_on_each_page() {
 
     let mut users = crate::demo_app();
     select_page(&mut users, AppPage::Users);
+    super::session_control::install_test_incarnations(&mut users);
     let _ = press_enter(&mut users);
     assert_eq!(
         users.local_surface_kind(),

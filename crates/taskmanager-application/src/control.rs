@@ -2,9 +2,9 @@
 
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity};
 use taskmanager_core::core::startup::{StartupEntry, StartupEntryId};
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_core::core::target::ServiceId;
 
 /// Correlates an asynchronous control result with the latest UI intent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -73,6 +73,56 @@ impl LatestServiceControlRequest {
     }
 }
 
+/// Latest-wins session intent correlation bound to the exact incarnation and
+/// action. A matching request id alone cannot authorize an outcome.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LatestSessionControlRequest {
+    generation: LatestControlRequest,
+    pending: Option<(ControlRequestId, SessionIdentity, SessionControlAction)>,
+}
+
+impl LatestSessionControlRequest {
+    #[must_use]
+    pub fn begin(
+        &mut self,
+        identity: SessionIdentity,
+        action: SessionControlAction,
+    ) -> ControlRequestId {
+        let request_id = self.generation.begin();
+        self.pending = Some((request_id, identity, action));
+        request_id
+    }
+
+    pub fn accept(
+        &mut self,
+        request_id: ControlRequestId,
+        identity: &SessionIdentity,
+        action: SessionControlAction,
+    ) -> bool {
+        if !self.pending.as_ref().is_some_and(
+            |(expected_request, expected_identity, expected_action)| {
+                *expected_request == request_id
+                    && expected_identity == identity
+                    && *expected_action == action
+            },
+        ) {
+            return false;
+        }
+        if !self.generation.accept(request_id) {
+            return false;
+        }
+        self.pending = None;
+        true
+    }
+
+    #[must_use]
+    pub fn pending(&self) -> Option<(ControlRequestId, &SessionIdentity, SessionControlAction)> {
+        self.pending
+            .as_ref()
+            .map(|(request_id, identity, action)| (*request_id, identity, *action))
+    }
+}
+
 impl LatestControlRequest {
     #[must_use]
     pub fn begin(&mut self) -> ControlRequestId {
@@ -129,15 +179,17 @@ pub struct StartupControlOutcome {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionControlRequest {
     pub request_id: ControlRequestId,
-    pub session_id: SessionId,
+    pub identity: SessionIdentity,
     pub action: SessionControlAction,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionControlOutcome {
     pub request_id: ControlRequestId,
-    pub session_id: SessionId,
+    pub identity: SessionIdentity,
     pub action: SessionControlAction,
+    /// The native provider accepted or rejected dispatch. `Ok(())` does not
+    /// claim that the asynchronous session transition has completed.
     pub result: Result<(), FailureKind>,
 }
 

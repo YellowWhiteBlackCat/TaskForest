@@ -50,6 +50,7 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
         &mut shell,
         ProjectionSeedFact::Sessions(Some(vec![SessionItem {
             id: "local".into(),
+            incarnation: None,
             uid: 0,
             user: "unknown".into(),
             seat: Some(String::new()),

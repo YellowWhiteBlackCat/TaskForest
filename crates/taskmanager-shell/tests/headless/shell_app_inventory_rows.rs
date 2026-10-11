@@ -2,6 +2,7 @@ use super::*;
 
 use crate::fixture::{ProjectionSeedDomain, ProjectionSeedFact, seed_projection_fact};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::session::SessionIncarnation;
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
@@ -33,6 +34,9 @@ fn startup(id: &str, name: &str) -> StartupEntry {
 fn session(id: &str, user: &str) -> SessionItem {
     SessionItem {
         id: SessionId::new(id),
+        incarnation: Some(SessionIncarnation::WindowsWts {
+            logon_time_100ns: 1,
+        }),
         user: user.to_owned(),
         ..SessionItem::default()
     }
@@ -114,7 +118,8 @@ fn row_ids_use_owner_facts_and_reject_missing_ids() {
     );
 
     let service_id = InventoryRowId::Service(ServiceId::new("same-token"));
-    let session_id = InventoryRowId::Session(SessionId::new("same-token"));
+    let session_id = InventoryRowId::from_session(&session("same-token", "user"))
+        .expect("trusted session identity");
     assert_ne!(service_id, session_id, "owner domains remain distinct");
 }
 
@@ -250,6 +255,24 @@ fn inventory_refresh_reconciles_identity_and_rejects_stale_rows_for_all_domains(
             &mut app,
             inventory_fixture_rows(domain, FixtureOrder::DuplicateIds),
         );
+        if domain == InventoryRowDomain::Sessions {
+            assert_eq!(
+                app.inventory_row_identity_at(domain, 0),
+                None,
+                "duplicate complete session identities have no row identity"
+            );
+            assert_eq!(
+                app.inventory_row_anchor_at(domain, 0),
+                None,
+                "duplicate complete session identities have no geometry anchor"
+            );
+            assert_eq!(
+                app.reconcile_inventory_row_identity(&selected),
+                None,
+                "duplicate complete session identities are ambiguous"
+            );
+            continue;
+        }
         let duplicate = app
             .inventory_row_identity_at(domain, 0)
             .expect("duplicate rows still carry their owner ID");
@@ -267,6 +290,46 @@ fn inventory_refresh_reconciles_identity_and_rejects_stale_rows_for_all_domains(
             "ambiguous owner IDs cannot resolve pointer geometry: {domain:?}"
         );
     }
+}
+
+#[test]
+fn session_row_anchors_require_one_complete_incarnation_identity() {
+    let mut app = ShellApp::new();
+    let row = session("session:stable", "alice");
+    app.data.sessions = Some(vec![row.clone()]);
+
+    let anchor = app
+        .inventory_row_anchor_at(InventoryRowDomain::Sessions, 0)
+        .expect("one trusted session has a stable row anchor");
+    let mut replacement = row.clone();
+    replacement.incarnation = Some(SessionIncarnation::WindowsWts {
+        logon_time_100ns: 2,
+    });
+    app.data.sessions = Some(vec![replacement]);
+    assert_eq!(app.reconcile_inventory_row_identity(anchor.id()), None);
+    assert_eq!(app.resolve_inventory_row_anchor(&anchor), None);
+
+    let duplicate = row;
+    app.data.sessions = Some(vec![duplicate.clone(), duplicate]);
+    assert_eq!(
+        app.inventory_row_identity_at(InventoryRowDomain::Sessions, 0),
+        None,
+        "duplicate complete identities cannot become a selection anchor"
+    );
+    assert_eq!(
+        app.inventory_row_anchor_at(InventoryRowDomain::Sessions, 1),
+        None,
+        "duplicate complete identities remain visible without a row anchor"
+    );
+
+    let mut unverified = session("session:unverified", "bob");
+    unverified.incarnation = None;
+    app.data.sessions = Some(vec![unverified]);
+    assert_eq!(
+        app.inventory_row_identity_at(InventoryRowDomain::Sessions, 0),
+        None,
+        "a display row without source evidence has no stable identity"
+    );
 }
 
 #[test]

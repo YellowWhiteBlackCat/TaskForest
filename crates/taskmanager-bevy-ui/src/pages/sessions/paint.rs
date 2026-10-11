@@ -43,7 +43,7 @@ fn paint(mut access: PaintAccess) {
     let shell = &access.track.shell;
     let rows = session_rows(shell);
     if let Some(target) = &access.selection.target
-        && !rows.iter().any(|row| &row.target == target)
+        && !rows.iter().any(|row| row.identity.as_ref() == Some(target))
     {
         access.selection.target = None;
     }

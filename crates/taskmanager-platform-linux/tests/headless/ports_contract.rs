@@ -31,9 +31,10 @@ use taskmanager_core::{
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads, RaplPowerSnapshot,
     ResourceGroupLimitRequest, SensorCenterSnapshot, ServiceAction, ServiceDeps, ServiceId,
     ServiceItem, ServiceLogErrorKind, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind, SessionId, SessionItem,
-    SmartSelfTestIntent, SmartSelfTestReport, SmbiosMemorySnapshot, StartupBootEvidenceSnapshot,
-    StartupEntry, StorageDeviceTarget, StorageTelemetryObservation,
+    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind, SessionId, SessionIdentity,
+    SessionIncarnation, SessionItem, SmartSelfTestIntent, SmartSelfTestReport,
+    SmbiosMemorySnapshot, StartupBootEvidenceSnapshot, StartupEntry, StorageDeviceTarget,
+    StorageTelemetryObservation,
 };
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityStatus, CompositeSourceSnapshot, DeviceSourceSnapshot, EventEnvelope,

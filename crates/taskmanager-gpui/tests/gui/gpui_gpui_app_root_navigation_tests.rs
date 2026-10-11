@@ -185,6 +185,7 @@ fn page_switch_dispatches_refresh_and_snapshot_populates_page_rows(cx: &mut gpui
 
         let session = SessionItem {
             id: SessionId::from("s1"),
+            incarnation: None,
             uid: 1000,
             user: "zhugenanbei".into(),
             seat: Some("seat0".into()),

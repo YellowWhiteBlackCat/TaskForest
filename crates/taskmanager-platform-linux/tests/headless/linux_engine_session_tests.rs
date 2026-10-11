@@ -1,7 +1,49 @@
 use super::*;
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
+#[cfg(unix)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 use taskmanager_core::SessionId;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+
+const FIXTURE_BOOT_ID: &str = "01234567-89ab-cdef-0123-456789abcdef";
+
+fn fixture_boot_id() -> Result<String, ProviderFailure> {
+    Ok(FIXTURE_BOOT_ID.to_string())
+}
+
+#[cfg(unix)]
+fn unavailable_boot_id() -> Result<String, ProviderFailure> {
+    Err(ProviderFailure::Unsupported)
+}
+
+fn fixture_identity(boot_id: &str, created_monotonic_usec: u64) -> SessionIdentity {
+    SessionIdentity {
+        session_id: SessionId::new("fixture"),
+        incarnation: SessionIncarnation::LinuxLogind {
+            boot_id: boot_id.to_string(),
+            created_monotonic_usec,
+        },
+    }
+}
+
+#[cfg(unix)]
+fn successful_output(stdout: &[u8]) -> BoundedOutput {
+    BoundedOutput {
+        status: std::process::ExitStatus::from_raw(0),
+        stdout: stdout.to_vec(),
+        stderr: Vec::new(),
+    }
+}
+
+#[cfg(unix)]
+fn failed_output(stderr: &[u8]) -> BoundedOutput {
+    BoundedOutput {
+        status: std::process::ExitStatus::from_raw(1 << 8),
+        stdout: Vec::new(),
+        stderr: stderr.to_vec(),
+    }
+}
 
 #[cfg(unix)]
 fn successful_session_scan(
@@ -9,19 +51,31 @@ fn successful_session_scan(
     timeout: Duration,
 ) -> Result<BoundedOutput, BoundedCommandError> {
     assert_eq!(command.get_program(), "loginctl");
-    assert_eq!(
-        command
-            .get_args()
-            .map(|argument| argument.to_string_lossy().into_owned())
-            .collect::<Vec<_>>(),
-        ["list-sessions", "--no-legend"]
-    );
-    assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
-    Ok(BoundedOutput {
-        status: std::process::ExitStatus::from_raw(0),
-        stdout: b"fixture 1000 alice seat0 tty2 no 2026-08-22 12:00:00\n".to_vec(),
-        stderr: Vec::new(),
-    })
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    match arguments.as_slice() {
+        [command, flag] if command == "list-sessions" && flag == "--no-legend" => {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(
+                b"fixture 1000 alice seat0 tty2 no 2026-08-22 12:00:00\n",
+            ))
+        }
+        [id_property, timestamp_property, command, id]
+            if id_property == "--property=Id"
+                && timestamp_property == "--property=TimestampMonotonic"
+                && command == "show-session"
+                && id == "fixture" =>
+        {
+            assert!(!timeout.is_zero());
+            assert!(timeout <= SESSION_IDENTITY_ENRICHMENT_BUDGET);
+            Ok(successful_output(
+                b"Id=fixture\nTimestampMonotonic=123456789\n",
+            ))
+        }
+        _ => panic!("unexpected loginctl arguments: {arguments:?}"),
+    }
 }
 
 #[cfg(unix)]
@@ -34,21 +88,229 @@ fn denied_session_control(
         .get_args()
         .map(|argument| argument.to_string_lossy().into_owned())
         .collect::<Vec<_>>();
-    assert_eq!(arguments.len(), 2);
-    assert!(arguments[0].ends_with("-session"));
-    assert_eq!(arguments[1], "fixture");
+    match arguments.as_slice() {
+        [id_property, timestamp_property, command, id]
+            if id_property == "--property=Id"
+                && timestamp_property == "--property=TimestampMonotonic"
+                && command == "show-session"
+                && id == "fixture" =>
+        {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(
+                b"Id=fixture\nTimestampMonotonic=123456789\n",
+            ))
+        }
+        [verb, id] if verb.ends_with("-session") && id == "fixture" => {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(failed_output(b"fixture access denied"))
+        }
+        _ => panic!("unexpected loginctl arguments: {arguments:?}"),
+    }
+}
+
+#[cfg(unix)]
+static CONTROL_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(unix)]
+fn ordered_session_control(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    let call = CONTROL_CALLS.fetch_add(1, Ordering::SeqCst);
+    assert_eq!(command.get_program(), "loginctl");
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    match (call, arguments.as_slice()) {
+        (0, [id_property, timestamp_property, command, id])
+            if id_property == "--property=Id"
+                && timestamp_property == "--property=TimestampMonotonic"
+                && command == "show-session"
+                && id == "fixture" =>
+        {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(
+                b"Id=fixture\nTimestampMonotonic=123456789\n",
+            ))
+        }
+        (1, [verb, id]) if verb == "terminate-session" && id == "fixture" => {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(b""))
+        }
+        (2, [id_property, timestamp_property, command, id])
+            if id_property == "--property=Id"
+                && timestamp_property == "--property=TimestampMonotonic"
+                && command == "show-session"
+                && id == "fixture" =>
+        {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(
+                b"Id=fixture\nTimestampMonotonic=123456789\n",
+            ))
+        }
+        (3, [verb, id]) if verb == "lock-session" && id == "fixture" => {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(b""))
+        }
+        _ => panic!("unexpected loginctl call {call}: {arguments:?}"),
+    }
+}
+
+#[cfg(unix)]
+fn stale_session_identity(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    assert_eq!(
+        command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        [
+            "--property=Id",
+            "--property=TimestampMonotonic",
+            "show-session",
+            "fixture"
+        ]
+    );
     assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
-    Ok(BoundedOutput {
-        status: std::process::ExitStatus::from_raw(1 << 8),
-        stdout: Vec::new(),
-        stderr: b"fixture access denied".to_vec(),
-    })
+    Ok(successful_output(
+        b"Id=fixture\nTimestampMonotonic=999999999\n",
+    ))
+}
+
+#[cfg(unix)]
+fn different_session_id_identity(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    assert_eq!(
+        command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        [
+            "--property=Id",
+            "--property=TimestampMonotonic",
+            "show-session",
+            "fixture"
+        ]
+    );
+    assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+    Ok(successful_output(
+        b"Id=replaced\nTimestampMonotonic=123456789\n",
+    ))
+}
+
+#[cfg(unix)]
+fn missing_session_identity_property(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    assert!(
+        command
+            .get_args()
+            .any(|argument| argument == "show-session")
+    );
+    assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+    Ok(successful_output(b"Id=fixture\n"))
+}
+
+#[cfg(unix)]
+fn unexpected_session_action(
+    command: &mut Command,
+    _timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(arguments.get(2).map(String::as_str), Some("show-session"));
+    Ok(successful_output(
+        b"Id=fixture\nTimestampMonotonic=123456789\n",
+    ))
+}
+
+#[cfg(unix)]
+fn zero_creation_session_identity(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    assert_eq!(
+        command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        [
+            "--property=Id",
+            "--property=TimestampMonotonic",
+            "show-session",
+            "fixture"
+        ]
+    );
+    assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+    Ok(successful_output(b"Id=fixture\nTimestampMonotonic=0\n"))
+}
+
+#[cfg(unix)]
+fn partial_session_identity_scan(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    match arguments.as_slice() {
+        [command, flag] if command == "list-sessions" && flag == "--no-legend" => {
+            assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+            Ok(successful_output(
+                b"present 1000 alice seat0 tty2 no\nmissing 1001 bob - pts/0 yes\n",
+            ))
+        }
+        [id_property, timestamp_property, command, id]
+            if id_property == "--property=Id"
+                && timestamp_property == "--property=TimestampMonotonic"
+                && command == "show-session" =>
+        {
+            assert!(!timeout.is_zero());
+            match id.as_str() {
+                "present" => Ok(successful_output(b"Id=present\nTimestampMonotonic=700\n")),
+                "missing" => Ok(failed_output(b"No session 'missing' known")),
+                _ => panic!("unexpected session id: {id}"),
+            }
+        }
+        _ => panic!("unexpected loginctl arguments: {arguments:?}"),
+    }
+}
+
+#[cfg(unix)]
+fn session_listing_without_identity_query(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<BoundedOutput, BoundedCommandError> {
+    assert_eq!(command.get_program(), "loginctl");
+    assert_eq!(
+        command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        ["list-sessions", "--no-legend"]
+    );
+    assert_eq!(timeout, SESSION_CONTROL_TIMEOUT);
+    Ok(successful_output(b"fixture 1000 alice seat0 tty2 no\n"))
 }
 
 #[test]
 #[cfg(unix)]
 fn scan_executes_the_bounded_provider_and_returns_its_parsed_session() {
-    let manager = SessionManager::with_command_runner(successful_session_scan);
+    let manager = SessionManager::with_sources(successful_session_scan, fixture_boot_id);
 
     let sessions = manager.try_scan().expect("fixture provider should succeed");
 
@@ -58,24 +320,146 @@ fn scan_executes_the_bounded_provider_and_returns_its_parsed_session() {
     assert_eq!(sessions[0].user, "alice");
     assert_eq!(sessions[0].seat.as_deref(), Some("seat0"));
     assert_eq!(sessions[0].tty.as_deref(), Some("tty2"));
+    assert_eq!(
+        sessions[0].incarnation,
+        Some(SessionIncarnation::LinuxLogind {
+            boot_id: FIXTURE_BOOT_ID.to_string(),
+            created_monotonic_usec: 123_456_789,
+        })
+    );
 }
 
 #[test]
 #[cfg(unix)]
-fn every_public_session_control_propagates_a_nonzero_provider_result() {
-    type SessionControl = fn(&SessionManager, &str) -> Result<(), String>;
-    let manager = SessionManager::with_command_runner(denied_session_control);
+fn scan_keeps_rows_when_logind_cannot_supply_their_incarnation() {
+    let manager = SessionManager::with_sources(partial_session_identity_scan, fixture_boot_id);
 
-    for control in [
-        SessionManager::terminate_session as SessionControl,
-        SessionManager::lock_session as SessionControl,
-        SessionManager::unlock_session as SessionControl,
-    ] {
-        assert_eq!(
-            control(&manager, "fixture"),
-            Err("fixture access denied".to_string())
-        );
-    }
+    let sessions = manager.try_scan().expect("session listing should succeed");
+
+    assert_eq!(sessions.len(), 2);
+    assert_eq!(sessions[0].id, SessionId::new("present"));
+    assert_eq!(
+        sessions[0].incarnation,
+        Some(SessionIncarnation::LinuxLogind {
+            boot_id: FIXTURE_BOOT_ID.to_string(),
+            created_monotonic_usec: 700,
+        })
+    );
+    assert_eq!(sessions[1].id, SessionId::new("missing"));
+    assert_eq!(sessions[1].user, "bob");
+    assert_eq!(sessions[1].incarnation, None);
+}
+
+#[test]
+#[cfg(unix)]
+fn missing_boot_id_keeps_session_row_without_identity() {
+    let manager =
+        SessionManager::with_sources(session_listing_without_identity_query, unavailable_boot_id);
+
+    let sessions = manager.try_scan().expect("session listing should succeed");
+
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].id, SessionId::new("fixture"));
+    assert_eq!(sessions[0].user, "alice");
+    assert_eq!(sessions[0].incarnation, None);
+}
+
+#[test]
+#[cfg(unix)]
+fn control_revalidates_before_one_native_action_and_preserves_provider_denial() {
+    let manager = SessionManager::with_sources(denied_session_control, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Lock),
+        Err(ProviderFailure::PermissionDenied)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn control_rechecks_full_identity_and_sends_no_action_when_creation_changes() {
+    let manager = SessionManager::with_sources(stale_session_identity, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Err(ProviderFailure::IdentityChanged)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn control_rejects_a_replaced_logind_id_without_dispatch() {
+    let manager = SessionManager::with_sources(different_session_id_identity, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Err(ProviderFailure::IdentityChanged)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn control_fails_closed_when_creation_property_is_missing() {
+    let manager = SessionManager::with_sources(missing_session_identity_property, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Err(ProviderFailure::Unsupported)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn zero_creation_timestamp_cannot_become_a_linux_incarnation() {
+    let manager = SessionManager::with_sources(zero_creation_session_identity, fixture_boot_id);
+
+    assert_eq!(
+        manager.query_session_incarnation("fixture", FIXTURE_BOOT_ID, SESSION_CONTROL_TIMEOUT),
+        Err(ProviderFailure::Unsupported)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn control_rejects_a_different_boot_before_querying_or_dispatching() {
+    let manager = SessionManager::with_sources(unexpected_session_action, fixture_boot_id);
+    let target = fixture_identity("fedcba98-7654-3210-fedc-ba9876543210", 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Err(ProviderFailure::IdentityChanged)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn control_rejects_invalid_incarnation_before_querying_or_dispatching() {
+    let manager = SessionManager::with_sources(unexpected_session_action, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 0);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Err(ProviderFailure::Unsupported)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn matching_identity_dispatches_each_action_once_after_revalidation() {
+    CONTROL_CALLS.store(0, Ordering::SeqCst);
+    let manager = SessionManager::with_sources(ordered_session_control, fixture_boot_id);
+    let target = fixture_identity(FIXTURE_BOOT_ID, 123_456_789);
+
+    assert_eq!(
+        manager.control(&target, SessionControlAction::Disconnect),
+        Ok(())
+    );
+    assert_eq!(manager.control(&target, SessionControlAction::Lock), Ok(()));
+    assert_eq!(CONTROL_CALLS.load(Ordering::SeqCst), 4);
 }
 
 // ── classic layout (SESSION UID USER SEAT TTY REMOTE TIMESTAMP) ──────────
@@ -217,4 +601,41 @@ fn looks_datetime_drops_structural_tokens() {
     // Real date/time tokens are accepted.
     assert!(looks_datetime("10:00:00"));
     assert!(looks_datetime("2026-07-28"));
+}
+
+#[test]
+fn logind_identity_properties_require_exact_keys_and_unsigned_creation_time() {
+    assert_eq!(
+        parse_session_identity_properties("Id=7\nTimestampMonotonic=42\n"),
+        Ok(SessionIdentityProperties {
+            id: "7".into(),
+            created_monotonic_usec: 42,
+        })
+    );
+    assert_eq!(
+        parse_session_identity_properties("Id=7\nTimestampMonotonic=-1\n"),
+        Err(ProviderFailure::Unsupported)
+    );
+    assert_eq!(
+        parse_session_identity_properties("Id=7\n"),
+        Err(ProviderFailure::Unsupported)
+    );
+    assert_eq!(
+        parse_session_identity_properties("Id=7\nId=8\nTimestampMonotonic=42\n"),
+        Err(ProviderFailure::Unsupported)
+    );
+}
+
+#[test]
+fn boot_id_normalization_accepts_only_kernel_uuid_shape() {
+    assert_eq!(
+        normalize_boot_id("01234567-89AB-CDEF-0123-456789ABCDEF\n"),
+        Some(FIXTURE_BOOT_ID.to_string())
+    );
+    assert_eq!(normalize_boot_id("not-a-boot-id"), None);
+    assert_eq!(normalize_boot_id("0123456789abcdef0123456789abcdef"), None);
+    assert_eq!(
+        normalize_boot_id("00000000-0000-0000-0000-000000000000"),
+        None
+    );
 }

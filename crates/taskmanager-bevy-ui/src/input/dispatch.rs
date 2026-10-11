@@ -466,7 +466,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .ses
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| self.shell.sorted_sessions().first().map(|s| s.id.clone()));
+            .or_else(|| crate::pages::sessions::first_session_identity(self.shell));
         target.is_some_and(|t| {
             crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t)
         })

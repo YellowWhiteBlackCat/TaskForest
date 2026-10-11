@@ -34,7 +34,7 @@ use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
 };
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
 
@@ -772,13 +772,26 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub fn begin_session_control(&mut self) -> ControlRequestId {
-        self.projection.session_control_requests.begin()
+    pub fn begin_session_control(
+        &mut self,
+        identity: SessionIdentity,
+        action: SessionControlAction,
+    ) -> ControlRequestId {
+        self.projection
+            .session_control_requests
+            .begin(identity, action)
     }
 
     #[must_use]
-    pub fn accept_session_control(&mut self, request_id: ControlRequestId) -> bool {
-        self.projection.session_control_requests.accept(request_id)
+    pub fn accept_session_control(
+        &mut self,
+        request_id: ControlRequestId,
+        identity: &SessionIdentity,
+        action: SessionControlAction,
+    ) -> bool {
+        self.projection
+            .session_control_requests
+            .accept(request_id, identity, action)
     }
 
     #[must_use]

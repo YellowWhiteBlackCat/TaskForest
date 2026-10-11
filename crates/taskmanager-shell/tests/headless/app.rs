@@ -3,6 +3,7 @@ use taskmanager_application::DeviceLifecycleSnapshotRevision;
 use taskmanager_core::core::alerts::NotificationPolicy;
 use taskmanager_core::core::alerts::{AlertRuleId, AlertTargetIdentity};
 use taskmanager_core::core::metrics::CpuMetrics;
+use taskmanager_core::core::session::SessionIncarnation;
 
 impl ShellApp {
     pub(crate) fn apply_session_control_outcome(
@@ -16,8 +17,8 @@ impl ShellApp {
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::SHORT,
                     format!(
-                        "Session {} {:?} completed",
-                        outcome.session_id, outcome.action
+                        "Session {} {:?} request accepted",
+                        outcome.identity.session_id, outcome.action
                     ),
                 ),
                 Err(error) => (
@@ -25,7 +26,7 @@ impl ShellApp {
                     FeedbackLifecycle::UntilReplaced,
                     format!(
                         "Session {} {:?} failed: {error:?}",
-                        outcome.session_id, outcome.action
+                        outcome.identity.session_id, outcome.action
                     ),
                 ),
             };
@@ -349,16 +350,27 @@ fn legacy_process_row_cannot_open_or_confirm_a_dangerous_action() {
 #[test]
 fn session_action_freezes_the_selected_opaque_target_and_action() {
     let mut app = crate::demo_app();
-    app.selected = 1;
+    let session = SessionItem {
+        id: "windows:session:9".into(),
+        incarnation: Some(SessionIncarnation::WindowsWts {
+            logon_time_100ns: 10,
+        }),
+        ..SessionItem::default()
+    };
+    app.data.sessions = Some(vec![session.clone()]);
+    assert!(app.select_session_control(&session, SessionControlAction::Lock));
 
     let effect = app
-        .request_session_control(SessionControlAction::Lock)
-        .expect("demo session selection should produce an action");
+        .confirm_session_control()
+        .expect("confirmed session action should produce an effect");
     let PlatformEffect::SessionControl(target) = effect else {
         panic!("session action must cross the typed platform-effect boundary");
     };
 
-    assert_eq!(target.session_id.as_str(), "9");
+    assert_eq!(
+        target.identity,
+        session.identity().expect("trusted session")
+    );
     assert_eq!(target.action, SessionControlAction::Lock);
     assert_ne!(target.request_id.get(), 0);
 }
@@ -366,11 +378,26 @@ fn session_action_freezes_the_selected_opaque_target_and_action() {
 #[test]
 fn session_control_completion_accepts_only_the_latest_intent() {
     let mut app = crate::demo_app();
-    let first = app
-        .request_session_control(SessionControlAction::Lock)
-        .expect("first session action");
+    let first_session = SessionItem {
+        id: "windows:session:1".into(),
+        incarnation: Some(SessionIncarnation::WindowsWts {
+            logon_time_100ns: 10,
+        }),
+        ..SessionItem::default()
+    };
+    let second_session = SessionItem {
+        id: "windows:session:2".into(),
+        incarnation: Some(SessionIncarnation::WindowsWts {
+            logon_time_100ns: 20,
+        }),
+        ..SessionItem::default()
+    };
+    app.data.sessions = Some(vec![first_session.clone(), second_session.clone()]);
+    assert!(app.select_session_control(&first_session, SessionControlAction::Lock));
+    let first = app.confirm_session_control().expect("first session action");
+    assert!(app.select_session_control(&second_session, SessionControlAction::Disconnect));
     let second = app
-        .request_session_control(SessionControlAction::Disconnect)
+        .confirm_session_control()
         .expect("second session action");
     let PlatformEffect::SessionControl(first) = first else {
         panic!("first action must be session control");
@@ -386,7 +413,7 @@ fn session_control_completion_accepts_only_the_latest_intent() {
     let banner = app.feedback_text().to_string();
     app.apply_session_control_outcome(SessionControlOutcome {
         request_id: first.request_id,
-        session_id: first.session_id,
+        identity: first.identity,
         action: first.action,
         result: Ok(()),
     });
@@ -398,7 +425,7 @@ fn session_control_completion_accepts_only_the_latest_intent() {
 
     app.apply_session_control_outcome(SessionControlOutcome {
         request_id: second.request_id,
-        session_id: second.session_id,
+        identity: second.identity,
         action: second.action,
         result: Err(FailureKind::PermissionDenied),
     });

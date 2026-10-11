@@ -156,7 +156,7 @@ pub use services::{
     detect_ordering_cycles, detect_requirement_cycles, is_ordering_acyclic, is_requirement_acyclic,
     service_exit_status_label,
 };
-pub use session::{SessionControlAction, SessionItem};
+pub use session::{SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem};
 pub use setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 pub use smart::self_test::{
     SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,

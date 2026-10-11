@@ -11,7 +11,7 @@ use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_core::core::services::{
     ServiceAction, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogTimeFilter,
 };
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
 use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
@@ -26,6 +26,21 @@ fn target_scope(request: &impl CapabilityRequest) -> RequestScope {
         RequestTracking::Target(scope) => scope,
         tracking => panic!("expected target lifecycle, got {tracking:?}"),
     }
+}
+
+fn session_identity(
+    session_id: &str,
+    boot_id: &str,
+    created_monotonic_usec: u64,
+) -> SessionIdentity {
+    SessionIdentity::new(
+        SessionId::new(session_id),
+        SessionIncarnation::LinuxLogind {
+            boot_id: boot_id.into(),
+            created_monotonic_usec,
+        },
+    )
+    .expect("fixture identity")
 }
 
 fn process(pid: u32, name: &str, wall_clock_start: u64, start_token: u64) -> FrozenProcessIdentity {
@@ -267,15 +282,16 @@ fn environment_controls_ignore_display_and_native_locator_when_scoping_targets()
         startup
     );
 
+    let stable_identity = session_identity("session:stable", "boot-a", 10);
     let session = target_scope(&SessionControlRequest {
         request_id: request_ids.begin(),
-        session_id: SessionId::new("session:stable"),
+        identity: stable_identity.clone(),
         action: SessionControlAction::Disconnect,
     });
     assert_eq!(
         target_scope(&SessionControlRequest {
             request_id: request_ids.begin(),
-            session_id: SessionId::new("session:stable"),
+            identity: stable_identity,
             action: SessionControlAction::Lock,
         }),
         session
@@ -283,7 +299,15 @@ fn environment_controls_ignore_display_and_native_locator_when_scoping_targets()
     assert_ne!(
         target_scope(&SessionControlRequest {
             request_id: request_ids.begin(),
-            session_id: SessionId::new("session:replacement"),
+            identity: session_identity("session:replacement", "boot-a", 15),
+            action: SessionControlAction::Disconnect,
+        }),
+        session
+    );
+    assert_ne!(
+        target_scope(&SessionControlRequest {
+            request_id: request_ids.begin(),
+            identity: session_identity("session:stable", "boot-a", 11),
             action: SessionControlAction::Disconnect,
         }),
         session
@@ -312,10 +336,15 @@ fn missing_opaque_identity_is_rejected_instead_of_minting_an_empty_target() {
     assert_eq!(
         SessionControlRequest {
             request_id: request_ids.begin(),
-            session_id: SessionId::default(),
+            identity: SessionIdentity {
+                session_id: SessionId::default(),
+                incarnation: SessionIncarnation::WindowsWts {
+                    logon_time_100ns: 1,
+                },
+            },
             action: SessionControlAction::Disconnect,
         }
         .runtime_tracking(),
-        Err(RequestTrackingError::EmptyTargetScope)
+        Err(RequestTrackingError::MissingTargetIdentity)
     );
 }

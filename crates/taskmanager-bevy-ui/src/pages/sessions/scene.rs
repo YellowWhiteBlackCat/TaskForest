@@ -210,7 +210,7 @@ pub(super) fn session_row_scene(
             border_radius: BorderRadius::all(Val::Px(radius)),
         }
         BackgroundColor(fill)
-        SessionsRowMarker(index, target)
+        SessionsRowMarker(index, row.id.clone(), row.identity.clone())
         Button
         on(on_sessions_row_activated)
         Children [

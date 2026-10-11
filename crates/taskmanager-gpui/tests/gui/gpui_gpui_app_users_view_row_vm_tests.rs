@@ -8,6 +8,7 @@ fn session(
 ) -> SessionItem {
     SessionItem {
         id: "session-7".to_owned().into(),
+        incarnation: None,
         uid: 1000,
         user: "alice".to_owned(),
         seat: seat.map(str::to_owned),
