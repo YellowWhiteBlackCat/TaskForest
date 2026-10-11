@@ -162,11 +162,9 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
 
 ### 8.2 存异边界
 
-模型与投影永不携带 toolkit 类型、颜色、布局或平台原生词汇；刻意保留的表面差异——
-精度、密度、皮肤、布局预算的执行方式、执行与游标模型（如"选中即游标"与独立 visual
-cursor 可并存）、未进入共享命令表的局部按键——属于渲染层设计权。求同到语义为止，
-不到像素。每个"异"必须挂在至少一个"同"上，实现同一个共享语义；没有对应"同"的
-新行为不是"异"，是分叉，不得落地。
+模型与投影不携带 toolkit 类型、颜色、布局或平台原生词汇；精度、密度、皮肤、布局预算、
+执行/游标模型（选中即游标或独立 visual cursor）及前端局部按键等表面差异属于渲染权。
+求同到语义为止；每个"异"须挂在共享语义上，无对应语义的新行为是分叉，不得落地。
 
 ### 8.3 防串扰律
 
@@ -175,12 +173,14 @@ cursor 可并存）、未进入共享命令表的局部按键——属于渲染�
 - 声称跨前端 parity 的行为必须由行为测试钉住同一矩阵定义；无测试支撑的 parity 注释或
   文档视为缺陷。
 - 修改共享语义必须四端同批落地，或显式登记未落端与原因。
-- toolkit 特有的窗口、widget、scene 或事件类型必须停留在对应 frontend crate。共享层
-  不添加 GPUI、Iced、Ratatui 或 Bevy 类型；唯一例外是 `taskmanager-platform-runtime` 的
-  调度内核（[ADR-033](../adr/033-bevy-ecs-runtime-scheduling-kernel.md)）：仅内部用 `bevy_app`/`bevy_ecs`，不向前端暴露。
-- 产品用户意图的 owner、生命周期、目标身份和四端表面裁决由
-  `taskmanager-ui-contract` 的 CORE-04 注册表统一声明；新增意图必须让每个目标前端显式
-  选择 shared/local/accepted-difference/typed-unsupported，不能只添加一条表面路径。
+- `taskmanager-ui-contract` 拥有语义快照和行输入；前端只投影 CORE-02 现有 Applications 行，
+  不扩展到 Services、Startup、Users。TUI 发布终端语义但不注册 AT-SPI 树（Linux 屏幕阅读器
+  读取终端模拟器原生树）。GPUI/Iced/Bevy 回执须有目标平台的真实 AT consumer；headless、
+  bridge `Ready` 或 `Detached` 都不算回执（[ADR-054](../adr/054-terminal-semantics-and-gui-accessibility-receipts.md)）。
+- toolkit 窗口/widget/scene/事件和原生无障碍类型留在 frontend/platform adapter；共享层无 toolkit
+  类型。唯一例外是 `taskmanager-platform-runtime` 的内部 Bevy 调度内核（[ADR-033](../adr/033-bevy-ecs-runtime-scheduling-kernel.md)）。
+- `taskmanager-ui-contract` 的 CORE-04 注册表统一声明产品意图 owner、生命周期、身份及四端表面裁决；
+  每个目标前端显式选择 shared/local/accepted-difference/typed-unsupported，新增意图不能只增表面路径。
 
 ## 9. 安装与发布边界
 
