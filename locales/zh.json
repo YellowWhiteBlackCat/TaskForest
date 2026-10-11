@@ -1450,6 +1450,8 @@
   "settings.config_load_failed": "配置加载失败",
   "settings.config_fallback": "配置回退：{source}",
   "service.log_request_rejected": "服务日志请求被拒绝：{reason}",
+  "duration.hours_minutes": "{hours}小时 {minutes}分钟",
+  "duration.days_hours_minutes": "{days}天 {hours}小时 {minutes}分钟",
   "status.demo_snapshot": "演示快照 · 无主机操作",
   "status.waiting_for_snapshot": "等待首次硬件能力快照…"
 }

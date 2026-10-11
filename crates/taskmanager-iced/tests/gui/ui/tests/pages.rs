@@ -51,6 +51,7 @@ use taskmanager_theme::Theme;
 
 #[test]
 fn byte_and_duration_formatting_matches_the_other_frontends() {
+    pin_english();
     assert_eq!(bytes(0), "0 B");
     assert_eq!(bytes(1536), "1.5 KiB");
     assert_eq!(bytes(2 * 1024 * 1024), "2.0 MiB");

@@ -1450,6 +1450,8 @@
   "settings.config_load_failed": "Configuration load failed",
   "settings.config_fallback": "Configuration fallback: {source}",
   "service.log_request_rejected": "Service log request was rejected: {reason}",
+  "duration.hours_minutes": "{hours}h {minutes}m",
+  "duration.days_hours_minutes": "{days}d {hours}h {minutes}m",
   "status.demo_snapshot": "Demo snapshot · no host actions",
   "status.waiting_for_snapshot": "waiting for the first capability snapshot…"
 }

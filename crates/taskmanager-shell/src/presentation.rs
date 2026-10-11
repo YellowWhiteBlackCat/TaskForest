@@ -101,18 +101,11 @@ pub fn optional_bytes(value: Option<u64>) -> String {
     value.map_or_else(missing_value, bytes)
 }
 
-/// Format an uptime the same way every frontend does: `1d 01h 00m` past a
-/// day, `00h 01m` otherwise. The SINGLE implementation.
+/// Format a duration using the active locale's shared hour/minute template.
+/// Numeric precision and zero-padding are owned by application i18n.
 #[must_use]
 pub fn duration(seconds: u64) -> String {
-    let days = seconds / 86_400;
-    let hours = (seconds % 86_400) / 3_600;
-    let minutes = (seconds % 3_600) / 60;
-    if days > 0 {
-        format!("{days}d {hours:02}h {minutes:02}m")
-    } else {
-        format!("{hours:02}h {minutes:02}m")
-    }
+    i18n::format_duration(seconds)
 }
 
 /// Format an optional count (threads / fds) without collapsing an unavailable

@@ -87,15 +87,28 @@ fn every_shared_page_has_typed_presentation_and_shortcut() {
 }
 
 #[test]
-fn byte_and_duration_formatting_is_binary_and_deterministic() {
+fn byte_formatting_is_binary_and_deterministic() {
     assert_eq!(bytes(0), "0 B");
     assert_eq!(bytes(1536), "1.5 KiB");
     assert_eq!(bytes(2 * 1024 * 1024), "2.0 MiB");
     assert_eq!(bytes(3 * 1024 * 1024 * 1024), "3.0 GiB");
-    assert_eq!(duration(90), "00h 01m");
-    assert_eq!(duration(86_400 + 3_600), "1d 01h 00m");
     assert_eq!(optional_bytes(Some(0)), "0 B");
     assert_eq!(optional_bytes(None), "—");
+}
+
+#[test]
+fn duration_formatting_uses_localized_units_and_stable_numeric_width() {
+    for (language, under_day, over_day) in [
+        (i18n::Language::En, "00h 01m", "1d 01h 00m"),
+        (i18n::Language::Zh, "00小时 01分钟", "1天 01小时 00分钟"),
+    ] {
+        i18n::set_language(language);
+        assert_eq!(duration(90), under_day);
+        assert_eq!(duration(86_400 + 3_600), over_day);
+        assert_eq!(optional_duration(Some(90)), under_day);
+        assert_eq!(optional_duration(None), "—");
+    }
+    i18n::set_language(i18n::Language::En);
 }
 
 #[test]

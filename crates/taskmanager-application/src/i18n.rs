@@ -220,6 +220,25 @@ pub fn t(key: &'static str) -> &'static str {
     key
 }
 
+/// Format an hour/minute duration with locale-specific units. The numeric
+/// fields stay zero-padded so compact readouts remain stable across locales.
+#[must_use]
+pub fn format_duration(seconds: u64) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    if days > 0 {
+        t("duration.days_hours_minutes")
+            .replace("{days}", &days.to_string())
+            .replace("{hours}", &format!("{hours:02}"))
+            .replace("{minutes}", &format!("{minutes:02}"))
+    } else {
+        t("duration.hours_minutes")
+            .replace("{hours}", &format!("{hours:02}"))
+            .replace("{minutes}", &format!("{minutes:02}"))
+    }
+}
+
 #[cfg(test)]
 #[path = "../tests/headless/application_i18n_tests.rs"]
 mod tests;
