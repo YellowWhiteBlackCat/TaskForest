@@ -198,7 +198,8 @@ fn alert_rule_inputs(app: &crate::IcedApp) -> Vec<AlertRuleInput> {
             let triggering = app
                 .shell
                 .projection()
-                .alert_active
+                .alert_center
+                .active_alerts()
                 .iter()
                 .any(|alert| alert.rule_id == managed.rule.id);
             let detail = if triggering {
@@ -207,7 +208,7 @@ fn alert_rule_inputs(app: &crate::IcedApp) -> Vec<AlertRuleInput> {
                 detail
             };
             AlertRuleInput {
-                id: managed.rule.id.clone(),
+                id: managed.rule.id.as_str().to_owned(),
                 name: row.metric_label.clone(),
                 enabled: managed.enabled,
                 detail: Some(detail),

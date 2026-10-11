@@ -19,11 +19,13 @@ use taskmanager_shell::fixture::process_insights::{
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
+use taskmanager_application::AlertEventSeed;
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
 };
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
@@ -474,10 +476,11 @@ pub(crate) fn dynamic_sensor_fixture() -> SensorCenterSnapshot {
     }
 }
 
-pub(crate) fn capture_event_fixture() -> Vec<AlertEvent> {
+pub(crate) fn capture_event_fixture() -> Vec<AlertEventSeed> {
+    let cpu_rule_id = AlertRuleId::new("capture-cpu");
     let warning = Alert {
-        instance_id: "capture-cpu:system".into(),
-        rule_id: "capture-cpu".into(),
+        instance_id: AlertInstanceId::new(cpu_rule_id.clone(), AlertTargetIdentity::System),
+        rule_id: cpu_rule_id,
         target: "CPU".into(),
         metric: AlertMetric::CpuUsagePercent,
         severity: AlertSeverity::Warning,
@@ -485,22 +488,21 @@ pub(crate) fn capture_event_fixture() -> Vec<AlertEvent> {
         threshold: 90.0,
         active_since_ms: 3_590_000,
     };
-    let activated = AlertEvent {
-        id: 1,
+    let activated = AlertEventSeed {
         kind: AlertEventKind::Activated,
         alert: warning.clone(),
         observed_at_ms: 3_590_000,
     };
     let mut cleared = warning;
-    cleared.instance_id = "capture-memory:system".into();
-    cleared.rule_id = "capture-memory".into();
+    let memory_rule_id = AlertRuleId::new("capture-memory");
+    cleared.instance_id = AlertInstanceId::new(memory_rule_id.clone(), AlertTargetIdentity::System);
+    cleared.rule_id = memory_rule_id;
     cleared.metric = AlertMetric::MemoryUsagePercent;
     cleared.target = "Memory".into();
     cleared.value = 74.0;
     vec![
         activated,
-        AlertEvent {
-            id: 2,
+        AlertEventSeed {
             kind: AlertEventKind::Cleared,
             alert: cleared,
             observed_at_ms: 3_560_000,

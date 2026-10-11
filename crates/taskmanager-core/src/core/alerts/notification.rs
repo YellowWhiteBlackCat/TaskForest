@@ -7,8 +7,9 @@
 //! evaluates alerts (GPUI today, Iced/TUI when they adopt BN-07).
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
-use super::Alert;
+use super::{Alert, AlertInstanceId, AlertRuleId, AlertTargetIdentity};
 
 /// Seconds of quiet hours represented as minutes after midnight; `start >= end`
 /// spans midnight (e.g. 22:00–07:00 is `(1320, 420)`).
@@ -90,7 +91,7 @@ pub fn apply_quiet_hour_bound(
 #[derive(Clone, Debug, Default)]
 pub struct NotificationGate {
     policy: NotificationPolicy,
-    last_notified_ms: std::collections::HashMap<String, u64>,
+    last_notified_ms: std::collections::HashMap<AlertInstanceId, u64>,
 }
 
 impl NotificationGate {
@@ -109,6 +110,22 @@ impl NotificationGate {
 
     pub fn set_policy(&mut self, policy: NotificationPolicy) {
         self.policy = policy;
+    }
+
+    /// Forget cooldowns for disk identities that were not trusted by the most
+    /// recent accepted storage snapshot. System-wide identities remain intact.
+    pub fn retain_disk_instances(&mut self, trusted: &HashSet<AlertInstanceId>) {
+        self.last_notified_ms.retain(|instance_id, _| {
+            matches!(instance_id.target(), AlertTargetIdentity::System)
+                || trusted.contains(instance_id)
+        });
+    }
+
+    /// Retire cooldown entries when their rule identity is removed or edited
+    /// to a different ID.
+    pub fn retain_rule_ids(&mut self, rule_ids: &HashSet<AlertRuleId>) {
+        self.last_notified_ms
+            .retain(|instance_id, _| rule_ids.contains(instance_id.rule_id()));
     }
 
     /// True when the alert should reach the desktop at `now_ms`. A true

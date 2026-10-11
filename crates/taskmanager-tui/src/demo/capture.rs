@@ -30,7 +30,12 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
     } else if scene == "active-alert" {
         app.health_open()
             && app.health_review.mode == crate::health_review::HealthReviewMode::ActiveAlerts
-            && !app.shell.projection().alert_active.is_empty()
+            && !app
+                .shell
+                .projection()
+                .alert_center
+                .active_alerts()
+                .is_empty()
     } else if matches!(
         scene.as_str(),
         "battery-fan-performance" | "battery-live-performance"

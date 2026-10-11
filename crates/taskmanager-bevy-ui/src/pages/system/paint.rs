@@ -75,7 +75,7 @@ fn paint_system(mut render: SystemRender) {
             t("dashboard.processes"),
             count,
             t("dashboard.active_alerts"),
-            projection.alert_active.len(),
+            projection.alert_center.active_alerts().len(),
             state.window.label()
         );
         let size = node.size() * node.inverse_scale_factor();

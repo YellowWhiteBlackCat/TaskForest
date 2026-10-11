@@ -5,7 +5,9 @@
 mod action;
 mod alert_center;
 mod alert_dispatch;
-pub use alert_center::{AlertCenter, AlertEvaluation};
+pub use alert_center::{
+    AlertCenter, AlertEvaluation, AlertEventSeed, AlertProjectionChanges, AlertRuleEditResult,
+};
 pub use alert_dispatch::AlertDispatcher;
 
 /// Maximum number of container summaries a frontend materializes in its

@@ -58,7 +58,6 @@ use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
     ProcessAffinityReady, ProjectedProcessInsights, RequestAttemptId,
 };
-use taskmanager_core::core::alerts::Alert;
 use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::process::ProcessBatchIntent;
 use taskmanager_core::core::process_telemetry::ContainerRollup;
@@ -108,7 +107,6 @@ pub enum ProjectionSeedFact {
     SessionsSource(Option<Vec<SourceStatus>>),
     ProcessAffinity(Option<ProcessAffinityReady>),
     ProcessInsights(Box<Option<ProjectedProcessInsights>>),
-    ActiveAlerts(Vec<Alert>),
     AdvanceRevision(ProjectionSeedDomain),
     AdvanceRefresh,
 }

@@ -8,11 +8,9 @@ use crate::app::{AlertsMessage, Message};
 use taskmanager_accessibility_linux::snapshot_to_tree_update;
 use taskmanager_application::AppAction;
 use taskmanager_application::InteractionEvent;
+use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::alerts::Alert;
-use taskmanager_core::core::alerts::AlertMetric;
-use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::services::ServiceAction;
@@ -107,22 +105,25 @@ fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
     let _ = app.update(Message::Alerts(AlertsMessage::ToggleRule {
         rule_id: "cpu-high".into(),
     }));
-    // Make the second rule (memory) fire: mirror one active alert whose
-    // rule_id matches, exactly like the shell's evaluation mirror.
-    let memory_rule_id = app.alerts_rules()[1].rule.id.clone();
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::ActiveAlerts(vec![Alert {
-            instance_id: format!("{memory_rule_id}:"),
-            rule_id: memory_rule_id.clone(),
-            target: String::new(),
-            metric: AlertMetric::MemoryUsagePercent,
-            severity: AlertSeverity::Warning,
-            value: 91.0,
-            threshold: 90.0,
-            active_since_ms: 0,
-        }]),
-    );
+    // Lower the second rule's real threshold and evaluate the demo snapshot
+    // so the semantic detail reads the shared evaluator's active projection.
+    let mut memory_rule = app.alerts_rules()[1].clone();
+    memory_rule.rule.threshold = 30.0;
+    memory_rule.rule.for_duration = std::time::Duration::ZERO;
+    let memory_rule_id = memory_rule.rule.id.clone();
+    app.shell
+        .edit_alert_rules(ManagedAlertRuleEdit::Update {
+            target_id: memory_rule_id.clone(),
+            managed: memory_rule,
+        })
+        .expect("the memory rule update applies");
+    let snapshot = app
+        .shell
+        .projection()
+        .snapshot
+        .clone()
+        .expect("demo snapshot");
+    app.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
 
     let snapshot = semantic_snapshot_with_local(&app).expect("tree must build");
     let disabled = snapshot

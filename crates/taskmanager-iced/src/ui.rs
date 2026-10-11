@@ -164,15 +164,10 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     // the old inline colored-text pill used). Rendered before the shortcut
     // hint; absent when no alert is active. The hover tooltip surfaces the
     // worst severity's label so the tone is never color-only information.
-    let alert_text: Option<String> = (!shell.projection().alert_active.is_empty()).then(|| {
-        t("alerts.active").replacen("{}", &shell.projection().alert_active.len().to_string(), 1)
-    });
-    let worst_severity = shell
-        .projection()
-        .alert_active
-        .iter()
-        .map(|a| a.severity)
-        .max();
+    let active_alerts = shell.projection().alert_center.active_alerts();
+    let alert_text: Option<String> = (!active_alerts.is_empty())
+        .then(|| t("alerts.active").replacen("{}", &active_alerts.len().to_string(), 1));
+    let worst_severity = active_alerts.iter().map(|a| a.severity).max();
     let alert_pill = match (&alert_text, worst_severity) {
         (Some(label), Some(worst)) => Some(components::tooltip(
             theme_snapshot,

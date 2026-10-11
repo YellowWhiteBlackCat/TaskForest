@@ -187,7 +187,7 @@ pub(super) fn evaluate_new_snapshot(store: &mut SystemProjectionStore, fold: &mu
 
     store.last_recorded_snapshot_ms = snapshot.timestamp_ms;
     let evaluation: AlertEvaluation = store.alert_center.evaluate(snapshot, submission_time_ms());
-    store.alert_active = evaluation.active;
+    store.record_alert_projection_changes(evaluation.changes);
     for request in evaluation.notifications {
         if store.pending_notifications.len() < MAX_PENDING_NOTIFICATIONS {
             store.pending_notifications.push_back(request);

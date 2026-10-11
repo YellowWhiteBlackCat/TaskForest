@@ -33,6 +33,6 @@ pub(crate) fn summary_model(
             .processes
             .as_ref()
             .map(|processes| processes.len()),
-        active_alerts: projection.alert_active.len(),
+        active_alerts: projection.alert_center.active_alerts().len(),
     }
 }

@@ -1,12 +1,15 @@
 use super::*;
 use crate::app::{FocusTarget, Message, ProcessStatusFilter};
+use taskmanager_application::AlertEventSeed;
 use taskmanager_application::AppPage;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::alerts::Alert;
-use taskmanager_core::core::alerts::AlertEvent;
 use taskmanager_core::core::alerts::AlertEventKind;
+use taskmanager_core::core::alerts::AlertInstanceId;
 use taskmanager_core::core::alerts::AlertMetric;
+use taskmanager_core::core::alerts::AlertRuleId;
 use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::alerts::AlertTargetIdentity;
 use taskmanager_shell::saved_views::SavedViewTransferFeedback;
 
 #[test]
@@ -60,9 +63,10 @@ fn test_alert_center_lifecycle() {
 
     // Install a deterministic event through the shared alert authority and
     // then clear it through the same application path the overlay uses.
+    let rule_id = AlertRuleId::new("cpu-high");
     let alert = Alert {
-        instance_id: "cpu-high:system".into(),
-        rule_id: "cpu-high".into(),
+        instance_id: AlertInstanceId::new(rule_id.clone(), AlertTargetIdentity::System),
+        rule_id,
         target: "system".into(),
         metric: AlertMetric::CpuUsagePercent,
         severity: AlertSeverity::Critical,
@@ -70,8 +74,7 @@ fn test_alert_center_lifecycle() {
         threshold: 90.0,
         active_since_ms: 1000,
     };
-    app.shell.replace_alert_event_history(vec![AlertEvent {
-        id: 1,
+    app.shell.replace_alert_event_history(vec![AlertEventSeed {
         kind: AlertEventKind::Activated,
         alert,
         observed_at_ms: 1000,

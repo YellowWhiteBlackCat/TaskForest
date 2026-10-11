@@ -30,10 +30,15 @@ use bevy::text::Font;
 use bevy::ui::Checked;
 use bevy::ui::widget::Text;
 use taskmanager_application::{
-    HostTelemetryRequest, ManagedAlertRule, ManagedAlertRuleEdit, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, SystemFacets,
+    AlertEventSeed, AlertRuleEditResult, HostTelemetryRequest, ManagedAlertRule,
+    ManagedAlertRuleEdit, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    SystemFacets,
 };
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
+};
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
@@ -75,7 +80,7 @@ fn import_alert_rules(
     shell: &mut ShellApp,
     json: &str,
     mode: AlertRuleImportMode,
-) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
     let entries = import_alert_rules_json(json)?;
     let rules: Vec<ManagedAlertRule> = entries.into_iter().map(ManagedAlertRule::from).collect();
     shell.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
@@ -173,15 +178,27 @@ fn rule_target_entity(world: &mut World, rule_id: &str) -> Entity {
     let mut targets = world.query_filtered::<(Entity, &AlertRuleToggleTarget), ()>();
     targets
         .iter(world)
-        .find(|(_, target)| target.0 == rule_id)
+        .find(|(_, target)| target.0.as_str() == rule_id)
         .map(|(entity, _)| entity)
         .unwrap_or_else(|| panic!("the {rule_id} toggle row must be mounted"))
 }
 
 fn alert(metric: AlertMetric, rule_id: &str, target: &str, value: f32, threshold: f32) -> Alert {
+    let rule_id = AlertRuleId::new(rule_id);
+    let target_identity = match metric {
+        AlertMetric::CpuUsagePercent | AlertMetric::MemoryUsagePercent => {
+            AlertTargetIdentity::System
+        }
+        AlertMetric::DiskTemperatureC
+        | AlertMetric::SmartPercentUsed
+        | AlertMetric::SmartCriticalWarning => AlertTargetIdentity::Storage {
+            device_id: DeviceId::new(target),
+            generation: DeviceGeneration::new(1),
+        },
+    };
     Alert {
-        instance_id: format!("{rule_id}:{target}"),
-        rule_id: rule_id.to_owned(),
+        instance_id: AlertInstanceId::new(rule_id.clone(), target_identity),
+        rule_id,
         target: target.to_owned(),
         metric,
         severity: AlertSeverity::Warning,
@@ -261,7 +278,7 @@ fn alerts_summary_counts_participation_through_the_canonical_edit_entry() {
     );
     shell
         .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: "cpu-high".to_owned(),
+            rule_id: "cpu-high".into(),
         })
         .expect("the default rule id resolves");
     assert_eq!(
@@ -280,13 +297,13 @@ fn managed_rule_line_labels_disabled_rules_as_present_not_deleted() {
             .alert_center
             .managed_rules()
             .iter()
-            .find(|managed| managed.rule.id == "cpu-high")
+            .find(|managed| managed.rule.id.as_str() == "cpu-high")
             .expect("the default cpu rule exists"),
     );
     assert_eq!(cpu_line, "Warning · ≥ 90.0% — enabled");
     shell
         .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: "cpu-high".to_owned(),
+            rule_id: "cpu-high".into(),
         })
         .expect("the toggle applies");
     let disabled_line = managed_rule_line(
@@ -295,7 +312,7 @@ fn managed_rule_line_labels_disabled_rules_as_present_not_deleted() {
             .alert_center
             .managed_rules()
             .iter()
-            .find(|managed| managed.rule.id == "cpu-high")
+            .find(|managed| managed.rule.id.as_str() == "cpu-high")
             .expect("a disabled rule stays in the canonical set"),
     );
     assert!(disabled_line.contains("disabled"), "{disabled_line}");
@@ -363,7 +380,7 @@ fn checkbox_activation_applies_the_shell_edit_and_remounts_fresh_state() {
         .alert_center
         .managed_rules()
         .iter()
-        .find(|managed| managed.rule.id == "cpu-high")
+        .find(|managed| managed.rule.id.as_str() == "cpu-high")
         .expect("the rule stays in the canonical set")
         .enabled;
     assert!(
@@ -407,7 +424,7 @@ fn checkbox_activation_applies_the_shell_edit_and_remounts_fresh_state() {
         .alert_center
         .managed_rules()
         .iter()
-        .find(|managed| managed.rule.id == "cpu-high")
+        .find(|managed| managed.rule.id.as_str() == "cpu-high")
         .expect("the rule is still present")
         .enabled;
     assert!(
@@ -497,13 +514,11 @@ fn pages_assemble_and_despawn_in_a_bare_scene_world() {
 
 #[test]
 fn event_history_renders_recent_events() {
-    use taskmanager_core::core::alerts::{
-        Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
-    };
-
+    let mut shell = ShellApp::new();
+    let rule_id = AlertRuleId::new("cpu-rule");
     let alert = Alert {
-        instance_id: "inst-1".into(),
-        rule_id: "cpu-rule".into(),
+        instance_id: AlertInstanceId::new(rule_id.clone(), AlertTargetIdentity::System),
+        rule_id,
         metric: AlertMetric::CpuUsagePercent,
         severity: AlertSeverity::Warning,
         target: "Global".into(),
@@ -511,12 +526,17 @@ fn event_history_renders_recent_events() {
         threshold: 80.0,
         active_since_ms: 1000,
     };
-    let event = AlertEvent {
-        id: 1,
+    shell.replace_alert_event_history(vec![AlertEventSeed {
         kind: AlertEventKind::Activated,
         alert,
         observed_at_ms: 1050,
-    };
+    }]);
+    let event = shell
+        .projection()
+        .alert_center
+        .event_history()
+        .first()
+        .expect("the seed becomes a canonical event");
 
     let line = super::event_history_line(&event);
     assert!(line.contains("[Activated]"));
@@ -543,7 +563,7 @@ fn alert_rule_export_and_import_round_trip() {
 
     let outcome =
         import_alert_rules(&mut shell, &custom_json, AlertRuleImportMode::Replace).expect("import");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
     assert_eq!(shell.projection().alert_center.managed_rules().len(), 1);
 }
 
@@ -688,7 +708,7 @@ fn rule_import_publishes_a_complete_document_and_rejects_invalid_json_without_mu
         .managed_rules()
         .to_vec();
     assert_eq!(imported.len(), 1);
-    assert_eq!(imported[0].rule.id, "imported-rule");
+    assert_eq!(imported[0].rule.id.as_str(), "imported-rule");
     assert!(!imported[0].enabled);
     app.world_mut().resource_mut::<PendingImport>().0 = Some((
         ClipboardRead::Ready(Ok("not json".into())),

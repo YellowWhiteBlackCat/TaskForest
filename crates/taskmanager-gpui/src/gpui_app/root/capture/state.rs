@@ -3,9 +3,10 @@
 use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use taskmanager_application::AlertEventSeed;
+use taskmanager_core::core::SmartSelfTestObservation;
 use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::startup::BootTimeline;
-use taskmanager_core::core::{AlertEvent, SmartSelfTestObservation};
 
 #[derive(Debug, PartialEq)]
 pub enum CaptureProcessAction {
@@ -156,7 +157,7 @@ pub(crate) struct CaptureEvidence {
     pub(super) system_health_observation: Option<SmartSelfTestObservation>,
     /// Capture-only handoff for deterministic alert events. The fixture is
     /// installed into the shared shell authority before the panel is shown.
-    pub(super) event_history_fixture: Option<Vec<AlertEvent>>,
+    pub(super) event_history_fixture: Option<Vec<AlertEventSeed>>,
     /// Capture-only: the synthetic real-time thermal-status readout has been
     /// seeded into the direct track exactly once. This is fixture data for the
     /// evidence frame, never a live privileged read.

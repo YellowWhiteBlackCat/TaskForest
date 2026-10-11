@@ -32,6 +32,7 @@ use taskmanager_platform_contract::{
 use crate::{InputDispatch, ProcessStatusFilter, ShellKeyEvent, matches_process_query, route_key};
 use selection::VisibleProcessesMemo;
 
+pub mod alert_rows;
 mod batch_fold;
 mod confirmation_gates;
 pub mod device_rows;
@@ -92,12 +93,11 @@ pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    AlertSuggestionWindow, InteractionEvent, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
-    PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle, SessionControlOutcome,
+    AlertEventSeed, AlertRuleEditResult, AlertSuggestionWindow, InteractionEvent,
+    ManagedAlertRuleEdit, PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle,
+    SessionControlOutcome,
 };
-use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
-};
+use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
 use taskmanager_core::core::storage::StorageDeviceTarget;
 use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
@@ -220,6 +220,8 @@ pub struct SystemProjectionStore {
     pub device_lifecycle_diagnostics: DeviceLifecycleDiagnosticHistory,
     /// Per-family source and ordering revisions for stable device rows.
     pub(crate) device_row_revisions: device_rows::DeviceRowRevisionState,
+    /// Independent row revisions for managed rules, active alerts, and event history.
+    pub(crate) alert_row_revisions: alert_rows::AlertRowRevisionState,
     /// Process-list generation used by renderer projections. Unlike
     /// `refresh_count`, this does not advance when an unrelated service,
     /// hardware, or system-telemetry domain changes.
@@ -233,13 +235,10 @@ pub struct SystemProjectionStore {
     /// System/performance-domain generation used by hardware, sensor, power,
     /// container, system-telemetry, and NPU inventory projections.
     pub system_revision: u64,
-    /// Shared alert evaluation + delivery (BN-07): the rule engine and
-    /// notification gate run here so every frontend gets identical "what
-    /// fired" and "should the desktop be told" decisions. `alert_active`
-    /// mirrors the latest evaluation for the in-app surfaces; notifications
-    /// accumulate in a bounded queue the frontend drains and submits.
+    /// Shared alert evaluation + delivery (BN-07): this is the sole rules,
+    /// active-alert, and transition-history owner. Notifications accumulate
+    /// in a bounded queue the frontend drains and submits.
     pub alert_center: AlertCenter,
-    pub alert_active: Vec<Alert>,
     pub(crate) pending_notifications: std::collections::VecDeque<DesktopNotificationRequest>,
     /// Timestamp of the last snapshot folded into the rolling suggestion
     /// window. Used to avoid double-counting a snapshot that did not change
@@ -508,8 +507,10 @@ impl ShellApp {
     pub fn edit_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.data.alert_center.edit_rules(edit)
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
+        let result = self.data.alert_center.edit_rules(edit)?;
+        self.data.record_alert_projection_changes(result.changes);
+        Ok(result)
     }
 
     /// Replace desktop-notification policy without exposing the alert engine.
@@ -520,13 +521,22 @@ impl ShellApp {
     /// Clear the shared alert transition history without changing the active
     /// evaluator or its notification policy.
     pub fn clear_alert_event_history(&mut self) {
-        self.data.alert_center.clear_event_history();
+        let changes = self.data.alert_center.clear_event_history();
+        self.data.record_alert_projection_changes(changes);
     }
 
     /// Install deterministic alert transition history through the shared
     /// fixture/capture seam; live history still comes only from evaluation.
-    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
-        self.data.alert_center.replace_event_history(events);
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEventSeed>) {
+        let changes = self.data.alert_center.replace_event_history(events);
+        self.data.record_alert_projection_changes(changes);
+    }
+
+    /// Reset alert evaluation and transition state while retaining the managed
+    /// rule list and monotonically increasing event identity authority.
+    pub fn reset_alert_center(&mut self) {
+        let changes = self.data.alert_center.reset();
+        self.data.record_alert_projection_changes(changes);
     }
 
     #[must_use]
@@ -535,7 +545,10 @@ impl ShellApp {
         snapshot: &SystemSnapshot,
         observed_at_ms: u64,
     ) -> AlertEvaluation {
-        self.data.alert_center.evaluate(snapshot, observed_at_ms)
+        let evaluation = self.data.alert_center.evaluate(snapshot, observed_at_ms);
+        self.data
+            .record_alert_projection_changes(evaluation.changes);
+        evaluation
     }
 
     #[must_use]

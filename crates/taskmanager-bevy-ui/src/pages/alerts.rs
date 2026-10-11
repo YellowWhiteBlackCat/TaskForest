@@ -2,7 +2,7 @@
 //! desktop-notification drain.
 //!
 //! Data entries (per the page-agent contract in [`crate::pages`]):
-//! - `context.shell.projection().alert_active` — what currently fired, with
+//! - `context.shell.projection().alert_center.active_alerts()` — what currently fired, with
 //!   the shared threshold/hysteresis semantics already applied by the
 //!   shell's evaluation fold;
 //! - `context.shell.projection().alert_center.managed_rules()` — the
@@ -41,7 +41,7 @@ pub(crate) mod editor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRuleId, AlertSeverity,
 };
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
@@ -125,8 +125,8 @@ fn alerts_fold_observer(
 /// back to the rule it owns.
 ///
 /// [`ShellApp::edit_alert_rules`]: taskmanager_shell::ShellApp::edit_alert_rules
-#[derive(Component, Clone, Default)]
-pub(crate) struct AlertRuleToggleTarget(pub(crate) String);
+#[derive(Component, Clone)]
+pub(crate) struct AlertRuleToggleTarget(pub(crate) AlertRuleId);
 
 /// The rule-toggle applier: a checkbox activation resolves its row's rule
 /// and flips it through the shell's canonical edit entry. Guarded so a
@@ -270,7 +270,7 @@ pub(crate) fn alerts_summary(shell: &ShellApp) -> String {
     let enabled = rules.iter().filter(|managed| managed.enabled).count();
     format!(
         "{} active · {}/{} rules enabled",
-        projection.alert_active.len(),
+        projection.alert_center.active_alerts().len(),
         enabled,
         rules.len()
     )
@@ -283,11 +283,11 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let projection = context.shell.projection();
     let rules = projection.alert_center.managed_rules();
     let summary = alerts_summary(context.shell);
-    let active_rows: Vec<Box<dyn Scene>> = if projection.alert_active.is_empty() {
+    let active_alerts = projection.alert_center.active_alerts();
+    let active_rows: Vec<Box<dyn Scene>> = if active_alerts.is_empty() {
         vec![Box::new(empty_active_scene()) as Box<dyn Scene>]
     } else {
-        projection
-            .alert_active
+        active_alerts
             .iter()
             .map(|alert| {
                 Box::new(active_row_scene(active_alert_line(alert, rules))) as Box<dyn Scene>

@@ -409,12 +409,15 @@ fn event_review_native_navigation_reaches_every_complete_transition_in_compact_v
     for (index, event) in events.iter().enumerate() {
         assert_eq!(app.health_review.selected, index);
         let text = event_review_frame(&app, 54, 16);
-        assert!(text.contains(&format!("Event {}", event.id)), "{text}");
+        assert!(
+            text.contains(&format!("Event {}", event.id.get())),
+            "{text}"
+        );
         assert!(
             text.contains(&format!("{:.1}", event.alert.value)),
             "{text}"
         );
-        assert!(text.contains(&event.alert.rule_id), "{text}");
+        assert!(text.contains(event.alert.rule_id.as_str()), "{text}");
         assert!(text.contains("h / Esc Close"), "{text}");
         let effect = handle_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
         assert!(effect.is_none());

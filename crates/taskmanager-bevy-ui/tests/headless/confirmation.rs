@@ -396,7 +396,7 @@ fn capture_system_sensor_alert_scenarios_seed_fixtures() {
 
     let mut shell = demo_shell();
     seed_capture_confirmation_scenario(&mut shell, "active-alert");
-    assert!(!shell.projection().alert_active.is_empty());
+    assert!(!shell.projection().alert_center.active_alerts().is_empty());
 
     let mut shell = demo_shell();
     seed_capture_confirmation_scenario(&mut shell, "event-center");

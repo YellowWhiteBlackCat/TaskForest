@@ -113,7 +113,7 @@ pub(crate) fn system_summary_model(projection: &SystemProjectionStore) -> System
             .processes
             .as_ref()
             .map(|processes| processes.len()),
-        active_alerts: projection.alert_active.len(),
+        active_alerts: projection.alert_center.active_alerts().len(),
         // KPI tiles own their label separately; keep the value slot to the
         // compact score so the full explanatory health sentence cannot be
         // clipped inside a narrow fifth card. The detailed deduction bill is

@@ -10,6 +10,7 @@ use taskmanager_core::core::DiagnosticBundleErrorKind;
 use taskmanager_core::core::process::ProcessCategory;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
+use taskmanager_shell::app::alert_rows::AlertRowFamily;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::seed_direct_track_fact;
@@ -253,16 +254,23 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.active_alert_capture_enabled() {
         let mut snapshot = view.system_snapshot().clone();
-        let mut active = Vec::new();
         for elapsed in [0, 10_000] {
             snapshot.timestamp_ms = snapshot.timestamp_ms.saturating_add(elapsed);
-            active = view
-                .shell
-                .evaluate_alerts(&snapshot, snapshot.timestamp_ms)
-                .active;
+            view.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
         }
+        let active = view
+            .shell
+            .projection()
+            .alert_center
+            .active_alerts()
+            .to_vec();
         let ready = !active.is_empty();
-        let revision = view.shell.accept_alert_evaluation(active.clone());
+        let revision = view
+            .shell
+            .projection()
+            .alert_row_projection_generation(AlertRowFamily::Active)
+            .data_revision()
+            .get();
         view.materialize_active_alerts(revision, active);
         if ready {
             view.capture_evidence.mark_active_alert_ready();

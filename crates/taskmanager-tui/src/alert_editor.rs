@@ -2,10 +2,10 @@
 use crate::TuiApp;
 use std::time::Duration;
 use taskmanager_application::{
-    AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
+    AlertRuleEditResult, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
 };
 use taskmanager_core::core::alerts::{
-    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry,
+    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
     AlertRuleTransferError, AlertSeverity, export_alert_rules_json, import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
@@ -52,7 +52,7 @@ impl TuiApp {
                 let rules = self.projection().alert_center.managed_rules();
                 let Some(id) = (0..=rules.len())
                     .map(|index| format!("custom-cpu-{index}"))
-                    .find(|id| rules.iter().all(|managed| managed.rule.id != *id))
+                    .find(|id| rules.iter().all(|managed| managed.rule.id.as_str() != id))
                 else {
                     return;
                 };
@@ -200,21 +200,21 @@ impl TuiApp {
     pub fn edit_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         self.shell.edit_alert_rules(edit)
     }
 
     pub fn add_alert_rule(
         &mut self,
         rule: AlertRule,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         self.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
     }
 
     pub fn remove_alert_rule(
         &mut self,
-        rule_id: String,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        rule_id: AlertRuleId,
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         self.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
     }
 
@@ -233,7 +233,7 @@ impl TuiApp {
         &mut self,
         json: &str,
         mode: AlertRuleImportMode,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         let entries = import_alert_rules_json(json)?;
         let rules: Vec<ManagedAlertRule> =
             entries.into_iter().map(ManagedAlertRule::from).collect();
@@ -277,11 +277,11 @@ impl TuiApp {
     }
 
     /// Toggle a managed alert rule by ID.
-    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
+    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<AlertRuleId>) -> bool {
         self.edit_alert_rules(ManagedAlertRuleEdit::Toggle {
             rule_id: rule_id.into(),
         })
-        .is_ok_and(|outcome| outcome.changed())
+        .is_ok_and(|result| result.outcome.changed())
     }
 
     /// Clear the recorded alert event history in the canonical alert center.

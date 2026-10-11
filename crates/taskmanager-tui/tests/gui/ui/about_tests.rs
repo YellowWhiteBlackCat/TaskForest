@@ -15,10 +15,11 @@ fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports()
     let alert = app
         .shell
         .projection()
-        .alert_active
+        .alert_center
+        .active_alerts()
         .first()
         .expect("evaluated CPU alert");
-    assert_eq!(alert.rule_id, "cpu-high");
+    assert_eq!(alert.rule_id.as_str(), "cpu-high");
     assert_eq!(alert.value, 94.0);
     assert_eq!(alert.threshold, 90.0);
     for (width, height) in [(120, 36), (54, 16)] {

@@ -4,18 +4,17 @@ use std::fmt;
 
 use serde::Serialize;
 
-use super::{AlertEvent, AlertEventKind, MAX_ALERT_EVENTS};
+use super::{AlertEvent, AlertEventId, AlertEventKind, AlertInstanceId, MAX_ALERT_EVENTS};
 
 /// Stable document identifier for alert-event exports.
 pub const ALERT_EVENT_FILE_SCHEMA: &str = "taskforest-alert-events";
 /// Version of the bounded alert-event export document.
-pub const ALERT_EVENT_FILE_VERSION: u8 = 1;
+pub const ALERT_EVENT_FILE_VERSION: u8 = 2;
 
 /// Errors that keep an alert-event export from claiming a valid document.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AlertEventExportError {
     TooManyEvents(usize),
-    ZeroEventId,
     NonMonotonicIds,
     Encode(String),
 }
@@ -27,7 +26,6 @@ impl fmt::Display for AlertEventExportError {
                 formatter,
                 "alert event history contains {count} entries; maximum is {MAX_ALERT_EVENTS}"
             ),
-            Self::ZeroEventId => formatter.write_str("alert event id must be non-zero"),
             Self::NonMonotonicIds => {
                 formatter.write_str("alert event ids must be strictly increasing")
             }
@@ -49,11 +47,11 @@ struct AlertEventFile<'a> {
 
 #[derive(Serialize)]
 struct AlertEventRecord<'a> {
-    id: u64,
+    id: AlertEventId,
     kind: &'static str,
     observed_at_ms: u64,
-    instance_id: &'a str,
-    rule_id: &'a str,
+    instance_id: &'a AlertInstanceId,
+    rule_id: &'a super::AlertRuleId,
     target: &'a str,
     metric: &'static str,
     severity: &'static str,
@@ -68,9 +66,6 @@ struct AlertEventRecord<'a> {
 pub fn export_alert_events_json(events: &[AlertEvent]) -> Result<String, AlertEventExportError> {
     if events.len() > MAX_ALERT_EVENTS {
         return Err(AlertEventExportError::TooManyEvents(events.len()));
-    }
-    if events.iter().any(|event| event.id == 0) {
-        return Err(AlertEventExportError::ZeroEventId);
     }
     if events.windows(2).any(|pair| pair[0].id >= pair[1].id) {
         return Err(AlertEventExportError::NonMonotonicIds);

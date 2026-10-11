@@ -24,8 +24,8 @@ use std::time::Duration;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_core::core::alerts::{
-    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertSeverity,
-    export_alert_rules_json, import_alert_rules_json,
+    AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
+    AlertSeverity, export_alert_rules_json, import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
@@ -33,13 +33,13 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, She
 pub(crate) enum RuleControl {
     #[default]
     Add,
-    Metric(String),
-    Threshold(String, i8),
-    Duration(String, i8),
-    Hysteresis(String, i8),
-    Severity(String),
-    Target(String),
-    Remove(String),
+    Metric(AlertRuleId),
+    Threshold(AlertRuleId, i8),
+    Duration(AlertRuleId, i8),
+    Hysteresis(AlertRuleId, i8),
+    Severity(AlertRuleId),
+    Target(AlertRuleId),
+    Remove(AlertRuleId),
     Export,
     ImportMerge,
     ImportReplace,
@@ -129,7 +129,7 @@ fn edit(shell: &ShellApp, action: &RuleControl) -> Option<ManagedAlertRuleEdit> 
     if *action == RuleControl::Add {
         let id = (0..=rules.len())
             .map(|index| format!("custom-cpu-{index}"))
-            .find(|id| rules.iter().all(|managed| managed.rule.id != *id))?;
+            .find(|id| rules.iter().all(|managed| managed.rule.id.as_str() != id))?;
         return Some(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(
             AlertRule::new(
                 id,

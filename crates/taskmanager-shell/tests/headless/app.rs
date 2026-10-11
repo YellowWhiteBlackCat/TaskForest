@@ -1,6 +1,7 @@
 use super::*;
 use taskmanager_application::DeviceLifecycleSnapshotRevision;
 use taskmanager_core::core::alerts::NotificationPolicy;
+use taskmanager_core::core::alerts::{AlertRuleId, AlertTargetIdentity};
 use taskmanager_core::core::metrics::CpuMetrics;
 
 impl ShellApp {
@@ -198,11 +199,13 @@ fn alert_center_evaluates_each_new_telemetry_tick_and_queues_notifications() {
     app.data.snapshot = Some(snapshot_with_cpu(95.0, 100_000));
     app.data.last_recorded_snapshot_ms = 0;
     app.apply_platform_batch(PlatformEventBatch::default());
-    assert_eq!(app.data.alert_active.len(), 1);
-    assert_eq!(app.data.alert_active[0].instance_id, "cpu-high:system");
+    assert_eq!(app.data.alert_center.active_alerts().len(), 1);
+    let active_instance = app.data.alert_center.active_alerts()[0].instance_id.clone();
+    assert_eq!(active_instance.rule_id(), &AlertRuleId::new("cpu-high"));
+    assert_eq!(active_instance.target(), &AlertTargetIdentity::System);
     let requests = app.drain_alert_notifications();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].instance_id, "cpu-high:system");
+    assert_eq!(requests[0].instance_id, active_instance);
 
     // Same snapshot timestamp: no re-evaluation, no re-notification.
     app.apply_platform_batch(PlatformEventBatch::default());
@@ -211,10 +214,10 @@ fn alert_center_evaluates_each_new_telemetry_tick_and_queues_notifications() {
     // New tick clears the alert, then a later tick re-fires: one new request.
     app.data.snapshot = Some(snapshot_with_cpu(10.0, 200_000));
     app.apply_platform_batch(PlatformEventBatch::default());
-    assert!(app.data.alert_active.is_empty());
+    assert!(app.data.alert_center.active_alerts().is_empty());
     app.data.snapshot = Some(snapshot_with_cpu(95.0, 300_000));
     app.apply_platform_batch(PlatformEventBatch::default());
-    assert_eq!(app.data.alert_active.len(), 1);
+    assert_eq!(app.data.alert_center.active_alerts().len(), 1);
     assert_eq!(app.drain_alert_notifications().len(), 1);
 }
 
@@ -232,7 +235,7 @@ fn alert_notifications_respect_opt_out_policy() {
     app.data.last_recorded_snapshot_ms = 0;
     app.apply_platform_batch(PlatformEventBatch::default());
     assert_eq!(
-        app.data.alert_active.len(),
+        app.data.alert_center.active_alerts().len(),
         1,
         "evaluation still runs when opted out"
     );

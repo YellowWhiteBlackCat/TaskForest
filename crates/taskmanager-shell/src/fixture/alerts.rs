@@ -16,9 +16,8 @@ pub fn seed_shell_active_alert(app: &mut ShellApp) -> bool {
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.global_usage_pct = ScalarObservation::available(94.0, snapshot.timestamp_ms);
         snapshot.cpu.apply_scalar_observations(observations);
-        let evaluation = app.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
-        seed_projection_fact(app, ProjectionSeedFact::ActiveAlerts(evaluation.active));
+        let _ = app.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
     }
     seed_projection_fact(app, ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))));
-    !app.projection().alert_active.is_empty()
+    !app.projection().alert_center.active_alerts().is_empty()
 }

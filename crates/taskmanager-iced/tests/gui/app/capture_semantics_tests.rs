@@ -39,7 +39,6 @@ fn startup_failure_scene_requires_failed_units_and_their_boot_chain() {
 #[test]
 fn alert_scenes_open_the_normal_rule_page_and_require_their_actual_content() {
     use std::time::Instant;
-    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "active-alert");
@@ -49,7 +48,7 @@ fn alert_scenes_open_the_normal_rule_page_and_require_their_actual_content() {
     assert_eq!(lines.len(), 1);
     assert!(lines[0].text.contains("94.0%"));
 
-    seed_projection_fact(&mut app.shell, ProjectionSeedFact::ActiveAlerts(Vec::new()));
+    app.shell.reset_alert_center();
     for _ in 0..3 {
         let _ = app.update(Message::Frame(Instant::now()));
     }

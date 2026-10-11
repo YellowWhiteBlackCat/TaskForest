@@ -10,9 +10,11 @@ use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterStat
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 
+use taskmanager_application::AlertEventSeed;
 use taskmanager_core::core::NpuInventorySnapshot;
 use taskmanager_core::core::PowerSupplySnapshot;
 use taskmanager_core::core::SensorCenterSnapshot;
+use taskmanager_core::core::ServiceId;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
@@ -23,7 +25,6 @@ use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::startup::BootTimeline;
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::{AlertEvent, ServiceId};
 use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::fixture::seed_capture_msr_readout;
 use taskmanager_telemetry_store::live_graph::{LiveGraphHistory, MAX_HISTORY_CAPACITY};
@@ -487,7 +488,7 @@ impl CaptureEvidence {
 
     /// Take the capture-only alert history handoff after the dashboard state
     /// has requested the Event Center. No renderer-local history is retained.
-    pub fn take_event_history_fixture(&mut self) -> Option<Vec<AlertEvent>> {
+    pub fn take_event_history_fixture(&mut self) -> Option<Vec<AlertEventSeed>> {
         self.event_history_fixture.take()
     }
 

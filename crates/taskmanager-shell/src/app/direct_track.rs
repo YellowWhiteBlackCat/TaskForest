@@ -50,15 +50,13 @@ mod process_viewing;
 
 pub use process_selection::identity_range;
 use taskmanager_application::{
-    AlertEvaluation, ControlRequestId, DesktopNotificationRequest, GpuEngineRowsState,
-    ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome, MsrReadoutState, NetworkEscalationState,
-    PersistentApplicationHistoryRecorder, PlatformEventBatch, ProcessAffinityState,
-    ProcessBatchState, ProcessEvent, RaplPowerState, RequestAttemptId, ShellUiActionIntent,
-    ShellUiActionState, SmartSelfTestState, SmbiosMemoryState,
+    AlertEvaluation, AlertEventSeed, AlertRuleEditResult, ControlRequestId,
+    DesktopNotificationRequest, GpuEngineRowsState, ManagedAlertRuleEdit, MsrReadoutState,
+    NetworkEscalationState, PersistentApplicationHistoryRecorder, PlatformEventBatch,
+    ProcessAffinityState, ProcessBatchState, ProcessEvent, RaplPowerState, RequestAttemptId,
+    ShellUiActionIntent, ShellUiActionState, SmartSelfTestState, SmbiosMemoryState,
 };
-use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
-};
+use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
 use taskmanager_core::core::history::HistoryRecordSink;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -387,8 +385,11 @@ impl DirectTrackState {
     pub fn edit_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.projection.alert_center.edit_rules(edit)
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
+        let result = self.projection.alert_center.edit_rules(edit)?;
+        self.projection
+            .record_alert_projection_changes(result.changes);
+        Ok(result)
     }
 
     pub fn set_alert_policy(&mut self, policy: NotificationPolicy) {
@@ -398,14 +399,21 @@ impl DirectTrackState {
     /// Clear the shared alert transition history without changing the active
     /// evaluator or notification policy.
     pub fn clear_alert_event_history(&mut self) {
-        self.projection.alert_center.clear_event_history();
+        let changes = self.projection.alert_center.clear_event_history();
+        self.projection.record_alert_projection_changes(changes);
     }
 
     /// Install deterministic alert transition history through the direct
     /// track's fixture boundary; production events still come only from the
     /// shared evaluator.
-    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
-        self.projection.alert_center.replace_event_history(events);
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEventSeed>) {
+        let changes = self.projection.alert_center.replace_event_history(events);
+        self.projection.record_alert_projection_changes(changes);
+    }
+
+    pub fn reset_alert_center(&mut self) {
+        let changes = self.projection.alert_center.reset();
+        self.projection.record_alert_projection_changes(changes);
     }
 
     #[must_use]
@@ -414,17 +422,13 @@ impl DirectTrackState {
         snapshot: &SystemSnapshot,
         observed_at_ms: u64,
     ) -> AlertEvaluation {
-        self.projection
+        let evaluation = self
+            .projection
             .alert_center
-            .evaluate(snapshot, observed_at_ms)
-    }
-
-    /// Commit a synchronous alert-rule evaluation through a named reducer.
-    /// Returns the new revision used by renderer materialization.
-    pub fn accept_alert_evaluation(&mut self, active: Vec<Alert>) -> u64 {
-        self.projection.alert_active = active;
-        self.projection.refresh_count = self.projection.refresh_count.saturating_add(1);
-        self.projection.refresh_count
+            .evaluate(snapshot, observed_at_ms);
+        self.projection
+            .record_alert_projection_changes(evaluation.changes);
+        evaluation
     }
 
     pub fn begin_process_control(

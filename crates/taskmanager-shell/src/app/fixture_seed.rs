@@ -74,7 +74,6 @@ impl ShellApp {
                 self.request_sessions.seed_affinity(value);
             }
             ProjectionSeedFact::ProcessInsights(value) => self.data.process_insights = *value,
-            ProjectionSeedFact::ActiveAlerts(value) => self.data.alert_active = value,
             ProjectionSeedFact::AdvanceRevision(domain) => match domain {
                 ProjectionSeedDomain::Processes => {
                     self.data.process_revision = self.data.process_revision.saturating_add(1);

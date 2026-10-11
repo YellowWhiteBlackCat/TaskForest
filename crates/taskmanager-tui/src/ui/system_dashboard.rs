@@ -50,7 +50,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         t("dashboard.processes"),
         count,
         t("dashboard.active_alerts"),
-        projection.alert_active.len()
+        projection.alert_center.active_alerts().len()
     );
     frame.render_widget(
         Paragraph::new(summary),

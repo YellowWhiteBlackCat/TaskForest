@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::alerts::{AlertInstanceId, AlertSeverity};
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::setup::SetupScriptAction;
@@ -63,7 +63,7 @@ pub struct UrlOpenRequest {
 /// by the pure [`taskmanager_core::alerts::NotificationGate`] before this request is emitted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DesktopNotificationRequest {
-    pub instance_id: String,
+    pub instance_id: AlertInstanceId,
     pub title: String,
     pub body: String,
     pub severity: AlertSeverity,

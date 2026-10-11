@@ -22,30 +22,27 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         format!(" {state} "),
         Style::new().fg(theme.color(Color::Black)).bg(style),
     );
-    let alert_span: Option<Span<'static>> =
-        (!app.shell.projection().alert_active.is_empty()).then(|| {
-            let count = app.shell.projection().alert_active.len();
-            let worst = app
-                .shell
-                .projection()
-                .alert_active
-                .iter()
-                .map(|alert| alert.severity)
-                .max()
-                .unwrap_or(AlertSeverity::Info);
-            let color = match worst {
-                AlertSeverity::Critical => theme.danger,
-                AlertSeverity::Warning => theme.warn,
-                AlertSeverity::Info => theme.good,
-            };
-            Span::styled(
-                format!(
-                    " {} ",
-                    t("alerts.active").replacen("{}", &count.to_string(), 1)
-                ),
-                Style::new().fg(theme.color(Color::Black)).bg(color),
-            )
-        });
+    let active_alerts = app.shell.projection().alert_center.active_alerts();
+    let alert_span: Option<Span<'static>> = (!active_alerts.is_empty()).then(|| {
+        let count = active_alerts.len();
+        let worst = active_alerts
+            .iter()
+            .map(|alert| alert.severity)
+            .max()
+            .unwrap_or(AlertSeverity::Info);
+        let color = match worst {
+            AlertSeverity::Critical => theme.danger,
+            AlertSeverity::Warning => theme.warn,
+            AlertSeverity::Info => theme.good,
+        };
+        Span::styled(
+            format!(
+                " {} ",
+                t("alerts.active").replacen("{}", &count.to_string(), 1)
+            ),
+            Style::new().fg(theme.color(Color::Black)).bg(color),
+        )
+    });
     let shortcut_span = Span::styled(t("footer.shortcuts"), Style::new().fg(theme.dim));
     let (marker, feedback_color) =
         app.shell

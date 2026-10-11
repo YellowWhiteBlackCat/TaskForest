@@ -199,7 +199,7 @@ pub fn merge_alert_rule_entries(
     validate_entries(imported)?;
 
     let mut entries = existing.to_vec();
-    let mut positions: HashMap<String, usize> = entries
+    let mut positions: HashMap<super::AlertRuleId, usize> = entries
         .iter()
         .enumerate()
         .map(|(index, entry)| (entry.rule.id.clone(), index))
@@ -212,7 +212,9 @@ pub fn merge_alert_rule_entries(
         if let Some(index) = positions.get(&entry.rule.id).copied() {
             match policy {
                 AlertRuleConflictPolicy::Reject => {
-                    return Err(AlertRuleTransferError::Conflict(entry.rule.id.clone()));
+                    return Err(AlertRuleTransferError::Conflict(
+                        entry.rule.id.as_str().to_owned(),
+                    ));
                 }
                 AlertRuleConflictPolicy::KeepExisting => kept_existing += 1,
                 AlertRuleConflictPolicy::ReplaceExisting => {
@@ -248,7 +250,7 @@ fn validate_entries(entries: &[AlertRuleTransferEntry]) -> Result<(), AlertRuleT
         validate_rule(index, &entry.rule)?;
         if !ids.insert(entry.rule.id.as_str()) {
             return Err(AlertRuleTransferError::DuplicateRuleId(
-                entry.rule.id.clone(),
+                entry.rule.id.as_str().to_owned(),
             ));
         }
     }
@@ -341,7 +343,7 @@ impl From<&AlertRuleTransferEntry> for AlertRuleWireV1 {
     fn from(entry: &AlertRuleTransferEntry) -> Self {
         let duration_ms = u64::try_from(entry.rule.for_duration.as_millis()).unwrap_or(u64::MAX);
         Self {
-            id: entry.rule.id.clone(),
+            id: entry.rule.id.as_str().to_owned(),
             metric: entry.rule.metric.into(),
             severity: entry.rule.severity.into(),
             threshold: entry.rule.threshold,
@@ -357,7 +359,7 @@ impl From<AlertRuleWireV1> for AlertRuleTransferEntry {
     fn from(wire: AlertRuleWireV1) -> Self {
         Self {
             rule: AlertRule {
-                id: wire.id,
+                id: wire.id.into(),
                 metric: wire.metric.into(),
                 severity: wire.severity.into(),
                 threshold: wire.threshold,

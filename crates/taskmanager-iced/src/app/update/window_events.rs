@@ -124,7 +124,13 @@ impl IcedApp {
                                         && evidence.critical_chain.len() >= 2
                                 })
                     } else if self.capture.data_target == CaptureDataTarget::ActiveAlerts {
-                        self.alerts_page_open() && !self.shell.projection().alert_active.is_empty()
+                        self.alerts_page_open()
+                            && !self
+                                .shell
+                                .projection()
+                                .alert_center
+                                .active_alerts()
+                                .is_empty()
                     } else if self.capture.data_target == CaptureDataTarget::AlertRules {
                         self.alerts_page_open() && !self.alerts_rules().is_empty()
                     } else if self.capture.data_target == CaptureDataTarget::Battery {

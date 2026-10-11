@@ -123,7 +123,7 @@ pub(super) fn card<'a>(
     .wrap();
     iced::widget::container(
         column![
-            text(id.clone()).size(f32::from(tokens::FONT_12)),
+            text(id.to_string()).size(f32::from(tokens::FONT_12)),
             fields,
             choices
         ]

@@ -1,13 +1,18 @@
 //! test-intent: behavior
 use super::*;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use taskmanager_core::core::alerts::{Alert, AlertEvent, AlertMetric, AlertSeverity};
+use taskmanager_application::AlertEventSeed;
+use taskmanager_core::core::alerts::{
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
+};
 #[test]
 fn event_modal_filters_authoritative_history_exports_complete_json_and_clears_it() {
     let mut app = crate::demo_app();
+    let rule_id = AlertRuleId::new("cpu");
     let alert = Alert {
-        instance_id: "cpu:system".into(),
-        rule_id: "cpu".into(),
+        instance_id: AlertInstanceId::new(rule_id.clone(), AlertTargetIdentity::System),
+        rule_id,
         target: "CPU".into(),
         metric: AlertMetric::CpuUsagePercent,
         severity: AlertSeverity::Warning,
@@ -16,14 +21,12 @@ fn event_modal_filters_authoritative_history_exports_complete_json_and_clears_it
         active_since_ms: 1,
     };
     app.shell.replace_alert_event_history(vec![
-        AlertEvent {
-            id: 1,
+        AlertEventSeed {
             kind: AlertEventKind::Activated,
             alert: alert.clone(),
             observed_at_ms: 1,
         },
-        AlertEvent {
-            id: 2,
+        AlertEventSeed {
             kind: AlertEventKind::Cleared,
             alert,
             observed_at_ms: 2,

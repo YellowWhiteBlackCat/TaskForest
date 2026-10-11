@@ -6,11 +6,12 @@ use taskmanager_core::core::metrics::{MemoryScalarObservations, ScalarObservatio
 
 use crate::demo_app;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRuleEdit};
+use taskmanager_application::{AlertEventSeed, AlertRuleImportMode, ManagedAlertRuleEdit};
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRule, AlertRuleConflictPolicy,
-    AlertSeverity,
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleConflictPolicy,
+    AlertRuleId, AlertSeverity, AlertTargetIdentity,
 };
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
@@ -284,7 +285,7 @@ fn tui_app_alert_rule_helpers_operate_on_canonical_rules() {
             rule_id: "cpu-high".into(),
         })
         .expect("toggle outcome");
-    assert!(outcome.changed());
+    assert!(outcome.outcome.changed());
     assert!(app.projection().alert_center.managed_rules()[0].enabled);
 
     // Clamped selection move.
@@ -306,13 +307,13 @@ fn health_overlay_renders_event_history_empty_and_populated() {
     assert!(text.contains("No events match this filter."), "{text}");
 
     // 2. Inject alert events: verify rendering
-    let event = AlertEvent {
-        id: 1,
+    let cpu_rule_id = AlertRuleId::new("cpu-high");
+    app.shell.replace_alert_event_history(vec![AlertEventSeed {
         observed_at_ms: 5000,
         kind: AlertEventKind::Activated,
         alert: Alert {
-            instance_id: "cpu-high:system-wide".into(),
-            rule_id: "cpu-high".into(),
+            instance_id: AlertInstanceId::new(cpu_rule_id.clone(), AlertTargetIdentity::System),
+            rule_id: cpu_rule_id,
             severity: AlertSeverity::Critical,
             metric: AlertMetric::CpuUsagePercent,
             target: "system-wide".into(),
@@ -320,8 +321,7 @@ fn health_overlay_renders_event_history_empty_and_populated() {
             threshold: 90.0,
             active_since_ms: 4500,
         },
-    };
-    app.shell.replace_alert_event_history(vec![event]);
+    }]);
     let text = frame_text(&app, 120, 40);
     assert!(text.contains("[Activated]"), "{text}");
     assert!(text.contains("system-wide"), "{text}");
@@ -348,13 +348,13 @@ fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
         5.0,
     );
     let add_outcome = app.add_alert_rule(custom_rule).expect("add rule");
-    assert!(add_outcome.changed());
+    assert!(add_outcome.outcome.changed());
     assert!(
         app.projection()
             .alert_center
             .managed_rules()
             .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
+            .any(|r| r.rule.id.as_str() == "custom-cpu-alert")
     );
 
     // 2. Export rules to JSON
@@ -365,26 +365,26 @@ fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
     let remove_outcome = app
         .remove_alert_rule("custom-cpu-alert".into())
         .expect("remove rule");
-    assert!(remove_outcome.changed());
+    assert!(remove_outcome.outcome.changed());
     assert!(
         !app.projection()
             .alert_center
             .managed_rules()
             .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
+            .any(|r| r.rule.id.as_str() == "custom-cpu-alert")
     );
 
     // 4. Import rules back in Replace mode
     let import_outcome = app
         .import_alert_rules(&json, AlertRuleImportMode::Replace)
         .expect("import rules");
-    assert!(import_outcome.changed());
+    assert!(import_outcome.outcome.changed());
     assert!(
         app.projection()
             .alert_center
             .managed_rules()
             .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
+            .any(|r| r.rule.id.as_str() == "custom-cpu-alert")
     );
 
     // 5. Invalid JSON import returns an error honestly
@@ -406,22 +406,51 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     let theme = TuiTheme::default();
 
     // Activated with empty target defaults to metric label
-    let activated = AlertEvent {
-        id: 1,
-        observed_at_ms: 1200,
-        kind: AlertEventKind::Activated,
-        alert: Alert {
-            instance_id: "mem:".into(),
-            rule_id: "mem-high".into(),
-            severity: AlertSeverity::Warning,
-            metric: AlertMetric::MemoryUsagePercent,
-            target: "".into(),
-            value: 88.0,
-            threshold: 80.0,
-            active_since_ms: 1000,
+    let mut app = TuiApp::new();
+    let memory_rule_id = AlertRuleId::new("mem-high");
+    let disk_rule_id = AlertRuleId::new("disk-temp");
+    app.shell.replace_alert_event_history(vec![
+        AlertEventSeed {
+            observed_at_ms: 1200,
+            kind: AlertEventKind::Activated,
+            alert: Alert {
+                instance_id: AlertInstanceId::new(
+                    memory_rule_id.clone(),
+                    AlertTargetIdentity::System,
+                ),
+                rule_id: memory_rule_id,
+                severity: AlertSeverity::Warning,
+                metric: AlertMetric::MemoryUsagePercent,
+                target: "".into(),
+                value: 88.0,
+                threshold: 80.0,
+                active_since_ms: 1000,
+            },
         },
-    };
-    let line1 = alert_event_line(&activated, theme);
+        AlertEventSeed {
+            observed_at_ms: 2400,
+            kind: AlertEventKind::Cleared,
+            alert: Alert {
+                instance_id: AlertInstanceId::new(
+                    disk_rule_id.clone(),
+                    AlertTargetIdentity::Storage {
+                        device_id: DeviceId::new("disk:/data"),
+                        generation: DeviceGeneration::new(1),
+                    },
+                ),
+                rule_id: disk_rule_id,
+                severity: AlertSeverity::Critical,
+                metric: AlertMetric::DiskTemperatureC,
+                target: "disk:/data".into(),
+                value: 70.0,
+                threshold: 90.0,
+                active_since_ms: 2000,
+            },
+        },
+    ]);
+    let events = app.projection().alert_center.event_history();
+    let activated = events.first().expect("activated event");
+    let line1 = alert_event_line(activated, theme);
     let s1 = line1.to_string();
     assert!(s1.contains("1200ms"), "{s1}");
     assert!(s1.contains("[Activated]"), "{s1}");
@@ -430,22 +459,8 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     assert!(s1.contains("thresh: 80.0%"), "{s1}");
 
     // Cleared with custom target
-    let cleared = AlertEvent {
-        id: 2,
-        observed_at_ms: 2400,
-        kind: AlertEventKind::Cleared,
-        alert: Alert {
-            instance_id: "disk:/data".into(),
-            rule_id: "disk-temp".into(),
-            severity: AlertSeverity::Critical,
-            metric: AlertMetric::DiskTemperatureC,
-            target: "disk:/data".into(),
-            value: 70.0,
-            threshold: 90.0,
-            active_since_ms: 2000,
-        },
-    };
-    let line2 = alert_event_line(&cleared, theme);
+    let cleared = events.get(1).expect("cleared event");
+    let line2 = alert_event_line(cleared, theme);
     let s2 = line2.to_string();
     assert!(s2.contains("2400ms"), "{s2}");
     assert!(s2.contains("[Cleared]"), "{s2}");

@@ -42,7 +42,8 @@ pub(crate) fn groups(app: &TuiApp) -> Vec<HealthReviewGroup> {
             })
             .collect(),
         HealthReviewMode::ActiveAlerts => projection
-            .alert_active
+            .alert_center
+            .active_alerts()
             .iter()
             .map(|alert| alert_group(alert, "Active alert"))
             .collect(),
@@ -58,7 +59,7 @@ pub(crate) fn groups(app: &TuiApp) -> Vec<HealthReviewGroup> {
             .map(|event| {
                 let mut group = alert_group(
                     &event.alert,
-                    &format!("Event {} · {:?}", event.id, event.kind),
+                    &format!("Event {} · {:?}", event.id.get(), event.kind),
                 );
                 group.rows.push(HealthReviewRow {
                     label: "Observed at".into(),
@@ -89,7 +90,7 @@ fn alert_group(alert: &Alert, context: &str) -> HealthReviewGroup {
             },
             HealthReviewRow {
                 label: "Rule".into(),
-                value: alert.rule_id.clone(),
+                value: alert.rule_id.to_string(),
             },
         ],
     }
