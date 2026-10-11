@@ -83,6 +83,22 @@ pub(crate) fn append_marker(path: &Path, event: &str, mode: &str, page: &str) {
     let _ = file.write_all(marker_line(event, mode, page).as_bytes());
 }
 
+/// Append the current demo process identity before its first frame. The
+/// Windows capture helper requires this PID to bind Windows.Graphics.Capture
+/// to the exact product process that emitted the readiness markers.
+pub(crate) fn append_process_marker(path: &Path, process_id: u32) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = writeln!(
+        file,
+        "ICED_CAPTURE_MARKER event=process_ready pid={process_id}"
+    );
+}
+
 /// Append the selected Performance resource marker after the first frame is
 /// presented. The validator requires this line so a valid Iced screenshot cannot
 /// silently be a different device page than the requested scenario.

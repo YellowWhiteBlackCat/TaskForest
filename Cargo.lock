@@ -10007,6 +10007,7 @@ dependencies = [
  "taskmanager-ui-contract",
  "unicode-segmentation",
  "windows 0.58.0",
+ "windows-capture",
 ]
 
 [[package]]

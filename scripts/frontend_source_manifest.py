@@ -26,6 +26,7 @@ FRONTEND_PACKAGES = {
 }
 FRONTEND_SCRIPTS = {
     "gpui": (
+        "scripts/capture-windows.sh",
         "scripts/capture-niri.sh",
         "scripts/capture-host-wayland-diagnostic.sh",
         "scripts/capture_scenarios.tsv",
@@ -50,6 +51,7 @@ FRONTEND_SCRIPTS = {
         "scripts/validate_capture_evidence.py",
     ),
     "iced": (
+        "scripts/capture-iced-windows.sh",
         "scripts/capture-iced.sh",
         "scripts/capture-iced-matrix.sh",
         "scripts/private-session.conf",
@@ -59,6 +61,7 @@ FRONTEND_SCRIPTS = {
         "scripts/capture-reclaim.sh",
         "scripts/capture_iced_scenarios.tsv",
         "scripts/validate_iced_matrix.py",
+        "scripts/validate_iced_windows_capture.py",
         "scripts/validate_capture_evidence.py",
         "scripts/validate_tui_evidence.py",
     ),

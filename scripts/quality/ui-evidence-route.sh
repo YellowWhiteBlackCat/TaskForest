@@ -6,9 +6,9 @@
 # carry fresh pixel receipts (--require-capture) for every frontend whose
 # pixels the diff can actually move. Pure core changes never force re-capture.
 # A receipt is only fresh when its frontend-scoped source manifest hash still
-# matches the current worktree and its metadata records the private
-# background-Niri route; mtime alone is not evidence after a dirty-tree
-# change.
+# matches the current worktree and its metadata records either the private
+# background-Niri route or a native Windows window capture; mtime alone is not
+# evidence after a dirty-tree change.
 #
 # Impact routing (W22-B): the two requirements are separate judgments.
 #
@@ -316,8 +316,9 @@ while IFS= read -r path; do
         tui_touched=1
         ;;
     crates/taskmanager-iced/* | scripts/capture-iced.sh | scripts/capture-iced-matrix.sh | \
-        scripts/capture_iced_scenarios.tsv | scripts/validate_iced_matrix.py | \
-        scripts/validate_iced_evidence.py)
+        scripts/capture-iced-windows.sh | scripts/capture_iced_scenarios.tsv | \
+        scripts/validate_iced_matrix.py | scripts/validate_iced_evidence.py | \
+        scripts/validate_iced_windows_capture.py)
         ui_touched=1
         iced_touched=1
         ;;
@@ -438,14 +439,24 @@ if [[ "$require_capture" == "1" ]]; then
         while IFS= read -r file; do
             newer_than_base "$file" || continue
             run_dir="$(dirname "$file")"
-            metadata="$(find "$run_dir" -maxdepth 1 -type f \
-                \( -name '*metadata.txt' -o -name 'metadata.txt' \) -print -quit)"
-            [[ -n "$metadata" && -f "$metadata" ]] || continue
-            grep -q '^niri_background=1$' "$metadata" || continue
-            recorded_hash="$(jq -r '.source_manifest_sha256 // empty' "$file" 2>/dev/null || true)"
-            if [[ -z "$recorded_hash" ]]; then
+            if [[ "$root" == "target/windows-evidence" ]]; then
+                # Native Windows receipts are themselves key/value metadata;
+                # they must bind to the requested frontend and Windows target.
+                metadata="$file"
+                [[ "$(awk -F= '$1 == "frontend" { print $2; exit }' "$metadata")" == "$frontend" ]] || continue
+                [[ "$(awk -F= '$1 == "target" { print $2; exit }' "$metadata")" == "windows" ]] || continue
                 recorded_hash="$(awk -F= '$1 == "source_manifest_sha256" { print $2; exit }' \
                     "$metadata")"
+            else
+                metadata="$(find "$run_dir" -maxdepth 1 -type f \
+                    \( -name '*metadata.txt' -o -name 'metadata.txt' \) -print -quit)"
+                [[ -n "$metadata" && -f "$metadata" ]] || continue
+                grep -q '^niri_background=1$' "$metadata" || continue
+                recorded_hash="$(jq -r '.source_manifest_sha256 // empty' "$file" 2>/dev/null || true)"
+                if [[ -z "$recorded_hash" ]]; then
+                    recorded_hash="$(awk -F= '$1 == "source_manifest_sha256" { print $2; exit }' \
+                        "$metadata")"
+                fi
             fi
             if [[ -n "$recorded_hash" && "$recorded_hash" == "$expected_hash" ]]; then
                 return 0
@@ -466,7 +477,8 @@ if [[ "$require_capture" == "1" ]]; then
         missing="$missing tui-capture"
     fi
     if [[ "$iced_touched" == "1" ]] &&
-        ! find_current_receipt "target/iced-evidence" "iced-capture-validation.json" iced; then
+        ! find_current_receipt "target/iced-evidence" "iced-capture-validation.json" iced &&
+        ! find_current_receipt "target/windows-evidence" "receipt-metadata.txt" iced; then
         missing="$missing iced-capture"
     fi
     if [[ "$bevy_touched" == "1" ]] &&

@@ -420,6 +420,10 @@ fi
 if maybe capture-build-self; then
     run_stage capture-build-self quick run_py scripts/capture_build.py --self-test
 fi
+if maybe iced-windows-capture-validator; then
+    run_stage iced-windows-capture-validator quick run_py \
+        scripts/quality/test_validate_iced_windows_capture.py
+fi
 if maybe visual-capture-coverage-self; then
     run_stage visual-capture-coverage-self quick run_py scripts/quality/visual_capture_coverage.py --self-test
 fi

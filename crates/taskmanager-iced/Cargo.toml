@@ -93,6 +93,10 @@ nvidia = ["taskmanager-app-host/nvidia"]
 # wgpu-hal.  This is a resolver constraint only: platform behavior remains
 # behind Iced/wgpu's safe public APIs and this crate does not call Windows APIs.
 [target.'cfg(windows)'.dependencies]
+# Windows-only real-window evidence uses the safe Windows.Graphics.Capture
+# wrapper; the Git Bash runner invokes this product binary as a helper for the
+# marker-identified Iced process and never captures a desktop or Linux frame.
+windows-capture = "1.5.0"
 windows = { version = "0.58.0", default-features = false, features = [
     "Win32_Graphics_Direct3D12",
     "Win32_Graphics_Dxgi_Common",

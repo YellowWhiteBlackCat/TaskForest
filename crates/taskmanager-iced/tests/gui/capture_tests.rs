@@ -1,6 +1,6 @@
 use super::{
-    PerfDevice, append_device_marker, append_marker, device_name, marker_line, page_name,
-    target_marker_line,
+    PerfDevice, append_device_marker, append_marker, append_process_marker, device_name,
+    marker_line, page_name, target_marker_line,
 };
 use taskmanager_application::AppPage;
 
@@ -50,6 +50,19 @@ fn marker_line_has_typed_capture_identity() {
     assert!(
         !unwritable.exists(),
         "an unwritable marker path must not fabricate evidence"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn process_marker_binds_capture_to_the_emitting_application() {
+    let dir = crate::test_support::temp_dir("capture-process-marker");
+    let path = dir.join("markers.txt");
+    append_process_marker(&path, 47_211);
+    let text = std::fs::read_to_string(&path).expect("the appended process marker");
+    assert_eq!(
+        text, "ICED_CAPTURE_MARKER event=process_ready pid=47211\n",
+        "the runner must target the PID emitted by the actual Iced process"
     );
     let _ = std::fs::remove_dir_all(dir);
 }
