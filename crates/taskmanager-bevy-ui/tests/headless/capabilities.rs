@@ -252,23 +252,25 @@ fn capability_declaration_is_complete_and_pinned() {
         (ModalOverlay, Kind::Ported),
         (ContextMenu, Kind::Ported),
         // The column-visibility selection menu over the Applications table.
-        (DropdownMenu, Kind::Ported),
+        (DropdownMenu, Kind::Divergent),
         // The pointer-hover explanation tooltip overlay surface.
-        (Tooltip, Kind::Ported),
+        (Tooltip, Kind::Divergent),
         (Toast, Kind::Divergent),
         (TextInput, Kind::Divergent),
         (SearchInput, Kind::Ported),
         // Read-only text selection and clipboard export surface.
-        (TextSelection, Kind::Ported),
+        (TextSelection, Kind::Divergent),
         // Boolean rows ride the official Checkbox.
         (Switch, Kind::Divergent),
         // Bounded settings are discrete radio choices.
         (Slider, Kind::Divergent),
+        // Both are semantic-contract capabilities, so Bevy's local
+        // composition remains Ported even when it uses official widgets.
         (Checkbox, Kind::Ported),
         (Select, Kind::Ported),
         (SegmentedControl, Kind::Ported),
         (Table, Kind::Ported),
-        (ColumnDragResize, Kind::Divergent),
+        (ColumnDragResize, Kind::Unsupported),
         (VirtualList, Kind::Ported),
         (Tree, Kind::Ported),
         // Scrolling rides the official ScrollArea.
@@ -345,7 +347,7 @@ fn declared_cells_match_the_mounted_page_surface() {
     );
     assert!(
         settings.official_radio_group >= 1 && settings.official_radio_button >= 1,
-        "bounded settings ride discrete official radio choices (Slider cell): {settings:?}"
+        "Select is composed from official RadioGroup/RadioButton; bounded settings also use those discrete choices for the Slider adaptation: {settings:?}"
     );
     assert!(
         of(Page::Performance).scroll_areas >= 1,

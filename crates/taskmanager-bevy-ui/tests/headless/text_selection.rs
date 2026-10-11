@@ -1,12 +1,10 @@
 //! test-intent: behavior
 //!
-//! Behavior tests for Bevy UI text selection explicit state transitions,
-//! clipboard export, and visual highlight component toggling.
+//! Behavior tests for Bevy's whole-readout selection state and clipboard export.
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
-use bevy::ecs::query::With;
 use bevy::picking::hover::PickingInteraction;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage};
@@ -16,8 +14,7 @@ use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
 
 use super::{
-    ClipboardPort, SelectableText, TextSelectionChanged, TextSelectionHighlight,
-    TextSelectionSession, TextSelectionState, copy_selection_or_row,
+    ClipboardPort, SelectableText, TextSelectionSession, TextSelectionState, copy_selection_or_row,
 };
 
 fn token_process(pid: u32, name: &str) -> ProcessItem {
@@ -140,7 +137,7 @@ fn copy_selection_or_row_prioritizes_text_selection_over_row_summary() {
 }
 
 #[test]
-fn text_selection_picking_mounts_and_despawns_highlight() {
+fn pointer_press_selects_the_whole_readout_for_copy() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     super::register(&mut app);
@@ -155,39 +152,26 @@ fn text_selection_picking_mounts_and_despawns_highlight() {
 
     app.update();
 
-    let world = app.world_mut();
-    let highlighted = world
-        .query_filtered::<Entity, With<TextSelectionHighlight>>()
-        .iter(world)
-        .count();
-    assert_eq!(highlighted, 0, "initially unhighlighted");
-
-    // 1. Pointer press establishes selection and triggers highlight observer
+    // Pointer press establishes a whole-readout selection. Bevy does not yet
+    // render a visible highlight or support range/word selection.
     *app.world_mut()
         .get_mut::<PickingInteraction>(entity)
         .unwrap() = PickingInteraction::Pressed;
     app.update();
 
-    assert!(app.world().resource::<TextSelectionState>().is_active());
-    let world = app.world_mut();
-    let highlighted = world
-        .query_filtered::<Entity, With<TextSelectionHighlight>>()
-        .iter(world)
-        .count();
-    assert_eq!(highlighted, 1, "highlight component mounted");
+    let state = app.world().resource::<TextSelectionState>();
+    assert!(state.is_active());
+    assert_eq!(state.selected_text(), Some("AMD Ryzen"));
 
-    // 2. Clear selection removes highlight
+    // Clearing the application selection leaves no copyable text.
     app.world_mut().resource_mut::<TextSelectionState>().clear();
-    app.world_mut().commands().trigger(TextSelectionChanged);
     app.update();
 
     assert!(!app.world().resource::<TextSelectionState>().is_active());
-    let world = app.world_mut();
-    let highlighted = world
-        .query_filtered::<Entity, With<TextSelectionHighlight>>()
-        .iter(world)
-        .count();
-    assert_eq!(highlighted, 0, "highlight component removed");
+    assert_eq!(
+        app.world().resource::<TextSelectionState>().selected_text(),
+        None
+    );
 }
 
 #[test]

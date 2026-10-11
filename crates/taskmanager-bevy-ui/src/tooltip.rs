@@ -1,8 +1,9 @@
 //! Pointer-hover explanation tooltip overlay surface.
 //!
-//! Delivers true parity with GPUI's `TooltipHost` and Iced's `widget::tooltip`:
-//! interactive controls and key metrics can attach a [`TooltipText`] component
-//! so hovering reveals an explanation card anchored to the root view.
+//! Interactive controls and key metrics can attach [`TooltipText`] so pointer
+//! hover reveals a viewport-fixed explanation card. This surface is declared
+//! `Divergent`: it has no keyboard-focus trigger, though the overlay is
+//! pointer-transparent and supports click/Escape dismissal.
 //!
 //! # Architecture
 //!
@@ -15,10 +16,14 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::message::MessageReader;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::input::ButtonState;
+use bevy::input::keyboard::{KeyCode, KeyboardInput};
+use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
@@ -42,6 +47,7 @@ pub(crate) struct TooltipSession {
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct TooltipState {
     pub(crate) session: Option<TooltipSession>,
+    dismissed_target: Option<Entity>,
 }
 
 impl TooltipState {
@@ -88,8 +94,9 @@ pub(crate) fn tooltip_card_scene(text: &str, palette: &UiPalette) -> impl Scene 
         }
         BackgroundColor({ palette.panel_fill })
         TooltipOverlay
+        Pickable::IGNORE
         Children [
-             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
         ]
     }
 }
@@ -98,18 +105,45 @@ pub(crate) fn tooltip_card_scene(text: &str, palette: &UiPalette) -> impl Scene 
 pub(crate) fn tooltip_hover_interaction_system(
     mut state: ResMut<TooltipState>,
     query: Query<(Entity, &TooltipText, &PickingInteraction), Changed<PickingInteraction>>,
+    mut keyboard: MessageReader<KeyboardInput>,
     mut commands: Commands,
 ) {
     let mut changed = false;
+    for input in keyboard.read() {
+        if input.state == ButtonState::Pressed
+            && input.key_code == KeyCode::Escape
+            && let Some(target) = state.session.as_ref().map(|session| session.target)
+        {
+            state.dismiss(target);
+            changed = true;
+        }
+    }
     for (entity, text, interaction) in &query {
         match interaction {
             PickingInteraction::Hovered => {
-                state.show(entity, text.0.clone());
-                changed = true;
+                if state.dismissed_target != Some(entity) {
+                    let next = TooltipSession {
+                        target: entity,
+                        text: text.0.clone(),
+                    };
+                    if state.session.as_ref() != Some(&next) {
+                        state.show(entity, text.0.clone());
+                        changed = true;
+                    }
+                }
             }
-            PickingInteraction::None | PickingInteraction::Pressed => {
+            PickingInteraction::None => {
+                if state.dismissed_target == Some(entity) {
+                    state.dismissed_target = None;
+                }
                 if state.session.as_ref().map(|s| s.target) == Some(entity) {
                     state.hide();
+                    changed = true;
+                }
+            }
+            PickingInteraction::Pressed => {
+                if state.session.as_ref().map(|s| s.target) == Some(entity) {
+                    state.dismiss(entity);
                     changed = true;
                 }
             }
@@ -117,6 +151,15 @@ pub(crate) fn tooltip_hover_interaction_system(
     }
     if changed {
         commands.trigger(TooltipStateChanged);
+    }
+}
+
+impl TooltipState {
+    fn dismiss(&mut self, target: Entity) {
+        self.dismissed_target = Some(target);
+        if self.session.as_ref().map(|session| session.target) == Some(target) {
+            self.session = None;
+        }
     }
 }
 

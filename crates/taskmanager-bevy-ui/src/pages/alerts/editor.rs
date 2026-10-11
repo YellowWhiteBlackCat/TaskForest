@@ -374,11 +374,11 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
     };
     let toggle: Box<dyn Scene> = if managed.enabled {
         Box::new(
-            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox Checked super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, true) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
+            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox Checked super::AlertRuleToggleTarget(Option::Some({id.clone()})) ControlVisual(ControlTone::Surface, true) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
         )
     } else {
         Box::new(
-            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox super::AlertRuleToggleTarget({id.clone()}) ControlVisual(ControlTone::Surface, false) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
+            bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox super::AlertRuleToggleTarget(Option::Some({id.clone()})) ControlVisual(ControlTone::Surface, false) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
         )
     };
     bsn! {

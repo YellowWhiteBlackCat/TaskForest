@@ -289,8 +289,6 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             && sel.is_active()
         {
             sel.clear();
-            self.commands
-                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }
@@ -559,16 +557,15 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         true
     }
 
-    /// Arm 3b — copy chord: Ctrl+C copies active text selection or selected row summary.
+    /// Arm 3b — copy chord: Ctrl/Cmd+C copies active text selection or selected row summary.
     fn copy_chord(&mut self, press: KeyPress) -> bool {
         if matches!(press.context, KeyboardOwner::Free)
             && press.key_code == KeyCode::KeyC
-            && press.modifiers.control
+            && (press.modifiers == Modifiers::CONTROL
+                || press.modifiers == Modifiers::new(false, false, false, true))
             && let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard)
             && crate::text_selection::copy_selection_or_row(sel, clip, self.shell)
         {
-            self.commands
-                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }

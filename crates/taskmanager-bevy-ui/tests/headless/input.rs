@@ -627,6 +627,15 @@ fn press_ctrl(app: &mut App, key: KeyCode, text: Option<&str>) {
         .reset_all();
 }
 
+fn press_platform(app: &mut App, key: KeyCode, text: Option<&str>) {
+    press(app, KeyCode::SuperLeft, None);
+    press(app, key, text);
+    app.update();
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .reset_all();
+}
+
 fn query_of(app: &App) -> String {
     app.world().non_send::<FrontendTrack>().shell.query.clone()
 }
@@ -774,10 +783,9 @@ fn text_input_clear_actions() {
 
 #[test]
 fn search_editor_binds_no_clipboard_chords() {
-    // TextSelection is declared `Unsupported`: no system-clipboard read/write
-    // is wired, so the search editor binds no clipboard chords. Ctrl+C/X/V
-    // must leave the shell-owned query untouched rather than edit a private
-    // buffer that never reaches the OS clipboard.
+    // Search owns only its query editing chords. The separate read-only
+    // selection surface provides copy; search must not treat Ctrl+C/X/V as
+    // edits to its shell-owned query.
     let mut app = input_app(shell_with_selection());
     app.update();
     app.update();
@@ -797,6 +805,34 @@ fn search_editor_binds_no_clipboard_chords() {
         query_of(&app),
         "clip",
         "Ctrl+V must not paste from any private buffer"
+    );
+}
+
+#[test]
+fn platform_c_copies_the_active_text_selection() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+    app.world_mut()
+        .resource_mut::<crate::text_selection::TextSelectionState>()
+        .select_range(
+            Entity::from_raw_u32(501).unwrap(),
+            "cpu-fact".into(),
+            "AMD Ryzen 9".into(),
+            4..9,
+        );
+
+    press_platform(&mut app, KeyCode::KeyC, None);
+
+    app.world_mut().resource_scope(|world, mut clipboard: bevy::ecs::change_detection::Mut<crate::text_selection::ClipboardPort>| {
+        let mut track = world.non_send_mut::<FrontendTrack>();
+        crate::text_selection::flush_clipboard(&mut clipboard, &mut track.shell, |_text| Ok(()));
+    });
+    assert_eq!(
+        app.world()
+            .resource::<crate::text_selection::ClipboardPort>()
+            .get_text(),
+        Some("Ryzen")
     );
 }
 

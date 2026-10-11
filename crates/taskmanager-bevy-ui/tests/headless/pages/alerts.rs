@@ -178,7 +178,12 @@ fn rule_target_entity(world: &mut World, rule_id: &str) -> Entity {
     let mut targets = world.query_filtered::<(Entity, &AlertRuleToggleTarget), ()>();
     targets
         .iter(world)
-        .find(|(_, target)| target.0.as_str() == rule_id)
+        .find(|(_, target)| {
+            target
+                .0
+                .as_ref()
+                .is_some_and(|target| target.as_str() == rule_id)
+        })
         .map(|(entity, _)| entity)
         .unwrap_or_else(|| panic!("the {rule_id} toggle row must be mounted"))
 }

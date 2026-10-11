@@ -125,8 +125,8 @@ fn alerts_fold_observer(
 /// back to the rule it owns.
 ///
 /// [`ShellApp::edit_alert_rules`]: taskmanager_shell::ShellApp::edit_alert_rules
-#[derive(Component, Clone)]
-pub(crate) struct AlertRuleToggleTarget(pub(crate) AlertRuleId);
+#[derive(Component, Clone, Default)]
+pub(crate) struct AlertRuleToggleTarget(pub(crate) Option<AlertRuleId>);
 
 /// The rule-toggle applier: a checkbox activation resolves its row's rule
 /// and flips it through the shell's canonical edit entry. Guarded so a
@@ -143,16 +143,19 @@ fn rule_toggle_observer(
     let Ok(target) = targets.get(change.event().source) else {
         return; // a foreign checkbox: none of this page's business
     };
+    let Some(rule_id) = target.0.as_ref() else {
+        return; // BSN's empty template seed never represents a rule.
+    };
     let enabled_now = track
         .shell
         .projection()
         .alert_center
         .managed_rules()
         .iter()
-        .any(|managed| managed.rule.id == target.0 && managed.enabled);
+        .any(|managed| &managed.rule.id == rule_id && managed.enabled);
     if enabled_now != requested {
         let edit = ManagedAlertRuleEdit::Toggle {
-            rule_id: target.0.clone(),
+            rule_id: rule_id.clone(),
         };
         if let Err(error) = track.shell.edit_alert_rules(edit) {
             // The Toggle edit resolves against the canonical set; a typed

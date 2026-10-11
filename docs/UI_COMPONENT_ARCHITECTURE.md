@@ -30,9 +30,9 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 
 每个组件必须有键盘路径、焦点可见态、语义名称/角色/状态、窄窗口行为和失败/禁用表达。
 危险操作只提交 typed intent；确认框关闭、取消和 Escape 不产生副作用。
-只读详情值通过 `SelectableText` 提供鼠标拖选、Ctrl/Cmd+A、Ctrl/Cmd+C，并在 Linux 鼠标
-释放时同步主选择区；同一窗口只有一个活动文本选择，新选择必须清除旧高亮。密集表格必须
-先解决与行选择、双击和列拖动的仲裁，不能直接套用。
+只读详情 `SelectableText` 提供指针选择和 Ctrl/Cmd+C，GPUI 另有 Ctrl/Cmd+A；Iced 保留 Ctrl+A
+给行摘要，多行日志逐行选择、Linux Iced 释放时同步 PRIMARY；TUI 交终端处理。Bevy 点击选整段、
+无区间/可见高亮，登记 `Divergent`；应用自有选区每窗口单项，新选清旧；密集表格先解决行选择、双击、列拖宽仲裁。
 
 ## 参考语义与组件挂载
 

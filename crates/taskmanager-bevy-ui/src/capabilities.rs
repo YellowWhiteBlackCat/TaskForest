@@ -18,7 +18,7 @@ use taskmanager_ui_contract::{
 /// Declare the Bevy shape's complete component capability surface.
 #[must_use]
 pub fn capability_declaration() -> FrontendCapabilityDeclaration {
-    use CapabilitySupport::{Divergent, Ported};
+    use CapabilitySupport::{Divergent, Ported, Unsupported};
     use ComponentCapability::{
         Checkbox, ColumnDragResize, ContextMenu, DropdownMenu, FocusVisible, ModalOverlay,
         Scrollbar, SearchInput, SegmentedControl, Select, Slider, Switch, Table, TextInput,
@@ -28,10 +28,22 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        // The column-visibility selection menu over the Applications table.
-        (DropdownMenu, Ported),
-        // The pointer-hover explanation tooltip overlay surface.
-        (Tooltip, Ported),
+        // The column chooser is a blocking modal; it preserves multi-toggle
+        // behavior and Escape dismissal but does not close on focus loss.
+        (
+            DropdownMenu,
+            Divergent {
+                reason: "the column chooser is a blocking modal with a scrim; toggles stay open and Escape dismisses, but focus loss does not close it",
+            },
+        ),
+        // Bevy shows a viewport-fixed tooltip on pointer hover, without a
+        // keyboard-focus trigger.
+        (
+            Tooltip,
+            Divergent {
+                reason: "tooltips are viewport-fixed and pointer-hover only; keyboard focus does not open them",
+            },
+        ),
         (
             Toast,
             Divergent {
@@ -45,8 +57,14 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
             },
         ),
         (SearchInput, Ported),
-        // Read-only text selection and clipboard export surface.
-        (TextSelection, Ported),
+        // A pointer press selects and copies one whole readout; there is no
+        // range gesture or visible selection highlight.
+        (
+            TextSelection,
+            Divergent {
+                reason: "pointer press selects a whole readout for Ctrl/Cmd+C; range and word gestures, Ctrl/Cmd+A, and visible selection highlighting are not implemented",
+            },
+        ),
         // Boolean rows use the official `bevy_ui_widgets::Checkbox`; no
         // switch-specific control is authored.
         (
@@ -62,14 +80,18 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 reason: "bounded settings render as discrete radio choices",
             },
         ),
+        // These are semantic-contract capabilities. Bevy composes the
+        // checkbox contract with its official Checkbox behavior primitive.
         (Checkbox, Ported),
+        // Select is composed from the official RadioGroup/RadioButton pair;
+        // Bevy does not mount a generic Select or enable FeathersSelect.
         (Select, Ported),
         (SegmentedControl, Ported),
         (Table, Ported),
         (
             ColumnDragResize,
-            Divergent {
-                reason: "the Bevy table uses responsive flex slot distribution rather than pointer-drag column resizing",
+            Unsupported {
+                reason: "the Bevy process table has no user-driven column-width control or resize handle",
             },
         ),
         (VirtualList, Ported),
