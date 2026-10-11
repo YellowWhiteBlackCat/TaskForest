@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_application::DeviceLifecycleSnapshotRevision;
 use taskmanager_core::core::alerts::NotificationPolicy;
 use taskmanager_core::core::metrics::CpuMetrics;
 

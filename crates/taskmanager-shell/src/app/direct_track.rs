@@ -242,7 +242,7 @@ impl DirectTrackState {
     pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::DirectTrackSeedFact) {
         match fact {
             crate::fixture::DirectTrackSeedFact::NpuInventory(snapshot) => {
-                self.projection.npu_inventory = Some(snapshot);
+                self.projection.seed_npu_inventory_fixture(snapshot);
                 self.projection.system_revision = self.projection.system_revision.saturating_add(1);
             }
             crate::fixture::DirectTrackSeedFact::Processes(processes) => {

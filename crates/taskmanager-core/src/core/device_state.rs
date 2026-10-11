@@ -18,9 +18,17 @@ pub const DEFAULT_DEVICE_ABSENCE_RETENTION_MS: u64 = 30_000;
 /// without bound inside the 30-second absence window. When an observation
 /// would exceed the ceiling, the registry first forgets the identity that
 /// has been confirmed absent the longest — or, absent none, the least
-/// recently seen one — so memory stays finite and one present device keeps
-/// exactly one authority record.
+/// recently seen one — so the number of tracked identity records stays
+/// bounded. Retired generation tombstones use a separate cache with the same
+/// ceiling; excess churn can eventually release an old ID's generation
+/// authority as well.
 pub const MAX_TRACKED_DEVICE_IDENTITIES: usize = 1_024;
+
+/// Keep generation continuity for the same number of identities after their
+/// lifecycle rows expire or are evicted. This is separate from row retention:
+/// old rows leave the projection on time while their incarnation token remains
+/// available for a later return.
+const MAX_RETIRED_DEVICE_GENERATIONS: usize = MAX_TRACKED_DEVICE_IDENTITIES;
 
 /// A small, actionable state vocabulary shared by disks, NICs, GPUs and
 /// auxiliary providers such as SMART.
@@ -208,6 +216,13 @@ pub struct DeviceLifecycleDelta {
     pub expired: Vec<DeviceId>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RetiredDeviceGeneration {
+    generation: DeviceGeneration,
+    confirmed_absent: bool,
+    retired_at_ms: u64,
+}
+
 /// Stateful reconciliation for hot-pluggable devices.
 ///
 /// Call [`begin_refresh`](Self::begin_refresh), then
@@ -215,11 +230,15 @@ pub struct DeviceLifecycleDelta {
 /// [`finish_refresh`](Self::finish_refresh). Confirmed-absent entries remain
 /// queryable through the configured retention period so selection and
 /// diagnostics can explain disappearance; they are evicted only when
-/// `absence_age > retention_ms`.
+/// `absence_age > retention_ms`. Expired or capacity-evicted entries leave a
+/// bounded, exact-ID generation tombstone so a later confirmed return can
+/// advance the incarnation without retaining the old row. If the tombstone
+/// cache reaches its ceiling, it evicts the oldest retired ID first.
 #[derive(Debug, Clone)]
 pub struct DeviceLifecycleRegistry {
     retention_ms: u64,
     entries: HashMap<DeviceId, DeviceLifecycle>,
+    retired_generations: HashMap<DeviceId, RetiredDeviceGeneration>,
     observed: HashSet<DeviceId>,
     reappeared: HashSet<DeviceId>,
 }
@@ -230,6 +249,7 @@ impl DeviceLifecycleRegistry {
         Self {
             retention_ms,
             entries: HashMap::new(),
+            retired_generations: HashMap::new(),
             observed: HashSet::new(),
             reappeared: HashSet::new(),
         }
@@ -254,9 +274,20 @@ impl DeviceLifecycleRegistry {
         now_ms: u64,
     ) -> DeviceLifecycle {
         let stable_id = stable_id.into();
-        self.observed.insert(stable_id.clone());
+        let retired = self.retired_generations.remove(&stable_id);
         if !self.entries.contains_key(&stable_id) {
-            self.evict_beyond_ceiling();
+            self.evict_beyond_ceiling(now_ms);
+        }
+        self.observed.insert(stable_id.clone());
+        let initial_generation = retired.map_or(DeviceGeneration::INITIAL, |retired| {
+            if retired.confirmed_absent {
+                retired.generation.next()
+            } else {
+                retired.generation
+            }
+        });
+        if retired.is_some_and(|retired| retired.confirmed_absent) {
+            self.reappeared.insert(stable_id.clone());
         }
         let lifecycle = self
             .entries
@@ -264,7 +295,7 @@ impl DeviceLifecycleRegistry {
             .or_insert_with(|| DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::default().merge_observation(observed_state, now_ms),
-                generation: DeviceGeneration::INITIAL,
+                generation: initial_generation,
                 first_seen_ms: Some(now_ms),
                 last_seen_ms: Some(now_ms),
                 absent_since_ms: None,
@@ -293,7 +324,7 @@ impl DeviceLifecycleRegistry {
     /// stable-ID string is the deterministic tie-break so eviction never
     /// depends on hash order. Identities the size of the ceiling or below
     /// never lose an entry to this path.
-    fn evict_beyond_ceiling(&mut self) {
+    fn evict_beyond_ceiling(&mut self, now_ms: u64) {
         if self.entries.len() < MAX_TRACKED_DEVICE_IDENTITIES {
             return;
         }
@@ -312,7 +343,46 @@ impl DeviceLifecycleRegistry {
             })
             .map(|(id, _)| (*id).clone());
         if let Some(victim) = victim {
-            self.entries.remove(&victim);
+            if let Some(lifecycle) = self.entries.remove(&victim) {
+                self.observed.remove(&victim);
+                self.remember_generation(
+                    victim,
+                    lifecycle.generation,
+                    lifecycle.presence == DevicePresence::Absent,
+                    now_ms,
+                );
+            }
+        }
+    }
+
+    fn remember_generation(
+        &mut self,
+        stable_id: DeviceId,
+        generation: DeviceGeneration,
+        confirmed_absent: bool,
+        now_ms: u64,
+    ) {
+        self.retired_generations.insert(
+            stable_id,
+            RetiredDeviceGeneration {
+                generation,
+                confirmed_absent,
+                retired_at_ms: now_ms,
+            },
+        );
+        if self.retired_generations.len() <= MAX_RETIRED_DEVICE_GENERATIONS {
+            return;
+        }
+        let oldest = self
+            .retired_generations
+            .iter()
+            .min_by(|(left_id, left), (right_id, right)| {
+                (left.retired_at_ms, left_id.as_str())
+                    .cmp(&(right.retired_at_ms, right_id.as_str()))
+            })
+            .map(|(id, _)| id.clone());
+        if let Some(oldest) = oldest {
+            self.retired_generations.remove(&oldest);
         }
     }
 
@@ -347,16 +417,22 @@ impl DeviceLifecycleRegistry {
             }
         }
 
-        self.entries.retain(|id, lifecycle| {
-            let expired = lifecycle.presence == DevicePresence::Absent
-                && lifecycle.absent_since_ms.is_some_and(|absent_since| {
-                    now_ms.saturating_sub(absent_since) > self.retention_ms
-                });
-            if expired {
-                delta.expired.push(id.clone());
-            }
-            !expired
-        });
+        let expired = self
+            .entries
+            .iter()
+            .filter_map(|(id, lifecycle)| {
+                let is_expired = lifecycle.presence == DevicePresence::Absent
+                    && lifecycle.absent_since_ms.is_some_and(|absent_since| {
+                        now_ms.saturating_sub(absent_since) > self.retention_ms
+                    });
+                is_expired.then(|| (id.clone(), lifecycle.generation))
+            })
+            .collect::<Vec<_>>();
+        for (id, generation) in expired {
+            self.entries.remove(&id);
+            self.remember_generation(id.clone(), generation, true, now_ms);
+            delta.expired.push(id);
+        }
         delta.reappeared.extend(self.reappeared.drain());
         self.observed.clear();
         delta.newly_absent.sort();

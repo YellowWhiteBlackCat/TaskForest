@@ -149,9 +149,11 @@ src/app/batch_fold/                 event folding: failure seed → domain syste
 │                                   → alert watermark → feedback
 src/app/direct_track/               process inventory, sorting, selection (GPUI track)
 src/app/process_rows/               cacheable category/tree structure and row identity
+src/app/device_rows.rs              family-qualified device identities and row revisions
 src/app/request_sessions.rs         per-track typed request-session instances
 src/app/lifecycle.rs                ShellLifecycleState (quit and feedback)
 src/app/effects.rs  effect_dispatch.rs     effect generation and dispatch
+src/app/fixture_seed.rs             fixture facts enter through shell-owned reducers
 src/app/confirmation_gates.rs       dangerous-action confirmation gates
 src/app/process_control.rs  process_requests.rs  process action and request handling
 src/app/frame.rs  input_mode.rs  selection.rs  search_input.rs
@@ -179,3 +181,7 @@ src/fixture/ (cpu_topology dashboard_history inventory process_insights setup sm
 ## Shared semantic rows
 
 See [`docs/SEMANTIC_ROWS.md`](docs/SEMANTIC_ROWS.md) for the ordered shell-to-ui-contract adapter, row identity behavior, and typed process measurement handoff.
+
+## Device row identities
+
+See [`docs/DEVICE_ROWS.md`](docs/DEVICE_ROWS.md) for family-qualified identity, lifecycle admission, generation, and row revision behavior.

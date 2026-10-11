@@ -1,7 +1,11 @@
+//! test-intent: behavior
+
 use std::collections::{BTreeMap, HashMap};
 
 use super::*;
-use taskmanager_core::DeviceGeneration;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
 
 fn lifecycle(
     presence: DevicePresence,
@@ -910,3 +914,6 @@ fn unconfirmed_missing_retention_is_bounded_and_retires_only_newcomers() {
     );
     assert_eq!(projection.devices().count(), capacity);
 }
+
+#[path = "device_lifecycle/npu.rs"]
+mod npu;
