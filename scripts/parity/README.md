@@ -12,7 +12,8 @@ against real test discovery.
   data source the Rust gate's evidence closure reads through
   `include_str!`, so a `Ready` cell can no longer be claimed from the static
   source commitment alone.
-- `feature_evidence.tsv`'s optional sixth column (`co_test_id`) — the W23-B
+- `feature_evidence.tsv`'s required sixth column (`co_test_id`; use `-` when
+  there is no co-anchor) — the W23-B
   co-anchor record, folded into the main table by D6 phase 6. It names a
   further hand-declared test that proves a named clause of an already-anchored
   `(feature_id, frontend)` cell when the primary anchor test does not drive
@@ -50,8 +51,9 @@ against real test discovery.
   it consumes the unified matrix as a second declaration source, including
   `pending` rows, and with `--feature-evidence` (default:
   `scripts/parity/feature_evidence.tsv`, so it is on in the gate) the P5
-  feature-level table as a third; the table's optional sixth column carries the
-  feature co-anchors in the same pass. It owns no contract-tag vocabulary
+  feature-level table as a third; the table's required sixth column carries
+  optional feature co-anchor values in the same pass. It owns no contract-tag
+  vocabulary
   (`contract_tag` is an opaque required field), no requirement vocabulary
   (`p0_id` is opaque unless `--requirements` supplies the public id list), and
   no feature vocabulary (`feature_id` is opaque; the Rust registry owns it).
@@ -315,8 +317,8 @@ Anchored batches (2026-09-22):
   observed `swap_bytes` and assert the rendered charge (plus the dash for an
   unobserved one), so all four shapes now anchor the cell.
 
-The table now carries **75 anchored + 0 `pending`** rows (per frontend: gpui 17,
-iced 19, tui 21, bevy 18 anchored). Every registered cell is committed
+The table now carries **200 anchored + 0 `pending`** rows (50 feature IDs, with
+50 anchored cells per frontend). Every registered cell is committed
 evidence; a new near-miss must again be recorded as an explicit `pending` row.
 Every other source-complete cell keeps its G2 finding until a real test is
 anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
@@ -328,8 +330,9 @@ anchor.
 The W23-B batch is not a new cell but a schema extension: `feature_evidence.tsv`
 can now record a **co-anchor**, a further discoverable test that proves a named
 clause of an already-anchored cell whose production surface the primary anchor
-test does not drive. It is the table's optional sixth column, read in the same
-resolver pass. The W23-B side table (`feature_evidence_co_anchors.tsv`) was
+test does not drive. It is the table's required sixth column; use `-` when a row
+has no co-anchor. The value is read in the same resolver pass. The W23-B side
+table (`feature_evidence_co_anchors.tsv`) was
 folded into that column by D6 phase 6 and deleted; nothing reads a second file.
 
 | column | meaning |
@@ -844,7 +847,7 @@ Remaining, in order, each requiring its own decision:
   the vocabulary authority is the Rust `FeatureId::ALL` registry, and the
   contract test in `ui_feature_platform_gate.rs` parses the table and rejects an
   unknown id. The resolver never defines feature ids; it only resolves the
-  anchored `test_id` values and the optional `co_test_id` values against
+  anchored `test_id` values and declared (non-`-`) `co_test_id` values against
   discovery.
 - A feature co-anchor (`feature_evidence.tsv`'s sixth `co_test_id` column) is
   the same kind of hand-declared anchor as a primary one: it must name a
@@ -899,7 +902,7 @@ flag**: `--feature-evidence` defaults to
 anchors (R4) exactly like the other two declaration sources, and its
 `dangling` count feeds the same fail-closed exit. A commit that renames a test
 referenced by the table is red at the `parity-evidence` stage. The table's
-optional sixth `co_test_id` column follows the same rule, so a renamed
+required sixth `co_test_id` column follows the same rule, so a renamed
 co-anchor is dangling in the same pass, and a malformed or empty sixth column
 is a stage error rather than a silent skip.
 
@@ -1000,8 +1003,8 @@ python3 scripts/parity/resolve_frontend_evidence.py --nextest
 
 # Resolve the P5 feature-level evidence table explicitly (the default path is
 # the same file, so the gate call above already consumes it). The table's
-# optional sixth `co_test_id` column carries every feature co-anchor, so no
-# separate flag or side file exists:
+# required sixth `co_test_id` column carries optional feature co-anchor values,
+# so no separate flag or side file exists:
 python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery gpui=discovery/gpui.json \
   --discovery iced=discovery/iced.json \

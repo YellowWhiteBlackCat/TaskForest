@@ -85,7 +85,8 @@ vocabulary authority is the Rust `FeatureId::ALL` registry in
 
 Feature co-anchors (sixth column of `feature_evidence.tsv`)
 -----------------------------------------------------------
-The feature table's optional sixth column (`co_test_id`) records one further
+The feature table's required sixth column (`co_test_id`, with `-` when absent)
+records one further
 hand-declared test id that proves a named clause of an already-anchored
 `(feature_id, frontend)` cell. The cell's primary `test_id` keeps its meaning
 and stays the anchor authority; a co-anchor only records a further discoverable
@@ -179,9 +180,9 @@ INTERACTION_SUBJECT_KIND = "interaction"
 # `(feature_id, frontend)`.  The `feature_id` vocabulary is owned by the Rust
 # `FeatureId::ALL` registry in taskmanager-ui-contract; this resolver treats the
 # field as opaque declaration data (its contract test rejects an unknown id).
-# The optional sixth column (`co_test_id`) records one further discoverable test
-# that proves a named clause of the anchored cell; it extends the primary
-# `test_id`, never replaces it, and can never make a cell `Ready`.
+# The required sixth column (`co_test_id`; `-` means absent) records one further
+# discoverable test that proves a named clause of the anchored cell; it extends
+# the primary `test_id`, never replaces it, and can never make a cell `Ready`.
 FEATURE_EVIDENCE_FIELDS = (
     "feature_id",
     "frontend",
@@ -530,7 +531,7 @@ def read_feature_evidence(path: Path) -> list[dict[str, str]]:
     row, `co_test_id` used only when the row declares a co-anchor), and a
     non-empty gap note on every pending row.  The `feature_id` vocabulary is
     owned by the Rust `FeatureId::ALL` registry and is NOT copied here; this
-    resolver only resolves the anchored test ids and the optional co-anchor
+    resolver only resolves the anchored test ids and each declared co-anchor
     (`co_test_id`) against discovery.
     """
     if not path.is_file():
@@ -1087,7 +1088,7 @@ def resolve(args: argparse.Namespace) -> dict:
                 "channel": "feature-evidence",
             })
 
-    # Feature-level co-anchors: the feature table's optional sixth column
+    # Feature-level co-anchors: the feature table's required sixth column
     # extends an already-anchored `(feature_id, frontend)` cell with a further
     # discoverable test for a named definition clause whose production surface
     # the primary anchor does not drive.  The primary `test_id` keeps its

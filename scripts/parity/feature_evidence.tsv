@@ -14,7 +14,8 @@
 #   test_id     the nextest test path, or `-` on a pending row
 #   status      anchored | pending
 #   note        `-` on an anchored row; the honest gap on a pending row
-#   co_test_id  the optional co-anchor: a further nextest test path that proves
+#   co_test_id  required column; the value is an optional co-anchor: a further
+#               nextest test path that proves
 #               a named clause of this anchored cell whose production surface
 #               the primary `test_id` does not drive, or `-` when the row
 #               declares none.  The primary `test_id` keeps its meaning and

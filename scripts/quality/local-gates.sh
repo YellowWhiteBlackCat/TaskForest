@@ -673,9 +673,8 @@ if maybe parity-evidence; then
     # Since W11-C the stage resolves both declaration sources: the facet
     # manifest and the unified S4 interaction matrix, so a renamed or deleted
     # interaction test is dangling here too.  The P5 feature table and its
-    # sparse feature co-anchor side table are consumed by default
-    # (`--feature-evidence` defaults to the committed file; a co-anchor is the
-    # feature table's sixth column),
+    # sixth-column co-anchors are consumed by default (`--feature-evidence`
+    # defaults to the committed file; use `-` when a row has no co-anchor),
     # so a renamed feature anchor or co-anchor is dangling in the same pass.
     # `--requirements` + `--require-requirement-coverage` make the per-frontend
     # P0-MC coverage a fail-closed 8/8 x 4 check: every frontend carries a real

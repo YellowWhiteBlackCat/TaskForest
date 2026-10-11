@@ -19,7 +19,7 @@ Per selected frontend it
 4. re-resolves Layer B (R4/R6) with
    ``scripts/parity/resolve_frontend_evidence.py`` against the same discovery
    artifacts (facet manifest, unified interaction matrix, and feature evidence
-   including its optional sixth-column co-anchors);
+   including the required sixth column for optional co-anchor values);
 5. folds the segments with ``scripts/quality/cross_frontend_manifest.py`` and,
    unless ``--report-only`` is passed, verifies the aggregate.
 
