@@ -92,7 +92,10 @@ pub use boot_baseline::{
     BootBaselineRecordKind, BootBaselineRequest, BootBaselineRequestId, BootBaselineState,
     BootBaselineSubmission,
 };
-pub use command::{CommandId, KeyChord, KeyCode, KeyParseError, Modifiers};
+pub use command::{
+    CommandId, CommandPaletteDisposition, CommandPaletteExclusionReason, KeyChord, KeyCode,
+    KeyParseError, Modifiers, command_palette_commands,
+};
 pub use config_runtime::{
     ConfigBootstrap, ConfigBootstrapFallback, ConfigClient, ConfigCoordinator, ConfigDrain,
     ConfigPublication, ConfigPublicationId, ConfigPublicationOutcome, ConfigRecovery,
