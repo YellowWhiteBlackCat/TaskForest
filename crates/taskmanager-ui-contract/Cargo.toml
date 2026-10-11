@@ -7,6 +7,7 @@ license = "Apache-2.0"
 description = "Toolkit-neutral semantic UI contracts for TaskForest frontends"
 
 [dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 

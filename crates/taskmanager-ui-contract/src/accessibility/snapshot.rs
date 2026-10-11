@@ -11,8 +11,9 @@
 //! [`AccessibilityBridge`]: super::AccessibilityBridge
 
 use crate::{
-    SemanticAction, SemanticLiveRegion, SemanticNode, SemanticNodeId, SemanticNumericValue,
-    SemanticRole, SemanticSnapshot, SemanticSnapshotError, SemanticState,
+    ProcessAggregateSemantics, ProcessRowObservations, SemanticAction, SemanticLiveRegion,
+    SemanticNode, SemanticNodeId, SemanticNumericValue, SemanticRole, SemanticSnapshot,
+    SemanticSnapshotError, SemanticState,
 };
 
 /// One process rendered as a table row with name, CPU, and memory cells.
@@ -32,14 +33,33 @@ pub struct ProcessRowInput {
     pub selected: bool,
 }
 
+/// Interaction and tree state for a process row supplied by a canonical row
+/// projection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProcessRowBehavior {
+    /// A row with a validated live identity and no expandable children.
+    Selectable,
+    /// A display-only row whose source identity is unavailable.
+    NonActionable,
+    /// A process row with children in the shared process hierarchy.
+    TreeItem {
+        expanded: bool,
+        selectable: bool,
+        /// The key the renderer uses to change this row's expansion state.
+        /// Missing identity leaves the row visible and expanded, but exposes
+        /// no expand/collapse action.
+        expansion_key: Option<String>,
+    },
+}
+
 /// One structural row in the process hierarchy (category or application
 /// aggregate). It is intentionally separate from [`ProcessRowInput`]: a
 /// group has no process CPU/memory facts, but it does have tree state and a
 /// stable presentation identity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProcessGroupRowInput {
-    /// Stable identity within the semantic process table. Callers should use
-    /// the same identity that keys their visual expansion state.
+    /// Stable semantic row identity within the process table, without the
+    /// builder's `group-row:` node prefix.
     pub id: String,
     pub name: String,
     pub expanded: bool,
@@ -48,8 +68,18 @@ pub struct ProcessGroupRowInput {
 
 #[derive(Clone, Debug, PartialEq)]
 enum ProcessTableRowInput {
-    Process(ProcessRowInput),
-    Group(ProcessGroupRowInput),
+    Process {
+        row: ProcessRowInput,
+        behavior: ProcessRowBehavior,
+        observations: Option<ProcessRowObservations>,
+    },
+    Group {
+        row: ProcessGroupRowInput,
+        expansion_key: Option<String>,
+        selectable: bool,
+        expandable: bool,
+        aggregate: Option<ProcessAggregateSemantics>,
+    },
 }
 
 /// One modal surface exposed by a frontend's semantic tree.
@@ -169,14 +199,57 @@ impl SemanticSnapshotBuilder {
 
     #[must_use]
     pub fn process_row(mut self, row: ProcessRowInput) -> Self {
-        self.rows.push(ProcessTableRowInput::Process(row));
+        self.rows.push(ProcessTableRowInput::Process {
+            row,
+            behavior: ProcessRowBehavior::Selectable,
+            observations: None,
+        });
+        self
+    }
+
+    /// Append a process row with interaction state from the canonical tree
+    /// projection. Rows without live identity use `NonActionable` and remain
+    /// present without focus, selection, or control actions.
+    #[must_use]
+    pub fn process_row_with_behavior(
+        mut self,
+        row: ProcessRowInput,
+        behavior: ProcessRowBehavior,
+    ) -> Self {
+        self.rows.push(ProcessTableRowInput::Process {
+            row,
+            behavior,
+            observations: None,
+        });
+        self
+    }
+
+    /// Append a process row with shared interaction state and core-owned
+    /// scalar observations. The observations remain typed through snapshot
+    /// construction, including stale values and failure reasons.
+    #[must_use]
+    pub fn process_row_with_semantics(
+        mut self,
+        row: ProcessRowInput,
+        behavior: ProcessRowBehavior,
+        observations: Option<ProcessRowObservations>,
+    ) -> Self {
+        self.rows.push(ProcessTableRowInput::Process {
+            row,
+            behavior,
+            observations,
+        });
         self
     }
 
     #[must_use]
     pub fn process_rows(mut self, rows: impl IntoIterator<Item = ProcessRowInput>) -> Self {
         self.rows
-            .extend(rows.into_iter().map(ProcessTableRowInput::Process));
+            .extend(rows.into_iter().map(|row| ProcessTableRowInput::Process {
+                row,
+                behavior: ProcessRowBehavior::Selectable,
+                observations: None,
+            }));
         self
     }
 
@@ -185,7 +258,54 @@ impl SemanticSnapshotBuilder {
     /// not a fabricated process, and carries only expansion/selection state.
     #[must_use]
     pub fn process_group_row(mut self, row: ProcessGroupRowInput) -> Self {
-        self.rows.push(ProcessTableRowInput::Group(row));
+        self.rows.push(ProcessTableRowInput::Group {
+            row,
+            expansion_key: None,
+            selectable: true,
+            expandable: true,
+            aggregate: None,
+        });
+        self
+    }
+
+    /// Append a structural or application aggregate row with its semantic ID,
+    /// expansion key, and available actions kept as separate values.
+    #[must_use]
+    pub fn process_group_row_with_state(
+        mut self,
+        row: ProcessGroupRowInput,
+        expansion_key: Option<String>,
+        selectable: bool,
+        expandable: bool,
+    ) -> Self {
+        self.rows.push(ProcessTableRowInput::Group {
+            row,
+            expansion_key,
+            selectable,
+            expandable,
+            aggregate: None,
+        });
+        self
+    }
+
+    /// Append a structural or application aggregate row with canonical tree
+    /// state and its complete core-owned aggregate facts.
+    #[must_use]
+    pub fn process_group_row_with_semantics(
+        mut self,
+        row: ProcessGroupRowInput,
+        expansion_key: Option<String>,
+        selectable: bool,
+        expandable: bool,
+        aggregate: ProcessAggregateSemantics,
+    ) -> Self {
+        self.rows.push(ProcessTableRowInput::Group {
+            row,
+            expansion_key,
+            selectable,
+            expandable,
+            aggregate: Some(aggregate),
+        });
         self
     }
 
@@ -261,29 +381,76 @@ impl SemanticSnapshotBuilder {
 
         for row in &rows {
             match row {
-                ProcessTableRowInput::Process(row) => {
+                ProcessTableRowInput::Process {
+                    row,
+                    behavior,
+                    observations,
+                } => {
                     let row_id = SemanticNodeId::owned(format!("row:{}", row.id));
                     let cell_name = SemanticNodeId::owned(format!("row:{}:cell:name", row.id));
                     let cell_cpu = SemanticNodeId::owned(format!("row:{}:cell:cpu", row.id));
                     let cell_memory = SemanticNodeId::owned(format!("row:{}:cell:memory", row.id));
                     table_children.push(row_id.clone());
-
-                    nodes.push(
-                        SemanticNode::new(row_id.clone(), SemanticRole::Row)
-                            .named(row.name.clone())
-                            .with_state(SemanticState {
-                                focusable: true,
-                                selected: Some(row.selected),
-                                ..SemanticState::default()
-                            })
-                            .with_action(SemanticAction::Focus)
-                            .with_action(SemanticAction::Select)
-                            .with_children([
-                                cell_name.clone(),
-                                cell_cpu.clone(),
-                                cell_memory.clone(),
-                            ]),
-                    );
+                    let mut node = match behavior {
+                        ProcessRowBehavior::Selectable => {
+                            SemanticNode::new(row_id.clone(), SemanticRole::Row)
+                                .with_state(SemanticState {
+                                    focusable: true,
+                                    selected: Some(row.selected),
+                                    ..SemanticState::default()
+                                })
+                                .with_action(SemanticAction::Focus)
+                                .with_action(SemanticAction::Select)
+                        }
+                        ProcessRowBehavior::NonActionable => {
+                            SemanticNode::new(row_id.clone(), SemanticRole::Row).with_state(
+                                SemanticState {
+                                    selected: Some(false),
+                                    ..SemanticState::default()
+                                },
+                            )
+                        }
+                        ProcessRowBehavior::TreeItem {
+                            expanded,
+                            selectable,
+                            expansion_key,
+                        } => {
+                            let mut node =
+                                SemanticNode::new(row_id.clone(), SemanticRole::TreeItem)
+                                    .named(row.name.clone())
+                                    .with_state(SemanticState {
+                                        focusable: *selectable,
+                                        selected: Some(*selectable && row.selected),
+                                        expanded: Some(*expanded),
+                                        ..SemanticState::default()
+                                    });
+                            if *selectable {
+                                node = node
+                                    .with_action(SemanticAction::Focus)
+                                    .with_action(SemanticAction::Select);
+                            }
+                            if *selectable && let Some(expansion_key) = expansion_key {
+                                let action = if *expanded {
+                                    SemanticAction::Collapse
+                                } else {
+                                    SemanticAction::Expand
+                                };
+                                node = node.with_expansion_key(expansion_key).with_action(action);
+                            }
+                            node
+                        }
+                    };
+                    if node.name().is_none() {
+                        node = node.named(row.name.clone());
+                    }
+                    if let Some(observations) = observations {
+                        node = node.with_process_row_observations(observations.clone());
+                    }
+                    nodes.push(node.with_children([
+                        cell_name.clone(),
+                        cell_cpu.clone(),
+                        cell_memory.clone(),
+                    ]));
                     nodes.push(
                         SemanticNode::new(cell_name, SemanticRole::Cell)
                             .with_value_text(row.name.clone()),
@@ -297,7 +464,13 @@ impl SemanticSnapshotBuilder {
                             .with_value_text(format_optional_percent(row.memory_percent)),
                     );
                 }
-                ProcessTableRowInput::Group(row) => {
+                ProcessTableRowInput::Group {
+                    row,
+                    expansion_key,
+                    selectable,
+                    expandable,
+                    aggregate,
+                } => {
                     let row_id = SemanticNodeId::owned(format!("group-row:{}", row.id));
                     table_children.push(row_id.clone());
                     let action = if row.expanded {
@@ -305,19 +478,29 @@ impl SemanticSnapshotBuilder {
                     } else {
                         SemanticAction::Expand
                     };
-                    nodes.push(
-                        SemanticNode::new(row_id, SemanticRole::TreeItem)
-                            .named(row.name.clone())
-                            .with_state(SemanticState {
-                                focusable: true,
-                                selected: Some(row.selected),
-                                expanded: Some(row.expanded),
-                                ..SemanticState::default()
-                            })
+                    let mut node = SemanticNode::new(row_id, SemanticRole::TreeItem)
+                        .named(row.name.clone())
+                        .with_state(SemanticState {
+                            focusable: *selectable,
+                            selected: Some(*selectable && row.selected),
+                            expanded: Some(row.expanded),
+                            ..SemanticState::default()
+                        });
+                    if *selectable {
+                        node = node
                             .with_action(SemanticAction::Focus)
-                            .with_action(SemanticAction::Select)
-                            .with_action(action),
-                    );
+                            .with_action(SemanticAction::Select);
+                    }
+                    if let Some(expansion_key) = expansion_key {
+                        node = node.with_expansion_key(expansion_key);
+                    }
+                    if *expandable {
+                        node = node.with_action(action);
+                    }
+                    if let Some(aggregate) = aggregate {
+                        node = node.with_process_aggregate_semantics(aggregate.clone());
+                    }
+                    nodes.push(node);
                 }
             }
         }

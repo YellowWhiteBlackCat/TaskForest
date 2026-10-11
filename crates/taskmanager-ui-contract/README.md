@@ -48,3 +48,7 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
                                  binding, and the read-only three-axis ledger fold
 src/accessibility/               neutral accessibility model and snapshots
 ```
+
+## Process row semantic inputs
+
+See [`docs/ACCESSIBILITY_PROCESS_ROWS.md`](docs/ACCESSIBILITY_PROCESS_ROWS.md) for typed process observations, aggregate coverage, and tree action identity.

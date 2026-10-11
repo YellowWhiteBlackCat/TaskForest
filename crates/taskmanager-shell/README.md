@@ -175,3 +175,7 @@ src/process_filter.rs               process filter predicates
 src/memory.rs                       memory presentation helpers
 src/fixture/ (cpu_topology dashboard_history inventory process_insights setup smbios_memory) deterministic demo/capture/test seam
 ```
+
+## Shared semantic rows
+
+See [`docs/SEMANTIC_ROWS.md`](docs/SEMANTIC_ROWS.md) for the ordered shell-to-ui-contract adapter, row identity behavior, and typed process measurement handoff.

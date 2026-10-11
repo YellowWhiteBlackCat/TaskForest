@@ -42,7 +42,8 @@ pub use app::inventory_rows::{
 pub use app::process_rows::{
     APP_TREE_EXPANSION_KEY_PREFIX, ProcessProjectionGeneration, ProcessRowAggregate,
     ProcessRowAnchor, ProcessRowId, ProcessTreeRow, app_tree_expansion_key,
-    app_tree_expansion_key_for_identity, process_semantic_key, project_process_tree_rows,
+    app_tree_expansion_key_for_identity, append_process_semantic_rows, process_semantic_key,
+    project_process_tree_rows,
 };
 pub use app::{
     BatchFoldChanges, BatchFoldOutput, DirectTrackState, FeedbackBatchLifetime, FeedbackLifecycle,

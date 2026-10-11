@@ -10319,6 +10319,7 @@ name = "taskmanager-ui-contract"
 version = "0.2.0"
 dependencies = [
  "taskmanager-application",
+ "taskmanager-core",
  "taskmanager-platform-contract",
 ]
 
