@@ -117,7 +117,7 @@ case "$mode" in
         configure
         unset SHARED_UI_KIT_READ_KEY
         export TASKFOREST_SHARED_UI_KIT_KEY_FILE="$secret_file"
-        GIT_TERMINAL_PROMPT=0 cargo fetch --locked
+        GIT_TERMINAL_PROMPT=0 CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked
         ;;
     *)
         printf 'usage: %s fetch\n' "$0" >&2
