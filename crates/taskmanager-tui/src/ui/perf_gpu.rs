@@ -21,6 +21,7 @@ use taskmanager_shell::presentation::gpu_chart_metric::{
 use taskmanager_shell::presentation::{bytes, gpu_display_identity};
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{StatePanel, StatePanelKind};
 use crate::{TuiApp, TuiTheme};
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_platform_contract::CapabilityId;
@@ -181,11 +182,12 @@ pub(super) fn render_gpu_section(
     );
     let gpus = gpus.as_slice();
     if gpus.is_empty() {
-        super::render_empty_panel(
+        StatePanel::render(
             frame,
             theme,
             area,
             t("common.gpu"),
+            StatePanelKind::Message,
             "No GPU telemetry available",
         );
         return;
@@ -511,14 +513,7 @@ fn render_gpu_metric_chart(
         // The honest dash/gap projection (ADR-034): a selected family with
         // no trustworthy samples renders the collecting placeholder, never
         // a fabricated flat line at zero.
-        super::render_centered_state(
-            frame,
-            theme,
-            area,
-            &title,
-            IconId::Refresh,
-            t("perf.collecting_samples"),
-        );
+        super::render_collecting_panel(frame, theme, area, &title, t("perf.collecting_samples"));
         return;
     }
 

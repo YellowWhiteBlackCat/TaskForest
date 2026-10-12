@@ -11,7 +11,7 @@ use crate::ui::device_chart::{
 };
 use crate::ui::perf_layout::{DetailBody, DetailExtent, DetailHeader, main_with_stats};
 use crate::ui::responsive::{PerformanceChartInventory, PerformancePageBudget};
-use iced::widget::{column, row, text};
+use iced::widget::column;
 use iced::{Color, Element, Renderer};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::identity::DeviceId;
@@ -24,7 +24,7 @@ use taskmanager_shell::presentation::gpu_chart_metric::{
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsAction, GpuEngineRowsPresentation, present_gpu_engine_rows,
 };
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::Theme;
 
 use super::projection::GpuChartLayout;
 
@@ -121,52 +121,25 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
         graphs.push(engines_panel);
     }
     let mut stats = gpu_summary_lines(gpu);
-    match &engine_rows {
-        GpuEngineRowsPresentation::Active(engines) => {
-            if engines.is_empty() {
-                stats.push(StatRow::text(
-                    t("gpu.per_engine_title"),
-                    Some(t("gpu.engines_none_reported").to_string()),
-                ));
-            }
-            for engine in *engines {
-                stats.push(StatRow::text(
-                    engine.name.clone(),
-                    Some(format!("{:.0}%", engine.utilization_pct.round())),
-                ));
-            }
-        }
-        presentation => {
-            if let Some(message_key) = presentation.message_key()
-                && !matches!(presentation, GpuEngineRowsPresentation::PermissionRequired)
-            {
-                stats.push(StatRow::text(
-                    t("gpu.per_engine_title"),
-                    Some(t(message_key).to_string()),
-                ));
-                if matches!(presentation, GpuEngineRowsPresentation::MissingDependency) {
-                    stats.push(StatRow::text(
-                        "",
-                        Some(t("gpu.engines_install_hint").to_string()),
-                    ));
-                }
-            }
-        }
-    }
-    let stats_footer = super::device_status_footer(theme_snapshot, gpu.device_state.status);
+    append_gpu_engine_stats(
+        gpu,
+        &engine_rows,
+        app.performance.gpu_engines_expanded,
+        &mut stats,
+    );
     let block = main_with_stats(
         theme_snapshot,
         DetailHeader {
             title: gpu_title(gpu, index),
             subtitle: gpu_subtitle(gpu),
-            // The undroppable one-line VRAM fact renders at every vertical rung
-            // (GPUI `gpu_vram_vital_line` parity).
-            vital_line: Some(gpu_vram_vital_line(gpu, app.drive_units())),
+            // Any complete VRAM pair remains in the vital line at every rung;
+            // no pair omits the otherwise empty `— · —` line.
+            vital_line: gpu_vram_vital_line(gpu, app.drive_units()),
         },
         DetailBody {
             left: graphs,
             stats,
-            footer: stats_footer,
+            footer: None,
         },
         budget,
         DetailExtent::Fill,
@@ -370,19 +343,12 @@ pub(super) fn engine_rows_toggle_section<'a>(
             Message::ToggleGpuEngines,
             true,
         )),
-        GpuEngineRowsAction::Enable => Some(
-            row![
-                ghost_button(
-                    theme_snapshot,
-                    FocusTarget::GpuEngineRowsToggle,
-                    t("gpu.enable_per_engine"),
-                    Message::ToggleGpuEngines,
-                ),
-                text(t("gpu.engines_requires_auth")).size(f32::from(tokens::FONT_11)),
-            ]
-            .spacing(8)
-            .into(),
-        ),
+        GpuEngineRowsAction::Enable => Some(ghost_button(
+            theme_snapshot,
+            FocusTarget::GpuEngineRowsToggle,
+            t("gpu.enable_per_engine"),
+            Message::ToggleGpuEngines,
+        )),
         GpuEngineRowsAction::Reauthorize | GpuEngineRowsAction::Recheck => Some(ghost_button(
             theme_snapshot,
             FocusTarget::GpuEngineRowsToggle,

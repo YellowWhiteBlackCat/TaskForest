@@ -111,7 +111,7 @@ pub(crate) fn scroll_intent_system(
     let rows = -wheel_rows(
         scroll_input.delta.y,
         scroll_input.unit,
-        palette.inner.control_height_px,
+        palette.inner.control_height_px(),
     );
     if rows == 0 {
         return;

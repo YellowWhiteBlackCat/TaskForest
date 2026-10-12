@@ -28,7 +28,8 @@ use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, JustifyContent, Node, PositionType, UiRect, Val, px,
+    AlignItems, BackgroundColor, BorderRadius, FixedNode, JustifyContent, Node, UiRect, Val,
+    percent, px,
 };
 use bevy::ui::widget::Text;
 
@@ -84,19 +85,24 @@ pub(crate) fn tooltip_card_scene(text: &str, palette: &UiPalette) -> impl Scene 
     let label = text.to_string();
     bsn! {
         Node {
-            position_type: PositionType::Absolute,
+            // Viewport-anchored hover card: offsets resolve against the
+            // camera viewport, immune to any future shell layout reflow.
             bottom: px(34.0),
             left: px(24.0),
+            min_width: px(0.0),
+            max_width: percent(90),
             padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_4())),
             border_radius: BorderRadius::all(Val::Px(radius)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
         }
+        FixedNode
         BackgroundColor({ palette.panel_fill })
         TooltipOverlay
         Pickable::IGNORE
         Children [
-             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::WordOrCharacter }
+             Node { min_width: px(0.0), max_width: percent(100) } Pickable::IGNORE
         ]
     }
 }

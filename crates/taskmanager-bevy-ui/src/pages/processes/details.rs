@@ -8,8 +8,8 @@
 //! The panel deliberately has two refresh paths:
 //!
 //! - a selection or shell-fold observer rebuilds the small, bounded surface;
-//! - an official Bevy 0.20 `Button` requests a fresh identity-safe insight
-//!   sample through the existing app-host client seam.
+//! - an official Bevy 0.20 `Button` queues a fresh identity-safe insight
+//!   sample for the shared PreUpdate effect drain.
 //!
 //! There is no per-frame polling and no native read here. Pending, mismatched,
 //! denied, unsupported, and empty observations keep their typed honest copy.
@@ -20,14 +20,14 @@ use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, percent,
-    px,
+    px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use bevy::ui_widgets::{Button, ScrollArea};
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
@@ -42,8 +42,9 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
 
 use super::super::processes;
-use crate::app::{FrontendTrack, PageContext, SharedRuntimeHandle, ShellTrack};
+use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
+use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
 
@@ -302,13 +303,16 @@ pub(super) fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
     }
 }
 
+mod effects;
 mod formatting;
 use bevy::text::{LineBreak, TextLayout};
+use effects::{
+    on_network_escalate_activated, on_refresh_activated, queue_selected_process_insights,
+};
 pub(crate) use formatting::*;
 use taskmanager_application::ProjectedProcessInsights;
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::command_identity_summary;
-use taskmanager_shell::queue_effect;
 
 // ---- observer bridge ----------------------------------------------------
 
@@ -316,7 +320,7 @@ fn bootstrap_details_page(
     trigger: On<Add<ProcessDetailsRoot>>,
     mut commands: Commands,
     mut track: Option<NonSendMut<FrontendTrack>>,
-    runtime: Option<Res<SharedRuntimeHandle>>,
+    mut pending: Option<ResMut<PendingEffects>>,
 ) {
     let root = trigger.event().entity;
     let fold_observer = commands.spawn(Observer::new(on_details_folded)).id();
@@ -330,8 +334,8 @@ fn bootstrap_details_page(
         .entity(root)
         .add_one_related::<ChildOf>(selection_observer);
 
-    if let Some(mut track) = track.take() {
-        queue_selected_process_insights(&mut track, runtime.as_deref(), false);
+    if let (Some(mut track), Some(pending)) = (track.take(), pending.as_deref_mut()) {
+        queue_selected_process_insights(&mut track, pending, false);
     }
 }
 
@@ -362,7 +366,7 @@ fn on_details_selection_changed(
     roots: Query<Entity, With<ProcessDetailsRoot>>,
     artifacts: Query<Entity, With<ProcessDetailsArtifact>>,
     mut commands: Commands,
-    runtime: Option<Res<SharedRuntimeHandle>>,
+    mut pending: Option<ResMut<PendingEffects>>,
 ) {
     let Ok(root) = roots.single() else {
         return;
@@ -376,43 +380,9 @@ fn on_details_selection_changed(
     );
     // The table observer has already reduced the selection before publishing
     // the event, so this uses exactly the same shell target as the panel.
-    queue_selected_process_insights(&mut track, runtime.as_deref(), false);
-}
-
-fn on_refresh_activated(
-    _activate: On<Activate>,
-    mut track: NonSendMut<FrontendTrack>,
-    runtime: Option<Res<SharedRuntimeHandle>>,
-) {
-    queue_selected_process_insights(&mut track, runtime.as_deref(), true);
-}
-
-fn queue_selected_process_insights(
-    track: &mut FrontendTrack,
-    runtime: Option<&SharedRuntimeHandle>,
-    force: bool,
-) {
-    let Some(target) = track.shell.selected_process_identity() else {
-        return;
-    };
-    if !force
-        && track
-            .shell
-            .projection()
-            .process_insights
-            .as_ref()
-            .is_some_and(|projection| projection.target == target)
-    {
-        return;
+    if let Some(pending) = pending.as_deref_mut() {
+        queue_selected_process_insights(&mut track, pending, false);
     }
-    let Some(effect) = track.shell.request_process_insights() else {
-        return;
-    };
-    let Some(runtime) = runtime else {
-        return;
-    };
-    let mut client = runtime.shared.lock_client();
-    queue_effect(&mut track.shell, &mut client, effect);
 }
 
 fn rebuild(
@@ -571,7 +541,7 @@ fn insight_card_scene(card: &InsightCard, palette: &UiPalette) -> impl Scene + u
     bsn! {
         Node {
             width: percent(100),
-            min_height: px(palette.control_height_px),
+            min_height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::FlexStart,
             column_gap: Val::Px(space_2()),
@@ -599,7 +569,7 @@ fn insight_card_scene(card: &InsightCard, palette: &UiPalette) -> impl Scene + u
 fn network_escalate_button_scene(palette: &UiPalette) -> impl Scene + use<> {
     bsn! {
         Node {
-            height: px(palette.control_height_px),
+            height: rem(palette.control_height_rem),
             padding: UiRect::horizontal(Val::Px(space_8())),
             align_items: AlignItems::Center,
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
@@ -613,24 +583,11 @@ fn network_escalate_button_scene(palette: &UiPalette) -> impl Scene + use<> {
     }
 }
 
-fn on_network_escalate_activated(
-    _activate: On<Activate>,
-    mut track: NonSendMut<FrontendTrack>,
-    runtime: Option<Res<SharedRuntimeHandle>>,
-) {
-    let effect = ShellApp::request_process_network_escalation();
-    let Some(runtime) = runtime else {
-        return;
-    };
-    let mut client = runtime.shared.lock_client();
-    queue_effect(&mut track.shell, &mut client, effect);
-}
-
 fn refresh_button_scene(palette: &UiPalette) -> impl Scene + use<> {
     bsn! {
         Node {
             width: px(space_24() * 3.0),
-            height: px(palette.control_height_px),
+            height: rem(palette.control_height_rem),
             padding: UiRect::horizontal(Val::Px(space_8())),
             align_items: AlignItems::Center,
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
@@ -647,3 +604,7 @@ fn refresh_button_scene(palette: &UiPalette) -> impl Scene + use<> {
 #[cfg(test)]
 #[path = "../../../tests/headless/pages/process_details.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/headless/pages/process_details/effects.rs"]
+mod effect_tests;

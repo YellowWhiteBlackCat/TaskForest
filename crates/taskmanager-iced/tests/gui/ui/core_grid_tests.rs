@@ -106,7 +106,25 @@ fn core_cell_program_fingerprint_tracks_history_not_color() {
 
 #[test]
 fn format_core_readout_surfaces_clock_frequency() {
-    assert_eq!(format_core_readout(35.2, None), " 35%");
-    assert_eq!(format_core_readout(50.0, Some(800)), " 50% · 800 MHz");
-    assert_eq!(format_core_readout(75.8, Some(3600)), " 76% · 3.6 GHz");
+    assert_eq!(format_core_readout(Some(35.2), None), " 35%");
+    assert_eq!(format_core_readout(Some(50.0), Some(800)), " 50% · 800 MHz");
+    assert_eq!(
+        format_core_readout(Some(75.8), Some(3600)),
+        " 76% · 3.6 GHz"
+    );
+}
+
+#[test]
+fn format_core_readout_keeps_missing_and_non_finite_usage_honest() {
+    assert_eq!(format_core_readout(None, None), MISSING_VALUE);
+    assert_eq!(format_core_readout(Some(f32::NAN), None), MISSING_VALUE);
+    assert_eq!(
+        format_core_readout(Some(f32::INFINITY), None),
+        MISSING_VALUE
+    );
+    assert_eq!(
+        format_core_readout(Some(f32::NAN), Some(1800)),
+        "1.8 GHz",
+        "an unavailable utilization must not hide an independently observed clock"
+    );
 }

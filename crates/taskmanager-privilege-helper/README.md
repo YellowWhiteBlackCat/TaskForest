@@ -2,25 +2,35 @@
 
 ## Role
 
-One-shot Linux helper for Intel GPU PMU reads, invoked through the escalation
-seam and emitting a typed JSON envelope.
+Linux package for fixed-operation privileged helper binaries, invoked through
+the escalation seam and emitting typed JSON envelopes.
 
 ## Boundary
 
-The helper accepts only the fixed `--gpu-engines` operation, owns its privileged
-resource for that invocation and never becomes a general command runner.
+Each binary target accepts one fixed operation, owns its privileged resource
+for that invocation, and has a separate installed path and polkit action. The
+package never becomes a general command runner.
 
 ## Contract and verification
 
-Exit code, stderr, JSON schema, denial and malformed input are part of the
-contract. Package/polkit verification and a live perf receipt are separate;
-without the latter the capability remains permission-limited.
+The GPU PMU fixed-operation rule, typed outcome surface and receipt separation
+are specified in [`docs/HELPER_CONTRACT.md`](docs/HELPER_CONTRACT.md). The
+`taskforest-smart-self-test-helper` target also verifies a persistent disk
+identity and the exact requested self-test capability before starting one test.
 
 ## Module map
 
 ```text
-src/main.rs                  root entry, single bounded invocation
+src/main.rs                  Intel GPU PMU helper target
+src/smart_self_test_main.rs  SMART helper binary entry
+src/smart_self_test.rs       identity-checked SMART test operation
 src/discovery.rs  engine_names.rs   GPU engine discovery
 src/sample.rs                PMU sampling
 src/json.rs                  fixed JSON envelope output
 ```
+
+## Docs
+
+- [`docs/HELPER_CONTRACT.md`](docs/HELPER_CONTRACT.md) — the fixed-operation rule, contract
+  surface and module notes.
+- [ADR-022](../../adr/022-audited-perf-boundary-crate.md) — audited perf boundary.

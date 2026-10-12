@@ -22,7 +22,7 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, px,
+    Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -250,7 +250,7 @@ fn chip_button(
     Box::new(bsn! {
 
             Node {
-                height: px(palette.control_height_px),
+                height: rem(palette.control_height_rem),
                 padding: UiRect::horizontal(Val::Px(space_12())),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,

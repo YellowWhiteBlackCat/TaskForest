@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest per-feature escalation policy (ADR-023). This action authorizes
+  one explicitly requested SMART self-test operation after the fixed helper
+  revalidates the persistent disk identity and requested test capability.
+
+  Install paths:
+    this file   -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy
+    helper bin -> /usr/libexec/taskforest-smart-self-test-helper
+
+  The annotated path MUST match the path passed to pkexec exactly.
+-->
+<policyconfig>
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.smart-self-test">
+    <description>Start a SMART self-test for a selected disk</description>
+    <message>TaskForest needs authorization to start the requested SMART self-test on the selected disk. The fixed helper checks the live disk identity and starts only the selected test kind.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-smart-self-test-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

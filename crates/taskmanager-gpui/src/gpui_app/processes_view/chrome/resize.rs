@@ -1,11 +1,11 @@
-//! Processes-column drag-resize adapter. The reusable GPUI handle, typed drag
-//! payload, and reference interaction live in `taskmanager-ui`; this page
-//! module only maps the generic column index onto `SortCol` and owns the
-//! process-table session anchor.
+//! Processes-column resize adapter. The reusable GPUI handle, typed drag
+//! payload, keyboard steps, and reference bounds live in `taskmanager-ui`; this
+//! page module maps the generic control onto `SortCol` and owns the process
+//! table's live width and drag-session anchor.
 
 use gpui::{
-    App, Div, DragMoveEvent, Entity, InteractiveElement, ParentElement, Pixels, Stateful, Styled,
-    div,
+    App, Div, DragMoveEvent, Entity, FocusHandle, InteractiveElement, ParentElement, Pixels,
+    Stateful, Styled, div, px,
 };
 use std::collections::HashMap;
 
@@ -14,7 +14,8 @@ use crate::gpui_app::root::RootView;
 use taskmanager_shell::SortCol;
 use taskmanager_theme::Theme;
 use taskmanager_ui::data::table::{
-    ColumnResizeDrag, ColumnResizeHandleProps, column_resize_handle, width_from_drag,
+    COLUMN_RESIZE_KEYBOARD_STEP, ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
+    column_resize_handle_with_keyboard, width_from_drag,
 };
 
 /// Resolve a column's live header width (user override else default) — the
@@ -27,23 +28,25 @@ pub(super) fn header_col_width(widths: &HashMap<SortCol, Pixels>, col: SortCol) 
         .unwrap_or_else(|| default_width(col))
 }
 
-/// Mount the reference GPUI resize handle for one process-table column. The
-/// page keeps the `SortCol` identity and its anchor state; the shared helper
-/// owns the hitbox, typed drag construction, propagation stop, and outside
-/// release hook.
+/// Mount the reference GPUI resize control for one process-table column. The
+/// page keeps the `SortCol` identity, focus handle, live width and drag anchor;
+/// the shared helper owns the hitbox, typed drag construction, keyboard step
+/// actions, propagation stop, and outside-release hook.
 fn proc_resize_handle(
     theme: &Theme,
     col: SortCol,
     start_width: Pixels,
     entity: &Entity<RootView>,
+    focus_handle: FocusHandle,
 ) -> Stateful<Div> {
     let col_index = column_index(col);
     let owner = entity.entity_id();
     let ent_move = entity.clone();
     let ent_start = entity.clone();
     let ent_finish = entity.clone();
+    let ent_step = entity.clone();
 
-    column_resize_handle(ColumnResizeHandleProps {
+    let props = ColumnResizeHandleProps {
         id: ("proc-resize-h", col_index).into(),
         owner,
         column: col_index,
@@ -78,11 +81,21 @@ fn proc_resize_handle(
                 cx.notify();
             });
         },
+    };
+    column_resize_handle_with_keyboard(props, focus_handle, move |step, cx| {
+        ent_step.update(cx, |view, cx| {
+            let delta = match step {
+                ColumnResizeStep::Narrower => -COLUMN_RESIZE_KEYBOARD_STEP,
+                ColumnResizeStep::Wider => COLUMN_RESIZE_KEYBOARD_STEP,
+            };
+            let width = view.proc_col_width(col);
+            view.resize_proc_col(col, width + px(delta), cx);
+        });
     })
     .debug_selector(move || format!("tm-proc-resize-h:{col_index}"))
 }
 
-/// Wrap a sized header cell with its right-edge resize handle. The caller
+/// Wrap a sized header cell with its right-edge resize control. The caller
 /// applies `.w(width)` (or `.flex_grow()` for Name) to the `sort_cell` before
 /// passing it in. Mirrors the shared table crate's `render_th` cell+handle
 /// composition; called only for resizable columns — `Name` (the flexible growable
@@ -94,11 +107,17 @@ pub(super) fn mount_resize_handle(
     start_width: Pixels,
     theme: &Theme,
     entity: &Entity<RootView>,
+    resize_focus_handles: &HashMap<SortCol, FocusHandle>,
 ) -> Div {
-    div()
-        .flex()
-        .flex_row()
-        .h_full()
-        .child(cell)
-        .child(proc_resize_handle(theme, col, start_width, entity))
+    let mut wrapper = div().flex().flex_row().h_full().child(cell);
+    if let Some(focus_handle) = resize_focus_handles.get(&col).cloned() {
+        wrapper = wrapper.child(proc_resize_handle(
+            theme,
+            col,
+            start_width,
+            entity,
+            focus_handle,
+        ));
+    }
+    wrapper
 }

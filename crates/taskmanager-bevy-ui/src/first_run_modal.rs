@@ -21,7 +21,7 @@ use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
-use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
+use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px, rem};
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition};
 use bevy::ui_widgets::{Activate, Button};
@@ -157,7 +157,7 @@ pub(crate) fn action_scene(
     command: FirstRunCommand,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(Val::Px(space_8())) }
+    bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::all(Val::Px(space_8())) }
     BackgroundColor({ palette.content_bg }) Button SetupControl({ command }) on(activate)
     Children [ Text(label) TextRole(Role::Body) Pickable::IGNORE ] }
 }

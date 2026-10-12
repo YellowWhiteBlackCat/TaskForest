@@ -1,11 +1,14 @@
 //! Complete selected health groups in a bounded terminal modal.
 use super::alerts::{metric_label, metric_unit};
+use super::containers::KeyHint;
+use crate::command_palette::{TuiSurfaceAction, TuiSurfaceScope, surface_hint_pairs};
 use crate::health_review::HealthReviewMode;
 use crate::{TuiApp, TuiTheme};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    text::Line,
+    style::Style,
+    text::{Line, Span},
     widgets::Paragraph,
 };
 use taskmanager_application::i18n::t;
@@ -14,6 +17,7 @@ use taskmanager_core::core::alerts::Alert;
 use taskmanager_shell::presentation::health_review::{
     HealthReviewGroup, HealthReviewRow, sensor_groups, storage_groups,
 };
+
 pub(crate) fn groups(app: &TuiApp) -> Vec<HealthReviewGroup> {
     let projection = app.projection();
     match app.health_review.mode {
@@ -95,11 +99,36 @@ fn alert_group(alert: &Alert, context: &str) -> HealthReviewGroup {
         ],
     }
 }
+
+fn navigation_hint_line(
+    theme: TuiTheme,
+    modes: &[HealthReviewMode],
+    prefix: Option<&'static str>,
+) -> Line<'static> {
+    let hints = modes
+        .iter()
+        .copied()
+        .flat_map(|mode| {
+            surface_hint_pairs(
+                TuiSurfaceScope::HealthReview,
+                TuiSurfaceAction::SelectHealthReview(mode),
+            )
+        })
+        .collect();
+    let mut spans = prefix
+        .map(|text| vec![Span::styled(text.to_owned(), Style::new().fg(theme.dim))])
+        .unwrap_or_default();
+    spans.extend(KeyHint::spans(theme, hints));
+    Line::from(spans)
+}
+
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, inner: Rect) {
+    let event_review = app.health_review.mode == HealthReviewMode::Events;
+    let footer_height = if event_review { 4 } else { 3 };
     let [heading, body, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(1),
-        Constraint::Length(3),
+        Constraint::Length(footer_height),
     ])
     .areas(inner);
     let groups = groups(app);
@@ -129,23 +158,31 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, inner
     } else {
         frame.render_widget(Paragraph::new("No observations in this view"), body);
     }
+    let mut footer_lines = vec![
+        navigation_hint_line(
+            theme,
+            &[HealthReviewMode::ActiveAlerts, HealthReviewMode::Events],
+            Some("Up/Down groups · "),
+        ),
+        navigation_hint_line(
+            theme,
+            &[
+                HealthReviewMode::Storage,
+                HealthReviewMode::Sensors,
+                HealthReviewMode::Rules,
+            ],
+            None,
+        ),
+    ];
+    if event_review {
+        footer_lines.push(Line::from(format!(
+            "F2 Filter {:?} · F5 Export · F8 Clear",
+            app.health_review.event_filter
+        )));
+    }
+    footer_lines.push(Line::from(format!("h / Esc {}", t("chrome.close"))));
     frame.render_widget(
-        Paragraph::new(vec![
-            Line::from("Up/Down groups · p Active · e Events"),
-            Line::from(if app.health_review.mode == HealthReviewMode::Events {
-                format!(
-                    "F2 Filter {:?} · F5 Export · F8 Clear",
-                    app.health_review.event_filter
-                )
-            } else {
-                "w Storage · s Sensors · q Rules".into()
-            }),
-            Line::from(format!(
-                "z Short test · x Extended test · h / Esc {}",
-                t("chrome.close")
-            )),
-        ])
-        .style(ratatui::style::Style::new().fg(theme.dim)),
+        Paragraph::new(footer_lines).style(ratatui::style::Style::new().fg(theme.dim)),
         footer,
     );
 }

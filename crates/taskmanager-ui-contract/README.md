@@ -15,6 +15,9 @@ first-class divergence quality baselines under "求同存异" standards governan
 
 The crate has no renderer, OS API, provider, window object or business I/O. It
 expresses intent and semantics that GPUI, Iced, TUI, and Bevy adapt independently.
+Process semantic rows retain core-owned `ScalarObservation` and
+`AggregateMetric` values so availability, failure reasons, retained values,
+and aggregate coverage survive the shared projection.
 
 ## Contract and verification
 
@@ -30,7 +33,8 @@ defines an explicit, toolkit-neutral semantic specification (`CapabilitySemantic
 covering user-facing behavior, keyboard/pointer semantics, and invariant expectations;
 `ColumnDragResize` is a component-level contract whose GPUI reference is
 `taskmanager-ui/src/data/table/resize.rs`; page identity and persistence stay
-outside this crate.
+outside this crate. Registry and coverage detail lives in
+[`docs/CAPABILITY_REGISTRY.md`](docs/CAPABILITY_REGISTRY.md).
 
 ## Module map
 
@@ -48,6 +52,14 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
                                  binding, and the read-only three-axis ledger fold
 src/accessibility/               neutral accessibility model and snapshots
 ```
+
+## Docs
+
+- [`docs/CAPABILITY_REGISTRY.md`](docs/CAPABILITY_REGISTRY.md) — capability semantic specs,
+  navigation vocabulary and the feature-coverage ledger.
+- [`UI_COMPONENT_ARCHITECTURE`](../../docs/UI_COMPONENT_ARCHITECTURE.md) and
+  [ADR-046](../../adr/046-bevy-fourth-shared-contract-shape.md) — shared contract shape.
+
 
 ## Process row semantic inputs
 

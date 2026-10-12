@@ -69,8 +69,13 @@ pub(crate) struct UiPalette {
     pub(crate) panel_radius_px: f32,
     /// Control (nav item, table row) corner radius in px.
     pub(crate) control_radius_px: f32,
-    /// Standard control / table-row height in px, from the density scale.
-    pub(crate) control_height_px: f32,
+    /// Standard control / table-row height in `rem`, from the density scale.
+    /// `Val::Rem` resolves against the live [`RemSize`], so a UI-size choice
+    /// re-scales every control without touching a scene.
+    pub(crate) control_height_rem: f32,
+    /// Standard inline icon extent in `rem`, from the size scale — the same
+    /// ladder the type roles ride, so icons re-scale with the reading size.
+    pub(crate) icon_rem: f32,
     /// Accent ink — the theme's accent token.
     pub(crate) accent: bevy::color::Color,
     /// Heading ink.
@@ -101,15 +106,46 @@ pub(crate) struct UiPalette {
     pub(crate) border_color: bevy::color::Color,
     /// High-contrast modality-aware focus ring color (derived from theme palette ring).
     pub(crate) focus_ring: bevy::color::Color,
+    /// The UI-size axis this palette renders (`Small`/`Standard`/`Large`).
+    /// Same type-scale authority as GPUI's root rem; the settings read-back
+    /// and the capture overrides resolve against it.
+    pub(crate) ui_size: UiSize,
+    /// The rem size in logical px the palette was resolved for — the value
+    /// the window's [`RemSize`] resource must carry while this palette is
+    /// live (the body type of the size ladder: 14/16/18px).
+    pub(crate) rem_px: f32,
 }
 
-/// Resolve the window palette from a theme snapshot.
+impl UiPalette {
+    /// The live control / table-row height in logical px, derived from the
+    /// rem ratio and the current rem size. Pure-core window math (row
+    /// counting, virtual windows) reads this; scenes author `rem(...)` Vals.
+    #[must_use]
+    pub(crate) fn control_height_px(&self) -> f32 {
+        self.control_height_rem * self.rem_px
+    }
+
+    /// The live inline icon extent in logical px, derived from the rem ratio
+    /// and the current rem size.
+    #[must_use]
+    pub(crate) fn icon_size_px(&self) -> f32 {
+        self.icon_rem * self.rem_px
+    }
+}
+
+/// Resolve the window palette from a theme snapshot and the UI-size axis.
 ///
-/// The M0 window deliberately takes the cold-start theme (`Theme::dark()`);
-/// appearance detection and config restoration arrive with the first feature
-/// page (M1), so the adapter stays the only place tokens become bevy values.
-pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
-    let standard = UiSize::Standard;
+/// Every length that belongs to the type ladder is authored as a `rem` ratio
+/// of the size's body type (14/16/18px), mirroring GPUI's root-rem contract:
+/// the window's `RemSize` resource carries `rem_px`, so a UI-size choice
+/// re-scales type, icons and controls in one place. Radii are theme radius
+/// tokens and stay px — they do not ride the reading-size axis.
+///
+/// The ratios derive from the same `UiSize` tables the other frontends read,
+/// so all four surfaces resolve identical px metrics per size choice.
+pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
+    let rem_px = ui_size.body_font_size().0;
+    let ratio = |px: f32| px / rem_px;
     UiPalette {
         cpu: theme_color(theme.cpu),
         memory: theme_color(theme.memory),
@@ -127,7 +163,8 @@ pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
         scrim: theme_color(theme.scrim),
         panel_radius_px: tokens::card_radius(theme).0,
         control_radius_px: tokens::control_radius(theme).0,
-        control_height_px: standard.control_height().0,
+        control_height_rem: ratio(ui_size.control_height().0),
+        icon_rem: ratio(ui_size.icon_size().0),
         accent: theme_color(theme.accent),
         heading_color: theme_color(theme.fg),
         body_color: theme_color(theme.fg),
@@ -138,25 +175,27 @@ pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
         border_color: theme_color(theme.border),
         focus_ring: theme_color(theme.with_focus_visible(true).palette().ring),
         heading: TextFont {
-            font_size: FontSize::Px(standard.page_title_font_size().0),
+            font_size: FontSize::Rem(ratio(ui_size.page_title_font_size().0)),
             weight: theme_weight(tokens::FONT_WEIGHT_HEADER),
             ..TextFont::default()
         },
         body: TextFont {
-            font_size: FontSize::Px(f32::from(tokens::FONT_BODY)),
+            font_size: FontSize::Rem(1.0),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
         caption: TextFont {
-            font_size: FontSize::Px(f32::from(tokens::FONT_CAPTION)),
+            font_size: FontSize::Rem(ratio(ui_size.caption_font_size().0)),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
         mono: TextFont {
-            font_size: FontSize::Px(f32::from(tokens::FONT_BODY)),
+            font_size: FontSize::Rem(1.0),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
+        ui_size,
+        rem_px,
     }
 }
 

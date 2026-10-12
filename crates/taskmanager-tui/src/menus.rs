@@ -4,6 +4,7 @@
 //! line budget. Behavior is unchanged — every method stays reachable on
 //! `TuiApp` (impl blocks may live in any module of the defining crate).
 
+use crate::smart_self_test::target_is_running;
 use crate::ui;
 use crate::{
     ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
@@ -15,15 +16,13 @@ use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
     ProcessAffinityReady, ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
 };
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::process::{FrozenProcessIdentity, PriorityTier};
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::StorageDeviceKey;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 /// The frozen batch-control menu target: the menu cursor plus the count of
@@ -697,10 +696,11 @@ fn affinity_last_good<'a>(
 }
 
 /// Resolve the frozen SMART self-test intent the Performance·Disk surface can
-/// offer, or `None` when the current snapshot has no disk whose provider
-/// reports [`SmartAvailability::Available`] (the exact readiness GPUI's
-/// health view demands before it enables its self-test actions). The TUI disk
-/// view has no per-disk cursor, so the target is the first SMART-capable disk
+/// offer, or `None` when the current snapshot has no disk with explicit Short
+/// support evidence or the first capable target's
+/// exact current report is already `Running`. The TUI direct `t` chord and its
+/// palette twin share this guard. The TUI disk view has no per-disk cursor, so
+/// the target is the first SMART-capable disk
 /// in snapshot order — the same first-disk fallback GPUI uses when no device
 /// is selected. The intent freezes the full identity (device id, hot-plug
 /// generation, provider locator, display name), so the shared confirmation
@@ -711,18 +711,8 @@ fn affinity_last_good<'a>(
 #[must_use]
 pub(crate) fn smart_self_test_target(app: &TuiApp) -> Option<SmartSelfTestIntent> {
     let disks = app.sidebar_disks();
-    let disk = disks
+    let intent = disks
         .iter()
-        .find(|disk| disk.smart_availability == SmartAvailability::Available)?;
-    Some(SmartSelfTestIntent {
-        device_id: DeviceId::new(disk.device_id.clone()),
-        device_generation: disk.device_generation,
-        device_key: StorageDeviceKey::new(disk.name.clone()),
-        display_name: if disk.model.is_empty() {
-            disk.name.clone()
-        } else {
-            disk.model.clone()
-        },
-        kind: SmartSelfTestKind::Short,
-    })
+        .find_map(|disk| self_test_intent(disk, SmartSelfTestKind::Short))?;
+    (!target_is_running(app, &intent)).then_some(intent)
 }

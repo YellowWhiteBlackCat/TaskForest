@@ -25,6 +25,7 @@ use taskmanager_ui::theme_binding::pixels;
 use taskmanager_ui_contract::find;
 use taskmanager_ui_contract::{IconId, ProcessColumnSpec};
 
+pub(crate) mod aggregate_display;
 mod cells;
 mod formatting;
 use cells::append_body_cells;
@@ -662,7 +663,7 @@ pub fn proc_row_with_layout(
             });
         })
         // Focusable so clicking a row routes keyboard focus here (the row's own
-        // on_key_down then handles ArrowUp/Down/Left/Right). gpui 0.2.2 lays uniform_list
+        // on_key_down then handles Space and ArrowUp/Down/Left/Right). gpui 0.2.2 lays uniform_list
         // rows out as independent roots, so a key handler on the list itself wouldn't
         // reliably receive bubbled row key events — hence per-row handlers.
         //
@@ -678,6 +679,34 @@ pub fn proc_row_with_layout(
         .on_key_down(move |ev: &KeyDownEvent, _win, cx: &mut App| {
             let key = ev.keystroke.key.as_str();
             match key {
+                "space"
+                    if !ev.keystroke.modifiers.control
+                        && !ev.keystroke.modifiers.shift
+                        && !ev.keystroke.modifiers.alt
+                        && !ev.keystroke.modifiers.platform =>
+                {
+                    // Space toggles the live selected node (or this focused
+                    // row when selection is empty) through the same structural
+                    // action as its chevron. It never changes the selected
+                    // ProcessRowId, so collapsing a subtree cannot replace its
+                    // frozen row identity with a visible ancestor.
+                    ent_key.update(cx, |v, cx| {
+                        let target = v.selected_process_row().and_then(|active| {
+                            all_rows
+                                .iter()
+                                .find(|row| row.selection_key == Some(active))
+                        });
+                        let (has_children, toggle) = match target {
+                            Some(row) => (row.has_children, &row.toggle),
+                            None => (key_has_children, &key_toggle),
+                        };
+                        if has_children {
+                            toggle_expansion(v, toggle);
+                            cx.notify();
+                        }
+                    });
+                    cx.stop_propagation();
+                }
                 "down" | "up" => {
                     let down = key == "down";
                     // Bare arrow collapses to the focused row (standard list

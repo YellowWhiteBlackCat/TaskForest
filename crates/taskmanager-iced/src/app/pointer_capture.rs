@@ -38,7 +38,7 @@ pub(crate) fn subscription(capture: Option<CapturedDrag>) -> iced::Subscription<
 /// Cursor motion advances the session; the left release closes it. All other
 /// events are discarded so the subscription stays traffic-free outside the
 /// two shapes the drag actually consumes.
-fn process_column_drag_event(
+pub(crate) fn process_column_drag_event(
     event: iced::Event,
     _status: iced::event::Status,
     _window: iced::window::Id,

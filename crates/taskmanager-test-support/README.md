@@ -26,22 +26,10 @@ when a consumer demonstrably needs value-agnostic rich fixtures.
 
 ## Contract and verification
 
-Builders must use the same typed constructors and apply operations as production
-providers. They must not recreate writable mirrors or a second domain model.
-Observation assembly is staged at compile time: a builder may install an
-optional whole-group base once, then apply named overrides. The first named
-override closes the base stage, so a later whole-group replacement is not a
-legal method call. The process scalar and metadata groups advance independently.
-
-Builder inventory: `DiskMetricsFixtureBuilder` and
-`DiskPartitionFixtureBuilder` (disk rows/partitions), `NetworkMetricsFixtureBuilder`
-(network rows), `ProcessItemFixtureBuilder` (process rows), and
-`MemoryMetricsFixtureBuilder` (memory rows — both whole-group bases stay legal
-until the first named override; `from_item` keeps the prior groups so a fixture
-can layer one family, e.g. the zram `mm_stat` depth, onto an existing snapshot).
-
-Check with `cargo check -p taskmanager-test-support --all-targets` and its
-downstream behavior tests.
+Builder staging, composition discipline and the builder inventory are
+specified in [`docs/BUILDER_RULES.md`](docs/BUILDER_RULES.md); check with
+`cargo check -p taskmanager-test-support --all-targets` and its downstream
+behavior tests.
 
 ## Module map
 
@@ -54,3 +42,8 @@ src/smbios_memory.rs            responding memory-inventory port and recorded re
 ```
 
 Consumed only through dev-dependencies; never a product dependency.
+
+## Docs
+
+- [`docs/BUILDER_RULES.md`](docs/BUILDER_RULES.md) — compile-time staging, composition
+  discipline and the builder inventory.

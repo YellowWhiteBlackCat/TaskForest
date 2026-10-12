@@ -10,9 +10,17 @@ use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::metrics::CpuMetrics;
 use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
-use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
-use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_core::core::process::{
+    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
+    ProcessMetadataObservation, ProcessScalarObservations,
+};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskmanager_core::core::{
+    CpuScalarObservations, FailureKind, ScalarAvailability, ScalarObservation,
+};
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
+use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::SemanticSnapshot;
 use taskmanager_ui_contract::{
@@ -392,6 +400,66 @@ async fn assistive_technology_modal_dismissal_uses_the_shared_surface_owner(
 }
 
 #[gpui::test]
+async fn session_confirmation_publishes_its_frozen_target_to_assistive_technology(
+    cx: &mut TestAppContext,
+) {
+    set_language(Language::En);
+    let root = make_root(cx);
+    let session = SessionItem {
+        id: "7".into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "test-boot".into(),
+            created_monotonic_usec: 700,
+        }),
+        uid: 1000,
+        user: "capture-user".into(),
+        seat: Some("seat0".into()),
+        tty: Some("tty7".into()),
+        remote: false,
+        timestamp: None,
+    };
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        seed_direct_track_fact(
+            &mut view.shell,
+            DirectTrackSeedFact::Sessions(Some(vec![session.clone()])),
+        );
+        let projection = view.projection().clone();
+        view.materialized.replace_sessions(
+            projection.sessions_revision,
+            projection.sessions.clone().unwrap_or_default(),
+            projection.sessions_source.clone().unwrap_or_default(),
+        );
+        view.page = TopPage::Users;
+        assert!(
+            view.request_session_control_confirmation(&session, SessionControlAction::Disconnect,)
+        );
+    });
+
+    let snapshot = snapshot_of(cx, &root, 29);
+    let status = snapshot
+        .get(&SemanticNodeId::borrowed("status"))
+        .expect("status live region present");
+    let announcement = status.name().unwrap_or_default();
+    assert!(
+        announcement
+            .to_ascii_lowercase()
+            .contains("disconnect session 7 for capture-user")
+    );
+    let modal = snapshot
+        .get(&SemanticNodeId::borrowed(
+            "modal:session-control-confirmation",
+        ))
+        .expect("session confirmation modal present");
+    assert!(
+        modal
+            .description()
+            .unwrap_or_default()
+            .contains("capture-user")
+    );
+}
+
+#[gpui::test]
 async fn publish_accessibility_snapshot_advances_revision_and_updates_published_tree(
     cx: &mut TestAppContext,
 ) {
@@ -419,6 +487,71 @@ async fn publish_accessibility_snapshot_advances_revision_and_updates_published_
             assert_eq!(view.a11y_snapshot.as_ref().unwrap().revision(), 2);
         }
     });
+}
+
+#[gpui::test]
+async fn aggregate_group_accessibility_summary_matches_typed_coverage_and_reason(
+    cx: &mut TestAppContext,
+) {
+    pin_english();
+    let application = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
+        .expect("fixture identity");
+    let item = |pid: u32, cpu: ScalarObservation<f32>, memory: u64| {
+        ProcessItemFixtureBuilder::new()
+            .pid(pid)
+            .name(format!("editor-{pid}"))
+            .application_identity_observation(ProcessMetadataObservation::available(
+                application.clone(),
+                1,
+            ))
+            .scalar_observations(ProcessScalarObservations {
+                start_token: ScalarObservation::available(u64::from(pid) + 100, 1),
+                cpu_percentage: cpu,
+                memory_bytes: ScalarObservation::available(memory, 1),
+                ..ProcessScalarObservations::default()
+            })
+            .build()
+    };
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.replace_processes_for_test(vec![
+            item(1001, ScalarObservation::available(0.0, 1), 0),
+            item(
+                1002,
+                ScalarObservation::unavailable(FailureKind::PermissionDenied),
+                1024,
+            ),
+        ]);
+    });
+
+    let snapshot = snapshot_of(cx, &root, 31);
+    let id = ProcessRowId::Category(ProcessCategory::Application).stable_key();
+    let row = snapshot
+        .get(&SemanticNodeId::owned(format!("group-row:{id}")))
+        .expect("Applications group row is available to assistive technology");
+    let name = row.name().expect("group row has an accessible name");
+    assert!(
+        name.contains("0.0%"),
+        "measured zero remains spoken: {name}"
+    );
+    assert!(name.contains("partial 1/2"), "coverage is spoken: {name}");
+    assert!(
+        name.contains("Permission denied"),
+        "reason is spoken: {name}"
+    );
+
+    let aggregate = row
+        .process_aggregate_semantics()
+        .expect("aggregate facts stay typed in the semantic row");
+    assert_eq!(
+        aggregate.cpu.availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+    assert_eq!(aggregate.cpu.current_value(), Some(&0.0));
+    assert_eq!(aggregate.cpu.current_member_count(), 1);
+    assert_eq!(aggregate.cpu.member_count(), 2);
 }
 
 #[cfg(target_os = "linux")]

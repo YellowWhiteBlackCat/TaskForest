@@ -38,7 +38,7 @@ build() {
   cd "$pkgname"
   # GPUI-only release surface (owner decision 2026-08-24): the Iced frontend
   # stays a supported product surface but is not distributed in packages yet.
-  # Binaries: the GPUI app, the fixed setup helper, and the three per-feature
+  # Binaries: the GPUI app, the fixed setup helper, and the per-feature
   # privileged helpers the manifest
   # authorizes for package install (ADR-023 Boundary 2).
   # taskmanager-process-control-helper ships in-package (owner decision
@@ -91,6 +91,8 @@ package() {
   # system_install_manifest_guard stays green.
   install -Dm755 target/release/taskmanager-privilege-helper \
     "$pkgdir/usr/libexec/taskforest-privilege-helper"
+  install -Dm755 target/release/taskmanager-smart-self-test-helper \
+    "$pkgdir/usr/libexec/taskforest-smart-self-test-helper"
   install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in \
     "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy"
   install -Dm755 target/release/taskmanager-net-launcher \
@@ -113,6 +115,8 @@ package() {
     "$pkgdir/usr/libexec/taskforest-msr-helper"
   install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy.in \
     "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.desktop \
     "$pkgdir/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml \

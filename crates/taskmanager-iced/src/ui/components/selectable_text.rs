@@ -385,3 +385,7 @@ impl From<SelectableText> for Element<'static, Message, iced::Theme, iced::Rende
 #[cfg(test)]
 #[path = "../../../tests/gui/selectable_text_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/selectable_text_interaction_tests.rs"]
+mod interaction_tests;

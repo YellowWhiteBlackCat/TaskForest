@@ -22,30 +22,14 @@ verified on the target device.
 
 ## Telemetry status
 
-CPU and memory telemetry are explicitly deferred. The published `sysinfo`
-support list does not include OpenHarmony, so a successful Rust compilation
-must not be treated as evidence of valid runtime observations. The available
-community OpenHarmony bindings are unofficial and still incomplete for the
-HiDebug component. See [ADR-043](../../adr/043-defer-openharmony-native-telemetry.md).
-
-Until a maintained safe wrapper or a separately audited OHOS native boundary
-exists, this crate keeps those capabilities absent and returns typed
-unsupported outcomes.
+CPU and memory telemetry are explicitly deferred (ADR-043); the deferral
+reasons, admission rule and verification commands live in
+[`docs/TELEMETRY_STATUS.md`](docs/TELEMETRY_STATUS.md).
 
 ## Contract and verification
 
 The crate must remain safe Rust and must not depend on GPUI, Iced, Ratatui,
-Wayland, Linux procfs helpers, or Linux privilege helpers. The current checks
-are:
-
-```text
-cargo nextest run --locked -p taskmanager-platform-ohos --all-targets -j 4
-cargo check --locked --target aarch64-unknown-linux-ohos -p taskmanager-platform-ohos
-```
-
-The crate is not yet connected to `taskmanager-platform-native` or any
-frontend. That connection belongs after the first verified OHOS provider and
-the application-data path/context boundary exist.
+Wayland, Linux procfs helpers, or Linux privilege helpers.
 
 ## Module map
 
@@ -53,3 +37,10 @@ the application-data path/context boundary exist.
 src/lib.rs                     OpenHarmony placeholder; CPU/memory telemetry deferred as
                                capability absence per ADR-043 (typed Unsupported)
 ```
+
+## Docs
+
+- [`docs/TELEMETRY_STATUS.md`](docs/TELEMETRY_STATUS.md) — deferral reasons, provider
+  admission rule and verification commands.
+- [ADR-043](../../adr/043-defer-openharmony-native-telemetry.md) — deferred OpenHarmony
+  native telemetry.

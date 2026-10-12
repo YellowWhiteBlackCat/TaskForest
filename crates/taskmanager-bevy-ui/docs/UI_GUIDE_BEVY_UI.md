@@ -3,7 +3,7 @@
 > **Role**: Implementation guide — widget patterns, rendering, interaction. For architecture decisions see [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md).
 
 本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.20 的数据驱动 ECS 架构范式与交互纪律。
-跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
+跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](../../../docs/UI_COMPONENT_ARCHITECTURE.md)。
 
 保存视图由应用页原生按钮进入，typed 命令只声明预设资源、shell、列选择、配置与剪贴板。
 共享 shell 模型负责预设身份及转移；配置发布成功后恢复已保存行，失败由状态反馈说明。
@@ -75,4 +75,23 @@
 
 Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单元格锚点因此
 在投影断言之外，把每个投影行的生产 `row_scene` 挂载并回读 `Text`，证明单元格文本
-进入绘制场景图；像素等价仍由 Wayland capture 矩阵承担。
+进入绘制场景图；像素等价仍由 Wayland capture 矩阵承担。需要"场景及其全部子孙就绪"
+这一时刻时，观察 0.20 的 `Ready` 事件（见 §6），不要按组件 `Add` 逐个探测。
+
+## 6. Bevy 0.20 正式版模式（2026-10-11 起）
+
+- **rem 尺寸轴**：类型阶梯长度（控件高度、图标、字号、行高）一律
+  `rem(...)`/`FontSize::Rem`，禁止为它们新增 `px(...)` 字面量或硬编码比例；
+  px 只属于真实几何合同（边框、半径、固定窗口几何）。`RemSize` 由 palette 的
+  UI-size 档位驱动，文本无关节点的 `EmSize` 由 `sync_node_em_size` 兜底。
+- **headless `TabList`**：页签面（导航 strip、弹窗页签）用 `TabList`+`Tab`，
+  点选经 typed `ValueChange<Option<Entity>>`；选择权威（`Route`/呈现 state）
+  永远只有一个，条带经 `SelectedTab` 单向镜像，镜像挂在 `Ready` 上（场景声明期
+  实体不存在），禁止双写（不挂 `tablist_self_update`）。
+- **`FixedNode` 浮层**：模态 scrim、tooltip、菜单浮窗根节点声明 `FixedNode`
+  （视口锚定，不继承布局/裁剪/变换），不再写 `PositionType::Absolute` +
+  `percent(100)` 惯用法。
+- **`InlineIcon` 行内图文**：与文字同线的语义图标（表头排序板）用
+  `crate::icons::inline_icon_scene`——`InlineBox`（几何权威）+ 标记组件在场景
+  声明，位图句柄由观察者 typed 补全；图标随 ui_size 阶梯缩放
+  （`palette.icon_size_px()`）。

@@ -5,6 +5,7 @@
 use taskmanager_application::PlatformEffect;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
+use taskmanager_theme::tokens::UiSize;
 
 use super::affinity::{ProcessAffinityModalState, affinity_modal_scene};
 use taskmanager_theme::Theme;
@@ -70,6 +71,6 @@ fn affinity_modal_scene_renders_without_panic() {
     };
 
     let theme = Theme::default();
-    let palette = crate::palette::ui_palette(&theme);
+    let palette = crate::palette::ui_palette(&theme, UiSize::Standard);
     let _scene = affinity_modal_scene(&session, &palette);
 }

@@ -522,7 +522,7 @@ fn window_scenes(
         return vec![empty_state_scene(empty_state_text(query))];
     }
     let columns = visible_columns(hidden_cols);
-    let row_height = palette.control_height_px;
+    let row_height = palette.control_height_px();
     projection
         .rows
         .iter()
@@ -595,7 +595,7 @@ fn rebuild_table(
 fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
     let text = query.to_owned();
     let width = space_24() * 12.0;
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {

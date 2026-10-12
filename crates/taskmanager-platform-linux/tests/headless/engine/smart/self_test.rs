@@ -144,6 +144,84 @@ fn start_and_poll_revalidate_immediately_before_every_native_attempt() {
 }
 
 #[test]
+fn unsupported_unknown_or_denied_preflight_never_reaches_the_start_command() {
+    let connection = StorageConnection::new(
+        StorageProtocol::Ata,
+        StorageInterconnect::Sata,
+        StorageDeviceKind::Physical,
+    );
+    for failure in [
+        SmartSelfTestFailure::SupportUnknown,
+        SmartSelfTestFailure::Unsupported,
+        SmartSelfTestFailure::PermissionDenied,
+    ] {
+        let inspections = Cell::new(0);
+        let starts = Cell::new(0);
+        let revalidations = Cell::new(0);
+        let result = execute_start_with_capability_preflight(
+            "sda",
+            connection,
+            SmartSelfTestKind::Short,
+            || {
+                revalidations.set(revalidations.get() + 1);
+                Ok(())
+            },
+            |device, _, kind| {
+                assert_eq!(device, "/dev/sda");
+                assert_eq!(kind, SmartSelfTestKind::Short);
+                inspections.set(inspections.get() + 1);
+                StrategyAttempt::Failed(failure)
+            },
+            |_, _, _| {
+                starts.set(starts.get() + 1);
+                StrategyAttempt::Success(())
+            },
+        );
+
+        assert_eq!(result, Err(StrategyFailure::Report(failure)));
+        assert_eq!(inspections.get(), 1);
+        assert_eq!(starts.get(), 0);
+        assert_eq!(revalidations.get(), 1);
+    }
+}
+
+#[test]
+fn target_replacement_after_preflight_prevents_the_start_command() {
+    let connection = StorageConnection::new(
+        StorageProtocol::Ata,
+        StorageInterconnect::Sata,
+        StorageDeviceKind::Physical,
+    );
+    let revalidations = Cell::new(0);
+    let starts = Cell::new(0);
+    let result = execute_start_with_capability_preflight(
+        "sda",
+        connection,
+        SmartSelfTestKind::Short,
+        || {
+            revalidations.set(revalidations.get() + 1);
+            if revalidations.get() == 2 {
+                Err(ProviderFailure::IdentityChanged)
+            } else {
+                Ok(())
+            }
+        },
+        |_, _, _| StrategyAttempt::Success(()),
+        |_, _, _| {
+            starts.set(starts.get() + 1);
+            StrategyAttempt::Success(())
+        },
+    );
+
+    assert_eq!(
+        result,
+        Err(StrategyFailure::Provider(ProviderFailure::IdentityChanged))
+    );
+    assert_eq!(revalidations.get(), 2);
+    assert_eq!(starts.get(), 0);
+}
+
+#[test]
 fn unsupported_protocol_and_exhausted_usb_bridge_are_provider_failures() {
     let mmc = StorageConnection::new(
         StorageProtocol::Mmc,
@@ -281,6 +359,7 @@ fn provider_failure_preserves_success_and_parsed_recovery_advances_it() {
 fn failed_self_test_reports_preserve_failure_and_device_status() {
     for (failure, expected_status) in [
         (SmartSelfTestFailure::MissingTool, DeviceStatus::MissingTool),
+        (SmartSelfTestFailure::Unsupported, DeviceStatus::Unsupported),
         (
             SmartSelfTestFailure::RequiresEscalation,
             DeviceStatus::PermissionDenied,
@@ -290,6 +369,16 @@ fn failed_self_test_reports_preserve_failure_and_device_status() {
             DeviceStatus::PermissionDenied,
         ),
         (SmartSelfTestFailure::TimedOut, DeviceStatus::Stale),
+        (SmartSelfTestFailure::SupportUnknown, DeviceStatus::Stale),
+        (
+            SmartSelfTestFailure::AuthorizationUnavailable,
+            DeviceStatus::Stale,
+        ),
+        (SmartSelfTestFailure::HelperUnavailable, DeviceStatus::Stale),
+        (
+            SmartSelfTestFailure::HelperProtocolViolation,
+            DeviceStatus::Stale,
+        ),
         (SmartSelfTestFailure::InvalidDevice, DeviceStatus::Stale),
         (
             SmartSelfTestFailure::ProviderUnavailable,

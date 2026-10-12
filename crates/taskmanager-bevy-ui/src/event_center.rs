@@ -20,7 +20,7 @@ use bevy::ecs::{
 };
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
-use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px, widget::Text};
+use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px, rem, widget::Text};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::{AlertEventKind, export_alert_events_json};
@@ -45,7 +45,7 @@ pub(crate) fn button(
     action: EventAction,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! {Node {min_height:px(palette.control_height_px),padding:UiRect::all(px(space_8()))} BackgroundColor({palette.content_bg}) Button EventControl({action}) on(activate) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
+    bsn! {Node {min_height:rem(palette.control_height_rem),padding:UiRect::all(px(space_8()))} BackgroundColor({palette.content_bg}) Button EventControl({action}) on(activate) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
 }
 pub(crate) fn scene(
     shell: &ShellApp,

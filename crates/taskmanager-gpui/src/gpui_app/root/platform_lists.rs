@@ -63,7 +63,9 @@ impl RootView {
                     .map_err(|error| submission_error_kind(error.kind))
             });
         if let Err(error) = queued
-            && self.shell.accept_session_control(request_id)
+            && self
+                .shell
+                .accept_session_control(request_id, &identity, action)
         {
             self.shell.feedback.record_session(SessionControlOutcome {
                 request_id,

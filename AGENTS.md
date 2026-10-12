@@ -3,14 +3,15 @@
 TaskForest is a Rust 2024 system monitor for Linux, Windows, and macOS. This file
 defines repository-wide engineering boundaries; implementation detail belongs to
 the lower document layers.
-
 ## Public documentation contract
 
-- `README.md` is the human-facing product introduction (identity, capabilities, status,
-  usage, platforms, releases, license); it is never navigation, index, or a route.
+- `README.md` is the human-facing product introduction; it is never navigation, index, or a route.
 - `AGENTS.md` defines the mission, boundaries, invariants, and the project-map top, refined downward through `docs/`.
-- `docs/` contains concise current-state charters; every living document is ≤200 lines.
-- `crates/*/README.md` owns crate responsibilities, contracts, dependencies, and checks.
+- `docs/` contains concise, size-capped current-state charters.
+- `crates/README.md` is the crate project map linking every crate README.
+  `crates/*/README.md` owns crate responsibilities, contracts, dependencies, and
+  checks, and links that crate's `docs/` charters; root `docs/` keeps only
+  cross-crate charters.
 - `adr/` records current irreversible decisions.
 - History, plans, scores, TODOs, dated receipts, host snapshots, and real captures are
   private material. They belong only in ignored `.private/` storage and must never be
@@ -60,15 +61,14 @@ the lower document layers.
 
 ## Authority route
 
-- Start at [docs/README.md](docs/README.md), then read the relevant current charter;
-  task-type routing and document layering live there.
+- Start at [docs/README.md](docs/README.md): task-type routing and document layering live there.
 - Read [docs/ARCH.md](docs/ARCH.md), [docs/STATE_OWNERSHIP.md](docs/STATE_OWNERSHIP.md),
   [docs/STANDARDS.md](docs/STANDARDS.md), [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md);
   house terminology is defined in [docs/GLOSSARY.md](docs/GLOSSARY.md).
+- For shared Iced/Bevy changes, follow [shared UI packages](docs/SHARED_UI_PACKAGES.md): extend the owner first and verify consumers/version compatibility.
 - For responsive or dense UI layout work, follow [docs/ELASTIC_LAYOUT_PLAYBOOK.md](docs/ELASTIC_LAYOUT_PLAYBOOK.md) and the affected UI/component charter before editing the renderer.
-- Read [docs/PERMISSION_MODEL.md](docs/PERMISSION_MODEL.md), the affected crate README,
-  and relevant [ADR](adr/) via the [adr/README.md](adr/README.md) index, never the
-  directory top-to-bottom, before changing trust or platform boundaries.
+- Read [docs/PERMISSION_MODEL.md](docs/PERMISSION_MODEL.md), the affected crate README, and
+  [ADRs](adr/README.md) by index — never top-to-bottom — before trust/platform changes.
 
 ## Working protocol
 

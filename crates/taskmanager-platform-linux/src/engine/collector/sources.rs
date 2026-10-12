@@ -165,6 +165,7 @@ pub(super) fn apply_smart(d: &mut DiskMetrics, s: &DiskSmart) {
     d.smart_state = s.state;
     d.smart_provider.clone_from(&s.provider);
     d.smart_failure = s.failure;
+    d.smart_self_test_capabilities = s.self_test_capabilities;
     d.smart_temperature_c = s.temperature_c;
     d.smart_temperature_sensors_c = s.temperature_sensors_c.clone();
     d.smart_critical_warning = s.critical_warning;

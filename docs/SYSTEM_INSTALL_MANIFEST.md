@@ -110,6 +110,7 @@ and the Linux polkit helpers are not part of it.
 | SMBIOS memory optional capability | `taskforest-smbios-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy` | Package transaction or the same manager's `smbios` transaction |
 | RAPL package-power optional capability | `taskforest-rapl-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy` | Package transaction or the same manager's `rapl` transaction |
 | MSR readout optional capability | `taskforest-msr-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy` | Package transaction or the same manager's `msr` transaction |
+| SMART self-test control | `taskforest-smart-self-test-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy` | Package transaction or the same manager's `smart-self-test` transaction |
 | Developer user integration | User-local TaskForestG/TaskForestI `.desktop` entries, shared SVG, conditional `index.theme`, and one ownership receipt | [`scripts/dev-install-frontends.sh`](../scripts/dev-install-frontends.sh); user-owned and separate from root package files |
 | Windows MSI products | Per-UI `taskforest-<ui>.exe` and Start Menu shortcut, plus the shared process-control helper, license notices, and `HKLM\Software\TaskForest` markers | Windows Installer — one MSI per UI target; remove with `msiexec /x TaskForest-<UI>.msi` |
 

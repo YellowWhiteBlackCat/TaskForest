@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use taskmanager_shell::SortCol;
 
-use gpui::Pixels;
+use gpui::{App, FocusHandle, Pixels};
 use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::{processes_view, services_view, startup_view};
@@ -60,6 +60,9 @@ pub struct ProcessesState {
     pub hidden_cols: HashSet<SortCol>,
     /// User-resized widths for the resizable process columns.
     pub col_widths: HashMap<SortCol, Pixels>,
+    /// Stable keyboard focus targets for resizable columns; hidden columns
+    /// retain their identity when shown again.
+    pub resize_focus_handles: HashMap<SortCol, FocusHandle>,
     /// Presentation-only column cursor, independent from sort and selection.
     pub column_cursor: SortCol,
     /// Cursor anchor retained during an active column resize.
@@ -81,8 +84,23 @@ impl Default for ProcessesState {
                 SortCol::Nice,
             ]),
             col_widths: HashMap::new(),
+            resize_focus_handles: HashMap::new(),
             column_cursor: SortCol::Name,
             resize_anchor_x: None,
         }
+    }
+}
+
+impl ProcessesState {
+    /// Create the per-column focus identities once for this window. Hidden
+    /// columns keep their handle so showing them again restores the same target.
+    pub fn with_resize_focus_handles(cx: &mut App) -> Self {
+        let mut state = Self::default();
+        state.resize_focus_handles = SortCol::ALL
+            .into_iter()
+            .filter(|col| processes_view::rows::is_resizable(*col))
+            .map(|col| (col, cx.focus_handle().tab_stop(true)))
+            .collect();
+        state
     }
 }

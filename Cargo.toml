@@ -106,3 +106,11 @@ cryoglyph = { path = "./patches/cryoglyph" }
 # a fixed, bounded budget (COUNT_BASE sets), and reset clears each sub-pool in
 # place via vkResetDescriptorPool without reallocating. The public API is unchanged.
 blade-graphics = { path = "./patches/blade-graphics" }
+
+[workspace.dependencies]
+
+# Shared UI packages use one Git revision per product.
+zhuge-ui-core = { git = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git", rev = "7bd25ea87739c926ff230e0b0da4d0f107ce000d", version = "0.1" }
+zhuge-ui-tokens = { git = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git", rev = "7bd25ea87739c926ff230e0b0da4d0f107ce000d", version = "0.1" }
+zhuge-ui-kit-iced = { git = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git", rev = "7bd25ea87739c926ff230e0b0da4d0f107ce000d", version = "0.1" }
+zhuge-ui-kit-bevy = { git = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git", rev = "7bd25ea87739c926ff230e0b0da4d0f107ce000d", version = "0.1" }

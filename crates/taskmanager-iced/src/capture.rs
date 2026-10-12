@@ -6,9 +6,13 @@
 
 use std::path::Path;
 
+use iced::Size;
 use taskmanager_application::AppPage;
+use taskmanager_core::core::hardware::CoreBreakdown;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::app::PerfDevice;
+use crate::ui::responsive::PerformancePageBudget;
 
 pub(crate) fn persisted_history_requested() -> bool {
     std::env::var("TM_ICED_CAPTURE_DEVICE").is_ok_and(|target| {
@@ -53,6 +57,80 @@ pub(crate) const HEALTH_TARGET: &str = "health";
 #[must_use]
 pub(crate) fn target_marker_line(page: &str, target: &str) -> String {
     format!("ICED_CAPTURE_MARKER event=target_ready mode=demo page={page} device={target}\n")
+}
+
+/// Build a readiness line for the real process row identity mounted in the
+/// Applications Popover surface.
+#[must_use]
+pub(crate) fn process_context_menu_marker_line(identity: ProcessLiveKey) -> String {
+    format!(
+        "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=process-context-menu pid={} start_token={}\n",
+        identity.pid(),
+        identity.start_token(),
+    )
+}
+
+/// Build a readiness line from the logical client viewport received by the
+/// app, including the typed Performance allocation derived from that frame.
+#[must_use]
+pub(crate) fn performance_viewport_marker_line(
+    target: &str,
+    viewport: Size,
+    page_viewport: Size,
+    budget: PerformancePageBudget,
+) -> String {
+    format!(
+        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device={target} width={:.2} height={:.2} page_width={:.2} page_height={:.2} rung={:?} inventory={:?}\n",
+        viewport.width,
+        viewport.height,
+        page_viewport.width,
+        page_viewport.height,
+        budget.vertical,
+        budget.chart_inventory,
+    )
+}
+
+/// Typed CPU facts captured by the dedicated CPU-facts scenario.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CpuFactsMarkerData<'a> {
+    pub(crate) core_breakdown: CoreBreakdown,
+    pub(crate) caches_kib: [Option<u64>; 4],
+    pub(crate) base_frequency_mhz: Option<u64>,
+    pub(crate) physical_cores: Option<usize>,
+    pub(crate) logical_cores: Option<usize>,
+    pub(crate) virtualization: Option<&'a str>,
+    pub(crate) temperature_average_max_c: Option<(i32, i32)>,
+}
+
+/// Build readiness evidence from the typed CPU facts projected in the rail.
+#[must_use]
+pub(crate) fn cpu_facts_marker_line(data: CpuFactsMarkerData<'_>) -> Option<String> {
+    let [Some(l1d), Some(l1i), Some(l2), Some(l3)] = data.caches_kib else {
+        return None;
+    };
+    let base_frequency_mhz = data.base_frequency_mhz?;
+    let physical_cores = data.physical_cores?;
+    let logical_cores = data.logical_cores?;
+    let virtualization = data.virtualization?;
+    let (temperature_average_c, temperature_maximum_c) = data.temperature_average_max_c?;
+    Some(format!(
+        "ICED_CAPTURE_MARKER event=cpu_facts_ready mode=demo page=performance device=cpu-facts rail=stats-end core_breakdown={}/{}/{} cache_kib={l1d}/{l1i}/{l2}/{l3} base_frequency_mhz={base_frequency_mhz} core_counts={physical_cores}/{logical_cores} virtualization={virtualization} core_temperature_c={temperature_average_c}/{temperature_maximum_c}\n",
+        data.core_breakdown.p_cores, data.core_breakdown.e_cores, data.core_breakdown.lp_cores,
+    ))
+}
+
+/// Append typed CPU facts after the capture readiness gate has accepted them.
+pub(crate) fn append_cpu_facts_marker(path: &Path, data: CpuFactsMarkerData<'_>) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let Some(line) = cpu_facts_marker_line(data) else {
+        return;
+    };
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = file.write_all(line.as_bytes());
 }
 
 /// Return the canonical capture spelling for one shared page.
@@ -115,6 +193,36 @@ pub(crate) fn append_target_marker(path: &Path, page: &str, target: &str) {
         return;
     };
     let _ = file.write_all(target_marker_line(page, target).as_bytes());
+}
+
+/// Append a marker for a production overlay that must be mounted before capture.
+pub(crate) fn append_process_context_menu_marker(path: &Path, identity: ProcessLiveKey) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = file.write_all(process_context_menu_marker_line(identity).as_bytes());
+}
+
+/// Append the actual received client viewport and its Performance budget.
+pub(crate) fn append_performance_viewport_marker(
+    path: &Path,
+    target: &str,
+    viewport: Size,
+    page_viewport: Size,
+    budget: PerformancePageBudget,
+) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = file.write_all(
+        performance_viewport_marker_line(target, viewport, page_viewport, budget).as_bytes(),
+    );
 }
 
 #[cfg(test)]

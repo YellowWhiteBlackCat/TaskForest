@@ -14,48 +14,11 @@ discovery coherence. They contain no OS I/O, target-specific paths or
 
 ## Contract and verification
 
-Keep assertions portable across minimal runners. Each adapter runs the same
-contract on its native host; the suite proves shared semantics, not hardware
-coverage or pixel acceptance. Native adapters and the root smoke share the
-publication-liveness budget in `src/smoke_budget.rs`; collector latency belongs
-to the scheduler and throughput contracts.
-
-## Capability-surface same-source scenario
-
-`assert_fresh_surface_descriptors` proves the M3.2 fresh-runtime face: the
-declared lane set, the typed initial status, the provider attribution, and the
-typed absence for every unregistered product-expected identity. The stricter
-live-catalog companion is `assert_capability_surface_matches_catalog`: it
-cross-checks one platform's layer-B declaration
-(`PlatformCapabilitySurface`) against the running catalog in both directions —
-every declared `Present` lane is really registered under the adapter's
-provider prefix, every registered lane is declared, and no product-expected
-identity answers `Undeclared`. Whether a registered lane is a real source or a
-registered-pending one is the adapter declaration's own split, because the
-catalog publishes both as a registered descriptor; the adapter's typed-outcome
-contract test proves the pending lanes answer `Unsupported`.
-
-## Escalation/permission capability invariant
-
-An escalatable denial and a hard permission denial are distinct capability
-states, and an adapter must never fold one onto the other. The contract
-projection that every provider must satisfy:
-
-| Provider failure | Capability status |
-| --- | --- |
-| `RequiresEscalation` (the per-feature seam can still reach the data) | `RequiresEscalation` |
-| `PermissionDenied` (hard denial, no offer) | `PermissionRequired` |
-| `TimedOut` / `TemporarilyUnavailable` / `Rejected` (transient, no offer) | `TemporarilyUnavailable` |
-
-`assert_capability_failure_status` checks this projection over synthetic input,
-`admits_escalation` names the classification (only `RequiresEscalation` proves an
-offer exists), and `projected_capability_status` re-enters the single authority
-`ProviderFailure::capability_status` owned by `platform-contract` — the same
-function the runtime catalog delegates to, so there is no second projection to
-keep in sync. A future Windows or macOS provider that denies a capability must
-report the escalation-aware variant whenever its per-feature seam can still
-prompt, and the plain gate only for a hard denial. Adapters that project directly
-from an escalation probe must publish the same states.
+Scenario contracts stay portable across minimal runners and prove shared
+semantics, not hardware coverage or pixel acceptance. The publication-liveness
+budget, the capability-surface same-source scenario and the
+escalation/permission capability invariant are specified in
+[`docs/SCENARIOS.md`](docs/SCENARIOS.md).
 
 ## Module map
 
@@ -66,3 +29,10 @@ src/smoke_budget.rs                            native publication wait budget
 ```
 
 Run against real hosts by each adapter's tests/conformance.rs and the root live smoke.
+
+## Docs
+
+- [`docs/SCENARIOS.md`](docs/SCENARIOS.md) — the capability-surface same-source scenario and
+  the escalation/permission capability invariant.
+- [ADR-053](../../adr/053-product-expected-capability-surface.md) — product-expected
+  capability surface.

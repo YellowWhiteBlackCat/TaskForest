@@ -42,11 +42,13 @@ use super::process_rows::ProcessRowId;
 use super::sort_axis::sort_axis;
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
+use crate::fixture::DirectTrackSeedFact;
 use taskmanager_core::core::process::ProcessLiveKey;
 
 mod inventory_sort;
 mod process_selection;
 mod process_viewing;
+mod session_control;
 
 pub use process_selection::identity_range;
 use taskmanager_application::{
@@ -237,17 +239,25 @@ impl DirectTrackState {
         }
     }
 
-    pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::DirectTrackSeedFact) {
+    pub(crate) fn seed_fixture_fact(&mut self, fact: DirectTrackSeedFact) {
         match fact {
-            crate::fixture::DirectTrackSeedFact::NpuInventory(snapshot) => {
+            DirectTrackSeedFact::NpuInventory(snapshot) => {
                 self.projection.seed_npu_inventory_fixture(snapshot);
                 self.projection.system_revision = self.projection.system_revision.saturating_add(1);
             }
-            crate::fixture::DirectTrackSeedFact::Processes(processes) => {
+            DirectTrackSeedFact::Processes(processes) => {
                 self.projection.processes = Some(std::sync::Arc::new(processes));
                 self.projection.processes_observed_at_ms = 0;
                 self.projection.process_revision =
                     self.projection.process_revision.saturating_add(1);
+            }
+            DirectTrackSeedFact::Sessions(sessions) => {
+                self.projection.sessions = sessions;
+                self.projection.sessions_revision =
+                    self.projection.sessions_revision.saturating_add(1);
+            }
+            DirectTrackSeedFact::SessionsSource(source) => {
+                self.projection.sessions_source = source;
             }
         }
     }

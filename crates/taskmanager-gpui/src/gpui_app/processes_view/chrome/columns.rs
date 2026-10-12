@@ -77,6 +77,7 @@ pub fn columns_dropdown(
                             });
                         })
                         .checked(!is_hidden)
+                        .checkable(true)
                         .disabled(!is_hideable(column) || auto_hidden),
                     )
                 })
@@ -85,3 +86,7 @@ pub fn columns_dropdown(
         },
     )
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/gui/gpui_app/processes_view/columns_behavior_tests.rs"]
+mod behavior_tests;

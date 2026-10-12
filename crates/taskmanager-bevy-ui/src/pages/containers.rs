@@ -247,7 +247,7 @@ fn header_scene(palette: &UiPalette) -> impl Scene + use<> {
 }
 
 fn container_row_scene(model: &ContainerRowModel, palette: &UiPalette) -> impl Scene + use<> {
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let id = model.id.clone();
     let name = model.name.clone();

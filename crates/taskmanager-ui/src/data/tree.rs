@@ -44,7 +44,7 @@ actions!(
 );
 
 /// Register the tree keymap (up/down move, left collapses / selects the
-/// parent, right expands / selects the first child, Enter toggles).
+/// parent, right expands / selects the first child, Enter or Space toggles).
 pub fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("up", TreeSelectUp, Some(TREE_CONTEXT)),
@@ -52,6 +52,7 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("left", TreeSelectLeft, Some(TREE_CONTEXT)),
         KeyBinding::new("right", TreeSelectRight, Some(TREE_CONTEXT)),
         KeyBinding::new("enter", TreeConfirm, Some(TREE_CONTEXT)),
+        KeyBinding::new("space", TreeConfirm, Some(TREE_CONTEXT)),
     ]);
 }
 

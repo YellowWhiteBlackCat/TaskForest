@@ -58,7 +58,8 @@ use taskmanager_shell::{
 pub(crate) enum ProjectedRow {
     /// A category or application aggregate header. The summed
     /// observation cells are carried here (computed once by the projection)
-    /// so the renderer never re-aggregates; `None` fields render as dashes.
+    /// so the renderer never re-aggregates and can preserve their typed
+    /// availability and coverage in the group row.
     /// `expansion_key` is the membership key in the frontend-local expand
     /// set — a `category:<stable_key>` category token or `app-tree:<live-key>`
     /// application token (locale-neutral, so

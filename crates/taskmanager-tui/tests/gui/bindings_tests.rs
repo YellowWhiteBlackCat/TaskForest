@@ -1,4 +1,6 @@
 use super::*;
+use crate::command_palette::{ROW_TARGET_SHORTCUT, TUI_LOCAL_COMMANDS};
+use crate::health_review::HealthReviewMode;
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::presentation::command_help;
 use taskmanager_shell::shell_local_bindings;
@@ -61,7 +63,8 @@ fn every_wired_command_carries_the_shortcut_the_help_renders() {
 
 /// Anti-drift between the declaration and the rendered help overlay:
 /// the overlay's shared rows must be exactly the declaration's bound
-/// entries. The terminal-local chords (the shell's five terminal-only
+/// entries except `OpenProperties`, which is folded into the single
+/// context-aware row-target hint. The terminal-local chords (the shell's five terminal-only
 /// bindings plus the TUI-local commands) have no `CommandId` and stay
 /// outside the matrix but inside the row count — if either layer changes
 /// without the other, this composition breaks.
@@ -76,7 +79,7 @@ fn bound_entries_match_the_help_overlay_row_composition() {
     let rows = crate::ui::help::help_rows();
     assert_eq!(
         rows.len(),
-        bound + shell_local_bindings().len() + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
+        bound - 1 + shell_local_bindings().len() + TUI_LOCAL_COMMANDS.len() + 2
     );
 }
 
@@ -160,22 +163,31 @@ fn service_menu_footer_paints_the_shared_vocabulary_bytes() {
 fn local_registry_is_shared_by_help_and_palette() {
     let palette = crate::TuiApp::palette_rows();
     let help = crate::ui::help::help_rows();
-    for command in crate::command_palette::TUI_LOCAL_COMMANDS {
+    for command in TUI_LOCAL_COMMANDS {
         assert!(
             help.iter()
                 .any(|row| row.shortcut == command.binding.shortcut),
             "local shortcut {:?} must be advertised by help",
             command.binding.shortcut
         );
-        assert!(
-            palette.iter().any(|row| {
-                row.shortcut == command.binding.shortcut
-                    && row.label == command.binding.label
-                    && row.local_action == command.palette_action
-            }),
-            "local shortcut {:?} must carry the registry palette action",
-            command.binding.shortcut
-        );
+        if command.binding.shortcut == ROW_TARGET_SHORTCUT {
+            assert!(
+                !palette.iter().any(|row| {
+                    row.shortcut == command.binding.shortcut && row.label == command.binding.label
+                }),
+                "the structural palette Enter key must not advertise a row-target command"
+            );
+        } else {
+            assert!(
+                palette.iter().any(|row| {
+                    row.shortcut == command.binding.shortcut
+                        && row.label == command.binding.label
+                        && row.local_action == command.palette_action
+                }),
+                "local shortcut {:?} must carry the registry palette action",
+                command.binding.shortcut
+            );
+        }
     }
 }
 
@@ -220,16 +232,16 @@ fn surface_hints_cite_declared_protocol_arms() {
     }
 }
 
-/// Coverage: every action chord the StatusOverlay and ServiceLogPanel scopes
-/// declare is painted exactly once (the overlays' toggle footers and the
-/// panel's title control run derive from the protocol, not from a second
-/// hand-written list); the settings form deliberately paints no protocol
-/// footer — its surface owns that copy.
+/// Coverage: every action chord the StatusOverlay, HealthReview and
+/// ServiceLogPanel scopes declare has exactly one protocol-derived hint; the
+/// settings form deliberately paints no protocol footer — its surface owns
+/// that copy.
 #[test]
 fn surface_hints_cover_every_painted_scope_arm_exactly_once() {
     use crate::command_palette::TuiSurfaceScope;
     for scope in [
         TuiSurfaceScope::StatusOverlay,
+        TuiSurfaceScope::HealthReview,
         TuiSurfaceScope::ServiceLogPanel,
     ] {
         let declared: Vec<_> = crate::command_palette::TUI_SURFACE_PROTOCOL
@@ -267,7 +279,8 @@ fn surface_hints_cover_every_painted_scope_arm_exactly_once() {
 
 /// The rendered pairs are pinned under English so any byte drift in the chord
 /// tokens, the catalog words, or the spacing fails here before any renderer
-/// can change: the three overlay footers and the panel's title control run.
+/// can change: overlay footers, HealthReview navigation and the panel's
+/// title control run.
 #[test]
 fn surface_hint_vocabulary_pairs_match_the_pinned_footers() {
     use crate::command_palette::{
@@ -302,6 +315,41 @@ fn surface_hint_vocabulary_pairs_match_the_pinned_footers() {
         ),
         vec![(" c / Esc ", "  Close".to_owned())],
         "the containers footer is `c / Esc  Close`"
+    );
+    assert_eq!(
+        surface_hint_pairs(
+            TuiSurfaceScope::HealthReview,
+            TuiSurfaceAction::SelectHealthReview(HealthReviewMode::ActiveAlerts)
+        ),
+        vec![("p", " Alerts · ".to_owned())]
+    );
+    assert_eq!(
+        surface_hint_pairs(
+            TuiSurfaceScope::HealthReview,
+            TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Events)
+        ),
+        vec![("e", " Event center".to_owned())]
+    );
+    assert_eq!(
+        surface_hint_pairs(
+            TuiSurfaceScope::HealthReview,
+            TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Storage)
+        ),
+        vec![("w", " Storage health · ".to_owned())]
+    );
+    assert_eq!(
+        surface_hint_pairs(
+            TuiSurfaceScope::HealthReview,
+            TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Sensors)
+        ),
+        vec![("s", " Sensors · ".to_owned())]
+    );
+    assert_eq!(
+        surface_hint_pairs(
+            TuiSurfaceScope::HealthReview,
+            TuiSurfaceAction::SelectHealthReview(HealthReviewMode::Rules)
+        ),
+        vec![("q", " Alert rules".to_owned())]
     );
     assert_eq!(
         surface_hint_run(TuiSurfaceScope::ServiceLogPanel),

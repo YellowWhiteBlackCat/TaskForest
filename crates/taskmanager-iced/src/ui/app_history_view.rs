@@ -10,6 +10,8 @@ use std::rc::Rc;
 use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus};
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::bytes;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::virtual_table_body;
 
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::Theme;

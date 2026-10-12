@@ -45,29 +45,31 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
     });
     let mut body = column(cards).spacing(8).width(Length::Fill);
     for (index, disk) in disks.iter().enumerate() {
-        body = body.push(
-            row![
-                focus::button(
-                    app.theme(),
-                    FocusTarget::SmartSelfTestShort { index },
-                    t("health.short_test"),
-                    Message::RequestSmartSelfTest(self_test_intent(disk, SmartSelfTestKind::Short)),
-                    false
-                ),
-                focus::button(
-                    app.theme(),
-                    FocusTarget::SmartSelfTestExtended { index },
-                    t("health.extended_test"),
-                    Message::RequestSmartSelfTest(self_test_intent(
-                        disk,
-                        SmartSelfTestKind::Extended
-                    )),
-                    false
-                ),
-            ]
-            .spacing(8)
-            .wrap(),
-        );
+        let mut actions = row![];
+        let mut has_actions = false;
+        if let Some(intent) = self_test_intent(disk, SmartSelfTestKind::Short) {
+            actions = actions.push(focus::button(
+                app.theme(),
+                FocusTarget::SmartSelfTestShort { index },
+                t("health.short_test"),
+                Message::RequestSmartSelfTest(intent),
+                false,
+            ));
+            has_actions = true;
+        }
+        if let Some(intent) = self_test_intent(disk, SmartSelfTestKind::Extended) {
+            actions = actions.push(focus::button(
+                app.theme(),
+                FocusTarget::SmartSelfTestExtended { index },
+                t("health.extended_test"),
+                Message::RequestSmartSelfTest(intent),
+                false,
+            ));
+            has_actions = true;
+        }
+        if has_actions {
+            body = body.push(actions.spacing(8).wrap());
+        }
     }
     let tabs = row(HealthReviewSection::ALL.into_iter().map(|section| {
         let label = match section {

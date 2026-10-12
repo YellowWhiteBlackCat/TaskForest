@@ -10,24 +10,36 @@ use super::super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AppAction, AppPage, SmartControlRequest, SmartSelfTestState};
+use taskmanager_application::{
+    AppAction, AppPage, SmartControlRequest, SmartObservationBatch, SmartSelfTestState,
+};
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestSupport,
+};
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
+use taskmanager_core::core::target::StorageDeviceKey;
 
 use crate::{TuiApp, TuiTheme, render};
 use taskmanager_application::{PendingConfirmation, PlatformClient};
 use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::fixture::health::seed_smart_observation_batch;
 use taskmanager_shell::queue_effect;
 
-/// Seed: the stock demo disk reports the `Unavailable` default, so flip it to
-/// `Available` — the readiness GPUI's health view demands before it enables
-/// its self-test actions. The fixture rides the shell's typed snapshot seam,
-/// never a hand-rolled store write.
+/// Seed explicit device support on the synthetic disk through the shell's
+/// typed snapshot seam. SMART health availability is independent.
 fn seed_smart_capable_disk(app: &mut TuiApp) {
     edit_snapshot(&mut app.shell, |snapshot| {
         let snapshot = snapshot.as_mut().expect("demo snapshot");
         for disk in &mut snapshot.disks {
             disk.smart_availability = SmartAvailability::Available;
+            disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+                short: SmartSelfTestSupport::Supported,
+                extended: SmartSelfTestSupport::Unsupported,
+                conveyance: SmartSelfTestSupport::Unknown,
+            };
         }
     });
 }
@@ -60,6 +72,43 @@ fn armed_app() -> TuiApp {
     seed_smart_capable_disk(&mut app);
     let _ = press_t(&mut app, ratatui::crossterm::event::KeyModifiers::NONE);
     app
+}
+
+fn seed_smart_reports(
+    app: &mut TuiApp,
+    reports: Vec<(DeviceId, DeviceGeneration, SmartSelfTestPhase)>,
+) {
+    let revision = app
+        .projection()
+        .smart_projection()
+        .0
+        .revision()
+        .checked_next()
+        .expect("fixture revision advances");
+    seed_smart_observation_batch(
+        &mut app.shell,
+        SmartObservationBatch {
+            revision,
+            subject: None,
+            observations: reports
+                .into_iter()
+                .map(
+                    |(device_id, device_generation, phase)| SmartSelfTestObservation {
+                        device_id,
+                        device_generation,
+                        device_key: StorageDeviceKey::new("fixture-device"),
+                        display_name: String::from("Fixture disk"),
+                        report: SmartSelfTestReport {
+                            phase,
+                            ..SmartSelfTestReport::default()
+                        },
+                    },
+                )
+                .collect(),
+            issues: Vec::new(),
+            ended: Vec::new(),
+        },
+    );
 }
 
 // ── the arm ───────────────────────────────────────────────────────────────
@@ -124,9 +173,15 @@ fn armed_gate_renders_the_named_self_test_dialog() {
 /// page, or under Ctrl — the chord stays honestly inert.
 #[test]
 fn t_stays_inert_without_a_smart_capable_target_or_off_its_scope() {
-    // Stock demo: the disk reports SMART Unavailable.
+    // Healthy SMART data alone is not evidence of self-test support.
     let mut app = crate::demo_app();
     on_disk_device(&mut app);
+    edit_snapshot(&mut app.shell, |snapshot| {
+        for disk in &mut snapshot.as_mut().expect("demo snapshot").disks {
+            disk.smart_availability = SmartAvailability::Available;
+            disk.smart_self_test_capabilities = SmartSelfTestCapabilities::default();
+        }
+    });
     let effect = press_t(&mut app, ratatui::crossterm::event::KeyModifiers::NONE);
     assert!(effect.is_none());
     assert!(
@@ -172,6 +227,52 @@ fn t_stays_inert_without_a_smart_capable_target_or_off_its_scope() {
     );
 }
 
+#[test]
+fn running_exact_target_blocks_both_keyboard_and_palette_arming() {
+    use crate::PaletteLocalAction;
+
+    let mut keyboard = crate::demo_app();
+    on_disk_device(&mut keyboard);
+    seed_smart_capable_disk(&mut keyboard);
+    let target = crate::menus::smart_self_test_target(&keyboard).expect("capable target");
+    seed_smart_reports(
+        &mut keyboard,
+        vec![(
+            target.device_id.clone(),
+            target.device_generation,
+            SmartSelfTestPhase::Running,
+        )],
+    );
+
+    let effect = press_t(&mut keyboard, ratatui::crossterm::event::KeyModifiers::NONE);
+    assert!(
+        effect.is_none(),
+        "a Running target must not produce an effect"
+    );
+    assert!(
+        keyboard.pending_confirmation().is_none(),
+        "the direct chord must not arm a gate for an exact Running report"
+    );
+
+    let mut palette = crate::demo_app();
+    on_disk_device(&mut palette);
+    seed_smart_capable_disk(&mut palette);
+    let target = crate::menus::smart_self_test_target(&palette).expect("capable target");
+    seed_smart_reports(
+        &mut palette,
+        vec![(
+            target.device_id,
+            target.device_generation,
+            SmartSelfTestPhase::Running,
+        )],
+    );
+    palette.run_palette_local_action(Some(PaletteLocalAction::RequestSmartSelfTest));
+    assert!(
+        palette.pending_confirmation().is_none(),
+        "the palette twin must use the same exact-target Running guard"
+    );
+}
+
 // ── the shared gate ───────────────────────────────────────────────────────
 
 /// `y` on the armed gate emits the typed `SmartControl(StartSelfTest)` effect
@@ -194,6 +295,73 @@ fn y_confirms_the_displayed_intent_into_the_typed_smart_effect() {
         app.pending_confirmation().is_none(),
         "the gate consumed the confirmation"
     );
+}
+
+#[test]
+fn y_dismisses_when_the_frozen_target_becomes_running_after_arm() {
+    let mut app = armed_app();
+    let Some(PendingConfirmation::SmartSelfTest(intent)) = app.pending_confirmation().cloned()
+    else {
+        panic!("precondition: the SMART confirmation is armed");
+    };
+    seed_smart_reports(
+        &mut app,
+        vec![(
+            intent.device_id,
+            intent.device_generation,
+            SmartSelfTestPhase::Running,
+        )],
+    );
+
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Char('y'));
+    assert!(effect.is_none(), "Running recheck must suppress the effect");
+    assert!(
+        app.pending_confirmation().is_none(),
+        "the stale confirmation gate must close"
+    );
+    assert_eq!(
+        app.shell.smart_self_test_state(),
+        &SmartSelfTestState::Idle,
+        "a rejected confirmation must not start a request session"
+    );
+}
+
+#[test]
+fn running_reports_for_other_device_lifecycles_do_not_block_confirmation() {
+    let mut app = armed_app();
+    let Some(PendingConfirmation::SmartSelfTest(intent)) = app.pending_confirmation().cloned()
+    else {
+        panic!("precondition: the SMART confirmation is armed");
+    };
+    let other_generation = DeviceGeneration::new(
+        intent
+            .device_generation
+            .get()
+            .checked_add(1)
+            .expect("fixture generation advances"),
+    );
+    seed_smart_reports(
+        &mut app,
+        vec![
+            (
+                DeviceId::new("disk:other"),
+                intent.device_generation,
+                SmartSelfTestPhase::Running,
+            ),
+            (
+                intent.device_id.clone(),
+                other_generation,
+                SmartSelfTestPhase::Running,
+            ),
+        ],
+    );
+
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Char('y'));
+    let Some(PlatformEffect::SmartControl(SmartControlRequest::StartSelfTest(confirmed))) = effect
+    else {
+        panic!("only the exact device lifecycle can block the frozen intent");
+    };
+    assert_eq!(confirmed, intent);
 }
 
 /// `n` and Esc dismiss without platform work and leave the request session

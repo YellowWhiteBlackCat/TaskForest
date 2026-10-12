@@ -29,7 +29,9 @@ use taskmanager_core::core::services::{
     ServiceLogTimeFilter, ServiceStatus,
 };
 use taskmanager_core::core::session::SessionIncarnation;
-use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
+};
 use taskmanager_core::core::startup::StartupEntryId;
 use taskmanager_core::core::target::ServiceId;
 
@@ -125,6 +127,10 @@ fn disk_row(device_id: &str, name: &str, model: &str) -> DiskMetrics {
     disk.device_id = device_id.to_owned();
     disk.model = model.to_owned();
     disk.device_generation = DeviceGeneration::new(1);
+    disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+        short: SmartSelfTestSupport::Supported,
+        ..Default::default()
+    };
     disk
 }
 
@@ -639,6 +645,7 @@ fn arm_2_confirms_the_armed_service_gate_so_the_inventory_enter_arm_never_runs()
 #[test]
 fn arm_2c_key_t_arms_the_self_test_for_the_focused_disk_then_the_first_reported_one() {
     let mut shell = fixture::demo_app();
+    fixture::health::seed_smart_self_test_capabilities(&mut shell);
     let first = shell
         .projection()
         .snapshot

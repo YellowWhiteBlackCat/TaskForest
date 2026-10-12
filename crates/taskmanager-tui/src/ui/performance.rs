@@ -1,5 +1,6 @@
 //! Performance detail composition over the cached device identity and preferences.
 
+use super::containers::{StatePanel, StatePanelKind};
 use super::*;
 
 pub(super) fn render_performance(
@@ -16,7 +17,13 @@ pub(super) fn render_performance(
         return;
     }
     let Some(snapshot) = app.projection().snapshot.as_ref() else {
-        render_loading(frame, theme, content, t("common.collecting_telemetry"));
+        super::render_collecting_panel(
+            frame,
+            theme,
+            content,
+            t("common.loading"),
+            t("common.collecting_telemetry"),
+        );
         return;
     };
     // The compact resource selector row sits above the selected resource's
@@ -28,21 +35,23 @@ pub(super) fn render_performance(
         let entries = app.sidebar_entries();
         match entries.iter().find(|entry| &entry.key == key) {
             None => {
-                render_empty_panel(
+                StatePanel::render(
                     frame,
                     theme,
                     content,
                     t("device.disconnected"),
+                    StatePanelKind::Message,
                     t("device.reconnect_hint"),
                 );
                 return;
             }
             Some(entry) if !entry.visible => {
-                render_empty_panel(
+                StatePanel::render(
                     frame,
                     theme,
                     content,
                     t("sidebar.devices"),
+                    StatePanelKind::Message,
                     t("sidebar.hide_device"),
                 );
                 return;

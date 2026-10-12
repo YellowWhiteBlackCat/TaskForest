@@ -9,6 +9,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from frontend_source_manifest import source_paths
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
@@ -69,15 +70,17 @@ def current(*command: str, cwd: Path) -> str:
 
 
 def validate_source_manifest(path: Path, root: Path) -> None:
+    allowed = None
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         digest, separator, relative = line.partition("  ")
         if not separator or len(digest) != 64 or not relative:
             raise EvidenceError(f"invalid source manifest line {number}")
         source = (root / relative).resolve()
-        try:
-            source.relative_to(root.resolve())
-        except ValueError as error:
-            raise EvidenceError(f"source path escapes repository: {relative}") from error
+        if not source.is_relative_to(root.resolve()):
+            if allowed is None:
+                allowed = {entry.resolve() for entry in source_paths(root.resolve(), "iced")}
+            if source not in allowed:
+                raise EvidenceError(f"source path is outside the declared production graph: {relative}")
         if not source.is_file() or file_sha256(source) != digest:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 

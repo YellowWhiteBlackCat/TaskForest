@@ -68,6 +68,15 @@ pub(super) fn smart_self_test_focus_target(focused_control: Option<FocusTarget>)
     }
 }
 
+pub(super) fn session_control_focus_target(focused_control: Option<FocusTarget>) -> FocusTarget {
+    match focused_control {
+        Some(FocusTarget::ConfirmSessionControl) => FocusTarget::CancelSessionControl,
+        Some(FocusTarget::CancelSessionControl) => FocusTarget::CloseSessionControl,
+        Some(FocusTarget::CloseSessionControl) => FocusTarget::ConfirmSessionControl,
+        _ => FocusTarget::ConfirmSessionControl,
+    }
+}
+
 impl IcedApp {
     /// Resolve one update's focus operation into an Iced focus task. The modal
     /// scopes (end-task / service-control / local modal) Tab-cycle their own
@@ -97,6 +106,11 @@ impl IcedApp {
             && focus_cycle.is_some()
         {
             let target = smart_self_test_focus_target(self.input.focused_control);
+            self.input.focused_control = Some(target);
+            return iced::widget::operation::focus(crate::focus::focus_id(target));
+        }
+        if self.shell.pending_session().is_some() && modal.was_open() && focus_cycle.is_some() {
+            let target = session_control_focus_target(self.input.focused_control);
             self.input.focused_control = Some(target);
             return iced::widget::operation::focus(crate::focus::focus_id(target));
         }
@@ -144,6 +158,9 @@ impl IcedApp {
             super::InputScope::SharedSurface(SurfaceKind::Confirmation(
                 ConfirmationKind::SmartSelfTest,
             )) => FocusTarget::ConfirmSmartSelfTest,
+            super::InputScope::SharedSurface(SurfaceKind::Confirmation(
+                ConfirmationKind::SessionControl,
+            )) => FocusTarget::ConfirmSessionControl,
             super::InputScope::LocalSurface(super::LocalSurfaceKind::RunTask) => {
                 FocusTarget::RunTaskCommandInput
             }

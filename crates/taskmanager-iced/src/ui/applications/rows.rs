@@ -5,16 +5,14 @@
 //! dispatch and the `RowRender` context are re-exported so callers keep
 //! compiling unchanged.
 
+use super::aggregate_projection::{AggregateCellProjection, project_group_aggregate_cells};
 use super::process_projection::{ProcessRowFacts, ProjectedRow, RowCells};
 use super::*;
 use iced::widget::canvas;
 use iced::widget::text::Wrapping;
 use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::ProcessRowId;
-use taskmanager_shell::presentation::{
-    missing_value, optional_bytes, optional_duration, optional_nice,
-};
+use taskmanager_shell::presentation::optional_nice;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -31,7 +29,7 @@ pub(super) fn project_row_element(
 ) -> Option<Element<'static, Message, iced::Theme, iced::Renderer>> {
     let zebra = theme::zebra_index(row_index);
     match row {
-        ProjectedRow::GroupHeader { .. } => Some(group_header_row(ctx, row)),
+        ProjectedRow::GroupHeader { .. } => Some(group_header_row(ctx, row, row_index)),
         ProjectedRow::Tree { flat_index, .. } => {
             let process = projection.process_facts(*flat_index)?;
             let cells = projection.row_cells(*flat_index)?;
@@ -220,16 +218,22 @@ fn tree_node_row(
         // selects the parent (a parent's flat index is stable across collapse,
         // so both can happen on one activation). The header-button styling
         // reads as an actionable parent row.
-        iced::widget::button(row_content)
-            .on_press(Message::ActivateTreeNode {
-                identity: row.row_key().and_then(|key| key.live_key()),
-                flat_index: *flat_index,
-            })
+        let action = Message::ActivateTreeNode {
+            identity: row.row_key().and_then(|key| key.live_key()),
+            flat_index: *flat_index,
+        };
+        let parent_button = iced::widget::button(row_content)
+            .on_press(action.clone())
             .style(move |_theme, status| {
                 theme::header_button_style(&theme_snapshot, status, selected)
             })
-            .padding(0)
-            .into()
+            .padding(0);
+        focus::focusable_control(
+            &theme_snapshot,
+            FocusTarget::ProcessTreeNode(*flat_index),
+            parent_button.into(),
+            action,
+        )
     } else {
         let identity = row.row_key().and_then(|key| key.live_key());
         let row_element = match identity {
@@ -326,6 +330,42 @@ fn zero_tinted_text(
     column_cell(ctx, cell, column)
 }
 
+/// Render an aggregate cell with its complete status text retained in the
+/// text semantics and available in a bounded tooltip when the status needs
+/// more detail than the table column can show. Status text starts at the left
+/// edge so clipping never hides the measured value at the beginning.
+fn aggregate_tinted_text(
+    ctx: &RowRender,
+    aggregate: AggregateCellProjection,
+    column: SortCol,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    let AggregateCellProjection {
+        text: label,
+        compact_text,
+        is_current_zero,
+        has_detail,
+    } = aggregate;
+    let mut cell = text(compact_text).wrapping(Wrapping::None);
+    if ctx.gray_zero && is_current_zero {
+        cell = cell.color(theme::muted_text_color(&ctx.theme));
+    }
+    let alignment = if has_detail {
+        iced::alignment::Horizontal::Left
+    } else {
+        column_alignment(column)
+    };
+    let content: Element<'static, Message, iced::Theme, iced::Renderer> = container(cell)
+        .clip(true)
+        .width(Length::Fixed(ctx.resolved_column_width(column)))
+        .align_x(alignment)
+        .into();
+    if has_detail {
+        crate::ui::components::tooltip_owned(ctx.theme, content, label)
+    } else {
+        content
+    }
+}
+
 /// A plain text cell bounded and aligned by the column's contract spec.
 fn text_cell(
     ctx: &RowRender,
@@ -416,6 +456,7 @@ pub(crate) fn visible_column_elements(
 fn group_header_row(
     ctx: &RowRender,
     row: &ProjectedRow,
+    row_index: usize,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let ProjectedRow::GroupHeader {
         flat_index: _,
@@ -440,18 +481,10 @@ fn group_header_row(
     let theme_snapshot = ctx.theme;
     let selected = row_key.is_some_and(|key| ctx.selected_row == Some(key));
     let marker = if *expanded { "▼" } else { "▶" };
-    // The typed aggregate keeps the PSS-preferred display metric and the PSS
-    // metric separate. Only current values become strings; stale and
-    // unavailable values remain explicit dashes.
-    let (cpu_text, cpu_zero) = aggregate_f32_text(metrics.cpu(), |cpu| format!("{cpu:>5.1}%"));
-    let memory = metrics.memory().current_value().copied();
-    let pss = metrics.memory_pss().current_value().copied();
-    let swap = metrics.swap().current_value().copied();
-    let disk_read = metrics.disk_read().current_value().copied();
-    let disk_write = metrics.disk_write().current_value().copied();
-    let cpu_time = metrics.cpu_time().current_value().copied();
-    let threads = aggregate_count_text(metrics.threads());
-    let fds = aggregate_count_text(metrics.fds());
+    // Keep the PSS-preferred display metric and the explicit PSS metric
+    // separate. This projection preserves each aggregate's freshness,
+    // coverage, and typed failure reason before any widget is constructed.
+    let aggregate = project_group_aggregate_cells(metrics);
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.
@@ -477,10 +510,10 @@ fn group_header_row(
         .into(),
         text_cell(ctx, user.clone(), SortCol::User),
         text_cell(ctx, "—".to_string(), SortCol::Pid),
-        zero_tinted_text(ctx, threads.0, threads.1, SortCol::Threads),
+        aggregate_tinted_text(ctx, aggregate.threads, SortCol::Threads),
         text_cell(ctx, start_clock.clone(), SortCol::StartTime),
         text_cell(ctx, status.clone(), SortCol::State),
-        zero_tinted_text(ctx, cpu_text, cpu_zero, SortCol::Cpu),
+        aggregate_tinted_text(ctx, aggregate.cpu, SortCol::Cpu),
         // Aggregate group headers carry no single CPU history, so the Trend
         // column stays blank — but the same-width cell keeps the column
         // boundary pixel-aligned with the member rows beneath it.
@@ -488,37 +521,24 @@ fn group_header_row(
             .width(Length::Fixed(PROCESS_SPARK_WIDTH))
             .height(Length::Shrink)
             .into(),
-        zero_tinted_text(
-            ctx,
-            optional_bytes(memory),
-            memory == Some(0),
-            SortCol::Memory,
-        ),
+        aggregate_tinted_text(ctx, aggregate.memory, SortCol::Memory),
     ];
     if ctx.swap_visible {
-        cells.push(zero_tinted_text(
-            ctx,
-            optional_bytes(swap),
-            swap == Some(0),
-            SortCol::Swap,
-        ));
+        cells.push(aggregate_tinted_text(ctx, aggregate.swap, SortCol::Swap));
     }
-    cells.push(zero_tinted_text(
+    cells.push(aggregate_tinted_text(
         ctx,
-        optional_bytes(pss),
-        pss == Some(0),
+        aggregate.memory_pss,
         SortCol::Pss,
     ));
-    cells.push(zero_tinted_text(
+    cells.push(aggregate_tinted_text(
         ctx,
-        optional_bytes(disk_read),
-        disk_read == Some(0),
+        aggregate.disk_read,
         SortCol::DiskRead,
     ));
-    cells.push(zero_tinted_text(
+    cells.push(aggregate_tinted_text(
         ctx,
-        optional_bytes(disk_write),
-        disk_write == Some(0),
+        aggregate.disk_write,
         SortCol::DiskWrite,
     ));
     cells.push(zero_tinted_text(
@@ -527,13 +547,12 @@ fn group_header_row(
         false,
         SortCol::Network,
     ));
-    cells.push(zero_tinted_text(
+    cells.push(aggregate_tinted_text(
         ctx,
-        optional_duration(cpu_time),
-        cpu_time == Some(0),
+        aggregate.cpu_time,
         SortCol::CpuTime,
     ));
-    cells.push(zero_tinted_text(ctx, fds.0, fds.1, SortCol::Fds));
+    cells.push(aggregate_tinted_text(ctx, aggregate.fds, SortCol::Fds));
     cells.push(zero_tinted_text(
         ctx,
         optional_nice(*nice),
@@ -541,36 +560,25 @@ fn group_header_row(
         SortCol::Nice,
     ));
     let cells = visible_column_elements(cells, ctx.swap_visible, &ctx.hidden_columns, true);
-    iced::widget::button(container(
+    let action = Message::ToggleGroupExpansion {
+        name: expansion_key.clone(),
+        row_key: *row_key,
+    };
+    let header = iced::widget::button(container(
         iced::widget::row(cells)
             .padding(theme::row_padding(ctx.compact))
             .spacing(theme::table_column_spacing()),
     ))
-    .on_press(Message::ToggleGroupExpansion {
-        name: expansion_key.clone(),
-        row_key: *row_key,
-    })
+    .on_press(action.clone())
     .style(move |_theme, status| theme::header_button_style(&theme_snapshot, status, selected))
     .padding(0)
-    .width(Length::Fill)
-    .into()
-}
-
-fn aggregate_f32_text(
-    metric: &AggregateMetric<f32>,
-    format: impl FnOnce(f32) -> String,
-) -> (String, bool) {
-    match metric.current_value().copied() {
-        Some(value) => (format(value), value == 0.0),
-        None => (missing_value(), false),
-    }
-}
-
-fn aggregate_count_text(metric: &AggregateMetric<u64>) -> (String, bool) {
-    match metric.current_value().copied() {
-        Some(value) => (value.to_string(), value == 0),
-        None => (missing_value(), false),
-    }
+    .width(Length::Fill);
+    focus::focusable_control(
+        &theme_snapshot,
+        FocusTarget::ProcessGroupHeader(row_index),
+        header.into(),
+        action,
+    )
 }
 
 /// One per-row CPU sparkline cell, or a same-width blank container when the
@@ -602,3 +610,7 @@ fn process_sparkline_cell(
             .into()
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/applications_aggregate_tests.rs"]
+mod tests;

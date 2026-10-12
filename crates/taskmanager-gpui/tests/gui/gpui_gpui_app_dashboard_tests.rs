@@ -33,8 +33,8 @@ fn event_center_reads_shared_history_and_tracks_local_read_state() {
         }),
         ..SystemSnapshot::default()
     };
-    shell.evaluate_alerts(&first_tick, 1_000);
-    shell.evaluate_alerts(&second_tick, 11_000);
+    let _ = shell.evaluate_alerts(&first_tick, 1_000);
+    let _ = shell.evaluate_alerts(&second_tick, 11_000);
     let appended = shell.projection().alert_center.event_history();
     assert_eq!(appended.len(), 3);
     assert_eq!(center.unread_count(appended), 1);

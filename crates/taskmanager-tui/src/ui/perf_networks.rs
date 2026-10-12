@@ -26,6 +26,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{MISSING_VALUE, device_status_i18n_key};
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
 
@@ -50,11 +51,12 @@ pub(super) fn render_network_section(
     // devices parity): a hidden class drops out of the panel entirely.
     let filtered = visible_networks(app, networks);
     if filtered.is_empty() {
-        super::render_empty_panel(
+        StatePanel::render(
             frame,
             theme,
             area,
             t("sidebar.network"),
+            StatePanelKind::Message,
             // Aligned with the shared `network.empty` catalog entry the other
             // frontends read (single-source wording).
             t("network.empty"),

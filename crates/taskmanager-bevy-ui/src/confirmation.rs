@@ -7,11 +7,11 @@
 //! re-reads a live row and never builds a request itself (the double-echo
 //! authority is `ShellApp`, not a widget).
 //!
-//! Scope: the kinds this frontend can actually arm (EndTask via the shared
-//! Delete chord, ProcessBatch via tree end) render a full dialog with the
-//! same `confirm.*` copy the TUI shows. Unreachable kinds fail closed: they
-//! produce no dialog here, and the keyboard's `y`/`n` gate vocabulary in the
-//! shell remains the only confirm path for them.
+//! Every current shared gate kind (EndTask, ProcessBatch, ServiceControl,
+//! StartupControl, SessionControl, and SmartSelfTest) has a typed dialog view
+//! and a matching shell confirmation route. The shell freezes the target and
+//! owns the confirm semantics; this renderer neither re-reads live rows nor
+//! constructs platform requests.
 //!
 //! Open/dismiss paths (keyboard y/n/Enter/Escape live in [`crate::input`];
 //! the two buttons here) all converge on the same shell methods, and every
@@ -31,7 +31,7 @@ use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, Syste
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::ComputedNode;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
+    AlignItems, BackgroundColor, BorderRadius, FixedNode, FlexDirection, JustifyContent, Node,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
@@ -71,8 +71,9 @@ pub(crate) struct PendingConfirmationView {
 }
 
 impl PendingConfirmationView {
-    /// Build the view from the shell's pending gate. `None` for kinds this
-    /// frontend cannot arm (no dialog; keyboard `y`/`n` stays authoritative).
+    /// Build the view from one shared pending gate. Every current gate kind
+    /// returns a typed Bevy dialog; callers handle shell absence in the outer
+    /// `Option` returned by `pending_confirmation`.
     #[must_use]
     pub(crate) fn from_pending(pending: &PendingConfirmation) -> Option<Self> {
         match pending {
@@ -408,10 +409,13 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
         Node {
             width: percent(100),
             height: percent(100),
-            position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
         }
+        // Viewport-anchored modal layer: `FixedNode` makes the overlay a root
+        // node — no inherited layout, clipping or transform from the shell —
+        // replacing the absolute-position idiom.
+        FixedNode
         BackgroundColor({ scrim })
         ConfirmationOverlay
         ArmedConfirmation({ Some(armed) })

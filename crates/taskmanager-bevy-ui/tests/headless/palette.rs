@@ -8,7 +8,7 @@
 //! reinterprets the token scale fails here without any window.
 
 use bevy::color::Srgba;
-use bevy::text::FontSize;
+use bevy::text::{FontSize, RemSize};
 use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -60,13 +60,13 @@ fn token_colors_round_trip_channel_exact() {
 }
 
 fn px(size: FontSize) -> f32 {
-    size.eval(bevy::math::Vec2::ZERO, bevy::text::RemSize(16.0))
+    size.eval(bevy::math::Vec2::ZERO, RemSize(16.0))
 }
 
 #[test]
 fn ui_palette_derives_every_metric_from_tokens() {
     let theme = Theme::dark();
-    let palette: UiPalette = ui_palette(&theme);
+    let palette: UiPalette = ui_palette(&theme, UiSize::Standard);
     assert_same_color(palette.window_clear, theme.window_bg);
     assert_same_color(palette.panel_fill, theme.card_surface());
     assert_same_color(palette.content_bg, theme.view_bg);
@@ -89,9 +89,9 @@ fn ui_palette_derives_every_metric_from_tokens() {
         "the control corner radius comes from the theme radius scale"
     );
     assert_eq!(
-        palette.control_height_px,
+        palette.control_height_px(),
         UiSize::Standard.control_height().0,
-        "the control height is the Standard density token"
+        "the control height resolves to the Standard density token"
     );
     assert_eq!(
         px(palette.heading.font_size),
@@ -100,18 +100,18 @@ fn ui_palette_derives_every_metric_from_tokens() {
     );
     assert_eq!(
         px(palette.body.font_size),
-        f32::from(tokens::FONT_BODY),
-        "the body size is the body baseline token"
+        UiSize::Standard.body_font_size().0,
+        "the body size is the Standard reading-size token"
     );
     assert_eq!(
         px(palette.caption.font_size),
-        f32::from(tokens::FONT_CAPTION),
-        "the caption size is the caption baseline token"
+        UiSize::Standard.caption_font_size().0,
+        "the caption size meets the 12px Standard Chinese floor"
     );
     assert_eq!(
         px(palette.mono.font_size),
-        f32::from(tokens::FONT_BODY),
-        "the mono role keeps the metric text baseline size"
+        UiSize::Standard.body_font_size().0,
+        "the mono role tracks the body baseline size"
     );
     assert_eq!(palette.heading.weight.0, 600, "header weight token");
     assert_eq!(palette.body.weight.0, 400, "normal weight token");
@@ -120,9 +120,33 @@ fn ui_palette_derives_every_metric_from_tokens() {
 }
 
 #[test]
+fn ui_size_axis_rescales_the_rem_ladder() {
+    let small = ui_palette(&Theme::dark(), UiSize::Small);
+    let standard = ui_palette(&Theme::dark(), UiSize::Standard);
+    let large = ui_palette(&Theme::dark(), UiSize::Large);
+    // RemSize follows each step's body type; every rem Val in every scene
+    // re-scales from this one resource.
+    assert_eq!(small.rem_px, 14.0);
+    assert_eq!(standard.rem_px, 16.0);
+    assert_eq!(large.rem_px, 18.0);
+    // The control height keeps resolving to the density table's px per step.
+    assert_eq!(small.control_height_px(), 32.0);
+    assert_eq!(standard.control_height_px(), 38.0);
+    assert_eq!(large.control_height_px(), 46.0);
+    // Type roles are rem ratios of the step's body type, so a step switch
+    // re-scales them without touching a scene.
+    assert_eq!(small.body.font_size, FontSize::Rem(1.0));
+    assert_eq!(standard.heading.font_size, FontSize::Rem(28.0 / 16.0));
+    assert_eq!(
+        large.caption.font_size,
+        FontSize::Rem(UiSize::Large.caption_font_size().0 / 18.0)
+    );
+}
+
+#[test]
 fn light_and_dark_themes_resolve_to_different_surfaces() {
-    let dark = ui_palette(&Theme::dark());
-    let light = ui_palette(&light_theme());
+    let dark = ui_palette(&Theme::dark(), UiSize::Standard);
+    let light = ui_palette(&light_theme(), UiSize::Standard);
     assert_ne!(
         dark.window_clear.to_srgba(),
         light.window_clear.to_srgba(),
@@ -142,14 +166,14 @@ fn light_and_dark_themes_resolve_to_different_surfaces() {
 
 #[test]
 fn high_contrast_theme_strengthens_bevy_palette_and_flags_hc() {
-    let standard = ui_palette(&Theme::dark());
+    let standard = ui_palette(&Theme::dark(), UiSize::Standard);
     let hc_theme = Theme::build(
         Skin::Gnome,
         LightDark::Dark,
         HighContrast::On,
         ResolvedFonts::system_for(Skin::Gnome),
     );
-    let hc = ui_palette(&hc_theme);
+    let hc = ui_palette(&hc_theme, UiSize::Standard);
     assert!(!standard.high_contrast);
     assert!(hc.high_contrast);
     assert_ne!(standard.border_color.to_srgba(), hc.border_color.to_srgba());

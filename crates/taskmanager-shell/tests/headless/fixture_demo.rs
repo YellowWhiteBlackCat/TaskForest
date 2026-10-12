@@ -5,6 +5,7 @@
 
 use super::*;
 use taskmanager_application::i18n;
+use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 
@@ -102,6 +103,21 @@ fn direct_demo_contains_the_shared_product_projection() {
     assert_eq!(
         projection.capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
         Some(CapabilityStatus::RequiresEscalation)
+    );
+
+    let gpu = projection
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.gpu.first())
+        .expect("demo GPU snapshot");
+    assert_eq!(
+        gpu.device_state.status,
+        DeviceStatus::Healthy,
+        "available demo GPU metrics carry a healthy device-source state"
+    );
+    assert!(
+        gpu.current_utilization_pct().is_some(),
+        "the demo GPU status matches its measured utilization"
     );
 }
 

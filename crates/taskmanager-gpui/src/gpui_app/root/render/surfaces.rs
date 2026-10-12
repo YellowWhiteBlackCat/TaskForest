@@ -96,7 +96,9 @@ fn compose_shared_surface(
                 ))
             }
             Some(
-                PendingConfirmation::ServiceControl(_) | PendingConfirmation::StartupControl(_),
+                PendingConfirmation::ServiceControl(_)
+                | PendingConfirmation::StartupControl(_)
+                | PendingConfirmation::SessionControl(_),
             ) => {
                 let Some(intent) = service_control::confirmation_dialog(view) else {
                     return root;
@@ -125,10 +127,7 @@ fn compose_shared_surface(
                     cx,
                 ))
             }
-            // GPUI currently offers no login-session destructive menu. The
-            // branch is still swallowed by the shared input scope; adding the
-            // menu requires a renderer in the same change before it may arm.
-            Some(PendingConfirmation::SessionControl(_)) | None => root,
+            None => root,
         },
     }
 }

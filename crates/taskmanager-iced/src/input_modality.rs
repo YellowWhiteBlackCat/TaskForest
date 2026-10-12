@@ -18,11 +18,12 @@
 //!   iced analog of a capture-phase mouse-down listener (a root `mouse_area`
 //!   cannot do this: it captures the presses it reports).
 //!
-use iced::advanced::widget::{Operation, Tree};
+use iced::advanced::widget::operation::Focusable;
+use iced::advanced::widget::{Id, Operation, Tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::{Element, Event, Length, Rectangle, Size, Vector};
 
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 
 /// The most recent input origin capable of changing focus. One-to-one with
 /// the GPUI root tracker's vocabulary.
@@ -48,16 +49,43 @@ impl InputModality {
 }
 
 /// The root input observer: a transparent pass-through shell around the whole
-/// view tree that watches pointer presses before the wrapped tree handles the
-/// same event. It never captures, so every descendant control sees the press
-/// unchanged — only the one observation message is added.
+/// view tree that watches pointer presses and checks the tracked focus target
+/// before the wrapped tree handles an event. It never captures input, so every
+/// descendant sees the same event unchanged.
 pub(crate) struct Observer<'a> {
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
+    focused_target: Option<FocusTarget>,
 }
 
 impl<'a> Observer<'a> {
-    pub(crate) fn new(content: Element<'a, Message, iced::Theme, iced::Renderer>) -> Self {
-        Self { content }
+    pub(crate) fn new(
+        content: Element<'a, Message, iced::Theme, iced::Renderer>,
+        focused_target: Option<FocusTarget>,
+    ) -> Self {
+        Self {
+            content,
+            focused_target,
+        }
+    }
+}
+
+/// Finds the tracked focus target in the current widget tree. A `focusable`
+/// callback is the owner-level presence signal: disabled or removed controls
+/// do not register an Iced focus stop.
+struct FocusTargetPresence {
+    target: Id,
+    found: bool,
+}
+
+impl Operation<()> for FocusTargetPresence {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
+        if !self.found {
+            visit(self);
+        }
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, _bounds: Rectangle, _state: &mut dyn Focusable) {
+        self.found |= id.is_some_and(|id| id == &self.target);
     }
 }
 
@@ -113,6 +141,26 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Observer<'_> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        // `Widget::diff` cannot publish a message, so confirm the app-owned
+        // target against the reconciled tree on the next real event. Only a
+        // missing target is reported; changing focus while the old target is
+        // still mounted preserves keyboard modality.
+        if let Some(target) = self.focused_target {
+            let mut presence = FocusTargetPresence {
+                target: Id::from(crate::focus::focus_id(target)),
+                found: false,
+            };
+            self.content.as_widget_mut().operate(
+                &mut tree.children[0],
+                layout,
+                renderer,
+                &mut presence,
+            );
+            if !presence.found {
+                shell.publish(Message::FocusedTargetUnmounted(target));
+            }
+        }
+
         // Observe BEFORE forwarding: the descendant that handles the press may
         // capture it, and this tracker must see every press regardless.
         if matches!(event, Event::Mouse(iced::mouse::Event::ButtonPressed(_))) {

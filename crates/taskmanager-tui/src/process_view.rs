@@ -18,9 +18,8 @@
 //! The test-side `build_process_rows` helper materializes the shared rows and
 //! remains the fresh-rebuild reference for cache-invalidation tests.
 
-use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
-use taskmanager_shell::{ProcessRowId, ProcessTreeRow};
+use taskmanager_shell::{ProcessRowAggregate, ProcessRowId, ProcessTreeRow};
 
 #[cfg(test)]
 #[path = "../tests/headless/process_view_support.rs"]
@@ -49,8 +48,7 @@ pub(crate) enum ProcessRow<'a> {
         label: String,
         depth: usize,
         count: usize,
-        cpu: AggregateMetric<f32>,
-        memory: AggregateMetric<u64>,
+        aggregate: ProcessRowAggregate,
         expanded: bool,
         row_key: Option<ProcessRowId>,
     },
@@ -224,8 +222,7 @@ fn materialize_row_on<'a, L: ?Sized + VisibleLookup<'a>>(
             label: category_label(*category).to_owned(),
             depth: 0,
             count: *count,
-            cpu: aggregate.cpu().clone(),
-            memory: aggregate.memory().clone(),
+            aggregate: aggregate.clone(),
             expanded: *expanded,
             row_key: None,
         }),
@@ -247,8 +244,7 @@ fn materialize_row_on<'a, L: ?Sized + VisibleLookup<'a>>(
                     .to_owned(),
                 depth: 1,
                 count: *count,
-                cpu: aggregate.cpu().clone(),
-                memory: aggregate.memory().clone(),
+                aggregate: aggregate.clone(),
                 expanded: *expanded,
                 row_key: *row_key,
             })

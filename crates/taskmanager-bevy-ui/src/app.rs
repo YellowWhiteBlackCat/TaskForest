@@ -52,7 +52,7 @@ use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, Singl
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::scene::{CommandsSceneExt, Ready, Scene, bsn, on};
 use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
@@ -60,7 +60,9 @@ use bevy::ui::prelude::{
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{
+    Activate, Button, ControlOrientation, SelectedTab, Tab, TabActivation, TabList, ValueChange,
+};
 use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
@@ -70,6 +72,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 
 use crate::input::{PendingEffects, ShellInteractionApplied};
+use crate::navigation::NavigationStrip;
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
@@ -485,16 +488,122 @@ fn nav_button_activated(
     let Ok(target) = target else {
         return;
     };
-    // The keyboard adapter signals a re-render for every accepted route chord
-    // (effect or not) and stays silent for pages with no shared action — the
-    // pointer path mirrors that exactly.
-    if let Some(action) = action_for_page(target.0) {
+    apply_nav_route(
+        target.0,
+        &mut track,
+        &mut route,
+        &mut pending,
+        &mut commands,
+    );
+}
+
+/// The one route-apply body every pointer/keyboard/selection path shares:
+/// the page action joins the shell (with the same re-render signal a key
+/// press publishes), then the route protocol moves the resource and fires
+/// [`RouteChanged`].
+fn apply_nav_route(
+    page: Page,
+    track: &mut NonSendMut<FrontendTrack>,
+    route: &mut Route,
+    pending: &mut PendingEffects,
+    commands: &mut Commands,
+) {
+    if let Some(action) = action_for_page(page) {
         if let Some(effect) = track.shell.apply_action(action) {
             pending.0.push(effect);
         }
         commands.trigger(ShellInteractionApplied);
     }
-    request_route(&mut route, target.0, &mut commands);
+    request_route(route, page, commands);
+}
+
+/// The headless tab strip reports its selection through
+/// [`ValueChange<Option<Entity>>`]; the typed tab identity resolves back to
+/// the page it owns. Selection state itself stays on [`Route`] — the strip
+/// mirrors it via [`sync_selected_tab`], never the reverse.
+fn on_nav_tab_change(
+    change: On<ValueChange<Option<Entity>>>,
+    targets: Query<&NavTarget>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut route: ResMut<Route>,
+    mut pending: ResMut<PendingEffects>,
+    mut commands: Commands,
+) {
+    let Some(tab) = change.value else {
+        return;
+    };
+    let Ok(target) = targets.get(tab) else {
+        return;
+    };
+    apply_nav_route(
+        target.0,
+        &mut track,
+        &mut route,
+        &mut pending,
+        &mut commands,
+    );
+}
+
+/// The one route→strip selection write. `SelectedTab` is the widget's mirror
+/// of [`Route`]; writing it only on drift keeps the derived-state system
+/// quiet for idempotent transitions.
+fn sync_selected_tab(
+    strip: Query<(Entity, Option<&SelectedTab>, &Children), With<NavigationStrip>>,
+    targets: Query<&NavTarget>,
+    route: Res<Route>,
+    mut commands: Commands,
+) {
+    let Ok((strip, selected, children)) = strip.single() else {
+        return;
+    };
+    let tabs: Vec<Entity> = children.iter().copied().collect();
+    let next = tabs.into_iter().find(|child| {
+        targets
+            .get(*child)
+            .is_ok_and(|target| target.0 == route.page)
+    });
+    if selected.is_some_and(|current| current.0 == next) {
+        return;
+    }
+    commands.entity(strip).insert(SelectedTab(next));
+}
+
+/// The strip mirrors every accepted route change, however it was reached
+/// (keyboard chord, pointer tab, deep link).
+fn sync_selected_tab_on_route(
+    _changed: On<RouteChanged>,
+    strip: Query<(Entity, Option<&SelectedTab>, &Children), With<NavigationStrip>>,
+    targets: Query<&NavTarget>,
+    route: Res<Route>,
+    commands: Commands,
+) {
+    sync_selected_tab(strip, targets, route, commands);
+}
+
+/// The strip's full-spawn signal: Bevy 0.20 fires `Ready` bottom-up after
+/// every descendant (all tabs) has mounted — the typed initial-selection
+/// moment, because scene entities do not exist while the scene is still
+/// being declared.
+fn nav_strip_ready(
+    ready: On<Ready>,
+    strip: Query<(Option<&SelectedTab>, &Children)>,
+    targets: Query<&NavTarget>,
+    route: Res<Route>,
+    mut commands: Commands,
+) {
+    let Ok((selected, children)) = strip.get(ready.entity) else {
+        return;
+    };
+    let tabs: Vec<Entity> = children.iter().copied().collect();
+    let next = tabs.into_iter().find(|child| {
+        targets
+            .get(*child)
+            .is_ok_and(|target| target.0 == route.page)
+    });
+    if selected.is_some_and(|current| current.0 == next) {
+        return;
+    }
+    commands.entity(ready.entity).insert(SelectedTab(next));
 }
 
 /// Observer: despawn the outgoing page content and request a remount. The
@@ -633,6 +742,8 @@ impl Plugin for AppShellPlugin {
             .init_resource::<crate::text_selection::ClipboardPort>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
+            .add_observer(on_nav_tab_change)
+            .add_observer(sync_selected_tab_on_route)
             .add_observer(crate::widgets::table::on_process_sort_header_activated)
             .add_observer(crate::app::containers::containers_fold_observer)
             .add_plugins(crate::input::InputPlugin)
@@ -694,7 +805,7 @@ pub(crate) fn tab_icon(page: Page) -> IconId {
 /// ellipses labels instead of pushing the trailing buttons out of the strip.
 fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
     let label = page.nav_label().to_owned();
-    let height = palette.control_height_px * 1.4;
+    let height = palette.control_height_px() * 1.4;
     let radius = palette.control_radius_px;
     let fill = nav_item_background(active, palette);
     let ink = if active {
@@ -717,8 +828,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         BackgroundColor(fill)
         NavTarget(page)
         ControlVisual(ControlTone::Nav, active)
-        Button
-        on(nav_button_activated)
+        Tab
         Children [
              @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE --
 
@@ -741,7 +851,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
 /// Trailing strip affordance for the two frontend-owned routes: a compact
 /// square icon button (Alerts bell, Settings gear) — GPUI's gear slot.
 fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
-    let height = palette.control_height_px * 1.4;
+    let height = palette.control_height_px() * 1.4;
     let fill = nav_item_background(active, palette);
     let ink = if active {
         palette.nav_active_ink
@@ -788,6 +898,15 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
         }
         BackgroundColor({ palette.nav_bg })
         crate::navigation::NavigationStrip
+        // The headless tab-list widget: roving arrow-key focus, the shared
+        // tablist/tab AT-SPI roles, and `ValueChange` selection events. The
+        // route resource stays the sole selection authority — this strip
+        // mirrors it through `sync_selected_tab`, never a local copy.
+        TabList {
+            orientation: ControlOrientation::Horizontal,
+            activation: TabActivation::Manual,
+        }
+        on(nav_strip_ready)
         bevy::ui_widgets::ScrollArea
         Children [
             @{crate::navigation::button(palette)} -- { tabs }--

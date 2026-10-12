@@ -11,12 +11,14 @@ use iced::Element;
 use iced::widget::{Space, column, container, mouse_area, row, scrollable, text};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::virtual_horizontal_body;
 
 use super::history_replay;
 use super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
 use super::{
-    VirtualWindow, battery_section, cpu_memory_detail, disk_section, fan, gpu_section,
-    network_section, npu_section, perf_rail, virtual_horizontal_body,
+    battery_section, cpu_memory_detail, disk_section, fan, gpu_section, network_section,
+    npu_section, perf_rail,
 };
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};

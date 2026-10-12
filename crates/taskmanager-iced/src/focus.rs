@@ -37,6 +37,16 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::TableRow { page, index } => {
             format!("iced-table-row-{}-{index}", page_key(page))
         }
+        FocusTarget::ProcessSortHeader(column) => {
+            format!("iced-process-sort-header-{column:?}")
+        }
+        FocusTarget::InfoSortHeader { table, column } => {
+            format!("iced-info-sort-header-{table:?}-{}", column.label())
+        }
+        FocusTarget::ProcessTreeNode(index) => format!("iced-process-tree-node-{index}"),
+        FocusTarget::ProcessGroupHeader(index) => {
+            format!("iced-process-group-header-{index}")
+        }
         FocusTarget::PageTab(page) => format!("iced-page-tab-{}", page_key(page)),
         FocusTarget::SearchTrigger => "iced-search-trigger".to_owned(),
         FocusTarget::SearchClose => "iced-search-close".to_owned(),
@@ -100,6 +110,9 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::CancelEndTask => "iced-cancel-end-task".to_owned(),
         FocusTarget::SessionDisconnect => "iced-session-disconnect".to_owned(),
         FocusTarget::SessionLock => "iced-session-lock".to_owned(),
+        FocusTarget::ConfirmSessionControl => "iced-confirm-session-control".to_owned(),
+        FocusTarget::CancelSessionControl => "iced-cancel-session-control".to_owned(),
+        FocusTarget::CloseSessionControl => "iced-close-session-control".to_owned(),
         FocusTarget::UserRowMenuDisconnect => "iced-user-row-menu-disconnect".to_owned(),
         FocusTarget::UserRowMenuLock => "iced-user-row-menu-lock".to_owned(),
         FocusTarget::UserRowMenuClose => "iced-user-row-menu-close".to_owned(),

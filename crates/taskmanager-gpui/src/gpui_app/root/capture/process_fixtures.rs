@@ -2,6 +2,7 @@
 
 use taskmanager_core::core::DeviceState;
 use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity, ProcessItem,
     ProcessLiveKey, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
@@ -77,11 +78,25 @@ pub(super) fn prepare_apps_group_expanded(processes: &mut Vec<ProcessItem>) {
         process.cmdline = "/usr/bin/capture-browser --group-capture".into();
         process.status = status.into();
         process.parent_pid = (offset > 0).then_some(BASE_PID);
+        let cpu_observation = if offset == 1 {
+            ScalarObservation::unavailable(FailureKind::PermissionDenied)
+        } else {
+            ScalarObservation::available(cpu, 1)
+        };
+        let memory_observation = if offset == 1 {
+            ScalarObservation::unavailable(FailureKind::PermissionDenied)
+        } else {
+            ScalarObservation::available(memory, 1)
+        };
         process.apply_scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(9_300_000 + u64::from(pid), 1),
-            cpu_percentage: ScalarObservation::available(cpu, 1),
-            memory_bytes: ScalarObservation::available(memory, 1),
-            memory_pss_bytes: ScalarObservation::available(memory / 2, 1),
+            cpu_percentage: cpu_observation,
+            memory_bytes: memory_observation,
+            memory_pss_bytes: if offset == 1 {
+                ScalarObservation::unavailable(FailureKind::PermissionDenied)
+            } else {
+                ScalarObservation::available(memory / 2, 1)
+            },
             disk_read_bytes_per_sec: ScalarObservation::available(16 * 1024, 1),
             disk_write_bytes_per_sec: ScalarObservation::available(8 * 1024, 1),
             threads: ScalarObservation::available(threads, 1),

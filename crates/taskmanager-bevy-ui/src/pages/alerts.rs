@@ -10,14 +10,14 @@
 //!   [`ShellApp::edit_alert_rules`] (the one edit authority — this page
 //!   never mutates the projection directly);
 //! - `ShellApp::drain_alert_notifications` — desktop notifications the
-//!   shared evaluation queued are submitted through `queue_effect`, the same
-//!   seam every effect uses (never a direct platform call).
+//!   shared evaluation queued become typed `PendingEffects`; the PreUpdate
+//!   drain submits them through the same seam every effect uses.
 //!
 //! **Refresh contract.** The page content is mounted once per route
 //! residence; live data reaches it through observers carried by the page
 //! itself (`page_observer`): the fold observer (`alerts_fold_observer`)
-//! reacts to `crate::drain::ShellProjectionFolded` — submit queued
-//! notifications, then ask the app shell's route machinery to remount the
+//! reacts to `crate::drain::ShellProjectionFolded` — enqueue notifications for
+//! the PreUpdate drain, then ask the app shell's route machinery to remount the
 //! mounted page so the freshly folded projection renders. Idle frames fold
 //! nothing, fire nothing, and redraw nothing. The toggle observer
 //! (`rule_toggle_observer`) resolves `bevy_ui_widgets` checkbox
@@ -31,7 +31,7 @@ use bevy::ecs::component::Component;
 use bevy::ecs::event::EventPattern;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::{Observer, On};
-use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, Res};
+use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, ResMut};
 use bevy::scene::{EntityScene, ResolveContext, ResolveSceneError, ResolvedScene, Scene, bsn};
 use bevy::ui::Overflow;
 use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
@@ -46,11 +46,11 @@ use taskmanager_core::core::alerts::{
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
-use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
+use crate::app::{FrontendTrack, PageContext, RouteChanged};
 use crate::drain::ShellProjectionFolded;
+use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
-use taskmanager_shell::queue_effect;
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the
 /// observer component, so the observer's lifetime equals the page content's
@@ -98,23 +98,17 @@ pub(crate) fn request_projection_refresh(_fold: On<ShellProjectionFolded>, mut c
     commands.trigger(RouteChanged);
 }
 
-/// The alerts page's fold observer: submit every desktop notification the
-/// shared evaluation queued (through the one effect seam, mirroring the TUI
-/// run loop), then request the projection refresh. The route resource — not
-/// the event payload — stays the remount authority.
+/// The alerts page's fold observer: move every queued desktop notification
+/// into the drain-owned effect bridge, then request the projection refresh.
+/// The route resource — not the event payload — stays the remount authority.
 fn alerts_fold_observer(
     _fold: On<ShellProjectionFolded>,
     mut track: NonSendMut<FrontendTrack>,
-    runtime: Res<SharedRuntimeHandle>,
+    mut pending: ResMut<PendingEffects>,
     mut commands: Commands,
 ) {
-    let mut client = runtime.shared.lock_client();
     for request in track.shell.drain_alert_notifications() {
-        queue_effect(
-            &mut track.shell,
-            &mut client,
-            PlatformEffect::DesktopNotification(request),
-        );
+        pending.0.push(PlatformEffect::DesktopNotification(request));
     }
     commands.trigger(RouteChanged);
 }
@@ -398,3 +392,7 @@ fn rule_rows(rules: &[ManagedAlertRule], palette: &UiPalette) -> Vec<Box<dyn Sce
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/effects.rs"]
+mod effect_tests;

@@ -1,3 +1,4 @@
+use super::aggregate::{ProcessTreeCellKind, ProcessTreeTextCell};
 use super::*;
 use taskmanager_application::process_category_projection::category_buckets;
 use taskmanager_core::core::FailureKind;
@@ -253,6 +254,9 @@ fn tree_rows_carry_typed_aggregates_without_zero_fallback() {
     assert!(process_row.cpu.is_none());
     assert!(process_row.memory.is_none());
 }
+
+#[path = "process_tree/aggregate_metric.rs"]
+mod aggregate_metric;
 
 #[test]
 fn native_expand_and_collapse_preserve_all_live_tree_identities_and_selection() {

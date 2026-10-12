@@ -16,7 +16,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    PositionType, UiRect, Val, percent, px,
+    PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -145,7 +145,7 @@ pub(crate) fn affinity_modal_scene(
 
                 Node {
                     width: px(88.0),
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
                     border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),

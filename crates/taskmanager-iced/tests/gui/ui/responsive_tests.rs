@@ -18,6 +18,8 @@ use taskmanager_shell::SortCol;
 use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::navigation::NavOrientation;
+use zhuge_ui_core::virtual_list::DEFAULT_OVERSCAN;
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 fn frame(width: f32, height: f32) -> Size {
     Size::new(width, height)
@@ -333,7 +335,7 @@ fn elastic_layout_playbook_table_columns_under_narrow_and_wide_short_viewports()
         application_row_height, apps_columns, apps_table_width, column_alignment, column_hideable,
         column_width, localized_sort_column_label,
     };
-    use super::super::virtual_list::VirtualWindow;
+
     use taskmanager_application::i18n::{Language, set_language};
     use taskmanager_shell::SortCol;
 
@@ -387,9 +389,7 @@ fn elastic_layout_playbook_table_columns_under_narrow_and_wide_short_viewports()
             "window end <= total_rows at {width}x{height}"
         );
         let materialized_count = window.end - window.start;
-        let max_visible = (viewport_height / row_height).ceil() as usize
-            + 2 * super::super::virtual_list::OVERSCAN_ROWS
-            + 1;
+        let max_visible = (viewport_height / row_height).ceil() as usize + 2 * DEFAULT_OVERSCAN + 1;
         assert!(
             materialized_count <= max_visible,
             "materialized rows ({materialized_count}) must be bounded by viewport capacity ({max_visible}) at {width}x{height}"

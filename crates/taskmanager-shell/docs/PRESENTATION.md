@@ -1,0 +1,47 @@
+# Presentation projections
+
+- `src/saved_views.rs` owns saved process-view identity, built-ins, typed
+  filter/sort/columns, strict JSON transfer and config projection shared by all
+  four frontends. Native controls adapt this model; persisted schema and
+  transfer limits belong to core config.
+- `src/presentation/about.rs` owns the common build-metadata projection and
+  copied details. Product identity, license and repository remain owned by
+  neutral assets.
+- `src/presentation/system_information.rs` groups cached OS, kernel, desktop
+  and hardware facts, omits unavailable rows and preserves complete copied
+  values.
+- `src/presentation/health_review.rs` projects complete filesystem integrity,
+  sensor measurements and generation-matched SMART reports. Unknown counts and
+  denied observations remain unavailable. `fixture/health.rs` owns the shared
+  deterministic health inputs and seeds the normal storage/SMART fold.
+- `src/app/diagnostics.rs` freezes observed snapshot/process inventory,
+  services, startup and diagnostic facts into one sanitized application plan.
+  Missing required observations fail as unavailable; unobserved optional
+  inventories remain null. Shared presentation owns the preview summary and
+  privacy-safe typed failure text.
+- `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral
+  projections, including the product-first GPU display identity that keeps
+  hardware names separate from driver names.
+- `src/presentation/privilege_center.rs` folds helper capability/request states
+  once for all four renderers. Authorization is offered only when the catalog
+  exposes a usable request seam; GPU actions retain the observed device
+  identity.
+
+## GPU chart metric session
+
+GPU history retains typed utilization/scalar/engine query windows. The shared
+chart-metric selection model in `presentation/gpu_chart_metric.rs` owns the
+telemetry-store series vocabulary, typed availability gating (unavailable
+series project explicit, never zero or hidden), default Utilization,
+fixed-order cycling, and generation-reset reconcile as one pure per-window
+session state. All supported frontends consume this projection, and the
+headline window read (`gpu_chart_metric_history`) is one generation-scoped
+typed dispatch over the store's `gpu_metric_point_series_for`: the same
+`GpuChartMetric::value` fold the gate uses, consumed by Iced/TUI through the
+shell history and by GPUI's direct track through its own `LiveGraphHistory`
+view of the same store — no frontend keeps a second sampling fold.
+
+The System timeline adapter implements the application read port over the
+authoritative telemetry rings. Window, gap and summary rules stay in
+application; frontends receive immutable projections and hold only native
+rendering caches.

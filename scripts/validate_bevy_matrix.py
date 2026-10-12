@@ -14,6 +14,7 @@ import zlib
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
+from frontend_source_manifest import source_paths
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
@@ -121,15 +122,17 @@ def parse_window(value: str) -> tuple[int, int]:
 
 def validate_source_manifest(path: Path, root: Path) -> None:
     root = root.resolve()
+    allowed = None
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         digest, separator, relative = line.partition("  ")
         if not separator or len(digest) != 64 or not relative:
             raise EvidenceError(f"invalid source manifest line {number}")
         source = (root / relative).resolve()
-        try:
-            source.relative_to(root)
-        except ValueError as error:
-            raise EvidenceError(f"source path escapes repository: {relative}") from error
+        if not source.is_relative_to(root.resolve()):
+            if allowed is None:
+                allowed = {entry.resolve() for entry in source_paths(root.resolve(), "bevy")}
+            if source not in allowed:
+                raise EvidenceError(f"source path is outside the declared production graph: {relative}")
         if not source.is_file() or file_sha256(source) != digest:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 

@@ -16,11 +16,9 @@ GPUI、Iced、TUI 与 Bevy 四大前端均已全部纳入官方发行包矩阵�
 
 "四端平权"仅指四端发行物与前端语义同权，不含"跨平台功能对等"，也不表示三个平台具备
 相同的系统级能力。平台能力一律以 typed 结果呈现——要么是可用值，要么是 typed 不可用
-（`Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
-`TemporarilyUnavailable`，均为 `platform-contract::CapabilityStatus` 的真实变体名；
-`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴）；
-未注册的期望身份以 typed 缺席呈现——`Unsupported`、无 provider 归属，不以"无条目"静默
-消失（`CapabilityId::EXPECTED_SURFACE`，机制见
+（五种 `CapabilityStatus` 变体与两轴规则见 [GLOSSARY](GLOSSARY.md)）；未注册的期望身份以
+typed 缺席作答（`CapabilityId::EXPECTED_SURFACE`，机制见
+[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 与
 [ADR-053](../adr/053-product-expected-capability-surface.md)）。平台按 typed 原因诚实降级
 是产品承诺的一部分，typed 缺席不视为落空，也不得用空值、静态占位或未接线按钮伪装为
 已实现功能。
@@ -54,15 +52,16 @@ TaskForest-<UI>-<版本>-<平台>.<格式>
 
 Linux 安装树中的特权面统一使用产品前缀，全部落在 `/usr/libexec/taskforest-*`：
 `taskforest-setup-helper`、`taskforest-privilege-helper`、`taskforest-net-launcher`、
-`taskforest-process-control-helper`（udev 规则资产为
+`taskforest-process-control-helper`、`taskforest-smart-self-test-helper`（udev 规则资产为
 `/usr/share/taskforest/setup/99-taskforest.rules`）。cargo 构建产物名仍是内部的
 `taskmanager-*`，安装时映射为发行名。
 
 polkit action id 与桌面 app id 共用同一 reverse-DNS 命名空间：
-`io.github.YellowWhiteBlackCat.TaskForest.<feature>`。目前声明的四个 action：
-`perf-helper`、`net-launcher`、`process-control`、`first-run-setup`；前三个的
-`.policy` 安装文件名与 action id 同名（模板在 `polkit/`），`first-run-setup`
-的安装文件是 `packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy`。
+`io.github.YellowWhiteBlackCat.TaskForest.<feature>`。特权 helper action 包括
+`perf-helper`、`net-launcher`、`process-control`、`smbios-helper`、
+`rapl-helper`、`msr-helper` 和 `smart-self-test`；每个 `.policy` 安装文件名
+与 action id 同名，模板在 `polkit/`。`first-run-setup` 的安装文件是
+`packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy`。
 
 ## 图标权威
 

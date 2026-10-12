@@ -12,7 +12,7 @@
 //! appended only inside the capture composition.
 
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
-use taskmanager_shell::fixture::health::seed_shell_health;
+use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
 use taskmanager_shell::fixture::process_insights::{
     process_insights_projection, seed_process_properties_history,
 };
@@ -22,7 +22,6 @@ use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::StorageDeviceKey;
 use taskmanager_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
@@ -30,6 +29,7 @@ use taskmanager_core::core::alerts::{
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::metrics::{
     CpuMetrics, DiskMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine,
     GpuEngineKind, ScalarObservation, ScalarObservationGroup, SmartAvailability,
@@ -50,12 +50,14 @@ use taskmanager_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{ProcessRowId, ShellApp};
 
 /// Build the capture-only shell with a warm, deterministic graph window.
@@ -240,14 +242,44 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             }
         }
         "smart-self-test-confirm" => {
-            let intent = SmartSelfTestIntent {
-                device_id: DeviceId::new("disk:demo:nvme0"),
-                device_generation: DeviceGeneration::new(1),
-                device_key: StorageDeviceKey::new("nvme0n1"),
-                display_name: "TiPro9000 2TB".into(),
-                kind: SmartSelfTestKind::Short,
+            seed_smart_self_test_capabilities(shell);
+            if let Some(intent) = shell
+                .projection()
+                .snapshot
+                .as_ref()
+                .and_then(|snapshot| snapshot.disks.first())
+                .and_then(|disk| self_test_intent(disk, SmartSelfTestKind::Short))
+            {
+                let _ = shell.arm_smart_self_test(intent);
+            }
+        }
+        "users-session-confirmation" => {
+            let session = SessionItem {
+                id: "capture-session-7".into(),
+                incarnation: Some(SessionIncarnation::LinuxLogind {
+                    boot_id: "capture-boot-identity".into(),
+                    created_monotonic_usec: 700_000,
+                }),
+                uid: 1000,
+                user: "capture-user".into(),
+                seat: Some("seat0".into()),
+                tty: Some("tty7".into()),
+                remote: false,
+                timestamp: Some("2026-10-12 09:30".into()),
             };
-            shell.arm_smart_self_test(intent);
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::Sessions(Some(vec![session.clone()])),
+            );
+            seed_projection_fact(
+                shell,
+                ProjectionSeedFact::SessionsSource(Some(vec![SourceStatus {
+                    provider: ProviderId::borrowed("capture.sessions"),
+                    outcome: SourceOutcome::Available,
+                    item_count: 1,
+                }])),
+            );
+            let _ = shell.select_session_control(&session, SessionControlAction::Disconnect);
         }
         "process-network-details"
         | "process-gpu-details"

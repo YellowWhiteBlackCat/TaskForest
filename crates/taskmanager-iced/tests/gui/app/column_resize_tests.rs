@@ -5,9 +5,10 @@
 //! close on release, the keyboard/menu stepper path publishes the same
 //! transition in fixed steps, and the override set round-trips through the
 //! persisted `process_col_widths` config token (unknown tokens and hostile
-//! values degrade, never panic). The mouse event sequence itself (edge press
-//! → raw cursor moves → release) is not headless-drivable in iced; these
-//! tests exercise the pure state transitions the subscription feeds.
+//! values degrade, never panic). The real header edge press and raw
+//! cursor-move/release event path is exercised by the sibling
+//! `ui::applications` behavior test; this file pins reducer transitions and
+//! persistence edge cases.
 
 use std::collections::HashSet;
 use std::time::Instant;

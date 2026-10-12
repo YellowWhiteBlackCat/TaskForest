@@ -3,6 +3,8 @@ use taskmanager_application::PendingConfirmation;
 use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
@@ -131,6 +133,84 @@ async fn escape_closes_help_overlay_without_disturbing_the_page(cx: &mut TestApp
         win.read_with(cx, |view, _cx| view.page).unwrap(),
         TopPage::Services,
         "closing help must restore the untouched page"
+    );
+}
+
+#[gpui::test]
+async fn session_confirmation_enter_and_escape_use_the_shared_gate(cx: &mut TestAppContext) {
+    let win = root(cx);
+    let session = SessionItem {
+        id: "7".into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "test-boot".into(),
+            created_monotonic_usec: 700,
+        }),
+        uid: 1000,
+        user: "capture-user".into(),
+        seat: Some("seat0".into()),
+        tty: Some("tty7".into()),
+        remote: false,
+        timestamp: None,
+    };
+    win.update(cx, |view, _window, cx| {
+        seed_direct_track_fact(
+            &mut view.shell,
+            DirectTrackSeedFact::Sessions(Some(vec![session.clone()])),
+        );
+        let projection = view.projection().clone();
+        view.materialized.replace_sessions(
+            projection.sessions_revision,
+            projection.sessions.clone().unwrap_or_default(),
+            projection.sessions_source.clone().unwrap_or_default(),
+        );
+        view.page = TopPage::Users;
+        assert!(
+            view.request_session_control_confirmation(&session, SessionControlAction::Disconnect,)
+        );
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("tab").unwrap());
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("enter").unwrap());
+    assert!(
+        win.read_with(cx, |view, _| view.pending_confirmation().is_none())
+            .unwrap(),
+        "Dialog Enter must confirm the active session branch"
+    );
+    assert!(
+        win.read_with(cx, |view, _| view
+            .shell
+            .projection()
+            .session_control_requests
+            .pending()
+            .is_none())
+            .unwrap()
+    );
+
+    win.update(cx, |view, _window, cx| {
+        assert!(view.request_session_control_confirmation(&session, SessionControlAction::Lock,));
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("escape").unwrap());
+    assert!(
+        win.read_with(cx, |view, _| view.pending_confirmation().is_none())
+            .unwrap(),
+        "Escape must cancel without leaving the frozen session intent"
+    );
+    assert!(
+        win.read_with(cx, |view, _| view
+            .shell
+            .projection()
+            .session_control_requests
+            .pending()
+            .is_none())
+            .unwrap()
     );
 }
 

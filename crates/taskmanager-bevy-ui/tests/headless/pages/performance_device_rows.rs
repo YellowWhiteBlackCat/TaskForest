@@ -16,6 +16,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::replay::{PerformanceHistoryEntry, PerformanceLiveBody, PerformanceReplayRoot};
 use super::scene::content;
@@ -214,7 +215,7 @@ fn gpu_section_enumerates_every_projected_adapter() {
     // The mounted page really spawns one block per adapter with that
     // adapter's own fact line and engine rows.
     let mut app = headless_scene_app();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
     let context = PageContext {
         sidebar: &Default::default(),
@@ -314,7 +315,7 @@ fn disk_block_renders_the_projected_partition_rows() {
     // The mounted disk block paints one row per projected partition: its
     // identity and its own usage math.
     let mut app = headless_scene_app();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
     let context = PageContext {
         sidebar: &Default::default(),
@@ -392,7 +393,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
     assert!(fact_line.contains(&duration(7200)));
 
     let mut app = headless_scene_app();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
     let context = PageContext {
         sidebar: &Default::default(),
@@ -430,7 +431,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
 fn performance_history_mount_starts_live_without_inventing_replay_availability() {
     let mut app = headless_scene_app();
     let shell = ShellApp::new();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
     let context = PageContext {
         sidebar: &Default::default(),

@@ -43,6 +43,6 @@ where
         events,
         demo,
         capture_marker,
-        TuiTerminalProfile::default(),
+        TuiTerminalProfile::default,
     )
 }

@@ -97,6 +97,8 @@ process-tree-confirm	process-tree-confirm	1180x780	gnome-light
 process-tree-confirm-compact	process-tree-confirm	720x480	gnome-light
 process-batch-confirm	process-batch-confirm	1180x780	gnome-light
 process-batch-confirm-compact	process-batch-confirm	720x480	gnome-light
+users-session-confirmation	users-session-confirmation	1180x780	gnome-light
+users-session-confirmation-compact	users-session-confirmation	720x480	gnome-light
 smart-self-test-confirm	smart-self-test-confirm	1180x780	gnome-light
 smart-self-test-confirm-compact	smart-self-test-confirm	720x480	gnome-light
 process-properties-performance	process-properties-performance	1180x780	gnome-light

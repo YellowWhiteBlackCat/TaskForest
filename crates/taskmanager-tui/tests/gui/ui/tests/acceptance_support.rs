@@ -528,8 +528,7 @@ fn open_batch_confirmation(app: &mut TuiApp) -> bool {
 }
 
 fn open_session_control_confirmation(app: &mut TuiApp) -> bool {
-    go_to(app, AppPage::Users);
-    if !app.open_session_menu() {
+    if !open_session_menu(app) {
         return false;
     }
     app.session_menu_select();

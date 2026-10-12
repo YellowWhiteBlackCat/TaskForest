@@ -237,11 +237,14 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for PopoverOverlay<'
         clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
     ) {
+        let Some(panel_layout) = layout.children().next() else {
+            return;
+        };
         // A press that does not land on the panel closes the surface, and the
         // captured event never reaches the base tree — the click that dismisses
         // a menu must not also activate whatever happened to sit under it.
         if let Event::Mouse(iced::mouse::Event::ButtonPressed(_)) = event {
-            let over_panel = cursor.is_over(layout.bounds());
+            let over_panel = cursor.is_over(panel_layout.bounds());
             if !over_panel {
                 shell.publish(self.on_dismiss.clone());
                 shell.capture_event();
@@ -251,7 +254,7 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for PopoverOverlay<'
         self.panel.as_widget_mut().update(
             self.tree,
             event,
-            layout,
+            panel_layout,
             cursor,
             renderer,
             clipboard,
@@ -288,9 +291,11 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for PopoverOverlay<'
         renderer: &iced::Renderer,
         operation: &mut dyn Operation,
     ) {
-        self.panel
-            .as_widget_mut()
-            .operate(self.tree, layout, renderer, operation);
+        if let Some(panel_layout) = layout.children().next() {
+            self.panel
+                .as_widget_mut()
+                .operate(self.tree, panel_layout, renderer, operation);
+        }
     }
 
     fn mouse_interaction(
@@ -299,12 +304,17 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for PopoverOverlay<'
         cursor: iced::advanced::mouse::Cursor,
         renderer: &iced::Renderer,
     ) -> iced::advanced::mouse::Interaction {
-        self.panel.as_widget().mouse_interaction(
-            self.tree,
-            layout,
-            cursor,
-            &Rectangle::with_size(Size::INFINITE),
-            renderer,
+        layout.children().next().map_or_else(
+            iced::advanced::mouse::Interaction::default,
+            |panel_layout| {
+                self.panel.as_widget().mouse_interaction(
+                    self.tree,
+                    panel_layout,
+                    cursor,
+                    &Rectangle::with_size(Size::INFINITE),
+                    renderer,
+                )
+            },
         )
     }
 }

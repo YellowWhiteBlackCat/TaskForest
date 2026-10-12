@@ -134,7 +134,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
     bsn! {
         Node {
             width: percent(48.0),
-            min_width: px(palette.control_height_px * 5.0),
+            min_width: rem(palette.control_height_rem * 5.0),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),
@@ -267,8 +267,8 @@ fn device_pill_scene(
 ) -> impl Scene + use<> {
     bsn! {
         Node {
-            min_width: px(palette.control_height_px * 2.8),
-            height: px(palette.control_height_px),
+            min_width: rem(palette.control_height_rem * 2.8),
+            height: rem(palette.control_height_rem),
             padding: UiRect::horizontal(Val::Px(space_12())),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,

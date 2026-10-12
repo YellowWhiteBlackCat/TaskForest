@@ -16,6 +16,9 @@ publish = false
 # the other frontends.
 
 [dependencies]
+zhuge-ui-core.workspace = true
+zhuge-ui-tokens.workspace = true
+zhuge-ui-kit-iced.workspace = true
 # The real focusable modal adapter uses iced's public custom-widget/operation
 # edge; this feature is iced-only and does not expose toolkit types to shell or
 # the neutral theme contract.

@@ -15,6 +15,7 @@ use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::sensors::SensorReading;
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -128,7 +129,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
-    let palette = crate::palette::ui_palette(&Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
     app.insert_resource(WindowPalette { inner: palette });
     app.insert_non_send(FrontendTrack {
         shell: shell_with_hardware(Some(fixture_hardware())),
@@ -140,7 +141,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     // Mount the real scene after registering its typed paint system. The context borrows locals;
     // the shell moves into the track right after the spawn.
     let shell = shell_with_hardware(Some(fixture_hardware()));
-    let palette = crate::palette::ui_palette(&Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
     let history = HistoryProjectionResource::default();
     let context = crate::app::PageContext {
         sidebar: &Default::default(),
@@ -412,7 +413,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
-    let palette = crate::palette::ui_palette(&Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
     app.insert_resource(WindowPalette {
         inner: palette.clone(),
     });

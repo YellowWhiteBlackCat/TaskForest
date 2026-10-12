@@ -26,7 +26,7 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 mkdir -p "$STAGE/usr/lib" "$STAGE/usr/libexec" "$STAGE/usr/share/polkit-1/actions"
-for feature in perf net process smbios rapl msr; do
+for feature in perf net process smbios rapl msr smart-self-test; do
     case "$feature" in
         perf)
             helper="/usr/libexec/taskforest-privilege-helper"
@@ -51,6 +51,10 @@ for feature in perf net process smbios rapl msr; do
         msr)
             helper="/usr/libexec/taskforest-msr-helper"
             policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
+            ;;
+        smart-self-test)
+            helper="/usr/libexec/taskforest-smart-self-test-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy"
             ;;
     esac
     CONFLICT_STAGE="$(mktemp -d "$SCRATCH_ROOT/system-install-conflict.XXXXXX")"

@@ -67,17 +67,17 @@ fn services_name_highlight_follows_the_page_local_query_not_the_shared_one() {
         "the demo fixture keeps exactly the timesync service under this query"
     );
     for row in &visible {
-        let matched_by_page_query = highlight::highlight_segments(&row.name, services_query)
+        let matched_by_page_query = highlight::cell_runs(&row.name, services_query)
             .into_iter()
-            .any(|(_, matched)| matched);
+            .any(|run| run.highlighted);
         assert!(
             matched_by_page_query,
             "name {} must highlight by the services query",
             row.name
         );
-        let matched_by_shared_query = highlight::highlight_segments(&row.name, shared_query)
+        let matched_by_shared_query = highlight::cell_runs(&row.name, shared_query)
             .into_iter()
-            .any(|(_, matched)| matched);
+            .any(|run| run.highlighted);
         assert!(
             !matched_by_shared_query,
             "the Processes-page query {} must not highlight services rows",

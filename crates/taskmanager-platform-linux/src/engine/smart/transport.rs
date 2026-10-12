@@ -4,7 +4,9 @@ use taskmanager_core::core::metrics::{
     SmartAvailability, StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
 use taskmanager_core::core::smart::AtaSmartAttribute;
-use taskmanager_core::core::smart::SmartProviderFailureKind;
+use taskmanager_core::core::smart::{
+    SmartProviderFailureKind, SmartSelfTestCapabilities, SmartSelfTestSupport,
+};
 
 use super::{DiskSmart, SmartCommandResult, parse_command_result};
 #[cfg(target_os = "linux")]
@@ -236,9 +238,8 @@ fn smartctl_exit_allows_data(exit_code: i32) -> bool {
 /// Pure parser for smartctl ATA/SATA/SAS/SCSI JSON. Standard top-level fields
 /// take precedence; ATA attribute IDs are conservative compatibility fallbacks.
 pub fn parse_smartctl_json(stdout: &str) -> Option<DiskSmart> {
-    use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-
     let root: serde_json::Value = serde_json::from_str(stdout).ok()?;
+    let self_test_capabilities = parse_self_test_capabilities(&root);
     let attributes = root
         .pointer("/ata_smart_attributes/table")
         .and_then(serde_json::Value::as_array)
@@ -303,37 +304,68 @@ pub fn parse_smartctl_json(stdout: &str) -> Option<DiskSmart> {
         .and_then(serde_json::Value::as_u64);
     let ata_attributes = parse_ata_attributes(attributes);
 
-    if temperature_c.is_none()
-        && critical_warning.is_none()
-        && percent_used.is_none()
-        && available_spare_pct.is_none()
-        && available_spare_threshold_pct.is_none()
-        && power_on_hours.is_none()
-        && unsafe_shutdowns.is_none()
-        && temperature_sensors_c.is_empty()
-        && ata_attributes.is_none()
-    {
+    let has_health_observation = temperature_c.is_some()
+        || critical_warning.is_some()
+        || percent_used.is_some()
+        || available_spare_pct.is_some()
+        || available_spare_threshold_pct.is_some()
+        || power_on_hours.is_some()
+        || unsafe_shutdowns.is_some()
+        || !temperature_sensors_c.is_empty()
+        || ata_attributes.is_some();
+    if !has_health_observation && self_test_capabilities == SmartSelfTestCapabilities::default() {
         return None;
     }
-    Some(DiskSmart {
-        availability: SmartAvailability::Available,
-        state: DeviceState {
-            status: DeviceStatus::Healthy,
-            last_success_ms: None,
-        },
-        provider: None,
-        failure: None,
-        temperature_c,
-        temperature_sensors_c,
-        critical_warning,
-        temp_critical_c: None,
-        percent_used,
-        available_spare_pct,
-        available_spare_threshold_pct,
-        power_on_hours,
-        unsafe_shutdowns,
-        ata_attributes,
-    })
+    let mut observation = DiskSmart::with_availability(if has_health_observation {
+        SmartAvailability::Available
+    } else {
+        SmartAvailability::Unavailable
+    });
+    observation.temperature_c = temperature_c;
+    observation.temperature_sensors_c = temperature_sensors_c;
+    observation.critical_warning = critical_warning;
+    observation.percent_used = percent_used;
+    observation.available_spare_pct = available_spare_pct;
+    observation.available_spare_threshold_pct = available_spare_threshold_pct;
+    observation.power_on_hours = power_on_hours;
+    observation.unsafe_shutdowns = unsafe_shutdowns;
+    observation.ata_attributes = ata_attributes;
+    observation.self_test_capabilities = self_test_capabilities;
+    Some(observation)
+}
+
+fn parse_self_test_capabilities(root: &serde_json::Value) -> SmartSelfTestCapabilities {
+    if let Some(nvme_commands) = root
+        .get("nvme_optional_admin_commands")
+        .and_then(serde_json::Value::as_object)
+    {
+        let self_test = explicit_support(nvme_commands.get("self_test"));
+        return SmartSelfTestCapabilities {
+            short: self_test,
+            extended: self_test,
+            conveyance: SmartSelfTestSupport::Unsupported,
+        };
+    }
+
+    let Some(ata_capabilities) = root
+        .pointer("/ata_smart_data/capabilities")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return SmartSelfTestCapabilities::default();
+    };
+    SmartSelfTestCapabilities {
+        short: explicit_support(ata_capabilities.get("self_tests_supported")),
+        extended: explicit_support(ata_capabilities.get("self_tests_supported")),
+        conveyance: explicit_support(ata_capabilities.get("conveyance_self_test_supported")),
+    }
+}
+
+fn explicit_support(value: Option<&serde_json::Value>) -> SmartSelfTestSupport {
+    match value.and_then(serde_json::Value::as_bool) {
+        Some(true) => SmartSelfTestSupport::Supported,
+        Some(false) => SmartSelfTestSupport::Unsupported,
+        None => SmartSelfTestSupport::Unknown,
+    }
 }
 
 /// smartctl exposes NVMe health temperatures in Kelvin while nvme-cli text

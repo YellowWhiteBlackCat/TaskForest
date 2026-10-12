@@ -7,6 +7,7 @@ mod tests_inner {
     use std::cell::{Cell, RefCell};
 
     use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+    use taskmanager_core::core::smart::SmartSelfTestSupport;
     use taskmanager_core::core::smart::refresh_state;
 
     use super::*;
@@ -131,6 +132,86 @@ mod tests_inner {
         assert!(
             nvme.ata_attributes.is_none(),
             "a device without an ATA attribute table must not synthesize one"
+        );
+        assert_eq!(
+            nvme.self_test_capabilities.short,
+            SmartSelfTestSupport::Unknown,
+            "a health reading must not imply self-test support"
+        );
+    }
+
+    #[test]
+    fn ata_capability_bits_map_each_self_test_kind_without_health_inference() {
+        let supported = parse_smartctl_json(
+            r#"{"ata_smart_data":{"capabilities":{"self_tests_supported":true,"conveyance_self_test_supported":false}}}"#,
+        )
+        .expect("capability-only response is retained");
+        assert_eq!(supported.availability, SmartAvailability::Unavailable);
+        assert_eq!(
+            supported.self_test_capabilities.short,
+            SmartSelfTestSupport::Supported
+        );
+        assert_eq!(
+            supported.self_test_capabilities.extended,
+            SmartSelfTestSupport::Supported
+        );
+        assert_eq!(
+            supported.self_test_capabilities.conveyance,
+            SmartSelfTestSupport::Unsupported
+        );
+
+        let unsupported = parse_smartctl_json(
+            r#"{"ata_smart_data":{"capabilities":{"self_tests_supported":false,"conveyance_self_test_supported":true}}}"#,
+        )
+        .expect("explicit unsupported capability is retained");
+        assert_eq!(
+            unsupported.self_test_capabilities.short,
+            SmartSelfTestSupport::Unsupported
+        );
+        assert_eq!(
+            unsupported.self_test_capabilities.extended,
+            SmartSelfTestSupport::Unsupported
+        );
+        assert_eq!(
+            unsupported.self_test_capabilities.conveyance,
+            SmartSelfTestSupport::Supported
+        );
+
+        let absent = parse_smartctl_json(r#"{"ata_smart_data":{"capabilities":{}}}"#);
+        assert!(
+            absent.is_none(),
+            "empty capabilities are not device evidence"
+        );
+    }
+
+    #[test]
+    fn nvme_controller_capability_maps_short_and_extended_support() {
+        let supported =
+            parse_smartctl_json(r#"{"nvme_optional_admin_commands":{"self_test":true}}"#)
+                .expect("NVMe capability-only response is retained");
+        assert_eq!(
+            supported.self_test_capabilities.short,
+            SmartSelfTestSupport::Supported
+        );
+        assert_eq!(
+            supported.self_test_capabilities.extended,
+            SmartSelfTestSupport::Supported
+        );
+        assert_eq!(
+            supported.self_test_capabilities.conveyance,
+            SmartSelfTestSupport::Unsupported
+        );
+
+        let unsupported =
+            parse_smartctl_json(r#"{"nvme_optional_admin_commands":{"self_test":false}}"#)
+                .expect("explicit NVMe unsupported result is retained");
+        assert_eq!(
+            unsupported.self_test_capabilities.short,
+            SmartSelfTestSupport::Unsupported
+        );
+        assert_eq!(
+            unsupported.self_test_capabilities.extended,
+            SmartSelfTestSupport::Unsupported
         );
     }
 

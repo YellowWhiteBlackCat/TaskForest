@@ -70,6 +70,26 @@ fn t_resolves_and_falls_back() {
     set_language(Language::En);
 }
 
+#[test]
+fn scoped_language_override_nests_and_keeps_language_changes_local() {
+    with_language(Language::En, || {
+        assert_eq!(current_language(), Language::En);
+        assert_eq!(t("tab.performance"), "Performance");
+
+        set_language(Language::Zh);
+        assert_eq!(current_language(), Language::Zh);
+        assert_eq!(t("tab.performance"), "性能");
+
+        with_language(Language::En, || {
+            assert_eq!(current_language(), Language::En);
+            assert_eq!(t("tab.performance"), "Performance");
+        });
+
+        assert_eq!(current_language(), Language::Zh);
+        assert_eq!(t("tab.performance"), "性能");
+    });
+}
+
 /// `detect_language` must be total (no panic on unset vars) and map a `zh*`
 /// locale to [`Language::Zh`]. The host `LANG` is whatever the dev/CI box
 /// sets, so we only assert the no-panic + type-correctness here; the

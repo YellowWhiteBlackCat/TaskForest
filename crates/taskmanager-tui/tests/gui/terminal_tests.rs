@@ -1,7 +1,9 @@
 use super::*;
+use crate::terminal::TuiTerminalSignals;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::style::Color;
+use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_ui_contract::IconId;
 
@@ -14,6 +16,7 @@ fn terminal_signals_resolve_explicit_color_and_glyph_capabilities() {
             false,
             None,
             Some("C.UTF-8"),
+            Language::En,
         ),
         TuiTerminalProfile {
             color: TuiColorMode::Ansi256,
@@ -27,6 +30,7 @@ fn terminal_signals_resolve_explicit_color_and_glyph_capabilities() {
             false,
             Some("ascii"),
             Some("C.UTF-8"),
+            Language::En,
         ),
         TuiTerminalProfile {
             color: TuiColorMode::TrueColor,
@@ -43,6 +47,7 @@ fn dumb_and_no_color_signals_fail_closed() {
         false,
         None,
         Some("C.UTF-8"),
+        Language::En,
     );
     assert_eq!(dumb.color, TuiColorMode::Monochrome);
     assert_eq!(dumb.glyphs, TuiGlyphMode::Ascii);
@@ -54,10 +59,99 @@ fn dumb_and_no_color_signals_fail_closed() {
         true,
         Some("unicode"),
         Some("C.UTF-8"),
+        Language::En,
     );
     assert_eq!(no_color.color, TuiColorMode::Monochrome);
     assert_eq!(no_color.glyphs, TuiGlyphMode::Unicode);
     assert_eq!(no_color.color(Color::White), Color::Reset);
+}
+
+#[test]
+fn zh_glyph_floor_preserves_terminal_and_explicit_override_precedence() {
+    let cases = [
+        (
+            Some("xterm-256color"),
+            None,
+            Some("C"),
+            None,
+            TuiGlyphMode::Unicode,
+            "Zh overrides a non-UTF-8 locale",
+        ),
+        (
+            Some("xterm-256color"),
+            None,
+            None,
+            None,
+            TuiGlyphMode::Unicode,
+            "Zh is a floor when locale is missing",
+        ),
+        (
+            Some("dumb"),
+            None,
+            Some("zh_CN.UTF-8"),
+            None,
+            TuiGlyphMode::Ascii,
+            "TERM=dumb stays ASCII under Zh",
+        ),
+        (
+            Some("xterm-256color"),
+            None,
+            Some("C"),
+            Some("ascii"),
+            TuiGlyphMode::Ascii,
+            "explicit ASCII override wins under Zh",
+        ),
+        (
+            Some("dumb"),
+            None,
+            Some("C"),
+            Some("unicode"),
+            TuiGlyphMode::Unicode,
+            "explicit Unicode override remains highest priority",
+        ),
+    ];
+
+    for (term, color_term, locale, glyph_override, expected, reason) in cases {
+        let profile = TuiTerminalProfile::from_signals(
+            term,
+            color_term,
+            false,
+            glyph_override,
+            locale,
+            Language::Zh,
+        );
+        assert_eq!(profile.glyphs, expected, "{reason}");
+    }
+}
+
+#[test]
+fn captured_terminal_signals_follow_live_ui_language_changes() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("language guard");
+    let signals = TuiTerminalSignals {
+        term: Some(String::from("xterm-256color")),
+        color_term: None,
+        no_color: false,
+        glyph_override: None,
+        locale: Some(String::from("C")),
+    };
+
+    set_language(Language::En);
+    assert_eq!(
+        signals.resolve(current_language()).glyphs,
+        TuiGlyphMode::Ascii
+    );
+    set_language(Language::Zh);
+    assert_eq!(
+        signals.resolve(current_language()).glyphs,
+        TuiGlyphMode::Unicode
+    );
+    set_language(Language::En);
+    assert_eq!(
+        signals.resolve(current_language()).glyphs,
+        TuiGlyphMode::Ascii
+    );
 }
 
 #[test]

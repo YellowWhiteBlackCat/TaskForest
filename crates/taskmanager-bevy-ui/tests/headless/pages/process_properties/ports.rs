@@ -12,11 +12,12 @@ use crate::window::{AppShellRoot, WindowPalette};
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
+use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::{entity::Entity, query::With};
 use bevy::scene::ScenePlugin;
 use bevy::text::Font;
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Activate;
+use bevy::ui_widgets::{Activate, ValueChange};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use taskmanager_application::ProcessInsightFacet;
@@ -32,6 +33,7 @@ use taskmanager_platform_contract::{
 };
 use taskmanager_shell::{fixture, queue_effect};
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 #[derive(Default)]
 struct NetworkPort(Mutex<Vec<RequestEnvelope<ProcessNetworkRequest>>>);
@@ -55,7 +57,7 @@ fn app() -> App {
     app.add_plugins((MinimalPlugins, AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
     app.insert_resource(WindowPalette {
-        inner: ui_palette(&Theme::dark()),
+        inner: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<PendingEffects>();
     app.insert_non_send(FrontendTrack {
@@ -145,15 +147,23 @@ fn mounted_properties_submit_once_fold_partial_results_and_reject_late_refresh_r
         .expect("target")
         .clone();
     app.world_mut().non_send_mut::<FrontendTrack>().shell.query = "hidden selection".to_owned();
-    let tab = app
+    let (tab, list) = app
         .world_mut()
-        .query::<(Entity, &ProcessPropertiesTab)>()
+        .query::<(Entity, &ProcessPropertiesTab, &ChildOf)>()
         .iter(app.world())
-        .find(|(_, tab)| tab.0 == ProcessPropertiesSection::Insights)
-        .map(|(e, _)| e)
+        .find(|(_, tab, _)| tab.0 == ProcessPropertiesSection::Insights)
+        .map(|(e, _, parent)| (e, parent.parent()))
         .expect("tab");
-    app.world_mut().trigger(Activate { entity: tab });
-    app.world_mut().trigger(Activate { entity: tab });
+    app.world_mut().trigger(ValueChange {
+        source: list,
+        value: Some(tab),
+        is_final: true,
+    });
+    app.world_mut().trigger(ValueChange {
+        source: list,
+        value: Some(tab),
+        is_final: true,
+    });
     assert_eq!(app.world().resource::<PendingEffects>().0.len(), 1);
     submit_and_fold(&mut app, &mut client);
     let first = network.0.lock().expect("requests")[0].clone();

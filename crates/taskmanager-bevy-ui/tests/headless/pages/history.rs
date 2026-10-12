@@ -6,6 +6,7 @@
 //! collector process.
 
 use std::sync::Arc;
+use taskmanager_theme::tokens::UiSize;
 
 use super::*;
 use taskmanager_application::{
@@ -321,10 +322,10 @@ fn the_disabled_page_states_itself_exactly_once() {
     app.insert_resource(crate::pages::history::HistoryProjectionResource::default());
     crate::pages::history::scene::register(&mut app);
     app.insert_resource(crate::window::WindowPalette {
-        inner: crate::palette::ui_palette(&Theme::dark()),
+        inner: crate::palette::ui_palette(&Theme::dark(), UiSize::Standard),
     });
     let projection = crate::pages::history::HistoryRuntime::default().projection();
-    let palette = crate::palette::ui_palette(&Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
     let world = app.world_mut();
     let root = world
         .spawn_scene(crate::pages::history::scene::content(&projection, &palette))

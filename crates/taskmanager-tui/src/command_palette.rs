@@ -10,15 +10,19 @@
 //!    but never re-declares those chords; the only TUI-side chord→action map
 //!    for them is [`terminal_local_action`].
 //! 2. **This registry** — [`TUI_LOCAL_COMMANDS`] owns every TUI-local
-//!    command chord. It is the single authority for the help rows, the
-//!    palette rows, AND the direct keyboard dispatch (the `direct` arms below
-//!    are what `runtime::keys` executes). A chord may appear in layer 1 or
-//!    layer 2, never both; the binding-matrix test enforces the disjointness.
+//!    command chord. It is the single authority for Help rows and direct
+//!    keyboard dispatch (the `direct` arms below are what `runtime::keys`
+//!    executes). The palette shows its executable/discoverable command rows
+//!    except the content-page `Enter` row target: Enter is already the
+//!    palette's structural select key, so that hint stays in Help only. A
+//!    chord may appear in layer 1 or layer 2, never both; the binding-matrix
+//!    test enforces the disjointness.
 //! 3. **Surface-modal protocol** — action-semantic character chords consumed
 //!    only while a modal surface owns input. [`TUI_SURFACE_PROTOCOL`] is
 //!    their single typed declaration source: the settings form's `p i h c`,
-//!    the Health/Containers overlays' `i h c`, About's `r i c a`, and the open service-log
-//!    panel's `f p l t`. They never appear in help/palette — they are input
+//!    Health review's `p e w s q`, the Health/Containers overlays' `i h c`,
+//!    About's `r i c a`, and the open service-log panel's `f p l t`. They
+//!    never appear in help/palette — they are input
 //!    protocol of the open surface, not commands.
 //!    *Hard boundary against layers 1-2:* this layer is consulted at the top
 //!    of the modal precedence, above shell and registry dispatch, so a chord
@@ -47,9 +51,10 @@
 //! `?` opens the palette (replacing the static help overlay): typing narrows
 //! the keybinding rows, Enter runs the selected row's action, Esc closes. The
 //! rows cover the shared router commands (executed through [`AppAction`]) and
-//! the TUI-local bindings (executed through [`PaletteLocalAction`]), so the
-//! palette is a true command entry point for the whole keyboard surface, not
-//! just the shared commands. Extracted from `lib.rs` so no crate-root file
+//! the TUI-local palette actions (executed through [`PaletteLocalAction`]),
+//! so the palette is a command entry point for the shared and terminal-local
+//! actions. The content-page `Enter` row target stays in Help because Enter
+//! selects the highlighted palette command. Extracted from `lib.rs` so no crate-root file
 //! exceeds the source line budget; every method stays reachable on `TuiApp`
 //! (impl blocks may live in any module of the defining crate), and the types
 //! stay reachable at `crate::CommandPalette` / `crate::CommandPaletteRow` /
@@ -68,9 +73,8 @@ pub struct CommandPaletteRow {
     pub shortcut: &'static str,
     pub label: &'static str,
     pub action: Option<AppAction>,
-    /// The TUI-local action Enter runs for terminal-only rows. Mirrors the
-    /// shared-action lane so the palette can execute the whole keyboard
-    /// surface, not just the shared router commands.
+    /// The TUI-local action Enter runs for included terminal-only rows. Mirrors
+    /// the shared-action lane so the palette can execute TUI-owned commands.
     pub local_action: Option<PaletteLocalAction>,
 }
 
@@ -208,18 +212,19 @@ pub(crate) struct TuiDirectArm {
     pub(crate) action: TuiDirectAction,
 }
 
-/// The registry's display token for the row-target (`Enter`) command; the
-/// content-level Enter resolver answers exactly this row.
+/// The Help display token for the row-target (`Enter`) command; the
+/// content-level Enter resolver answers exactly this row. The palette omits
+/// it because Enter selects a highlighted palette item there.
 pub(crate) const ROW_TARGET_SHORTCUT: &str = "Enter";
 /// The registry's display token for the Performance resource digit range; the
 /// digit resolver answers exactly this row.
 pub(crate) const RESOURCE_DIGITS_SHORTCUT: &str = "1-7";
 pub(crate) const SYSTEM_HISTORY_DIGITS_SHORTCUT: &str = "1-4";
 
-/// One TUI-local shortcut together with the two execution lanes the command
-/// palette and the direct key router use for it.  Help rows, palette rows and
-/// the direct dispatch all derive from this one table; a row that is
-/// discoverable but intentionally not palette-executable carries
+/// One TUI-local shortcut together with the command-palette action and direct
+/// key router arms. Help rows and direct dispatch derive from this table; the
+/// palette shows its rows except the structural `Enter` row target. A row
+/// that is discoverable but intentionally not palette-executable carries
 /// `None` explicitly (for example the context-sensitive `m` and `e`
 /// gestures), and every entry wires at least one [`TuiDirectArm`] so an
 /// advertised chord always executes.
@@ -369,7 +374,7 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 24] = [
     TuiLocalCommand {
         binding: LocalBinding {
             shortcut: ROW_TARGET_SHORTCUT,
-            label: "Service actions (Services page)",
+            label: "Properties / actions",
         },
         palette_action: None,
         direct: &[

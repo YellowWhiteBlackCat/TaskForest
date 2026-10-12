@@ -625,6 +625,35 @@ impl TuiApp {
         self.sync_grouped_application_selection();
     }
 
+    /// Keep the exact Applications row selected while a search query changes
+    /// if that identity remains visible. When the query removes it, clear the
+    /// stale target and use the search field's established first-actionable
+    /// row fallback.
+    pub(crate) fn reconcile_query_application_anchor(
+        &mut self,
+        anchor: Option<ApplicationRowAnchor>,
+    ) {
+        if self.page() != AppPage::Applications {
+            return;
+        }
+        let target = anchor.as_ref().and_then(|anchor| {
+            self.with_canonical_rows_indexed(|ids, visible| {
+                ids.iter()
+                    .position(|row| self.application_row_id_matches(row, visible, anchor))
+            })
+        });
+        let Some(target) = target else {
+            self.shell.set_row_selection(None, None);
+            self.reconcile_applications_cursor();
+            return;
+        };
+        if self.selected != target {
+            self.detail_scroll_reset();
+        }
+        self.shell.move_selection_to(target);
+        self.sync_grouped_application_selection();
+    }
+
     /// Preserve the selected Applications row while the shell changes its
     /// process sort. The shell still owns the sort and notice; this wrapper
     /// only restores the renderer-local visual anchor afterward.

@@ -26,6 +26,7 @@ use taskmanager_shell::{
 };
 
 use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectAction, TuiDirectArm, TuiDirectScope};
+use crate::smart_self_test::pending_target_is_running;
 use crate::ui::chart_cursor::chart_cursor_system;
 use crate::{FocusPanel, PerfDevice, TuiApp, TuiInputScope};
 
@@ -89,6 +90,12 @@ fn owned_input_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
 fn route_shared_surface(app: &mut TuiApp, kind: SurfaceKind, key: &KeyEvent) -> InputDispatch {
     match kind {
         SurfaceKind::Confirmation(_) => match key.code {
+            // A SMART report may advance while its shared gate remains open;
+            // reject the frozen intent before the shell's generic `y` route.
+            KeyCode::Char('y') if pending_target_is_running(app) => {
+                app.shell.dismiss_overlay();
+                InputDispatch::Consumed
+            }
             KeyCode::Char(character) => app.handle_local_char(character, modifiers(key)),
             KeyCode::Esc => {
                 app.shell.dismiss_overlay();
@@ -137,12 +144,21 @@ fn route_search(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
     match key.code {
         KeyCode::Char(character) => app.handle_local_char(character, modifiers(key)),
         KeyCode::Esc if !app.query.is_empty() => {
+            let anchor = app.selected_application_row_anchor();
             app.query.clear();
             app.detail_scroll_reset();
+            if app.page() == AppPage::Applications {
+                app.reconcile_query_application_anchor(anchor);
+            }
             InputDispatch::Consumed
         }
         KeyCode::Backspace => {
+            let anchor = app.selected_application_row_anchor();
+            let query_before = app.query.clone();
             app.pop_search_char();
+            if app.query != query_before && app.page() == AppPage::Applications {
+                app.reconcile_query_application_anchor(anchor);
+            }
             InputDispatch::Consumed
         }
         KeyCode::Enter if app.page() == AppPage::Applications => {

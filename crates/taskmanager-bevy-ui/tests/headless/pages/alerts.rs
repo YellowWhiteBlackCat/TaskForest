@@ -43,6 +43,7 @@ use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
 };
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
@@ -143,7 +144,7 @@ fn headless_shell_app() -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime: scripted_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<Assets<Font>>();
     app
@@ -483,7 +484,7 @@ fn pages_assemble_and_despawn_in_a_bare_scene_world() {
     let world = app.world_mut();
 
     let fixture_shell = ShellApp::new();
-    let fixture_palette = ui_palette(&Theme::dark());
+    let fixture_palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let fixture_history = crate::pages::history::HistoryProjectionResource::default();
     let context = crate::app::PageContext {
         sidebar: &Default::default(),

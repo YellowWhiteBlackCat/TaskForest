@@ -27,6 +27,7 @@ use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_shell::ShellApp;
 
+use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
 use taskmanager_core::core::power::PowerSupplySnapshot;
@@ -48,7 +49,14 @@ pub(super) fn render_battery_section(
         return;
     }
     let Some(supplies) = power_supplies else {
-        super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
+        StatePanel::render(
+            frame,
+            theme,
+            area,
+            t("common.battery"),
+            StatePanelKind::Message,
+            t("battery.empty"),
+        );
         return;
     };
     let batteries = app.order_sidebar_rows(
@@ -63,7 +71,14 @@ pub(super) fn render_battery_section(
             .collect(),
     );
     if batteries.is_empty() {
-        super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
+        StatePanel::render(
+            frame,
+            theme,
+            area,
+            t("common.battery"),
+            StatePanelKind::Message,
+            t("battery.empty"),
+        );
         return;
     }
     let lines = if area.height < 12 {

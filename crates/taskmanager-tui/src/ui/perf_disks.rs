@@ -31,6 +31,7 @@ use taskmanager_shell::presentation::{
 };
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
 
@@ -62,11 +63,12 @@ pub(super) fn render_disk_section(
             .collect(),
     );
     if disks.is_empty() {
-        super::render_empty_panel(
+        StatePanel::render(
             frame,
             theme,
             area,
             t("common.disk"),
+            StatePanelKind::Message,
             // No existing catalog key for "no disk at all"; kept English by the
             // i18n rule (do not edit locales) and listed in the task notes.
             "No disk telemetry available",
@@ -126,7 +128,14 @@ pub(super) fn render_directory_usage(
     // task notes alongside the "No disk telemetry available" precedent.
     let title = "Directory usage";
     let Some(snapshot) = app.projection().directory_usage.as_ref() else {
-        super::render_empty_panel(frame, theme, area, title, "No directory scan projected");
+        StatePanel::render(
+            frame,
+            theme,
+            area,
+            title,
+            StatePanelKind::Message,
+            "No directory scan projected",
+        );
         return;
     };
     let use_bytes = app.prefs.units[2];

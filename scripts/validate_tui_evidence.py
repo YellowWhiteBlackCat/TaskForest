@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import struct
 import subprocess
 import sys
@@ -19,10 +20,15 @@ from validate_capture_evidence import EvidenceError, file_sha256, png_chunk, png
 
 try:
     from capture_supervisor import SupervisorError, validate_supervised_metadata
+    from capture_tui_terminal_profiles import MatrixError, read_profiles
 except ModuleNotFoundError:
     from scripts.capture_supervisor import (  # type: ignore[no-redef]
         SupervisorError,
         validate_supervised_metadata,
+    )
+    from scripts.capture_tui_terminal_profiles import (  # type: ignore[no-redef]
+        MatrixError,
+        read_profiles,
     )
 
 
@@ -31,6 +37,23 @@ class VisualContentReceipt:
     visible_pixels: int
     unique_colors: int
     luminance_span: int
+
+
+TERMINAL_PROFILE_PATTERN = re.compile(
+    r"TUI_CAPTURE_MARKER event=terminal_profile "
+    r"language=(en|zh) glyphs=(ascii|unicode) "
+    r"color=(truecolor|ansi256|ansi16|monochrome)"
+)
+TERMINAL_PROFILE_INPUTS = {
+    "terminal_term": "term",
+    "terminal_colorterm": "colorterm",
+    "terminal_no_color": "no_color",
+    "terminal_lc_all": "lc_all",
+    "terminal_lc_ctype": "lc_ctype",
+    "terminal_lc_messages": "lc_messages",
+    "terminal_lang": "lang",
+    "terminal_glyph_override": "glyph_override",
+}
 
 
 def _paeth(left: int, above: int, upper_left: int) -> int:
@@ -162,6 +185,33 @@ def self_test() -> None:
         evidence_root.mkdir(parents=True)
         inside = evidence_root / "image.png"
         assert resolve_evidence_path(inside, evidence_root, "image") == inside
+        binary = evidence_root / "bin" / "taskforest-t"
+        binary.parent.mkdir()
+        binary.write_bytes(b"receipt binary")
+        repo_root = Path(temporary)
+        binary_values = {
+            "binary": str(binary.relative_to(repo_root)),
+            "binary_sha256": file_sha256(binary),
+            "binary_provision": "prebuilt",
+            "binary_source": "target/debug/taskforest-t",
+            "terminal_scenario": "<manual>",
+        }
+        assert validate_binary_provenance(
+            binary_values,
+            repo_root,
+            repo_root / "target" / "tui-evidence",
+        ) == binary
+        binary_values["binary_sha256"] = "0" * 64
+        try:
+            validate_binary_provenance(
+                binary_values,
+                repo_root,
+                repo_root / "target" / "tui-evidence",
+            )
+        except EvidenceError:
+            pass
+        else:
+            raise EvidenceError("binary provenance accepted a mismatched hash")
         outside = Path(temporary) / "outside.png"
         try:
             resolve_evidence_path(outside, evidence_root, "image")
@@ -169,6 +219,42 @@ def self_test() -> None:
             pass
         else:
             raise EvidenceError("evidence path outside the run root was accepted")
+
+    for row in read_profiles().values():
+        values = {"terminal_scenario": row["name"]}
+        values.update(
+            {
+                metadata_key: row[matrix_key]
+                for metadata_key, matrix_key in TERMINAL_PROFILE_INPUTS.items()
+            }
+        )
+        language = row["expected_language"]
+        glyphs = row["expected_glyphs"]
+        color = row["expected_color"]
+        values.update(
+            {
+                "terminal_profile_language": language,
+                "terminal_profile_glyphs": glyphs,
+                "terminal_profile_color": color,
+            }
+        )
+        marker = (
+            "TUI_CAPTURE_MARKER event=terminal_profile "
+            f"language={language} glyphs={glyphs} color={color}"
+        )
+        validate_terminal_profile(values, marker)
+
+    try:
+        terminal_profile_from_markers(
+            "TUI_CAPTURE_MARKER event=terminal_profile language=en "
+            "glyphs=unicode color=ansi256\n"
+            "TUI_CAPTURE_MARKER event=terminal_profile language=en "
+            "glyphs=unicode color=ansi256"
+        )
+    except EvidenceError:
+        pass
+    else:
+        raise EvidenceError("duplicate resolved terminal profile markers were accepted")
 
 
 def metadata(path: Path) -> dict[str, str]:
@@ -194,16 +280,82 @@ def metadata(path: Path) -> dict[str, str]:
         "niri",
         "terminal",
         "stack",
+        "binary",
+        "binary_sha256",
+        "binary_provision",
+        "binary_source",
         "source_scope",
         "source_manifest_sha256",
         "dbus_isolation",
         "command",
+        "terminal_scenario",
+        *TERMINAL_PROFILE_INPUTS,
+        "terminal_profile_language",
+        "terminal_profile_glyphs",
+        "terminal_profile_color",
     }
     if missing := required - values.keys():
         raise EvidenceError(f"metadata missing fields: {sorted(missing)}")
     if values["dbus_isolation"] != "private-session":
         raise EvidenceError("TUI capture must use the private D-Bus session")
     return values
+
+
+def terminal_profile_from_markers(markers: str) -> tuple[str, str, str]:
+    lines = [
+        line
+        for line in markers.splitlines()
+        if line.startswith("TUI_CAPTURE_MARKER event=terminal_profile ")
+    ]
+    if len(lines) != 1:
+        raise EvidenceError(
+            f"expected exactly one resolved terminal profile marker, found {len(lines)}"
+        )
+    match = TERMINAL_PROFILE_PATTERN.fullmatch(lines[0])
+    if match is None:
+        raise EvidenceError(f"invalid resolved terminal profile marker: {lines[0]!r}")
+    return match.groups()
+
+
+def validate_terminal_profile(values: dict[str, str], markers: str) -> dict[str, str]:
+    language, glyphs, color = terminal_profile_from_markers(markers)
+    marker_profile = {
+        "terminal_profile_language": language,
+        "terminal_profile_glyphs": glyphs,
+        "terminal_profile_color": color,
+    }
+    if any(values[key] != value for key, value in marker_profile.items()):
+        raise EvidenceError("resolved terminal profile metadata differs from the painted frame marker")
+
+    scenario = values["terminal_scenario"]
+    if scenario != "<manual>":
+        try:
+            row = read_profiles().get(scenario)
+        except (MatrixError, OSError) as error:
+            raise EvidenceError(f"terminal profile matrix is invalid: {error}") from error
+        if row is None:
+            raise EvidenceError(f"unknown terminal profile scenario: {scenario!r}")
+        for metadata_key, matrix_key in TERMINAL_PROFILE_INPUTS.items():
+            if values[metadata_key] != row[matrix_key]:
+                raise EvidenceError(
+                    f"terminal input {metadata_key} differs from matrix scenario {scenario!r}"
+                )
+        expected = (
+            row["expected_language"],
+            row["expected_glyphs"],
+            row["expected_color"],
+        )
+        if (language, glyphs, color) != expected:
+            raise EvidenceError(
+                f"resolved terminal profile {(language, glyphs, color)!r} "
+                f"differs from {scenario!r} expectation {expected!r}"
+            )
+    return {
+        "scenario": scenario,
+        "language": language,
+        "glyphs": glyphs,
+        "color": color,
+    }
 
 
 def current(*command: str, cwd: Path) -> str:
@@ -236,6 +388,24 @@ def resolve_evidence_path(path: Path, evidence_root: Path, label: str) -> Path:
             f"{label} path escapes target/tui-evidence: {path}"
         ) from error
     return resolved
+
+
+def validate_binary_provenance(
+    values: dict[str, str], root: Path, evidence_root: Path
+) -> Path:
+    binary = resolve_evidence_path(root / values["binary"], evidence_root, "binary")
+    if not binary.is_file() or file_sha256(binary) != values["binary_sha256"]:
+        raise EvidenceError("run-owned TUI binary is missing or differs from its receipt hash")
+    if values["binary_provision"] not in {"capture-build", "prebuilt"}:
+        raise EvidenceError("unknown TUI binary provisioning path")
+    if values["binary_source"] != "target/debug/taskforest-t":
+        raise EvidenceError("TUI evidence must use the taskforest-t product binary")
+    if (
+        values["terminal_scenario"] != "<manual>"
+        and values["binary_provision"] != "prebuilt"
+    ):
+        raise EvidenceError("terminal matrix rows must reuse the prebuilt taskforest-t binary")
+    return binary
 
 
 def main() -> int:
@@ -273,6 +443,7 @@ def main() -> int:
         receipt = png_receipt(image)
         visual = visual_content_receipt(image)
         values = metadata(metadata_path)
+        binary_path = validate_binary_provenance(values, root, evidence_root)
         cols = int(values.get("terminal_columns", "120"))
         lines_cnt = int(values.get("terminal_lines", "36"))
         min_width = 500 if cols <= 80 else 900
@@ -285,6 +456,7 @@ def main() -> int:
             raise EvidenceError(str(error)) from error
         expected_page = values.get("page", "performance")
         markers = markers_path.read_text(encoding="utf-8")
+        terminal_profile = validate_terminal_profile(values, markers)
         for token in (
             "TUI_CAPTURE_MARKER event=demo_data_ready mode=demo",
             f"TUI_CAPTURE_MARKER event=frame_ready page={expected_page}",
@@ -324,8 +496,16 @@ def main() -> int:
             "worktree": values["worktree"],
             "rust": values["rust"],
             "stack": values["stack"],
+            "binary": binary_path.name,
+            "binary_sha256": values["binary_sha256"],
+            "binary_provision": values["binary_provision"],
             "source_scope": values["source_scope"],
             "source_manifest_sha256": values["source_manifest_sha256"],
+            "terminal_environment": {
+                key.removeprefix("terminal_"): values[key]
+                for key in TERMINAL_PROFILE_INPUTS
+            },
+            "terminal_profile": terminal_profile,
             "metadata_sha256": file_sha256(metadata_path),
             "markers_sha256": file_sha256(markers_path),
             "artifact": {
@@ -343,7 +523,13 @@ def main() -> int:
             receipt_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"TUI evidence validation: PASS ({receipt.width}x{receipt.height})")
         return 0
-    except (EvidenceError, OSError, ValueError, subprocess.CalledProcessError) as error:
+    except (
+        EvidenceError,
+        MatrixError,
+        OSError,
+        ValueError,
+        subprocess.CalledProcessError,
+    ) as error:
         print(f"TUI evidence validation: FAIL: {error}", file=sys.stderr)
         return 1
 

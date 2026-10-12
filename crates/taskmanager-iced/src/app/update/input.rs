@@ -102,7 +102,21 @@ impl IcedApp {
                 }
                 UpdateDispatch::none()
             }
+            Message::FocusedTargetUnmounted(target) => {
+                if self.input.focused_control == Some(target) {
+                    self.input.focused_control = None;
+                    self.reset_focus_visible();
+                }
+                UpdateDispatch::none()
+            }
             _ => UpdateDispatch::none(),
         }
+    }
+
+    /// Return focus-visible state to the programmatic baseline after the
+    /// window or its tracked target stops being a valid keyboard focus owner.
+    pub(super) fn reset_focus_visible(&mut self) {
+        self.input.modality = crate::input_modality::InputModality::Programmatic;
+        self.configuration.set_focus_visible(false);
     }
 }

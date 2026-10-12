@@ -7,6 +7,30 @@ use std::time::Duration;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::i18n::Language;
 use taskmanager_theme::LightDark;
+use taskmanager_theme::tokens::UiSize;
+
+/// The UI-size ladder in display order — the same three steps the GPUI/Iced
+/// settings rows expose, each a whole-surface type-scale choice.
+pub(super) fn ui_size_entries(current: UiSize) -> Vec<ChoiceEntry> {
+    UiSize::ALL
+        .into_iter()
+        .map(|size| ChoiceEntry {
+            label: ui_size_label(size).to_owned(),
+            choice: SettingsChoice(SettingsField::UiSize(size)),
+            selected: current == size,
+        })
+        .collect()
+}
+
+/// Stable display labels for the size ladder; the config keeps the typed
+/// `config_token()` vocabulary, these are only the row's visible words.
+fn ui_size_label(size: UiSize) -> &'static str {
+    match size {
+        UiSize::Small => "Small",
+        UiSize::Standard => "Standard",
+        UiSize::Large => "Large",
+    }
+}
 
 pub(super) fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
     vec![

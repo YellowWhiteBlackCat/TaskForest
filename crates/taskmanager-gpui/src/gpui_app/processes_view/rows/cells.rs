@@ -16,6 +16,7 @@ use taskmanager_ui::theme_binding::rgba;
 
 use taskmanager_ui::overlays::context_menu::ContextMenuExt;
 use taskmanager_ui::overlays::popup::PopupMenuState;
+use taskmanager_ui::primitives::tooltip::{Tooltip, TooltipHost};
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{self, RootView};
@@ -33,6 +34,8 @@ fn numeric_cell(theme: &Theme, text: String, color: Color, ui_size: UiSize) -> D
         .flex()
         .flex_row()
         .justify_end()
+        .min_w(px(0.0))
+        .truncate()
         .text_size(absolute(ui_size.body_font_size()))
         .font(mono_font_with_fallback(theme))
         .text_color(hsla(color))
@@ -208,61 +211,74 @@ pub(super) fn append_body_cells(
     // (including tree parents); aggregate rows carry no single history
     // (cpu_history empty) → a blank cell of the matching width keeps columns aligned.
     if !hidden_cols.contains(&SortCol::Cpu) {
-        line = line
-            .child(
-                numeric_cell(
-                    theme,
-                    row.cell_text.cpu.clone(),
-                    zero_value_color(
-                        theme.cpu,
-                        theme.fg_dim,
-                        gray_zero_values,
-                        row.cpu == Some(0.0),
-                    ),
-                    ui_size,
-                )
-                .w(live_width(col_widths, SortCol::Cpu))
-                .pl(definite_length(tokens::SPACE_8))
-                .pr(definite_length(tokens::SPACE_8)),
-            )
-            .child({
-                if row.process_identity.is_some() {
-                    div()
-                        .w(px(56.0))
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .child(elements::sparkline(
-                            Rc::clone(&row.cpu_history),
-                            rgba(theme.cpu),
-                            48.0,
-                            16.0,
-                            graph_cache.clone(),
-                        ))
-                } else {
-                    div().w(px(56.0))
-                }
-            });
+        let cpu_cell = numeric_cell(
+            theme,
+            row.cell_text.cpu_compact.clone(),
+            zero_value_color(
+                theme.cpu,
+                theme.fg_dim,
+                gray_zero_values,
+                row.cpu == Some(0.0),
+            ),
+            ui_size,
+        )
+        .w(live_width(col_widths, SortCol::Cpu))
+        .pl(definite_length(tokens::SPACE_8))
+        .pr(definite_length(tokens::SPACE_8));
+        let cpu_cell = if row.cpu_aggregate.is_some() {
+            TooltipHost::new(("process-aggregate-cpu", row_idx), cpu_cell.justify_start())
+                .tooltip(Tooltip::text(row.cell_text.cpu.clone(), theme.palette()))
+                .into_any_element()
+        } else {
+            cpu_cell.into_any_element()
+        };
+        line = line.child(cpu_cell).child({
+            if row.process_identity.is_some() {
+                div()
+                    .w(px(56.0))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .child(elements::sparkline(
+                        Rc::clone(&row.cpu_history),
+                        rgba(theme.cpu),
+                        48.0,
+                        16.0,
+                        graph_cache.clone(),
+                    ))
+            } else {
+                div().w(px(56.0))
+            }
+        });
     }
     if !hidden_cols.contains(&SortCol::Memory) {
-        line = line.child(
-            numeric_cell(
-                theme,
-                row.cell_text.memory.clone(),
-                // Memory is a headline metric (peer of CPU/Disk): category color,
-                // not the dim counter gray. Matches CPU→theme.cpu / Disk→theme.disk.
-                zero_value_color(
-                    theme.memory,
-                    theme.fg_dim,
-                    gray_zero_values,
-                    row.mem == Some(0),
-                ),
-                ui_size,
+        let memory_cell = numeric_cell(
+            theme,
+            row.cell_text.memory_compact.clone(),
+            // Memory is a headline metric (peer of CPU/Disk): category color,
+            // not the dim counter gray. Matches CPU→theme.cpu / Disk→theme.disk.
+            zero_value_color(
+                theme.memory,
+                theme.fg_dim,
+                gray_zero_values,
+                row.mem == Some(0),
+            ),
+            ui_size,
+        )
+        .w(live_width(col_widths, SortCol::Memory))
+        .pl(definite_length(tokens::SPACE_8))
+        .pr(definite_length(tokens::SPACE_8));
+        let memory_cell = if row.memory_aggregate.is_some() {
+            TooltipHost::new(
+                ("process-aggregate-memory", row_idx),
+                memory_cell.justify_start(),
             )
-            .w(live_width(col_widths, SortCol::Memory))
-            .pl(definite_length(tokens::SPACE_8))
-            .pr(definite_length(tokens::SPACE_8)),
-        );
+            .tooltip(Tooltip::text(row.cell_text.memory.clone(), theme.palette()))
+            .into_any_element()
+        } else {
+            memory_cell.into_any_element()
+        };
+        line = line.child(memory_cell);
     }
     if !hidden_cols.contains(&SortCol::Swap) {
         line = line.child(

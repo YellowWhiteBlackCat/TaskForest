@@ -212,7 +212,7 @@ impl Render for RootView {
             // restoration as Escape, the close button, and scrim dismissal.
             restore_modal(window, cx);
         }
-        self.ensure_input_modality_key_interceptor(window, cx);
+        self.ensure_input_modality_observers(window, cx);
         self.poll_diagnostic_bundle_result();
         schedule_system_inventory_capture(self, window, cx);
         schedule_window_capture(self, window, cx);

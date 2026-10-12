@@ -11,9 +11,10 @@ use std::time::Duration;
 use crate::ElementBuilder;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, App, Context, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
-    Point, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Task, Window, anchored,
-    deferred, div, point, px,
+    AnyElement, App, Context, ElementId, FocusHandle, FocusOutEvent, InteractiveElement,
+    IntoElement, KeyDownEvent, ParentElement, Pixels, Point, RenderOnce, SharedString,
+    StatefulInteractiveElement, Styled, Subscription, Task, Window, anchored, deferred, div, point,
+    px,
 };
 use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
@@ -157,20 +158,32 @@ pub fn tooltip_step(
 pub struct TooltipHostState {
     visibility: TooltipVisibility,
     hover_since: Option<std::time::Instant>,
+    focus_within: bool,
+    dismissed: bool,
+    focus_handle: FocusHandle,
+    _focus_in_subscription: Subscription,
+    _focus_out_subscription: Subscription,
     _task: Option<Task<()>>,
 }
 
-impl Default for TooltipHostState {
-    fn default() -> Self {
+impl TooltipHostState {
+    fn new(
+        focus_handle: FocusHandle,
+        focus_in_subscription: Subscription,
+        focus_out_subscription: Subscription,
+    ) -> Self {
         Self {
             visibility: TooltipVisibility::Hidden,
             hover_since: None,
+            focus_within: false,
+            dismissed: false,
+            focus_handle,
+            _focus_in_subscription: focus_in_subscription,
+            _focus_out_subscription: focus_out_subscription,
             _task: None,
         }
     }
-}
 
-impl TooltipHostState {
     /// Advance the state machine from a pointer-hover change.
     pub fn on_hover_changed(
         &mut self,
@@ -180,9 +193,15 @@ impl TooltipHostState {
     ) {
         let now = std::time::Instant::now();
         if hovering {
+            if self.hover_since.is_none() {
+                self.dismissed = false;
+            }
             self.hover_since = Some(now);
         } else {
             self.hover_since = None;
+            if !self.focus_within {
+                self.dismissed = false;
+            }
         }
         self.recompute(window, cx);
     }
@@ -194,40 +213,57 @@ impl TooltipHostState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.visibility = tooltip_step(
-            self.visibility,
-            self.hover_since.is_some(),
-            focus_within,
-            self.hover_elapsed(),
-        );
-        if self.visibility == TooltipVisibility::Visible {
-            window.refresh();
+        if self.focus_within == focus_within {
+            return;
         }
-        let _ = cx;
+        if focus_within {
+            self.dismissed = false;
+        }
+        self.focus_within = focus_within;
+        if !self.focus_within && self.hover_since.is_none() {
+            self.dismissed = false;
+        }
+        self.recompute(window, cx);
+    }
+
+    /// Hide the tooltip until its trigger leaves both hover and focus, or a
+    /// new pointer/focus entry begins.
+    pub fn dismiss(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.dismissed = true;
+        self.visibility = TooltipVisibility::Hidden;
+        self._task = None;
+        cx.notify();
+        window.refresh();
     }
 
     /// Spawn a one-shot wakeup that re-evaluates the hover delay.
     fn recompute(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.visibility = tooltip_step(
-            self.visibility,
-            self.hover_since.is_some(),
-            false,
-            self.hover_elapsed(),
-        );
+        self.visibility = if self.dismissed {
+            TooltipVisibility::Hidden
+        } else {
+            tooltip_step(
+                self.visibility,
+                self.hover_since.is_some(),
+                self.focus_within,
+                self.hover_elapsed(),
+            )
+        };
         if self.visibility == TooltipVisibility::Armed {
             let delay = TOOLTIP_DELAY.saturating_sub(self.hover_elapsed().unwrap_or_default());
             let this = cx.entity();
             self._task = Some(window.spawn(cx, async move |cx| {
                 gpui::Timer::after(delay).await;
                 this.update(cx, |state, cx| {
-                    state.visibility = tooltip_step(
-                        state.visibility,
-                        state.hover_since.is_some(),
-                        false,
-                        state.hover_elapsed(),
-                    );
-                    if state.visibility == TooltipVisibility::Visible {
-                        cx.notify();
+                    if !state.dismissed {
+                        state.visibility = tooltip_step(
+                            state.visibility,
+                            state.hover_since.is_some(),
+                            state.focus_within,
+                            state.hover_elapsed(),
+                        );
+                        if state.visibility == TooltipVisibility::Visible {
+                            cx.notify();
+                        }
                     }
                 })
                 .ok();
@@ -281,14 +317,40 @@ impl TooltipHost {
 
 impl RenderOnce for TooltipHost {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let state = window.use_state(cx, |_, _| TooltipHostState::default());
+        let state_key = ElementId::from((self.id.clone(), "state"));
+        let state = window.use_keyed_state(state_key, cx, |window, cx| {
+            let focus_handle = cx.focus_handle();
+            let focus_in_state: gpui::WeakEntity<TooltipHostState> = cx.weak_entity();
+            let focus_in_subscription = window.on_focus_in(&focus_handle, cx, move |window, cx| {
+                let _ = focus_in_state.update(cx, |state, cx| {
+                    state.on_focus_changed(true, window, cx);
+                });
+            });
+            let focus_out_state: gpui::WeakEntity<TooltipHostState> = cx.weak_entity();
+            let focus_out_subscription = window.on_focus_out(
+                &focus_handle,
+                cx,
+                move |_event: FocusOutEvent, window, cx| {
+                    let _ = focus_out_state.update(cx, |state, cx| {
+                        state.on_focus_changed(false, window, cx);
+                    });
+                },
+            );
+            TooltipHostState::new(focus_handle, focus_in_subscription, focus_out_subscription)
+        });
         let tooltip = self.tooltip.take();
         let offset = self.offset;
+        let focus_handle = state.read_with(cx, |state, _| state.focus_handle.clone());
+        let focus_within = focus_handle.contains_focused(window, cx);
+        state.update(cx, |state, cx| {
+            state.on_focus_changed(focus_within, window, cx);
+        });
 
         let trigger = self.trigger.expect("trigger must be set");
         let mut base = div()
             .id(self.id)
             .relative()
+            .track_focus(&focus_handle)
             .cursor_default()
             .on_hover({
                 let state = state.clone();
@@ -296,6 +358,21 @@ impl RenderOnce for TooltipHost {
                     state.update(cx, |state, cx| {
                         state.on_hover_changed(*hovering, window, cx);
                     });
+                }
+            })
+            .on_click({
+                let state = state.clone();
+                move |_event, window, cx| {
+                    state.update(cx, |state, cx| state.dismiss(window, cx));
+                }
+            })
+            .on_key_down({
+                let state = state.clone();
+                move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key == "escape" && !event.keystroke.modifiers.modified() {
+                        cx.stop_propagation();
+                        state.update(cx, |state, cx| state.dismiss(window, cx));
+                    }
                 }
             })
             .child(trigger);

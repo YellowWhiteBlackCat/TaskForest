@@ -12,8 +12,8 @@ mod tests_inner {
     // existing `#[gpui::test]` file in this repo imports explicitly for the
     // same reason.
     use gpui::{
-        AppContext, Context, Entity, IntoElement, Keystroke, ParentElement, Render, SharedString,
-        Styled, TestAppContext, VisualTestContext, Window, div, px, size,
+        AppContext, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled,
+        TestAppContext, VisualTestContext, Window, div, px, size,
     };
 
     use super::super::fonts::effective_font_summary;
@@ -221,16 +221,6 @@ mod tests_inner {
             });
             div().p(definite_length(tokens::SPACE_4)).child(row)
         }
-    }
-
-    /// Press Enter on the currently focused element through the real key-event
-    /// pipeline (KeyUp is what gpui's `Stateful` interactivity turns into a
-    /// `ClickEvent::Keyboard` for focused elements, which is what fires the
-    /// pill `on_click` — the same path a keyboard user takes).
-    fn press_enter(win: &mut gpui::VisualTestContext) {
-        win.simulate_event(gpui::KeyUpEvent {
-            keystroke: Keystroke::parse("enter").unwrap(),
-        });
     }
 
     /// The Settings dialog renders under five semantic group titles
@@ -597,12 +587,10 @@ mod tests_inner {
         }));
     }
 
-    /// The Startup-page select records the window's live token through the
-    /// real focus + keyboard pipeline: tab to the trigger, open the menu
-    /// with Enter, arrow to the option, confirm with Enter — the matching
-    /// token lands on the harness's own RootView. The trigger opens with
-    /// Enter via the dropdown's keyboard path, so the focus chain reaches
-    /// the option list and confirm runs the on_change callback.
+    /// The Startup-page select records the window's live token through its
+    /// real event pipeline: pointer-open the menu, navigate and confirm with
+    /// the keyboard, then reopen from the restored trigger with Enter. The
+    /// matching token lands on the harness's own RootView.
     #[gpui::test]
     async fn startup_page_select_records_the_window_token(cx: &mut TestAppContext) {
         let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
@@ -620,12 +608,11 @@ mod tests_inner {
         });
         vcx.update(|window, cx| window.draw(cx).clear());
 
-        // Focus the select trigger and open the menu with Enter.
+        // Open the select menu through the rendered trigger.
         vcx.update(|window, cx| window.draw(cx).clear());
         let trigger = vcx
             .debug_bounds("startup-page:trigger")
             .expect("select renders");
-        eprintln!("TRIGGER: {trigger:?}");
         vcx.simulate_mouse_move(
             trigger.center(),
             None::<gpui::MouseButton>,
@@ -648,14 +635,17 @@ mod tests_inner {
             "confirming the Processes option must record the processes token"
         );
 
-        // The menu dismisses and the trigger regains focus: the next
-        // Enter (focused trigger, KeyUp-click path) reopens the menu, which
-        // proves both the dismissal and the focus restore happened.
+        // The menu dismisses and restores focus to the trigger. A real Enter
+        // keydown exercises its explicit dropdown activation action.
 
         // Reopen and choose the first option (Remember last).
         vcx.update(|window, cx| window.draw(cx).clear());
-        press_enter(&mut vcx);
+        vcx.simulate_keystrokes("enter");
         vcx.update(|window, cx| window.draw(cx).clear());
+        assert!(
+            vcx.debug_bounds("tm-popup").is_some(),
+            "Enter on the restored select trigger must reopen the menu"
+        );
         vcx.simulate_keystrokes("down enter");
         vcx.update(|window, cx| window.draw(cx).clear());
         assert!(
@@ -716,8 +706,12 @@ mod tests_inner {
         // Reopen and restore the System sentinel (negotiation default): the
         // first Up lands on the LAST option, so three ups reach the first.
         vcx.update(|window, cx| window.draw(cx).clear());
-        press_enter(&mut vcx);
+        vcx.simulate_keystrokes("enter");
         vcx.update(|window, cx| window.draw(cx).clear());
+        assert!(
+            vcx.debug_bounds("tm-popup").is_some(),
+            "Enter on the restored select trigger must reopen the menu"
+        );
         vcx.simulate_keystrokes("up up up enter");
         vcx.update(|window, cx| window.draw(cx).clear());
         assert!(

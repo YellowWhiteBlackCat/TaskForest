@@ -47,6 +47,7 @@ mod marker;
 mod process_fixtures;
 mod properties;
 mod scenarios;
+mod session_control;
 mod state;
 mod system_health;
 use fixtures::{
@@ -62,6 +63,7 @@ use process_fixtures::{
     prepare_startup_failure_evidence, prepare_startup_impact,
 };
 pub use scenarios::CaptureScenario;
+pub(crate) use session_control::session_control_fixture;
 pub(super) use state::{
     CaptureDataReadiness, CaptureEvidence, CaptureMode, CaptureProcessAction,
     CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,

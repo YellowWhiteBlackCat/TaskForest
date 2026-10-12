@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry};
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, scrollable, text};
 use iced::{Color, Length, Rectangle};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -56,6 +56,7 @@ const CELL_STROKE_WIDTH: f32 = 1.4;
 /// Alpha multiplier applied to the tier color for the area fill (matches the
 /// Cpu chart's legibility wash).
 const CELL_AREA_ALPHA: f32 = 0.18;
+pub(crate) const CORE_GRID_SCROLL_ID: &str = "performance-cpu-core-grid";
 
 type Elem<'a> = iced::Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -74,13 +75,25 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
         if h.core_breakdown.total() > 0 {
             let mut parts = Vec::new();
             if h.core_breakdown.p_cores > 0 {
-                parts.push(format!("{} P-Cores", h.core_breakdown.p_cores));
+                parts.push(format!(
+                    "{} {}",
+                    t("cpu.performance_cores"),
+                    h.core_breakdown.p_cores
+                ));
             }
             if h.core_breakdown.e_cores > 0 {
-                parts.push(format!("{} E-Cores", h.core_breakdown.e_cores));
+                parts.push(format!(
+                    "{} {}",
+                    t("cpu.efficiency_cores"),
+                    h.core_breakdown.e_cores
+                ));
             }
             if h.core_breakdown.lp_cores > 0 {
-                parts.push(format!("{} LP-Cores", h.core_breakdown.lp_cores));
+                parts.push(format!(
+                    "{} {}",
+                    t("cpu.low_power_cores"),
+                    h.core_breakdown.lp_cores
+                ));
             }
             Some(parts.join(" · "))
         } else {
@@ -114,9 +127,17 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
                 .into_iter()
                 .map(|(index, samples)| {
                     let core_type = cpu_types.and_then(|types| types.get(index)).copied();
+                    let core_usage = cpu_metrics.and_then(|cpu| cpu.current_core_usage_pct(index));
                     let core_freq =
                         cpu_metrics.and_then(|cpu| cpu.current_core_frequency_mhz(index));
-                    core_grid_cell(index, samples, theme_snapshot, core_type, core_freq)
+                    core_grid_cell(
+                        index,
+                        samples,
+                        theme_snapshot,
+                        core_type,
+                        core_usage,
+                        core_freq,
+                    )
                 })
                 .collect();
             row(cells).spacing(8).width(Length::Fill).into()
@@ -147,29 +168,41 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
         );
     }
 
-    container(column(vec![
-        row(header_items)
-            .spacing(8)
-            .align_y(iced::Alignment::Center)
-            .into(),
-        column(rows).spacing(8).into(),
-    ]))
-    .style(move |_| theme::panel_style(theme_snapshot))
+    // The chart card and stats rail retain their fixed outer bounds. The
+    // complete core matrix owns the bounded residual viewport so every
+    // logical core stays reachable even when the 300px headline is pinned.
+    scrollable(
+        container(column(vec![
+            row(header_items)
+                .spacing(8)
+                .align_y(iced::Alignment::Center)
+                .into(),
+            column(rows).spacing(8).into(),
+        ]))
+        .style(move |_| theme::panel_style(theme_snapshot)),
+    )
+    .id(CORE_GRID_SCROLL_ID)
+    .height(Length::Fill)
+    .width(Length::Fill)
     .into()
 }
 
 /// Format the per-core utilization and observed clock frequency readout.
 #[must_use]
-pub(crate) fn format_core_readout(usage_pct: f32, freq_mhz: Option<u64>) -> String {
-    let clamped = usage_pct.clamp(0.0, 100.0);
+pub(crate) fn format_core_readout(usage_pct: Option<f32>, freq_mhz: Option<u64>) -> String {
+    let mut parts = Vec::with_capacity(2);
+    if let Some(value) = usage_pct.filter(|value| value.is_finite()) {
+        parts.push(format!("{:>3.0}%", value.clamp(0.0, 100.0)));
+    }
     match freq_mhz {
-        Some(mhz) if mhz >= 1000 => {
-            format!("{clamped:>3.0}% · {:.1} GHz", mhz as f64 / 1000.0)
-        }
-        Some(mhz) if mhz > 0 => {
-            format!("{clamped:>3.0}% · {mhz} MHz")
-        }
-        _ => format!("{clamped:>3.0}%"),
+        Some(mhz) if mhz >= 1000 => parts.push(format!("{:.1} GHz", mhz as f64 / 1000.0)),
+        Some(mhz) if mhz > 0 => parts.push(format!("{mhz} MHz")),
+        _ => {}
+    }
+    if parts.is_empty() {
+        MISSING_VALUE.to_owned()
+    } else {
+        parts.join(" · ")
     }
 }
 
@@ -184,6 +217,7 @@ fn core_grid_cell(
     samples: Rc<[f32]>,
     theme_snapshot: &Theme,
     core_type: Option<CpuType>,
+    usage_pct: Option<f32>,
     freq_mhz: Option<u64>,
 ) -> Elem<'static> {
     let type_suffix = match core_type {
@@ -194,22 +228,28 @@ fn core_grid_cell(
     };
     let label = format!("C{index:02}{type_suffix}");
 
-    let body: Elem<'static> = match samples.last().copied() {
-        Some(value) => {
-            let clamped = value.clamp(0.0, 100.0);
-            let stroke_color = tier_color(theme_snapshot, clamped);
-            let chart = canvas::Canvas::new(CoreCellChart::new(samples, stroke_color))
-                .width(Length::Fill)
-                .height(Length::Fixed(CELL_CHART_HEIGHT));
-            let readout = format_core_readout(clamped, freq_mhz);
-            column(vec![
-                chart.into(),
-                text(readout).size(f32::from(tokens::FONT_10)).into(),
-            ])
-            .spacing(2)
-            .into()
-        }
-        None => text(MISSING_VALUE).size(f32::from(tokens::FONT_12)).into(),
+    let readout = format_core_readout(usage_pct, freq_mhz);
+    let has_finite_history = samples.iter().any(|value| value.is_finite());
+    let body: Elem<'static> = if has_finite_history {
+        // Historical samples can still draw a trend while the current typed
+        // observation is unavailable. Dim that stale trend and keep the
+        // readout missing instead of treating the history gap (NaN) as a
+        // current percentage.
+        let stroke_color = usage_pct
+            .filter(|value| value.is_finite())
+            .map(|value| tier_color(theme_snapshot, value.clamp(0.0, 100.0)))
+            .unwrap_or_else(|| crate::theme_binding::color(theme_snapshot.fg_dim));
+        let chart = canvas::Canvas::new(CoreCellChart::new(samples, stroke_color))
+            .width(Length::Fill)
+            .height(Length::Fixed(CELL_CHART_HEIGHT));
+        column(vec![
+            chart.into(),
+            text(readout).size(f32::from(tokens::FONT_10)).into(),
+        ])
+        .spacing(2)
+        .into()
+    } else {
+        text(readout).size(f32::from(tokens::FONT_12)).into()
     };
     column(vec![
         text(label).size(f32::from(tokens::FONT_10)).into(),

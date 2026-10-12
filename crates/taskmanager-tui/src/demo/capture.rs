@@ -2,10 +2,13 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use taskmanager_application::AppPage;
-use taskmanager_core::core::metrics::SmartAvailability;
+use taskmanager_application::{AppPage, ConfirmationKind};
+use taskmanager_core::core::metrics::{ScalarAvailability, SmartAvailability};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskmanager_core::core::target::SessionId;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
-use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// A scene is ready only when its requested product state exists.
@@ -89,10 +92,25 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
             && app
                 .selected_detail_process()
                 .is_some_and(|process| process.current_cpu_percentage() == Some(0.0))
-    } else if scene == "event-center" {
+    } else if scene == "apps-empty" {
+        app.page() == AppPage::Applications
+            && app
+                .projection()
+                .processes
+                .as_ref()
+                .is_some_and(|processes| processes.is_empty())
+            && app.query.trim().is_empty()
+    } else if matches!(scene.as_str(), "event-center" | "health-review-events") {
         app.health_open()
             && app.health_review.mode == crate::health_review::HealthReviewMode::Events
             && !app.projection().alert_center.event_history().is_empty()
+    } else if scene == "users-session-confirmation" {
+        app.page() == AppPage::Users
+            && app.shell.confirmation_kind() == Some(ConfirmationKind::SessionControl)
+            && app.shell.pending_session().is_some_and(|pending| {
+                pending.action == SessionControlAction::Disconnect
+                    && pending.session.identity().is_some()
+            })
     } else if scene == "alert-rules-manager" {
         app.health_open()
             && !app
@@ -143,6 +161,21 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                     }
                 )
             })
+            && rows.get(app.selected).is_some_and(|row| {
+                matches!(
+                    row,
+                    crate::process_view::ProcessRow::Group { aggregate, .. }
+                        if matches!(aggregate.cpu().availability(), ScalarAvailability::Partial(_))
+                            && aggregate.cpu().current_member_count() + 1
+                                == aggregate.cpu().member_count()
+                            && matches!(
+                                aggregate.memory().availability(),
+                                ScalarAvailability::Partial(_)
+                            )
+                            && aggregate.memory().current_member_count() + 1
+                                == aggregate.memory().member_count()
+                )
+            })
     } else if scene == "keyboard-focus" {
         app.focus_panel == crate::FocusPanel::Details
             && app.shell.selected_process_identity().is_some()
@@ -163,6 +196,33 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                 .any(|entry| entry.key == "memory")
     } else {
         true
+    }
+}
+
+pub(crate) fn prepare_users_session_confirmation(app: &mut TuiApp) {
+    app.shell.application.active_page = AppPage::Users;
+    app.selected = 0;
+
+    let session = SessionItem {
+        id: SessionId::new("capture-session-7"),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: String::from("capture-boot"),
+            created_monotonic_usec: 7,
+        }),
+        uid: 1000,
+        user: String::from("capture-user"),
+        seat: Some(String::from("seat0")),
+        tty: Some(String::from("tty1")),
+        remote: false,
+        timestamp: None,
+    };
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::Sessions(Some(vec![session])),
+    );
+
+    if app.open_session_menu() {
+        app.session_menu_select();
     }
 }
 
@@ -189,12 +249,11 @@ pub(super) fn prepare_capture_settings(app: &mut TuiApp, field: usize, change: b
 
 pub(super) fn prepare_expanded_tree(app: &mut TuiApp) {
     app.shell.application.active_page = AppPage::Applications;
-    let _ = seed_shell_process_tree(&mut app.shell);
+    let _ = seed_shell_process_tree_with_partial_aggregate(&mut app.shell);
     app.shell.query = "capture-".into();
     let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
-    for _ in 0..3 {
-        let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
-    }
+    app.selected = 1;
+    app.sync_grouped_application_selection();
 }
 
 pub(super) fn prepare_help(app: &mut TuiApp, end: bool) {
@@ -214,4 +273,15 @@ pub(super) fn prepare_zero_gray(app: &mut TuiApp) {
     app.prefs.gray_zero = true;
     app.shell.query = "k".into();
     let _ = crate::runtime::handle_key(app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+}
+
+pub(super) fn prepare_empty_processes(app: &mut TuiApp) {
+    app.shell.application.active_page = AppPage::Applications;
+    app.shell.query.clear();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::Processes(Some(Vec::new())),
+    );
+    app.selected = 0;
+    app.reconcile_applications_cursor();
 }

@@ -46,6 +46,7 @@ use crate::perf_chart::{
     series_point_runs_windowed, smooth_area_path, smooth_line_path, vertical_area_gradient,
     y_axis_tick_values,
 };
+use crate::text_metrics::measured_text_width;
 use crate::trend_strip::finite_peak;
 
 /// How far the secondary series' color is lifted toward white from the family
@@ -55,6 +56,13 @@ const SECONDARY_TINT_LIFT: f32 = 0.32;
 /// The legend swatch size and the legend label font size.
 const LEGEND_SWATCH: f32 = 8.0;
 const LEGEND_FONT_SIZE: f32 = 10.0;
+
+/// The shaped width of one device-chart legend label, using the same text
+/// metrics as the canvas renderer rather than a per-character estimate.
+#[must_use]
+pub(crate) fn legend_label_width(label: &str) -> f32 {
+    measured_text_width(label, LEGEND_FONT_SIZE)
+}
 
 /// The (primary, secondary) series color pair for one device family: the
 /// family token as-is, and the same token lifted toward white by
@@ -292,7 +300,17 @@ impl canvas::Program<Message> for DeviceMultiChart {
             // horizontal rule + snap dot on its own sample (the primary's
             // rule; the secondary shares the pill's x). A gap in one series
             // never fabricates a mark.
-            if let Some(&value) = primary.samples.get(index).filter(|value| value.is_finite()) {
+            let primary_value = primary
+                .samples
+                .get(index)
+                .copied()
+                .filter(|value| value.is_finite());
+            let secondary_value = secondary
+                .samples
+                .get(index)
+                .copied()
+                .filter(|value| value.is_finite());
+            if let Some(value) = primary_value {
                 draw_hover_sample_mark(
                     frame,
                     size,
@@ -302,11 +320,7 @@ impl canvas::Program<Message> for DeviceMultiChart {
                     grid_color,
                 );
             }
-            if let Some(&value) = secondary
-                .samples
-                .get(index)
-                .filter(|value| value.is_finite())
-            {
+            if let Some(value) = secondary_value {
                 draw_hover_sample_mark(
                     frame,
                     size,
@@ -316,10 +330,14 @@ impl canvas::Program<Message> for DeviceMultiChart {
                     grid_color,
                 );
             }
+            let anchor_y = primary_value
+                .or(secondary_value)
+                .map(|value| scaled_y(value, max, size.height));
             draw_readout_pill(
                 frame,
                 size,
                 x,
+                anchor_y,
                 multi_readout_text(primary, secondary, index, format_value).as_deref(),
                 grid_color,
                 readout,
@@ -389,9 +407,8 @@ fn draw_multi_series(
 }
 
 /// Draw the mini legend top-right: one color swatch + label per series, in
-/// the caller's order (primary first). Text width is the pill's fixed
-/// per-glyph estimate (the canvas has no text measurement without a
-/// renderer) — a layout approximation, not a measured glyph width.
+/// the caller's order (primary first). Text width follows shaped glyph metrics
+/// so proportional and CJK labels reserve their actual horizontal space.
 fn draw_chart_legend(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
@@ -408,10 +425,9 @@ fn draw_chart_legend(
     }
     let swatch_gap = 4.0;
     let entry_gap = 12.0;
-    let text_width = |label: &str| label.chars().count() as f32 * LEGEND_FONT_SIZE * 0.6;
     let total: f32 = entries
         .iter()
-        .map(|(label, _)| LEGEND_SWATCH + swatch_gap + text_width(label) + entry_gap)
+        .map(|(label, _)| LEGEND_SWATCH + swatch_gap + legend_label_width(label) + entry_gap)
         .sum();
     let mut x = (size.width - total - 6.0).max(6.0);
     for (label, color) in entries {
@@ -427,7 +443,7 @@ fn draw_chart_legend(
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
         });
-        x += LEGEND_SWATCH + swatch_gap + text_width(label) + entry_gap;
+        x += LEGEND_SWATCH + swatch_gap + legend_label_width(label) + entry_gap;
     }
 }
 

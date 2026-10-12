@@ -159,7 +159,8 @@ pub use services::{
 pub use session::{SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem};
 pub use setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 pub use smart::self_test::{
-    SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestCapabilities, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,
+    SmartSelfTestReport, SmartSelfTestSupport,
 };
 pub use smart::{AtaSmartAttribute, DiskSmart, SmartProviderFailureKind};
 pub use source::{SourceOutcome, SourceStatus};

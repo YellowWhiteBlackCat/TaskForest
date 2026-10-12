@@ -1,17 +1,86 @@
-//! The honesty unit tests for the insights facet helpers (thread CPU gaps,
-//! unreadable open-file targets, cold-start engine rates, typed unavailable
-//! reasons), extracted from [`super`] so the insights module stays under the
-//! source-size budget. Moved verbatim; the assertions are unchanged.
+//! Honesty and rendered-text tests for the Insights facet helpers (thread CPU
+//! gaps, unreadable open-file targets, cold-start engine rates, typed
+//! unavailable reasons, and mixed Current/Pending/Unavailable facets),
+//! extracted from [`super`] so the insights module stays under the source-size
+//! budget.
 
 const PREVIEW_CAP: usize = 8;
 
 use super::*;
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::{Id, Operation, Tree};
+use iced::{Element, Rectangle, Size};
+use taskmanager_application::i18n::{Language, with_language};
+use taskmanager_application::{
+    ProcessInsightFacet, ProcessInsightFacetState, ProcessInsightUnavailable,
+};
+use taskmanager_assets::embedded_fonts;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::ConnectionState;
 use taskmanager_core::core::process_telemetry::OpenFileKind;
 use taskmanager_core::core::process_telemetry::ThreadState;
 use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_shell::demo_app;
+use taskmanager_shell::fixture::process_insights::process_insights_projection;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_test_support::pin_english;
 use taskmanager_theme::Theme;
+
+#[derive(Default)]
+struct RenderedTextFragments(Vec<(String, Rectangle)>);
+
+impl Operation for RenderedTextFragments {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation)) {
+        visit(self);
+    }
+
+    fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, fragment: &str) {
+        self.0.push((fragment.to_owned(), bounds));
+    }
+}
+
+fn software_renderer() -> iced::Renderer {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        iced::Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer")
+}
+
+fn rendered_text_fragments(
+    element: &mut Element<'_, Message, iced::Theme, iced::Renderer>,
+    renderer: &iced::Renderer,
+) -> Vec<(String, Rectangle)> {
+    let mut tree = Tree::new(&*element);
+    let node = element.as_widget_mut().layout(
+        &mut tree,
+        renderer,
+        &Limits::new(Size::ZERO, Size::new(720.0, 480.0)),
+    );
+    let mut fragments = RenderedTextFragments::default();
+    element
+        .as_widget_mut()
+        .operate(&mut tree, Layout::new(&node), renderer, &mut fragments);
+    fragments.0
+}
+
+fn has_visible_text(fragments: &[(String, Rectangle)], expected: &str) -> bool {
+    fragments
+        .iter()
+        .any(|(fragment, bounds)| fragment == expected && bounds.width > 0.0 && bounds.height > 0.0)
+}
 
 /// Honesty: a thread whose `stat` lacked parseable CPU counters must render
 /// the explicit dash, never a fabricated "0.0s"/"0.0%". These are the same
@@ -202,41 +271,63 @@ fn engine_usage_keeps_a_cold_start_gap_honest() {
     assert!(!xe.contains("1h") && !xe.contains("h "));
 }
 
-/// The typed unavailable message maps reason variants the way the overlay
-/// promises: permission-denied (and escalation-requiring) → "permission
-/// denied", unsupported → "unsupported", anything else → "unavailable".
+/// The typed unavailable message maps reasons to the shared localized copy:
+/// permission-denied/escalation, unsupported-provider, and general unavailable.
 #[test]
 fn facet_unavailable_text_maps_typed_reasons() {
+    pin_english();
     assert_eq!(
         facet_unavailable_text(&ProcessInsightUnavailable::Provider(
             FailureKind::PermissionDenied
         )),
-        "permission denied"
+        "Permission denied"
     );
     assert_eq!(
         facet_unavailable_text(&ProcessInsightUnavailable::Provider(
             FailureKind::RequiresEscalation
         )),
-        "permission denied"
+        "Permission denied"
     );
     assert_eq!(
         facet_unavailable_text(&ProcessInsightUnavailable::Provider(
             FailureKind::Unsupported
         )),
-        "unsupported"
+        "Unsupported by this provider"
     );
     assert_eq!(
         facet_unavailable_text(&ProcessInsightUnavailable::Submission(
             SubmissionErrorKind::UnsupportedCapability
         )),
-        "unsupported"
+        "Unsupported by this provider"
     );
     assert_eq!(
         facet_unavailable_text(&ProcessInsightUnavailable::Provider(
             FailureKind::TemporarilyUnavailable
         )),
-        "unavailable"
+        "Unavailable"
     );
+
+    with_language(Language::Zh, || {
+        assert_eq!(
+            facet_unavailable_text(&ProcessInsightUnavailable::Provider(
+                FailureKind::PermissionDenied
+            )),
+            "权限不足"
+        );
+        assert_eq!(
+            facet_unavailable_text(&ProcessInsightUnavailable::Provider(
+                FailureKind::Unsupported
+            )),
+            "此提供器不支持该指标"
+        );
+        assert_eq!(
+            facet_unavailable_text(&ProcessInsightUnavailable::Provider(
+                FailureKind::TemporarilyUnavailable
+            )),
+            "不可用"
+        );
+    });
+    pin_english();
 }
 
 #[cfg(test)]
@@ -350,58 +441,77 @@ fn format_resource_pair_formats_honestly() {
 }
 
 #[test]
-fn insights_sections_render_all_states_without_panic() {
-    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-
-    let theme = Theme::default();
-
-    // None (initial)
-    let _ = environment_section(&theme, None);
-    let _ = resources_section(&theme, None);
-    let _ = isolation_section(&theme, None);
-    let _ = gpu_devices_section(&theme, None);
-
-    // Pending via tracker
+fn insights_current_resource_facet_renders_beside_pending_and_typed_unavailable_siblings() {
+    pin_english();
+    let theme = Theme::dark();
     let target =
         FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
-    let mut tracker = ProcessInsightsProjection::default();
-    tracker.begin(target.clone(), ProcessInsightsRevision::new(1));
-    let pending = tracker.snapshot().unwrap();
+    let mut mixed = process_insights_projection(target.clone()).expect("fixture insights");
+    mixed.environment = ProcessInsightFacetState::Pending;
+    let unavailable_reason = ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied);
+    mixed.network = ProcessInsightFacetState::Unavailable(unavailable_reason);
 
-    let _ = environment_section(&theme, Some(&pending));
-    let _ = resources_section(&theme, Some(&pending));
-    let _ = isolation_section(&theme, Some(&pending));
-    let _ = gpu_devices_section(&theme, Some(&pending));
-
-    // Unavailable
-    let mut unavailable = pending.clone();
-    unavailable.threads = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
-    );
-    unavailable.open_files = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
-    );
-    unavailable.network = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Provider(FailureKind::RequiresEscalation),
-    );
-    unavailable.gpu = ProcessInsightFacetState::Unavailable(ProcessInsightUnavailable::Provider(
-        FailureKind::Unsupported,
+    assert!(matches!(
+        &mixed.resources,
+        ProcessInsightFacetState::Current(_)
     ));
-    unavailable.resources = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Submission(SubmissionErrorKind::UnsupportedCapability),
+    assert!(matches!(
+        &mixed.environment,
+        ProcessInsightFacetState::Pending
+    ));
+    assert!(matches!(
+        &mixed.network,
+        ProcessInsightFacetState::Unavailable(ProcessInsightUnavailable::Provider(
+            FailureKind::PermissionDenied
+        ))
+    ));
+    assert!(mixed.is_collecting(), "pending siblings remain pending");
+
+    let mut shell = demo_app();
+    seed_projection_fact(
+        &mut shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(mixed))),
     );
-    unavailable.isolation = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Provider(FailureKind::TemporarilyUnavailable),
-    );
-    unavailable.environment = ProcessInsightFacetState::Unavailable(
-        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
+    let renderer = software_renderer();
+
+    let mut current_view = insights_block(&theme, &shell, &target, ProcessInsightFacet::Resources);
+    let current_text = rendered_text_fragments(&mut current_view, &renderer);
+    assert!(has_visible_text(
+        &current_text,
+        "/system.slice/telemetry-worker.scope"
+    ));
+
+    let mut pending_view =
+        insights_block(&theme, &shell, &target, ProcessInsightFacet::Environment);
+    let pending_text = rendered_text_fragments(&mut pending_view, &renderer);
+    assert!(
+        pending_text.iter().any(|(fragment, bounds)| {
+            matches!(fragment.as_str(), "collecting…" | "采集中…")
+                && bounds.width > 0.0
+                && bounds.height > 0.0
+        }),
+        "the Pending sibling must produce visible collecting text: {pending_text:?}"
     );
 
-    let _ = environment_section(&theme, Some(&unavailable));
-    let _ = resources_section(&theme, Some(&unavailable));
-    let _ = isolation_section(&theme, Some(&unavailable));
-    let _ = gpu_devices_section(&theme, Some(&unavailable));
+    let mut unavailable_view =
+        insights_block(&theme, &shell, &target, ProcessInsightFacet::Network);
+    let unavailable_text = rendered_text_fragments(&mut unavailable_view, &renderer);
+    assert!(
+        unavailable_text.iter().any(|(fragment, bounds)| {
+            fragment == "Permission denied" && bounds.width > 0.0 && bounds.height > 0.0
+        }),
+        "the typed PermissionDenied sibling must keep its visible reason: {unavailable_text:?}"
+    );
+
+    let chinese_unavailable_text = with_language(Language::Zh, || {
+        let mut unavailable_view =
+            insights_block(&theme, &shell, &target, ProcessInsightFacet::Network);
+        rendered_text_fragments(&mut unavailable_view, &renderer)
+    });
+    assert!(
+        has_visible_text(&chinese_unavailable_text, "权限不足"),
+        "the typed PermissionDenied sibling must localize its visible reason: {chinese_unavailable_text:?}"
+    );
 }
 
 #[test]

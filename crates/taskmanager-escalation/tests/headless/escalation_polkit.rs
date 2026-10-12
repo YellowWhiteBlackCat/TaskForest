@@ -422,9 +422,10 @@ fn polkit_gate_probe_process_control_is_typed_without_overclaiming() {
 }
 
 #[test]
-fn polkit_gate_probe_smbios_rapl_and_msr_are_typed_without_overclaiming() {
-    // MemorySmbios / PackagePowerRapl / CpuMsr have real filesystem probes
-    // (gate:: probe_smbios_helper / probe_rapl_helper / probe_msr_helper):
+fn polkit_gate_probe_installed_helpers_are_typed_without_overclaiming() {
+    // MemorySmbios / PackagePowerRapl / CpuMsr / StorageSelfTest have real
+    // filesystem probes: an installed crossing reports RequiresEscalation, a
+    // missing one HelperUnavailable, non-Linux Unsupported.
     // an installed crossing reports RequiresEscalation, a missing one
     // HelperUnavailable, non-Linux Unsupported — never Available (a probe
     // escalates nothing).
@@ -433,6 +434,7 @@ fn polkit_gate_probe_smbios_rapl_and_msr_are_typed_without_overclaiming() {
         EscalationFeature::MemorySmbios,
         EscalationFeature::PackagePowerRapl,
         EscalationFeature::CpuMsr,
+        EscalationFeature::StorageSelfTest,
     ] {
         match gate.probe(feature) {
             EscalationAvailability::RequiresEscalation(current) if current == feature => {}

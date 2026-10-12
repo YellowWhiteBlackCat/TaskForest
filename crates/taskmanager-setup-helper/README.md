@@ -12,9 +12,9 @@ and rolls back on failure; it is not a general installer or shell.
 
 ## Contract and verification
 
-Conflict, permission, reload failure, retry, revert and restart outcomes are
-typed. Test the helper in isolation and keep installed-package polkit and
-restart receipts separate from fixture evidence.
+The install/revert vocabulary, the typed outcome set and the fixture-versus-
+receipt separation are specified in
+[`docs/SETUP_ACTIONS.md`](docs/SETUP_ACTIONS.md).
 
 ## Module map
 
@@ -22,3 +22,9 @@ restart receipts separate from fixture evidence.
 src/main.rs   install/revert setup actions (udev rules, pkexec; idempotent,
               bounded atomic steps with rollback)
 ```
+
+## Docs
+
+- [`docs/SETUP_ACTIONS.md`](docs/SETUP_ACTIONS.md) — the install/revert vocabulary, atomic
+  steps with rollback and verification.
+- [ADR-040](../../adr/040-optional-setup-discovery.md) — optional setup discovery.

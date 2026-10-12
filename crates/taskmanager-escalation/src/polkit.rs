@@ -494,6 +494,12 @@ pub use msr::{
     MsrHelperError, MsrHelperErrorKind, MsrHelperOutcome, MsrHelperProcess, MsrPackageReading,
     MsrReadoutSuccess, PkexecMsrHelper, invoke_msr_helper, invoke_msr_helper_with,
 };
+mod smart_self_test;
+pub use smart_self_test::{
+    PkexecSmartSelfTestHelper, SmartSelfTestHelperFailure, SmartSelfTestHelperOutcome,
+    SmartSelfTestHelperProcess, SmartSelfTestHelperRequest, invoke_smart_self_test_helper,
+    invoke_smart_self_test_helper_with,
+};
 
 /// Cap a non-contract stdout in a detail string so a giant/garbage blob does
 /// not balloon the diagnostic. Cuts at the newest UTF-8 char boundary at or

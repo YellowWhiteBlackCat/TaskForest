@@ -19,7 +19,7 @@ pub(crate) fn curve_card_scene(
 ) -> impl Scene + use<> {
     let title = curve.title();
     let caption = curve_caption(shell, curve);
-    let strip_height = palette.control_height_px * 3.0;
+    let strip_height = palette.control_height_px() * 3.0;
     let samples = curve_samples(shell, curve);
     // The polyline is the only curve render path (M2): the bounded,
     // gap-aware projection feeds rotated 2px segments — the same visual
@@ -49,7 +49,7 @@ pub(crate) fn curve_card_scene(
     bsn! {
         Node {
             flex_grow: 1.0,
-            min_width: px(palette.control_height_px * 6.0),
+            min_width: rem(palette.control_height_rem * 6.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_2()),
             padding: UiRect::all(Val::Px(space_2())),
@@ -167,7 +167,7 @@ pub(super) fn collecting_overlay_scene(caption: String, palette: &UiPalette) -> 
 
                 Node {
                     padding: UiRect::horizontal(Val::Px(space_8())),
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     align_items: AlignItems::Center,
                     border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
                 }

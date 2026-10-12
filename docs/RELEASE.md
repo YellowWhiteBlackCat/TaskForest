@@ -21,14 +21,11 @@ Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
 四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台
-的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed
-`Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency` 或
-`TemporarilyUnavailable` 呈现（这五个是 `platform-contract::CapabilityStatus` 的真实变体名）；
-`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 是不同轴，不得
-混用。平台按 typed 原因诚实降级是产品承诺的一部分，不得用空值、静态占位或未接线按钮把它写成
-正式版功能。能力身份承诺面由产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明：runtime
-catalog 为每个平台未注册的期望身份发布 typed 缺席 descriptor（`Unsupported`、无 provider
-归属），"无条目"不是合法的产品答案；机制与不可逆性见
+的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以
+typed 能力状态作答（五种 `CapabilityStatus` 不可用变体与两轴规则见
+[GLOSSARY](GLOSSARY.md)），不得用空值、静态占位或未接线按钮把它写成正式版功能。能力身份
+承诺面（`CapabilityId::EXPECTED_SURFACE`）的作答机制见
+[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 与
 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 
 只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应

@@ -2,6 +2,9 @@
 
 use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px, size};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_ui::data::table::{
+    COLUMN_RESIZE_KEYBOARD_STEP, COLUMN_RESIZE_MAX_WIDTH, COLUMN_RESIZE_MIN_WIDTH,
+};
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use crate::gpui_app::root::TopPage;
@@ -140,6 +143,95 @@ async fn apps_column_edge_drag_updates_the_live_width(cx: &mut TestAppContext) {
     assert!(
         view.read_with(cx, |v, _| v.processes_state.resize_anchor_x.is_none()),
         "releasing outside the window must close the page adapter's drag session"
+    );
+}
+
+/// The Apps page uses the shared column resize actions as well as its typed
+/// process-width adapter. Keyboard steps must update the live SortCol width and
+/// honor the same lower/upper bounds as pointer drag.
+#[gpui::test]
+async fn apps_column_resize_handle_steps_width_within_declared_bounds(cx: &mut TestAppContext) {
+    let (win, view) = super::wrapped_root(cx);
+    cx.simulate_window_resize(win.into(), size(px(1280.0), px(720.0)));
+    view.update(cx, |view, cx| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.processes_state.hidden_cols.clear();
+        view.replace_processes_for_test(
+            (1..=8)
+                .map(|pid| {
+                    ProcessItemFixtureBuilder::new()
+                        .pid(pid)
+                        .name(format!("keyboard-resize-worker-{pid}"))
+                        .build()
+                })
+                .collect(),
+        );
+        view.resize_proc_col(
+            SortCol::Cpu,
+            px(COLUMN_RESIZE_MIN_WIDTH + COLUMN_RESIZE_KEYBOARD_STEP),
+            cx,
+        );
+        cx.notify();
+    });
+    super::draw(cx, win);
+
+    let mut visual = VisualTestContext::from_window(win.into(), cx);
+    let handle = visual
+        .debug_bounds("tm-proc-resize-h:6")
+        .expect("the visible CPU column must mount its shared resize control");
+    assert!(handle.size.width > px(0.0) && handle.size.height > px(0.0));
+    let focus_handle = view.read_with(cx, |view, _| {
+        view.processes_state
+            .resize_focus_handles
+            .get(&SortCol::Cpu)
+            .cloned()
+            .expect("each resizable process column owns a stable focus target")
+    });
+    visual.update(|window, _| focus_handle.focus(window));
+    assert!(
+        visual.update(|window, _| focus_handle.is_focused(window)),
+        "the process resize control must accept keyboard focus"
+    );
+
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
+        px(COLUMN_RESIZE_MIN_WIDTH),
+        "Left must shrink the process CPU column to its declared minimum"
+    );
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
+        px(COLUMN_RESIZE_MIN_WIDTH),
+        "Left at the minimum must not move the process column below its bound"
+    );
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
+        px(COLUMN_RESIZE_MIN_WIDTH + COLUMN_RESIZE_KEYBOARD_STEP),
+        "Right must expand the same live process column by one shared step"
+    );
+
+    view.update(cx, |view, cx| {
+        view.resize_proc_col(
+            SortCol::Cpu,
+            px(COLUMN_RESIZE_MAX_WIDTH - COLUMN_RESIZE_KEYBOARD_STEP),
+            cx,
+        );
+    });
+    super::draw(cx, win);
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
+        px(COLUMN_RESIZE_MAX_WIDTH),
+        "Right must saturate at the declared process-column maximum"
+    );
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
+        px(COLUMN_RESIZE_MAX_WIDTH),
+        "Right at the maximum must not move the process column beyond its bound"
     );
 }
 

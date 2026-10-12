@@ -35,6 +35,7 @@ use taskmanager_core::core::sensors::{
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
+use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
 
@@ -61,7 +62,14 @@ pub(super) fn render_fan_section(
         return;
     }
     let Some(sensors) = sensors else {
-        super::render_empty_panel(frame, theme, area, t("common.fan"), t("fan.empty"));
+        StatePanel::render(
+            frame,
+            theme,
+            area,
+            t("common.fan"),
+            StatePanelKind::Message,
+            t("fan.empty"),
+        );
         return;
     };
     let mut filtered = sensors.clone();
@@ -87,7 +95,14 @@ pub(super) fn render_fan_section(
         .iter()
         .any(|reading| reading.quantity() == &SensorQuantity::Temperature);
     if !has_fans && !has_temperatures {
-        super::render_empty_panel(frame, theme, area, t("common.fan"), t("fan.empty"));
+        StatePanel::render(
+            frame,
+            theme,
+            area,
+            t("common.fan"),
+            StatePanelKind::Message,
+            t("fan.empty"),
+        );
         return;
     }
     let block = super::panel(t("common.fan"), theme);

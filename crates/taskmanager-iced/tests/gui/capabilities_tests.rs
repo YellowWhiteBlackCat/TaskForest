@@ -24,8 +24,10 @@ fn declaration_is_total_and_every_difference_is_registered() {
 
 /// The registered divergences are exactly the known architecture drivers —
 /// this pins the set so a new divergence cannot appear silently. Text
-/// selection keeps its registered keyboard/block-selection differences, while
-/// the footer feedback line remains the one deliberate toast divergence.
+/// selection keeps its registered keyboard/block-selection differences, the
+/// footer feedback line remains the toast divergence, Tooltip records the
+/// native Iced hover-only trigger and dismissal boundary, and DropdownMenu
+/// records Iced's captured outside press.
 #[test]
 fn the_registered_divergences_are_exactly_the_known_drivers() {
     let declaration = capability_declaration();
@@ -35,7 +37,42 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(divergent, ["toast", "text-selection"]);
+    assert_eq!(
+        divergent,
+        ["dropdown-menu", "tooltip", "toast", "text-selection"]
+    );
+}
+
+#[test]
+fn dropdown_menu_divergence_records_outside_press_capture() {
+    let declaration = capability_declaration();
+    let dropdown = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.capability == ComponentCapability::DropdownMenu)
+        .expect("DropdownMenu capability is registered");
+    assert!(matches!(
+        dropdown.support,
+        CapabilitySupport::Divergent { reason }
+            if reason == "Iced captures the outside dismissal press so the background target does not activate; GPUI forwards that same press to the background target"
+    ));
+}
+
+#[test]
+fn tooltip_divergence_records_the_native_interaction_boundary() {
+    let declaration = capability_declaration();
+    let tooltip = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.capability == ComponentCapability::Tooltip)
+        .expect("Tooltip capability is registered");
+    assert!(matches!(
+        tooltip.support,
+        CapabilitySupport::Divergent { reason }
+            if reason == "Iced widget::tooltip opens immediately on pointer hover and closes on \
+                          pointer exit; it has no keyboard-focus trigger and ignores \
+                          pointer-click and Escape dismissal"
+    ));
 }
 
 #[test]
@@ -54,7 +91,10 @@ fn every_capability_is_classified_correctly() {
                     "Scrollbar must be Native via iced scrollable"
                 );
             }
-            ComponentCapability::Toast | ComponentCapability::TextSelection => {
+            ComponentCapability::Tooltip
+            | ComponentCapability::Toast
+            | ComponentCapability::TextSelection
+            | ComponentCapability::DropdownMenu => {
                 assert!(
                     matches!(entry.support, CapabilitySupport::Divergent { reason } if !reason.is_empty()),
                     "{capability:?} must be Divergent with a non-empty reason"

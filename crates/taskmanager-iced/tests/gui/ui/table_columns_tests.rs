@@ -5,10 +5,12 @@
 //! flexible remainder column, and the sticky-header body window keeps the
 //! clamped, prefix-free geometry.
 
-use super::{ColumnWidth, VirtualWindow, virtual_table};
+use super::ColumnWidth;
 use crate::app::Message;
 use iced::Element;
 use taskmanager_shell::SortCol;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::virtual_table;
 
 use crate::ui::applications::rows::visible_column_elements;
 use crate::ui::applications::{

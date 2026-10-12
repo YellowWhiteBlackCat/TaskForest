@@ -15,7 +15,8 @@
 #
 # Prerequisites: release binaries must exist under target/release —
 # taskforest-g, taskmanager-setup-helper,
-# taskmanager-privilege-helper, taskmanager-net-launcher,
+# taskmanager-privilege-helper, taskmanager-smart-self-test-helper,
+# taskmanager-net-launcher,
 # taskmanager-process-control-helper, taskmanager-smbios-helper,
 # taskmanager-rapl-helper, and taskmanager-msr-helper (the PKGBUILD build()
 # set) — plus python3, which regenerates the third-party notices file.

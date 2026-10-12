@@ -16,7 +16,7 @@ use bevy::ecs::{
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::{
-    AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, Val, percent, px,
+    AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, Val, percent, px, rem,
 };
 use bevy::ui_widgets::{Activate, Button};
 use bevy::window::{PrimaryWindow, Window};
@@ -58,7 +58,7 @@ fn toggle(
     state.0 = state.0.toggled();
 }
 pub(crate) fn button(palette: &UiPalette) -> impl Scene + use<> {
-    bsn! {Node {width:px(palette.control_height_px*1.4),height:px(palette.control_height_px*1.4),align_items:AlignItems::Center,justify_content:JustifyContent::Center} Button NavigationToggle on(activate)
+    bsn! {Node {width:rem(palette.control_height_rem*1.4),height:rem(palette.control_height_rem*1.4),align_items:AlignItems::Center,justify_content:JustifyContent::Center} Button NavigationToggle on(activate)
     crate::tooltip::TooltipText({t("navigation.toggle").to_owned()})
     Children [@{crate::icons::icon_scene(IconId::Sidebar,18.0,palette.dim_color)} Pickable::IGNORE]}
 }

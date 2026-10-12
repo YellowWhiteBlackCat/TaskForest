@@ -12,7 +12,7 @@ use gpui::{
 };
 use taskmanager_theme::Palette;
 
-use crate::overlays::popup::PopupMenuState;
+use crate::overlays::popup::{DROPDOWN_TRIGGER_CONTEXT, DropdownTriggerActivate, PopupMenuState};
 
 /// Dropdown state (element state entity, held across frames).
 struct DropdownMenuState {
@@ -155,11 +155,27 @@ impl<E: StatefulInteractiveElement + ParentElement + Element + 'static> Element
         // The trigger is focusable (tab stop); gpui's default focused
         // element behavior dispatches a click on Enter/Space (KeyUp), so the
         // keyboard path and the mouse path converge on `toggle` below.
+        let focus_handle = state.read_with(cx, |state, _| state.focus_handle.clone());
+        let element = element.track_focus(&focus_handle);
+        let element = if open {
+            element
+        } else {
+            element.key_context(DROPDOWN_TRIGGER_CONTEXT).on_action({
+                let open_menu = open_menu.clone();
+                move |_: &DropdownTriggerActivate, window, cx| open_menu(window, cx)
+            })
+        };
         let element = element
-            .track_focus(&state.read_with(cx, |state, _| state.focus_handle.clone()))
             .on_click({
                 let toggle = toggle.clone();
-                move |_event: &ClickEvent, window, cx| toggle(window, cx)
+                move |event: &ClickEvent, window, cx| {
+                    // Trigger keyboard activation has an explicit context
+                    // action. Ignore GPUI's synthetic keyboard ClickEvent so
+                    // the keyup after opening/closing cannot toggle twice.
+                    if matches!(event, ClickEvent::Mouse(_)) {
+                        toggle(window, cx);
+                    }
+                }
             })
             // Right-click opens the menu only when it lands ON the trigger
             // itself (native context-menu semantics). Previously this used

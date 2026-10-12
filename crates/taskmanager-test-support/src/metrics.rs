@@ -15,6 +15,7 @@ use crate::{GroupBaseOpen, NamedOverrides};
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
 use taskmanager_core::core::smart::SmartProviderFailureKind;
+use taskmanager_core::core::smart::SmartSelfTestCapabilities;
 use taskmanager_core::core::storage::{StorageConnection, StorageIdentityStability};
 
 const FIXTURE_OBSERVED_AT: u64 = 1;
@@ -157,6 +158,11 @@ impl<ScalarStage> DiskMetricsFixtureBuilder<ScalarStage> {
     #[must_use]
     pub fn smart_availability(mut self, value: SmartAvailability) -> Self {
         self.item.smart_availability = value;
+        self
+    }
+    #[must_use]
+    pub fn smart_self_test_capabilities(mut self, value: SmartSelfTestCapabilities) -> Self {
+        self.item.smart_self_test_capabilities = value;
         self
     }
     #[must_use]

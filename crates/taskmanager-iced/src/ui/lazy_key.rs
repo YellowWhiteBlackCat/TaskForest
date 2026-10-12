@@ -30,10 +30,9 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 use taskmanager_theme::Theme;
-
-use super::virtual_list::VirtualWindow;
 
 /// One lazy-body invalidation key under construction. Cheap; build, chain,
 /// [`Self::finish`].

@@ -31,10 +31,11 @@ use bevy::DefaultPlugins;
 use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup};
 use bevy::asset::{Assets, Handle};
 use bevy::camera::{Camera2d, ClearColor};
+use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::component::Component;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::{Changed, Has, Or, With};
+use bevy::ecs::query::{Changed, Has, Or, With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
@@ -42,7 +43,7 @@ use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, bsn};
 use bevy::text::{Font, FontSource, TextColor, TextFont};
 use bevy::ui::Pressed;
-use bevy::ui::prelude::BackgroundColor;
+use bevy::ui::prelude::{BackgroundColor, EmSize, Node, RemSize};
 use bevy::ui::widget::Text;
 use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
@@ -54,11 +55,12 @@ use capture_state::{initialize_capture_state, is_demo, is_production};
 
 use taskmanager_assets::product;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 pub(crate) mod chrome;
 use chrome::app_shell_scene;
 mod appearance;
-use appearance::demo_theme_from_env;
+use appearance::{demo_theme_from_env, demo_ui_size_from_env};
 
 use crate::app::{AppShellPlugin, Route};
 use crate::capture::{capture_page, capture_scenario_target, capture_window_resolution};
@@ -182,7 +184,15 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
     } else {
         Theme::dark()
     };
-    let palette = palette::ui_palette(&theme);
+    // Cold start resolves the readability-first Standard ladder; production
+    // re-resolves from the persisted config in the Startup restore (before
+    // the first frame), captures select a step through `TM_UI_SIZE`.
+    let ui_size = if demo {
+        demo_ui_size_from_env()
+    } else {
+        UiSize::Standard
+    };
+    let palette = palette::ui_palette(&theme, ui_size);
     let mut app = App::new();
     if demo {
         app.insert_resource(DemoMode);
@@ -302,9 +312,12 @@ impl Plugin for FrontendWindowPlugin {
         // production adds the non-send connector runtime below, while
         // headless compositions remain honestly Disabled.
         app.init_resource::<HistoryProjectionResource>();
+        app.init_resource::<RemSize>();
         app.init_resource::<PerformanceLayoutState>().add_systems(
             PostUpdate,
             (
+                sync_rem_size,
+                sync_node_em_size,
                 sync_performance_layout,
                 sync_control_visuals,
                 crate::widgets::table::paint_zero_values,
@@ -433,6 +446,33 @@ fn style_text_role(
         ..font
     };
     ink.0 = color;
+}
+
+/// Keep the window's `RemSize` resource on the live palette's UI-size step.
+/// The palette is the single rem authority; every `rem(...)` Val and
+/// `FontSize::Rem` in every scene resolves against this one resource, so a
+/// settings choice re-scales the whole surface without touching a scene.
+fn sync_rem_size(palette: Res<WindowPalette>, mut rem: ResMut<RemSize>) {
+    if palette.inner.rem_px != rem.0 {
+        rem.0 = palette.inner.rem_px;
+    }
+}
+
+/// Pin `EmSize` on text-less nodes to the live rem size. `Val::Rem` on a node
+/// without a `TextFont` resolves against its `EmSize`, which the engine
+/// defaults to the engine-default rem size and never tracks `RemSize`; text
+/// bearing nodes recompute their own `EmSize` from `FontSize::Rem` and are
+/// skipped here.
+fn sync_node_em_size(
+    rem: Res<RemSize>,
+    mut nodes: Query<&mut EmSize, (With<Node>, Without<TextFont>)>,
+) {
+    if !rem.is_changed() {
+        return;
+    }
+    for mut em in &mut nodes {
+        em.0 = rem.0;
+    }
 }
 
 /// Interactive controls whose interaction or selected state changed this

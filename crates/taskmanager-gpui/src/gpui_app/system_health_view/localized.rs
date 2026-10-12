@@ -2,9 +2,9 @@
 
 use taskmanager_application::i18n;
 use taskmanager_core::core::{
-    DeviceStatus, FilesystemHealthStatus, SmartSelfTestFailure, SmartSelfTestKind,
-    SmartSelfTestPhase,
+    DeviceStatus, FilesystemHealthStatus, SmartSelfTestKind, SmartSelfTestPhase,
 };
+use taskmanager_shell::presentation::smart::smart_self_test_failure_i18n_key;
 
 use super::{SensorGroup, SystemHealthText};
 
@@ -56,20 +56,7 @@ pub fn localized_text(text: SystemHealthText) -> String {
         SystemHealthText::SmartKind(SmartSelfTestKind::Short) => "health.kind_short",
         SystemHealthText::SmartKind(SmartSelfTestKind::Extended) => "health.kind_extended",
         SystemHealthText::SmartKind(SmartSelfTestKind::Conveyance) => "health.kind_conveyance",
-        SystemHealthText::SmartFailure(SmartSelfTestFailure::InvalidDevice) => {
-            "health.failure_invalid_device"
-        }
-        SystemHealthText::SmartFailure(SmartSelfTestFailure::MissingTool) => "device.missing_tool",
-        SystemHealthText::SmartFailure(SmartSelfTestFailure::RequiresEscalation) => {
-            "device.requires_escalation"
-        }
-        SystemHealthText::SmartFailure(SmartSelfTestFailure::PermissionDenied) => {
-            "device.permission_denied"
-        }
-        SystemHealthText::SmartFailure(
-            SmartSelfTestFailure::ProviderUnavailable | SmartSelfTestFailure::TimedOut,
-        ) => "health.failure_provider_unavailable",
-        SystemHealthText::SmartFailure(SmartSelfTestFailure::Rejected) => "health.failure_rejected",
+        SystemHealthText::SmartFailure(failure) => smart_self_test_failure_i18n_key(failure),
     };
     i18n::t(key).to_string()
 }

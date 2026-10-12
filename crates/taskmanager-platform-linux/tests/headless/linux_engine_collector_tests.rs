@@ -4,6 +4,7 @@ use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::smart::DiskSmart;
+use taskmanager_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]
@@ -26,6 +27,10 @@ fn apply_smart_copies_availability_with_optional_fields() {
         power_on_hours: None,
         unsafe_shutdowns: None,
         ata_attributes: None,
+        self_test_capabilities: SmartSelfTestCapabilities {
+            short: SmartSelfTestSupport::Supported,
+            ..Default::default()
+        },
     };
     let mut disk = DiskMetricsFixtureBuilder::new()
         .smart_availability(SmartAvailability::Available)
@@ -36,6 +41,10 @@ fn apply_smart_copies_availability_with_optional_fields() {
 
     assert_eq!(disk.smart_availability, SmartAvailability::MissingTool);
     assert_eq!(disk.smart_temperature_c, None);
+    assert_eq!(
+        disk.smart_self_test_capabilities.short,
+        SmartSelfTestSupport::Supported
+    );
     assert_eq!(
         disk.smart_provider
             .as_ref()

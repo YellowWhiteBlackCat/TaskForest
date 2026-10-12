@@ -45,31 +45,35 @@ pub(crate) fn gpu_subtitle(gpu: &GpuMetrics) -> String {
         .to_owned()
 }
 
-/// The GPU page's undroppable one-line VRAM fact (GPUI `gpu_vram_vital_line`
-/// parity): dedicated then shared used/total pairs, honest dashes for
-/// uncollected halves.
+/// The GPU page's one-line VRAM fact (GPUI `gpu_vram_vital_line` parity):
+/// dedicated then shared used/total pairs, honest dashes for an uncollected
+/// sibling pair. Omit the line when neither pair has a usable total.
 #[must_use]
-pub(crate) fn gpu_vram_vital_line(gpu: &GpuMetrics, units: UnitPrefs) -> String {
+pub(crate) fn gpu_vram_vital_line(gpu: &GpuMetrics, units: UnitPrefs) -> Option<String> {
     let observed = super::projection::GpuObservation::from(gpu);
     let pair = |used: Option<u64>, total: Option<u64>| match (used, total) {
-        (Some(used), Some(total)) => format!(
+        (Some(used), Some(total)) if total > 0 => Some(format!(
             "{} / {}",
             quantity_text_pref(used, units.use_bytes, units.use_base2),
             quantity_text_pref(total, units.use_bytes, units.use_base2),
-        ),
-        _ => missing_value(),
+        )),
+        _ => None,
     };
-    format!(
-        "{} · {}",
-        pair(
-            observed.dedicated_vram_used_bytes,
-            observed.dedicated_vram_total_bytes
-        ),
-        pair(
-            observed.shared_vram_used_bytes,
-            observed.shared_vram_total_bytes
-        ),
-    )
+    let dedicated = pair(
+        observed.dedicated_vram_used_bytes,
+        observed.dedicated_vram_total_bytes,
+    );
+    let shared = pair(
+        observed.shared_vram_used_bytes,
+        observed.shared_vram_total_bytes,
+    );
+    (dedicated.is_some() || shared.is_some()).then(|| {
+        format!(
+            "{} · {}",
+            dedicated.unwrap_or_else(missing_value),
+            shared.unwrap_or_else(missing_value),
+        )
+    })
 }
 
 /// Project one GPU's honest scalar readouts as pre-folded shell [`StatRow`]s
@@ -82,7 +86,7 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
     let observed = super::projection::GpuObservation::from(gpu);
     let mut rows = vec![
         StatRow::text(
-            t("device.status"),
+            format!("{} {}", t("common.gpu"), t("device.status")),
             Some(t(device_status_i18n_key(gpu.device_state.status)).to_string()),
         ),
         StatRow::text(
@@ -282,6 +286,61 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         ));
     }
     rows
+}
+
+/// Add only on-demand engine rows that are not already present in the
+/// provider's shared GPU projection. The graph inventory and base summary use
+/// `gpu.engines`; the active request may overlap that list or add extra rows.
+pub(crate) fn append_gpu_engine_stats(
+    gpu: &GpuMetrics,
+    engine_rows: &GpuEngineRowsPresentation<'_>,
+    expanded: bool,
+    stats: &mut Vec<StatRow>,
+) {
+    match engine_rows {
+        GpuEngineRowsPresentation::Active(engines) => {
+            if engines.is_empty() && !expanded {
+                // When expanded, the graph panel itself owns this message.
+                stats.push(StatRow::text(
+                    t("gpu.per_engine_title"),
+                    Some(t("gpu.engines_none_reported").to_string()),
+                ));
+            }
+            let mut seen: Vec<String> = gpu
+                .engines
+                .iter()
+                .filter(|engine| !engine.name.trim().is_empty() && engine.usage_pct.is_finite())
+                .map(|engine| engine.name.clone())
+                .collect();
+            for engine in *engines {
+                if engine.name.trim().is_empty()
+                    || !engine.utilization_pct.is_finite()
+                    || seen.contains(&engine.name)
+                {
+                    continue;
+                }
+                stats.push(StatRow::text(
+                    engine.name.clone(),
+                    Some(format!("{:.0}%", engine.utilization_pct.round())),
+                ));
+                seen.push(engine.name.clone());
+            }
+        }
+        presentation => {
+            if let Some(message_key) = presentation.message_key() {
+                stats.push(StatRow::text(
+                    t("gpu.per_engine_title"),
+                    Some(t(message_key).to_string()),
+                ));
+                if matches!(presentation, GpuEngineRowsPresentation::MissingDependency) {
+                    stats.push(StatRow::text(
+                        "",
+                        Some(t("gpu.engines_install_hint").to_string()),
+                    ));
+                }
+            }
+        }
+    }
 }
 
 pub(crate) fn gpu_percent_readout(value: Option<f32>) -> String {
@@ -503,14 +562,7 @@ pub(crate) fn gpu_engines_panel<'a>(
     .spacing(6)
     .align_y(iced::Alignment::Center);
 
-    let mut header_items = vec![header_title.into()];
-    if let Some(toggle) =
-        engine_graph::engine_rows_toggle_section(theme_snapshot, engine_rows.action())
-    {
-        header_items.push(iced::widget::Space::new().width(iced::Length::Fill).into());
-        header_items.push(toggle);
-    }
-    let header = iced::widget::row(header_items)
+    let header = header_title
         .width(iced::Length::Fill)
         .align_y(iced::Alignment::Center);
 
@@ -518,19 +570,16 @@ pub(crate) fn gpu_engines_panel<'a>(
 
     if expanded {
         if engine_items.is_empty() {
-            let msg = if let Some(key) = engine_rows.message_key() {
-                t(key).to_string()
-            } else {
-                t("gpu.engines_none_reported").to_string()
-            };
-            panel_col.push(
-                iced::widget::text(msg)
-                    .size(f32::from(tokens::FONT_11))
-                    .style(move |_| iced::widget::text::Style {
-                        color: Some(theme::muted_text_color(theme_snapshot)),
-                    })
-                    .into(),
-            );
+            if matches!(engine_rows, GpuEngineRowsPresentation::Active(_)) {
+                panel_col.push(
+                    iced::widget::text(t("gpu.engines_none_reported"))
+                        .size(f32::from(tokens::FONT_11))
+                        .style(move |_| iced::widget::text::Style {
+                            color: Some(theme::muted_text_color(theme_snapshot)),
+                        })
+                        .into(),
+                );
+            }
         } else {
             let mut engine_bars: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
                 Vec::new();

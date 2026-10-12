@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -42,12 +43,18 @@ FRONTEND_SCRIPTS = {
     ),
     "tui": (
         "scripts/capture-tui.sh",
+        "scripts/capture_tui_scenarios.tsv",
+        "scripts/capture_tui_terminal_env.sh",
+        "scripts/capture_tui_terminal_profiles.py",
+        "scripts/capture_tui_terminal_profiles.tsv",
         "scripts/private-session.conf",
         "scripts/capture_supervisor.py",
         "scripts/capture_build.py",
         "scripts/capture_publish.py",
         "scripts/capture-reclaim.sh",
         "scripts/validate_tui_evidence.py",
+        "scripts/validate_tui_health_review_events.py",
+        "scripts/validate_tui_apps_empty.py",
         "scripts/validate_capture_evidence.py",
     ),
     "iced": (
@@ -130,7 +137,7 @@ def digest(path: Path) -> str:
 
 def workspace_packages(root: Path) -> dict[str, dict]:
     output = subprocess.run(
-        ["cargo", "metadata", "--format-version", "1", "--no-deps", "--locked"],
+        ["cargo", "metadata", "--format-version", "1", "--locked"],
         cwd=root,
         check=True,
         text=True,
@@ -138,7 +145,41 @@ def workspace_packages(root: Path) -> dict[str, dict]:
         timeout=60,
     )
     metadata = json.loads(output.stdout)
-    return {package["name"]: package for package in metadata["packages"]}
+    packages = {}
+    for package in metadata["packages"]:
+        source = package.get("source")
+        if source is not None and not source.startswith("git+"):
+            continue
+        previous = packages.get(package["name"])
+        if previous and previous["manifest_path"] != package["manifest_path"]:
+            raise ValueError(f"ambiguous package owner: {package['name']}; align shared Git revisions")
+        packages[package["name"]] = package
+    pending = list(packages.values())
+    seen_manifests = {Path(package["manifest_path"]).resolve() for package in pending}
+    cursor = 0
+    while cursor < len(pending):
+        package = pending[cursor]
+        cursor += 1
+        for dependency in package["dependencies"]:
+            if dependency.get("kind") not in (None, "normal") or not dependency.get("path"):
+                continue
+            manifest = (Path(dependency["path"]) / "Cargo.toml").resolve()
+            if manifest in seen_manifests:
+                continue
+            output = subprocess.run(
+                ["cargo", "metadata", "--format-version", "1", "--no-deps", "--locked", "--manifest-path", str(manifest)],
+                cwd=root, check=True, text=True, capture_output=True, timeout=60,
+            )
+            for local in json.loads(output.stdout)["packages"]:
+                local_manifest = Path(local["manifest_path"]).resolve()
+                existing = packages.get(local["name"])
+                if existing and Path(existing["manifest_path"]).resolve() != local_manifest:
+                    raise ValueError(f"ambiguous local package owner: {local['name']}")
+                if local_manifest not in seen_manifests:
+                    seen_manifests.add(local_manifest)
+                    packages[local["name"]] = local
+                    pending.append(local)
+    return packages
 
 
 def package_scope(root: Path, packages: dict[str, dict], frontend: str) -> set[str]:
@@ -182,6 +223,16 @@ def source_paths(root: Path, frontend: str) -> list[Path]:
         manifest = Path(packages[package_name]["manifest_path"]).resolve()
         paths.add(manifest)
         package_root = manifest.parent
+        if not package_root.is_relative_to(root):
+            for parent in package_root.parents:
+                workspace_manifest = parent / "Cargo.toml"
+                if workspace_manifest.is_file():
+                    paths.add(workspace_manifest)
+                    for name in ("rust-toolchain.toml", ".cargo/config.toml"):
+                        path = parent / name
+                        if path.is_file():
+                            paths.add(path)
+                    break
         # Every walked package is a workspace member whose `src` tree affects
         # the selected product's receipt.
         source_root = package_root / "src"
@@ -200,12 +251,17 @@ def source_paths(root: Path, frontend: str) -> list[Path]:
     generator = root / "scripts" / "frontend_source_manifest.py"
     if generator.is_file():
         paths.add(generator)
-    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+    return sorted(paths, key=lambda path: source_name(root, path))
+
+
+def source_name(root: Path, path: Path) -> str:
+    """Portable labels also cover Cargo-declared sibling path dependencies."""
+    return Path(os.path.relpath(path, root)).as_posix()
 
 
 def write_manifest(root: Path, frontend: str, output: Path) -> int:
     paths = source_paths(root, frontend)
-    lines = [f"{digest(path)}  {path.relative_to(root).as_posix()}" for path in paths]
+    lines = [f"{digest(path)}  {source_name(root, path)}" for path in paths]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"frontend source scope: {frontend} ({len(lines)} files)")
@@ -221,6 +277,18 @@ def self_test() -> int:
         with patch(__name__ + ".source_paths", return_value=[source]):
             assert write_manifest(root, "gpui", output) == 0
             assert output.read_text(encoding="utf-8") == f"{digest(source)}  source.rs\n"
+        sibling = root / "libs" / "shared" / "src.rs"
+        sibling.parent.mkdir(parents=True)
+        sibling.write_text("pub fn shared() {}\n", encoding="utf-8")
+        product = root / "product"
+        product.mkdir()
+        with patch(__name__ + ".source_paths", return_value=[sibling]):
+            assert write_manifest(product, "iced", output) == 0
+            original = output.read_text(encoding="utf-8")
+            assert original == f"{digest(sibling)}  ../libs/shared/src.rs\n"
+            sibling.write_text("pub fn changed() {}\n", encoding="utf-8")
+            assert write_manifest(product, "iced", output) == 0
+            assert original != output.read_text(encoding="utf-8")
     assert FRONTEND_PACKAGES["gpui"] == "taskmanager-gpui"
     assert FRONTEND_PACKAGES["tui"] != FRONTEND_PACKAGES["iced"]
     assert FRONTEND_PACKAGES["bevy"] == "taskmanager-bevy-ui"

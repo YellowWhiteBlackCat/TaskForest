@@ -28,7 +28,7 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         palette.nav_active_ink
     };
     let width = space_24() * 10.0;
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {
@@ -118,7 +118,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
              Node { flex_grow: 1.0 } --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -142,7 +142,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -166,7 +166,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -190,7 +190,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -214,7 +214,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -238,7 +238,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -342,7 +342,7 @@ pub(super) fn service_row_scene(
     };
     let chip = chip_fill(service_chip(row.status), palette);
     let target = row.target.clone();
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let name_width = widths[0].width_px;
     let status_width = widths[1].width_px;

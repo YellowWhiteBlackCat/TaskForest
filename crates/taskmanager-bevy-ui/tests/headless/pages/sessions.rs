@@ -11,6 +11,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -155,7 +156,7 @@ fn headless_sessions_app() -> (App, Arc<ScriptedEvents>) {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime,
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     (app, events)
@@ -214,7 +215,7 @@ fn status_line(app: &mut App) -> String {
 }
 
 fn selected_row_target(app: &mut App) -> Option<String> {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let highlight = palette.nav_active_bg.to_srgba();
     app.world_mut()
         .query_filtered::<(&SessionsRowMarker, &BackgroundColor), ()>()

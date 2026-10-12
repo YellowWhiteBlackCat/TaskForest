@@ -7,6 +7,8 @@
 
 #[path = "tests/binding_matrix.rs"]
 mod binding_matrix;
+#[path = "tests/capability_behavior.rs"]
+mod capability_behavior;
 #[path = "tests/chart_cursor.rs"]
 mod chart_cursor;
 #[path = "tests/clipboard.rs"]

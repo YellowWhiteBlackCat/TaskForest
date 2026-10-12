@@ -15,7 +15,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
              Node { flex_grow: 1.0 } --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -39,7 +39,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -190,8 +190,7 @@ pub(super) fn session_row_scene(
     } else {
         Color::NONE
     };
-    let target = row.target.clone();
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let session_width = widths[0].width_px;
     let user_width = widths[1].width_px;
@@ -210,7 +209,7 @@ pub(super) fn session_row_scene(
             border_radius: BorderRadius::all(Val::Px(radius)),
         }
         BackgroundColor(fill)
-        SessionsRowMarker(index, row.id.clone(), row.identity.clone())
+        SessionsRowMarker(index, { row.id.clone() }, { row.identity.clone() })
         Button
         on(on_sessions_row_activated)
         Children [

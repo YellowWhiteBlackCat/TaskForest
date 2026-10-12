@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -111,7 +112,7 @@ fn headless_settings_app(runtime: &'static SharedRuntime) -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime,
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<Assets<Font>>();
     app.world_mut().resource_mut::<Route>().page = Page::Settings;

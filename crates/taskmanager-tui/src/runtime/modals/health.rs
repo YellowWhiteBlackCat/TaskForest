@@ -1,9 +1,10 @@
-//! Health-modal input owns its review, editing and transfer gestures.
+//! Health-modal input owns review navigation and managed-rule toggles.
 use crate::TuiApp;
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
+use crate::health_review::HealthReviewMode;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 pub(super) fn handle(app: &mut TuiApp, key: KeyEvent) {
-    if app.health_review.mode == crate::health_review::HealthReviewMode::Events {
+    if app.health_review.mode == HealthReviewMode::Events {
         match key.code {
             KeyCode::F(2) => {
                 app.filter_event_history();
@@ -21,14 +22,14 @@ pub(super) fn handle(app: &mut TuiApp, key: KeyEvent) {
             _ => {}
         }
     }
-    if app.health_review.mode != crate::health_review::HealthReviewMode::Rules {
+    if app.health_review.mode != HealthReviewMode::Rules {
         match key.code {
-            ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
-            ratatui::crossterm::event::KeyCode::Up => app.health_review_move(-1),
-            ratatui::crossterm::event::KeyCode::Down => app.health_review_move(1),
-            ratatui::crossterm::event::KeyCode::Home => app.health_review.selected = 0,
-            ratatui::crossterm::event::KeyCode::End => app.health_review_move(isize::MAX),
-            ratatui::crossterm::event::KeyCode::Char(character) => {
+            KeyCode::Esc => app.close_local_overlays(),
+            KeyCode::Up => app.health_review_move(-1),
+            KeyCode::Down => app.health_review_move(1),
+            KeyCode::Home => app.health_review.selected = 0,
+            KeyCode::End => app.health_review_move(isize::MAX),
+            KeyCode::Char(character) => {
                 if let Some(action) =
                     surface_protocol_action(TuiSurfaceScope::HealthReview, character).or_else(
                         || surface_protocol_action(TuiSurfaceScope::StatusOverlay, character),
@@ -45,28 +46,25 @@ pub(super) fn handle(app: &mut TuiApp, key: KeyEvent) {
     // declared surface protocol. In the health overlay, arrows and
     // Space / Enter navigate and toggle managed alert rules.
     match key.code {
-        ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
-        ratatui::crossterm::event::KeyCode::Up | ratatui::crossterm::event::KeyCode::Char('k') => {
+        KeyCode::Esc => app.close_local_overlays(),
+        KeyCode::Up | KeyCode::Char('k') => {
             app.health_rule_move(-1);
         }
-        ratatui::crossterm::event::KeyCode::Down
-        | ratatui::crossterm::event::KeyCode::Char('j') => {
+        KeyCode::Down | KeyCode::Char('j') => {
             app.health_rule_move(1);
         }
-        ratatui::crossterm::event::KeyCode::Home => {
+        KeyCode::Home => {
             app.health_rule_selection = 0;
         }
-        ratatui::crossterm::event::KeyCode::End => {
+        KeyCode::End => {
             let count = app.projection().alert_center.managed_rules().len();
             app.health_rule_selection = count.saturating_sub(1);
         }
-        ratatui::crossterm::event::KeyCode::Enter
-        | ratatui::crossterm::event::KeyCode::Char(' ') => {
+        KeyCode::Enter | KeyCode::Char(' ') => {
             app.toggle_selected_alert_rule();
         }
-        ratatui::crossterm::event::KeyCode::Char(character) => {
+        KeyCode::Char(character) => {
             if let Some(action) = surface_protocol_action(TuiSurfaceScope::HealthReview, character)
-                .or_else(|| surface_protocol_action(TuiSurfaceScope::HealthRule, character))
                 .or_else(|| surface_protocol_action(TuiSurfaceScope::StatusOverlay, character))
             {
                 app.run_surface_protocol_action(action);

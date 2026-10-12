@@ -1,14 +1,17 @@
 use super::*;
-use crate::presentation::smart::smart_section_visible;
+use crate::presentation::smart::{self_test_intent, smart_section_visible};
 use taskmanager_application::AppAction;
 use taskmanager_application::MsrReadoutSession;
-use taskmanager_core::SystemLoadAverage;
 use taskmanager_core::core::metrics::{
     CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, MsrReadoutSnapshot,
     MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics,
 };
 use taskmanager_core::core::services::ServiceDiagnostics;
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
+};
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_core::{DeviceGeneration, SystemLoadAverage};
 use taskmanager_platform_contract::RequestId;
 
 #[test]
@@ -506,6 +509,43 @@ fn smart_section_preserves_actionable_failures_without_fabricating_readings() {
         smart_section_visible(&disk),
         "an available provider keeps the honest status section even before scalars arrive"
     );
+}
+
+#[test]
+fn self_test_capability_keeps_the_smart_health_section_reachable_without_health_metrics() {
+    let mut disk = DiskMetrics::new("nvme0n1");
+    disk.smart_self_test_capabilities.short = SmartSelfTestSupport::Supported;
+    assert!(smart_section_visible(&disk));
+
+    disk.smart_self_test_capabilities.short = SmartSelfTestSupport::Unsupported;
+    assert!(smart_section_visible(&disk));
+}
+
+#[test]
+fn self_test_intent_requires_exact_support_and_a_current_lifecycle() {
+    let mut disk = DiskMetrics::new("/dev/sda");
+    disk.device_id = "disk:wwid:fixture".into();
+    disk.device_generation = DeviceGeneration::new(3);
+    disk.smart_availability = SmartAvailability::Available;
+
+    assert!(
+        self_test_intent(&disk, SmartSelfTestKind::Short).is_none(),
+        "SMART health availability does not imply self-test support"
+    );
+
+    disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+        short: SmartSelfTestSupport::Supported,
+        extended: SmartSelfTestSupport::Unsupported,
+        conveyance: SmartSelfTestSupport::Unknown,
+    };
+    let intent = self_test_intent(&disk, SmartSelfTestKind::Short)
+        .expect("explicit Short support produces a frozen intent");
+    assert_eq!(intent.device_id.as_str(), "disk:wwid:fixture");
+    assert_eq!(intent.device_generation, DeviceGeneration::new(3));
+    assert!(self_test_intent(&disk, SmartSelfTestKind::Extended).is_none());
+
+    disk.device_generation = DeviceGeneration::default();
+    assert!(self_test_intent(&disk, SmartSelfTestKind::Short).is_none());
 }
 
 #[test]

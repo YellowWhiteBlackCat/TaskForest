@@ -11,7 +11,7 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use taskmanager_application::i18n::t;
+use taskmanager_application::{CommandId, i18n::t};
 use taskmanager_ui_contract::IconId;
 
 use taskmanager_shell::LocalBinding;
@@ -19,6 +19,7 @@ use taskmanager_shell::LocalBinding;
 use super::containers::{KeyHint, KeyHintTone, Modal};
 use crate::{TuiApp, TuiTheme};
 
+use crate::bindings::is_deliberately_unbound;
 use crate::command_palette::TUI_LOCAL_COMMANDS;
 use taskmanager_shell::presentation::command_help;
 use taskmanager_shell::shell_local_bindings;
@@ -30,7 +31,10 @@ use taskmanager_shell::shell_local_bindings;
 /// binding surface are filtered out because the terminal must never advertise
 /// a chord it does not execute: confirmation uses `y` / `n` / `Esc`, the
 /// terminal has a resource selector instead of a sidebar, and Alerts management
-/// is not implemented yet. The terminal-only bindings (declared in [`taskmanager_shell::shell_local_bindings`] and
+/// is not implemented yet. The shared `OpenProperties` Enter row is composed
+/// into the one contextual row-target entry below, so Help does not show the
+/// same Enter token twice. The terminal-only bindings (declared in
+/// [`taskmanager_shell::shell_local_bindings`] and
 /// handled in `runtime::handle_key`) are appended instead, together with the
 /// TUI-local overlay bindings above (localized through
 /// [`localize_tui_binding`]).
@@ -38,7 +42,12 @@ use taskmanager_shell::shell_local_bindings;
 pub fn help_rows() -> Vec<LocalBinding> {
     let mut rows: Vec<LocalBinding> = command_help()
         .into_iter()
-        .filter(|help| !crate::bindings::is_deliberately_unbound(help.command))
+        .filter(|help| {
+            !is_deliberately_unbound(help.command)
+                // The one context-aware TUI row-target hint below also
+                // covers Applications' shared OpenProperties action.
+                && help.command != CommandId::OpenProperties
+        })
         .map(|help| LocalBinding {
             shortcut: help.shortcut,
             label: help.label,
@@ -80,7 +89,7 @@ fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
         "h" => "health.system_health_alerts",
         "c" => "containers.title",
         "x" => "system.export_snapshot",
-        "Enter" => "help.binding.service_actions",
+        "Enter" => "help.binding.row_actions",
         "1-7" => "help.binding.perf_resource",
         "1-4" => "help.binding.system_history",
         "w" => "help.binding.system_dashboard",

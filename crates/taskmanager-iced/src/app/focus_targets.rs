@@ -8,7 +8,7 @@ use taskmanager_application::{AppPage, ProcessInsightFacet, RefreshRequest};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
-use taskmanager_shell::SortCol;
+use taskmanager_shell::{InfoSortCol, InfoTable, SortCol};
 
 use super::DetailsSection;
 use super::selectors::PerfDevice;
@@ -27,6 +27,17 @@ pub enum FocusTarget {
         page: AppPage,
         index: usize,
     },
+    /// One sortable Applications process-table header.
+    ProcessSortHeader(SortCol),
+    /// One sortable header in the Services, Startup, or Users inventory.
+    InfoSortHeader {
+        table: InfoTable,
+        column: InfoSortCol,
+    },
+    /// An expandable parent process row, keyed by its current flat index.
+    ProcessTreeNode(usize),
+    /// An expandable category/application header, keyed by its projected row.
+    ProcessGroupHeader(usize),
     /// One of the seven shared page tabs.
     PageTab(AppPage),
     /// The Applications search trigger.
@@ -133,6 +144,12 @@ pub enum FocusTarget {
     SessionDisconnect,
     /// The Users session lock action.
     SessionLock,
+    /// Confirm the pending Users session-control request.
+    ConfirmSessionControl,
+    /// Cancel the pending Users session-control request.
+    CancelSessionControl,
+    /// Close the pending Users session-control surface.
+    CloseSessionControl,
     /// The Users row-context-menu disconnect entry.
     UserRowMenuDisconnect,
     /// The Users row-context-menu lock entry.
@@ -302,7 +319,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 195] = [
+    pub const ALL: [Self; 202] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -315,6 +332,13 @@ impl FocusTarget {
         Self::SearchTrigger,
         Self::SearchClose,
         Self::ProcessColumnsTrigger,
+        Self::ProcessSortHeader(SortCol::Cpu),
+        Self::InfoSortHeader {
+            table: InfoTable::Services,
+            column: InfoSortCol::Name,
+        },
+        Self::ProcessTreeNode(0),
+        Self::ProcessGroupHeader(0),
         Self::ProcessColumnToggle(SortCol::Pid),
         Self::ProcessColumnNarrow(SortCol::Pid),
         Self::ProcessColumnWiden(SortCol::Pid),
@@ -375,6 +399,9 @@ impl FocusTarget {
         Self::CancelEndTask,
         Self::SessionDisconnect,
         Self::SessionLock,
+        Self::ConfirmSessionControl,
+        Self::CancelSessionControl,
+        Self::CloseSessionControl,
         Self::UserRowMenuDisconnect,
         Self::UserRowMenuLock,
         Self::UserRowMenuClose,

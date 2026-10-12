@@ -320,11 +320,10 @@ fn canonical_row_digest(row: &crate::process_view::ProcessRow<'_>) -> String {
             label,
             depth,
             count,
-            cpu,
-            memory,
+            aggregate,
             expanded,
             row_key,
-        } => format!("G|{name}|{label}|{depth}|{count}|{cpu:?}|{memory:?}|{expanded}|{row_key:?}"),
+        } => format!("G|{name}|{label}|{depth}|{count}|{aggregate:?}|{expanded}|{row_key:?}"),
         ProcessRow::TreeNode {
             process,
             depth,

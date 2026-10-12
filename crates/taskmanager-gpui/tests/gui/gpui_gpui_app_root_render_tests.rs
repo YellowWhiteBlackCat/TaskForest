@@ -1,6 +1,30 @@
 use super::{CursorRefreshState, should_schedule_cursor_refresh, ui_font_with_fallback};
+use gpui::{
+    AppContext, Context, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render,
+    Styled, TestAppContext, VisualTestContext, Window, div,
+};
 use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
+
+struct FocusTargetHarness {
+    focus_handle: Option<FocusHandle>,
+}
+
+impl Render for FocusTargetHarness {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let root = div().size_full();
+        if let Some(focus_handle) = &self.focus_handle {
+            root.child(
+                div()
+                    .id("focus-lifecycle-target")
+                    .size_full()
+                    .track_focus(focus_handle),
+            )
+        } else {
+            root
+        }
+    }
+}
 
 #[test]
 fn cursor_refresh_is_coalesced_until_the_next_frame() {
@@ -83,6 +107,110 @@ fn input_modality_only_keyboard_paints_the_focus_ring() {
 }
 
 #[gpui::test]
+async fn input_modality_clears_when_its_window_blurs(cx: &mut TestAppContext) {
+    let window =
+        cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new_demo(Theme::dark(), cx));
+    let root = window.entity(cx).expect("demo RootView entity");
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("demo root should render");
+
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    // TestWindow starts inactive, so activate it explicitly before asking the
+    // visual harness to simulate a later window deactivation.
+    visual.update(|window, _cx| window.activate_window());
+    visual.run_until_parked();
+    visual.simulate_keystrokes("tab");
+    let keyboard_ring_alpha = root.read_with(&visual, |view, _| {
+        view.theme
+            .with_focus_visible(view.input_modality.shows_focus_ring())
+            .palette()
+            .ring
+            .a
+    });
+    assert!(
+        keyboard_ring_alpha > 0.0,
+        "keyboard traversal must arm the focus ring"
+    );
+
+    visual.deactivate_window();
+    visual.update(|window, cx| window.draw(cx).clear());
+    let blurred_ring_alpha = root.read_with(&visual, |view, _| {
+        view.theme
+            .with_focus_visible(view.input_modality.shows_focus_ring())
+            .palette()
+            .ring
+            .a
+    });
+    assert_eq!(
+        blurred_ring_alpha, 0.0,
+        "window deactivation must clear the keyboard focus-ring decision"
+    );
+}
+
+#[gpui::test]
+async fn input_modality_clears_when_focused_target_unmounts(cx: &mut TestAppContext) {
+    let root = cx.new(|cx| crate::gpui_app::root::RootView::new_demo(Theme::dark(), cx));
+    let window = cx.add_window(|_window, cx| FocusTargetHarness {
+        focus_handle: Some(cx.focus_handle().tab_stop(true)),
+    });
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("focus-target harness should render");
+
+    window
+        .update(cx, |_view, window, cx| {
+            root.update(cx, |root, cx| {
+                assert!(root.input_modality.observe_keyboard());
+                root.ensure_input_modality_observers(window, cx);
+            });
+        })
+        .expect("focus lifecycle window should update");
+    window
+        .update(cx, |view, window, _cx| {
+            view.focus_handle
+                .as_ref()
+                .expect("target starts mounted")
+                .focus(window);
+        })
+        .expect("focus target should accept focus");
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("focused target should render");
+
+    assert!(
+        root.read_with(cx, |root, _| {
+            root.theme
+                .with_focus_visible(root.input_modality.shows_focus_ring())
+                .palette()
+                .ring
+                .a
+                > 0.0
+        }),
+        "the mounted focused target must retain keyboard modality"
+    );
+
+    window
+        .update(cx, |view, _window, cx| {
+            view.focus_handle = None;
+            cx.notify();
+        })
+        .expect("target should unmount");
+    cx.run_until_parked();
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("unmounted target should produce a focus-lost frame");
+
+    assert!(
+        root.read_with(cx, |root, _| {
+            root.theme
+                .with_focus_visible(root.input_modality.shows_focus_ring())
+                .palette()
+                .ring
+                .a
+                == 0.0
+        }),
+        "target unmount must clear the stale keyboard focus-ring decision"
+    );
+}
+
+#[gpui::test]
 async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut TestAppContext) {
     let window =
         cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new_demo(Theme::dark(), cx));
@@ -121,7 +249,7 @@ async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut 
 // snapshot — proving the compact projection consumes the SAME facts as the
 // full dashboard rather than a second data fold.
 
-use gpui::{AppContext, TestAppContext, VisualTestContext, px};
+use gpui::px;
 
 use taskmanager_core::core::metrics::{
     CpuScalarObservations, MemoryOptionalObservations, MemoryScalarObservations, ScalarObservation,

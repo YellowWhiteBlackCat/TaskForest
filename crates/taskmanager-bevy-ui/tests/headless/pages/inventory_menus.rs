@@ -172,12 +172,11 @@ fn the_sessions_menu_freezes_disconnect_and_lock_verbs() {
         .first()
         .map(|session| (**session).clone())
         .expect("fixture session");
+    let identity = session.identity().expect("fixture identity");
     let mut modal = SessionMenuModal::default();
 
     assert!(crate::pages::sessions::menu::open_for(
-        &mut modal,
-        &shell,
-        &session.id,
+        &mut modal, &shell, &identity,
     ));
     let spec = modal
         .session
@@ -349,7 +348,7 @@ fn session_bidirectional_control_channel_flow() {
     assert!(
         shell
             .feedback_text()
-            .contains("Session c2 Disconnect completed"),
+            .contains("Session c2 Disconnect request accepted"),
         "feedback notice updated: {}",
         shell.feedback_text()
     );

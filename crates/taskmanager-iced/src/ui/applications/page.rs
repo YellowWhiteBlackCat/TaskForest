@@ -7,6 +7,8 @@ use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
 use taskmanager_core::core::process::ProcessBatchAction;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body};
 
 use taskmanager_shell::presentation::process_anomaly_summary;
 use taskmanager_shell::presentation::uninterruptible_process_summary;
@@ -180,12 +182,20 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             .into()
     } else {
         let key = applications_virtual_table_key(projection_generation, &row_context, window);
+        let open_menu = row_context.open_menu_identity.is_some();
         let model = ApplicationsTableModel {
             projection: Rc::clone(&projection),
             render: row_context,
             window,
         };
-        iced::widget::lazy(key, move |_| render_table_body(&model)).into()
+        if open_menu {
+            // Lazy's overlay adapter drops nested widget operations. Keep the
+            // same bounded virtual window mounted directly while a process
+            // menu is open so focus and action operations reach its Popover.
+            render_table_body(&model)
+        } else {
+            iced::widget::lazy(key, move |_| render_table_body(&model)).into()
+        }
     };
     let table = virtual_table(
         app.applications_scroll_id(),

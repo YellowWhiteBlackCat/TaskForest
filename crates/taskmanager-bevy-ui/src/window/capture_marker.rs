@@ -34,6 +34,7 @@ use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::SystemPageSection;
+use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
@@ -243,6 +244,17 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             if rows.iter().filter(|row| row.item.is_some()).count() < 7
                 || !rows.iter().any(|row| row.depth >= 3)
                 || rows.iter().any(|row| row.has_children && !row.expanded)
+                || !rows.iter().any(|row| {
+                    row.item.is_none()
+                        && row.cpu.as_ref().is_some_and(|cpu| {
+                            matches!(cpu.availability(), ScalarAvailability::Partial(_))
+                                && cpu.current_member_count() + 1 == cpu.member_count()
+                        })
+                        && row.memory.as_ref().is_some_and(|memory| {
+                            matches!(memory.availability(), ScalarAvailability::Partial(_))
+                                && memory.current_member_count() + 1 == memory.member_count()
+                        })
+                })
             {
                 return;
             }
@@ -443,10 +455,12 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         {
             return;
         }
+        Some("users-session-confirmation") if route != Page::Sessions => return,
         Some(
             "process-force-kill"
             | "process-tree-confirm"
             | "process-batch-confirm"
+            | "users-session-confirmation"
             | "smart-self-test-confirm",
         ) if !crate::confirmation::capture_ready(&access.confirmation) => return,
         Some(
@@ -491,10 +505,15 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 access.state.hardware_scroll_requested = true;
                 return;
             }
+            // A compact System page can make this card taller than the body
+            // viewport. The body owns vertical scrolling, so prove that the
+            // anchored inventory content is actually in view without
+            // requiring the entire scrollable card to fit at once.
             if !access.bodies.iter().any(|(node, transform, _)| {
-                center.y - size.y / 2.0 >= transform.translation.y - node.size().y / 2.0 - 0.5
-                    && center.y + size.y / 2.0
-                        <= transform.translation.y + node.size().y / 2.0 + 0.5
+                center.x >= transform.translation.x - node.size().x / 2.0 - 0.5
+                    && center.x <= transform.translation.x + node.size().x / 2.0 + 0.5
+                    && center.y >= transform.translation.y - node.size().y / 2.0 - 0.5
+                    && center.y <= transform.translation.y + node.size().y / 2.0 + 0.5
             }) {
                 return;
             }

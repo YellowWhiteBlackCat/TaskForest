@@ -75,7 +75,7 @@ impl canvas::Program<Message> for PerfChart {
         let smooth = self.smooth;
         let data_geometry = state.data_cache.draw(renderer, bounds.size(), |frame| {
             let size = frame.size();
-            draw_grid_opts(frame, size, grid_color, ChartOpts::DEFAULT);
+            draw_grid_opts(frame, size, grid_color, ChartOpts::PERFORMANCE);
             // CPU first (drawn under memory), then memory, so the upper series
             // sits on top at any crossing. Each series is drawn from its own
             // samples — a partial buffer never fabricates points for the other.
@@ -87,11 +87,25 @@ impl canvas::Program<Message> for PerfChart {
         let readout = self.readout;
         let cpu_color = self.cpu_color;
         let memory_color = self.memory_color;
+        let latest = latest_readout_text(cpu, memory);
+        let latest_anchor = latest_readout_anchor(cpu, memory);
+        let latest_sample_count = cpu.len().max(memory.len());
         let overlay_geometry = state.overlay_cache.draw(renderer, bounds.size(), |frame| {
+            let size = frame.size();
             let Some(index) = hover_index else {
+                draw_latest_badge(
+                    frame,
+                    size,
+                    latest.as_deref(),
+                    latest_anchor,
+                    latest_sample_count,
+                    cpu_color,
+                    memory_color,
+                    grid_color,
+                    readout,
+                );
                 return;
             };
-            let size = frame.size();
             draw_hover_readout(
                 frame,
                 size,

@@ -88,6 +88,10 @@ fn scenario_tokens_parse_strictly() {
             "process-batch-confirm",
             CaptureScenario::ProcessBatchConfirm,
         ),
+        (
+            "users-session-confirmation",
+            CaptureScenario::UsersSessionConfirmation,
+        ),
         ("startup-impact", CaptureScenario::StartupImpact),
         (
             "startup-failure-evidence",
@@ -166,6 +170,23 @@ fn scenario_tokens_parse_strictly() {
     assert_eq!(CaptureScenario::parse(""), None);
     assert_eq!(CaptureScenario::parse("force-kill"), None);
     assert_eq!(CaptureScenario::parse("process-batch-confirmation"), None);
+}
+
+#[test]
+fn session_control_capture_waits_for_data_and_an_armed_confirmation() {
+    let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::UsersSessionConfirmation));
+    assert!(!evidence.session_control_confirmation_requested());
+    evidence.mark_test_telemetry_ready();
+    evidence.mark_test_ui_data_ready();
+    assert!(evidence.session_control_confirmation_requested());
+    evidence.mark_session_control_confirmation_ready(false);
+    assert!(!evidence.scenario_ready());
+    evidence.mark_session_control_confirmation_ready(true);
+    assert!(evidence.scenario_ready());
+    assert_eq!(
+        CaptureScenario::UsersSessionConfirmation.token(),
+        "users-session-confirmation"
+    );
 }
 
 #[test]

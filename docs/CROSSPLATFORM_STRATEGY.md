@@ -6,7 +6,7 @@ OS 特性留在 adapter；没有合格来源的能力保持 typed `Unsupported`�
 
 ## 平权口径
 
-**平权的两根轴是分开的。** 前端轴与平台轴独立演进。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` / `TemporarilyUnavailable`（`platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。**平台 typed 降级是产品承诺的一部分**：平台 `Unsupported` 属于合规状态，前端缺入口属于 parity 缺陷。
+**平权的两根轴是分开的。** 前端轴与平台轴独立演进。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或五种 typed 不可用能力状态（变体名与 `PermissionDenied`/`PermissionRequired` 两轴规则见 [GLOSSARY](GLOSSARY.md) 的「平权」条）。**平台 typed 降级是产品承诺的一部分**：平台 `Unsupported` 属于合规状态，前端缺入口属于 parity 缺陷。
 
 ### 「一碗水端平」的三层递进结构
 
@@ -61,9 +61,9 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 - provider unavailable、权限失败、驱动缺失和 confirmed absent 必须分开；一个字段失败不
   能让同一设备或其他平台条目消失。
 - 产品期望面（`CapabilityId::EXPECTED_SURFACE`）是"每个平台都必须作答"的能力身份全集，
-  是产品事实而非平台能力声明：未注册期望能力由 runtime catalog 兜底发布 typed 缺席
-  descriptor（`Unsupported`、无 provider 归属），真实注册只替换自身条目，"无条目"不是
-  合法产品答案。具体机制与不可逆性见 [ADR-053](../adr/053-product-expected-capability-surface.md)。
+  是产品事实而非平台能力声明；未注册期望能力由 runtime catalog 兜底作答，"无条目"不是
+  合法产品答案。作答机制见 [TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md)，决策与不可逆性见
+  [ADR-053](../adr/053-product-expected-capability-surface.md)。
 - 稳定 identity、generation、last-success 和 recovery 由 runtime/application 管理；热插拔、
   重排、counter rollback 和 PID reuse 都必须断开旧 baseline。
 - 标准二进制在运行时发现 Intel、AMD、NVIDIA、NVMe、ATA、Wi-Fi 等能力；硬件 vendor 不是

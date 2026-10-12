@@ -23,6 +23,8 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::{virtual_table_body, virtual_table_row};
 
 use iced::widget::canvas::{self, Cache, Geometry};
 use iced::widget::{column, container, row, text};
@@ -36,7 +38,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_theme::{Theme, tokens};
 
 use super::UnitPrefs;
-use super::{VirtualWindow, virtual_table_body, virtual_table_row};
+
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::perf_chart::{SeriesGeneration, line_path, series_point_runs_for};

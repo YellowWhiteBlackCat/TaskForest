@@ -9,7 +9,7 @@
 //! ONE shared dash in a dim style — the same fold all frontend renderers read.
 
 use iced::alignment::Horizontal;
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{Id, column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::viewmodel::StatRow;
@@ -24,6 +24,8 @@ use crate::theme;
 use taskmanager_theme::Theme;
 
 type Elem<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
+
+pub(crate) const PERFORMANCE_STATS_RAIL_SCROLL_ID: &str = "performance-stats-rail";
 
 /// A compact, fixed-order row of simultaneous current facts. CPU and GPU use
 /// this above their single aggregate chart so narrowing the viewport never
@@ -68,6 +70,12 @@ impl DetailExtent {
             DeviceNavigationPresentation::Strip => Self::Content,
             DeviceNavigationPresentation::Sidebar => Self::Fill,
         }
+    }
+
+    /// Keep a primary chart at its intrinsic fixed-canvas height when a
+    /// below-band must also fit inside the same fixed viewport.
+    pub(super) const fn for_primary_chart(self, below_band: bool) -> Self {
+        if below_band { Self::Content } else { self }
     }
 
     pub(super) fn length(self) -> Length {
@@ -285,14 +293,22 @@ fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
     if let Some(footer) = footer {
         body = column![body, footer].spacing(12).into();
     }
+    // The vertical scrollbar overlays its viewport. Reserve its 4px track and
+    // 4px gap inside the scroll content so right-aligned values never paint
+    // beneath that track.
+    let body = container(body)
+        .width(Length::Fill)
+        .padding(iced::Padding::ZERO.right(8.0));
     let mut rail = container(
         scrollable(body)
+            .id(Id::new(PERFORMANCE_STATS_RAIL_SCROLL_ID))
             .width(content_width)
             .height(Length::Fill)
             .direction(iced::widget::scrollable::Direction::Vertical(
                 iced::widget::scrollable::Scrollbar::new()
                     .width(4)
-                    .scroller_width(4),
+                    .scroller_width(4)
+                    .spacing(4),
             )),
     )
     .width(content_width)
@@ -404,8 +420,17 @@ pub(super) fn graph_card<'a>(
     content: Elem<'static>,
     extent: DetailExtent,
 ) -> Elem<'a> {
+    graph_card_with_padding(theme_snapshot, content, extent, 8)
+}
+
+pub(super) fn graph_card_with_padding<'a>(
+    theme_snapshot: &'a Theme,
+    content: Elem<'static>,
+    extent: DetailExtent,
+    padding: u16,
+) -> Elem<'a> {
     container(content)
-        .padding(8)
+        .padding(padding)
         .width(Length::Fill)
         .height(extent.length())
         .style(move |_| theme::card_style(theme_snapshot))

@@ -21,15 +21,22 @@ use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use bevy::ui::widget::Text;
 use taskmanager_application::{AppAction, AppPage, ConfirmationKind};
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
     ProcessScalarObservations,
 };
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::{DeviceGeneration, StorageDeviceKey};
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture;
+use taskmanager_shell::fixture::health::seed_smart_self_test_capabilities;
 use taskmanager_shell::presentation::process_batch_action_label;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_theme::Theme;
 
 use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
@@ -41,9 +48,6 @@ use taskmanager_application::PendingConfirmation;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::SmartControlRequest;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::process::PriorityTier;
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
@@ -79,7 +83,7 @@ fn window_app() -> App {
     app.init_resource::<Assets<bevy::text::Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: crate::palette::ui_palette(&Theme::dark()),
+        palette: crate::palette::ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app
 }
@@ -303,8 +307,12 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
     app.update();
     assert!(overlay_despawned(&mut app), "a dismissed modal despawns");
     assert!(
-        app.world().resource::<PendingEffects>().0.is_empty(),
-        "dismissal never submits"
+        !app.world()
+            .resource::<PendingEffects>()
+            .0
+            .iter()
+            .any(|effect| matches!(effect, PlatformEffect::EndTask(_))),
+        "dismissal does not enqueue the gated end-task effect"
     );
 
     // The full loop: re-arm, confirm, let the drain submit through the
@@ -335,6 +343,7 @@ fn prearmed_gate_mounts_after_the_window_shell_at_startup() {
         "process-force-kill",
         "process-tree-confirm",
         "process-batch-confirm",
+        "users-session-confirmation",
         "smart-self-test-confirm",
     ] {
         let mut app = window_app();
@@ -356,6 +365,34 @@ fn prearmed_gate_mounts_after_the_window_shell_at_startup() {
         assert_eq!(armed.0.as_ref(), Some(&expected), "{scenario}");
         let _ = button_entity(&mut app, "confirm");
         let _ = button_entity(&mut app, "dismiss");
+        let gated_effect_was_queued =
+            app.world()
+                .resource::<PendingEffects>()
+                .0
+                .iter()
+                .any(|effect| match expected.kind {
+                    ConfirmationKind::EndTask => matches!(effect, PlatformEffect::EndTask(_)),
+                    ConfirmationKind::ProcessBatch => {
+                        matches!(effect, PlatformEffect::ExecuteBatch(_))
+                    }
+                    ConfirmationKind::ServiceControl => {
+                        matches!(effect, PlatformEffect::ServiceControl(_))
+                    }
+                    ConfirmationKind::StartupControl => {
+                        matches!(effect, PlatformEffect::StartupControl(_))
+                    }
+                    ConfirmationKind::SessionControl => {
+                        matches!(effect, PlatformEffect::SessionControl(_))
+                    }
+                    ConfirmationKind::SmartSelfTest => {
+                        matches!(effect, PlatformEffect::SmartControl(_))
+                    }
+                });
+        assert!(
+            !gated_effect_was_queued,
+            "capture fixture {scenario} mounts {:?} without queuing its gated effect; independent effects such as ProcessInsights may be queued",
+            expected.kind
+        );
     }
 }
 
@@ -365,6 +402,10 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
         ("process-force-kill", ConfirmationKind::ProcessBatch),
         ("process-tree-confirm", ConfirmationKind::ProcessBatch),
         ("process-batch-confirm", ConfirmationKind::ProcessBatch),
+        (
+            "users-session-confirmation",
+            ConfirmationKind::SessionControl,
+        ),
         ("smart-self-test-confirm", ConfirmationKind::SmartSelfTest),
     ] {
         let mut shell = demo_shell();
@@ -380,6 +421,34 @@ fn capture_confirmation_scenarios_arm_expected_gates() {
                 .expect("tree confirmation has a frozen intent");
             assert_eq!(intent.targets.len(), 7);
             assert_eq!(intent.targets.last().expect("root").pid, 90_000);
+        }
+        if scenario == "users-session-confirmation" {
+            let pending = shell
+                .pending_session()
+                .expect("Users capture freezes one session target");
+            assert_eq!(pending.session.id.as_str(), "capture-session-7");
+            assert_eq!(pending.action, SessionControlAction::Disconnect);
+            let identity = pending
+                .session
+                .identity()
+                .expect("capture fixture carries a full session identity");
+            let matches = shell
+                .projection()
+                .sessions
+                .as_deref()
+                .expect("capture session projection is seeded")
+                .iter()
+                .filter(|session| session.identity().as_ref() == Some(&identity))
+                .count();
+            assert_eq!(matches, 1, "frozen capture target is current and unique");
+            assert!(
+                shell
+                    .projection()
+                    .session_control_requests
+                    .pending()
+                    .is_some(),
+                "capture leaves the request pending for explicit confirmation"
+            );
         }
     }
 }
@@ -430,14 +499,14 @@ fn capture_system_sensor_alert_scenarios_seed_fixtures() {
 
 #[test]
 fn smart_self_test_confirmation_view_and_confirm_armed() {
-    let intent = SmartSelfTestIntent {
+    let pending_intent = SmartSelfTestIntent {
         device_id: DeviceId::new("disk-0"),
         device_generation: DeviceGeneration::new(1),
         device_key: StorageDeviceKey::new("nvme0n1"),
         display_name: "Samsung SSD 980".to_owned(),
         kind: SmartSelfTestKind::Short,
     };
-    let pending = PendingConfirmation::SmartSelfTest(intent.clone());
+    let pending = PendingConfirmation::SmartSelfTest(pending_intent);
     let view = PendingConfirmationView::from_pending(&pending).expect("SmartSelfTest renders view");
     assert_eq!(view.kind, ConfirmationKind::SmartSelfTest);
     assert_eq!(view.title, "SMART self-test");
@@ -445,8 +514,16 @@ fn smart_self_test_confirmation_view_and_confirm_armed() {
     assert!(view.body.contains("Samsung SSD 980"));
     assert_eq!(view.target_key, "smart-self-test:disk-0:Short");
 
-    let mut shell = ShellApp::new();
-    shell.arm_smart_self_test(intent.clone());
+    let mut shell = demo_app();
+    seed_smart_self_test_capabilities(&mut shell);
+    let intent = shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.disks.first())
+        .and_then(|disk| self_test_intent(disk, SmartSelfTestKind::Short))
+        .expect("demo disk has explicit Short support");
+    assert!(shell.arm_smart_self_test(intent));
     assert_eq!(
         shell.confirmation_kind(),
         Some(ConfirmationKind::SmartSelfTest)
@@ -457,7 +534,7 @@ fn smart_self_test_confirmation_view_and_confirm_armed() {
         effect,
         Some(PlatformEffect::SmartControl(
             SmartControlRequest::StartSelfTest(ref i)
-        )) if i.display_name == "Samsung SSD 980"
+        )) if i.display_name == "TiPro9000 2TB"
     ));
     assert_eq!(shell.confirmation_kind(), None);
 }

@@ -91,7 +91,7 @@ async fn service_control_cancel_is_inert_and_confirm_is_the_only_submit_path(
         assert_eq!(pending.action, ServiceAction::Stop);
         assert!(view.services_feedback().is_none());
 
-        view.cancel_service_control_confirmation();
+        view.cancel_control_confirmation();
         assert!(view.service_control_confirmation().is_none());
         assert!(view.services_feedback().is_none());
 

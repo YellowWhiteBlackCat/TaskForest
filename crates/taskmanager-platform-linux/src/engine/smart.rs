@@ -313,6 +313,7 @@ fn read_sysfs_hwmon_in(base: &std::path::Path, ctrl: &str) -> SmartSysfsObservat
                 power_on_hours: None,
                 unsafe_shutdowns: None,
                 ata_attributes: None,
+                self_test_capabilities: Default::default(),
             }),
             failure,
         };

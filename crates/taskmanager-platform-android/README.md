@@ -20,37 +20,17 @@ OpenHarmony, GPUI, Iced, Ratatui, Wayland, or desktop privilege adapters.
 
 ## Android source contract
 
-An Android provider may publish a capability only after its source, permission,
-identity, lifecycle, timeout, and failure mapping are verified on a target
-device. Candidate source families are:
-
-| Capability | Android source direction | Initial contract |
-|---|---|---|
-| Host memory | `ActivityManager.MemoryInfo` | typed current/partial/unavailable |
-| Battery | `BatteryManager` | separate Android provider; do not use `starship-battery` |
-| Storage | `StorageStatsManager` | app-private data by default; usage access is explicit |
-| Network | `NetworkStatsManager` and verified interface sources | bucket/device/app scope must remain explicit |
-| Sensors | `SensorManager` | lifecycle-aware sampling and typed absence |
-| CPU/processes | Android APIs or verified `/proc` access | no assumption of desktop-equivalent visibility |
-
-Ordinary Android applications cannot promise unrestricted foreign-process
-memory inspection or control. Such operations remain typed `Unsupported` or
-permission-gated until an Android-specific authority is verified.
+An Android provider may publish a capability only after its source,
+permission, identity, lifecycle, timeout, and failure mapping are verified on
+a target device. The candidate source-family table and composition rules
+live in [`docs/ANDROID_SOURCE_CONTRACT.md`](docs/ANDROID_SOURCE_CONTRACT.md).
 
 ## Contract and verification
 
 The provider is not connected to `taskmanager-platform-native`, the desktop
 app-host, or a frontend. An Android Activity/Service and APK packaging layer
 must own Android lifecycle and context/path injection before product wiring.
-
-```text
-cargo nextest run --locked -p taskmanager-platform-android --all-targets -j 4
-cargo check --locked --target aarch64-linux-android \
-  -p taskmanager-platform-android --features android-provider
-```
-
-Target compilation proves only the Rust target seam. It does not prove Android
-permissions, runtime values, background execution, or APK behavior.
+Verification commands are in the doc above.
 
 ## Module map
 
@@ -58,3 +38,10 @@ permissions, runtime values, background execution, or APK behavior.
 src/lib.rs                     android-provider feature-gated seam (ADR-044);
                                currently capability absence (typed Unsupported)
 ```
+
+## Docs
+
+- [`docs/ANDROID_SOURCE_CONTRACT.md`](docs/ANDROID_SOURCE_CONTRACT.md) — candidate source
+  families, composition rules and verification commands.
+- [ADR-044](../../adr/044-feature-gated-android-provider-seam.md) — feature-gated Android
+  provider seam.

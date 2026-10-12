@@ -5,18 +5,20 @@ edition = "2024"
 rust-version = "1.99.0"
 authors = ["TaskForest"]
 license = "Apache-2.0"
-description = "Privileged helper binary: reads the Intel iGPU perf PMU and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023)."
+description = "Fixed-operation privileged helper binaries for TaskForest (TaskForest permission-model Boundary 2, ADR-023)."
 publish = false
 
-# This is one feature-specific privileged piece of TaskForest (ADR-023, docs/PERMISSION_MODEL.md
-# Boundary 2). It performs exactly ONE operation: a system-wide Intel i915/xe GPU
-# per-engine utilization read via the audited perf_event_open boundary crate
-# (taskmanager-perf-ioctl, ADR-022 — one of the workspace's four unsafe trust roots, used
-# here only through its safe API). It emits ONE JSON object to stdout then exits.
-# There are NO flags and NO file access beyond /sys discovery plus the perf
-# counter read itself, keeping the privileged attack surface minimal. Missing or
-# permission-denied data is reported as a typed ERROR envelope — NEVER a
-# fabricated or zeroed busy_pct.
+[[bin]]
+name = "taskmanager-smart-self-test-helper"
+path = "src/smart_self_test_main.rs"
+
+# Each binary target in this package is a separate feature-specific privileged
+# operation (ADR-023, docs/PERMISSION_MODEL.md Boundary 2). The GPU PMU binary
+# reads only Intel i915/xe counters through taskmanager-perf-ioctl. The SMART
+# self-test binary accepts one fixed, generation-bound disk request, rechecks
+# persistent identity and exact requested capability, then starts one test.
+# Each target has its own installed path and polkit action; neither is a general
+# command runner.
 
 [dependencies]
 # The audited perf_event_open boundary crate. Its public API (GpuEngineCounter:
@@ -25,5 +27,7 @@ publish = false
 # of the trust root alongside taskmanager-platform-linux (see the dependency
 # firewall test, which allowlists both).
 taskmanager-perf-ioctl = { path = "../taskmanager-perf-ioctl" }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

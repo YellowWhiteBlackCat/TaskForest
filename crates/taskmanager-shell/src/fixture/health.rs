@@ -2,7 +2,10 @@
 
 use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
-use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestSupport,
+};
 use taskmanager_core::core::storage_health::FilesystemBackingKind;
 use taskmanager_core::core::system_health::SmartSelfTestObservation;
 use taskmanager_core::core::{
@@ -152,6 +155,11 @@ pub fn health_fixture() -> HealthFixture {
             disk.mount_point = "/".into();
             disk.fs_type = "ext4".into();
             disk.smart_availability = SmartAvailability::Available;
+            disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+                short: SmartSelfTestSupport::Supported,
+                extended: SmartSelfTestSupport::Supported,
+                conveyance: SmartSelfTestSupport::Unsupported,
+            };
             disk.smart_state = DeviceState::healthy(now);
             disk.smart_temperature_c = Some(39.0);
             disk.apply_scalar_observations(DiskScalarObservations {
@@ -212,6 +220,24 @@ pub fn seed_shell_health(app: &mut crate::ShellApp) {
         );
     }
     app.apply_platform_batch(batch);
+}
+
+/// Add explicit self-test support to synthetic disk rows for capture and
+/// behavior fixtures. The ordinary demo snapshot keeps support unknown.
+pub fn seed_smart_self_test_capabilities(app: &mut crate::ShellApp) {
+    use crate::fixture::{ProjectionSeedFact, seed_projection_fact};
+
+    let Some(mut snapshot) = app.projection().snapshot.clone() else {
+        return;
+    };
+    for disk in &mut snapshot.disks {
+        disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+            short: SmartSelfTestSupport::Supported,
+            extended: SmartSelfTestSupport::Supported,
+            conveyance: SmartSelfTestSupport::Unsupported,
+        };
+    }
+    seed_projection_fact(app, ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))));
 }
 
 /// Inject one typed SMART observation batch through the normal shell reducer.

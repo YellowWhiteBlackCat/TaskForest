@@ -17,16 +17,13 @@ Every target must expose the same typed platform surface with honest fallbacks;
 shared contract types remain owned by `taskmanager-platform-contract` and are
 not forwarded through this selector.
 OS-specific process liveness and native path knowledge remain in the selected
-adapter; the application host receives only safe probes and owned paths.
-Linux currently provides validated local-time rules. macOS and Windows return
-typed `Unsupported` until their native time-zone adapters exist; the selector
-never substitutes UTC for an unavailable local zone.
-Current-window PNG capture is selected here as well. The selector first tries
-the registered in-process renderer hook, then delegates to the target adapter:
-Linux uses KDE Spectacle, Windows uses Windows.Graphics.Capture, and macOS
-returns typed `Unsupported` when no renderer hook is available.
-Verify cfg edges, feature closure and reverse dependency firewalls whenever an
-adapter or composition dependency changes.
+adapter; the application host receives only safe probes and owned paths. The
+per-target adapter, local-time and capture roster is the selection matrix in
+[`docs/SELECTION_MATRIX.md`](docs/SELECTION_MATRIX.md); the selector never
+substitutes UTC for an unavailable local zone, and capture never falls back to
+a fabricated image. Runtime invocation order (renderer hook first) is owned by
+the app-host worker. Verify cfg edges, feature closure and reverse dependency
+firewalls whenever an adapter or composition dependency changes.
 
 ## Module map
 
@@ -35,3 +32,9 @@ src/instance.rs   compile-time selection of the one native OS adapter (ADR-009)
 src/tray.rs       tray adapter selection
 src/lib.rs        executable composition boundary and native capture selection
 ```
+
+## Docs
+
+- [`docs/SELECTION_MATRIX.md`](docs/SELECTION_MATRIX.md) — the per-target adapter, local-time
+  and capture selection matrix with fallback rules.
+- [ADR-009](../../adr/009-native-os-adapter-selection.md) — native OS adapter selection.

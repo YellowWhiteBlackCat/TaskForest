@@ -423,14 +423,19 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-ui-contract",
             ][..],
         ),
-        // ADR-023: the privileged helper binary depends ONLY on the audited perf
-        // boundary crate (one of the workspace's four unsafe trust roots, reached
-        // through its safe API) — not on the whole Linux adapter — so the privileged
-        // attack surface stays minimal. serde/serde_json are non-workspace deps
-        // and not tracked by this DAG assertion.
+        // ADR-023: privileged helper targets reach the audited perf boundary
+        // only through its safe API. The core dependency supplies canonical
+        // persistent-disk identity types/rules; platform-portable supplies the
+        // shared bounded fixed-argv child lifecycle. The helper does not depend
+        // on the broad Linux adapter or frontend crates. serde/serde_json are
+        // non-workspace dependencies and are not tracked by this DAG assertion.
         (
             "taskmanager-privilege-helper",
-            &["taskmanager-perf-ioctl"][..],
+            &[
+                "taskmanager-core",
+                "taskmanager-perf-ioctl",
+                "taskmanager-platform-portable",
+            ][..],
         ),
         // ADR-023/031: process-control helper depends only on the audited
         // boundary crates — windows-api on Windows, fd-bridge on Linux (the

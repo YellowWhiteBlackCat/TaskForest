@@ -41,10 +41,9 @@ mod containers;
 mod system_information;
 // The first-run dialog is wired end-to-end (boot observation, correlated
 // platform answers and the `LocalSurface::FirstRun` slot live in
-// `app::update::first_run`). The System dashboard segment's page mount still
-// lands with its owner (`ui::system_table`, a parallel workflow); until then
-// that module is exercised by its headless behavior tests, which is why it
-// carries a scoped dead-code allowance.
+// `app::update::first_run`). The System page routes Dashboard, Health and
+// hardware facts through `ui::system_table`, which owns its section selection
+// and bounded details surfaces.
 pub(crate) mod core_grid;
 mod device_chart;
 pub(crate) mod directory_usage;
@@ -57,7 +56,7 @@ mod insights;
 mod navigation;
 pub(crate) mod overlays;
 pub(crate) mod perf_devices;
-mod perf_layout;
+pub(crate) mod perf_layout;
 pub(crate) mod perf_overview;
 pub(crate) mod perf_rail;
 mod performance;
@@ -69,6 +68,7 @@ pub(crate) mod service_details;
 mod service_menu;
 mod settings;
 mod sidebar_editor;
+pub(crate) mod smart_self_test_confirmation;
 pub(crate) mod spinner;
 mod startup_menu;
 pub(crate) mod startup_table;
@@ -79,10 +79,7 @@ pub(crate) mod tables;
 pub(crate) mod users;
 mod virtual_list;
 
-pub(crate) use virtual_list::{
-    VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_horizontal_body, virtual_table,
-    virtual_table_body, virtual_table_key, virtual_table_row,
-};
+pub(crate) use virtual_list::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 
 // Re-export the extracted render groups so the root view and the headless
 // tests reach every seam by its original (unqualified) name. Each glob only
@@ -110,11 +107,11 @@ pub(crate) fn current_window_capture_btn<'a>(
 }
 
 /// Build the root element for one render. The root input observer watches
-/// pointer presses for the focus-visible tracker
-/// (`crate::input_modality`) before the tree below handles the same event —
-/// the iced counterpart of the GPUI root's capture-phase listeners.
+/// pointer presses for the focus-visible tracker and verifies the app's
+/// tracked focus target against the current widget tree before forwarding
+/// events.
 pub fn view(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
-    crate::input_modality::Observer::new(view_root(app)).into()
+    crate::input_modality::Observer::new(view_root(app), app.input.focused_control).into()
 }
 
 /// The observed root: page scaffold, overlays, and warm-up body for one render.

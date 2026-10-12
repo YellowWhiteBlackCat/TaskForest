@@ -7,11 +7,17 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 
-use crate::{TuiApp, TuiTheme};
+use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 
-pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+pub(super) fn render(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    input_scope: TuiInputScope,
+) {
     let state = if app.paused() {
         t("common.paused_badge")
     } else {
@@ -43,7 +49,6 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             Style::new().fg(theme.color(Color::Black)).bg(color),
         )
     });
-    let shortcut_span = Span::styled(t("footer.shortcuts"), Style::new().fg(theme.dim));
     let (marker, feedback_color) =
         app.shell
             .feedback_notice()
@@ -73,7 +78,12 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         format!(" {marker}{feedback}  "),
         Style::new().fg(feedback_color),
     ));
-    spans.push(shortcut_span);
+    if input_scope != TuiInputScope::LocalSurface(TuiSurfaceKind::Health) {
+        spans.push(Span::styled(
+            t("footer.shortcuts"),
+            Style::new().fg(theme.dim),
+        ));
+    }
     let lines = vec![Line::from(spans)];
     frame.render_widget(
         Paragraph::new(lines)

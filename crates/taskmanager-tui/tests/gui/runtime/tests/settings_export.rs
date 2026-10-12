@@ -502,7 +502,7 @@ fn refresh_interval_field_applies_to_the_shared_policy_and_persists() {
 }
 
 #[test]
-fn refresh_field_wraps_across_the_four_choices() {
+fn refresh_field_clamps_across_the_four_choices() {
     let mut form = crate::ui::settings::SettingsForm {
         field: 7,
         ..Default::default()
@@ -511,9 +511,13 @@ fn refresh_field_wraps_across_the_four_choices() {
     form.step_value(-1);
     assert_eq!(form.refresh_ms(), 500);
     form.step_value(-1);
-    assert_eq!(form.refresh_ms(), 5_000, "wraps to the last choice");
+    assert_eq!(form.refresh_ms(), 500, "the first choice is a hard bound");
     form.step_value(1);
-    assert_eq!(form.refresh_ms(), 500);
+    assert_eq!(form.refresh_ms(), 1_000);
+    form.step_value(3);
+    assert_eq!(form.refresh_ms(), 5_000);
+    form.step_value(1);
+    assert_eq!(form.refresh_ms(), 5_000, "the last choice is a hard bound");
     assert_eq!(crate::ui::settings::REFRESH_MS.len(), 4);
 }
 

@@ -133,7 +133,7 @@ pub(crate) fn button(
     active: bool,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     bsn! {
         Node { min_height: px(height), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 }
         Button DashboardControlButton(action) ControlVisual(ControlTone::Surface, active) on(activate)
@@ -157,7 +157,7 @@ pub(crate) fn toolbar(state: &SystemDashboardState, palette: &UiPalette) -> impl
             (IconId::NavigateDown, DashboardControl::Next),
         ] {
             let image = icon_scene(icon, 16.0, palette.body_color);
-            let height = palette.control_height_px;
+            let height = palette.control_height_px();
             controls.push(Box::new(bsn! { Node { width: px(height), min_height: px(height), flex_shrink: 0.0, padding: UiRect::all(px(space_8())) } Button DashboardControlButton(action) ControlVisual(ControlTone::Surface, false) on(activate) Children [ @{image} ] }));
         }
         controls.push(Box::new(button(

@@ -228,7 +228,10 @@ fn confirm_active_surface(view: &mut RootView, cx: &mut Context<RootView>) {
         Some(ConfirmationKind::SmartSelfTest) => {
             view.confirm_system_health_self_test(cx);
         }
-        Some(ConfirmationKind::SessionControl) | None => {}
+        Some(ConfirmationKind::SessionControl) => {
+            view.confirm_session_control_confirmation(cx);
+        }
+        None => {}
     }
 }
 
@@ -288,10 +291,8 @@ fn apply_app_action(
         }
         AppAction::ToggleSidebar => view.sidebar_visible = !view.sidebar_visible,
         AppAction::ConfirmEndTask => confirm_active_surface(view, cx),
-        AppAction::RequestServiceControl
-        | AppAction::ConfirmServiceControl
-        | AppAction::CopySelectedRow
-        | AppAction::OpenAlerts => {}
+        AppAction::RequestServiceControl | AppAction::CopySelectedRow | AppAction::OpenAlerts => {}
+        AppAction::ConfirmServiceControl => confirm_active_surface(view, cx),
     }
 }
 

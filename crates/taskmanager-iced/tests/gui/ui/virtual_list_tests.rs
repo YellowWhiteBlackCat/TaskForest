@@ -1,5 +1,5 @@
-use super::VirtualWindow;
-
+use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, VirtualWindow};
+use zhuge_ui_kit_iced::virtual_list::virtual_table_body;
 #[test]
 fn initial_window_is_bounded_for_a_ten_thousand_row_table() {
     let window = VirtualWindow::for_rows(10_000, 0.0, 320.0, 24.0, 32.0);
@@ -59,12 +59,13 @@ fn generic_body_factory_receives_only_the_materialized_range() {
     let window = VirtualWindow::for_rows(10_000, 2_400.0, 240.0, 30.0, 32.0);
     let seen = Rc::new(Cell::new((usize::MAX, usize::MAX)));
     let writer = Rc::clone(&seen);
-    let _body = super::virtual_table_body(window, iced::Length::Fill, move |start, end| {
-        writer.set((start, end));
-        (start..end)
-            .map(|_| iced::widget::text("").into())
-            .collect()
-    });
+    let _body: iced::Element<'static, crate::app::Message> =
+        virtual_table_body(window, iced::Length::Fill, move |start, end| {
+            writer.set((start, end));
+            (start..end)
+                .map(|_| iced::widget::text("").into())
+                .collect()
+        });
 
     assert_eq!(seen.get(), (window.start, window.end));
     assert!(window.end - window.start < 10_000);
@@ -83,7 +84,7 @@ fn a_fifty_thousand_row_table_materializes_only_the_viewport_band() {
         (2_400.0_f32, 32.0_f32),
     ] {
         let visible = (viewport_height / row_height).ceil() as usize;
-        let contract_bound = visible + 2 * super::OVERSCAN_ROWS + 1;
+        let contract_bound = visible + 2 * DEFAULT_OVERSCAN + 1;
 
         for scroll_y in [0.0, 12_345.0, 1.9e6, f32::MAX] {
             let window =
@@ -103,13 +104,5 @@ fn a_fifty_thousand_row_table_materializes_only_the_viewport_band() {
                 "spacers + rows must reconstruct the {content}px content, got {total}px"
             );
         }
-    }
-}
-
-impl VirtualWindow {
-    /// Number of row widgets that this window asks the renderer to build.
-    #[must_use]
-    pub(crate) const fn materialized_len(self) -> usize {
-        self.end.saturating_sub(self.start)
     }
 }

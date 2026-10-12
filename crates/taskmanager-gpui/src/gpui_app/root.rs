@@ -235,6 +235,10 @@ pub struct RootView {
     /// action before element key listeners run, so root capture alone is not
     /// sufficient; the RootView owns this subscription for its full lifetime.
     pub(crate) input_modality_key_subscription: Option<Subscription>,
+    /// Clear keyboard modality when this window loses OS activation.
+    pub(crate) input_modality_activation_subscription: Option<Subscription>,
+    /// Clear keyboard modality when the focused target leaves the rendered tree.
+    pub(crate) input_modality_focus_lost_subscription: Option<Subscription>,
     /// Per-window switch states for the Settings dialog toggles (hc +
     /// device visibility), created lazily on first Settings render. The
     /// `Entity<SwitchState>` owns the `on` flag and focus handle, so two
@@ -747,6 +751,8 @@ impl RootView {
             font_availability: detect_font_availability(cx),
             input_modality: InputModality::default(),
             input_modality_key_subscription: None,
+            input_modality_activation_subscription: None,
+            input_modality_focus_lost_subscription: None,
             settings_switches: HashMap::new(),
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
@@ -827,7 +833,7 @@ impl RootView {
             startup_search: None,
             startup_table: None,
             users_table: None,
-            processes_state: ProcessesState::default(),
+            processes_state: ProcessesState::with_resize_focus_handles(cx),
             sidebar_visible: true,
             sidebar_edit_mode: false,
             sidebar_resize_anchor_x: None,

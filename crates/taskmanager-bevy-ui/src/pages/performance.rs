@@ -41,24 +41,23 @@ use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent, px,
+    rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
     MemoryMetrics, MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation,
 };
 use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::presentation::trend::{self, TrendSeries};
 use taskmanager_shell::presentation::{
     bytes, gpu_display_identity, graph_summary, megahertz, missing_value, power_w, temperature_c,
@@ -428,19 +427,7 @@ pub(crate) fn request_smart_self_test(
     let Some(disk) = disks.iter().find(|d| d.device_id == disk_id) else {
         return false;
     };
-    let intent = SmartSelfTestIntent {
-        device_id: DeviceId::new(disk.device_id.clone()),
-        device_generation: disk.device_generation,
-        device_key: StorageDeviceKey::new(disk.name.clone()),
-        display_name: if disk.model.is_empty() {
-            disk.name.clone()
-        } else {
-            disk.model.clone()
-        },
-        kind,
-    };
-    shell.arm_smart_self_test(intent);
-    true
+    self_test_intent(disk, kind).is_some_and(|intent| shell.arm_smart_self_test(intent))
 }
 
 // ---- view model: pure resolvers over the read-only shell ----
@@ -722,7 +709,7 @@ fn sync_strips(
     transforms: &mut Query<&mut UiTransform>,
     commands: &mut Commands,
 ) {
-    let strip_height = palette.control_height_px * 3.0;
+    let strip_height = palette.control_height_px() * 3.0;
     for (strip_entity, strip, children, mut chart) in strips.iter_mut() {
         let segments = line_segments(
             &trend::window(&shell.history, strip.0.series()),

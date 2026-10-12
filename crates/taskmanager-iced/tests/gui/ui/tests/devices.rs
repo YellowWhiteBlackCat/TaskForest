@@ -33,6 +33,7 @@ use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 #[path = "devices/fan.rs"]
 mod fan;
@@ -104,7 +105,7 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
     assert_eq!(
         flat(&rows),
         vec![
-            ("Status", "Healthy"),
+            ("GPU Status", "Healthy"),
             ("Utilization", "42%"),
             ("Dedicated VRAM", "4.0 GiB / 8.0 GiB"),
             ("Shared VRAM", "512.0 MiB / 1.0 GiB"),
@@ -132,7 +133,7 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
     let idle_rows = gpu_summary_lines(&idle);
     // Status leads; a measured-idle utilization stays 0% — the honest opposite
     // of "—".
-    assert_eq!(flat(&idle_rows)[0].0, "Status");
+    assert_eq!(flat(&idle_rows)[0].0, "GPU Status");
     assert_eq!(flat(&idle_rows)[1], ("Utilization", "0%"));
 
     set_language(Language::En);
@@ -236,7 +237,7 @@ fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
         2,
         "unavailable VRAM/clock/power/engines are omitted"
     );
-    assert_eq!(flat(&rows)[0], ("Status", "Unsupported"));
+    assert_eq!(flat(&rows)[0], ("GPU Status", "Unsupported"));
     assert_eq!(flat(&rows)[1], ("Utilization", "—"));
     assert!(
         !flat(&rows)
@@ -328,7 +329,7 @@ fn performance_page_renders_the_gpu_section_for_the_demo_snapshot() {
     let gpu_rows = gpu_summary_lines(&snapshot.gpu[0]);
     let gpu_flat = flat(&gpu_rows);
     assert_eq!(
-        gpu_flat[0].0, "Status",
+        gpu_flat[0].0, "GPU Status",
         "device.status leads the GPU readout"
     );
     assert_eq!(gpu_flat[1].0, "Utilization");

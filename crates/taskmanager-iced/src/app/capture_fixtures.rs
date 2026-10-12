@@ -10,10 +10,11 @@ use taskmanager_core::core::alerts::{
 };
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::hardware::CoreBreakdown;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::metrics::{
     DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, ScalarObservation,
-    SmartAvailability,
+    ScalarObservationGroup, SmartAvailability,
 };
 use taskmanager_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
@@ -33,11 +34,45 @@ use taskmanager_core::core::services::{
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
 use taskmanager_shell::fixture::{
-    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
+    ProjectionSeedFact, edit_hardware, edit_snapshot, record_demo_history_frame,
+    seed_projection_fact,
 };
 use taskmanager_shell::{ProcessRowId, ShellApp, ShellKeyEvent};
 
 use super::{DetailsSection, IcedApp, Message, PerfDevice};
+
+/// Add a deterministic typed CPU-facts capture profile matching the demo's
+/// documented 6P + 8E + 2LP-E topology; counts are fixture inputs, never
+/// inferred from the per-logical-CPU type vector.
+pub(super) fn seed_capture_cpu_facts(app: &mut IcedApp) {
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let Some(snapshot) = snapshot.as_mut() else {
+            return;
+        };
+        snapshot.cpu.l1d_cache_kb = Some(64);
+        snapshot.cpu.l1i_cache_kb = Some(64);
+        snapshot.cpu.l2_cache_kb = Some(1_024);
+        snapshot.cpu.l3_cache_kb = Some(16_384);
+        snapshot.cpu.physical_cores = Some(16);
+        snapshot.cpu.logical_cores = Some(22);
+        let mut observations = snapshot.cpu.scalar_observations().clone();
+        observations.per_core_temperature_group =
+            ScalarObservationGroup::available(vec![51.0, 59.0], snapshot.timestamp_ms);
+        snapshot.cpu.apply_scalar_observations(observations);
+    });
+    edit_hardware(&mut app.shell, |hardware| {
+        if let Some(hardware) = hardware.as_mut() {
+            hardware.core_breakdown = CoreBreakdown {
+                p_cores: 6,
+                e_cores: 8,
+                lp_cores: 2,
+            };
+            hardware.base_freq_mhz = Some(2_400);
+            hardware.cpu_cores = Some(22);
+            hardware.virt = Some("VT-x".to_owned());
+        }
+    });
+}
 
 pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
     if target == "smart-missing-tool" {
@@ -272,7 +307,7 @@ pub(super) fn capture_page_from_name(name: &str) -> Option<AppPage> {
         "applications" => Some(AppPage::Applications),
         "services" => Some(AppPage::Services),
         "startup" => Some(AppPage::Startup),
-        "users" => Some(AppPage::Users),
+        "users" | "users-session-confirmation" => Some(AppPage::Users),
         "system" => Some(AppPage::System),
         "app-history" => Some(AppPage::AppHistory),
         _ => None,

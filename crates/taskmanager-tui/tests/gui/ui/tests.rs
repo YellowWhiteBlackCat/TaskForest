@@ -62,6 +62,8 @@ mod fan_thermal_render;
 mod focus_control;
 #[path = "tests/focus_paint.rs"]
 mod focus_paint;
+#[path = "tests/footer_health_owner.rs"]
+mod footer_health_owner;
 #[path = "tests/memory_selector_parity.rs"]
 mod memory_selector_parity;
 #[path = "tests/overlay_hit.rs"]

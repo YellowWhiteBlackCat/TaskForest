@@ -18,6 +18,7 @@ fn health_capture_frame_emits_one_health_target_marker() {
     let mut app = IcedApp::demo();
     app.capture.marker = Some(marker.clone());
     let _ = app.update(Message::OpenHealth);
+    let _ = app.update(Message::WindowResized(iced::Size::new(1180.0, 780.0)));
 
     let _ = app.handle_window_message(Message::Frame(Instant::now()));
     let _ = app.handle_window_message(Message::Frame(Instant::now()));
@@ -28,7 +29,7 @@ fn health_capture_frame_emits_one_health_target_marker() {
         "ICED_CAPTURE_MARKER event=target_ready mode=demo page=performance device=health"
     ));
     assert_eq!(log.matches("event=target_ready").count(), 1);
-    assert!(!log.contains("device=cpu"));
+    assert!(!log.contains("event=target_ready mode=demo page=performance device=cpu"));
     std::fs::remove_dir_all(&dir).expect("clean up capture marker scratch");
 }
 
@@ -39,6 +40,7 @@ fn performance_capture_frame_keeps_the_selected_device_marker() {
     let marker = dir.join("markers.log");
     let mut app = IcedApp::demo();
     app.capture.marker = Some(marker.clone());
+    let _ = app.update(Message::WindowResized(iced::Size::new(1180.0, 780.0)));
 
     let _ = app.handle_window_message(Message::Frame(Instant::now()));
 

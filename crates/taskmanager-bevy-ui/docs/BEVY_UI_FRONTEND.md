@@ -4,8 +4,8 @@
 
 `taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.20 的官方两件套 `bevy_ui` +
 `bevy_ui_widgets` 渲染同一份中立 shell 投影。本文是它当前的公开事实权威；
-跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)，
-行为与像素门禁归 [QUALITY_GATES.md](QUALITY_GATES.md)。
+跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](../../../docs/UI_COMPONENT_ARCHITECTURE.md)，
+行为与像素门禁归 [QUALITY_GATES.md](../../../docs/QUALITY_GATES.md)。
 
 ## 定位
 
@@ -14,7 +14,7 @@
   GPU 指标选择已对齐，设备级 hero 图提升、系统页深度与多窗口/layer-shell 仍是
   公开的已知边界，不在文档中虚构。偏好（外观/语言/节奏/容量）经共享 config
   协调器跨会话持久并在启动组合恢复。
-- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，现已完全纳入官方发布流水线矩阵，享有同等的领域语义、配置持久化与安装包分发地位（提供 DEB、RPM、MSI 官方安装包）。
+- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](../../../docs/PRODUCT_IDENTITY.md)，现已完全纳入官方发布流水线矩阵，享有同等的领域语义、配置持久化与安装包分发地位（提供 DEB、RPM、MSI 官方安装包）。
 - 产品组件（进程表、图表、确认面）由自有 theme tokens + `ui-contract` 定义
   语义；Bevy 官方 Feathers 皮肤体系不采用——theme tokens 是唯一皮肤权威。
 
@@ -27,8 +27,9 @@
   状态变更经 typed observer/system 同步更新其明确拥有的资源；实体变更由 `Commands` 提交。
   Bevy 应用的组合入口只负责注册资源、系统与插件；业务不能通过 `App::world()` /
   `App::world_mut()` 借回整个世界。测试夹具可操作测试 App，但不能成为生产业务入口。
-- Bevy 锁定 `=0.20.0-rc.2`，与 `taskmanager-platform-runtime` 的 `bevy_app`/`bevy_ecs`
-  保持单一 workspace 解析；升级需架构与发布评审。
+- Bevy 锁定 `=0.20.0`（2026-10-11 经架构与发布评审从 `0.20.0-rc.2` 升级到正式版；
+  仓库场景已写在新语法上，源码零改动通过编译），与 `taskmanager-platform-runtime`
+  的 `bevy_app`/`bevy_ecs` 保持单一 workspace 解析；后续升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
   `bevy_text`、`ui_picking`、`system_clipboard`；Linux 追加 `wayland` 与 `accesskit_unix`，`x11` 永不
@@ -38,6 +39,9 @@
   ui-contract、assets、icons（neutral 半，gpui feature 关）、`accesskit`（与
   bevy 栈同版本）—— never platform-runtime、platform crates。Bevy 类型不跨
   本 crate 公开 API。
+- 业务无关的 surface/button BSN 层归 `zhuge-ui-kit-bevy`；其基础包无窗口后端、
+  Feathers 或产品依赖。产品适配器保留尺寸、token、标记和 typed observer，
+  不复制公共场景树。公共库源码必须纳入当前前端 capture provenance。
 - **100% `bsn!` 场景法**：生产 UI 树（页面、行/单元格、控件、覆盖层、
   loading/empty/error 变体）全部由 `bsn!` 场景组合并经 `spawn_scene` 挂载；
   禁止命令式 `Node`/`Children`/`with_children` 另起 UI 树。ECS 系统只更新
@@ -51,8 +55,10 @@
   - **`template_value` / `TemplateValue` 硬零**：场景能表达的值禁止套壳；
     场景表达不了的整值不存在"运行期值"豁免——标记、样式、层级、可见性、
     页面身份（如 `PageContent`）一律声明在 `bsn!` 里，不进 `insert`。
-  - **整值窄出口**：仅限已有实体的异步表现补全（位图句柄就绪后的
-    `ImageNode`），用 `apply_scene(bsn! { ... })` 声明式补丁；这不是第二
+  - **整值窄出口**：仅限已有实体的异步表现补全——位图句柄就绪后的
+    `ImageNode`（`apply_scene(bsn! { ... })` 声明式补丁）与文字流
+    `InlineImage`（上游 bsn 模板不支持其 `Option` 字段，观察者以 typed
+    组件补全；`InlineBox` 几何仍由场景声明为唯一权威）。这不是第二
     语义路径。创建链上的 `.insert(`（`spawn_scene` 后紧链）被门禁禁止。
   - **相机与观察者归属**：Camera2d 走 `spawn_scene(bsn! { Camera2d })`；
     页面级全局事件观察者（非 EntityEvent，如 `ShellProjectionFolded`）不是
@@ -65,6 +71,23 @@
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
 - Linux 窗口仅支持 Wayland；X11 已被全面废弃，非 Wayland 或纯终端环境由 TaskForest-T 承载。
+
+## 0.20 正式版能力面（2026-10-11 起）
+
+- **rem 尺寸轴**：`RemSize` 资源是唯一 rem 权威，由 palette 的 UI-size 档位
+  （Small/Standard/Large，正文 14/16/18px）驱动；类型阶梯长度一律 `rem(...)`/
+  `FontSize::Rem`，文本无关节点的 `EmSize` 由 `sync_node_em_size` 钉住。设置页
+  「界面尺寸」行写共享 config 的 `ui_size` 权威，捕获经 `TM_UI_SIZE` 选档。
+- **headless `TabList`**：导航 strip 与属性弹窗页签是 `TabList`+`Tab`（共享
+  tablist/tab 无障碍角色与漫游箭头焦点）；`Route`/呈现 section 是唯一选择权威，
+  条带经 `SelectedTab` 单向镜像，点选走 typed `ValueChange`。
+- **`Ready` 事件**：条带的初始选择镜像与弹窗每次重挂的镜像都挂在 `Ready`
+  （子孙全部就绪的自底向上信号）上——场景声明期实体不存在，`Ready` 是类型化的
+  挂载完成时刻，禁止再按组件 `Add` 逐个探测。
+- **`FixedNode` 浮层**：确认面、tooltip、菜单浮窗的根节点视口锚定
+  （不继承 shell 布局、裁剪与变换），替代 `PositionType::Absolute` 惯用法。
+- **`InlineBox`/`InlineImage` 行内图文**：排序方向板等语义图标以 `InlineIcon`
+  流入文字布局（与标签同线裁切对齐），位图句柄由观察者 typed 补全。
 
 ## 数据接缝
 
@@ -138,6 +161,6 @@ feature 让 winit 的 AccessKit 桥把组件树发布到 AT-SPI；无窗口的 h
   `cargo clippy ... -- -D warnings`。
 - `python3 scripts/quality/bevy_bsn_guard.py --mode enforce`（quick gate）。
 - `bash scripts/accept-bevy-interactions.sh`：交互矩阵先 discovery 后全量，
-  见 [QUALITY_GATES.md](QUALITY_GATES.md) 前端证据表。
+  见 [QUALITY_GATES.md](../../../docs/QUALITY_GATES.md) 前端证据表。
 - `bash scripts/capture-bevy.sh`：真实像素，fail-closed 验证器。
 - `cargo tree -p taskmanager-bevy-ui -d`：bevy 栈单一 0.20 解析。

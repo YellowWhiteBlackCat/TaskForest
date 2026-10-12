@@ -19,6 +19,7 @@ use bevy::scene::ScenePlugin;
 use bevy::text::Font;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::{TooltipOverlay, TooltipSession, TooltipState, TooltipText};
 use crate::palette::ui_palette;
@@ -60,7 +61,7 @@ fn tooltip_overlay_is_pointer_transparent_and_dismisses_until_pointer_exit() {
     app.init_resource::<Assets<Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
 
     // Initial frames to mount AppShellRoot

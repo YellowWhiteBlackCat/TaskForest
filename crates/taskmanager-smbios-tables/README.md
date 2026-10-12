@@ -18,16 +18,9 @@ entry point means the record is not that structure type at all.
 
 ## Contract and verification
 
-Field offsets and sentinels follow dmidecode's `dmi_decode` cases 0/1/2/17
-(size word with KB-unit bit, form-factor and memory-type enums, string-set
-decoding with the double-NUL terminator, SMBIOS 2.6 configured-speed and UUID
-length gates, the mixed-endian UUID rendering of `dmi_system_uuid`). Verified
-by headless byte-fixture tests:
-
-```bash
-cargo nextest run -p taskmanager-smbios-tables -j 4 --all-targets
-cargo clippy -p taskmanager-smbios-tables --all-targets -- -D warnings
-```
+The dmidecode-compatible offset/sentinel rules and the byte-fixture
+verification route are specified in
+[`docs/DECODING_RULES.md`](docs/DECODING_RULES.md).
 
 ## Module map
 
@@ -35,3 +28,8 @@ cargo clippy -p taskmanager-smbios-tables --all-targets -- -D warnings
 src/lib.rs   the ONE pure SMBIOS record parser, shared by the unprivileged
              DMI probe and the pkexec-escalated helper (types 0/1/2/17)
 ```
+
+## Docs
+
+- [`docs/DECODING_RULES.md`](docs/DECODING_RULES.md) — dmidecode-compatible offsets and
+  sentinels, honesty rules and verification.

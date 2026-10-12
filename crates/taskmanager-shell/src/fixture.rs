@@ -162,6 +162,12 @@ pub enum DirectTrackSeedFact {
     /// owner used by the live direct track. This exists only for headless
     /// renderer tests and never exposes a mutable projection reference.
     Processes(Vec<ProcessItem>),
+    /// Install a deterministic login-session projection for direct-track
+    /// headless and capture scenes.
+    Sessions(Option<Vec<SessionItem>>),
+    /// Install the paired session-source status used by direct-track
+    /// headless and capture scenes.
+    SessionsSource(Option<Vec<SourceStatus>>),
 }
 
 pub fn seed_direct_track_fact(app: &mut crate::DirectTrackState, fact: DirectTrackSeedFact) {
@@ -683,6 +689,7 @@ fn snapshot() -> SystemSnapshot {
         }],
         gpu: vec![{
             let mut gpu = GpuMetrics::new("gpu:demo:xe", "Intel Graphics (xe)");
+            gpu.device_state = DeviceState::healthy(1_785_292_800_000);
             gpu.driver = Some("xe".into());
             gpu.vbios_version = Some("101.0.0.0".into());
             gpu.graphics_api = Some(GpuGraphicsApi {

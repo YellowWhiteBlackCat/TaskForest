@@ -4,7 +4,7 @@
 //!
 //! Columns: Session(120) / User(140) / Seat(80) / TTY(80) / Remote(70) /
 //! Logon(140). An action bar offers Disconnect (`terminate-session`) and Lock
-//! (`lock-session`) once a visible shared confirmation surface is available; transient feedback
+//! (`lock-session`) through the shared visible confirmation surface; transient feedback
 //! (success/failure) lands in a status line, reusing the shared
 //! [`crate::gpui_app::list_view::ActionFeedback`] / `feedback_status_line`
 //! scaffolding (same type services/startup use). Empty-state reads "No
@@ -209,8 +209,7 @@ impl TableDelegate for UsersDelegate {
     }
 
     /// Row context menu (Win11 parity): disconnect / lock the session.
-    /// Controls remain disabled until this frontend has a visible shared
-    /// confirmation presentation. Selection retains its exact verified identity.
+    /// Selection and action retain the exact verified identity.
     fn context_menu(
         &mut self,
         row_ix: usize,
@@ -222,6 +221,7 @@ impl TableDelegate for UsersDelegate {
         };
         let root = self.root.clone();
         let selected_identity = unique_session_identity(&self.rows, &session);
+        let can_control = selected_identity.is_some();
         root.update(cx, |v, cx| {
             v.selected_session = selected_identity;
             cx.notify();
@@ -235,8 +235,20 @@ impl TableDelegate for UsersDelegate {
         ]
         .into_iter()
         .map(|(label, action)| {
-            let _ = action;
-            MenuEntry::Item(MenuItem::new(label, |_, _| {}).disabled(true))
+            let root = root.clone();
+            let session = session.clone();
+            let item = MenuItem::new(label, move |_, cx| {
+                let _ = root.update(cx, |view, cx| {
+                    if view.request_session_control_confirmation(&session, action) {
+                        cx.notify();
+                    }
+                });
+            });
+            MenuEntry::Item(if can_control {
+                item
+            } else {
+                item.disabled(true)
+            })
         })
         .collect();
         PopupMenuState::new(items, cx)
@@ -419,6 +431,7 @@ pub fn render_users(
         .gap(definite_length(tokens::SPACE_8))
         .child(action_bar(
             &theme,
+            rows.as_slice(),
             selected.as_ref(),
             hovered.as_ref(),
             feedback,
@@ -496,12 +509,11 @@ pub fn render_users(
 
 // ── action bar (Disconnect / Lock) ───────────────────────────────────────────
 
-/// Build the Users action bar. Session controls stay disabled until GPUI has a
-/// visible shared confirmation presentation; no selected identity is sent to
-/// the platform from this bar. The typed feedback slot remains available for
-/// requests submitted by a future confirmed path.
+/// Build the Users action bar. Session controls arm the shared confirmation
+/// only when the selected complete identity is unique in the current rows.
 fn action_bar(
     theme: &Theme,
+    rows: &[SessionItem],
     selected: Option<&SessionIdentity>,
     hovered: Option<&Hover>,
     feedback: Option<ActionFeedback>,
@@ -519,24 +531,42 @@ fn action_bar(
     // `elements::tool_btn` stays decoupled from `root` — the same entity-binding
     // pattern services_view uses.
     let entity = cx.entity();
+    let selected_session = selected.and_then(|identity| {
+        let mut matches = rows
+            .iter()
+            .filter(|session| session.identity().as_ref() == Some(identity));
+        let session = matches.next()?.clone();
+        matches.next().is_none().then_some(session)
+    });
 
     Toolbar::new()
-        // This action remains inert until the shared session confirmation has
-        // a visible GPUI presentation.
         .child({
             let label = i18n::t("users.disconnect");
-            let enabled = false;
+            let session = selected_session.clone();
+            let enabled = session.is_some();
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_h = entity.clone();
+            let click_entity = entity.clone();
+            let hover_entity = entity.clone();
             elements::tool_btn(
                 theme,
                 label,
                 label,
                 enabled,
                 hovered_bool,
-                move |_win: &mut Window, _cx: &mut App| {},
+                move |_win: &mut Window, cx: &mut App| {
+                    if let Some(session) = &session {
+                        let _ = click_entity.update(cx, |view, cx| {
+                            if view.request_session_control_confirmation(
+                                session,
+                                SessionControlAction::Disconnect,
+                            ) {
+                                cx.notify();
+                            }
+                        });
+                    }
+                },
                 move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
+                    hover_entity.update(cx, |v, cx| {
                         v.set_hover(
                             if *is_hov {
                                 Some(Hover::Static(label))
@@ -549,21 +579,33 @@ fn action_bar(
                 },
             )
         })
-        // Lock stays disabled for the same confirmation-presentation gap.
         .child({
             let label = i18n::t("users.lock");
-            let enabled = false;
+            let session = selected_session;
+            let enabled = session.is_some();
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_h = entity.clone();
+            let click_entity = entity.clone();
+            let hover_entity = entity.clone();
             elements::tool_btn(
                 theme,
                 label,
                 label,
                 enabled,
                 hovered_bool,
-                move |_win: &mut Window, _cx: &mut App| {},
+                move |_win: &mut Window, cx: &mut App| {
+                    if let Some(session) = &session {
+                        let _ = click_entity.update(cx, |view, cx| {
+                            if view.request_session_control_confirmation(
+                                session,
+                                SessionControlAction::Lock,
+                            ) {
+                                cx.notify();
+                            }
+                        });
+                    }
+                },
                 move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
+                    hover_entity.update(cx, |v, cx| {
                         v.set_hover(
                             if *is_hov {
                                 Some(Hover::Static(label))

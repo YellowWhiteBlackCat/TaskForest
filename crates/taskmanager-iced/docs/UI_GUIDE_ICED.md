@@ -1,7 +1,7 @@
 # Iced (TaskForest-I) 前端架构与开发指南
 
 本文定义 `taskmanager-iced` 前端的纯函数式 Elm 架构（TEA）范式、状态流转与渲染纪律。
-跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
+跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](../../../docs/UI_COMPONENT_ARCHITECTURE.md)。
 
 ## 1. 核心思维：严格践行 The Elm Architecture (TEA)
 

@@ -37,6 +37,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "process-selection" => Some("process-selection"),
         "process-tree-confirm" => Some("process-tree-confirm"),
         "process-batch-confirm" => Some("process-batch-confirm"),
+        "users-session-confirmation" => Some("users-session-confirmation"),
         "smart-self-test-confirm" => Some("smart-self-test-confirm"),
         "process-properties-performance" => Some("process-properties-performance"),
         "process-memory-pss-swap" => Some("process-memory-pss-swap"),
@@ -199,7 +200,7 @@ pub(crate) fn capture_page() -> Option<Page> {
             Some(Page::System)
         }
         "alerts" | "active-alert" | "alert-rules-manager" | "event-center" => Some(Page::Alerts),
-        "users" | "sessions" => Some(Page::Sessions),
+        "users-session-confirmation" | "users" | "sessions" => Some(Page::Sessions),
         "settings"
         | "settings-permission-center"
         | "settings-zero-gray"

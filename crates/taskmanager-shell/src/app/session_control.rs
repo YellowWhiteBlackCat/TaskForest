@@ -1,6 +1,7 @@
 //! Identity-safe session and startup control seams for [`ShellApp`].
 
 use super::ShellApp;
+use crate::presentation::smart::self_test_supported;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, PendingConfirmation, PlatformEffect,
     SessionControlConfirmation, StartupControlRequest, SurfaceDismissReason,
@@ -138,9 +139,29 @@ impl ShellApp {
         self.confirm_confirmation(ConfirmationKind::StartupControl)
     }
 
-    /// Arm the shared SMART self-test confirmation gate with an explicit intent.
-    pub fn arm_smart_self_test(&mut self, intent: SmartSelfTestIntent) {
+    /// Arm the shared SMART self-test confirmation gate with an explicit,
+    /// still-current device intent. A stale generation or unsupported kind is
+    /// rejected before confirmation can reach the platform adapter.
+    pub fn arm_smart_self_test(&mut self, intent: SmartSelfTestIntent) -> bool {
+        let supported = self.projection().snapshot.as_ref().is_some_and(|snapshot| {
+            snapshot
+                .disks
+                .iter()
+                .filter(|disk| {
+                    disk.device_id == intent.device_id.as_str()
+                        && disk.device_generation == intent.device_generation
+                        && disk.name == intent.device_key.as_str()
+                        && intent.device_generation.is_valid()
+                        && self_test_supported(disk, intent.kind)
+                })
+                .count()
+                == 1
+        });
+        if !supported {
+            return false;
+        }
         self.arm_confirmation(PendingConfirmation::SmartSelfTest(intent));
+        true
     }
 
     /// Confirm the pending SMART self-test: emit it as a

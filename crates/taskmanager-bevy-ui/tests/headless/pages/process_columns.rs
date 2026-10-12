@@ -20,6 +20,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::{
     ProcessColumnToggleId, ProcessColumnsModalChanged, ProcessColumnsModalOverlay,
@@ -71,7 +72,7 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
     app.init_resource::<Assets<Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
 
     let target_proc = test_proc(4242, "cargo");

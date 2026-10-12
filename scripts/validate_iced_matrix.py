@@ -10,6 +10,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from frontend_source_manifest import source_paths
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
@@ -24,6 +25,7 @@ except ModuleNotFoundError:
 
 
 EXPECTED_APP_ID = "io.github.YellowWhiteBlackCat.TaskForestI"
+CLIENT_VIEWPORT_TOLERANCE = 0.5
 MATRIX_FIELDS = {"name", "device", "window_size"}
 MANIFEST_FIELDS = {
     "scenario",
@@ -113,15 +115,17 @@ def current(*command: str, cwd: Path) -> str:
 
 def validate_source_manifest(path: Path, root: Path) -> None:
     root = root.resolve()
+    allowed = None
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         digest, separator, relative = line.partition("  ")
         if not separator or len(digest) != 64 or not relative:
             raise EvidenceError(f"invalid source manifest line {number}")
         source = (root / relative).resolve()
-        try:
-            source.relative_to(root)
-        except ValueError as error:
-            raise EvidenceError(f"source path escapes repository: {relative}") from error
+        if not source.is_relative_to(root.resolve()):
+            if allowed is None:
+                allowed = {entry.resolve() for entry in source_paths(root.resolve(), "iced")}
+            if source not in allowed:
+                raise EvidenceError(f"source path is outside the declared production graph: {relative}")
         if not source.is_file() or file_sha256(source) != digest:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 
@@ -145,7 +149,9 @@ def validate_niri_outputs(path: Path) -> None:
         raise EvidenceError("Niri output receipt has no logical dimensions")
 
 
-def validate_markers(path: Path, device: str) -> None:
+def validate_markers(
+    path: Path, device: str, expected_window: str | None = None
+) -> None:
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
     page = (
         "services"
@@ -156,11 +162,13 @@ def validate_markers(path: Path, device: str) -> None:
         if device == "application-history-replay"
         else "system"
         if device in {"system-hardware", "system-dashboard", "history-60m", "sensor-center", "storage-health"}
+        else "users"
+        if device in {"users-session-confirmation", "users-session-confirmation-compact"}
         else "applications"
         if device in {
             "process-selection", "saved-view-presets",
             "process-details", "process-properties-performance", "process-insights",
-            "process-command", "process-affinity", "process-end-confirm", "apps-search-highlight",
+            "process-command", "process-affinity", "process-end-confirm", "process-context-menu", "apps-search-highlight",
             "process-force-kill", "process-tree-confirm", "process-batch-confirm",
             "process-memory-pss-swap", "process-network-details", "process-gpu-details",
             "process-resource-limits", "process-isolation", "apps-group-expanded",
@@ -179,6 +187,90 @@ def validate_markers(path: Path, device: str) -> None:
         raise EvidenceError(f"expected one frame marker in {path}, got {lines!r}")
     if lines.count(target) != 1:
         raise EvidenceError(f"expected one target marker for {device!r} in {path}")
+    if device == "process-context-menu":
+        surface_prefix = (
+            "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications "
+            "surface=process-context-menu "
+        )
+        surface_lines = [line for line in lines if line.startswith(surface_prefix)]
+        if len(surface_lines) != 1:
+            raise EvidenceError(
+                f"expected one mounted Process context-menu surface marker in {path}"
+            )
+        identity_fields = surface_lines[0].split()[5:]
+        if len(identity_fields) != 2:
+            raise EvidenceError(f"Process context-menu marker lacks a live identity in {path}")
+        try:
+            identity = {
+                key: int(value)
+                for field in identity_fields
+                for key, separator, value in [field.partition("=")]
+                if separator
+            }
+        except ValueError as error:
+            raise EvidenceError(f"Process context-menu identity is malformed in {path}") from error
+        if set(identity) != {"pid", "start_token"} or min(identity.values()) <= 0:
+            raise EvidenceError(f"Process context-menu identity is incomplete in {path}")
+    if device == "cpu-facts":
+        facts = (
+            "ICED_CAPTURE_MARKER event=cpu_facts_ready mode=demo page=performance "
+            "device=cpu-facts rail=stats-end core_breakdown=6/8/2 cache_kib=64/64/1024/16384 "
+            "base_frequency_mhz=2400 core_counts=16/22 virtualization=VT-x "
+            "core_temperature_c=55/59"
+        )
+        if lines.count(facts) != 1:
+            raise EvidenceError(f"expected one typed CPU facts readiness marker in {path}")
+    if page == "performance" and expected_window is not None:
+        viewport_prefix = (
+            "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance "
+            f"device={device} "
+        )
+        viewport_lines = [line for line in lines if line.startswith(viewport_prefix)]
+        if len(viewport_lines) != 1:
+            raise EvidenceError(
+                f"expected one app-received Performance viewport marker in {path}, got {viewport_lines!r}"
+            )
+        fields: dict[str, str] = {}
+        for field in viewport_lines[0].split()[5:]:
+            key, separator, value = field.partition("=")
+            if not separator or key in fields:
+                raise EvidenceError(f"invalid Performance viewport field: {field!r}")
+            fields[key] = value
+        try:
+            requested_width, requested_height = parse_window(expected_window)
+            viewport_width = float(fields["width"])
+            viewport_height = float(fields["height"])
+            page_width = float(fields["page_width"])
+            page_height = float(fields["page_height"])
+        except (KeyError, ValueError) as error:
+            raise EvidenceError("Performance viewport marker has invalid dimensions") from error
+        if min(viewport_width, viewport_height, page_width, page_height) <= 0:
+            raise EvidenceError("Performance viewport marker reports an empty viewport")
+        if (fields.get("rung"), fields.get("inventory")) not in {
+            ("Floor", "AggregateOnly"),
+            ("Core", "AggregateOnly"),
+            ("Charts", "Full"),
+        }:
+            raise EvidenceError("Performance viewport marker lacks a valid rung/inventory")
+        if abs(viewport_width - requested_width) > CLIENT_VIEWPORT_TOLERANCE or abs(
+            viewport_height - requested_height
+        ) > CLIENT_VIEWPORT_TOLERANCE:
+            raise EvidenceError(
+                f"app-received viewport {viewport_width:g}x{viewport_height:g} differs from requested {expected_window}"
+            )
+        if device in {"cpu", "cpu-facts"}:
+            expected_budget = {
+                (1180, 780): ("Charts", "Full"),
+                (720, 480): ("Floor", "AggregateOnly"),
+            }.get((requested_width, requested_height))
+            if expected_budget is None:
+                raise EvidenceError(
+                    f"CPU capture has no accepted viewport rung for {expected_window}"
+                )
+            if (fields.get("rung"), fields.get("inventory")) != expected_budget:
+                raise EvidenceError(
+                    f"CPU {expected_window} capture expected rung/inventory {expected_budget}, got {(fields.get('rung'), fields.get('inventory'))}"
+                )
 
 
 def validate_window(path: Path, app_pid: str, window_id: str) -> None:
@@ -286,7 +378,9 @@ def main() -> int:
                 raise EvidenceError(f"manifest dimensions differ for {row['scenario']}")
             if str(image_receipt.size) != row["bytes"] or image_receipt.sha256 != row["sha256"]:
                 raise EvidenceError(f"manifest image receipt differs for {row['scenario']}")
-            validate_markers(run_dir / row["markers"], row["device"])
+            validate_markers(
+                run_dir / row["markers"], row["device"], expected["window_size"]
+            )
             validate_window(run_dir / row["windows"], row["app_pid"], row["window_id"])
             validate_action(run_dir / row["action"], row["window_id"])
             artifacts.append(

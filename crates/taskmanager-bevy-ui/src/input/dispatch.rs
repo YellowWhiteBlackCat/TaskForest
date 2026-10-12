@@ -44,6 +44,8 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 
 #[path = "dispatch/diagnostics.rs"]
 mod diagnostics;
+#[path = "dispatch/system_about.rs"]
+mod system_about;
 
 /// One just-pressed key, normalized once for the whole arm chain: the facts
 /// every arm reads are captured here so each arm stays a predicate on
@@ -154,6 +156,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             || self.smart_self_test(press)
             || self.snapshot_export(press)
             || self.search_editing(press)
+            || self.system_about(press)
             || self.shell_char(press)
             || self.copy_chord(press)
         {

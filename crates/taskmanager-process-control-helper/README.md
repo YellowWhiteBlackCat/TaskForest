@@ -23,3 +23,9 @@ payload checks are separate from live installed authorization evidence.
 src/main.rs   one identity-revalidated foreign-process operation
               (Windows UAC one-shot reply-file protocol, ADR-035)
 ```
+
+## Docs
+
+- [`docs/IDENTITY_REVALIDATION.md`](docs/IDENTITY_REVALIDATION.md) — the revalidation rule
+  and distinguishable outcome vocabulary.
+- [ADR-035](../../adr/035-windows-uac-foreign-process-control-transport.md) — UAC transport.

@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::layout::Rect;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
@@ -34,6 +35,7 @@ use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{SortCol, SortDir};
 
+use crate::ui::{TuiFramePlan, render_with_plan};
 use crate::{TuiApp, TuiTheme, render};
 
 use super::*;
@@ -469,6 +471,57 @@ fn steady_state_frame_smoke_budget_at_50k() {
         steady_state < Duration::from_millis(2_000),
         "50k steady-state frame took {steady_state:?}, smoke budget is 2s"
     );
+}
+
+#[test]
+fn warm_frame_projection_timing_breakdown_at_10k_and_50k() {
+    let area = Rect::new(0, 0, 120, 40);
+    let theme = TuiTheme::default();
+    for (name, shape) in [("10k", FIXTURE_10K), ("50k", FIXTURE_50K)] {
+        let fixture = tree_fixture(shape.0, shape.1, shape.2, shape.3);
+        let app = seeded_app(&fixture);
+        let plan = TuiFramePlan::build(&app, area);
+
+        // Warm all app-owned memoization before measuring the three named
+        // costs: plan/layout projection, visible widget rendering from a
+        // committed plan, and the complete warm frame that combines them.
+        let mut visible_terminal =
+            Terminal::new(TestBackend::new(area.width, area.height)).expect("test terminal");
+        visible_terminal
+            .draw(|frame| render_with_plan(frame, &app, theme, &plan))
+            .expect("warm visible render");
+        let mut full_terminal =
+            Terminal::new(TestBackend::new(area.width, area.height)).expect("test terminal");
+        full_terminal
+            .draw(|frame| render(frame, &app, theme))
+            .expect("warm full frame");
+
+        let plan_ns = average_nanos(200, || {
+            std::hint::black_box(TuiFramePlan::build(&app, area));
+        });
+        let visible_render_ns = average_nanos(5, || {
+            visible_terminal
+                .draw(|frame| render_with_plan(frame, &app, theme, &plan))
+                .expect("visible render");
+        });
+        let full_frame_ns = average_nanos(5, || {
+            full_terminal
+                .draw(|frame| render(frame, &app, theme))
+                .expect("full frame");
+        });
+
+        eprintln!(
+            "TUI006_WARM_TIME processes={name} frame=120x40 plan_layout_ns={plan_ns} visible_render_ns={visible_render_ns} full_frame_ns={full_frame_ns}"
+        );
+    }
+}
+
+fn average_nanos(iterations: u128, mut operation: impl FnMut()) -> u128 {
+    let start = Instant::now();
+    for _ in 0..iterations {
+        operation();
+    }
+    start.elapsed().as_nanos() / iterations
 }
 
 // ─── Layered dirty-repaint behavior (TUI-006 charter tail) ──────────────────

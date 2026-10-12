@@ -228,9 +228,14 @@ fn report_failure(report: &SmartSelfTestReport) -> Option<FailureKind> {
         |failure| {
             Some(match failure {
                 SmartSelfTestFailure::InvalidDevice => FailureKind::IdentityChanged,
+                SmartSelfTestFailure::SupportUnknown => FailureKind::TemporarilyUnavailable,
+                SmartSelfTestFailure::Unsupported => FailureKind::Unsupported,
                 SmartSelfTestFailure::MissingTool => FailureKind::MissingDependency,
                 SmartSelfTestFailure::RequiresEscalation => FailureKind::RequiresEscalation,
                 SmartSelfTestFailure::PermissionDenied => FailureKind::PermissionDenied,
+                SmartSelfTestFailure::AuthorizationUnavailable => FailureKind::RequiresEscalation,
+                SmartSelfTestFailure::HelperUnavailable => FailureKind::MissingDependency,
+                SmartSelfTestFailure::HelperProtocolViolation => FailureKind::ProviderFault,
                 SmartSelfTestFailure::TimedOut => FailureKind::TimedOut,
                 SmartSelfTestFailure::ProviderUnavailable => FailureKind::TemporarilyUnavailable,
                 SmartSelfTestFailure::Rejected => FailureKind::Rejected,

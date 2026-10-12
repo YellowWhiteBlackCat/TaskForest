@@ -21,6 +21,7 @@ use taskmanager_ui_contract::IconId;
 
 use super::IcedElement;
 use crate::theme;
+use zhuge_ui_kit_iced::surface::{self, BadgeGeometry};
 
 /// Badge / progress fill tones; each maps to one palette semantic color.
 ///
@@ -69,16 +70,20 @@ const BADGE_HEIGHT: f32 = 20.0;
 pub(crate) fn badge<'a>(theme: &'a Theme, label: &str, tone: BadgeTone) -> IcedElement<'a> {
     let fill = crate::theme_binding::color(tone.fill(theme));
     let foreground = crate::theme_binding::color(tone.foreground(theme));
-    container(
-        text(label.to_owned())
-            .size(f32::from(tokens::FONT_CAPTION))
-            .color(foreground),
+    surface::badge(
+        label,
+        BadgeGeometry {
+            size: f32::from(tokens::FONT_CAPTION),
+            font: None,
+            padding: [0.0, f32::from(tokens::SPACE_8)].into(),
+            height: Length::Fixed(BADGE_HEIGHT),
+            centered: true,
+        },
+        move |_| container::Style {
+            text_color: Some(foreground),
+            ..container_style(fill, (BADGE_HEIGHT / 2.0).into())
+        },
     )
-    .padding([0.0, f32::from(tokens::SPACE_8)])
-    .height(Length::Fixed(BADGE_HEIGHT))
-    .align_y(Alignment::Center)
-    .style(move |_| container_style(fill, (BADGE_HEIGHT / 2.0).into()))
-    .into()
 }
 
 /// A 1px horizontal hairline in the palette's border color — the divider
@@ -193,6 +198,33 @@ pub(crate) fn tooltip<'a>(
         .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
         .style(move |_| theme::panel_style(surface))
         .into();
+    iced::widget::tooltip(content, hint, iced::widget::tooltip::Position::FollowCursor)
+        .snap_within_viewport(true)
+        .gap(f32::from(tokens::SPACE_4))
+        .into()
+}
+
+/// Owned variant for row projections whose detail string is created during
+/// rendering. The trigger keeps its own full text content (including its
+/// accessibility text) while the wrapped tooltip exposes that detail without
+/// widening the containing table column.
+pub(crate) fn tooltip_owned(
+    theme: Theme,
+    content: IcedElement<'static>,
+    tip: String,
+) -> IcedElement<'static> {
+    let tip_fg = crate::theme_binding::color(theme.palette().fg);
+    let surface = theme;
+    let hint: IcedElement<'static> = container(
+        text(tip)
+            .size(f32::from(tokens::FONT_11))
+            .color(tip_fg)
+            .width(Length::Fixed(280.0))
+            .wrapping(iced::widget::text::Wrapping::Word),
+    )
+    .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
+    .style(move |_| theme::panel_style(&surface))
+    .into();
     iced::widget::tooltip(content, hint, iced::widget::tooltip::Position::FollowCursor)
         .snap_within_viewport(true)
         .gap(f32::from(tokens::SPACE_4))

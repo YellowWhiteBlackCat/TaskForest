@@ -123,7 +123,7 @@ fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
         .snapshot
         .clone()
         .expect("demo snapshot");
-    app.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
+    let _ = app.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
 
     let snapshot = semantic_snapshot_with_local(&app).expect("tree must build");
     let disabled = snapshot

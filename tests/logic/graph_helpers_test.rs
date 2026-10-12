@@ -1,7 +1,6 @@
 //! Pure-logic tests for headless-math helpers in the gpui layer that are cheap to
 //! assert without a window:
 //! - `graph::compute_column_count` — the Mission Center core-grid column chooser.
-//! - `cpu_view::format_uptime` — the system-uptime `D:HH:MM:SS` / `HH:MM:SS` formatter.
 //!
 //! Private helpers that WOULD belong here but cannot be reached from `tests/`
 //! without editing `src/` (out of this agent's file ownership) — noted as gaps:
@@ -10,7 +9,6 @@
 //! - `perf_views::memory_composition_segments` / `stacked_bar` share math (private).
 //! - `perf_views::rate_str` / `sidebar::rate_str` bytes→rate formatters (private).
 
-use taskmanager_gpui::gpui_app::cpu_view::format_uptime;
 use taskmanager_gpui::gpui_app::graph::compute_column_count;
 
 // ── compute_column_count ─────────────────────────────────────────────────────
@@ -83,56 +81,4 @@ fn compute_column_count_always_positive_and_le_n() {
         assert!(c >= 1, "n={n}: column count must be >= 1, got {c}");
         assert!(c <= n, "n={n}: column count must be <= n, got {c}");
     }
-}
-
-// ── format_uptime ────────────────────────────────────────────────────────────
-//
-// `format_uptime(secs)`:
-//   secs < 1 day  -> "HH:MM:SS"
-//   secs >= 1 day -> "D:HH:MM:SS"  (day count unpadded, the rest zero-padded)
-
-#[test]
-fn format_uptime_zero() {
-    assert_eq!(format_uptime(0), "00:00:00");
-}
-
-#[test]
-fn format_uptime_seconds_only() {
-    assert_eq!(format_uptime(59), "00:00:59");
-}
-
-#[test]
-fn format_uptime_minutes_and_seconds() {
-    assert_eq!(format_uptime(125), "00:02:05"); // 2m 5s
-}
-
-#[test]
-fn format_uptime_exactly_one_hour() {
-    assert_eq!(format_uptime(3_600), "01:00:00");
-}
-
-#[test]
-fn format_uptime_last_second_of_a_day() {
-    assert_eq!(format_uptime(86_399), "23:59:59");
-}
-
-#[test]
-fn format_uptime_first_second_of_day_two_switches_to_day_format() {
-    // 86_400s = exactly 1 day → the `d > 0` branch engages, day count unpadded.
-    assert_eq!(format_uptime(86_400), "1:00:00:00");
-}
-
-#[test]
-fn format_uptime_day_plus_hours_minutes_seconds() {
-    // 1 day + 1h + 1m + 1s
-    assert_eq!(format_uptime(86_400 + 3_661), "1:01:01:01");
-}
-
-#[test]
-fn format_uptime_multi_day_day_field_unpadded() {
-    // 3 days + 2h + 30m + 5s — day field has no leading zero.
-    assert_eq!(
-        format_uptime(3 * 86_400 + 2 * 3_600 + 30 * 60 + 5),
-        "3:02:30:05"
-    );
 }

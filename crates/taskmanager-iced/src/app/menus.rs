@@ -1,7 +1,7 @@
 //! Shared reset for Iced's renderer-local menu surfaces.
 
 use super::*;
-use taskmanager_application::PlatformEffect;
+use taskmanager_application::{AppPage, KeyCode};
 use taskmanager_core::core::session::SessionControlAction;
 
 impl IcedApp {
@@ -41,19 +41,31 @@ impl IcedApp {
         }
     }
 
-    /// Emit a direct Users-menu action from the frozen provider payload. The
-    /// shell gate is armed and immediately confirmed here to preserve Iced's
-    /// existing direct-menu behavior while retaining the exact target.
-    pub(super) fn request_user_menu_action(
-        &mut self,
-        action: SessionControlAction,
-    ) -> Option<PlatformEffect> {
-        let session = self.user_menu_session()?.clone();
+    /// Arm the shared confirmation from the Users menu's frozen provider
+    /// payload. A later inventory reorder cannot retarget this pending action.
+    pub(super) fn arm_user_menu_session_control(&mut self, action: SessionControlAction) -> bool {
+        let Some(session) = self.user_menu_session().cloned() else {
+            return false;
+        };
         self.close_context_menus();
-        self.shell
-            .select_session_control(&session, action)
-            .then(|| self.shell.confirm_session_control())
-            .flatten()
+        self.shell.select_session_control(&session, action)
+    }
+
+    /// Arm the shared confirmation from the current canonical Users row.
+    pub(super) fn arm_selected_session_control(&mut self, action: SessionControlAction) -> bool {
+        let session = self
+            .shell
+            .sorted_session_indices()
+            .get(self.shell.selected)
+            .and_then(|source_index| {
+                self.shell
+                    .projection()
+                    .sessions
+                    .as_deref()
+                    .and_then(|sessions| sessions.get(*source_index))
+            })
+            .cloned();
+        session.is_some_and(|session| self.shell.select_session_control(&session, action))
     }
 
     pub fn focus_request_for(&self, message: &Message) -> Option<FocusTarget> {
@@ -79,6 +91,22 @@ impl IcedApp {
             }
             Message::OpenDiskSmart { index } => Some(FocusTarget::DiskSmartOpen { index: *index }),
             Message::CloseSearch if self.shell.search_active() => Some(FocusTarget::SearchTrigger),
+            Message::Key(IcedKey::Fixed(event))
+                if event.key == KeyCode::Escape
+                    && self.context_menu_kind() == Some(ContextMenuKind::ProcessColumns) =>
+            {
+                Some(FocusTarget::ProcessColumnsTrigger)
+            }
+            Message::Key(IcedKey::Fixed(event))
+                if event.key == KeyCode::Escape
+                    && self.shell.page() == AppPage::Services
+                    && !self.services_query().is_empty() =>
+            {
+                Some(FocusTarget::TableRow {
+                    page: AppPage::Services,
+                    index: 0,
+                })
+            }
             Message::AuthorizeRaplPower => Some(FocusTarget::AuthorizeRaplPower),
             Message::AuthorizeMsrReadouts => Some(FocusTarget::AuthorizeMsrReadouts),
             Message::OpenUserRowMenu(_) => Some(FocusTarget::UserRowMenuDisconnect),

@@ -15,14 +15,14 @@ impl IcedApp {
 
     pub(super) fn toggle_process_column(&mut self, column: SortCol) {
         // Hideability is contract truth (PROCESS_COLUMNS): the identity
-        // column is not hideable, so its toggle is a no-op that only closes
-        // the menu.
+        // column is not hideable, so its toggle is a no-op. This is a
+        // multi-select menu; individual choices leave it open so users can
+        // change several columns before dismissing it.
         if crate::ui::applications::column_hideable(column)
             && !self.process_presentation.hidden_columns.remove(&column)
         {
             self.process_presentation.hidden_columns.insert(column);
         }
-        self.close_process_columns_menu();
     }
 
     pub(super) fn reset_process_columns(&mut self) {

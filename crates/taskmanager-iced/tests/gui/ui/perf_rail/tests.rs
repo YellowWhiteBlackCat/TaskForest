@@ -1,13 +1,14 @@
 use super::*;
 use crate::app::{Message, SettingsChange};
-use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::identity::DeviceGeneration;
 use taskmanager_core::core::metrics::OptionalObservation;
 use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryMetrics,
-    MemoryScalarObservations, NetworkAdapterType, ScalarObservation, ScalarObservationGroup,
+    CpuFrequencySource, CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations,
+    MemoryMetrics, MemoryScalarObservations, NetworkAdapterType, ScalarObservation,
+    ScalarObservationGroup,
 };
 use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations};
 use taskmanager_core::core::sensors::{
@@ -17,8 +18,10 @@ use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::trend::cpu_usage_percent;
 use taskmanager_shell::presentation::trend::memory_usage_percent;
+use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 fn rail_key(app: &crate::IcedApp, theme: &Theme) -> u64 {
     let devices = [PerfDevice::Cpu];
@@ -96,14 +99,23 @@ fn cpu_caption_reads_typed_usage_temperature_and_core_range() {
 
     let mut measured = CpuMetrics::from_observations(CpuScalarObservations {
         global_usage_pct: ScalarObservation::available(42.0, 1),
+        frequency_mhz: ScalarObservation::available(3_500, 1),
         temperature_c: ScalarObservation::available(55.0, 1),
         per_core_temperature_group: ScalarObservationGroup::available(vec![45.0, 47.0], 1),
         ..Default::default()
     });
     measured.brand = Some("Test CPU".into());
     let (cap1, cap2) = cpu_rail_caption(&measured);
-    assert_eq!(cap1, "42% · 55 \u{b0}C");
-    assert_eq!(cap2, "cores 45..47 \u{b0}C");
+    assert_eq!(cap1, "42% · 3.50 GHz");
+    assert_eq!(cap2, "55 \u{b0}C · cores 45..47 \u{b0}C");
+
+    measured.frequency_source = CpuFrequencySource::BogoMips;
+    assert_eq!(
+        cpu_rail_caption(&measured).0,
+        "42% · 3500.00 BogoMIPS",
+        "a calibration fallback must keep its typed source label"
+    );
+    measured.frequency_source = CpuFrequencySource::Native;
     assert_eq!(cpu_rail_heading(&measured), "CPU");
     assert_eq!(cpu_rail_heading(&unavailable), "CPU");
     assert_eq!(cpu_rail_subtitle(&measured), "Test CPU");
@@ -114,7 +126,7 @@ fn cpu_caption_reads_typed_usage_temperature_and_core_range() {
         ..measured.scalar_observations().clone()
     });
     let (_, cap2) = cpu_rail_caption(&collapsed);
-    assert_eq!(cap2, "cores 46 \u{b0}C");
+    assert_eq!(cap2, "55 \u{b0}C · cores 46 \u{b0}C");
 }
 
 #[test]
@@ -158,7 +170,16 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
     assert_eq!(disk_rail_subtitle(&disk), "ZHITAI TiPro9000 2TB");
     let (cap1, cap2) = disk_rail_caption(&disk, UnitPrefs::default());
     assert_eq!(cap1, "12% · 124.0 MiB/s");
-    assert_eq!(cap2, "nvme0n1 · NVMe SSD · 41 \u{b0}C");
+    assert_eq!(cap2, "NVMe SSD · 41 \u{b0}C");
+    let full_identity = [
+        disk_rail_heading(&disk),
+        disk_rail_subtitle(&disk),
+        cap2.clone(),
+    ]
+    .join(" · ");
+    assert_eq!(full_identity.matches("nvme0n1").count(), 1);
+    assert!(full_identity.contains("ZHITAI TiPro9000 2TB"));
+    assert!(full_identity.contains("NVMe SSD"));
 
     let degraded = DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:sda".into())
@@ -169,8 +190,15 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
     assert_eq!(disk_rail_subtitle(&degraded), "");
     let (cap1, cap2) = disk_rail_caption(&degraded, UnitPrefs::default());
     assert_eq!(cap1, "— · —");
-    assert!(cap2.starts_with("sda"), "empty type omitted: {cap2}");
-    assert!(cap2.contains(" · "), "degraded badge appended: {cap2}");
+    assert!(
+        !cap2.contains("sda"),
+        "heading already identifies the disk: {cap2}"
+    );
+    assert_eq!(
+        cap2,
+        t(device_status_i18n_key(effective_smart_status(&degraded))),
+        "with no model or type, the status badge is the only caption"
+    );
 }
 
 #[test]
@@ -503,3 +531,6 @@ fn compact_device_label_cleanly_indicates_gpu_in_demo_app() {
     assert!(!label.contains('…'));
     assert!(!label.contains("Graphics"));
 }
+
+#[path = "tooltip_behavior_tests.rs"]
+mod tooltip_behavior_tests;

@@ -12,12 +12,15 @@ use bevy::ecs::hierarchy::Children;
 use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{Scene, bsn};
+use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px,
+    UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
+use zhuge_ui_kit_bevy::control::{ButtonLayout, button_scene};
+use zhuge_ui_kit_bevy::surface::{self, SurfaceLayout};
 
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
 use crate::window::{Role, TextRole};
@@ -26,7 +29,11 @@ use bevy::text::{LineBreak, TextLayout};
 /// The sortable-header indicator: a semantic direction plate (arrow-up /
 /// arrow-down) tinted with the dim ink, or empty when the sort rests
 /// elsewhere. The arrow is an image, never a text codepoint — a glyph the
-/// embedded faces do not guarantee is exactly how tofu bugs ship.
+/// embedded faces do not guarantee is exactly how tofu bugs ship. It flows
+/// INLINE with the column label: bevy_text reserves its box inside the text
+/// layout, so label and direction clip, align and shift as one line under the
+/// header's bounded-line discipline — never a flex sibling that outlives a
+/// clipped label.
 pub(crate) fn sort_indicator_scene(
     descending: Option<bool>,
     palette: &UiPalette,
@@ -37,7 +44,11 @@ pub(crate) fn sort_indicator_scene(
         Some(false) => IconId::NavigateUp,
         None => return Vec::new(),
     };
-    vec![crate::icons::icon_scene(icon, 12.0, palette.dim_color)]
+    vec![crate::icons::inline_icon_scene(
+        icon,
+        palette.icon_size_px(),
+        palette.dim_color,
+    )]
 }
 
 /// Which idle/selected surface a shared interactive control belongs to.
@@ -105,19 +116,19 @@ pub(crate) fn surface_scene(
     children: Vec<Box<dyn Scene>>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! {
-        Node {
+    surface::surface_scene(
+        SurfaceLayout {
             width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
+            min_width: Val::Auto,
+            max_width: Val::Auto,
+            direction: FlexDirection::Column,
+            gap: Val::Px(space_2()),
             padding: UiRect::all(Val::Px(space_16())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-        }
-        BackgroundColor({ surface_fill(tone, palette) })
-        Children [
-            { children }
-        ]
-    }
+            radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+        },
+        surface_fill(tone, palette),
+        children,
+    )
 }
 
 /// A compact key/value row. The label is caption ink; the value is body ink
@@ -131,7 +142,7 @@ pub(crate) fn stat_row_scene(
     bsn! {
         Node {
             width: percent(100),
-            min_height: px(palette.control_height_px),
+            min_height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceBetween,
@@ -167,7 +178,7 @@ pub(crate) fn detail_row_scene(
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     bsn! {
-        Node { width: percent(100), min_width: px(0.0), min_height: px(palette.control_height_px), flex_shrink: 0.0,
+        Node { width: percent(100), min_width: px(0.0), min_height: rem(palette.control_height_rem), flex_shrink: 0.0,
             flex_direction: FlexDirection::Column, row_gap: px(space_2()),
             padding: UiRect::vertical(px(space_2())) }
         Children [
@@ -180,24 +191,25 @@ pub(crate) fn detail_row_scene(
 /// Unstyled Bevy button plus the product pill skin. Interaction wiring belongs
 /// to the caller so the same visual control can carry different typed events.
 pub(crate) fn pill_scene(label: String, active: bool, palette: &UiPalette) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            min_width: px(palette.control_height_px * 2.8),
-            height: px(palette.control_height_px),
+    let scene = button_scene(
+        ButtonLayout {
+            min_width: rem(palette.control_height_rem * 2.8),
+            height: rem(palette.control_height_rem),
             padding: UiRect::horizontal(Val::Px(space_12())),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-        }
-        BackgroundColor({
-            if active { palette.nav_active_bg } else { palette.content_bg }
-        })
-        ControlVisual(ControlTone::Surface, active)
-        Button
-        Children [
-             Text(label) TextRole(Role::Body)
-        ]
-    }
+            border: UiRect::default(),
+            align: AlignItems::Center,
+            justify: JustifyContent::Center,
+            radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+        },
+        if active {
+            palette.nav_active_bg
+        } else {
+            palette.content_bg
+        },
+        BorderColor::default(),
+        bsn! { Text(label) TextRole(Role::Body) },
+    );
+    bsn! { @{ scene } ControlVisual(ControlTone::Surface, active) }
 }
 
 /// Device row variant with a bounded visual accessory. The accessory owns its
@@ -214,7 +226,7 @@ pub(crate) fn device_row_with_accessory_scene(
     bsn! {
         Node {
             width: percent(100),
-            min_height: px(palette.control_height_px * 2.25),
+            min_height: rem(palette.control_height_rem * 2.25),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),

@@ -8,14 +8,25 @@
 //! - closing the panel closes the shell lifecycle;
 //! - relation sections build without panic.
 
+use bevy::MinimalPlugins;
+use bevy::app::App;
+use bevy::asset::{AssetPlugin, Assets};
+use bevy::scene::{ScenePlugin, WorldSceneExt};
+use bevy::text::Font;
+use bevy::ui::widget::Text;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::ServiceDependenciesLifecycle;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
     ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus,
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_test_support::pin_english;
+use taskmanager_theme::tokens::UiSize;
 
 use super::dependencies_panel::{dependencies_fingerprint, service_dependencies_panel_scene};
 use super::tests::{headless_services_app, push_services, route_to_services};
@@ -106,14 +117,6 @@ fn the_dependencies_fingerprint_tracks_lifecycle_transitions() {
 
 #[test]
 fn dependencies_panel_renders_relations_scene() {
-    use bevy::MinimalPlugins;
-    use bevy::app::App;
-    use bevy::asset::{AssetPlugin, Assets};
-    use bevy::scene::{ScenePlugin, WorldSceneExt};
-    use bevy::text::Font;
-    use bevy::ui::widget::Text;
-    use taskmanager_application::i18n::t;
-
     let mut shell = ShellApp::new();
     let target = ServiceId::new("demo.service");
     let mut deps = ServiceDeps::default();
@@ -131,7 +134,7 @@ fn dependencies_panel_renders_relations_scene() {
     shell.service_dependencies.resolve(req_id, target, deps);
 
     let theme = Theme::default();
-    let palette = crate::palette::ui_palette(&theme);
+    let palette = crate::palette::ui_palette(&theme, UiSize::Standard);
     let scene = service_dependencies_panel_scene(&shell, &palette);
 
     // Spawn the production scene and read the painted text nodes: the panel
@@ -180,5 +183,45 @@ fn dependencies_panel_renders_relations_scene() {
     assert_eq!(
         texts.iter().filter(|text| *text == "req.service").count(),
         1
+    );
+}
+
+#[test]
+fn dependency_failure_renders_the_shared_localized_reason_in_the_production_scene() {
+    pin_english();
+    let failure = FailureKind::PermissionDenied;
+    let target = ServiceId::new("restricted.service");
+    let request = RequestId::new(1).expect("valid request id");
+    let mut shell = ShellApp::new();
+    shell.service_dependencies.begin(request, target.clone());
+    assert!(shell.service_dependencies.fail(request, target, failure));
+
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
+    let scene = service_dependencies_panel_scene(&shell, &palette);
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    app.world_mut()
+        .spawn_scene(scene)
+        .expect("the failed dependency panel resolves");
+    app.update();
+
+    let painted = app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .map(|text| text.0.clone())
+        .collect::<Vec<_>>();
+    assert!(painted.contains(&format!(
+        "{}: {}",
+        t("source.unavailable_title"),
+        control_error_detail(failure)
+    )));
+    assert!(
+        painted
+            .iter()
+            .all(|text| !text.contains("PermissionDenied")),
+        "renderer output must not expose the Rust enum debug spelling"
     );
 }

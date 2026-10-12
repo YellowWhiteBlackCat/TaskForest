@@ -20,6 +20,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
 #[cfg(not(target_os = "linux"))]
 use taskmanager_ui_contract::DetachedAccessibilityBridge;
@@ -249,6 +250,20 @@ fn active_modal(shell: &ShellApp) -> Option<ModalInput> {
             description: Some(format!(
                 "Confirm the requested {:?} action for service {}",
                 target.action, target.service_id
+            )),
+        });
+    }
+    if let Some(target) = shell.pending_session() {
+        let action = match target.action {
+            SessionControlAction::Disconnect => t("users.disconnect"),
+            SessionControlAction::Lock => t("users.lock"),
+        };
+        return Some(ModalInput {
+            id: String::from("session-control-confirmation"),
+            name: String::from("Session control confirmation"),
+            description: Some(format!(
+                "Confirm {action} for session {} ({})",
+                target.session.id, target.session.user
             )),
         });
     }

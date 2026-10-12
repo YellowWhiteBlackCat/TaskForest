@@ -9,6 +9,8 @@ use super::super::*;
 use ratatui::crossterm::event::KeyModifiers;
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn app_on_processes() -> crate::TuiApp {
@@ -17,6 +19,117 @@ fn app_on_processes() -> crate::TuiApp {
     app.shell.selected = 0;
     app.reconcile_applications_cursor();
     app
+}
+
+fn select_process_by_name(app: &mut crate::TuiApp, name: &str) -> FrozenProcessIdentity {
+    let visible = app.shell.visible_processes();
+    let process = visible
+        .iter()
+        .copied()
+        .find(|process| process.name == name)
+        .unwrap_or_else(|| panic!("demo process {name:?} must exist"));
+    let identity = ProcessLiveKey::from_process(process).expect("demo process identity");
+    assert!(app.shell.select_row_id(ProcessRowId::Process(identity)));
+    app.reconcile_applications_cursor();
+    assert_eq!(
+        app.selected_detail_process()
+            .as_ref()
+            .map(|row| row.name.as_str()),
+        Some(name),
+        "the grouped Applications cursor must select the requested process"
+    );
+    app.shell
+        .selected_process_identity()
+        .expect("selected demo process identity")
+}
+
+fn type_search_query(app: &mut crate::TuiApp, query: &str) {
+    for character in query.chars() {
+        let _ = handle_key(
+            app,
+            KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::Char(character),
+                KeyModifiers::NONE,
+            ),
+        );
+    }
+}
+
+#[test]
+fn query_change_keeps_the_selected_process_when_it_still_matches() {
+    let mut app = app_on_processes();
+    let selected_before = select_process_by_name(&mut app, "taskmanager-tui");
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('f'),
+            KeyModifiers::CONTROL,
+        ),
+    );
+
+    type_search_query(&mut app, "a");
+
+    assert!(app.search_active());
+    assert!(
+        app.visible_processes()
+            .iter()
+            .any(|process| process.name == "taskmanager-tui"),
+        "the selected process remains in the filtered projection"
+    );
+    let filtered = app.visible_processes();
+    assert!(
+        filtered
+            .iter()
+            .position(|process| process.name == "taskmanager-tui")
+            .is_some_and(|position| position > 0),
+        "the query must retain an earlier matching row so resetting to the first row is observable"
+    );
+    assert_eq!(
+        app.shell.selected_process_identity(),
+        Some(selected_before),
+        "query edits preserve the selected process's full frozen identity"
+    );
+    assert_eq!(
+        app.selected_detail_process()
+            .as_ref()
+            .map(|row| row.name.as_str()),
+        Some("taskmanager-tui")
+    );
+}
+
+#[test]
+fn query_change_falls_back_when_the_selected_process_is_filtered_out() {
+    let mut app = app_on_processes();
+    let selected_before = select_process_by_name(&mut app, "rust-analyzer");
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('f'),
+            KeyModifiers::CONTROL,
+        ),
+    );
+
+    type_search_query(&mut app, "dbus-broker");
+
+    assert_eq!(
+        app.visible_processes()
+            .iter()
+            .map(|process| process.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["dbus-broker"],
+        "the query filters the old selection and keeps the deterministic match"
+    );
+    let selected_after = app
+        .shell
+        .selected_process_identity()
+        .expect("the first actionable filtered process is selected");
+    assert_ne!(selected_after, selected_before);
+    assert_eq!(
+        app.selected_detail_process()
+            .as_ref()
+            .map(|row| row.name.as_str()),
+        Some("dbus-broker")
+    );
 }
 
 #[test]

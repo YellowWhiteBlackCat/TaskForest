@@ -6,6 +6,8 @@ use crate::text_selection::flush_clipboard;
 use crate::window::tests::scripted_frontend_app;
 use bevy::ecs::change_detection::Mut;
 use bevy::ecs::entity::Entity;
+use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
+use bevy::input::{ButtonInput, ButtonState};
 use taskmanager_shell::fixture;
 
 #[test]
@@ -124,6 +126,50 @@ fn independent_system_information_copies_the_frozen_review_and_ignores_stale_abo
     app.world_mut().trigger(SystemInformationCommand::Close);
     app.update();
     assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+}
+
+#[test]
+fn shared_show_system_about_command_opens_the_mounted_system_information_surface() {
+    let mut app = scripted_frontend_app();
+    app.update();
+    app.world_mut().write_message(KeyboardInput {
+        key_code: KeyCode::ControlLeft,
+        logical_key: Key::Unidentified(NativeKey::Unidentified),
+        state: ButtonState::Pressed,
+        text: None,
+        repeat: false,
+        window: Entity::PLACEHOLDER,
+    });
+    app.update();
+    assert!(
+        app.world()
+            .resource::<ButtonInput<KeyCode>>()
+            .pressed(KeyCode::ControlLeft),
+        "the real input plugin must fold the Control key before the chord"
+    );
+
+    app.world_mut().write_message(KeyboardInput {
+        key_code: KeyCode::KeyA,
+        logical_key: Key::Unidentified(NativeKey::Unidentified),
+        state: ButtonState::Pressed,
+        text: None,
+        repeat: false,
+        window: Entity::PLACEHOLDER,
+    });
+    app.update();
+
+    assert!(matches!(
+        app.world().resource::<WindowSurfaceState>().0,
+        Some(WindowSurface::SystemInformation(_))
+    ));
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "the graphical command opens the review surface instead of leaving the shell's terminal hint"
+    );
 }
 
 #[test]

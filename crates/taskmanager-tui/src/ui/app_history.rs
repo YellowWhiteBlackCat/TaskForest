@@ -11,6 +11,7 @@ use taskmanager_application::{
 use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
+use super::containers::{StatePanel, StatePanelKind};
 use super::sparkline::history_trend_in;
 use crate::{TuiApp, TuiTheme};
 
@@ -60,7 +61,7 @@ fn render_app_history_projection(
             || detail.to_owned(),
             |reason| format!("{detail} ({})", reason.stable_code()),
         );
-        super::render_empty_panel(frame, theme, area, &title, &detail);
+        StatePanel::render(frame, theme, area, &title, StatePanelKind::Message, &detail);
         return;
     }
 

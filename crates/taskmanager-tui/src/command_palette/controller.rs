@@ -2,7 +2,7 @@
 
 use super::{
     CommandPalette, CommandPaletteRow, PALETTE_SHARED_COMMANDS, PaletteLocalAction,
-    TUI_LOCAL_COMMANDS, TuiSurfaceAction, terminal_local_action,
+    ROW_TARGET_SHORTCUT, TUI_LOCAL_COMMANDS, TuiSurfaceAction, terminal_local_action,
 };
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
 use taskmanager_application::{AppPage, PlatformEffect, UrlOpenRequest};
@@ -31,9 +31,9 @@ impl TuiApp {
             .collect();
         // Local rows are executable from the palette too: each terminal-only
         // chord and TUI-local binding maps to the [`PaletteLocalAction`] the
-        // TUI runs itself, so the palette is a true command entry point for
-        // the whole keyboard surface. The prefix jump and the F1 alias are
-        // discoverable only (`None`).
+        // TUI runs itself. The prefix jump and F1 alias are discoverable only
+        // (`None`); the content-page Enter row target is omitted because Enter
+        // selects the highlighted palette row.
         for binding in shell_local_bindings() {
             rows.push(CommandPaletteRow {
                 shortcut: binding.shortcut,
@@ -42,7 +42,13 @@ impl TuiApp {
                 local_action: terminal_local_action(binding.shortcut),
             });
         }
-        for command in TUI_LOCAL_COMMANDS {
+        // Enter selects the highlighted palette row. Keep the content-page
+        // row-target shortcut in Help, where it describes its own action;
+        // listing it here would advertise a non-executable duplicate.
+        for command in TUI_LOCAL_COMMANDS
+            .into_iter()
+            .filter(|command| command.binding.shortcut != ROW_TARGET_SHORTCUT)
+        {
             rows.push(CommandPaletteRow {
                 shortcut: command.binding.shortcut,
                 label: command.binding.label,
@@ -180,14 +186,6 @@ impl TuiApp {
     ) -> Option<PlatformEffect> {
         match action {
             TuiSurfaceAction::SelectHealthReview(mode) => self.select_health_review(mode),
-            TuiSurfaceAction::HealthSelfTest(kind) => {
-                if let Some(mut target) = crate::menus::smart_self_test_target(self) {
-                    target.kind = kind;
-                    self.close_local_overlays();
-                    self.shell.arm_smart_self_test(target);
-                }
-            }
-            TuiSurfaceAction::EditAlertRule(gesture) => self.edit_rule_gesture(gesture),
             TuiSurfaceAction::OpenRepository => {
                 return Some(PlatformEffect::OpenUrl(UrlOpenRequest {
                     url: REPOSITORY_URL.into(),

@@ -29,6 +29,7 @@ use taskmanager_core::core::history::{
     ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey,
 };
 use taskmanager_core::core::identity::DeviceId;
+use taskmanager_theme::tokens::UiSize;
 
 #[test]
 fn review_title_actions_and_scroll_owner_fit_measured_font_bounds_and_keep_graphs_stable() {
@@ -43,7 +44,7 @@ fn review_title_actions_and_scroll_owner_fit_measured_font_bounds_and_keep_graph
                 .add_plugins(HeadlessFrontendPlugins)
                 .add_plugins(FrontendWindowPlugin {
                     runtime,
-                    palette: ui_palette(&Theme::dark()),
+                    palette: ui_palette(&Theme::dark(), UiSize::Standard),
                 });
             app.init_resource::<Assets<Font>>();
             app.add_plugins((

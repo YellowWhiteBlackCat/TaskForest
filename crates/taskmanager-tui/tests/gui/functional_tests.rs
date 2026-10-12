@@ -143,7 +143,7 @@ fn alert_event_history_decision_is_local_surface() {
 }
 
 #[test]
-fn alert_rule_authoring_decision_is_local_surface() {
+fn alert_rule_authoring_is_declared_unsupported() {
     let declaration = functional_declaration();
     let entry = declaration
         .entries
@@ -152,14 +152,14 @@ fn alert_rule_authoring_decision_is_local_surface() {
         .expect("authoring intent is registered");
     assert_eq!(
         entry.decision,
-        SurfaceDecision::Local {
-            route: "health.alert-rules.authoring",
+        SurfaceDecision::Unsupported {
+            reason: "CORE-04 keeps managed alert-rule authoring unsupported in the TUI",
         }
     );
 }
 
 #[test]
-fn alert_rule_transfer_decision_is_local_surface() {
+fn alert_rule_transfer_is_declared_unsupported() {
     let declaration = functional_declaration();
     let entry = declaration
         .entries
@@ -168,8 +168,8 @@ fn alert_rule_transfer_decision_is_local_surface() {
         .expect("transfer intent is registered");
     assert_eq!(
         entry.decision,
-        SurfaceDecision::Local {
-            route: "health.alerts.transfer",
+        SurfaceDecision::Unsupported {
+            reason: "CORE-04 keeps alert-rule import and export unsupported in the TUI",
         }
     );
 }

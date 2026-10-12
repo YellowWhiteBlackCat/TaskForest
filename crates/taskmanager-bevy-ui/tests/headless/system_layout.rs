@@ -6,6 +6,7 @@ use crate::app::NavTarget;
 use crate::pages::settings::privilege_center::PrivilegeControl;
 use crate::pages::system::{SystemActions, SystemBody, SystemStatusLine};
 use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
+use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::query::{Has, With, Without};
 use bevy::image::TextureAtlasLayout;
 use bevy::math::UVec2;
@@ -14,13 +15,14 @@ use bevy::text::TextPlugin;
 use bevy::transform::TransformPlugin;
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
-use bevy::ui_widgets::{Activate, ScrollArea};
+use bevy::ui_widgets::{Activate, ScrollArea, ValueChange};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskmanager_application::{PlatformClient, SmbiosMemoryState, i18n::t};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_test_support::{pin_english, smbios_memory};
+use taskmanager_theme::tokens::UiSize;
 
 #[test]
 fn memory_permission_entry_and_system_actions_fit_real_font_viewport_bounds() {
@@ -60,14 +62,24 @@ fn memory_permission_entry_and_system_actions_fit_real_font_viewport_bounds() {
             1,
             "two activations in one frame authorize only once"
         );
-        let system_tab = app
-            .world_mut()
-            .query::<(Entity, &NavTarget)>()
-            .iter(app.world())
-            .find(|(_, target)| target.0 == Page::System)
-            .map(|(entity, _)| entity)
-            .expect("System navigation tab");
-        app.world_mut().trigger(Activate { entity: system_tab });
+        let (strip, system_tab) = {
+            let world = app.world_mut();
+            let mut nav = world.query::<(Entity, &NavTarget)>();
+            let tab = nav
+                .iter(world)
+                .find(|(_, target)| target.0 == Page::System)
+                .map(|(entity, _)| entity)
+                .expect("System navigation tab");
+            let mut strips =
+                world.query_filtered::<Entity, With<crate::navigation::NavigationStrip>>();
+            let strip = strips.single(world).expect("one navigation strip");
+            (strip, tab)
+        };
+        app.world_mut().trigger(ValueChange {
+            source: strip,
+            value: Some(system_tab),
+            is_final: true,
+        });
         for _ in 0..6 {
             app.update();
         }
@@ -123,7 +135,7 @@ fn system_layout_app(width: u32, height: u32, client: PlatformClient) -> App {
         .add_plugins(HeadlessFrontendPlugins)
         .add_plugins(FrontendWindowPlugin {
             runtime,
-            palette: ui_palette(&Theme::dark()),
+            palette: ui_palette(&Theme::dark(), UiSize::Standard),
         });
     app.init_resource::<Assets<Font>>();
     app.add_plugins((
@@ -335,14 +347,18 @@ fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bound
             app.update();
         }
         for section in ProcessPropertiesSection::ALL {
-            let entity = app
+            let (entity, list) = app
                 .world_mut()
-                .query::<(Entity, &ProcessPropertiesTab)>()
+                .query::<(Entity, &ProcessPropertiesTab, &ChildOf)>()
                 .iter(app.world())
-                .find(|(_, tab)| tab.0 == section)
-                .map(|(entity, _)| entity)
+                .find(|(_, tab, _)| tab.0 == section)
+                .map(|(entity, _, parent)| (entity, parent.parent()))
                 .expect("normal tab");
-            app.world_mut().trigger(Activate { entity });
+            app.world_mut().trigger(ValueChange {
+                source: list,
+                value: Some(entity),
+                is_final: true,
+            });
             for _ in 0..6 {
                 app.update();
             }

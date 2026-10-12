@@ -286,6 +286,9 @@ impl super::RootView {
             self.process_insights.clear();
             self.shell.close_network_escalation();
         }
+        if kind == SurfaceKind::Confirmation(ConfirmationKind::SessionControl) {
+            self.clear_pending_session_control_request();
+        }
     }
 
     fn dismiss_shared_surface_if_present(&mut self, reason: SurfaceDismissReason) {
@@ -309,6 +312,27 @@ impl super::RootView {
     ) -> Option<PlatformEffect> {
         self.reduce_shared_interaction(InteractionEvent::Confirm(expected))
             .effect
+    }
+
+    pub(crate) fn confirm_direct_track_session_control(&mut self) -> Option<PlatformEffect> {
+        let surface = SurfaceKind::Confirmation(ConfirmationKind::SessionControl);
+        if self.shell.interaction.kind() != Some(surface) {
+            return None;
+        }
+        let effect = self.shell.confirm_session_control();
+        let transition = if effect.is_some() {
+            SurfaceTransition::Confirmed(ConfirmationKind::SessionControl)
+        } else if self.shell.interaction.kind().is_none() {
+            SurfaceTransition::Dismissed {
+                surface,
+                reason: SurfaceDismissReason::TargetUnavailable,
+            }
+        } else {
+            SurfaceTransition::Unchanged
+        };
+        self.cleanup_shared_transition(transition);
+        self.hovered = None;
+        effect
     }
 
     pub(crate) fn open_shared_process_properties(

@@ -11,27 +11,15 @@ emitting a typed JSON envelope.
 
 The helper performs exactly one operation: enumerate the existing
 `/dev/cpu/N/msr` nodes (sorted by `N`, capped at 1024) and `pread` the
-register set selected by the CPUID family gate — the five verified Intel
-registers (`0xCE` PLATFORM_INFO, `0x1AD` TURBO_RATIO_LIMIT, `0x198`
-IA32_PERF_STATUS, `0x1A2` TEMPERATURE_TARGET, `0x1B1`
-PACKAGE_THERM_STATUS), or, for CPUID family 0x17–0x19, the AMD P-state
-block of ADR-049 (`0xC0010063` status + `0xC0010064..0xC001006B`). MSR
-reads on Linux are plain file I/O (open + pread at the register-address
-offset — the same mechanism libcpuid uses for CPU-X), so this helper is
+register set selected by the CPUID family gate. MSR reads on Linux are plain
+file I/O (open + pread at the register-address offset), so this helper is
 `#![forbid(unsafe_code)]` std + serde with zero workspace dependencies: no
-fifth audited unsafe trust root (ADR-048). The same is true of the
-read-only `/dev/cpu/N/cpuid` sibling node (one 16-byte pread per leaf; the
-driver registers no write): it supplies the family gate and the base-clock
-enumeration. No flags, no ioctl, no file writes, no other path.
+fifth audited unsafe trust root (ADR-048). The read-only `/dev/cpu/N/cpuid`
+sibling node supplies the family gate and base-clock enumeration. No flags,
+no ioctl, no file writes, no other path.
 
-A register the CPU does not implement (driver `EIO`) or a value outside its
-documented plausibility range becomes a per-field `null` — the vendor gate
-is per-register honesty, not a CPUID dependency. `bclk_mhz` is filled only
-when CPUID leaf 0x16 enumerates the SDM Bus (Reference) Frequency inside
-the 20–500 MHz envelope (ADR-048 amendment); AMD temperature and BCLK stay
-`null` — temperature already reaches the product unprivileged through the
-k10temp/zenpower hwmon chips, and SMN-only telemetry needs PCI-config
-writes or `mmap` (ADR-049 records why that is structurally out of reach).
+The exact register tables, honest-null semantics and their reasoning live in
+[`docs/REGISTER_CONTRACT.md`](docs/REGISTER_CONTRACT.md).
 
 ## Contract and verification
 
@@ -59,3 +47,11 @@ src/main.rs → msr_read.rs    pre-read of fixed MSR registers (/dev/cpu/*/msr)
                              and the /dev/cpu/N/cpuid family gate
 src/json.rs                  honest-null JSON envelope output
 ```
+
+## Docs
+
+- [`docs/REGISTER_CONTRACT.md`](docs/REGISTER_CONTRACT.md) — Intel/AMD register tables,
+  honest-null rules and verification notes.
+- [ADR-048](../../adr/048-msr-read-helper.md) and
+  [ADR-049](../../adr/049-amd-msr-readouts-safe-file-io.md) — MSR helper and AMD readout
+  decisions.

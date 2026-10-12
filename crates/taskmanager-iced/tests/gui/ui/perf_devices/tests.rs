@@ -1,27 +1,83 @@
 use super::battery::battery_summary_lines;
-use super::disk::partition_usage_text;
+use super::disk::{disk_subtitle, disk_title, partition_usage_text};
 use super::gpu::gpu_headline_label_value;
 use super::network::network_summary_lines;
 use super::*;
+use crate::app::{IcedApp, Message, PerfDevice};
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::{Id, Operation, Tree};
+use iced::{Rectangle, Size};
+use taskmanager_application::AppPage;
 use taskmanager_application::GpuEngineRowsState;
-use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_application::i18n::{Language, with_language};
+use taskmanager_assets::embedded_fonts;
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::DiskPartitionScalarObservations;
 use taskmanager_core::core::metrics::GpuScalarObservations;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::metrics::{
+    DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, GpuEngineMetric, GpuMetrics,
+};
 use taskmanager_core::core::power::BatteryScalarObservations;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricProjection;
+use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 use taskmanager_test_support::pin_english;
+
+#[derive(Default)]
+struct RenderedGpuPageText(Vec<(String, Rectangle)>);
+
+impl Operation for RenderedGpuPageText {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation)) {
+        visit(self);
+    }
+
+    fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, fragment: &str) {
+        self.0.push((fragment.to_owned(), bounds));
+    }
+}
+
+fn software_renderer() -> iced::Renderer {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        iced::Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer")
+}
+
+fn rendered_gpu_page_text(
+    app: &IcedApp,
+    size: Size,
+    renderer: &iced::Renderer,
+) -> Vec<(String, Rectangle)> {
+    let mut view = crate::ui::view(app);
+    let mut tree = Tree::new(&view);
+    let node = view
+        .as_widget_mut()
+        .layout(&mut tree, renderer, &Limits::new(Size::ZERO, size));
+    let mut text = RenderedGpuPageText::default();
+    view.as_widget_mut()
+        .operate(&mut tree, Layout::new(&node), renderer, &mut text);
+    text.0
+}
 
 /// Iced consumes the shared typed presentation keys; it does not maintain a
 /// second failure-kind mapping.
@@ -61,8 +117,6 @@ fn engine_rows_failure_keys_cover_every_typed_kind() {
 
 #[test]
 fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
-    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetrics};
-
     let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
     gpu.engines = vec![
         GpuEngine {
@@ -105,8 +159,6 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
 
 #[test]
 fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
-    use taskmanager_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
-
     pin_english();
 
     let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
@@ -139,6 +191,223 @@ fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
             ("Power".to_string(), "—".to_string()),
         ]
     );
+}
+
+#[test]
+fn gpu_vram_vital_line_omits_double_missing_and_preserves_a_known_pair() {
+    let bare = GpuMetrics::new("gpu0", "Fixture GPU");
+    assert_eq!(
+        gpu_vram_vital_line(&bare, UnitPrefs::default()),
+        None,
+        "a GPU with no usable VRAM pair should not print a `— · —` header line"
+    );
+
+    let mut dedicated_only = GpuMetrics::new("gpu0", "Fixture GPU");
+    dedicated_only.apply_scalar_observations(GpuScalarObservations {
+        dedicated_vram_used_bytes: ScalarObservation::available(1 << 30, 1),
+        dedicated_vram_total_bytes: ScalarObservation::available(8 << 30, 1),
+        ..GpuScalarObservations::default()
+    });
+    assert_eq!(
+        gpu_vram_vital_line(&dedicated_only, UnitPrefs::default()),
+        Some("1.0 GiB / 8.0 GiB · —".to_string()),
+        "a known dedicated pair remains visible with an honest dash for missing shared VRAM"
+    );
+
+    let zero_total = GpuMetrics::from_observations(GpuScalarObservations {
+        dedicated_vram_used_bytes: ScalarObservation::available(0, 1),
+        dedicated_vram_total_bytes: ScalarObservation::available(0, 1),
+        ..GpuScalarObservations::default()
+    });
+    assert_eq!(
+        gpu_vram_vital_line(&zero_total, UnitPrefs::default()),
+        None,
+        "a zero-total VRAM pair is not a usable measurement"
+    );
+}
+
+#[test]
+fn active_gpu_engine_stats_deduplicate_projected_rows_and_expanded_empty_state() {
+    let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
+    gpu.engines = vec![GpuEngine {
+        name: "Render/3D".into(),
+        kind: GpuEngineKind::Render,
+        usage_pct: 42.0,
+    }];
+    let active = [
+        GpuEngineMetric {
+            name: "Render/3D".into(),
+            kind: GpuEngineKind::Render,
+            utilization_pct: 44.0,
+        },
+        GpuEngineMetric {
+            name: "Video Decode".into(),
+            kind: GpuEngineKind::VideoDecode,
+            utilization_pct: 7.0,
+        },
+    ];
+    let presentation = GpuEngineRowsPresentation::Active(&active);
+    let mut stats = gpu_summary_lines(&gpu);
+    append_gpu_engine_stats(&gpu, &presentation, false, &mut stats);
+    assert_eq!(
+        stats
+            .iter()
+            .filter(|row| row.label() == "Render/3D")
+            .count(),
+        1,
+        "the same engine from the base projection and active request appears once"
+    );
+    assert_eq!(
+        stats
+            .iter()
+            .find(|row| row.label() == "Video Decode")
+            .and_then(StatRow::value),
+        Some("7%"),
+        "a genuinely additional active engine remains visible"
+    );
+
+    let empty = GpuEngineRowsPresentation::Active(&[]);
+    let mut collapsed_stats = Vec::new();
+    append_gpu_engine_stats(&gpu, &empty, false, &mut collapsed_stats);
+    assert_eq!(
+        collapsed_stats
+            .iter()
+            .filter(|row| row.label() == t("gpu.per_engine_title"))
+            .count(),
+        1,
+        "a collapsed empty inventory keeps one explanation in the facts rail"
+    );
+    let mut expanded_stats = Vec::new();
+    append_gpu_engine_stats(&gpu, &empty, true, &mut expanded_stats);
+    assert!(
+        expanded_stats.is_empty(),
+        "the expanded engine panel owns its empty-state message without a duplicate row"
+    );
+}
+
+#[test]
+fn gpu_device_and_engine_states_remain_scoped_and_distinct() {
+    pin_english();
+    let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
+    gpu.device_state = DeviceState::healthy(1);
+    gpu.apply_scalar_observations(GpuScalarObservations {
+        utilization_pct: ScalarObservation::available(22.0, 1),
+        ..GpuScalarObservations::default()
+    });
+    let mut rows = gpu_summary_lines(&gpu);
+    append_gpu_engine_stats(
+        &gpu,
+        &GpuEngineRowsPresentation::PermissionRequired,
+        false,
+        &mut rows,
+    );
+
+    assert_eq!(
+        row_value(
+            &rows,
+            &format!("{} {}", t("common.gpu"), t("device.status"))
+        ),
+        t("device.healthy"),
+        "the observed GPU status describes the device telemetry row"
+    );
+    assert_eq!(
+        row_value(&rows, t("gpu.per_engine_title")),
+        t("gpu.engines_requires_auth"),
+        "the separate engine row reflects its typed authorization state"
+    );
+    assert_eq!(
+        row_value(&rows, t("common.utilization")),
+        "22%",
+        "a current device utilization observation remains available independently"
+    );
+
+    let mut unsupported_engine_rows = gpu_summary_lines(&gpu);
+    append_gpu_engine_stats(
+        &gpu,
+        &GpuEngineRowsPresentation::Unsupported,
+        false,
+        &mut unsupported_engine_rows,
+    );
+    assert_eq!(
+        row_value(&unsupported_engine_rows, t("gpu.per_engine_title")),
+        t("gpu.engines_unsupported"),
+        "Unsupported names the per-engine telemetry capability"
+    );
+    assert_eq!(
+        row_value(
+            &unsupported_engine_rows,
+            &format!("{} {}", t("common.gpu"), t("device.status"))
+        ),
+        t("device.healthy"),
+        "the device status remains in its own scope"
+    );
+    assert_eq!(
+        row_value(&unsupported_engine_rows, t("common.utilization")),
+        "22%",
+        "unsupported engine telemetry does not erase current device utilization"
+    );
+}
+
+#[test]
+fn gpu_engine_auth_reason_and_action_render_once_in_standard_compact_and_chinese() {
+    let renderer = software_renderer();
+    for (locale, language, size, expected_auth) in [
+        (
+            "en",
+            Language::En,
+            Size::new(1180.0, 780.0),
+            "Needs authorization",
+        ),
+        ("zh", Language::Zh, Size::new(1180.0, 780.0), "需要授权"),
+        ("zh", Language::Zh, Size::new(720.0, 480.0), "需要授权"),
+    ] {
+        let (fragments, expected_action) = with_language(language, || {
+            let mut app = IcedApp::demo_for_capture_with(Some(locale.to_owned()), None);
+            assert_eq!(
+                app.shell
+                    .projection()
+                    .snapshot
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.gpu.first())
+                    .map(|gpu| gpu.device_state.status),
+                Some(DeviceStatus::Healthy),
+                "the Iced capture fixture inherits device health from the shared shell snapshot"
+            );
+            let _ = app.update(Message::SelectPage(AppPage::Performance));
+            let _ = app.update(Message::SelectPerfDevice(PerfDevice::Gpu(0)));
+            let _ = app.update(Message::WindowResized(size));
+            (
+                rendered_gpu_page_text(&app, size, &renderer),
+                t("gpu.enable_per_engine").to_owned(),
+            )
+        });
+        let reasons: Vec<_> = fragments
+            .iter()
+            .filter(|(fragment, _)| fragment == expected_auth)
+            .collect();
+        assert_eq!(
+            reasons.len(),
+            1,
+            "the typed engine authorization reason appears once at {size:?}: {fragments:?}"
+        );
+        assert!(
+            reasons[0].1.width > 0.0 && reasons[0].1.height > 0.0,
+            "the localized engine authorization reason has rendered bounds: {fragments:?}"
+        );
+        let actions: Vec<_> = fragments
+            .iter()
+            .filter(|(fragment, _)| fragment == &expected_action)
+            .collect();
+        assert_eq!(
+            actions.len(),
+            1,
+            "the engine authorization action appears once at {size:?}: {fragments:?}"
+        );
+        assert!(
+            actions[0].1.width > 0.0 && actions[0].1.height > 0.0,
+            "the authorization action remains present: {fragments:?}"
+        );
+    }
 }
 
 /// Look one summary row's value up by its localized label so the tests
@@ -258,6 +527,34 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
     let rows = network_summary_lines(&nic, false, false);
     assert_eq!(row_value(&rows, t("net.total_received")), "12.0 Mb");
     assert_eq!(row_value(&rows, t("net.total_sent")), "6.0 Mb");
+}
+
+#[test]
+fn disk_subtitle_only_repeats_device_name_when_title_is_model() {
+    let with_model = DiskMetricsFixtureBuilder::new()
+        .name("/dev/nvme0n1".into())
+        .model("Samsung SSD".into())
+        .disk_type("NVMe".into())
+        .fs_type("ext4".into())
+        .build();
+    assert_eq!(disk_title(&with_model), "Samsung SSD");
+    assert_eq!(
+        disk_subtitle(&with_model),
+        "nvme0n1 · NVMe · ext4",
+        "a known-model title keeps the device name as an independent subtitle fact"
+    );
+
+    let without_model = DiskMetricsFixtureBuilder::new()
+        .name("/dev/nvme0n1".into())
+        .disk_type("NVMe".into())
+        .fs_type("ext4".into())
+        .build();
+    assert_eq!(disk_title(&without_model), "nvme0n1");
+    assert_eq!(
+        disk_subtitle(&without_model),
+        "NVMe · ext4",
+        "when the device name is already the title, subtitle keeps only type/filesystem"
+    );
 }
 
 #[test]

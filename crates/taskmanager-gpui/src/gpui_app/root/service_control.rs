@@ -1,12 +1,10 @@
-//! Shared confirmation flow for destructive service / startup control.
+//! Shared confirmation flow for service, startup, and login-session control.
 //!
 //! The process-termination gate (`root/termination.rs`) captures an immutable
 //! identity at request time and renders a typed confirmation dialog whose
 //! Cancel/X/scrim/Escape paths only clear pending state — the confirm button is
-//! the sole submit path. This module mirrors that pattern for the actions that
-//! can lock the user out of the session (stopping or disabling NetworkManager,
-//! dbus, sshd, pipewire, …) and for startup enable/disable toggles, which
-//! previously executed immediately on click.
+//! the sole submit path. This module applies that pattern to service actions
+//! that can interrupt the host, startup toggles, and login-session controls.
 //!
 //! `RootView` remains the single owner of the pending UI state
 //! ([`RootView::service_control_confirmation`]); this module owns the intent
@@ -18,10 +16,12 @@ use gpui::{
 };
 use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfirmationKind, PendingConfirmation, ServiceControlTarget, StartupControlRequest,
-    SurfaceDismissReason, SurfaceKind,
+    ConfirmationKind, PendingConfirmation, ServiceControlTarget, SessionControlConfirmation,
+    StartupControlRequest, SurfaceDismissReason, SurfaceKind,
 };
 use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
@@ -53,6 +53,8 @@ pub(super) enum ServiceControlConfirmation {
     /// the gate because either changes boot-time configuration. The immutable
     /// entry snapshot keeps the source-specific identity out of the frontend.
     Startup { entry: StartupEntry, enabled: bool },
+    /// A login-session action with its full provider-issued identity frozen.
+    Session { intent: SessionControlConfirmation },
 }
 
 impl ServiceControlConfirmation {
@@ -64,7 +66,7 @@ impl ServiceControlConfirmation {
             Self::Service {
                 action: ServiceAction::Stop | ServiceAction::Restart,
                 ..
-            }
+            } | Self::Session { .. }
         )
     }
 
@@ -85,6 +87,7 @@ impl ServiceControlConfirmation {
             // Service Start/Enable are never gated; Startup uses its own title.
             Self::Service { .. } => i18n::t("svc.confirm_stop_title"),
             Self::Startup { .. } => i18n::t("startup.confirm_toggle_title"),
+            Self::Session { .. } => i18n::t("confirm.session_title"),
         }
     }
 
@@ -115,6 +118,17 @@ impl ServiceControlConfirmation {
                 };
                 template.replace("{name}", &entry.name)
             }
+            Self::Session { intent } => {
+                let action = match intent.action {
+                    SessionControlAction::Disconnect => i18n::t("users.disconnect"),
+                    SessionControlAction::Lock => i18n::t("users.lock"),
+                };
+                let headline = i18n::t("confirm.session_headline")
+                    .replace("{action}", action)
+                    .replace("{id}", intent.session.id.as_str())
+                    .replace("{user}", &intent.session.user);
+                format!("{headline}\n{}", i18n::t("confirm.provider_body"))
+            }
         }
     }
 
@@ -135,6 +149,10 @@ impl ServiceControlConfirmation {
                     i18n::t("common.disable")
                 }
             }
+            Self::Session { intent } => match intent.action {
+                SessionControlAction::Disconnect => i18n::t("users.disconnect"),
+                SessionControlAction::Lock => i18n::t("users.lock"),
+            },
         }
     }
 }
@@ -150,6 +168,53 @@ pub(crate) fn requires_service_confirmation(action: ServiceAction) -> bool {
 }
 
 impl RootView {
+    pub(crate) fn clear_pending_session_control_request(&mut self) {
+        if let Some((request_id, identity, action)) =
+            self.shell.projection().session_control_requests.pending()
+        {
+            let identity = identity.clone();
+            let _ = self
+                .shell
+                .accept_session_control(request_id, &identity, action);
+        }
+    }
+
+    /// Arm the shared session confirmation only for one exact row in the
+    /// current window projection. The shell rechecks its canonical inventory
+    /// at confirmation before it creates the platform effect.
+    pub fn request_session_control_confirmation(
+        &mut self,
+        session: &SessionItem,
+        action: SessionControlAction,
+    ) -> bool {
+        let Some(identity) = session.identity() else {
+            return false;
+        };
+        let mut matches = self
+            .sessions()
+            .iter()
+            .filter(|current| current.identity().as_ref() == Some(&identity));
+        if matches.next().is_none() || matches.next().is_some() {
+            return false;
+        }
+        if self.shell.interaction.confirmation_kind() == Some(ConfirmationKind::SessionControl) {
+            self.dismiss_shared_surface(
+                SurfaceKind::Confirmation(ConfirmationKind::SessionControl),
+                SurfaceDismissReason::Cancel,
+            );
+        }
+        self.selected_session = Some(identity.clone());
+        let request_id = self.shell.begin_session_control(identity, action);
+        self.arm_confirmation(PendingConfirmation::SessionControl(
+            SessionControlConfirmation {
+                request_id,
+                session: session.clone(),
+                action,
+            },
+        ));
+        true
+    }
+
     /// Open the shared service/startup confirmation dialog for a gated service
     /// action (Stop / Restart / Disable). Constructive Start / Enable ignore the
     /// gate and submit immediately. Merely setting this state performs no native
@@ -181,15 +246,17 @@ impl RootView {
         }));
     }
 
-    /// Dismiss the pending confirmation without submitting any native work.
-    /// Cancel, X, scrim, and Escape all funnel through here.
-    pub fn cancel_service_control_confirmation(&mut self) {
+    /// Dismiss the pending service/startup/session confirmation without
+    /// submitting work. Cancel, X, scrim, and Escape all funnel through here.
+    pub fn cancel_control_confirmation(&mut self) {
         let Some(kind) = self.shell.interaction.confirmation_kind() else {
             return;
         };
         if matches!(
             kind,
-            ConfirmationKind::ServiceControl | ConfirmationKind::StartupControl
+            ConfirmationKind::ServiceControl
+                | ConfirmationKind::StartupControl
+                | ConfirmationKind::SessionControl
         ) {
             self.dismiss_shared_surface(
                 SurfaceKind::Confirmation(kind),
@@ -215,6 +282,16 @@ impl RootView {
         self.confirm_confirmation(kind)
             .is_some_and(|effect| self.dispatch_confirmed_effect(effect, cx))
     }
+
+    /// Revalidate and submit the frozen session action through the shell gate.
+    /// A missing, duplicated, or replaced identity produces no platform effect.
+    pub fn confirm_session_control_confirmation(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.shell.interaction.confirmation_kind() != Some(ConfirmationKind::SessionControl) {
+            return false;
+        }
+        self.confirm_direct_track_session_control()
+            .is_some_and(|effect| self.dispatch_confirmed_effect(effect, cx))
+    }
 }
 
 pub(super) fn confirmation_dialog(view: &RootView) -> Option<ServiceControlConfirmation> {
@@ -236,9 +313,11 @@ pub(super) fn confirmation_dialog(view: &RootView) -> Option<ServiceControlConfi
             entry: request.entry.clone(),
             enabled: request.enabled,
         }),
+        PendingConfirmation::SessionControl(intent) => Some(ServiceControlConfirmation::Session {
+            intent: intent.clone(),
+        }),
         PendingConfirmation::EndTask(_)
         | PendingConfirmation::ProcessBatch(_)
-        | PendingConfirmation::SessionControl(_)
         | PendingConfirmation::SmartSelfTest(_) => None,
     }
 }
@@ -246,7 +325,8 @@ pub(super) fn confirmation_dialog(view: &RootView) -> Option<ServiceControlConfi
 /// Build the complete service/startup control confirmation dialog. Sibling of
 /// the process confirmation renderer. Closing via X / scrim and the Cancel
 /// button only clear pending state; the confirm button is the sole UI path to
-/// [`RootView::confirm_service_control_confirmation`].
+/// [`RootView::confirm_service_control_confirmation`] or
+/// [`RootView::confirm_session_control_confirmation`].
 pub(super) fn render_service_control_confirmation_dialog(
     theme: &Theme,
     intent: ServiceControlConfirmation,
@@ -258,11 +338,12 @@ pub(super) fn render_service_control_confirmation_dialog(
     let message = intent.dialog_message();
     let confirm_label = intent.confirm_label();
     let is_high_risk = intent.is_high_risk();
+    let is_session = matches!(&intent, ServiceControlConfirmation::Session { .. });
 
     let close_entity = entity.clone();
     let on_close = move |_window: &mut Window, cx: &mut App| {
         close_entity.update(cx, |view, cx| {
-            view.cancel_service_control_confirmation();
+            view.cancel_control_confirmation();
             cx.notify();
         });
     };
@@ -294,7 +375,7 @@ pub(super) fn render_service_control_confirmation_dialog(
                     false,
                     move |_window, cx| {
                         cancel_entity.update(cx, |view, cx| {
-                            view.cancel_service_control_confirmation();
+                            view.cancel_control_confirmation();
                             cx.notify();
                         });
                     },
@@ -308,7 +389,11 @@ pub(super) fn render_service_control_confirmation_dialog(
                     false,
                     move |_window, cx| {
                         confirm_entity.update(cx, |view, cx| {
-                            view.confirm_service_control_confirmation(cx);
+                            if is_session {
+                                view.confirm_session_control_confirmation(cx);
+                            } else {
+                                view.confirm_service_control_confirmation(cx);
+                            }
                             cx.notify();
                         });
                     },

@@ -1,7 +1,7 @@
 # GPUI (TaskForest-G) 前端架构与开发指南
 
 本文定义 `taskmanager-gpui` 前端的专属工程范式、核心思维与渲染纪律。
-跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
+跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](../../../docs/UI_COMPONENT_ARCHITECTURE.md)。
 
 ## 1. 核心思维与架构定位
 

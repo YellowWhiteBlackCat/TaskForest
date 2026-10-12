@@ -7,7 +7,8 @@ use taskmanager_application::{
     MsrReadoutRequestFailure, MsrReadoutState, RaplPowerRequestFailure, RaplPowerState,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::CpuTemperatureSource;
+use taskmanager_core::core::hardware::CoreBreakdown;
+use taskmanager_core::core::metrics::{CpuMetrics, CpuTemperatureSource};
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::TrendSeries;
@@ -118,6 +119,24 @@ pub(super) fn cpu_graph_summary_elements(
     lines
 }
 
+/// The independently classified hybrid core groups, matching the pinned
+/// CPU specification rows. Homogeneous or unclassified inventories do not
+/// fabricate class counts.
+pub(super) fn heterogeneous_core_rows(core: &CoreBreakdown) -> Vec<StatRow> {
+    if core.e_cores == 0 && core.lp_cores == 0 {
+        return Vec::new();
+    }
+    [
+        ("cpu.performance_cores", core.p_cores),
+        ("cpu.efficiency_cores", core.e_cores),
+        ("cpu.low_power_cores", core.lp_cores),
+    ]
+    .into_iter()
+    .filter(|(_, count)| *count > 0)
+    .map(|(label, count)| StatRow::text(t(label), Some(count.to_string())))
+    .collect()
+}
+
 pub(super) fn memory_graph_summary_elements(
     app: &crate::IcedApp,
 ) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
@@ -207,6 +226,67 @@ pub(crate) fn cpu_temperature_row(
 ) -> StatRow {
     let (label, value) = cpu_temperature_parts(temperature_c, source);
     StatRow::text(label, value)
+}
+
+/// Typed summary of the real per-core temperature channels accepted for the
+/// CPU facts rail and capture readiness.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CpuCoreTemperatureSummary {
+    pub(crate) samples: usize,
+    pub(crate) average_c: f32,
+    pub(crate) minimum_c: f32,
+    pub(crate) maximum_c: f32,
+}
+
+/// Fold at least two real per-core temperature channels. A lone channel is
+/// not an average and remains with the package-temperature fact alone.
+pub(crate) fn cpu_core_temperature_summary(cpu: &CpuMetrics) -> Option<CpuCoreTemperatureSummary> {
+    let mut count = 0_usize;
+    let mut sum = 0.0_f32;
+    let mut minimum = f32::INFINITY;
+    let mut maximum = f32::NEG_INFINITY;
+    for index in 0..cpu.current_core_temperature_len() {
+        let Some(temperature) = cpu
+            .current_core_temperature_c(index)
+            .filter(|temperature| temperature.is_finite())
+        else {
+            continue;
+        };
+        count += 1;
+        sum += temperature;
+        minimum = minimum.min(temperature);
+        maximum = maximum.max(temperature);
+    }
+    if count < 2 {
+        return None;
+    }
+    Some(CpuCoreTemperatureSummary {
+        samples: count,
+        average_c: sum / count as f32,
+        minimum_c: minimum,
+        maximum_c: maximum,
+    })
+}
+
+/// The live per-core temperature note used by the CPU facts rail.
+pub(crate) fn cpu_core_temperature_row(cpu: &CpuMetrics) -> Option<StatRow> {
+    let summary = cpu_core_temperature_summary(cpu)?;
+    if summary.maximum_c - summary.minimum_c < 1.0 {
+        Some(StatRow::text(
+            t("common.cores"),
+            Some(format!("{:.0} °C", summary.maximum_c.round())),
+        ))
+    } else {
+        Some(StatRow::text(
+            t("common.avg"),
+            Some(format!(
+                "{:.0} °C · {} {:.0} °C",
+                summary.average_c.round(),
+                t("common.max"),
+                summary.maximum_c.round()
+            )),
+        ))
+    }
 }
 
 #[must_use]
@@ -472,6 +552,38 @@ pub(crate) fn msr_readouts_card<'a>(
     }
 
     None
+}
+
+/// Preserve capability authorization actions when the per-core matrix replaces
+/// the duplicate detail cards. The caller places this footer inside the
+/// statistics rail's bounded scroll region, where both actions remain
+/// reachable without taking height from the pinned headline chart.
+pub(crate) fn authorization_actions_footer<'a>(
+    app: &'a crate::IcedApp,
+    theme_snapshot: &'a Theme,
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    let rapl_capability = app
+        .shell
+        .projection()
+        .capability_status(&CapabilityId::TELEMETRY_CPU_PACKAGE_POWER);
+    let msr_capability = app
+        .shell
+        .projection()
+        .capability_status(&CapabilityId::TELEMETRY_CPU_MSR);
+    let mut actions = Vec::new();
+
+    if rapl_power_needs_authorization(app.shell.rapl_power_state(), rapl_capability)
+        && let Some(card) = rapl_power_card(app, theme_snapshot)
+    {
+        actions.push(card);
+    }
+    if msr_readout_needs_authorization(app.shell.msr_readout_state(), msr_capability)
+        && let Some(card) = msr_readouts_card(app, theme_snapshot)
+    {
+        actions.push(card);
+    }
+
+    (!actions.is_empty()).then(|| column(actions).spacing(8).into())
 }
 
 pub(crate) fn append_rapl_and_msr_stats(shell: &ShellApp, stats: &mut Vec<StatRow>) {

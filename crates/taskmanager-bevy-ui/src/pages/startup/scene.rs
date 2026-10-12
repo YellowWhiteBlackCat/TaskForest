@@ -113,7 +113,7 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
              Node { flex_grow: 1.0 } --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -137,7 +137,7 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
             --
 
                 Node {
-                    height: px(palette.control_height_px),
+                    height: rem(palette.control_height_rem),
                     padding: UiRect::horizontal(Val::Px(space_12())),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -296,7 +296,7 @@ pub(super) fn startup_row_scene(
     let chip = chip_fill(enabled_chip(row.enabled), palette);
     let target = row.target.clone();
     let target_toggle = row.target.clone();
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let state_width = widths[0].width_px;
     let name_width = widths[1].width_px;

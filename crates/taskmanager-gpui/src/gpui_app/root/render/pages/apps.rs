@@ -90,6 +90,7 @@ impl RootView {
                     swap_auto_hidden: page_metrics.swap_auto_hidden,
                     batch_history_available: !self.process_batch_history.is_empty(),
                     col_widths: &self.processes_state.col_widths,
+                    resize_focus_handles: &self.processes_state.resize_focus_handles,
                     viewport_width: content_width,
                     processes_scroll: &self.processes_scroll.vertical,
                     horizontal_scroll: &self.processes_scroll.horizontal,

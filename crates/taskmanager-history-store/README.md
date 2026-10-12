@@ -28,22 +28,9 @@ locking are typed contracts. Verify store/query behavior independently from
 the live telemetry runtime and keep the real sustained-run receipt open until
 it exists. Pending samples, payload bytes, identities, persisted file count,
 total directory-scan work, per-file reads and boot-history reads have explicit
-global ceilings. Limit rejection is typed and observable; bounded
-backpressure keeps newest arrivals.
-TTL or quota retirement deletes empty/old whole series and releases revision
-guards unless a concurrent pending sample still owns that key. Quota may retire
-the oldest complete series when minimum one-line files cannot fit, so
-`max_bytes` is an actual post-flush bound rather than a best-effort target.
-Single-writer claims fail closed on unreadable or malformed ownership and are
-released only while the stored token still matches the exact owner.
-Encoded stems reserve the ordinary-file suffix within the portable component
-limit; rewrite temporaries use independent short names. Read ingress privately
-indexes published external locations by the current typed key, combines segments
-under one byte ceiling and retains corruption evidence. Retiring one segment
-releases revision guards only when no segment or pending sample remains.
-The read-only probe reports a held OS lock independently from free-file
-absent/live/stale/ambiguous claims. A bounded shared read lease permits claim
-inspection without becoming a writer; mandatory locking never fabricates a PID.
+global ceilings; limit rejection is typed and observable, and bounded
+backpressure keeps newest arrivals. Ceiling, lock, segment and concurrency
+rules are specified in [`docs/STORAGE_CONTRACTS.md`](docs/STORAGE_CONTRACTS.md).
 
 ## Module map
 
@@ -55,3 +42,11 @@ src/retention.rs  boot_history.rs  bounded_io.rs   retention, boot segments, bou
 ```
 
 Single writer: the app-host persistence generation; all other consumers are read-only.
+
+## Docs
+
+- [`docs/STORAGE_CONTRACTS.md`](docs/STORAGE_CONTRACTS.md) — retention/quota ceilings,
+  single-writer locking, segment ingress and snapshot-read concurrency.
+- [`STATE_OWNERSHIP`](../../docs/STATE_OWNERSHIP.md) and
+  [ADR-036](../../adr/036-in-process-history-persistence.md) — state ledger and in-process
+  history persistence.

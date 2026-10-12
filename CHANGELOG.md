@@ -6,6 +6,23 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [未发布]
+
+### 新增
+
+- **Bevy 前端界面尺寸档位**：设置页新增 Small/Standard/Large 三档界面尺寸
+  （正文 14/16/18px），与 GPUI/Iced 共享同一配置权威并跨会话恢复；Standard 档
+  正文与说明文字对齐 16px/12px 契约（原 14px/10px）。
+- **Bevy 前端页签键盘导航**：导航条与进程属性弹窗页签迁移到官方 headless
+  `TabList`——方向键漫游焦点、Enter/Space 选择、共享 tablist/tab 无障碍角色。
+
+### 变更
+
+- **Bevy 升级到 0.20.0 正式版**（自 `0.20.0-rc.2`，源码零改动），同步落地 0.20
+  能力：`RemSize`/`rem()` 尺寸层、`Ready` 挂载完成事件、`FixedNode` 视口锚定
+  浮层（确认面、悬浮提示、菜单）、`InlineBox`/`InlineImage` 行内图文
+  （表头排序指示与列标签同线排布）。
+
 ## [0.2.0] — 2026-10-06
 
 ### 新增

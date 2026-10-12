@@ -16,6 +16,7 @@
 //!   local copy state".
 
 use std::time::Duration;
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -254,7 +255,7 @@ fn headless_shell_app() -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime: scripted_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<Assets<Font>>();
     app
@@ -414,8 +415,8 @@ fn refresh_and_capacity_writes_round_trip_through_the_shell_entries() {
 
 #[test]
 fn theme_modes_resolve_pairwise_and_read_back_from_the_palette() {
-    let light = ui_palette(&theme_for_mode(LightDark::Light));
-    let dark = ui_palette(&theme_for_mode(LightDark::Dark));
+    let light = ui_palette(&theme_for_mode(LightDark::Light), UiSize::Standard);
+    let dark = ui_palette(&theme_for_mode(LightDark::Dark), UiSize::Standard);
     assert_ne!(
         light.content_bg.to_srgba(),
         dark.content_bg.to_srgba(),
@@ -424,17 +425,20 @@ fn theme_modes_resolve_pairwise_and_read_back_from_the_palette() {
     assert_eq!(palette_mode(&light), Some(LightDark::Light));
     assert_eq!(palette_mode(&dark), Some(LightDark::Dark));
     assert_eq!(
-        palette_mode(&ui_palette(&Theme::dark())),
+        palette_mode(&ui_palette(&Theme::dark(), UiSize::Standard)),
         Some(LightDark::Dark),
         "the cold-start palette reads back as Dark by construction"
     );
     // A mode combination the switch does not own is never claimed.
-    let eye_forest = ui_palette(&Theme::build(
-        Skin::Gnome,
-        LightDark::EyeForest,
-        HighContrast::Off,
-        ResolvedFonts::system_for(Skin::Gnome),
-    ));
+    let eye_forest = ui_palette(
+        &Theme::build(
+            Skin::Gnome,
+            LightDark::EyeForest,
+            HighContrast::Off,
+            ResolvedFonts::system_for(Skin::Gnome),
+        ),
+        UiSize::Standard,
+    );
     assert_eq!(
         palette_mode(&eye_forest),
         None,
@@ -578,7 +582,7 @@ fn theme_activation_swaps_the_palette_authority_and_restyles_the_rail() {
 
     let light_choice = choice_entity(app.world_mut(), &SettingsField::Theme(LightDark::Light));
     activate(&mut app, light_choice);
-    let light = ui_palette(&theme_for_mode(LightDark::Light));
+    let light = ui_palette(&theme_for_mode(LightDark::Light), UiSize::Standard);
     assert_eq!(
         app.world()
             .resource::<WindowPalette>()
@@ -605,7 +609,7 @@ fn theme_activation_swaps_the_palette_authority_and_restyles_the_rail() {
     // Switching back re-resolves the dark pair.
     let dark_choice = choice_entity(app.world_mut(), &SettingsField::Theme(LightDark::Dark));
     activate(&mut app, dark_choice);
-    let dark = ui_palette(&theme_for_mode(LightDark::Dark));
+    let dark = ui_palette(&theme_for_mode(LightDark::Dark), UiSize::Standard);
     assert_eq!(
         app.world()
             .resource::<WindowPalette>()

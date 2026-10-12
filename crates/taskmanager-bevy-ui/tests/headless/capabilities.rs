@@ -14,6 +14,7 @@
 //!   declaration is updated in the same change.
 
 use std::sync::Arc;
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -116,7 +117,7 @@ fn headless_window_app() -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime: scripted_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<Assets<Font>>();
     app

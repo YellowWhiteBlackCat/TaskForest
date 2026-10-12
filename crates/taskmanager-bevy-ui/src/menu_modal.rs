@@ -28,7 +28,7 @@ use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
+    AlignItems, BackgroundColor, BorderRadius, FixedNode, FlexDirection, JustifyContent, Node,
     UiRect, Val, percent, px,
 };
 use taskmanager_application::PlatformEffect;
@@ -301,10 +301,12 @@ fn menu_overlay_scene<Ctx: ActionMenuContext>(
         Node {
             width: percent(100),
             height: percent(100),
-            position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
         }
+        // Viewport-anchored modal layer (see confirmation.rs): FixedNode
+        // detaches the scrim from shell layout, clipping and transforms.
+        FixedNode
         BackgroundColor({ scrim })
         bevy::ui_widgets::Button
         MenuModalScrim

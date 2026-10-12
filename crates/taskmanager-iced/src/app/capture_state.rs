@@ -9,7 +9,7 @@ use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSe
 use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
-use taskmanager_shell::fixture::health::seed_shell_health;
+use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
@@ -17,12 +17,15 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::SmartSelfTestKind;
-use taskmanager_core::core::StorageDeviceKey;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::identity::DeviceGeneration;
 use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::process::{ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope};
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::process::{
+    ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessLiveKey,
+};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskmanager_core::core::target::SessionId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::presentation::smart::self_test_intent;
 
 use super::capture_fixtures::*;
 pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_from_name};
@@ -30,7 +33,10 @@ use super::{
     AlertsMessage, DetailsSection, FocusTarget, IcedApp, LocalSurface, Message, PerfDevice,
     SettingsChange,
 };
-use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+use taskmanager_shell::app_tree_expansion_key_for_identity;
+use taskmanager_shell::fixture::process_tree::{
+    seed_shell_process_tree, seed_shell_process_tree_with_partial_aggregate,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum CapturePresentationFrame {
@@ -44,9 +50,11 @@ pub(super) enum CapturePresentationFrame {
 pub(super) enum CaptureDataTarget {
     #[default]
     General,
+    ApplicationsAggregate,
     PerformanceHistory,
     ApplicationHistory,
     MemoryInventory,
+    CpuFacts,
     SystemDashboard,
     Health,
     ActiveAlerts,
@@ -57,6 +65,8 @@ pub(super) enum CaptureDataTarget {
     Battery,
     Smart(&'static str),
     Focus,
+    SessionControlConfirmation,
+    ProcessContextMenu,
     StartupFailure,
     ProcessProperties(&'static str),
 }
@@ -64,6 +74,7 @@ pub(super) enum CaptureDataTarget {
 pub(super) struct CaptureState {
     pub(super) marker: Option<PathBuf>,
     pub(super) emitted: bool,
+    pub(super) performance_viewport_observed: bool,
     pub(super) presentation_frame: CapturePresentationFrame,
     pub(super) data_target: CaptureDataTarget,
     pub(super) scroll_requested: bool,
@@ -77,6 +88,7 @@ impl CaptureState {
         Self {
             marker,
             emitted: false,
+            performance_viewport_observed: false,
             presentation_frame: CapturePresentationFrame::WaitingForData,
             data_target: CaptureDataTarget::General,
             scroll_requested: false,
@@ -90,9 +102,11 @@ impl CaptureState {
 /// Apply one fixed capture target and its page-local facts.
 pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     app.capture.data_target = match target {
+        "apps-group-expanded" => CaptureDataTarget::ApplicationsAggregate,
         "history-replay" => CaptureDataTarget::PerformanceHistory,
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
+        "cpu-facts" => CaptureDataTarget::CpuFacts,
         "system-dashboard" | "history-60m" => CaptureDataTarget::SystemDashboard,
         "storage-health" | "sensor-center" => CaptureDataTarget::Health,
         "active-alert" => CaptureDataTarget::ActiveAlerts,
@@ -106,6 +120,8 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         "settings-switch-focus" | "settings-zero-gray" | "keyboard-focus" => {
             CaptureDataTarget::Focus
         }
+        "users-session-confirmation" => CaptureDataTarget::SessionControlConfirmation,
+        "process-context-menu" => CaptureDataTarget::ProcessContextMenu,
         "startup-failure-evidence" => CaptureDataTarget::StartupFailure,
         "process-properties-performance" => {
             CaptureDataTarget::ProcessProperties("process-properties-performance")
@@ -167,7 +183,42 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     if apply_capture_alerts(app, target) {
         return true;
     }
-    if target == "process-selection" {
+    if target == "users-session-confirmation" {
+        let session = SessionItem {
+            id: SessionId::new("capture-session-7"),
+            incarnation: Some(SessionIncarnation::LinuxLogind {
+                boot_id: "capture-boot-identity".into(),
+                created_monotonic_usec: 700_000,
+            }),
+            uid: 1000,
+            user: "capture-user".into(),
+            seat: Some("seat0".into()),
+            tty: Some("tty7".into()),
+            remote: false,
+            timestamp: Some("2026-10-12 09:30".into()),
+        };
+        seed_projection_fact(
+            &mut app.shell,
+            ProjectionSeedFact::Sessions(Some(vec![session])),
+        );
+        app.shell.application.active_page = AppPage::Users;
+        let _ = app.update(Message::SelectRow(0));
+        let _ = app.update(Message::RequestSessionControl(
+            SessionControlAction::Disconnect,
+        ));
+        return true;
+    } else if target == "process-context-menu" {
+        app.shell.application.active_page = AppPage::Applications;
+        if let Some(identity) = app
+            .shell
+            .visible_processes()
+            .iter()
+            .find_map(|process| ProcessLiveKey::from_process(*process))
+        {
+            let _ = app.update(Message::OpenProcessRowMenu { identity });
+        }
+        return true;
+    } else if target == "process-selection" {
         app.shell.application.active_page = AppPage::Applications;
         let index = (0..app.shell.visible_process_count())
             .find(|index| app.shell.row_identity_at(*index).is_some());
@@ -303,6 +354,14 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.shell.query = "zed".into();
     } else if target == "apps-group-expanded" {
         app.shell.application.active_page = AppPage::Applications;
+        if let Some(root) = seed_shell_process_tree_with_partial_aggregate(&mut app.shell) {
+            app.shell.clear_process_selection();
+            let _ = app.update(Message::ExpandAllProcessTree);
+            let _ = app.update(Message::ToggleGroupExpansion {
+                name: app_tree_expansion_key_for_identity(root),
+                row_key: None,
+            });
+        }
     } else if target == "apps-zero-gray" {
         app.shell.application.active_page = AppPage::Applications;
         app.configuration.preferences_mut().gray_zero_values = true;
@@ -333,7 +392,12 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
 }
 
 fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
-    if target == "smart-self-test-confirm" {
+    if target == "cpu-facts" {
+        app.shell.application.active_page = AppPage::Performance;
+        app.performance.selected_device = PerfDevice::Cpu;
+        seed_capture_cpu_facts(app);
+    } else if target == "smart-self-test-confirm" {
+        seed_smart_self_test_capabilities(&mut app.shell);
         app.shell.application.active_page = AppPage::Performance;
         app.performance.selected_device = PerfDevice::Disk(0);
         if let Some(disk) = app
@@ -343,18 +407,9 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
             .as_ref()
             .and_then(|snapshot| snapshot.disks.first())
         {
-            let intent = SmartSelfTestIntent {
-                device_id: DeviceId::new(disk.device_id.clone()),
-                device_generation: disk.device_generation,
-                device_key: StorageDeviceKey::new(disk.name.clone()),
-                display_name: if disk.model.is_empty() {
-                    disk.name.clone()
-                } else {
-                    disk.model.clone()
-                },
-                kind: SmartSelfTestKind::Short,
-            };
-            app.shell.arm_smart_self_test(intent);
+            if let Some(intent) = self_test_intent(disk, SmartSelfTestKind::Short) {
+                let _ = app.shell.arm_smart_self_test(intent);
+            }
         }
     } else if target == "services-search-highlight" {
         app.shell.application.active_page = AppPage::Services;

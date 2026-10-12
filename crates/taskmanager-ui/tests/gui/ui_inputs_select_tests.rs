@@ -9,7 +9,7 @@ use std::rc::Rc;
 use taskmanager_theme::Theme;
 
 struct Harness {
-    chosen: Rc<RefCell<Option<String>>>,
+    chosen: Rc<RefCell<Vec<String>>>,
 }
 
 impl Render for Harness {
@@ -26,7 +26,7 @@ impl Render for Harness {
             ],
             palette,
             move |value, _window, _cx| {
-                *chosen.borrow_mut() = Some(value.to_string());
+                chosen.borrow_mut().push(value.to_string());
             },
         ))
     }
@@ -34,7 +34,8 @@ impl Render for Harness {
 
 #[gpui::test]
 async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) {
-    let chosen = Rc::new(RefCell::new(None));
+    cx.update(crate::overlays::popup::init);
+    let chosen = Rc::new(RefCell::new(Vec::new()));
     let window = cx.add_window(|_window, _cx| Harness {
         chosen: chosen.clone(),
     });
@@ -77,8 +78,36 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();
     assert_eq!(
-        *chosen.borrow(),
-        Some("auto".into()),
+        chosen.borrow().as_slice(),
+        &[String::from("auto")],
         "selecting an option reports its value"
+    );
+
+    // `auto` was already checked before activation. Its display marker must
+    // not turn this single-choice Select into a persistent checkbox menu.
+    // The debug bounds map retains old entries, so click the old row again
+    // and prove it cannot invoke the selection callback after dismissal.
+    vcx.simulate_click(first_item, Modifiers::none());
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    assert_eq!(
+        chosen.borrow().as_slice(),
+        &[String::from("auto")],
+        "choosing a checked single-select option must close the menu"
+    );
+
+    // Reopen the dismissed Select, then choose the other option through the
+    // popup's keyboard navigation. The pointer anchor remains stable across
+    // the first popup's unmount, while debug bounds retain historical entries.
+    vcx.simulate_click(trigger_bounds.center(), Modifiers::none());
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    vcx.simulate_keystrokes("down down enter");
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    assert_eq!(
+        chosen.borrow().as_slice(),
+        &[String::from("auto"), String::from("manual")],
+        "the trigger must regain focus and the reopened Select must accept another option"
     );
 }
