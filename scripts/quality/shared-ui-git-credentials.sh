@@ -31,6 +31,7 @@ configure() {
     fi
     export GIT_CONFIG_GLOBAL="$git_global_config_file"
     export GIT_CONFIG_NOSYSTEM=1
+    git config --file "$git_config_file" --replace-all credential.helper ''
 
     if [[ "$SHARED_UI_KIT_READ_KEY" == *'PRIVATE KEY'* ]]; then
         known_hosts_file="$(mktemp "$runner_temp/taskforest-shared-ui-kit-known-hosts.XXXXXX")"
@@ -50,11 +51,9 @@ github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAA
 github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
 HOST_KEYS
         chmod 600 "$known_hosts_file"
-        export GIT_CONFIG_COUNT=2
-        export GIT_CONFIG_KEY_0=credential.helper
-        export GIT_CONFIG_VALUE_0=
-        export GIT_CONFIG_KEY_1="url.\"${ssh_kit_url}\".insteadOf"
-        export GIT_CONFIG_VALUE_1="https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git"
+        git config --file "$git_config_file" \
+            "url.${ssh_kit_url}.insteadOf" \
+            "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git"
         printf -v key_arg '%q' "$git_private_key_file"
         printf -v hosts_arg '%q' "$git_known_hosts_file"
         export GIT_SSH_COMMAND="ssh -i $key_arg -o IdentitiesOnly=yes -o UserKnownHostsFile=$hosts_arg -o StrictHostKeyChecking=yes -o BatchMode=yes"
@@ -69,6 +68,7 @@ HOST_KEYS
         fi
         printf '%s\n' "$SHARED_UI_KIT_READ_KEY" >"$secret_file"
         chmod 600 "$secret_file"
+        git config --file "$git_config_file" credential.useHttpPath true
         cat >"$helper_file" <<'CREDENTIAL_HELPER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -90,13 +90,7 @@ if [[ "$protocol" == https && "$host" == github.com && ( "$path" == YellowWhiteB
 fi
 CREDENTIAL_HELPER
         chmod 700 "$helper_file"
-        export GIT_CONFIG_COUNT=3
-        export GIT_CONFIG_KEY_0=credential.helper
-        export GIT_CONFIG_VALUE_0=
-        export GIT_CONFIG_KEY_1=credential.helper
-        export GIT_CONFIG_VALUE_1="!bash \"$git_helper_file\""
-        export GIT_CONFIG_KEY_2=credential.useHttpPath
-        export GIT_CONFIG_VALUE_2=true
+        git config --file "$git_config_file" --add credential.helper "!bash \"$git_helper_file\""
     fi
 }
 
@@ -106,9 +100,7 @@ cleanup() {
             rm -f "$file"
         fi
     done
-    unset GIT_SSH_COMMAND GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
-    unset GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
-    unset GIT_CONFIG_KEY_2 GIT_CONFIG_VALUE_2 TASKFOREST_SHARED_UI_KIT_KEY_FILE
+    unset GIT_SSH_COMMAND GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM TASKFOREST_SHARED_UI_KIT_KEY_FILE
 }
 
 case "$mode" in
