@@ -268,7 +268,7 @@ fn process_context_menu_mounts_its_production_popover_action() {
         .shell
         .visible_processes()
         .iter()
-        .find_map(|process| ProcessLiveKey::from_process(*process))
+        .find_map(|process| ProcessLiveKey::from_process(process))
         .expect("the demo process fixture has a live row identity");
     let _ = app.update(Message::OpenProcessRowMenu { identity });
     assert_eq!(app.process_menu_identity(), Some(identity));
@@ -887,7 +887,6 @@ fn context_menu_outside_press_dismisses_without_activating_the_page_beneath() {
 
     let (press_messages, captured) = {
         let mut messages = Vec::new();
-        let captured;
         let mut shell = Shell::new(&mut messages);
         let mut clipboard = iced::advanced::clipboard::Null;
         overlay.update(
@@ -898,7 +897,7 @@ fn context_menu_outside_press_dismisses_without_activating_the_page_beneath() {
             &mut clipboard,
             &mut shell,
         );
-        captured = shell.is_event_captured();
+        let captured = shell.is_event_captured();
         (messages, captured)
     };
     assert!(

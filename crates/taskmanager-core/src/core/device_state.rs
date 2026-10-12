@@ -342,16 +342,16 @@ impl DeviceLifecycleRegistry {
                 )
             })
             .map(|(id, _)| (*id).clone());
-        if let Some(victim) = victim {
-            if let Some(lifecycle) = self.entries.remove(&victim) {
-                self.observed.remove(&victim);
-                self.remember_generation(
-                    victim,
-                    lifecycle.generation,
-                    lifecycle.presence == DevicePresence::Absent,
-                    now_ms,
-                );
-            }
+        if let Some(victim) = victim
+            && let Some(lifecycle) = self.entries.remove(&victim)
+        {
+            self.observed.remove(&victim);
+            self.remember_generation(
+                victim,
+                lifecycle.generation,
+                lifecycle.presence == DevicePresence::Absent,
+                now_ms,
+            );
         }
     }
 

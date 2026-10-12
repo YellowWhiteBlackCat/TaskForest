@@ -244,7 +244,7 @@ impl SessionManager {
             &current_boot_id,
             SESSION_CONTROL_TIMEOUT,
         )?;
-        if &current_incarnation != &target.incarnation {
+        if current_incarnation != target.incarnation {
             return Err(ProviderFailure::IdentityChanged);
         }
 

@@ -398,7 +398,11 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         ),
         (
             "taskmanager-ui-contract",
-            &["taskmanager-application", "taskmanager-platform-contract"][..],
+            &[
+                "taskmanager-application",
+                "taskmanager-core",
+                "taskmanager-platform-contract",
+            ][..],
         ),
         (
             "taskmanager-accessibility-linux",

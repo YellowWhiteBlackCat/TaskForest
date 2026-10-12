@@ -49,7 +49,8 @@ impl DeviceLifecycleProjection {
         }
         let duplicate_ids: BTreeSet<String> = id_counts
             .into_iter()
-            .filter_map(|(id, count)| (count > 1).then(|| id.to_owned()))
+            .filter(|(_, count)| *count > 1)
+            .map(|(id, _)| id.to_owned())
             .collect();
         let outcome = match snapshot.failure.as_ref() {
             None => {

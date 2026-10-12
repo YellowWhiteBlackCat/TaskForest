@@ -291,7 +291,7 @@ fn clear_replace_reset_and_event_eviction_keep_event_ids_monotonic() {
     assert_eq!(center.event_history()[1].id.get(), 3);
 
     let cleared = center.clear_event_history();
-    assert_eq!(cleared.events, true);
+    assert!(cleared.events);
     assert!(center.event_history().is_empty());
     assert_eq!(
         center.clear_event_history(),

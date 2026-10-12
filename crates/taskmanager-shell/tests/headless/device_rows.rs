@@ -599,14 +599,16 @@ fn sensor_and_power_fixture_seeds_apply_their_lifecycle_owner_projection() {
 
 #[test]
 fn gpu_rows_fail_closed_without_matching_lifecycle_identity() {
-    let mut store = SystemProjectionStore::default();
-    store.snapshot = Some(SystemSnapshot {
-        gpu: vec![gpu_metrics(
-            "macos:gpu:system-profiler:board",
-            DeviceGeneration::INITIAL,
-        )],
-        ..SystemSnapshot::default()
-    });
+    let mut store = SystemProjectionStore {
+        snapshot: Some(SystemSnapshot {
+            gpu: vec![gpu_metrics(
+                "macos:gpu:system-profiler:board",
+                DeviceGeneration::INITIAL,
+            )],
+            ..SystemSnapshot::default()
+        }),
+        ..SystemProjectionStore::default()
+    };
     assert!(
         store.device_row_ids(DeviceRowFamily::Gpu).is_empty(),
         "a metric without an accepted lifecycle sidecar has no stable row identity"

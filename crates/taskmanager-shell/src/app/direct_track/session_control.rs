@@ -21,9 +21,7 @@ impl DirectTrackState {
             )),
             _ => None,
         };
-        let Some((request_id, identity, action)) = pending else {
-            return None;
-        };
+        let (request_id, identity, action) = pending?;
 
         let identity_is_current = identity.as_ref().is_some_and(|identity| {
             self.projection
@@ -36,11 +34,11 @@ impl DirectTrackState {
                 let _ = self.accept_session_control(request_id, identity, action);
             } else if let Some((pending_id, pending_identity, pending_action)) =
                 self.projection.session_control_requests.pending()
+                && pending_id == request_id
+                && pending_action == action
             {
-                if pending_id == request_id && pending_action == action {
-                    let identity = pending_identity.clone();
-                    let _ = self.accept_session_control(pending_id, &identity, pending_action);
-                }
+                let identity = pending_identity.clone();
+                let _ = self.accept_session_control(pending_id, &identity, pending_action);
             }
             let _ = self.interaction.reduce(InteractionEvent::Dismiss(
                 SurfaceDismissReason::TargetUnavailable,

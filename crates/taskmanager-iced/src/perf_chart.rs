@@ -689,16 +689,21 @@ pub(crate) fn data_point_badge_bounds(size: Size, anchor: Point, text_width: f32
     }
 }
 
+#[derive(Clone, Copy)]
+struct LatestBadgeStyle {
+    cpu_color: Color,
+    memory_color: Color,
+    grid_color: Color,
+    readout: ReadoutColors,
+}
+
 fn draw_latest_badge(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
     content: Option<&str>,
     anchor: Option<LatestReadoutAnchor>,
     sample_count: usize,
-    cpu_color: Color,
-    memory_color: Color,
-    grid_color: Color,
-    readout: ReadoutColors,
+    style: LatestBadgeStyle,
 ) {
     let (Some(content), Some(anchor)) = (content, anchor) else {
         return;
@@ -709,16 +714,16 @@ fn draw_latest_badge(
         scaled_y(anchor.value, 100.0, size.height),
     );
     let point_color = match anchor.series {
-        ReadoutSeries::Cpu => cpu_color,
-        ReadoutSeries::Memory => memory_color,
+        ReadoutSeries::Cpu => style.cpu_color,
+        ReadoutSeries::Memory => style.memory_color,
     };
     frame.fill(&Path::circle(point, 2.5), point_color);
     draw_value_pill(
         frame,
         data_point_badge_bounds(size, point, text_width),
         content,
-        grid_color,
-        readout,
+        style.grid_color,
+        style.readout,
     );
 }
 

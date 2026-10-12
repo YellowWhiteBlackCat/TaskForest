@@ -78,7 +78,7 @@ enum ProcessTableRowInput {
         expansion_key: Option<String>,
         selectable: bool,
         expandable: bool,
-        aggregate: Option<ProcessAggregateSemantics>,
+        aggregate: Option<Box<ProcessAggregateSemantics>>,
     },
 }
 
@@ -304,7 +304,7 @@ impl SemanticSnapshotBuilder {
             expansion_key,
             selectable,
             expandable,
-            aggregate: Some(aggregate),
+            aggregate: Some(Box::new(aggregate)),
         });
         self
     }
@@ -498,7 +498,7 @@ impl SemanticSnapshotBuilder {
                         node = node.with_action(action);
                     }
                     if let Some(aggregate) = aggregate {
-                        node = node.with_process_aggregate_semantics(aggregate.clone());
+                        node = node.with_process_aggregate_semantics(aggregate.as_ref().clone());
                     }
                     nodes.push(node);
                 }

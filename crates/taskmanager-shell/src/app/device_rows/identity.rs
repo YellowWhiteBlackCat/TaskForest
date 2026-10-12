@@ -8,8 +8,9 @@ use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::sensors::SensorReading;
 
 /// Device family whose owner facts supply a renderer-neutral row.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DeviceRowFamily {
+    #[default]
     Storage,
     Network,
     Gpu,
@@ -211,10 +212,4 @@ fn nonempty_device_id(value: &str) -> Option<DeviceId> {
 
 fn nonempty_string(value: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
-}
-
-impl Default for DeviceRowFamily {
-    fn default() -> Self {
-        Self::Storage
-    }
 }

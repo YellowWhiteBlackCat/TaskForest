@@ -42,9 +42,11 @@ fn scalar_process(
     cpu: ScalarObservation<f32>,
     memory: ScalarObservation<u64>,
 ) -> ProcessItem {
-    let mut scalars = ProcessScalarObservations::default();
-    scalars.cpu_percentage = cpu;
-    scalars.memory_bytes = memory;
+    let scalars = ProcessScalarObservations {
+        cpu_percentage: cpu,
+        memory_bytes: memory,
+        ..ProcessScalarObservations::default()
+    };
     ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(format!("sample-{pid}"))

@@ -60,8 +60,10 @@ fn reappeared_disk_generation_discards_cached_self_test_capability() {
         short: SmartSelfTestSupport::Supported,
         ..Default::default()
     };
-    let mut smart = DiskSmart::default();
-    smart.self_test_capabilities = disk.smart_self_test_capabilities;
+    let smart = DiskSmart {
+        self_test_capabilities: disk.smart_self_test_capabilities,
+        ..DiskSmart::default()
+    };
     let mut state = DiskCollectionState::new();
     state.smart_cache.insert(id.to_owned(), smart);
     state.smart_source_cache.insert(

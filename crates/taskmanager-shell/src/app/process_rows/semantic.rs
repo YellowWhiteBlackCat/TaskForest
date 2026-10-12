@@ -96,8 +96,8 @@ pub fn append_process_semantic_rows<'process>(
                     || (None, None, None),
                     |process| {
                         let observations = ProcessRowObservations::new(
-                            process.scalar_observations().cpu_percentage.clone(),
-                            process.scalar_observations().memory_bytes.clone(),
+                            process.scalar_observations().cpu_percentage,
+                            process.scalar_observations().memory_bytes,
                         );
                         let cpu_percent = process.current_cpu_percentage().map(f64::from);
                         let memory_percent = process

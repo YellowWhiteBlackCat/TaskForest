@@ -12,6 +12,7 @@
 // terminal echo is given up.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+use taskmanager_cli::run::CaptureHandler;
 use taskmanager_cli::{FrontendHandlers, run};
 
 #[cfg(target_os = "windows")]
@@ -39,12 +40,12 @@ fn capture_window(out: &std::path::Path) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn capture_window_handler() -> Option<fn(&std::path::Path) -> Result<(), String>> {
+fn capture_window_handler() -> Option<CaptureHandler> {
     Some(capture_window)
 }
 
 #[cfg(not(target_os = "windows"))]
-fn capture_window_handler() -> Option<fn(&std::path::Path) -> Result<(), String>> {
+fn capture_window_handler() -> Option<CaptureHandler> {
     None
 }
 

@@ -129,7 +129,7 @@ fn typed_process_row_observations_preserve_current_and_retained_truth() {
                 selected: true,
             },
             ProcessRowBehavior::NonActionable,
-            Some(ProcessRowObservations::new(cpu.clone(), memory.clone())),
+            Some(ProcessRowObservations::new(cpu, memory)),
         )
         .build()
         .expect("typed process observations must validate");

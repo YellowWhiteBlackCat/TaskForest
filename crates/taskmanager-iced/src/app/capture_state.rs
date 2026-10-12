@@ -180,52 +180,10 @@ fn prepare_health_capture(app: &mut IcedApp, target: &str) {
 }
 
 fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
-    if apply_capture_alerts(app, target) {
+    if apply_capture_alerts(app, target) || apply_capture_user_and_process_targets(app, target) {
         return true;
     }
-    if target == "users-session-confirmation" {
-        let session = SessionItem {
-            id: SessionId::new("capture-session-7"),
-            incarnation: Some(SessionIncarnation::LinuxLogind {
-                boot_id: "capture-boot-identity".into(),
-                created_monotonic_usec: 700_000,
-            }),
-            uid: 1000,
-            user: "capture-user".into(),
-            seat: Some("seat0".into()),
-            tty: Some("tty7".into()),
-            remote: false,
-            timestamp: Some("2026-10-12 09:30".into()),
-        };
-        seed_projection_fact(
-            &mut app.shell,
-            ProjectionSeedFact::Sessions(Some(vec![session])),
-        );
-        app.shell.application.active_page = AppPage::Users;
-        let _ = app.update(Message::SelectRow(0));
-        let _ = app.update(Message::RequestSessionControl(
-            SessionControlAction::Disconnect,
-        ));
-        return true;
-    } else if target == "process-context-menu" {
-        app.shell.application.active_page = AppPage::Applications;
-        if let Some(identity) = app
-            .shell
-            .visible_processes()
-            .iter()
-            .find_map(|process| ProcessLiveKey::from_process(*process))
-        {
-            let _ = app.update(Message::OpenProcessRowMenu { identity });
-        }
-        return true;
-    } else if target == "process-selection" {
-        app.shell.application.active_page = AppPage::Applications;
-        let index = (0..app.shell.visible_process_count())
-            .find(|index| app.shell.row_identity_at(*index).is_some());
-        if let Some(index) = index {
-            let _ = app.update(Message::SelectRow(index));
-        }
-    } else if target == "service-details" {
+    if target == "service-details" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
     } else if matches!(target, "system-dashboard" | "history-60m") {
@@ -391,6 +349,56 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     true
 }
 
+fn apply_capture_user_and_process_targets(app: &mut IcedApp, target: &str) -> bool {
+    match target {
+        "users-session-confirmation" => {
+            let session = SessionItem {
+                id: SessionId::new("capture-session-7"),
+                incarnation: Some(SessionIncarnation::LinuxLogind {
+                    boot_id: "capture-boot-identity".into(),
+                    created_monotonic_usec: 700_000,
+                }),
+                uid: 1000,
+                user: "capture-user".into(),
+                seat: Some("seat0".into()),
+                tty: Some("tty7".into()),
+                remote: false,
+                timestamp: Some("2026-10-12 09:30".into()),
+            };
+            seed_projection_fact(
+                &mut app.shell,
+                ProjectionSeedFact::Sessions(Some(vec![session])),
+            );
+            app.shell.application.active_page = AppPage::Users;
+            let _ = app.update(Message::SelectRow(0));
+            let _ = app.update(Message::RequestSessionControl(
+                SessionControlAction::Disconnect,
+            ));
+        }
+        "process-context-menu" => {
+            app.shell.application.active_page = AppPage::Applications;
+            if let Some(identity) = app
+                .shell
+                .visible_processes()
+                .iter()
+                .find_map(|process| ProcessLiveKey::from_process(process))
+            {
+                let _ = app.update(Message::OpenProcessRowMenu { identity });
+            }
+        }
+        "process-selection" => {
+            app.shell.application.active_page = AppPage::Applications;
+            let index = (0..app.shell.visible_process_count())
+                .find(|index| app.shell.row_identity_at(*index).is_some());
+            if let Some(index) = index {
+                let _ = app.update(Message::SelectRow(index));
+            }
+        }
+        _ => return false,
+    }
+    true
+}
+
 fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
     if target == "cpu-facts" {
         app.shell.application.active_page = AppPage::Performance;
@@ -406,10 +414,9 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
             .snapshot
             .as_ref()
             .and_then(|snapshot| snapshot.disks.first())
+            && let Some(intent) = self_test_intent(disk, SmartSelfTestKind::Short)
         {
-            if let Some(intent) = self_test_intent(disk, SmartSelfTestKind::Short) {
-                let _ = app.shell.arm_smart_self_test(intent);
-            }
+            let _ = app.shell.arm_smart_self_test(intent);
         }
     } else if target == "services-search-highlight" {
         app.shell.application.active_page = AppPage::Services;

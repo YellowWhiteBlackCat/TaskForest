@@ -544,7 +544,7 @@ fn event_history_renders_recent_events() {
         .first()
         .expect("the seed becomes a canonical event");
 
-    let line = super::event_history_line(&event);
+    let line = super::event_history_line(event);
     assert!(line.contains("[Activated]"));
     assert!(line.contains("Warning"));
     assert!(line.contains("85.0%"));

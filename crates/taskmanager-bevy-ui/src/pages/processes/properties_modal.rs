@@ -439,12 +439,11 @@ pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> b
             // TabList selection is reported as ValueChange<Option<Entity>>
             // targeted at the list. Activate targets Buttons and cannot switch
             // a headless Tab, so drive the same typed event as a real tab click.
-            if let Some(source) = access.tab_lists.iter().find_map(|(list, children)| {
-                children
-                    .iter()
-                    .any(|child| *child == entity)
-                    .then_some(list)
-            }) {
+            if let Some(source) = access
+                .tab_lists
+                .iter()
+                .find_map(|(list, children)| children.contains(&entity).then_some(list))
+            {
                 access.commands.trigger(ValueChange {
                     source,
                     value: Some(entity),

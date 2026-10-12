@@ -8,7 +8,7 @@ pub use spec::{CommandId, CommandPaletteDisposition, CommandPaletteExclusionReas
 ///
 /// Frontends may add their own local actions after these shared commands;
 /// toolkit executors remain owned by each frontend.
-#[must_use]
+#[must_use = "the returned iterator contains the available command-palette entries"]
 pub fn command_palette_commands() -> impl Iterator<Item = CommandId> {
     CommandId::ALL
         .into_iter()

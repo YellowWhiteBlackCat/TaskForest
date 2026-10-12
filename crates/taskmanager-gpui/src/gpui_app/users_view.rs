@@ -238,7 +238,7 @@ impl TableDelegate for UsersDelegate {
             let root = root.clone();
             let session = session.clone();
             let item = MenuItem::new(label, move |_, cx| {
-                let _ = root.update(cx, |view, cx| {
+                root.update(cx, |view, cx| {
                     if view.request_session_control_confirmation(&session, action) {
                         cx.notify();
                     }
@@ -555,7 +555,7 @@ fn action_bar(
                 hovered_bool,
                 move |_win: &mut Window, cx: &mut App| {
                     if let Some(session) = &session {
-                        let _ = click_entity.update(cx, |view, cx| {
+                        click_entity.update(cx, |view, cx| {
                             if view.request_session_control_confirmation(
                                 session,
                                 SessionControlAction::Disconnect,
@@ -594,7 +594,7 @@ fn action_bar(
                 hovered_bool,
                 move |_win: &mut Window, cx: &mut App| {
                     if let Some(session) = &session {
-                        let _ = click_entity.update(cx, |view, cx| {
+                        click_entity.update(cx, |view, cx| {
                             if view.request_session_control_confirmation(
                                 session,
                                 SessionControlAction::Lock,

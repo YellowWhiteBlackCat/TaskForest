@@ -349,8 +349,8 @@ fn aggregate_cells_and_full_tooltip_fit_standard_and_compact_row_widths() {
                 .clone()
         };
         assert!(summary.contains(long_name));
-        assert!(summary.contains(&control_error_detail(FailureKind::PermissionDenied)));
-        assert!(summary.contains(&control_error_detail(FailureKind::MissingDependency)));
+        assert!(summary.contains(control_error_detail(FailureKind::PermissionDenied)));
+        assert!(summary.contains(control_error_detail(FailureKind::MissingDependency)));
         app.world_mut()
             .spawn_scene(tooltip_card_scene(&summary, &palette))
             .expect("the full tooltip scene resolves");

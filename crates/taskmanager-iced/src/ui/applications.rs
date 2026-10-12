@@ -476,7 +476,7 @@ fn header_cell(
         sort_action,
     );
     if !column_resizable(column) {
-        return sort_button.into();
+        return sort_button;
     }
     // Resize edge: a `mouse_area` strip over the cell's trailing edge. The
     // strip's press is captured before the sort button underneath sees the

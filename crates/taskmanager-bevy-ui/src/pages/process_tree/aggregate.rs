@@ -150,12 +150,12 @@ fn aggregate_metric_text<T>(
     match metric.availability() {
         ScalarAvailability::Available => metric
             .current_value()
-            .map(|value| format_value(value))
+            .map(&format_value)
             .unwrap_or_else(unknown),
         ScalarAvailability::Partial(failure) => {
             let value = metric
                 .current_value()
-                .map(|value| format_value(value))
+                .map(&format_value)
                 .unwrap_or_else(unknown);
             format!(
                 "{value} · {}/{} · {} · {}",
@@ -168,7 +168,7 @@ fn aggregate_metric_text<T>(
         ScalarAvailability::Stale(failure) => {
             let value = metric
                 .last_known_value()
-                .map(|value| format_value(value))
+                .map(&format_value)
                 .unwrap_or_else(unknown);
             format!(
                 "{value} · {}/{} · {} · {}",
@@ -198,12 +198,12 @@ fn aggregate_metric_compact_text<T>(
     match metric.availability() {
         ScalarAvailability::Available => metric
             .current_value()
-            .map(|value| format_value(value))
+            .map(&format_value)
             .unwrap_or_else(unknown),
         ScalarAvailability::Partial(_) => {
             let value = metric
                 .current_value()
-                .map(|value| compact_value(value))
+                .map(&compact_value)
                 .unwrap_or_else(unknown);
             format!(
                 "{value}P{}/{}",
@@ -214,7 +214,7 @@ fn aggregate_metric_compact_text<T>(
         ScalarAvailability::Stale(_) => {
             let value = metric
                 .last_known_value()
-                .map(|value| compact_value(value))
+                .map(&compact_value)
                 .unwrap_or_else(unknown);
             format!(
                 "{value}S{}/{}",

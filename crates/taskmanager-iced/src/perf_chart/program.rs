@@ -99,10 +99,12 @@ impl canvas::Program<Message> for PerfChart {
                     latest.as_deref(),
                     latest_anchor,
                     latest_sample_count,
-                    cpu_color,
-                    memory_color,
-                    grid_color,
-                    readout,
+                    super::LatestBadgeStyle {
+                        cpu_color,
+                        memory_color,
+                        grid_color,
+                        readout,
+                    },
                 );
                 return;
             };

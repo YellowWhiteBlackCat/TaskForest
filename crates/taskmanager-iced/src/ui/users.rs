@@ -153,23 +153,19 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let body_rows = Rc::clone(&rows);
             let body_open_menu = open_menu_session.clone();
             let columns = users_columns();
+            let row_style = UserRowStyle {
+                table_theme,
+                columns,
+                row_padding,
+                compact,
+            };
             let table_body = if body_open_menu.is_some() {
                 // Iced's Lazy overlay adapter does not forward widget
                 // operations from nested overlays. Keep the bounded Users
                 // window direct while its row menu is open so the focus
                 // request can reach the menu's actual action target.
                 virtual_table_body(window, Length::Fill, move |start, end| {
-                    user_rows_in_window(
-                        body_rows,
-                        body_open_menu,
-                        start,
-                        end,
-                        selected,
-                        table_theme,
-                        columns,
-                        row_padding,
-                        compact,
-                    )
+                    user_rows_in_window(body_rows, body_open_menu, start..end, selected, row_style)
                 })
             } else {
                 iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
@@ -179,13 +175,9 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                         user_rows_in_window(
                             rows,
                             open_menu_session,
-                            start,
-                            end,
+                            start..end,
                             selected,
-                            table_theme,
-                            columns,
-                            row_padding,
-                            compact,
+                            row_style,
                         )
                     })
                 })
@@ -194,7 +186,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let table = virtual_table(
                 app.users_scroll_id(),
                 header.into(),
-                table_body.into(),
+                table_body,
                 Length::Fill,
                 iced::widget::scrollable::Direction::Vertical(
                     iced::widget::scrollable::Scrollbar::default(),
@@ -229,23 +221,33 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 }
 
 /// Build the visible Users rows for one bounded virtual window.
-fn user_rows_in_window(
-    rows: Rc<Vec<UserRow>>,
-    open_menu_session: Option<String>,
-    start: usize,
-    end: usize,
-    selected: usize,
+#[derive(Clone, Copy)]
+struct UserRowStyle {
     table_theme: Theme,
     columns: UsersColumns,
     row_padding: iced::Padding,
     compact: bool,
+}
+
+fn user_rows_in_window(
+    rows: Rc<Vec<UserRow>>,
+    open_menu_session: Option<String>,
+    window: std::ops::Range<usize>,
+    selected: usize,
+    style: UserRowStyle,
 ) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
-    rows.get(start..end)
+    let UserRowStyle {
+        table_theme,
+        columns,
+        row_padding,
+        compact,
+    } = style;
+    rows.get(window.start..window.end)
         .unwrap_or(&[])
         .iter()
         .enumerate()
         .map(|(offset, session)| {
-            let index = start + offset;
+            let index = window.start + offset;
             let is_selected = index == selected;
             let zebra = crate::theme::zebra_index(index);
             let remote_cell: Element<'static, Message, iced::Theme, iced::Renderer> = {

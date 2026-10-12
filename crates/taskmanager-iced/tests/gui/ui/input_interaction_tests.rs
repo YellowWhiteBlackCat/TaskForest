@@ -631,7 +631,7 @@ fn last_refresh_value(messages: &[Message]) -> u64 {
             Message::SettingsChanged(SettingsChange::RefreshInterval(value)) => Some(*value),
             _ => None,
         })
-        .last()
+        .next_back()
         .expect("dragging the native slider emits a refresh interval")
 }
 

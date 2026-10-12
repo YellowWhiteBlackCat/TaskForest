@@ -48,9 +48,7 @@ pub(crate) fn self_test_action(
     enabled: bool,
     callbacks: &SystemHealthCallbacks,
 ) -> Option<AnyElement> {
-    let Some(disk) = disk.filter(|disk| self_test_supported(disk, kind)) else {
-        return None;
-    };
+    let disk = disk.filter(|disk| self_test_supported(disk, kind))?;
     if !enabled {
         return Some(disabled_action(theme, label, id).into_any_element());
     }

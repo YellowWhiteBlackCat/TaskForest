@@ -95,12 +95,13 @@ impl ProcessesState {
     /// Create the per-column focus identities once for this window. Hidden
     /// columns keep their handle so showing them again restores the same target.
     pub fn with_resize_focus_handles(cx: &mut App) -> Self {
-        let mut state = Self::default();
-        state.resize_focus_handles = SortCol::ALL
-            .into_iter()
-            .filter(|col| processes_view::rows::is_resizable(*col))
-            .map(|col| (col, cx.focus_handle().tab_stop(true)))
-            .collect();
-        state
+        Self {
+            resize_focus_handles: SortCol::ALL
+                .into_iter()
+                .filter(|col| processes_view::rows::is_resizable(*col))
+                .map(|col| (col, cx.focus_handle().tab_stop(true)))
+                .collect(),
+            ..Self::default()
+        }
     }
 }

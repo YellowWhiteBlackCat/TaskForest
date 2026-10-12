@@ -39,11 +39,11 @@ impl RootView {
     /// sizing).
     pub fn resize_proc_col(&mut self, col: SortCol, size: Pixels, cx: &mut Context<Self>) {
         let old = self.proc_col_width(col);
-        if let Some(clamped) = clamp_proc_col_width(size, old) {
-            if clamped != old {
-                self.processes_state.col_widths.insert(col, clamped);
-                cx.notify();
-            }
+        if let Some(clamped) = clamp_proc_col_width(size, old)
+            && clamped != old
+        {
+            self.processes_state.col_widths.insert(col, clamped);
+            cx.notify();
         }
     }
 

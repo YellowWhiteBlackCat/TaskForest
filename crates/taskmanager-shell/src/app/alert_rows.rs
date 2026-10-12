@@ -12,17 +12,12 @@ use taskmanager_core::core::alerts::{AlertEventId, AlertInstanceId, AlertRuleId}
 use super::SystemProjectionStore;
 
 /// Alert projection family whose owner rows have independent revisions.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AlertRowFamily {
+    #[default]
     Rules,
     Active,
     Events,
-}
-
-impl Default for AlertRowFamily {
-    fn default() -> Self {
-        Self::Rules
-    }
 }
 
 /// Stable identity of a row from one alert projection family.

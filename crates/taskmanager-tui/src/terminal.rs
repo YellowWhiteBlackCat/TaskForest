@@ -98,8 +98,8 @@ impl Default for TuiTerminalProfile {
 
 impl TuiTerminalProfile {
     /// Resolve from the captured process environment and current UI language.
-    /// The live runtime retains [`TuiTerminalSignals`] and re-resolves after a
-    /// language change without reading environment state again.
+    /// The live runtime retains captured terminal signals and re-resolves after
+    /// a language change without reading environment state again.
     #[must_use]
     pub fn detect() -> Self {
         TuiTerminalSignals::detect().resolve(current_language())

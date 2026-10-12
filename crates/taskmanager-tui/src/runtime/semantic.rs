@@ -47,7 +47,7 @@ enum TuiSemanticRow {
         name: String,
         expanded: bool,
         selected: bool,
-        aggregate: ProcessAggregateSemantics,
+        aggregate: Box<ProcessAggregateSemantics>,
     },
 }
 
@@ -124,7 +124,7 @@ impl TuiApp {
                         None,
                         true,
                         true,
-                        aggregate,
+                        *aggregate,
                     );
                 }
             }
@@ -177,7 +177,7 @@ impl TuiApp {
                         name: format!("{label} ({count})"),
                         expanded,
                         selected: index == self.selected,
-                        aggregate: aggregate_semantics(&aggregate),
+                        aggregate: Box::new(aggregate_semantics(&aggregate)),
                     },
                     ProcessRow::TreeNode { process, .. } => TuiSemanticRow::Process {
                         process: Box::new(process.clone()),

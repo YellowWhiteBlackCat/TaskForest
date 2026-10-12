@@ -136,15 +136,12 @@ fn execute_start_with_capability_preflight<T>(
     execute_start_strategy(
         disk_name,
         connection,
-        || revalidate(),
+        &mut revalidate,
         |device, device_type| inspect_support(device, device_type, kind),
     )?;
-    execute_start_strategy(
-        disk_name,
-        connection,
-        || revalidate(),
-        |device, device_type| start(device, device_type, kind),
-    )
+    execute_start_strategy(disk_name, connection, revalidate, |device, device_type| {
+        start(device, device_type, kind)
+    })
 }
 
 fn execute_poll_strategy<T>(
@@ -194,7 +191,7 @@ pub(crate) fn start_smart_self_test_for_connection(
         disk_name,
         connection,
         kind,
-        || revalidate(),
+        &mut revalidate,
         inspect_self_test_support_attempt,
         start_attempt,
     ) {

@@ -229,11 +229,11 @@ impl<D: super::TableDelegate> super::TableState<D> {
             return;
         }
         let old_width = col_group.width;
-        if let Some(width) = clamp_column_width(size, old_width) {
-            if width != old_width {
-                col_group.width = width;
-                cx.notify();
-            }
+        if let Some(width) = clamp_column_width(size, old_width)
+            && width != old_width
+        {
+            col_group.width = width;
+            cx.notify();
         }
     }
 
