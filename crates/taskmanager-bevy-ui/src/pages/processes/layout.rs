@@ -23,8 +23,8 @@ fn sync_chrome(
     let Ok((computed, mut page)) = pages.single_mut() else {
         return;
     };
-    let compact =
-        computed.size().y * computed.inverse_scale_factor() < palette.inner.control_height_px * 8.0;
+    let compact = computed.size().y * computed.inverse_scale_factor()
+        < palette.inner.control_height_px() * 8.0;
     let gap = px(if compact { space_4() } else { space_8() });
     if page.row_gap != gap {
         page.row_gap = gap;
@@ -54,7 +54,7 @@ fn sync_rows(
     };
     let capacity = rows_in_viewport(
         (node.size().y * node.inverse_scale_factor() - space_8()).max(0.0),
-        surface.palette.inner.control_height_px,
+        surface.palette.inner.control_height_px(),
     );
     if capacity == surface.scroll.viewport_rows {
         return;

@@ -11,16 +11,16 @@ use bevy::ecs::{
     component::Component,
     entity::Entity,
     event::Event,
-    hierarchy::ChildOf,
+    hierarchy::{ChildOf, Children},
     observer::On,
     query::With,
     resource::Resource,
     schedule::IntoScheduleConfigs,
     system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam},
 };
-use bevy::scene::CommandsSceneExt;
+use bevy::scene::{CommandsSceneExt, Ready};
 use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
-use bevy::ui_widgets::Activate;
+use bevy::ui_widgets::{Activate, SelectedTab, TabList, ValueChange};
 use taskmanager_application::{PlatformEffect, ProcessInsightFacet, i18n::t};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ShellApp;
@@ -187,14 +187,14 @@ fn request_insights(track: &mut FrontendTrack, effects: &mut PendingEffects, for
     }
 }
 pub(super) fn on_tab(
-    event: On<Activate>,
+    change: On<ValueChange<Option<Entity>>>,
     tabs: Query<&ProcessPropertiesTab>,
     mut state: ResMut<ProcessPropertiesPresentation>,
     mut track: NonSendMut<FrontendTrack>,
     mut effects: ResMut<PendingEffects>,
     mut commands: Commands,
 ) {
-    let Ok(tab) = tabs.get(event.event().entity) else {
+    let Some(tab) = change.value.and_then(|tab| tabs.get(tab).ok()) else {
         return;
     };
     state.section = tab.0;
@@ -202,6 +202,33 @@ pub(super) fn on_tab(
         request_insights(&mut track, &mut effects, false);
     }
     republish(&mut commands);
+}
+
+/// Mirror the presentation section into the tab list's widget state. Bevy
+/// 0.20 fires `Ready` bottom-up after the list's descendants (every tab) has
+/// mounted, and every section change respawns the whole modal scene — so the
+/// list's `Ready` is the typed mirror moment; scene entities do not exist
+/// while the scene is still being declared.
+pub(super) fn sync_selected_tab(
+    ready: On<Ready>,
+    lists: Query<&Children>,
+    tabs: Query<&ProcessPropertiesTab>,
+    state: Res<ProcessPropertiesPresentation>,
+    mut commands: Commands,
+) {
+    let Ok(children) = lists.get(ready.entity) else {
+        return;
+    };
+    let Some(selected) = children
+        .iter()
+        .copied()
+        .find(|child| tabs.get(*child).is_ok_and(|tab| tab.0 == state.section))
+    else {
+        return;
+    };
+    commands
+        .entity(ready.entity)
+        .insert(SelectedTab(Some(selected)));
 }
 pub(super) fn on_facet(
     event: On<Activate>,
@@ -334,6 +361,8 @@ pub(crate) fn register(app: &mut App) {
         .add_observer(on_changed)
         .add_observer(on_fold)
         .add_observer(on_applied)
+        .add_observer(sync_selected_tab)
+        .add_observer(on_tab)
         .add_systems(
             PostUpdate,
             (
@@ -353,6 +382,7 @@ pub(crate) struct PropertiesCapture<'w, 's> {
     state: Res<'w, ProcessPropertiesPresentation>,
     paint: Res<'w, PropertiesPaint>,
     tabs: Query<'w, 's, (Entity, &'static ProcessPropertiesTab)>,
+    tab_lists: Query<'w, 's, (Entity, &'static Children), With<TabList>>,
     facets: Query<'w, 's, (Entity, &'static ProcessPropertiesFacet)>,
     bodies: Query<'w, 's, &'static ComputedNode, With<ProcessPropertiesBody>>,
     curves: Query<
@@ -406,7 +436,20 @@ pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> b
             .find(|(_, button)| button.0 == section)
             .map(|(entity, _)| entity);
         if let Some(entity) = button {
-            access.commands.trigger(Activate { entity });
+            // TabList selection is reported as ValueChange<Option<Entity>>
+            // targeted at the list. Activate targets Buttons and cannot switch
+            // a headless Tab, so drive the same typed event as a real tab click.
+            if let Some(source) = access
+                .tab_lists
+                .iter()
+                .find_map(|(list, children)| children.contains(&entity).then_some(list))
+            {
+                access.commands.trigger(ValueChange {
+                    source,
+                    value: Some(entity),
+                    is_final: true,
+                });
+            }
         }
         return false;
     }

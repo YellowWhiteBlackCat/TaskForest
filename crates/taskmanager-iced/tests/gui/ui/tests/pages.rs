@@ -51,6 +51,7 @@ use taskmanager_theme::Theme;
 
 #[test]
 fn byte_and_duration_formatting_matches_the_other_frontends() {
+    pin_english();
     assert_eq!(bytes(0), "0 B");
     assert_eq!(bytes(1536), "1.5 KiB");
     assert_eq!(bytes(2 * 1024 * 1024), "2.0 MiB");
@@ -845,7 +846,10 @@ fn search_highlight_segments_flow_from_the_shared_shell_filter() {
         .find(|process| process.name == "rust-analyzer")
         .expect("demo fixture must keep rust-analyzer under query \"a\"");
     assert_eq!(
-        crate::ui::components::highlight::highlight_segments(&analyzer.name, &shell.query),
+        crate::ui::components::highlight::cell_runs(&analyzer.name, &shell.query)
+            .into_iter()
+            .map(|run| (run.text, run.highlighted))
+            .collect::<Vec<_>>(),
         vec![
             ("rust-".to_string(), false),
             ("a".to_string(), true),
@@ -862,7 +866,10 @@ fn search_highlight_segments_flow_from_the_shared_shell_filter() {
         .find(|process| process.name == "NetworkManager")
         .expect("demo fixture keeps NetworkManager under query \"a\"");
     assert_eq!(
-        crate::ui::components::highlight::highlight_segments(&manager.name, &shell.query),
+        crate::ui::components::highlight::cell_runs(&manager.name, &shell.query)
+            .into_iter()
+            .map(|run| (run.text, run.highlighted))
+            .collect::<Vec<_>>(),
         vec![
             ("NetworkM".to_string(), false),
             ("a".to_string(), true),

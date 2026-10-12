@@ -111,7 +111,7 @@ impl IcedApp {
     }
 
     #[must_use]
-    pub(super) fn config_draft(&self) -> Config {
+    pub(crate) fn config_draft(&self) -> Config {
         self.configuration.draft().clone()
     }
 

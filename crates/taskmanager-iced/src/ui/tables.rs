@@ -2,6 +2,8 @@
 
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 // Shared locale catalog for the shared-page body chrome (System / Services /
 // Startup column headers, action labels, confirm/cancel) that was previously
 // hard-coded English.
@@ -18,10 +20,7 @@ pub(super) use super::components::{
     message_panel, search_input, source_notice_banner, source_state_panel,
 };
 use super::virtual_list::{ColumnWidth, TableColumn};
-use super::{
-    VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
-    virtual_table_key, virtual_table_row,
-};
+use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
@@ -64,12 +63,18 @@ pub(super) fn info_header_cell<'a>(
         }
         _ => text(t(column.label())).width(Length::Fill).into(),
     };
-    button(label)
-        .on_press(Message::SortInfoTable { table, column })
+    let action = Message::SortInfoTable { table, column };
+    let header = button(label)
+        .on_press(action.clone())
         .style(move |_theme, status| theme::header_button_style(theme_snapshot, status, is_active))
         .padding([2.0, 4.0])
-        .width(width)
-        .into()
+        .width(width);
+    focus::focusable_control(
+        theme_snapshot,
+        FocusTarget::InfoSortHeader { table, column },
+        header.into(),
+        action,
+    )
 }
 
 /// A non-sortable column-header cell: a plain caption text at the spec's

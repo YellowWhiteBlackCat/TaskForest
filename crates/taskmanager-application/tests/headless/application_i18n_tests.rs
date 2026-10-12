@@ -12,12 +12,20 @@ fn t_resolves_and_falls_back() {
     assert_eq!(t("tab.performance"), "Performance");
     assert_eq!(t("settings.skin"), "Skin");
     assert_eq!(t("chrome.close"), "Close");
+    assert_eq!(
+        t("feedback.session_request_accepted"),
+        "{action} request accepted for {target}"
+    );
 
     // 2. Zh: a known key resolves to the zh string.
     set_language(Language::Zh);
     assert_eq!(t("tab.performance"), "性能");
     assert_eq!(t("settings.skin"), "皮肤");
     assert_eq!(t("chrome.close"), "关闭");
+    assert_eq!(
+        t("feedback.session_request_accepted"),
+        "已接受对 {target} 的“{action}”请求"
+    );
 
     // 3. Zh fallback to en when a key is present in en but missing from zh.
     set_language(Language::Zh);
@@ -60,6 +68,26 @@ fn t_resolves_and_falls_back() {
     // Restore En so the rest of the test suite (which assumes the default
     // English host locale) is unaffected by this global mutation.
     set_language(Language::En);
+}
+
+#[test]
+fn scoped_language_override_nests_and_keeps_language_changes_local() {
+    with_language(Language::En, || {
+        assert_eq!(current_language(), Language::En);
+        assert_eq!(t("tab.performance"), "Performance");
+
+        set_language(Language::Zh);
+        assert_eq!(current_language(), Language::Zh);
+        assert_eq!(t("tab.performance"), "性能");
+
+        with_language(Language::En, || {
+            assert_eq!(current_language(), Language::En);
+            assert_eq!(t("tab.performance"), "Performance");
+        });
+
+        assert_eq!(current_language(), Language::Zh);
+        assert_eq!(t("tab.performance"), "性能");
+    });
 }
 
 /// `detect_language` must be total (no panic on unset vars) and map a `zh*`

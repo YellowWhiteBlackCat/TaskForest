@@ -78,14 +78,13 @@ fn canonical_projection_buckets_in_domain_order_and_aggregates() {
             ProcessRow::Group {
                 name,
                 count,
-                cpu,
-                memory,
+                aggregate,
                 ..
             } => (
                 name.as_str(),
                 *count,
-                cpu.current_value().copied(),
-                memory.current_value().copied(),
+                aggregate.cpu().current_value().copied(),
+                aggregate.memory().current_value().copied(),
             ),
             ProcessRow::TreeNode { .. } => panic!("collapsed categories emit headers only"),
         })
@@ -115,16 +114,19 @@ fn group_rows_keep_typed_missing_metrics_instead_of_fabricating_zero() {
     let refs = vec![&missing];
     let projected = rows(&refs, &HashSet::new(), &HashSet::new());
 
-    let ProcessRow::Group { cpu, memory, .. } = &projected[0] else {
+    let ProcessRow::Group { aggregate, .. } = &projected[0] else {
         panic!("a non-empty category must emit its typed header");
     };
     assert_eq!(
-        cpu.availability(),
+        aggregate.cpu().availability(),
         ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
     );
-    assert_eq!(memory.availability(), cpu.availability());
-    assert_eq!(cpu.current_value(), None);
-    assert_eq!(memory.current_value(), None);
+    assert_eq!(
+        aggregate.memory().availability(),
+        aggregate.cpu().availability()
+    );
+    assert_eq!(aggregate.cpu().current_value(), None);
+    assert_eq!(aggregate.memory().current_value(), None);
 }
 
 #[test]
@@ -239,11 +241,10 @@ fn row_digest(row: &ProcessRow<'_>) -> String {
             label,
             depth,
             count,
-            cpu,
-            memory,
+            aggregate,
             expanded,
             row_key,
-        } => format!("G|{name}|{label}|{depth}|{count}|{cpu:?}|{memory:?}|{expanded}|{row_key:?}"),
+        } => format!("G|{name}|{label}|{depth}|{count}|{aggregate:?}|{expanded}|{row_key:?}"),
         ProcessRow::TreeNode {
             process,
             depth,

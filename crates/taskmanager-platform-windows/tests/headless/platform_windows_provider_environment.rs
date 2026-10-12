@@ -2,10 +2,12 @@ use super::*;
 #[cfg(windows)]
 use taskmanager_core::StartupImpactUnknownReason;
 use taskmanager_core::{
-    DeviceState, DeviceStatus, SessionControlAction, SessionId, StartupEvidenceFailure,
+    DeviceState, DeviceStatus, SessionControlAction, SessionId, SessionIdentity,
+    SessionIncarnation, StartupEvidenceFailure,
 };
 #[cfg(windows)]
 use taskmanager_windows_api::WindowsStartupTask;
+use taskmanager_windows_api::{WindowsApiError, WindowsSession, WindowsSessionState};
 
 #[test]
 fn win_environment_providers_degrade_honestly_off_windows() {
@@ -61,7 +63,7 @@ fn win_environment_providers_degrade_honestly_off_windows() {
     // side-effect free on a real host.
     let mut session_control = WinSessionControlProvider;
     let disconnect = session_control.control(
-        &SessionId::new("windows:session:4294967294"),
+        &session_identity("windows:session:4294967294", 12_345),
         SessionControlAction::Disconnect,
     );
     assert_ne!(
@@ -87,7 +89,7 @@ fn win_environment_providers_degrade_honestly_off_windows() {
     if !cfg!(windows) {
         assert_eq!(
             session_control.control(
-                &SessionId::new("windows:session:1"),
+                &session_identity("windows:session:1", 12_345),
                 SessionControlAction::Lock
             ),
             Err(ProviderFailure::MissingDependency),
@@ -98,11 +100,65 @@ fn win_environment_providers_degrade_honestly_off_windows() {
     // non-numeric) is reported as IdentityChanged, never crashes logoff.
     assert_eq!(
         session_control.control(
-            &SessionId::new("not-a-windows-session"),
+            &session_identity("not-a-windows-session", 12_345),
             SessionControlAction::Disconnect,
         ),
         Err(ProviderFailure::IdentityChanged),
     );
+}
+
+#[test]
+fn session_control_requires_a_windows_wts_identity_before_native_dispatch() {
+    let mut session_control = WinSessionControlProvider;
+    let linux_identity = SessionIdentity::new(
+        SessionId::new("7"),
+        SessionIncarnation::LinuxLogind {
+            boot_id: "boot-fixture".to_string(),
+            created_monotonic_usec: 1,
+        },
+    )
+    .expect("fixture identity");
+    assert_eq!(
+        session_control.control(&linux_identity, SessionControlAction::Disconnect),
+        Err(ProviderFailure::IdentityChanged),
+        "foreign provider identity must fail before any WTS action"
+    );
+
+    let malformed_identity = session_identity("not-a-windows-session", 12_345);
+    assert_eq!(
+        session_control.control(&malformed_identity, SessionControlAction::Lock),
+        Err(ProviderFailure::IdentityChanged),
+        "malformed WTS locator must fail before workstation lock"
+    );
+}
+
+#[test]
+fn missing_wts_logon_token_keeps_inventory_row_but_removes_control_identity() {
+    let snapshot = super::sessions::project_windows_session_snapshot(vec![WindowsSession {
+        session_id: 7,
+        incarnation: Err(WindowsApiError::Unsupported),
+        session_name: Some("RDP-Tcp#1".to_string()),
+        user_name: Some("fixture-user".to_string()),
+        state: WindowsSessionState::Active,
+    }]);
+
+    assert_eq!(snapshot.items.len(), 1);
+    assert_eq!(snapshot.items[0].id.as_str(), "windows:session:7");
+    assert_eq!(snapshot.items[0].user, "fixture-user");
+    assert_eq!(snapshot.items[0].incarnation, None);
+    assert_eq!(snapshot.items[0].identity(), None);
+    assert_eq!(
+        snapshot.sources[0].outcome,
+        SourceOutcome::Partial(FailureKind::Unsupported)
+    );
+}
+
+fn session_identity(session_id: &str, logon_time_100ns: u64) -> SessionIdentity {
+    SessionIdentity::new(
+        SessionId::new(session_id),
+        SessionIncarnation::WindowsWts { logon_time_100ns },
+    )
+    .expect("fixture session identity")
 }
 
 #[cfg(windows)]

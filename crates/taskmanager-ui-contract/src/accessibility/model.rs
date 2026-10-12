@@ -8,6 +8,8 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use super::process_semantics::{ProcessAggregateSemantics, ProcessRowObservations};
+
 /// Stable identity of one semantic node within and across snapshots.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SemanticNodeId(Cow<'static, str>);
@@ -138,6 +140,9 @@ pub struct SemanticNode {
     description: Option<String>,
     value_text: Option<String>,
     numeric_value: Option<SemanticNumericValue>,
+    expansion_key: Option<String>,
+    process_row_observations: Option<ProcessRowObservations>,
+    process_aggregate_semantics: Option<ProcessAggregateSemantics>,
     state: SemanticState,
     actions: BTreeSet<SemanticAction>,
     live_region: SemanticLiveRegion,
@@ -154,6 +159,9 @@ impl SemanticNode {
             description: None,
             value_text: None,
             numeric_value: None,
+            expansion_key: None,
+            process_row_observations: None,
+            process_aggregate_semantics: None,
             state: SemanticState::default(),
             actions: BTreeSet::new(),
             live_region: SemanticLiveRegion::Off,
@@ -182,6 +190,33 @@ impl SemanticNode {
     #[must_use]
     pub const fn with_numeric_value(mut self, value: SemanticNumericValue) -> Self {
         self.numeric_value = Some(value);
+        self
+    }
+
+    /// Attach the toolkit-neutral key used to expand or collapse this tree row.
+    ///
+    /// The key is row state metadata, separate from [`Self::id`], which is the
+    /// stable semantic node identity exposed to assistive technology.
+    #[must_use]
+    pub fn with_expansion_key(mut self, key: impl Into<String>) -> Self {
+        self.expansion_key = Some(key.into());
+        self
+    }
+
+    /// Attach core-owned scalar observations to a process row.
+    #[must_use]
+    pub fn with_process_row_observations(mut self, observations: ProcessRowObservations) -> Self {
+        self.process_row_observations = Some(observations);
+        self
+    }
+
+    /// Attach core-owned aggregate facts and coverage to a group row.
+    #[must_use]
+    pub fn with_process_aggregate_semantics(
+        mut self,
+        semantics: ProcessAggregateSemantics,
+    ) -> Self {
+        self.process_aggregate_semantics = Some(semantics);
         self
     }
 
@@ -243,6 +278,21 @@ impl SemanticNode {
     #[must_use]
     pub const fn numeric_value(&self) -> Option<SemanticNumericValue> {
         self.numeric_value
+    }
+
+    #[must_use]
+    pub fn expansion_key(&self) -> Option<&str> {
+        self.expansion_key.as_deref()
+    }
+
+    #[must_use]
+    pub fn process_row_observations(&self) -> Option<&ProcessRowObservations> {
+        self.process_row_observations.as_ref()
+    }
+
+    #[must_use]
+    pub fn process_aggregate_semantics(&self) -> Option<&ProcessAggregateSemantics> {
+        self.process_aggregate_semantics.as_ref()
     }
 
     #[must_use]
@@ -344,6 +394,10 @@ pub enum SemanticNodeIssue {
     InvalidNumericRange,
     UnsupportedActionForRole,
     DuplicateChild,
+    EmptyExpansionKey,
+    ExpansionKeyOnUnsupportedRole,
+    ProcessRowObservationsOnUnsupportedRole,
+    ProcessAggregateSemanticsOnUnsupportedRole,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -424,6 +478,30 @@ fn validate_node(node: &SemanticNode) -> Result<(), SemanticSnapshotError> {
         .is_some_and(|name| name.trim().is_empty())
     {
         return invalid(node, SemanticNodeIssue::EmptyName);
+    }
+    if node
+        .expansion_key
+        .as_ref()
+        .is_some_and(|key| key.trim().is_empty())
+    {
+        return invalid(node, SemanticNodeIssue::EmptyExpansionKey);
+    }
+    if node.expansion_key.is_some() && node.role != SemanticRole::TreeItem {
+        return invalid(node, SemanticNodeIssue::ExpansionKeyOnUnsupportedRole);
+    }
+    if node.process_row_observations.is_some()
+        && !matches!(node.role, SemanticRole::Row | SemanticRole::TreeItem)
+    {
+        return invalid(
+            node,
+            SemanticNodeIssue::ProcessRowObservationsOnUnsupportedRole,
+        );
+    }
+    if node.process_aggregate_semantics.is_some() && node.role != SemanticRole::TreeItem {
+        return invalid(
+            node,
+            SemanticNodeIssue::ProcessAggregateSemanticsOnUnsupportedRole,
+        );
     }
     if role_requires_name(node.role) && node.name.is_none() {
         return invalid(node, SemanticNodeIssue::MissingInteractiveName);

@@ -9,9 +9,9 @@ use taskmanager_application::system_timeline::{
 use taskmanager_application::{
     AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CommandContext, CommandScope,
     ConfirmationKind, ContainerRollupEvent, DesktopNotificationRequest,
-    DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
-    DirectoryUsageEvent, HardwareInventoryEvent, KeyCode, LatestControlRequest,
-    LatestServiceControlRequest, Modifiers, PendingConfirmation, PlatformEffect,
+    DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DirectoryUsageEvent,
+    HardwareInventoryEvent, KeyCode, LatestControlRequest, LatestServiceControlRequest,
+    LatestSessionControlRequest, Modifiers, PendingConfirmation, PlatformEffect,
     PlatformEventBatch, PowerSupplyEvent, ProcessAffinityEvent, ProcessEvent,
     ProjectedProcessInsights, ProjectedSystemTelemetry, Reduction, RefreshRequest, SensorEvent,
     ServiceControlTarget, ServiceEvent, ServiceUpdate, SessionControlConfirmation, SessionEvent,
@@ -33,15 +33,19 @@ use taskmanager_platform_contract::{
 use crate::{InputDispatch, ProcessStatusFilter, ShellKeyEvent, matches_process_query, route_key};
 use selection::VisibleProcessesMemo;
 
+pub mod alert_rows;
 mod batch_fold;
 mod confirmation_gates;
+pub mod device_rows;
 mod diagnostics;
 mod direct_track;
 mod effect_dispatch;
 mod effects;
+mod fixture_seed;
 mod frame;
 mod gpu_chart_metric;
 mod input_mode;
+pub mod inventory_rows;
 mod inventory_source;
 mod lifecycle;
 mod local_keys;
@@ -90,12 +94,11 @@ pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    AlertSuggestionWindow, InteractionEvent, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
-    PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle, SessionControlOutcome,
+    AlertEventSeed, AlertRuleEditResult, AlertSuggestionWindow, InteractionEvent,
+    ManagedAlertRuleEdit, PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle,
+    SessionControlOutcome,
 };
-use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
-};
+use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
 use taskmanager_core::core::storage::StorageDeviceTarget;
 use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
@@ -216,6 +219,10 @@ pub struct SystemProjectionStore {
     pub device_lifecycle_projection: DeviceLifecycleProjection,
     /// Bounded applied/ignored lifecycle outcomes for headless diagnostics.
     pub device_lifecycle_diagnostics: DeviceLifecycleDiagnosticHistory,
+    /// Per-family source and ordering revisions for stable device rows.
+    pub(crate) device_row_revisions: device_rows::DeviceRowRevisionState,
+    /// Independent row revisions for managed rules, active alerts, and event history.
+    pub(crate) alert_row_revisions: alert_rows::AlertRowRevisionState,
     /// Process-list generation used by renderer projections. Unlike
     /// `refresh_count`, this does not advance when an unrelated service,
     /// hardware, or system-telemetry domain changes.
@@ -227,15 +234,12 @@ pub struct SystemProjectionStore {
     /// Login-session inventory generation used by renderer projections.
     pub sessions_revision: u64,
     /// System/performance-domain generation used by hardware, sensor, power,
-    /// container, and system-telemetry projections.
+    /// container, system-telemetry, and NPU inventory projections.
     pub system_revision: u64,
-    /// Shared alert evaluation + delivery (BN-07): the rule engine and
-    /// notification gate run here so every frontend gets identical "what
-    /// fired" and "should the desktop be told" decisions. `alert_active`
-    /// mirrors the latest evaluation for the in-app surfaces; notifications
-    /// accumulate in a bounded queue the frontend drains and submits.
+    /// Shared alert evaluation + delivery (BN-07): this is the sole rules,
+    /// active-alert, and transition-history owner. Notifications accumulate
+    /// in a bounded queue the frontend drains and submits.
     pub alert_center: AlertCenter,
-    pub alert_active: Vec<Alert>,
     pub(crate) pending_notifications: std::collections::VecDeque<DesktopNotificationRequest>,
     /// Timestamp of the last snapshot folded into the rolling suggestion
     /// window. Used to avoid double-counting a snapshot that did not change
@@ -245,7 +249,7 @@ pub struct SystemProjectionStore {
     /// identity. Domain projections must use the narrower revisions above.
     pub refresh_count: u64,
     /// Latest-wins correlation for renderer-neutral login-session actions.
-    pub session_control_requests: LatestControlRequest,
+    pub session_control_requests: LatestSessionControlRequest,
     /// The last accepted session-control outcome, for point-of-action
     /// feedback in any frontend's action bar. Cleared when a new action is
     /// requested so stale feedback expires.
@@ -458,83 +462,6 @@ impl ShellApp {
         self.prune_stale_selection();
     }
 
-    pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::ProjectionSeedFact) {
-        use crate::fixture::ProjectionSeedFact;
-        let is_process_fact = matches!(&fact, ProjectionSeedFact::Processes(_));
-        match fact {
-            ProjectionSeedFact::Snapshot(value) => {
-                self.data.snapshot = *value;
-                self.data.system_revision = self.data.system_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::Hardware(value) => {
-                self.data.hardware = value.map(|value| *value);
-                self.data.system_revision = self.data.system_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::Processes(value) => {
-                self.data.processes = value.map(Arc::new);
-                self.data.processes_observed_at_ms = self
-                    .data
-                    .snapshot
-                    .as_ref()
-                    .map_or(0, |snapshot| snapshot.timestamp_ms);
-                self.data.process_revision = self.data.process_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::Services(value) => {
-                self.data.services = value;
-                self.data.services_revision = self.data.services_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::StartupEntries(value) => {
-                self.data.startup_entries = value;
-                self.data.startup_revision = self.data.startup_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::Sessions(value) => {
-                self.data.sessions = value;
-                self.data.sessions_revision = self.data.sessions_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::Containers(value) => self.data.containers = value,
-            ProjectionSeedFact::PowerSupplies(value) => self.data.power_supplies = value,
-            ProjectionSeedFact::Sensors(value) => self.data.sensors = value,
-            ProjectionSeedFact::NpuInventory(value) => {
-                self.data.npu_inventory = value;
-                self.data.system_revision = self.data.system_revision.saturating_add(1);
-            }
-            ProjectionSeedFact::DirectoryUsage(value) => self.data.directory_usage = value,
-            ProjectionSeedFact::StartupBootEvidence(value) => {
-                self.data.startup_boot_evidence = value;
-            }
-            ProjectionSeedFact::ServicesSource(value) => self.data.services_source = value,
-            ProjectionSeedFact::StartupSource(value) => self.data.startup_source = value,
-            ProjectionSeedFact::SessionsSource(value) => self.data.sessions_source = value,
-            ProjectionSeedFact::ProcessAffinity(value) => {
-                self.request_sessions.seed_affinity(value);
-            }
-            ProjectionSeedFact::ProcessInsights(value) => self.data.process_insights = *value,
-            ProjectionSeedFact::ActiveAlerts(value) => self.data.alert_active = value,
-            ProjectionSeedFact::AdvanceRevision(domain) => match domain {
-                crate::fixture::ProjectionSeedDomain::Processes => {
-                    self.data.process_revision = self.data.process_revision.saturating_add(1);
-                }
-                crate::fixture::ProjectionSeedDomain::Services => {
-                    self.data.services_revision = self.data.services_revision.saturating_add(1);
-                }
-                crate::fixture::ProjectionSeedDomain::Startup => {
-                    self.data.startup_revision = self.data.startup_revision.saturating_add(1);
-                }
-                crate::fixture::ProjectionSeedDomain::Sessions => {
-                    self.data.sessions_revision = self.data.sessions_revision.saturating_add(1);
-                }
-                crate::fixture::ProjectionSeedDomain::System => {
-                    self.data.system_revision = self.data.system_revision.saturating_add(1);
-                }
-            },
-            ProjectionSeedFact::AdvanceRefresh => {}
-        }
-        if is_process_fact {
-            self.prune_stale_selection();
-        }
-        self.data.refresh_count = self.data.refresh_count.saturating_add(1);
-    }
-
     pub(crate) fn edit_fixture_snapshot(&mut self, edit: impl FnOnce(&mut Option<SystemSnapshot>)) {
         edit(&mut self.data.snapshot);
         self.data.system_revision = self.data.system_revision.saturating_add(1);
@@ -581,8 +508,10 @@ impl ShellApp {
     pub fn edit_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.data.alert_center.edit_rules(edit)
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
+        let result = self.data.alert_center.edit_rules(edit)?;
+        self.data.record_alert_projection_changes(result.changes);
+        Ok(result)
     }
 
     /// Replace desktop-notification policy without exposing the alert engine.
@@ -593,13 +522,22 @@ impl ShellApp {
     /// Clear the shared alert transition history without changing the active
     /// evaluator or its notification policy.
     pub fn clear_alert_event_history(&mut self) {
-        self.data.alert_center.clear_event_history();
+        let changes = self.data.alert_center.clear_event_history();
+        self.data.record_alert_projection_changes(changes);
     }
 
     /// Install deterministic alert transition history through the shared
     /// fixture/capture seam; live history still comes only from evaluation.
-    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
-        self.data.alert_center.replace_event_history(events);
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEventSeed>) {
+        let changes = self.data.alert_center.replace_event_history(events);
+        self.data.record_alert_projection_changes(changes);
+    }
+
+    /// Reset alert evaluation and transition state while retaining the managed
+    /// rule list and monotonically increasing event identity authority.
+    pub fn reset_alert_center(&mut self) {
+        let changes = self.data.alert_center.reset();
+        self.data.record_alert_projection_changes(changes);
     }
 
     #[must_use]
@@ -608,7 +546,10 @@ impl ShellApp {
         snapshot: &SystemSnapshot,
         observed_at_ms: u64,
     ) -> AlertEvaluation {
-        self.data.alert_center.evaluate(snapshot, observed_at_ms)
+        let evaluation = self.data.alert_center.evaluate(snapshot, observed_at_ms);
+        self.data
+            .record_alert_projection_changes(evaluation.changes);
+        evaluation
     }
 
     #[must_use]

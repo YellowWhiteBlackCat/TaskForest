@@ -25,7 +25,8 @@ discovery payloads and proves the resolver is not a rubber stamp:
   cell and test id, counts `pending` rows separately, and rejects a malformed
   row (missing test id, note on an anchored row, test id on a pending row,
   empty gap note, duplicate cell, unknown frontend or status);
-* the feature table's optional sixth column (`co_test_id`) resolves every extra
+* the feature table's required sixth column (`co_test_id`; `-` means none)
+  resolves every extra
   co-anchor against the owning frontend's discovery, keeps the primary anchor's
   semantics untouched, reports a deleted co-anchor as dangling with its cell and
   channel, rejects a co-anchor that names a pending cell or repeats the primary
@@ -1184,9 +1185,9 @@ def test_feature_evidence_missing_file_errors(tmp: Path) -> None:
         check(False, "a missing feature table fails loudly")
 
 
-# The feature table's optional sixth column: extra discoverable tests for an
-# already-anchored cell.  The synthetic vocabulary is the same opaque fixture
-# vocabulary as the feature rows above.
+# The feature table's required sixth column carries optional extra discoverable
+# tests for an already-anchored cell. The synthetic vocabulary is the same
+# opaque fixture vocabulary as the feature rows above.
 CO_ANCHOR_GPUI_TEST = "feature_suite::co_anchor_gpui"
 CO_ANCHOR_ICED_TEST = "feature_suite::co_anchor_iced"
 

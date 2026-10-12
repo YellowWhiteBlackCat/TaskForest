@@ -6,8 +6,6 @@ use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_core::core::alerts::{AlertMetric, AlertRule};
-use taskmanager_shell::fixture::ProjectionSeedFact;
-use taskmanager_shell::fixture::seed_projection_fact;
 
 fn pin_english() {
     set_language(Language::En);
@@ -98,11 +96,8 @@ fn active_alert_lines_name_the_metric_value_and_severity() {
         .clone()
         .expect("demo snapshot fixture");
     let evaluation = app.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
-    seed_projection_fact(
-        &mut app.shell,
-        ProjectionSeedFact::ActiveAlerts(evaluation.active),
-    );
-    assert_eq!(app.shell.projection().alert_active.len(), 1);
+    assert_eq!(evaluation.active.len(), 1);
+    assert_eq!(app.shell.projection().alert_center.active_alerts().len(), 1);
 
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     let lines = active_alert_lines(&app);

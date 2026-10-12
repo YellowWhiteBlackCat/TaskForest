@@ -18,6 +18,7 @@ use bevy::picking::hover::PickingInteraction;
 use bevy::ui::{Node, Outline};
 use bevy::ui_widgets::Button;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::{FocusRingVisible, InputModality, InputModalityState};
 use crate::palette::ui_palette;
@@ -122,7 +123,7 @@ fn input_events_drive_modality_transitions_and_trigger_observers() {
 fn focus_ring_visible_mounts_on_keyboard_and_despawns_on_pointer() {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, InputPlugin));
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     app.insert_resource(WindowPalette {
         inner: palette.clone(),
     });

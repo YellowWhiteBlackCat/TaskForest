@@ -1,8 +1,8 @@
 //! Canonical managed-alert-rule state and edit reducer.
 
 use taskmanager_core::alerts::{
-    AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertRuleTransferError,
-    merge_alert_rule_entries,
+    AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
+    AlertRuleTransferError, merge_alert_rule_entries,
 };
 
 /// One durable alert rule and whether it participates in evaluation.
@@ -42,15 +42,15 @@ pub enum AlertRuleImportMode {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ManagedAlertRuleEdit {
     Toggle {
-        rule_id: String,
+        rule_id: AlertRuleId,
     },
     Add(ManagedAlertRule),
     Update {
-        target_id: String,
+        target_id: AlertRuleId,
         managed: ManagedAlertRule,
     },
     Remove {
-        rule_id: String,
+        rule_id: AlertRuleId,
     },
     Import {
         rules: Vec<ManagedAlertRule>,

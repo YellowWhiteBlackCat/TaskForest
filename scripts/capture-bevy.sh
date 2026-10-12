@@ -484,7 +484,10 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'appearance_receipt=%s\n' "${APPEARANCE_RECEIPT#"$REPO/"}"
     printf 'command=bash scripts/capture-bevy.sh\n'
 } >"$RUN_DIR/metadata.txt"
-PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 scripts/validate_bevy_matrix.py \
+# The validator fully decodes each PNG in Python; 30 seconds was sized for a
+# single probe, not the 110-image parity batch. Keep the run finite with room
+# for the complete receipt under the supervisor's 30-minute bound.
+PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=10s 900s python3 scripts/validate_bevy_matrix.py \
     --matrix "$VALIDATOR_MATRIX" --manifest "$VALIDATOR_MANIFEST" --run-dir "$RUN_DIR" \
     --metadata "$RUN_DIR/metadata.txt" --source-manifest "$SOURCE_MANIFEST" \
     --niri-outputs "$RUN_DIR/niri-outputs.json" --receipt "$RUN_DIR/bevy-capture-validation.json" \

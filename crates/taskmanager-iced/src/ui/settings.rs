@@ -653,3 +653,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/settings_upgrade_tests.rs"]
 mod upgrade_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/input_interaction_tests.rs"]
+mod interaction_tests;

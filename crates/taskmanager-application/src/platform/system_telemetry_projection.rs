@@ -14,7 +14,8 @@ use super::event_batch::CorrelatedSystemTelemetryOutcome;
 use super::facets::SystemTelemetryDomainOutcome;
 use super::{SystemTelemetryDomainEvent, SystemTelemetryRevision};
 use crate::device_lifecycle::{
-    DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
+    DeviceLifecycleApplyResult, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
+    DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
 };
 use taskmanager_platform_contract::CapabilityId;
 
@@ -306,28 +307,31 @@ pub fn apply_system_outcome_lifecycle(
     projection: &mut DeviceLifecycleProjection,
     diagnostics: &mut DeviceLifecycleDiagnosticHistory,
     correlated: &CorrelatedSystemTelemetryOutcome,
-) {
+) -> Option<DeviceLifecyclePartition> {
     let SystemTelemetryDomainOutcome::Observed(event) = &correlated.event else {
-        return;
+        return None;
     };
     let revision = DeviceLifecycleSnapshotRevision::new(correlated.sequence.get());
-    let result = match event {
-        SystemTelemetryDomainEvent::Storage { observation, .. } => {
-            Some(projection.apply_storage_telemetry_observation(revision, observation))
-        }
-        SystemTelemetryDomainEvent::Network { observation, .. } => {
-            Some(projection.apply_network_telemetry_observation(revision, observation))
-        }
-        SystemTelemetryDomainEvent::Gpu { observation, .. } => {
-            Some(projection.apply_gpu_telemetry_observation(revision, observation))
-        }
+    let (partition, result) = match event {
+        SystemTelemetryDomainEvent::Storage { observation, .. } => (
+            DeviceLifecyclePartition::SystemStorage,
+            projection.apply_storage_telemetry_observation(revision, observation),
+        ),
+        SystemTelemetryDomainEvent::Network { observation, .. } => (
+            DeviceLifecyclePartition::SystemNetwork,
+            projection.apply_network_telemetry_observation(revision, observation),
+        ),
+        SystemTelemetryDomainEvent::Gpu { observation, .. } => (
+            DeviceLifecyclePartition::SystemGpu,
+            projection.apply_gpu_telemetry_observation(revision, observation),
+        ),
         SystemTelemetryDomainEvent::Host { .. }
         | SystemTelemetryDomainEvent::Cpu { .. }
-        | SystemTelemetryDomainEvent::Memory { .. } => None,
+        | SystemTelemetryDomainEvent::Memory { .. } => return None,
     };
-    if let Some(result) = result {
-        diagnostics.record(result);
-    }
+    let accepted = matches!(result, DeviceLifecycleApplyResult::Applied(_));
+    diagnostics.record(result);
+    if accepted { Some(partition) } else { None }
 }
 
 impl<T> SystemTelemetryDomainState<T> {

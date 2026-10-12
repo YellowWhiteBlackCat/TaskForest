@@ -18,6 +18,8 @@ use iced::widget::{button, container};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{Color, Theme, tokens};
+use zhuge_ui_kit_iced::surface::{SurfaceGeometry, rgba, surface_style};
+use zhuge_ui_tokens::surface::SurfaceColors;
 
 /// The iced theme for one neutral theme snapshot: `Theme::custom` with the
 /// skin's backdrop/text/accent/status tokens. Widget default styles then
@@ -44,16 +46,18 @@ pub fn iced_theme(theme: &Theme) -> iced::Theme {
 #[must_use]
 pub fn panel_style(theme: &Theme) -> container::Style {
     let palette = theme.palette();
-    container::Style {
-        background: Some(color(palette.surface).into()),
-        text_color: Some(color(palette.fg)),
-        border: iced::Border {
-            color: color(palette.border),
-            width: 1.0,
-            radius: f32::from(palette.panel_radius).into(),
+    surface_style(
+        SurfaceColors {
+            background: rgba(color(palette.surface)),
+            border: rgba(color(palette.border)),
+            foreground: Some(rgba(color(palette.fg))),
         },
-        ..container::Style::default()
-    }
+        SurfaceGeometry {
+            radius: f32::from(palette.panel_radius).into(),
+            border_width: 1.0,
+            shadow: iced::Shadow::default(),
+        },
+    )
 }
 
 /// The modal-scrim fill: the window backdrop darkened toward black so the

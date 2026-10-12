@@ -16,6 +16,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -163,7 +164,7 @@ pub(crate) fn headless_services_app() -> (App, Arc<ScriptedEvents>) {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime,
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     (app, events)
@@ -224,7 +225,7 @@ fn status_line(app: &mut App) -> String {
 }
 
 fn selected_row_target(app: &mut App) -> Option<String> {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let highlight = palette.nav_active_bg.to_srgba();
     app.world_mut()
         .query_filtered::<(&ServicesRowMarker, &BackgroundColor), ()>()
@@ -322,7 +323,7 @@ fn cursor_moves_clamp_at_the_table_bounds() {
 
 #[test]
 fn status_chips_map_every_service_state_to_a_distinct_fill() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     assert_eq!(service_chip(ServiceStatus::Active), StatusChip::Positive);
     assert_eq!(service_chip(ServiceStatus::Failed), StatusChip::Negative);
     assert_eq!(service_chip(ServiceStatus::Inactive), StatusChip::Idle);

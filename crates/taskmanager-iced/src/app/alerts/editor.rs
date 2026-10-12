@@ -2,7 +2,7 @@
 use super::IcedApp;
 use std::time::Duration;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,7 +19,7 @@ impl IcedApp {
         let rules = self.alerts_rules();
         let Some(id) = (0..=rules.len())
             .map(|index| format!("custom-cpu-{index}"))
-            .find(|id| rules.iter().all(|rule| rule.rule.id != *id))
+            .find(|id| rules.iter().all(|rule| rule.rule.id.as_str() != id))
         else {
             return;
         };
@@ -45,7 +45,7 @@ impl IcedApp {
             );
         }
     }
-    pub(crate) fn adjust_alert_rule(&mut self, id: String, adjustment: RuleAdjustment) {
+    pub(crate) fn adjust_alert_rule(&mut self, id: AlertRuleId, adjustment: RuleAdjustment) {
         let Some(mut managed) = self
             .alerts_rules()
             .iter()

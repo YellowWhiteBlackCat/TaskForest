@@ -2,18 +2,22 @@
 //!
 //! `system_profiler SPDisplaysDataType -json` (run through the bounded command
 //! runner) is the same safe source `MacHardwareInventoryProvider` uses for
-//! model/chip facts. It publishes GPU identity (brand) and, for discrete
-//! adapters, total VRAM. A bounded `ioreg -r -c IOAccelerator -l` sample adds
+//! model/chip facts. It publishes GPU model/brand and, for discrete adapters,
+//! total VRAM, but no verified per-adapter identity. A bounded
+//! `ioreg -r -c IOAccelerator -l` sample adds
 //! overall device utilization when it can be unambiguously matched to a
 //! single discovered adapter; temperature, power, frequency and fan remain
 //! absent when the registry does not expose them (ADR-019).
 
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    DeviceGeneration, DeviceState, FailureKind, GpuMetricField, GpuMetricProvenance, GpuMetrics,
-    GpuScalarObservations, GpuTelemetryObservation, ProviderId, ScalarObservation,
+    DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceId, DeviceLifecycle, DeviceLifecycleRegistry,
+    DeviceRefreshOutcome, DeviceState, DeviceStatus, FailureKind, GpuMetricField,
+    GpuMetricProvenance, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation, ProviderId,
+    ScalarObservation,
 };
 use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::GpuTelemetryProvider;
@@ -31,82 +35,123 @@ fn unavailable_source(provider: ProviderId, failure: FailureKind) -> SourceStatu
     }
 }
 
-/// GPU inventory telemetry: identity (brand) and total VRAM come from
-/// `system_profiler SPDisplaysDataType -json`. Live dynamic scalars
-/// (utilization, temperature, power, frequency, fan) have no safe macOS
-/// source and stay honestly absent. A failed profiler invocation is typed as
-/// unavailable; a successful inventory containing no adapters is an
-/// authoritative empty result (ADR-019).
-pub struct MacGpuTelemetryProvider;
+/// GPU inventory telemetry from `system_profiler SPDisplaysDataType -json`.
+/// That source reports model/vendor facts but no verified per-adapter stable
+/// identity, so its non-empty rows remain visible without a row identity or
+/// lifecycle generation. A complete empty inventory can still confirm prior
+/// identities absent. Live dynamic scalars have no safe macOS source except
+/// optional `ioreg` utilization (ADR-019).
+pub struct MacGpuTelemetryProvider {
+    lifecycles: DeviceLifecycleRegistry,
+}
+
+impl MacGpuTelemetryProvider {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            lifecycles: DeviceLifecycleRegistry::new(DEFAULT_DEVICE_ABSENCE_RETENTION_MS),
+        }
+    }
+}
+
+impl Default for MacGpuTelemetryProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl GpuTelemetryProvider for MacGpuTelemetryProvider {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<GpuTelemetryObservation, ProviderFailure> {
+        let profiler_result = system_profiler_gpus();
+        let dynamic_result = match &profiler_result {
+            Ok(enumeration)
+                if enumeration.failure.is_none()
+                    && enumeration.raw_item_count == 1
+                    && enumeration.adapters.len() == 1 =>
+            {
+                collect_ioreg_gpu_utilization()
+            }
+            _ => Ok(None),
+        };
         Ok(gpu_observation_from_profiler_with_dynamic(
-            system_profiler_gpus(),
-            collect_ioreg_gpu_utilization(),
+            &mut self.lifecycles,
+            profiler_result,
+            dynamic_result,
             observed_at_ms,
         ))
     }
 }
 
 fn gpu_observation_from_profiler_with_dynamic(
-    profiler_result: Result<Vec<MacGpuAdapter>, FailureKind>,
+    lifecycles: &mut DeviceLifecycleRegistry,
+    profiler_result: Result<MacGpuEnumeration, FailureKind>,
     dynamic_result: Result<Option<f32>, FailureKind>,
     observed_at_ms: u64,
 ) -> GpuTelemetryObservation {
-    let mut adapters = match profiler_result {
-        Ok(adapters) => adapters,
+    lifecycles.begin_refresh();
+    let enumeration = match profiler_result {
+        Ok(enumeration) => enumeration,
         Err(failure) => {
+            let _delta = lifecycles.finish_refresh(
+                DeviceRefreshOutcome::Unavailable(DeviceStatus::from_failure(failure)),
+                observed_at_ms,
+            );
             return GpuTelemetryObservation::unavailable(
                 failure,
                 vec![unavailable_source(GPU_TELEMETRY_PROVIDER, failure)],
                 Vec::new(),
-                Default::default(),
+                lifecycle_snapshot(lifecycles),
             );
         }
     };
-    if adapters.is_empty() {
-        return GpuTelemetryObservation::current(
-            Vec::new(),
-            observed_at_ms,
-            vec![SourceStatus {
-                provider: GPU_TELEMETRY_PROVIDER,
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            }],
-            Vec::new(),
-            Default::default(),
-        );
-    }
+    let can_match_dynamic = enumeration.failure.is_none() && enumeration.raw_item_count == 1;
+    let mut adapters = enumeration.adapters;
     adapters.sort_by(|left, right| left.identity.cmp(&right.identity));
     let adapter_count = adapters.len();
     let (dynamic_utilization, dynamic_failure) = match dynamic_result {
         Ok(value) => (value, None),
         Err(failure) => (None, Some(failure)),
     };
-    let mut identities = std::collections::HashSet::<String>::new();
-    let mut identity_partial = false;
+    let mut identity_counts = HashMap::<String, usize>::new();
+    for identity in adapters
+        .iter()
+        .filter_map(|adapter| adapter.identity.as_deref())
+        .map(str::trim)
+        .filter(|identity| !identity.is_empty())
+    {
+        *identity_counts.entry(identity.to_string()).or_default() += 1;
+    }
+
+    let mut discovery_failure = enumeration.failure;
     let mut gpus = Vec::with_capacity(adapters.len());
     for adapter in adapters {
-        if !identities.insert(adapter.identity.clone()) {
-            // Two rows with the same available hardware identity cannot be
-            // separated safely by enumeration order.
-            identity_partial = true;
-            continue;
+        let identity = adapter
+            .identity
+            .as_deref()
+            .map(str::trim)
+            .filter(|identity| !identity.is_empty())
+            .filter(|identity| identity_counts.get(*identity) == Some(&1));
+        if identity.is_none() {
+            discovery_failure.get_or_insert(FailureKind::Unsupported);
         }
-        identity_partial |= !adapter.identity_is_authoritative;
         let mut provenance = vec![GpuMetricProvenance {
             field: GpuMetricField::Brand,
             provider: GPU_TELEMETRY_PROVIDER,
         }];
-        let mut row = GpuMetrics::new(
-            format!("macos:gpu:system-profiler:{}", adapter.identity),
-            adapter.brand,
-        );
-        row.device_generation = DeviceGeneration::INITIAL;
+        let device_id = identity.map(|identity| format!("macos:gpu:system-profiler:{identity}"));
+        let mut row = GpuMetrics::new(device_id.as_deref().unwrap_or_default(), adapter.brand);
         row.device_state = DeviceState::healthy(observed_at_ms);
+        if let Some(device_id) = device_id.as_deref() {
+            let lifecycle = lifecycles.observe(
+                device_id,
+                DeviceState::healthy(observed_at_ms),
+                observed_at_ms,
+            );
+            row.device_generation = lifecycle.generation;
+        }
         let mut observations = GpuScalarObservations::default();
-        if adapter_count == 1
+        if can_match_dynamic
+            && adapter_count == 1
             && let Some(value) = dynamic_utilization
         {
             observations.utilization_pct = ScalarObservation::available(value, observed_at_ms);
@@ -134,31 +179,83 @@ fn gpu_observation_from_profiler_with_dynamic(
         row.provenance = provenance;
         gpus.push(row);
     }
-    let gpu_count = gpus.len();
-    let source = SourceStatus {
-        provider: GPU_TELEMETRY_PROVIDER,
-        outcome: if identity_partial {
-            SourceOutcome::Partial(FailureKind::Unsupported)
-        } else if let Some(failure) = dynamic_failure {
-            SourceOutcome::Partial(failure)
-        } else {
-            SourceOutcome::Available
-        },
-        item_count: gpu_count,
+
+    let discovery_outcome = if gpus.is_empty() && discovery_failure.is_none() {
+        SourceOutcome::Empty
+    } else if let Some(failure) = discovery_failure {
+        SourceOutcome::Partial(failure)
+    } else {
+        SourceOutcome::Available
     };
-    GpuTelemetryObservation::current(
-        gpus,
-        observed_at_ms,
-        vec![source],
-        Vec::new(),
-        Default::default(),
-    )
+    let discovery_refresh = match discovery_outcome {
+        SourceOutcome::Available | SourceOutcome::Empty => DeviceRefreshOutcome::Complete,
+        SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => {
+            DeviceRefreshOutcome::Unavailable(DeviceStatus::from_failure(failure))
+        }
+    };
+    let _delta = lifecycles.finish_refresh(discovery_refresh, observed_at_ms);
+    let mut sources = vec![SourceStatus {
+        provider: GPU_TELEMETRY_PROVIDER,
+        outcome: discovery_outcome,
+        item_count: gpus.len(),
+    }];
+    if let Some(failure) = dynamic_failure {
+        sources.push(unavailable_source(GPU_IOREG_PROVIDER, failure));
+    } else if dynamic_utilization.is_some() && can_match_dynamic && adapter_count == 1 {
+        sources.push(SourceStatus {
+            provider: GPU_IOREG_PROVIDER,
+            outcome: SourceOutcome::Available,
+            item_count: 1,
+        });
+    }
+    sources.sort_by(|left, right| left.provider.cmp(&right.provider));
+    let lifecycles = lifecycle_snapshot(lifecycles);
+
+    match (discovery_failure, dynamic_failure) {
+        (Some(failure), _) => GpuTelemetryObservation::partial(
+            gpus,
+            observed_at_ms,
+            failure,
+            sources,
+            Vec::new(),
+            lifecycles,
+        ),
+        (None, Some(failure)) => GpuTelemetryObservation::partial(
+            gpus,
+            observed_at_ms,
+            failure,
+            sources,
+            Vec::new(),
+            lifecycles,
+        ),
+        (None, None) => {
+            GpuTelemetryObservation::current(gpus, observed_at_ms, sources, Vec::new(), lifecycles)
+        }
+    }
+}
+
+fn lifecycle_snapshot(lifecycles: &DeviceLifecycleRegistry) -> BTreeMap<DeviceId, DeviceLifecycle> {
+    lifecycles
+        .iter()
+        .map(|(id, lifecycle)| (DeviceId::new(id), *lifecycle))
+        .collect()
+}
+
+/// Parsed profiler inventory. `failure` means the command succeeded but at
+/// least one non-empty row could not be represented completely; callers may
+/// keep valid rows while refusing to confirm absence for omitted devices.
+struct MacGpuEnumeration {
+    adapters: Vec<MacGpuAdapter>,
+    failure: Option<FailureKind>,
+    raw_item_count: usize,
 }
 
 /// One GPU adapter discovered by `system_profiler SPDisplaysDataType -json`.
 struct MacGpuAdapter {
-    identity: String,
-    identity_is_authoritative: bool,
+    /// A per-adapter identity only when the source has proved one. The current
+    /// `system_profiler` display schema has no such field; vendor/device IDs,
+    /// revision, gMux and brand describe a model or controller, not one unit.
+    identity: Option<String>,
     brand: String,
     /// Total dedicated VRAM when system_profiler reports it (discrete GPUs).
     /// `None` on Apple Silicon unified-memory parts where system_profiler
@@ -166,43 +263,22 @@ struct MacGpuAdapter {
     vram_total_bytes: Option<u64>,
 }
 
-/// Map one `SPDisplaysDataType` JSON row onto an adapter. Returns None for
-/// rows that carry no GPU identity (e.g. display-only entries).
+/// Map one `SPDisplaysDataType` JSON row onto displayable adapter facts.
+/// Stable identity is intentionally not derived from the model, PCI model IDs,
+/// or row ordering.
 fn gpu_adapter_from_json(row: &serde_json::Value) -> Option<MacGpuAdapter> {
-    let brand = row
-        .get("_name")
-        .or_else(|| row.get("sppci_model"))
-        .and_then(serde_json::Value::as_str)
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())?;
+    let brand = ["_name", "sppci_model"]
+        .into_iter()
+        .filter_map(|key| row.get(key).and_then(serde_json::Value::as_str))
+        .map(str::trim)
+        .find(|name| !name.is_empty())?
+        .to_string();
     let vram_total_bytes = row
         .get("spdisplays_vram")
         .and_then(serde_json::Value::as_str)
         .and_then(parse_memory_string);
-    let identity_parts = [
-        "spdisplays_vendor-id",
-        "spdisplays_device-id",
-        "spdisplays_revision-id",
-        "spdisplays_gmux-version",
-    ]
-    .into_iter()
-    .filter_map(|key| {
-        row.get(key)
-            .and_then(serde_json::Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(|value| format!("{key}={value}"))
-    })
-    .collect::<Vec<_>>();
-    let identity_is_authoritative = !identity_parts.is_empty();
-    let identity = if identity_is_authoritative {
-        identity_parts.join(":")
-    } else {
-        format!("brand={}", brand.to_ascii_lowercase())
-    };
     Some(MacGpuAdapter {
-        identity,
-        identity_is_authoritative,
+        identity: None,
         brand,
         vram_total_bytes,
     })
@@ -211,7 +287,7 @@ fn gpu_adapter_from_json(row: &serde_json::Value) -> Option<MacGpuAdapter> {
 /// `system_profiler SPDisplaysDataType -json` → one entry per top-level GPU
 /// adapter. Invocation failures remain distinct from a successful empty
 /// inventory.
-fn system_profiler_gpus() -> Result<Vec<MacGpuAdapter>, FailureKind> {
+fn system_profiler_gpus() -> Result<MacGpuEnumeration, FailureKind> {
     let mut command = std::process::Command::new("system_profiler");
     command.args(["SPDisplaysDataType", "-json"]);
     let output = match run_with_timeout(&mut command, Duration::from_secs(5)) {
@@ -336,14 +412,30 @@ fn parse_ioreg_key_values(output: &str, key: &str) -> Vec<f32> {
     values
 }
 
-fn parse_system_profiler_gpus(output: &[u8]) -> Result<Vec<MacGpuAdapter>, FailureKind> {
+fn parse_system_profiler_gpus(output: &[u8]) -> Result<MacGpuEnumeration, FailureKind> {
     let root: serde_json::Value =
         serde_json::from_slice(output).map_err(|_| FailureKind::ProviderFault)?;
     let rows = root
         .get("SPDisplaysDataType")
         .and_then(serde_json::Value::as_array)
         .ok_or(FailureKind::ProviderFault)?;
-    Ok(rows.iter().filter_map(gpu_adapter_from_json).collect())
+    let mut adapters = Vec::with_capacity(rows.len());
+    let mut failure = None;
+    for row in rows {
+        if let Some(adapter) = gpu_adapter_from_json(row) {
+            adapters.push(adapter);
+        } else {
+            // A non-empty unrecognized row may represent a GPU that this
+            // parser cannot report. Preserve recognized rows but never turn
+            // the filtered result into an authoritative empty inventory.
+            failure.get_or_insert(FailureKind::ProviderFault);
+        }
+    }
+    Ok(MacGpuEnumeration {
+        adapters,
+        failure,
+        raw_item_count: rows.len(),
+    })
 }
 
 /// Parse a system_profiler memory string such as "8 GB" / "16384 MB" into

@@ -13,7 +13,7 @@ use crate::window_surface::WindowSurfaceCommand;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
-use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
+use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
@@ -67,7 +67,7 @@ pub(super) fn initialize_capture_state(
         };
     }
     if capture_scenario_target() == Some("apps-group-expanded") {
-        let _ = seed_shell_process_tree(&mut shell);
+        let _ = seed_shell_process_tree_with_partial_aggregate(&mut shell);
         shell.query = "capture-".into();
     }
     track.shell = shell;

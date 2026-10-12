@@ -21,7 +21,7 @@ use bevy::text::TextColor;
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px,
+    UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -381,7 +381,7 @@ fn header_cell_scene(
     bsn! {
         Node {
             width: px(width),
-            height: px(palette.control_height_px),
+            height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             justify_content: align,
             align_items: AlignItems::Center,
@@ -396,8 +396,8 @@ fn header_cell_scene(
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
         Children [
-             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
-            { indicator }
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
+             Children [ { indicator } ]
         ]
     }
 }

@@ -2,7 +2,7 @@
 //! desktop-notification drain.
 //!
 //! Data entries (per the page-agent contract in [`crate::pages`]):
-//! - `context.shell.projection().alert_active` — what currently fired, with
+//! - `context.shell.projection().alert_center.active_alerts()` — what currently fired, with
 //!   the shared threshold/hysteresis semantics already applied by the
 //!   shell's evaluation fold;
 //! - `context.shell.projection().alert_center.managed_rules()` — the
@@ -10,14 +10,14 @@
 //!   [`ShellApp::edit_alert_rules`] (the one edit authority — this page
 //!   never mutates the projection directly);
 //! - `ShellApp::drain_alert_notifications` — desktop notifications the
-//!   shared evaluation queued are submitted through `queue_effect`, the same
-//!   seam every effect uses (never a direct platform call).
+//!   shared evaluation queued become typed `PendingEffects`; the PreUpdate
+//!   drain submits them through the same seam every effect uses.
 //!
 //! **Refresh contract.** The page content is mounted once per route
 //! residence; live data reaches it through observers carried by the page
 //! itself (`page_observer`): the fold observer (`alerts_fold_observer`)
-//! reacts to `crate::drain::ShellProjectionFolded` — submit queued
-//! notifications, then ask the app shell's route machinery to remount the
+//! reacts to `crate::drain::ShellProjectionFolded` — enqueue notifications for
+//! the PreUpdate drain, then ask the app shell's route machinery to remount the
 //! mounted page so the freshly folded projection renders. Idle frames fold
 //! nothing, fire nothing, and redraw nothing. The toggle observer
 //! (`rule_toggle_observer`) resolves `bevy_ui_widgets` checkbox
@@ -31,7 +31,7 @@ use bevy::ecs::component::Component;
 use bevy::ecs::event::EventPattern;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::{Observer, On};
-use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, Res};
+use bevy::ecs::system::{Commands, IntoObserverSystem, NonSendMut, Query, ResMut};
 use bevy::scene::{EntityScene, ResolveContext, ResolveSceneError, ResolvedScene, Scene, bsn};
 use bevy::ui::Overflow;
 use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
@@ -41,16 +41,16 @@ pub(crate) mod editor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRuleId, AlertSeverity,
 };
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
-use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
+use crate::app::{FrontendTrack, PageContext, RouteChanged};
 use crate::drain::ShellProjectionFolded;
+use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
-use taskmanager_shell::queue_effect;
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the
 /// observer component, so the observer's lifetime equals the page content's
@@ -98,23 +98,17 @@ pub(crate) fn request_projection_refresh(_fold: On<ShellProjectionFolded>, mut c
     commands.trigger(RouteChanged);
 }
 
-/// The alerts page's fold observer: submit every desktop notification the
-/// shared evaluation queued (through the one effect seam, mirroring the TUI
-/// run loop), then request the projection refresh. The route resource — not
-/// the event payload — stays the remount authority.
+/// The alerts page's fold observer: move every queued desktop notification
+/// into the drain-owned effect bridge, then request the projection refresh.
+/// The route resource — not the event payload — stays the remount authority.
 fn alerts_fold_observer(
     _fold: On<ShellProjectionFolded>,
     mut track: NonSendMut<FrontendTrack>,
-    runtime: Res<SharedRuntimeHandle>,
+    mut pending: ResMut<PendingEffects>,
     mut commands: Commands,
 ) {
-    let mut client = runtime.shared.lock_client();
     for request in track.shell.drain_alert_notifications() {
-        queue_effect(
-            &mut track.shell,
-            &mut client,
-            PlatformEffect::DesktopNotification(request),
-        );
+        pending.0.push(PlatformEffect::DesktopNotification(request));
     }
     commands.trigger(RouteChanged);
 }
@@ -126,7 +120,7 @@ fn alerts_fold_observer(
 ///
 /// [`ShellApp::edit_alert_rules`]: taskmanager_shell::ShellApp::edit_alert_rules
 #[derive(Component, Clone, Default)]
-pub(crate) struct AlertRuleToggleTarget(pub(crate) String);
+pub(crate) struct AlertRuleToggleTarget(pub(crate) Option<AlertRuleId>);
 
 /// The rule-toggle applier: a checkbox activation resolves its row's rule
 /// and flips it through the shell's canonical edit entry. Guarded so a
@@ -143,16 +137,19 @@ fn rule_toggle_observer(
     let Ok(target) = targets.get(change.event().source) else {
         return; // a foreign checkbox: none of this page's business
     };
+    let Some(rule_id) = target.0.as_ref() else {
+        return; // BSN's empty template seed never represents a rule.
+    };
     let enabled_now = track
         .shell
         .projection()
         .alert_center
         .managed_rules()
         .iter()
-        .any(|managed| managed.rule.id == target.0 && managed.enabled);
+        .any(|managed| &managed.rule.id == rule_id && managed.enabled);
     if enabled_now != requested {
         let edit = ManagedAlertRuleEdit::Toggle {
-            rule_id: target.0.clone(),
+            rule_id: rule_id.clone(),
         };
         if let Err(error) = track.shell.edit_alert_rules(edit) {
             // The Toggle edit resolves against the canonical set; a typed
@@ -270,7 +267,7 @@ pub(crate) fn alerts_summary(shell: &ShellApp) -> String {
     let enabled = rules.iter().filter(|managed| managed.enabled).count();
     format!(
         "{} active · {}/{} rules enabled",
-        projection.alert_active.len(),
+        projection.alert_center.active_alerts().len(),
         enabled,
         rules.len()
     )
@@ -283,11 +280,11 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let projection = context.shell.projection();
     let rules = projection.alert_center.managed_rules();
     let summary = alerts_summary(context.shell);
-    let active_rows: Vec<Box<dyn Scene>> = if projection.alert_active.is_empty() {
+    let active_alerts = projection.alert_center.active_alerts();
+    let active_rows: Vec<Box<dyn Scene>> = if active_alerts.is_empty() {
         vec![Box::new(empty_active_scene()) as Box<dyn Scene>]
     } else {
-        projection
-            .alert_active
+        active_alerts
             .iter()
             .map(|alert| {
                 Box::new(active_row_scene(active_alert_line(alert, rules))) as Box<dyn Scene>
@@ -395,3 +392,7 @@ fn rule_rows(rules: &[ManagedAlertRule], palette: &UiPalette) -> Vec<Box<dyn Sce
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/effects.rs"]
+mod effect_tests;

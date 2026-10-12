@@ -38,11 +38,13 @@ eval "$(scripts/agent-workdir.sh enter tui-capture)"
 # The shared sccache socket exceeds Linux SUN_LEN for this repository path;
 # keep Cargo on the shared target but use rustc directly for this bounded run.
 export RUSTC_WRAPPER=
-# ADR-051: the TUI product is the taskmanager-tui crate's own bin.
-APP="$CAPTURE_RUN_ROOT/bin/taskmanager-tui"
+# ADR-051: the TUI product binary is taskmanager-tui's taskforest-t target.
+APP="$CAPTURE_RUN_ROOT/bin/taskforest-t"
 OUT="$REPO/target/tui-evidence/latest"
 EVIDENCE_ROOT="$REPO/target/tui-evidence"
 APP_ID="taskmanager-tui"
+CAPTURE_PREBUILT_BINARY="${TM_TUI_CAPTURE_PREBUILT_BINARY:-}"
+source "$REPO/scripts/capture_tui_terminal_env.sh"
 CAPTURE_PAGE="${TM_TUI_CAPTURE_PAGE:-performance}"
 CAPTURE_DEVICE="${TM_TUI_CAPTURE_DEVICE:-}"
 CAPTURE_SCENE="${TM_TUI_CAPTURE_SCENE:-}"
@@ -92,11 +94,12 @@ case "$CAPTURE_SCENE" in
   "") ;;
   keyboard-help|keyboard-help-end) CAPTURE_PAGE=performance ;;
   system-npu|system-hardware|system-dashboard|history-60m) CAPTURE_PAGE=system ;;
-  process-selection|process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-search-highlight|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) CAPTURE_PAGE=applications ;;
+  process-selection|process-force-kill|process-tree-confirm|process-batch-confirm|process-properties-performance|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-search-highlight|apps-group-expanded|apps-zero-gray|apps-empty|apps-identity-matrix|keyboard-focus|vertical-nav) CAPTURE_PAGE=applications ;;
+  users-session-confirmation) CAPTURE_PAGE=users ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;
   services-search-highlight|service-details-logs) CAPTURE_PAGE=services ;;
   application-history-replay) CAPTURE_PAGE=app-history ;;
-  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
+  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|health-review-events|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2
@@ -142,12 +145,35 @@ KWIN_ROOT=""
 KWIN_SOCKET=""
 KWIN_DISPLAY=""
 
-for command in cargo file git jq niri ps rustc sha256sum setsid stat timeout; do
+REQUIRED_CAPTURE_COMMANDS=(cargo chmod cp env file git jq niri ps rustc sha256sum setsid stat timeout)
+if [ "$CAPTURE_SCENE" = "health-review-events" ]; then
+  REQUIRED_CAPTURE_COMMANDS+=(tesseract)
+elif [ "$CAPTURE_SCENE" = "apps-empty" ]; then
+  REQUIRED_CAPTURE_COMMANDS+=(tesseract)
+fi
+for command in "${REQUIRED_CAPTURE_COMMANDS[@]}"; do
   if ! command -v "$command" >/dev/null 2>&1; then
     printf 'required capture command is unavailable: %s\n' "$command" >&2
     exit 2
   fi
 done
+
+if [ "$CAPTURE_TERMINAL_SCENARIO" != "<manual>" ]; then
+  PYTHONDONTWRITEBYTECODE=1 timeout 15s python3 \
+    "$REPO/scripts/capture_tui_terminal_profiles.py" \
+    --check-environment "$CAPTURE_TERMINAL_SCENARIO"
+fi
+PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 \
+  "$REPO/scripts/capture_tui_terminal_profiles.py" --self-test
+PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 \
+  "$REPO/scripts/validate_tui_evidence.py" --self-test
+if [ "$CAPTURE_SCENE" = "health-review-events" ]; then
+  PYTHONDONTWRITEBYTECODE=1 timeout 15s python3 \
+    "$REPO/scripts/validate_tui_health_review_events.py" --self-test
+elif [ "$CAPTURE_SCENE" = "apps-empty" ]; then
+  PYTHONDONTWRITEBYTECODE=1 timeout 15s python3 \
+    "$REPO/scripts/validate_tui_apps_empty.py" --self-test
+fi
 
 # Read the rendered frame's mean luminance so the receipt records what was
 # actually painted, not only the requested `TM_SKIN` token. `identify` is the
@@ -287,9 +313,28 @@ PYTHONDONTWRITEBYTECODE=1 timeout 60s python3 scripts/frontend_source_manifest.p
   --frontend tui --repo-root "$REPO" --output "$SOURCE_MANIFEST"
 SOURCE_MANIFEST_SHA256="$(sha256sum "$SOURCE_MANIFEST" | cut -d' ' -f1)"
 
-(cd "$REPO" && timeout --kill-after=10s 20m python3 scripts/capture_build.py \
-  --repo-root "$REPO" --source "$REPO/target/debug/taskmanager-tui" \
-  --destination "$APP" -- cargo build --locked --quiet -p taskmanager-tui --bin taskmanager-tui)
+if [ -n "$CAPTURE_PREBUILT_BINARY" ]; then
+  case "$CAPTURE_PREBUILT_BINARY" in
+    /*) PREBUILT_PATH="$CAPTURE_PREBUILT_BINARY" ;;
+    *) PREBUILT_PATH="$REPO/$CAPTURE_PREBUILT_BINARY" ;;
+  esac
+  if [ "$PREBUILT_PATH" != "$REPO/target/debug/taskforest-t" ] \
+    || [ ! -f "$PREBUILT_PATH" ] || [ ! -x "$PREBUILT_PATH" ]; then
+    printf 'prebuilt TUI binary must be executable target/debug/taskforest-t: %s\n' \
+      "$PREBUILT_PATH" >&2
+    exit 2
+  fi
+  cp -- "$PREBUILT_PATH" "$APP"
+  chmod 0555 "$APP"
+  BINARY_PROVISION=prebuilt
+  BINARY_SOURCE=target/debug/taskforest-t
+else
+  (cd "$REPO" && timeout --kill-after=10s 20m python3 scripts/capture_build.py \
+    --repo-root "$REPO" --source "$REPO/target/debug/taskforest-t" \
+    --destination "$APP" -- cargo build --locked --quiet -p taskmanager-tui --bin taskforest-t)
+  BINARY_PROVISION=capture-build
+  BINARY_SOURCE=target/debug/taskforest-t
+fi
 BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
 APP_RELATIVE="${APP#"$REPO/"}"
 
@@ -417,11 +462,6 @@ fi
 XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
   XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
   XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \
-  TM_TUI_CAPTURE_MARKER_FILE="$MARKERS" \
-  TM_TUI_CAPTURE_PAGE="$CAPTURE_PAGE" \
-  TM_TUI_CAPTURE_DEVICE="$CAPTURE_DEVICE" \
-  TM_TUI_CAPTURE_SCENE="$CAPTURE_SCENE" \
-  TM_TUI_CAPTURE_SOURCE_FAILURE="${TM_TUI_CAPTURE_SOURCE_FAILURE:-}" \
   TM_SKIN="$CAPTURE_SKIN" \
   LIBGL_ALWAYS_SOFTWARE=1 \
   setsid alacritty --class "$APP_ID" --title "TaskForest TUI Evidence" \
@@ -430,7 +470,13 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
     -o 'window.padding.x=8' \
     -o 'window.padding.y=8' \
     -o "font.size=$CAPTURE_FONT_SIZE" \
-    -e "$APP" --demo >"$RUN_DIR/alacritty.log" 2>&1 &
+    -e env "${TUI_APP_ENV_UNSET[@]}" "${TUI_APP_ENV_SET[@]}" \
+      "TM_TUI_CAPTURE_MARKER_FILE=$MARKERS" \
+      "TM_TUI_CAPTURE_PAGE=$CAPTURE_PAGE" \
+      "TM_TUI_CAPTURE_DEVICE=$CAPTURE_DEVICE" \
+      "TM_TUI_CAPTURE_SCENE=$CAPTURE_SCENE" \
+      "TM_TUI_CAPTURE_SOURCE_FAILURE=${TM_TUI_CAPTURE_SOURCE_FAILURE:-}" \
+      "$APP" --demo >"$RUN_DIR/alacritty.log" 2>&1 &
 ALACRITTY_PID=$!
 ALACRITTY_PGID="$(process_group "$ALACRITTY_PID")"
 
@@ -491,6 +537,29 @@ if [ ! -s "$IMAGE" ] || ! file "$IMAGE" | grep -q 'PNG image data' \
 fi
 RENDERED_APPEARANCE="$(appearance_of "$IMAGE")"
 APPEARANCE_CONTROL="$(appearance_control_of "$CAPTURE_SKIN" "$RENDERED_APPEARANCE")"
+PROFILE_FIELDS="$(PYTHONDONTWRITEBYTECODE=1 timeout 15s python3 \
+  "$REPO/scripts/capture_tui_terminal_profiles.py" --read-marker "$MARKERS")"
+IFS=$'\t' read -r PROFILE_LANGUAGE PROFILE_GLYPHS PROFILE_COLOR <<<"$PROFILE_FIELDS"
+
+if [ "$CAPTURE_SCENE" = "health-review-events" ]; then
+  PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 \
+    "$REPO/scripts/validate_tui_health_review_events.py" \
+    --image "$IMAGE" \
+    --columns "$CAPTURE_COLUMNS" \
+    --lines "$CAPTURE_LINES" \
+    --language "$PROFILE_LANGUAGE" \
+    --ocr-output "$RUN_DIR/health-review-events-ocr.txt" \
+    --receipt "$RUN_DIR/health-review-events-validation.json"
+elif [ "$CAPTURE_SCENE" = "apps-empty" ]; then
+  PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 \
+    "$REPO/scripts/validate_tui_apps_empty.py" \
+    --image "$IMAGE" \
+    --columns "$CAPTURE_COLUMNS" \
+    --lines "$CAPTURE_LINES" \
+    --language "$PROFILE_LANGUAGE" \
+    --ocr-output "$RUN_DIR/apps-empty-ocr.txt" \
+    --receipt "$RUN_DIR/apps-empty-validation.json"
+fi
 
 RUST_VERSION="$(rustc -V)"
 NIRI_VERSION="$(niri --version)"
@@ -513,6 +582,8 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'app_id=%s\n' "$APP_ID"
   printf 'binary=%s\n' "$APP_RELATIVE"
   printf 'binary_sha256=%s\n' "$BINARY_SHA256"
+  printf 'binary_provision=%s\n' "$BINARY_PROVISION"
+  printf 'binary_source=%s\n' "$BINARY_SOURCE"
   printf 'app_pid=%s\n' "$WINDOW_PID"
   printf 'launcher_pid=%s\n' "$ALACRITTY_PID"
   printf 'window_id=%s\n' "$WINDOW_ID"
@@ -534,6 +605,18 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'terminal_columns=%s\n' "$CAPTURE_COLUMNS"
   printf 'terminal_lines=%s\n' "$CAPTURE_LINES"
   printf 'terminal_font_size=%s\n' "$CAPTURE_FONT_SIZE"
+  printf 'terminal_scenario=%s\n' "$CAPTURE_TERMINAL_SCENARIO"
+  printf 'terminal_term=%s\n' "$CAPTURE_APP_TERM"
+  printf 'terminal_colorterm=%s\n' "$CAPTURE_APP_COLORTERM"
+  printf 'terminal_no_color=%s\n' "$CAPTURE_APP_NO_COLOR"
+  printf 'terminal_lc_all=%s\n' "$CAPTURE_APP_LC_ALL"
+  printf 'terminal_lc_ctype=%s\n' "$CAPTURE_APP_LC_CTYPE"
+  printf 'terminal_lc_messages=%s\n' "$CAPTURE_APP_LC_MESSAGES"
+  printf 'terminal_lang=%s\n' "$CAPTURE_APP_LANG"
+  printf 'terminal_glyph_override=%s\n' "$CAPTURE_APP_GLYPH_OVERRIDE"
+  printf 'terminal_profile_language=%s\n' "$PROFILE_LANGUAGE"
+  printf 'terminal_profile_glyphs=%s\n' "$PROFILE_GLYPHS"
+  printf 'terminal_profile_color=%s\n' "$PROFILE_COLOR"
   printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
   printf 'appearance_requested=%s\n' "$CAPTURE_SKIN"
   printf 'appearance_rendered=%s\n' "$RENDERED_APPEARANCE"

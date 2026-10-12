@@ -24,6 +24,8 @@ startup	startup	default	120	36	gnome-dark
 startup-compact	startup	default	54	16	gnome-dark
 users	users	default	120	36	gnome-dark
 users-compact	users	default	54	16	gnome-dark
+users-session-confirmation	users	default	120	36	gnome-dark
+users-session-confirmation-compact	users	default	80	24	gnome-dark
 app-history	app-history	default	120	36	gnome-dark
 app-history-compact	app-history	default	54	16	gnome-dark
 applications-light	applications	default	120	36	gnome-light
@@ -156,6 +158,8 @@ intel-gpu-telemetry	performance	gpu	120	36	gnome-dark
 intel-gpu-telemetry-compact	performance	gpu	54	16	gnome-dark
 apps-zero-gray	applications	default	120	36	gnome-dark
 apps-zero-gray-compact	applications	default	54	16	gnome-dark
+apps-empty	applications	default	120	36	gnome-dark
+apps-empty-compact	applications	default	54	16	gnome-dark
 settings-zero-gray	performance	default	120	36	gnome-dark
 settings-zero-gray-compact	performance	default	54	16	gnome-dark
 settings-switch-focus	performance	default	120	36	gnome-dark
@@ -186,6 +190,8 @@ vertical-nav	applications	default	120	36	gnome-dark
 vertical-nav-compact	applications	default	54	16	gnome-dark
 event-center	performance	default	120	36	gnome-dark
 event-center-compact	performance	default	54	16	gnome-dark
+health-review-events	performance	default	120	36	gnome-dark
+health-review-events-compact	performance	default	54	16	gnome-dark
 first-run	performance	default	120	36	gnome-dark
 first-run-compact	performance	default	54	16	gnome-dark
 system-npu	system	default	120	36	gnome-dark

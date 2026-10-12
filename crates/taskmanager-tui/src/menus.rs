@@ -4,6 +4,7 @@
 //! line budget. Behavior is unchanged — every method stays reachable on
 //! `TuiApp` (impl blocks may live in any module of the defining crate).
 
+use crate::smart_self_test::target_is_running;
 use crate::ui;
 use crate::{
     ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
@@ -15,15 +16,13 @@ use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
     ProcessAffinityReady, ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
 };
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::process::{FrozenProcessIdentity, PriorityTier};
 use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::StorageDeviceKey;
+use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 /// The frozen batch-control menu target: the menu cursor plus the count of
@@ -396,12 +395,27 @@ impl TuiApp {
         let Some(session) = self.sorted_session_at(self.selected) else {
             return false;
         };
-        if session.id.as_str().is_empty() {
+        let Some(identity) = session.identity() else {
             self.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                "This session row has no provider target",
+                "This session row has no verified provider identity",
+            );
+            return false;
+        };
+        let identity_count = self.projection().sessions.as_deref().map_or(0, |sessions| {
+            sessions
+                .iter()
+                .filter(|candidate| candidate.identity().as_ref() == Some(&identity))
+                .count()
+        });
+        if identity_count != 1 {
+            self.report_notice(
+                FeedbackSource::Interaction,
+                FeedbackSeverity::Warning,
+                FeedbackLifecycle::SHORT,
+                "This session row has an ambiguous provider identity",
             );
             return false;
         }
@@ -425,8 +439,8 @@ impl TuiApp {
     /// Consume the menu selection: arm the shared shell confirmation gate
     /// ([`taskmanager_shell::ShellApp::select_session_control`]) with the
     /// frozen row + chosen action. The platform request is only emitted by
-    /// [`Self::confirm_session_control`]. The frozen row's id is checked
-    /// against the current selection so a refresh cannot redirect the intent
+    /// [`Self::confirm_session_control`]. The frozen row's complete identity
+    /// is checked against the current selection so a refresh cannot redirect the intent
     /// to a different row (mirrors the startup menu's guard).
     pub fn session_menu_select(&mut self) {
         let Some(TuiSurface::SessionMenu(menu)) =
@@ -440,7 +454,21 @@ impl TuiApp {
             .unwrap_or(SessionControlAction::Disconnect);
         let still_selected = self
             .sorted_session_at(self.selected)
-            .is_some_and(|session| session.id == menu.session.id);
+            .is_some_and(|session| {
+                session.identity().is_some()
+                    && session.identity() == menu.session.identity()
+                    && self
+                        .projection()
+                        .sessions
+                        .as_deref()
+                        .is_some_and(|sessions| {
+                            sessions
+                                .iter()
+                                .filter(|candidate| candidate.identity() == menu.session.identity())
+                                .count()
+                                == 1
+                        })
+            });
         if !still_selected {
             self.report_notice(
                 FeedbackSource::Interaction,
@@ -455,7 +483,7 @@ impl TuiApp {
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                "This session row has no provider target",
+                "This session row has no verified provider identity",
             );
         }
     }
@@ -668,10 +696,11 @@ fn affinity_last_good<'a>(
 }
 
 /// Resolve the frozen SMART self-test intent the Performance·Disk surface can
-/// offer, or `None` when the current snapshot has no disk whose provider
-/// reports [`SmartAvailability::Available`] (the exact readiness GPUI's
-/// health view demands before it enables its self-test actions). The TUI disk
-/// view has no per-disk cursor, so the target is the first SMART-capable disk
+/// offer, or `None` when the current snapshot has no disk with explicit Short
+/// support evidence or the first capable target's
+/// exact current report is already `Running`. The TUI direct `t` chord and its
+/// palette twin share this guard. The TUI disk view has no per-disk cursor, so
+/// the target is the first SMART-capable disk
 /// in snapshot order — the same first-disk fallback GPUI uses when no device
 /// is selected. The intent freezes the full identity (device id, hot-plug
 /// generation, provider locator, display name), so the shared confirmation
@@ -682,18 +711,8 @@ fn affinity_last_good<'a>(
 #[must_use]
 pub(crate) fn smart_self_test_target(app: &TuiApp) -> Option<SmartSelfTestIntent> {
     let disks = app.sidebar_disks();
-    let disk = disks
+    let intent = disks
         .iter()
-        .find(|disk| disk.smart_availability == SmartAvailability::Available)?;
-    Some(SmartSelfTestIntent {
-        device_id: DeviceId::new(disk.device_id.clone()),
-        device_generation: disk.device_generation,
-        device_key: StorageDeviceKey::new(disk.name.clone()),
-        display_name: if disk.model.is_empty() {
-            disk.name.clone()
-        } else {
-            disk.model.clone()
-        },
-        kind: SmartSelfTestKind::Short,
-    })
+        .find_map(|disk| self_test_intent(disk, SmartSelfTestKind::Short))?;
+    (!target_is_running(app, &intent)).then_some(intent)
 }

@@ -120,6 +120,23 @@ impl ShellApp {
         if event.modifiers != Modifiers::NONE {
             return self.dispatch_key(event);
         }
+        // Applications row navigation is part of the shared ProcessList
+        // command contract. Keep its six registered bare chords on the same
+        // route as dispatch_key; other inventory pages below retain their
+        // shell-owned row navigation because they have no ProcessList scope.
+        if self.page() == AppPage::Applications
+            && matches!(
+                event.key,
+                KeyCode::ArrowUp
+                    | KeyCode::ArrowDown
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+                    | KeyCode::Home
+                    | KeyCode::End
+            )
+        {
+            return self.dispatch_key(event);
+        }
         match event.key {
             KeyCode::ArrowUp => {
                 self.move_selection(-1);
@@ -149,3 +166,7 @@ impl ShellApp {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/headless/app/local_keys.rs"]
+mod tests;

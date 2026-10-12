@@ -7,6 +7,7 @@
 
 mod bridge;
 mod model;
+mod process_semantics;
 mod snapshot;
 
 pub use bridge::{
@@ -20,9 +21,10 @@ pub use model::{
     SemanticNumericValue, SemanticRole, SemanticSnapshot, SemanticSnapshotError, SemanticSort,
     SemanticState,
 };
+pub use process_semantics::{ProcessAggregateSemantics, ProcessRowObservations};
 pub use snapshot::{
-    AlertRuleInput, GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowInput,
-    SemanticSnapshotBuilder,
+    AlertRuleInput, GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowBehavior,
+    ProcessRowInput, SemanticSnapshotBuilder,
 };
 
 #[cfg(test)]

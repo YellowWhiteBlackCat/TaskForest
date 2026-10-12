@@ -5,28 +5,98 @@ use ratatui::backend::TestBackend;
 use taskmanager_core::core::metrics::{MemoryScalarObservations, ScalarObservation};
 
 use crate::demo_app;
+use taskmanager_application::AlertEventSeed;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRuleEdit};
 use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRule, AlertRuleConflictPolicy,
-    AlertSeverity,
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
 };
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_shell::fixture::health::seed_shell_health;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
+use crate::health_review::HealthReviewMode;
+
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
+    frame_text_in_language(app, width, height, Language::En)
+}
+
+fn frame_text_in_language(app: &TuiApp, width: u16, height: u16, language: Language) -> String {
     // Pin English and serialize against the language-flipping i18n test
     // (see ui::LANG_TEST_GUARD). The title/headings resolve through the
     // process-global t(), which otherwise auto-seeds from the host locale.
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
-    set_language(Language::En);
+    set_language(language);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
         .draw(|frame| render_health_overlay(frame, app, crate::TuiTheme::default(), frame.area()))
         .expect("draw");
     terminal.backend().to_string()
+}
+
+#[test]
+fn health_review_footer_paints_localized_protocol_hints_in_compact_frames() {
+    let mut app = demo_app();
+    seed_shell_health(&mut app.shell);
+    app.toggle_health();
+    app.select_health_review(HealthReviewMode::Storage);
+
+    for (language, expected) in [
+        (
+            Language::En,
+            [
+                "Up/Down groups · p Alerts · e Event center",
+                "w Storage health · s Sensors · q Alert rules",
+            ],
+        ),
+        (
+            Language::Zh,
+            [
+                "Up/Down groups · p 告警 · e 通知与事件中心",
+                "w 存储健康 · s 传感器 · q 告警规则",
+            ],
+        ),
+    ] {
+        for (width, height) in [(54, 16), (80, 24)] {
+            let text = frame_text_in_language(&app, width, height, language);
+            for line in expected {
+                assert!(
+                    text.lines().any(|painted| painted.contains(line)),
+                    "{line:?} must be painted in {width}x{height} under {language:?}:\n{text}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn health_review_events_footer_keeps_all_mode_and_event_actions_at_compact_sizes() {
+    let mut app = demo_app();
+    app.toggle_health();
+    app.select_health_review(HealthReviewMode::Events);
+
+    for (width, height) in [(54, 16), (80, 24)] {
+        let text = frame_text(&app, width, height);
+        for expected in [
+            "Up/Down groups · p Alerts · e Event center",
+            "w Storage health · s Sensors · q Alert rules",
+            "h / Esc Close",
+        ] {
+            assert!(
+                text.lines().any(|line| line.contains(expected)),
+                "{expected:?} must be painted in Events mode at {width}x{height}:\n{text}"
+            );
+        }
+        let event_actions = text
+            .lines()
+            .find(|line| line.contains("F2 Filter"))
+            .expect("Events filter/export/clear row");
+        assert!(event_actions.contains("F5 Export"), "{text}");
+        assert!(event_actions.contains("F8 Clear"), "{text}");
+    }
 }
 
 #[test]
@@ -48,7 +118,7 @@ fn health_overlay_renders_domain_summary_and_alert_rules() {
 }
 
 #[test]
-fn compact_rule_editor_keeps_the_selected_rule_and_all_actions_reachable() {
+fn compact_rule_review_keeps_selection_and_toggle_controls_reachable() {
     let mut app = demo_app();
     app.toggle_health();
     app.health_rule_selection = app.projection().alert_center.managed_rules().len() - 1;
@@ -60,18 +130,21 @@ fn compact_rule_editor_keeps_the_selected_rule_and_all_actions_reachable() {
         assert!(text.contains("Target:"));
         assert!(
             text.contains("h / Esc Close"),
-            "last fixed action is inside the frame"
+            "close action is inside the frame"
         );
-        assert!(text.contains("a Merge"));
-        assert!(text.contains("r Replace"));
+        assert!(text.contains("Enter/Space Toggle"));
+        assert!(!text.contains("n Add"));
+        assert!(!text.contains("y Export"));
+        assert!(!text.contains("a Merge"));
+        assert!(!text.contains("r Replace"));
+        assert!(!text.contains("z Short test"));
+        assert!(!text.contains("x Extended test"));
     }
 }
 
 #[test]
 fn every_health_group_and_fixed_action_fits_the_minimum_terminal() {
     set_language(Language::En);
-    use crate::health_review::HealthReviewMode;
-    use taskmanager_shell::fixture::health::seed_shell_health;
     let mut app = demo_app();
     seed_shell_health(&mut app.shell);
     app.toggle_health();
@@ -82,7 +155,8 @@ fn every_health_group_and_fixed_action_fits_the_minimum_terminal() {
             app.health_review.selected = index;
             let text = frame_text(&app, 54, 16);
             assert!(text.contains("h / Esc Close"));
-            assert!(text.contains("z Short test"));
+            assert!(!text.contains("z Short test"));
+            assert!(!text.contains("x Extended test"));
             for row in &group.rows {
                 assert!(
                     text.contains(&row.label),
@@ -135,11 +209,7 @@ fn health_overlay_marks_high_memory_usage_as_failed() {
 #[test]
 fn health_overlay_keeps_a_disabled_canonical_rule_visible() {
     let mut app = TuiApp::new();
-    app.shell
-        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: "cpu-high".into(),
-        })
-        .unwrap();
+    assert!(app.toggle_alert_rule("cpu-high"));
     let text = frame_text(&app, 120, 40);
     let cpu_line = text
         .lines()
@@ -278,13 +348,8 @@ fn tui_app_alert_rule_helpers_operate_on_canonical_rules() {
     assert!(app.toggle_alert_rule("cpu-high"));
     assert!(!app.projection().alert_center.managed_rules()[0].enabled);
 
-    // Toggle back via edit_alert_rules.
-    let outcome = app
-        .edit_alert_rules(ManagedAlertRuleEdit::Toggle {
-            rule_id: "cpu-high".into(),
-        })
-        .expect("toggle outcome");
-    assert!(outcome.changed());
+    // Toggle back through the supported TUI rule-toggle path.
+    assert!(app.toggle_alert_rule("cpu-high"));
     assert!(app.projection().alert_center.managed_rules()[0].enabled);
 
     // Clamped selection move.
@@ -306,13 +371,13 @@ fn health_overlay_renders_event_history_empty_and_populated() {
     assert!(text.contains("No events match this filter."), "{text}");
 
     // 2. Inject alert events: verify rendering
-    let event = AlertEvent {
-        id: 1,
+    let cpu_rule_id = AlertRuleId::new("cpu-high");
+    app.shell.replace_alert_event_history(vec![AlertEventSeed {
         observed_at_ms: 5000,
         kind: AlertEventKind::Activated,
         alert: Alert {
-            instance_id: "cpu-high:system-wide".into(),
-            rule_id: "cpu-high".into(),
+            instance_id: AlertInstanceId::new(cpu_rule_id.clone(), AlertTargetIdentity::System),
+            rule_id: cpu_rule_id,
             severity: AlertSeverity::Critical,
             metric: AlertMetric::CpuUsagePercent,
             target: "system-wide".into(),
@@ -320,8 +385,7 @@ fn health_overlay_renders_event_history_empty_and_populated() {
             threshold: 90.0,
             active_since_ms: 4500,
         },
-    };
-    app.shell.replace_alert_event_history(vec![event]);
+    }]);
     let text = frame_text(&app, 120, 40);
     assert!(text.contains("[Activated]"), "{text}");
     assert!(text.contains("system-wide"), "{text}");
@@ -335,69 +399,6 @@ fn health_overlay_renders_event_history_empty_and_populated() {
 }
 
 #[test]
-fn tui_app_alert_rule_authoring_and_transfer_lifecycle() {
-    let mut app = TuiApp::new();
-
-    // 1. Add a new alert rule
-    let custom_rule = AlertRule::new(
-        "custom-cpu-alert",
-        AlertMetric::CpuUsagePercent,
-        AlertSeverity::Warning,
-        85.0,
-        std::time::Duration::from_secs(5),
-        5.0,
-    );
-    let add_outcome = app.add_alert_rule(custom_rule).expect("add rule");
-    assert!(add_outcome.changed());
-    assert!(
-        app.projection()
-            .alert_center
-            .managed_rules()
-            .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
-    );
-
-    // 2. Export rules to JSON
-    let json = app.export_alert_rules().expect("export rules");
-    assert!(json.contains("custom-cpu-alert"));
-
-    // 3. Remove the rule
-    let remove_outcome = app
-        .remove_alert_rule("custom-cpu-alert".into())
-        .expect("remove rule");
-    assert!(remove_outcome.changed());
-    assert!(
-        !app.projection()
-            .alert_center
-            .managed_rules()
-            .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
-    );
-
-    // 4. Import rules back in Replace mode
-    let import_outcome = app
-        .import_alert_rules(&json, AlertRuleImportMode::Replace)
-        .expect("import rules");
-    assert!(import_outcome.changed());
-    assert!(
-        app.projection()
-            .alert_center
-            .managed_rules()
-            .iter()
-            .any(|r| r.rule.id == "custom-cpu-alert")
-    );
-
-    // 5. Invalid JSON import returns an error honestly
-    assert!(
-        app.import_alert_rules(
-            "not-json",
-            AlertRuleImportMode::Merge(AlertRuleConflictPolicy::KeepExisting)
-        )
-        .is_err()
-    );
-}
-
-#[test]
 fn alert_event_line_formatting_covers_activated_and_cleared() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
@@ -406,22 +407,51 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     let theme = TuiTheme::default();
 
     // Activated with empty target defaults to metric label
-    let activated = AlertEvent {
-        id: 1,
-        observed_at_ms: 1200,
-        kind: AlertEventKind::Activated,
-        alert: Alert {
-            instance_id: "mem:".into(),
-            rule_id: "mem-high".into(),
-            severity: AlertSeverity::Warning,
-            metric: AlertMetric::MemoryUsagePercent,
-            target: "".into(),
-            value: 88.0,
-            threshold: 80.0,
-            active_since_ms: 1000,
+    let mut app = TuiApp::new();
+    let memory_rule_id = AlertRuleId::new("mem-high");
+    let disk_rule_id = AlertRuleId::new("disk-temp");
+    app.shell.replace_alert_event_history(vec![
+        AlertEventSeed {
+            observed_at_ms: 1200,
+            kind: AlertEventKind::Activated,
+            alert: Alert {
+                instance_id: AlertInstanceId::new(
+                    memory_rule_id.clone(),
+                    AlertTargetIdentity::System,
+                ),
+                rule_id: memory_rule_id,
+                severity: AlertSeverity::Warning,
+                metric: AlertMetric::MemoryUsagePercent,
+                target: "".into(),
+                value: 88.0,
+                threshold: 80.0,
+                active_since_ms: 1000,
+            },
         },
-    };
-    let line1 = alert_event_line(&activated, theme);
+        AlertEventSeed {
+            observed_at_ms: 2400,
+            kind: AlertEventKind::Cleared,
+            alert: Alert {
+                instance_id: AlertInstanceId::new(
+                    disk_rule_id.clone(),
+                    AlertTargetIdentity::Storage {
+                        device_id: DeviceId::new("disk:/data"),
+                        generation: DeviceGeneration::new(1),
+                    },
+                ),
+                rule_id: disk_rule_id,
+                severity: AlertSeverity::Critical,
+                metric: AlertMetric::DiskTemperatureC,
+                target: "disk:/data".into(),
+                value: 70.0,
+                threshold: 90.0,
+                active_since_ms: 2000,
+            },
+        },
+    ]);
+    let events = app.projection().alert_center.event_history();
+    let activated = events.first().expect("activated event");
+    let line1 = alert_event_line(activated, theme);
     let s1 = line1.to_string();
     assert!(s1.contains("1200ms"), "{s1}");
     assert!(s1.contains("[Activated]"), "{s1}");
@@ -430,22 +460,8 @@ fn alert_event_line_formatting_covers_activated_and_cleared() {
     assert!(s1.contains("thresh: 80.0%"), "{s1}");
 
     // Cleared with custom target
-    let cleared = AlertEvent {
-        id: 2,
-        observed_at_ms: 2400,
-        kind: AlertEventKind::Cleared,
-        alert: Alert {
-            instance_id: "disk:/data".into(),
-            rule_id: "disk-temp".into(),
-            severity: AlertSeverity::Critical,
-            metric: AlertMetric::DiskTemperatureC,
-            target: "disk:/data".into(),
-            value: 70.0,
-            threshold: 90.0,
-            active_since_ms: 2000,
-        },
-    };
-    let line2 = alert_event_line(&cleared, theme);
+    let cleared = events.get(1).expect("cleared event");
+    let line2 = alert_event_line(cleared, theme);
     let s2 = line2.to_string();
     assert!(s2.contains("2400ms"), "{s2}");
     assert!(s2.contains("[Cleared]"), "{s2}");

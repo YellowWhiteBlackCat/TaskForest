@@ -1,10 +1,11 @@
 use super::apply_capture_target;
 use crate::app::{IcedApp, LocalSurfaceKind, Message};
+use iced::Size;
+use std::time::Instant;
+use taskmanager_application::AppPage;
 
 #[test]
 fn startup_failure_scene_requires_failed_units_and_their_boot_chain() {
-    use std::time::Instant;
-    use taskmanager_application::AppPage;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "startup-failure-evidence");
@@ -38,9 +39,6 @@ fn startup_failure_scene_requires_failed_units_and_their_boot_chain() {
 
 #[test]
 fn alert_scenes_open_the_normal_rule_page_and_require_their_actual_content() {
-    use std::time::Instant;
-    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
-
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "active-alert");
     assert!(app.alerts_page_open());
@@ -49,7 +47,7 @@ fn alert_scenes_open_the_normal_rule_page_and_require_their_actual_content() {
     assert_eq!(lines.len(), 1);
     assert!(lines[0].text.contains("94.0%"));
 
-    seed_projection_fact(&mut app.shell, ProjectionSeedFact::ActiveAlerts(Vec::new()));
+    app.shell.reset_alert_center();
     for _ in 0..3 {
         let _ = app.update(Message::Frame(Instant::now()));
     }
@@ -72,7 +70,6 @@ fn alert_scenes_open_the_normal_rule_page_and_require_their_actual_content() {
 
 #[test]
 fn battery_scenes_ingest_both_real_chart_windows_before_the_presented_marker() {
-    use std::time::Instant;
     for scenario in ["battery-fan-performance", "battery-live-performance"] {
         let mut app = IcedApp::demo();
         apply_capture_target(&mut app, scenario);
@@ -100,7 +97,6 @@ fn battery_scenes_ingest_both_real_chart_windows_before_the_presented_marker() {
 
 #[test]
 fn smart_failure_scenes_open_the_normal_detail_and_do_not_accept_another_status() {
-    use std::time::Instant;
     use taskmanager_core::core::device_state::DeviceStatus;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     use taskmanager_shell::presentation::effective_smart_status;
@@ -136,4 +132,31 @@ fn smart_failure_scenes_open_the_normal_detail_and_do_not_accept_another_status(
             "another SMART state cannot certify {scenario}"
         );
     }
+}
+
+#[test]
+fn performance_capture_waits_for_received_viewport_and_records_its_budget() {
+    let directory = crate::test_support::temp_dir("capture-performance-viewport");
+    let marker = directory.join("markers.log");
+    let mut app = IcedApp::demo_for_capture_with(Some("en".to_owned()), None);
+    app.capture.marker = Some(marker.clone());
+    apply_capture_target(&mut app, "cpu");
+    assert_eq!(app.shell.page(), AppPage::Performance);
+
+    let _ = app.update(Message::Frame(Instant::now()));
+    let _ = app.update(Message::Frame(Instant::now()));
+    assert!(
+        !app.capture.emitted && !marker.exists(),
+        "the configured startup size is not capture evidence until a client resize reaches the app"
+    );
+
+    let _ = app.update(Message::WindowResized(Size::new(1180.0, 780.0)));
+    let _ = app.update(Message::Frame(Instant::now()));
+    assert!(app.capture.emitted);
+    let markers = std::fs::read_to_string(&marker).expect("capture markers are written");
+    assert!(markers.contains(
+        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device=cpu width=1180.00 height=780.00 page_width=1180.00 page_height=780.00 rung=Charts inventory=Full\n"
+    ));
+    assert!(markers.contains("ICED_CAPTURE_MARKER event=frame_ready mode=demo page=performance\n"));
+    let _ = std::fs::remove_dir_all(directory);
 }

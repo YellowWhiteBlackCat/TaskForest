@@ -15,9 +15,12 @@
 //! hours, the opt-in switch) so a second frontend can never diverge on policy.
 //! It performs no I/O and has no platform dependency.
 
-use taskmanager_core::alerts::{Alert, NotificationGate, NotificationPolicy};
+use taskmanager_core::alerts::{
+    Alert, AlertInstanceId, AlertRuleId, NotificationGate, NotificationPolicy,
+};
 
 use crate::platform::DesktopNotificationRequest;
+use std::collections::HashSet;
 use taskmanager_core::alerts::AlertMetric;
 
 /// Shared alert-to-notification delivery state.
@@ -53,6 +56,14 @@ impl AlertDispatcher {
 
     pub fn set_policy(&mut self, policy: NotificationPolicy) {
         self.gate.set_policy(policy);
+    }
+
+    pub fn retain_disk_instances(&mut self, trusted: &HashSet<AlertInstanceId>) {
+        self.gate.retain_disk_instances(trusted);
+    }
+
+    pub fn retain_rule_ids(&mut self, rule_ids: &HashSet<AlertRuleId>) {
+        self.gate.retain_rule_ids(rule_ids);
     }
 
     /// Turn an alert evaluation transition into desktop notifications.

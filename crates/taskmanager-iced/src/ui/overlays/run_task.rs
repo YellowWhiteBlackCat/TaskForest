@@ -23,6 +23,9 @@ pub fn run_task_overlay<'a>(
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let input = text_input(t("search.run_command"), &state.command)
+        .id(iced::widget::Id::from(crate::focus::focus_id(
+            FocusTarget::RunTaskCommandInput,
+        )))
         .on_input(Message::UpdateRunTaskCommand)
         .on_submit(Message::SubmitRunTask)
         .padding(8)

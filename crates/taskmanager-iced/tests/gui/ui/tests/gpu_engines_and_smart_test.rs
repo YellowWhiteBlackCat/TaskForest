@@ -3,6 +3,7 @@
 use crate::app::Message;
 use taskmanager_application::ConfirmationKind;
 use taskmanager_core::core::SmartSelfTestKind;
+use taskmanager_shell::fixture::health::seed_smart_self_test_capabilities;
 use taskmanager_shell::presentation::smart::self_test_intent;
 
 #[test]
@@ -46,6 +47,7 @@ fn gpu_engines_expanded_toggle_and_panel_rendering() {
 #[test]
 fn smart_self_test_control_request_and_confirm_flow() {
     let mut app = crate::IcedApp::demo();
+    seed_smart_self_test_capabilities(&mut app.shell);
     assert!(
         app.shell.pending_smart_self_test().is_none(),
         "starts with no pending test"
@@ -60,7 +62,8 @@ fn smart_self_test_control_request_and_confirm_flow() {
             .expect("snapshot")
             .disks[0],
         SmartSelfTestKind::Short,
-    );
+    )
+    .expect("demo disk explicitly supports short self-tests");
     let _ = app.update(Message::RequestSmartSelfTest(intent));
 
     let pending = app
@@ -86,8 +89,10 @@ fn a_painted_smart_control_cannot_retarget_a_replaced_disk() {
     use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     let mut app = crate::IcedApp::demo();
+    seed_smart_self_test_capabilities(&mut app.shell);
     let mut snapshot = app.shell.projection().snapshot.clone().expect("snapshot");
-    let intent = self_test_intent(&snapshot.disks[0], SmartSelfTestKind::Short);
+    let intent = self_test_intent(&snapshot.disks[0], SmartSelfTestKind::Short)
+        .expect("demo disk explicitly supports short self-tests");
     snapshot.disks[0].device_generation =
         DeviceGeneration::new(snapshot.disks[0].device_generation.get() + 1);
     seed_projection_fact(

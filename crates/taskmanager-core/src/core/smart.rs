@@ -8,7 +8,8 @@ use crate::core::metrics::SmartAvailability;
 
 pub mod self_test;
 pub use self_test::{
-    SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestCapabilities, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,
+    SmartSelfTestReport, SmartSelfTestSupport,
 };
 
 /// Precise reason why a selected SMART protocol provider could not produce a
@@ -64,6 +65,8 @@ pub struct DiskSmart {
     /// Typed ATA/SATA SMART attribute table. `None` when the device does not
     /// expose ATA attributes (NVMe / SCSI / SAS) or the transport omitted the table.
     pub ata_attributes: Option<Vec<AtaSmartAttribute>>,
+    /// Explicit per-kind device support observed independently of health data.
+    pub self_test_capabilities: SmartSelfTestCapabilities,
 }
 
 impl DiskSmart {
@@ -102,6 +105,7 @@ impl DiskSmart {
             power_on_hours: None,
             unsafe_shutdowns: None,
             ata_attributes: None,
+            self_test_capabilities: SmartSelfTestCapabilities::default(),
         }
     }
 

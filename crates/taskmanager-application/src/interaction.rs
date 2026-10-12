@@ -39,8 +39,8 @@ impl ConfirmationKind {
 
 /// Exact login-session payload frozen while its confirmation is visible.
 ///
-/// The observed session is retained for honest confirmation copy; native
-/// dispatch consumes only its provider-issued id, action and request id.
+/// The observed row, including its complete identity, is retained for honest
+/// confirmation copy and is submitted unchanged after confirmation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionControlConfirmation {
     pub request_id: ControlRequestId,
@@ -83,9 +83,10 @@ impl PendingConfirmation {
             Self::ServiceControl(target) => Some(PlatformEffect::ServiceControl(target)),
             Self::StartupControl(request) => Some(PlatformEffect::StartupControl(request)),
             Self::SessionControl(pending) => {
+                let identity = pending.session.identity()?;
                 Some(PlatformEffect::SessionControl(SessionControlTarget {
                     request_id: pending.request_id,
-                    session_id: pending.session.id.clone(),
+                    identity,
                     action: pending.action,
                 }))
             }

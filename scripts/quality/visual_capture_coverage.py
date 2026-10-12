@@ -146,6 +146,7 @@ def iced_capture_router_tokens(root: Path) -> set[str]:
         (
             "apply_capture_target",
             "apply_capture_surface_and_process",
+            "apply_capture_user_and_process_targets",
             "apply_capture_hardware_and_perf",
         ),
     )

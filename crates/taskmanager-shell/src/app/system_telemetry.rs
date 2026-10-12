@@ -1,8 +1,8 @@
 //! Shared mapping of the application-owned system telemetry acceptance policy.
 
 use taskmanager_application::{
-    CorrelatedSystemTelemetryOutcome, DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection,
-    ProjectedSystemTelemetry, ProjectionAcceptance,
+    CorrelatedSystemTelemetryOutcome, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
+    DeviceLifecycleProjection, ProjectedSystemTelemetry, ProjectionAcceptance,
 };
 
 use super::{FrameCommit, SystemSnapshot};
@@ -74,9 +74,9 @@ pub(super) fn apply_system_outcome_lifecycle(
     projection: &mut DeviceLifecycleProjection,
     diagnostics: &mut DeviceLifecycleDiagnosticHistory,
     correlated: &CorrelatedSystemTelemetryOutcome,
-) {
+) -> Option<DeviceLifecyclePartition> {
     use taskmanager_application::apply_system_outcome_lifecycle;
-    apply_system_outcome_lifecycle(projection, diagnostics, correlated);
+    apply_system_outcome_lifecycle(projection, diagnostics, correlated)
 }
 
 #[cfg(test)]

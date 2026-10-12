@@ -51,12 +51,23 @@ pub fn capture_english_text(text: SystemHealthText) -> String {
         SystemHealthText::SmartKind(SmartSelfTestKind::Extended) => "Extended",
         SystemHealthText::SmartKind(SmartSelfTestKind::Conveyance) => "Conveyance",
         SystemHealthText::SmartFailure(SmartSelfTestFailure::InvalidDevice) => "Invalid device",
+        SystemHealthText::SmartFailure(SmartSelfTestFailure::SupportUnknown) => "Support unknown",
+        SystemHealthText::SmartFailure(SmartSelfTestFailure::Unsupported) => "Unsupported",
         SystemHealthText::SmartFailure(SmartSelfTestFailure::MissingTool) => "Tool missing",
         SystemHealthText::SmartFailure(SmartSelfTestFailure::RequiresEscalation) => {
             "Authorization required"
         }
         SystemHealthText::SmartFailure(SmartSelfTestFailure::PermissionDenied) => {
             "Permission denied"
+        }
+        SystemHealthText::SmartFailure(SmartSelfTestFailure::AuthorizationUnavailable) => {
+            "Authorization unavailable"
+        }
+        SystemHealthText::SmartFailure(SmartSelfTestFailure::HelperUnavailable) => {
+            "Helper unavailable"
+        }
+        SystemHealthText::SmartFailure(SmartSelfTestFailure::HelperProtocolViolation) => {
+            "Invalid helper response"
         }
         SystemHealthText::SmartFailure(
             SmartSelfTestFailure::ProviderUnavailable | SmartSelfTestFailure::TimedOut,

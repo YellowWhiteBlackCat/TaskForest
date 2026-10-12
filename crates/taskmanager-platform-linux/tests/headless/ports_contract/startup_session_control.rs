@@ -126,7 +126,14 @@ fn startup_and_session_controls_are_non_blocking_and_correlated() {
                 submitted_at_ms: 1,
                 payload: SessionControlRequest {
                     request_id: session_id,
-                    session_id: "7".into(),
+                    identity: SessionIdentity::new(
+                        SessionId::new("7"),
+                        SessionIncarnation::LinuxLogind {
+                            boot_id: "01234567-89ab-cdef-0123-456789abcdef".into(),
+                            created_monotonic_usec: 7,
+                        },
+                    )
+                    .expect("session identity fixture"),
                     action: SessionControlAction::Lock,
                 },
             })

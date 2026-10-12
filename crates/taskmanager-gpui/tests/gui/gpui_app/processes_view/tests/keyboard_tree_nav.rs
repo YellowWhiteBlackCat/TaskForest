@@ -182,6 +182,57 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     });
 }
 
+/// Space runs the actual Apps row's existing tree toggle action and keeps the
+/// selected ProcessRowId stable while the selected subtree disappears and
+/// returns from the projection.
+#[gpui::test]
+async fn space_toggles_the_selected_tree_row_without_changing_its_identity(
+    cx: &mut TestAppContext,
+) {
+    set_language(Language::En);
+    let (win, view) = wrapped_root(cx);
+    seed_three_level_tree(cx, &view, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+
+    click_row(&mut vcx, 1);
+    let selected = Some(row_id(100));
+    assert_eq!(
+        view.read_with(cx, |v, _| v.selected_process_row()),
+        selected,
+        "the root row is selected before Space activation"
+    );
+
+    press(cx, win, "space");
+    assert_eq!(
+        view.read_with(cx, |v, _| v.selected_process_row()),
+        selected,
+        "collapsing with Space preserves the selected ProcessRowId"
+    );
+    view.update(cx, |v, _cx| {
+        let (rows, _, _) = v.processes_projection();
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.process_identity.map(ProcessLiveKey::pid))
+                .collect::<Vec<_>>(),
+            [None, Some(100)],
+            "Space collapses only the selected row's nested processes"
+        );
+        assert!(rows[1].collapsed, "the selected row is the collapsed node");
+    });
+
+    press(cx, win, "space");
+    assert_eq!(
+        view.read_with(cx, |v, _| v.selected_process_row()),
+        selected,
+        "re-expanding with Space preserves the same selected ProcessRowId"
+    );
+    view.update(cx, |v, _cx| {
+        let (rows, _, _) = v.processes_projection();
+        assert_eq!(rows.len(), 4, "Space restores the original nested rows");
+        assert_eq!(rows[3].process_identity.map(ProcessLiveKey::pid), Some(102));
+    });
+}
+
 /// The structural action resolves the LIVE selection, not the focused row:
 /// after End moves the selection to the leaf while row focus stays behind,
 /// Left must step the column cursor (leaf semantics) instead of collapsing

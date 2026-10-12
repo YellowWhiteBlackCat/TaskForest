@@ -58,7 +58,6 @@ use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
     ProcessAffinityReady, ProjectedProcessInsights, RequestAttemptId,
 };
-use taskmanager_core::core::alerts::Alert;
 use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
 use taskmanager_core::core::process::ProcessBatchIntent;
 use taskmanager_core::core::process_telemetry::ContainerRollup;
@@ -108,7 +107,6 @@ pub enum ProjectionSeedFact {
     SessionsSource(Option<Vec<SourceStatus>>),
     ProcessAffinity(Option<ProcessAffinityReady>),
     ProcessInsights(Box<Option<ProjectedProcessInsights>>),
-    ActiveAlerts(Vec<Alert>),
     AdvanceRevision(ProjectionSeedDomain),
     AdvanceRefresh,
 }
@@ -164,6 +162,12 @@ pub enum DirectTrackSeedFact {
     /// owner used by the live direct track. This exists only for headless
     /// renderer tests and never exposes a mutable projection reference.
     Processes(Vec<ProcessItem>),
+    /// Install a deterministic login-session projection for direct-track
+    /// headless and capture scenes.
+    Sessions(Option<Vec<SessionItem>>),
+    /// Install the paired session-source status used by direct-track
+    /// headless and capture scenes.
+    SessionsSource(Option<Vec<SourceStatus>>),
 }
 
 pub fn seed_direct_track_fact(app: &mut crate::DirectTrackState, fact: DirectTrackSeedFact) {
@@ -350,6 +354,12 @@ pub fn demo_app() -> ShellApp {
 pub fn demo_direct_track() -> DirectTrackState {
     let demo = demo_app();
     let mut track = DirectTrackState::from_fixture_projection(demo.projection().clone());
+    track.report_notice(
+        FeedbackSource::Demo,
+        FeedbackSeverity::Info,
+        FeedbackLifecycle::UntilReplaced,
+        t("status.demo_snapshot"),
+    );
     // The direct track owns its own request sessions (the projection copy does
     // not carry them), so seed the same synthetic readout through the shared
     // helper — one source of values for every frontend track.
@@ -679,6 +689,7 @@ fn snapshot() -> SystemSnapshot {
         }],
         gpu: vec![{
             let mut gpu = GpuMetrics::new("gpu:demo:xe", "Intel Graphics (xe)");
+            gpu.device_state = DeviceState::healthy(1_785_292_800_000);
             gpu.driver = Some("xe".into());
             gpu.vbios_version = Some("101.0.0.0".into());
             gpu.graphics_api = Some(GpuGraphicsApi {

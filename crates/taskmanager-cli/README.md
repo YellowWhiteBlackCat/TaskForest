@@ -13,30 +13,24 @@ own binary name and capability handlers. This crate owns:
   escalation modes drive the ADR-023 polkit/pkexec helpers on demand);
 - the help text and the honest `unsupported` reporting for capabilities a
   product does not carry;
-- tracing initialization on the GUI path only (the JSON snapshot mode owns
-  stdout exclusively);
+- tracing initialization on the GUI path only;
 - the one-shot snapshot collector (`collect_json_snapshot_from_client`,
   including the per-process GPU fdinfo bulk scan in
   [`cli_process_gpu`]).
 
 ## Boundary
 
-Shape differences enter as plain values in
-[`run::FrontendHandlers`] — a required `run_gui` handler plus optional
-`snapshot_text` (TUI product) and `capture_window` (Windows GPUI product).
-There is no `cfg`, no feature, and no frontend identity anywhere in this
-crate; a fifth frontend is a new product crate plus one handler struct.
-
+Shape differences enter as plain values in `run::FrontendHandlers`; the handler
+set, the no-cfg/no-frontend-identity rule and the fifth-frontend path are
+specified in [`docs/MODES_AND_HANDLERS.md`](docs/MODES_AND_HANDLERS.md).
 Dependencies stop at the composition edge: core, application, app-host,
-assets, escalation. No toolkit, no OS adapter, no frontend crate.
+assets, escalation — no toolkit, no OS adapter, no frontend crate.
 
 ## Contract and verification
 
-The JSON snapshot honesty contract (unavailable domains serialize as typed
-null/discriminators, never a fabricated `0`) is proven end-to-end by
-`tests/logic/main_tests.rs` against the real native runtime, and the parser/
-renderer contracts by the `cli_*_tests` units mounted through `#[path]`.
-Run: `cargo nextest run -p taskmanager-cli -j 4`.
+The JSON snapshot honesty contract, the `FrontendHandlers` composition rule
+and the verification route are specified in
+[`docs/MODES_AND_HANDLERS.md`](docs/MODES_AND_HANDLERS.md).
 
 ## Module map
 
@@ -49,3 +43,10 @@ src/cli_msr.rs                             --msr escalation mode
 src/cli_package_power.rs                   --package-power escalation mode
 src/cli_process_gpu.rs                     per-process GPU fdinfo bulk scan
 ```
+
+## Docs
+
+- [`docs/MODES_AND_HANDLERS.md`](docs/MODES_AND_HANDLERS.md) — the UI-neutral mode list,
+  `FrontendHandlers` shape and the JSON honesty verification.
+- [ADR-051](../../adr/051-four-frontend-products-zero-ui-features.md) — four frontend
+  products with zero `ui-*` features.

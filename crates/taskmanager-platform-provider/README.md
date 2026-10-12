@@ -12,9 +12,9 @@ perform I/O, own worker threads or render a result.
 
 ## Contract and verification
 
-Each registered capability has one provider, one route and one bounded lane.
-Keep request/outcome types exhaustive and verify catalog completeness,
-registration bijection and platform adapter conformance.
+Registration discipline (one provider, one route, one bounded lane per
+capability) and verification are specified in
+[`docs/SPI_DISCIPLINE.md`](docs/SPI_DISCIPLINE.md).
 
 ## Module map
 
@@ -25,3 +25,10 @@ src/environment.rs  integration.rs
 ```
 
 Platform adapters implement these traits; semantics never change per platform.
+
+## Docs
+
+- [`docs/SPI_DISCIPLINE.md`](docs/SPI_DISCIPLINE.md) — per-domain module ownership and
+  registration rules.
+- [ADR-007](../../adr/007-capability-facets-and-provider-registries.md) — capability facets
+  and provider registries.

@@ -12,18 +12,12 @@ impl IcedApp {
                 Some((Message::Tick, ()))
             })
         });
-        let keyboard = iced::keyboard::listen().map(|event| match event {
-            iced::keyboard::Event::KeyPressed { key, modifiers, .. } => {
-                Message::Key(map_key(&key, modifiers))
-            }
-            iced::keyboard::Event::ModifiersChanged(modifiers) => {
-                Message::ModifiersChanged(modifiers)
-            }
-            _ => Message::Tick,
-        });
+        let keyboard = iced::keyboard::listen().map(message_for_keyboard_event);
         let mut subscriptions = vec![tick, keyboard];
         subscriptions
             .push(iced::window::resize_events().map(|(_, size)| Message::WindowResized(size)));
+        subscriptions
+            .push(iced::window::events().filter_map(|(_, event)| message_for_window_event(event)));
         subscriptions.push(iced::window::close_requests().map(|_| Message::WindowCloseRequested));
         // The per-frame pump runs only while something actually animates: the
         // capture first-frame marker, an unfinished modal entrance, or the
@@ -45,3 +39,21 @@ impl IcedApp {
         iced::Subscription::batch(subscriptions)
     }
 }
+
+pub(crate) fn message_for_window_event(event: iced::window::Event) -> Option<Message> {
+    matches!(event, iced::window::Event::Unfocused).then_some(Message::WindowUnfocused)
+}
+
+fn message_for_keyboard_event(event: iced::keyboard::Event) -> Message {
+    match event {
+        iced::keyboard::Event::KeyPressed { key, modifiers, .. } => {
+            Message::Key(map_key(&key, modifiers))
+        }
+        iced::keyboard::Event::ModifiersChanged(modifiers) => Message::ModifiersChanged(modifiers),
+        _ => Message::Tick,
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/gui/overlay_interaction_tests.rs"]
+mod overlay_interaction_tests;

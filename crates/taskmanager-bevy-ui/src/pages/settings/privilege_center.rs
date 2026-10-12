@@ -6,7 +6,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::system::{NonSend, Query, ResMut};
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -80,7 +80,7 @@ fn privilege_row_scene(row: PrivilegeRow, palette: &UiPalette) -> impl Scene + u
         })
         .collect();
     bsn! {
-        Node { width: percent(100), min_height: px(palette.control_height_px),
+        Node { width: percent(100), min_height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row, align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()), padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())) }
         BackgroundColor({ palette.content_bg })

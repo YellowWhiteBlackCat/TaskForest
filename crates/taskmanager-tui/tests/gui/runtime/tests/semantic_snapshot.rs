@@ -15,7 +15,7 @@ use super::super::*;
 fn dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table() {
     let mut app = crate::demo_app();
     let expected = app.shell.row_anchor_at(0).expect("canonical first process");
-    crate::demo::apply_capture_scene_override(&mut app, "process-selection");
+    crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "process-selection");
     assert_eq!(app.shell.page(), AppPage::Applications);
     assert_eq!(app.shell.selected_row_anchor(), Some(expected));
     assert!(app.process_properties().is_none());
@@ -26,19 +26,22 @@ use std::collections::HashSet;
 
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     SystemSnapshot,
 };
+use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 
+use crate::process_view::ProcessRow;
 use crate::{ProcessDetailsSection, ProcessPropertiesTarget};
 use taskmanager_application::{InteractionEvent, PendingConfirmation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
-use taskmanager_ui_contract::{SemanticNode, SemanticSnapshot};
+use taskmanager_ui_contract::{ProcessAggregateSemantics, SemanticNode, SemanticSnapshot};
 
 /// The publication bound the GPUI/Iced frontends also apply.
 const EXPECTED_MAX_PUBLISHED_ROWS: usize = 64;
@@ -71,6 +74,73 @@ fn process_with(pid: u32, name: &str, cpu: Option<f32>, memory_bytes: Option<u64
     };
     item.apply_scalar_observations(observations);
     item
+}
+
+fn process_with_aggregate_observations(
+    pid: u32,
+    name: &str,
+    cpu: ScalarObservation<f32>,
+    memory: ScalarObservation<u64>,
+) -> ProcessItem {
+    let mut item = ProcessItemFixtureBuilder::new()
+        .pid(pid)
+        .name(name.to_owned())
+        .build();
+    let mut observations = *item.scalar_observations();
+    observations.cpu_percentage = cpu;
+    observations.memory_bytes = memory;
+    item.apply_scalar_observations(observations);
+    item
+}
+
+fn group_semantics_for(processes: Vec<ProcessItem>) -> ProcessAggregateSemantics {
+    let mut app = app_on_applications_page();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::Processes(Some(processes)),
+    );
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::AdvanceRefresh);
+
+    let projected_aggregate = app
+        .process_rows_snapshot()
+        .into_iter()
+        .find_map(|row| match row {
+            ProcessRow::Group { aggregate, .. } => Some(aggregate),
+            ProcessRow::TreeNode { .. } => None,
+        })
+        .expect("the non-empty process list must project a group row");
+    let snapshot = app
+        .semantic_snapshot()
+        .expect("the semantic projection must accept the group row");
+    let semantic_aggregate = snapshot
+        .nodes()
+        .find_map(|node| node.process_aggregate_semantics())
+        .cloned()
+        .expect("the semantic group row must carry its aggregate facts");
+
+    assert_eq!(semantic_aggregate.cpu(), projected_aggregate.cpu());
+    assert_eq!(semantic_aggregate.memory(), projected_aggregate.memory());
+    semantic_aggregate
+}
+
+fn assert_aggregate_metric<T: std::fmt::Debug + PartialEq>(
+    metric: &AggregateMetric<T>,
+    availability: ScalarAvailability,
+    current_value: Option<&T>,
+    last_known_value: Option<&T>,
+    coverage: (usize, usize, usize),
+) {
+    assert_eq!(metric.availability(), availability);
+    assert_eq!(metric.current_value(), current_value);
+    assert_eq!(metric.last_known_value(), last_known_value);
+    assert_eq!(
+        (
+            metric.member_count(),
+            metric.current_member_count(),
+            metric.known_member_count(),
+        ),
+        coverage
+    );
 }
 
 fn row_nodes(snapshot: &SemanticSnapshot) -> Vec<&SemanticNode> {
@@ -236,6 +306,122 @@ fn semantic_process_rows_follow_the_visual_tree_visibility() {
             .nodes()
             .any(|node| node.role() == SemanticRole::TreeItem),
         "a collapsed visual group remains available to assistive technology"
+    );
+}
+
+#[test]
+fn group_semantics_preserve_canonical_cpu_memory_availability_and_coverage() {
+    let zero_semantics = group_semantics_for(vec![process_with_aggregate_observations(
+        301,
+        "zero",
+        ScalarObservation::available(0.0, 10),
+        ScalarObservation::available(0, 10),
+    )]);
+    assert_aggregate_metric(
+        zero_semantics.cpu(),
+        ScalarAvailability::Available,
+        Some(&0.0_f32),
+        Some(&0.0_f32),
+        (1, 1, 1),
+    );
+    assert_aggregate_metric(
+        zero_semantics.memory(),
+        ScalarAvailability::Available,
+        Some(&0_u64),
+        Some(&0_u64),
+        (1, 1, 1),
+    );
+
+    let partial_semantics = group_semantics_for(vec![
+        process_with_aggregate_observations(
+            302,
+            "partial-current",
+            ScalarObservation::available(12.5, 10),
+            ScalarObservation::available(1_024, 10),
+        ),
+        process_with_aggregate_observations(
+            303,
+            "partial-denied",
+            ScalarObservation::unavailable(FailureKind::PermissionDenied),
+            ScalarObservation::unavailable(FailureKind::PermissionDenied),
+        ),
+    ]);
+    assert_aggregate_metric(
+        partial_semantics.cpu(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied),
+        Some(&12.5_f32),
+        Some(&12.5_f32),
+        (2, 1, 1),
+    );
+    assert_aggregate_metric(
+        partial_semantics.memory(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied),
+        Some(&1_024_u64),
+        Some(&1_024_u64),
+        (2, 1, 1),
+    );
+
+    let stale_semantics = group_semantics_for(vec![process_with_aggregate_observations(
+        304,
+        "stale",
+        ScalarObservation::stale(48.7, 9, FailureKind::PermissionDenied),
+        ScalarObservation::stale(2_048, 9, FailureKind::PermissionDenied),
+    )]);
+    assert_aggregate_metric(
+        stale_semantics.cpu(),
+        ScalarAvailability::Stale(FailureKind::PermissionDenied),
+        None,
+        Some(&48.7_f32),
+        (1, 0, 1),
+    );
+    assert_aggregate_metric(
+        stale_semantics.memory(),
+        ScalarAvailability::Stale(FailureKind::PermissionDenied),
+        None,
+        Some(&2_048_u64),
+        (1, 0, 1),
+    );
+
+    let unknown_semantics = group_semantics_for(vec![process_with_aggregate_observations(
+        305,
+        "unknown",
+        ScalarObservation::default(),
+        ScalarObservation::default(),
+    )]);
+    assert_aggregate_metric(
+        unknown_semantics.cpu(),
+        ScalarAvailability::Unknown,
+        None,
+        None,
+        (1, 0, 0),
+    );
+    assert_aggregate_metric(
+        unknown_semantics.memory(),
+        ScalarAvailability::Unknown,
+        None,
+        None,
+        (1, 0, 0),
+    );
+
+    let unavailable_semantics = group_semantics_for(vec![process_with_aggregate_observations(
+        306,
+        "unavailable",
+        ScalarObservation::unavailable(FailureKind::PermissionDenied),
+        ScalarObservation::unavailable(FailureKind::PermissionDenied),
+    )]);
+    assert_aggregate_metric(
+        unavailable_semantics.cpu(),
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied),
+        None,
+        None,
+        (1, 0, 0),
+    );
+    assert_aggregate_metric(
+        unavailable_semantics.memory(),
+        ScalarAvailability::Unavailable(FailureKind::PermissionDenied),
+        None,
+        None,
+        (1, 0, 0),
     );
 }
 

@@ -51,6 +51,14 @@ impl IcedApp {
                 InputScope::Help | InputScope::Suggestions => self.shell.dismiss_overlay(),
                 InputScope::ContextMenu(_) => self.close_context_menus(),
                 InputScope::Search => self.shell.close_search(),
+                InputScope::Content
+                    if self.shell.page() == AppPage::Services
+                        && !self.services_query().is_empty() =>
+                {
+                    // SearchInput's cross-frontend contract uses Escape to
+                    // clear the active filter and return to the restored list.
+                    self.process_presentation.services_query.clear();
+                }
                 InputScope::Content => {}
             }
             if !matches!(scope, InputScope::Content) {

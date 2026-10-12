@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::core::device_state::DeviceState;
+use crate::core::smart::{SmartProviderFailureKind, SmartSelfTestCapabilities};
 use crate::core::storage::{StorageConnection, StorageIdentityStability};
 use crate::core::{DeviceGeneration, FailureKind, ProviderId};
 
@@ -266,7 +267,10 @@ pub struct DiskMetrics {
     /// Runtime protocol provider selected for this SMART observation.
     pub smart_provider: Option<ProviderId>,
     /// Precise protocol/provider failure when availability is not healthy.
-    pub smart_failure: Option<crate::core::smart::SmartProviderFailureKind>,
+    pub smart_failure: Option<SmartProviderFailureKind>,
+    /// Device-reported self-test support, separate from SMART health
+    /// availability and current-process authorization.
+    pub smart_self_test_capabilities: SmartSelfTestCapabilities,
     /// Device-health temperature in °C. `None` means no trustworthy
     /// observation was available from the selected native provider.
     pub smart_temperature_c: Option<f32>,

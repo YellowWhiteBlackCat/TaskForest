@@ -8,9 +8,8 @@ use taskmanager_application::{
     SessionInventoryRequest, StartupControlOutcome, StartupControlRequest, StartupEvent,
     StartupEvidenceEvent, StartupEvidenceRequest, StartupInventoryRequest,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
-use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, ProviderFailure};
 
 use crate::{
@@ -26,8 +25,9 @@ type StartupControlExecutor =
     dyn FnMut(&StartupEntry, bool) -> Result<(), ProviderFailure> + Send + 'static;
 type SessionInventoryExecutor =
     dyn FnMut() -> Result<PartialSourceSnapshot<SessionItem>, ProviderFailure> + Send + 'static;
-type SessionControlExecutor =
-    dyn FnMut(&SessionId, SessionControlAction) -> Result<(), ProviderFailure> + Send + 'static;
+type SessionControlExecutor = dyn FnMut(&SessionIdentity, SessionControlAction) -> Result<(), ProviderFailure>
+    + Send
+    + 'static;
 
 /// Native environment operations adapted into OS-independent closures.
 pub struct EnvironmentExecutors {
@@ -52,7 +52,9 @@ impl EnvironmentExecutors {
         E: FnMut(u64) -> Result<StartupBootEvidenceSnapshot, ProviderFailure> + Send + 'static,
         C: FnMut(&StartupEntry, bool) -> Result<(), ProviderFailure> + Send + 'static,
         S: FnMut() -> Result<PartialSourceSnapshot<SessionItem>, ProviderFailure> + Send + 'static,
-        M: FnMut(&SessionId, SessionControlAction) -> Result<(), ProviderFailure> + Send + 'static,
+        M: FnMut(&SessionIdentity, SessionControlAction) -> Result<(), ProviderFailure>
+            + Send
+            + 'static,
     {
         Self {
             startup_inventory: Box::new(startup_inventory),
@@ -211,12 +213,12 @@ pub fn spawn_environment_lanes(
         session_control,
         events,
         move |_, request: SessionControlRequest| {
-            let result = execute_session_control(&request.session_id, request.action);
+            let result = execute_session_control(&request.identity, request.action);
             let provider_result = result;
             (
                 PlatformEvent::Sessions(SessionEvent::Control(SessionControlOutcome {
                     request_id: request.request_id,
-                    session_id: request.session_id,
+                    identity: request.identity,
                     action: request.action,
                     result: result.map_err(ProviderFailure::kind),
                 })),

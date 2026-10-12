@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::ScalarAvailability;
+use crate::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 
 #[test]
 fn typed_disk_zero_is_current_while_failure_is_not() {
@@ -100,6 +101,33 @@ fn pre_migration_wire_payload_decodes_as_unknown_compatibility_truth() {
     assert_eq!(decoded.current_capacity_bytes(), Some(100));
     assert_eq!(decoded.current_available_bytes(), Some(25));
     assert_eq!(decoded.current_read_bytes_per_sec(), Some(4));
+    assert_eq!(
+        decoded.smart_self_test_capabilities,
+        SmartSelfTestCapabilities::default(),
+        "old payloads have no device support evidence"
+    );
+}
+
+#[test]
+fn disk_self_test_capability_roundtrips_with_device_generation() {
+    let mut disk = DiskMetrics::new("nvme0n1");
+    disk.device_id = "disk:wwid:fixture".into();
+    disk.device_generation = DeviceGeneration::new(7);
+    disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+        short: SmartSelfTestSupport::Supported,
+        extended: SmartSelfTestSupport::Unsupported,
+        conveyance: SmartSelfTestSupport::Unknown,
+    };
+
+    let wire = serde_json::to_value(&disk).expect("serialize disk self-test capabilities");
+    let decoded: DiskMetrics = serde_json::from_value(wire).expect("decode capability projection");
+
+    assert_eq!(decoded.device_id, "disk:wwid:fixture");
+    assert_eq!(decoded.device_generation, DeviceGeneration::new(7));
+    assert_eq!(
+        decoded.smart_self_test_capabilities,
+        disk.smart_self_test_capabilities
+    );
 }
 
 #[test]

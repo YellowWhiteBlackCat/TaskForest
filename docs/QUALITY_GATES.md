@@ -68,7 +68,7 @@ Windows 开发机使用 `scripts/windows/local-gates.sh`，通过 Git Bash 调�
 Windows telemetry、测试和 helper 不使用 PowerShell 或其他命令解释器采集系统事实。
 
 Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick 与 CI 中检查：
-生产源码不得接收整世界或通过 App、hook、排队闭包绕过显式参数；范围见 [Bevy 章程](BEVY_UI_FRONTEND.md)。
+生产源码不得接收整世界或通过 App、hook、排队闭包绕过显式参数；范围见 [Bevy 章程](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)。
 
 ## 3. 公开仓库门禁
 
@@ -195,6 +195,6 @@ nextest/capture，主 checkout 永不被验证流程改动。这样兄弟线在�
 
 **视觉对等目检**（渲染行收口门禁）：绿色门禁只证明行为与来源，不证明观感。渲染行每轮
 收口必须把本行捕获与参考行捕获逐页并排目检，差距逐条记账——修掉的进提交，暂缓的写入
-该行公开文档的"已知边界/存异"清单（如 `docs/BEVY_UI_FRONTEND.md`）。装饰禁止用文本
+该行公开文档的"已知边界/存异"清单（如 `crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md`）。装饰禁止用文本
 字形冒充（嵌入字体无该字形即渲染 tofu）；图标走语义注册表（`IconId` → 共享 SVG → 各
 toolkit 材质化），行门禁须含机械反字形扫描与有界行单行契约测试。

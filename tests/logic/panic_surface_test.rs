@@ -99,12 +99,6 @@ const ALLOWED_PANIC_SITES: &[(&str, &str, &str)] = &[
          a build-tree error and fail-fast is the correct startup behavior",
     ),
     (
-        "crates/taskmanager-application/src/command.rs",
-        "command spec table covers every CommandId",
-        "COMMAND_SPECS is authoring-time data compiled into the binary; the spec-coverage test \
-         pins table/enum parity, so a miss is a build-tree error and fail-fast is correct",
-    ),
-    (
         "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
         "col_ix < columns.len()",
         "TableDelegate contract: col_ix is bounded by columns_count, which reads the same \

@@ -2,7 +2,12 @@ use super::*;
 use crate::fixture::health::seed_shell_health;
 use crate::fixture::{ProjectionSeedFact, demo_app, seed_projection_fact};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::smart::{
+    SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport,
+};
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
+use taskmanager_core::core::target::StorageDeviceKey;
 
 #[test]
 fn normal_health_fold_preserves_integrity_sensor_failure_and_report_identity() {
@@ -60,5 +65,32 @@ fn normal_health_fold_preserves_integrity_sensor_failure_and_report_identity() {
         groups.len(),
         3,
         "a previous incarnation's self-test report cannot be displayed for a replacement"
+    );
+}
+
+#[test]
+fn smart_self_test_failures_are_shared_health_rows_for_every_frontend() {
+    set_language(Language::En);
+    let mut disk = DiskMetrics::new("nvme0n1");
+    disk.device_id = "disk:wwid:fixture".into();
+    disk.device_generation = DeviceGeneration::new(4);
+    let report = SmartSelfTestObservation {
+        device_id: DeviceId::new("disk:wwid:fixture"),
+        device_generation: DeviceGeneration::new(4),
+        device_key: StorageDeviceKey::new("nvme0n1"),
+        display_name: "Fixture NVMe".into(),
+        report: SmartSelfTestReport {
+            phase: SmartSelfTestPhase::Failed,
+            failure: Some(SmartSelfTestFailure::AuthorizationUnavailable),
+            ..Default::default()
+        },
+    };
+
+    let groups = storage_groups(None, &[disk], &[report]);
+    assert!(
+        groups
+            .iter()
+            .flat_map(|group| &group.rows)
+            .any(|row| { row.label == "Errors" && row.value == "Authorization did not complete" })
     );
 }

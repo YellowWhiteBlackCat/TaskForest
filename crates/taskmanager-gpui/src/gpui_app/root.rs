@@ -70,8 +70,9 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::session::SessionIdentity;
 use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
@@ -234,6 +235,10 @@ pub struct RootView {
     /// action before element key listeners run, so root capture alone is not
     /// sufficient; the RootView owns this subscription for its full lifetime.
     pub(crate) input_modality_key_subscription: Option<Subscription>,
+    /// Clear keyboard modality when this window loses OS activation.
+    pub(crate) input_modality_activation_subscription: Option<Subscription>,
+    /// Clear keyboard modality when the focused target leaves the rendered tree.
+    pub(crate) input_modality_focus_lost_subscription: Option<Subscription>,
     /// Per-window switch states for the Settings dialog toggles (hc +
     /// device visibility), created lazily on first Settings render. The
     /// `Entity<SwitchState>` owns the `on` flag and focus handle, so two
@@ -357,7 +362,7 @@ pub struct RootView {
     /// Provider-issued identity of the currently-selected startup entry.
     pub selected_startup: Option<StartupEntryId>,
     /// Provider-issued identity of the currently-selected session row.
-    pub selected_session: Option<SessionId>,
+    pub selected_session: Option<SessionIdentity>,
     pub desktop_appearance: DesktopAppearance,
     /// Native-adapter source truth used to choose the initial visual skin.
     pub desktop_appearance_sources: Vec<SourceStatus>,
@@ -746,6 +751,8 @@ impl RootView {
             font_availability: detect_font_availability(cx),
             input_modality: InputModality::default(),
             input_modality_key_subscription: None,
+            input_modality_activation_subscription: None,
+            input_modality_focus_lost_subscription: None,
             settings_switches: HashMap::new(),
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
@@ -826,7 +833,7 @@ impl RootView {
             startup_search: None,
             startup_table: None,
             users_table: None,
-            processes_state: ProcessesState::default(),
+            processes_state: ProcessesState::with_resize_focus_handles(cx),
             sidebar_visible: true,
             sidebar_edit_mode: false,
             sidebar_resize_anchor_x: None,

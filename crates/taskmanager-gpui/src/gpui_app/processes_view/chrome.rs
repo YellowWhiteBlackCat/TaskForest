@@ -2,7 +2,7 @@
 //! header, action bar, and the column-visibility picker.
 
 use gpui::{
-    App, Div, Entity, InteractiveElement, ParentElement, Pixels, Stateful,
+    App, Div, Entity, FocusHandle, InteractiveElement, ParentElement, Pixels, Stateful,
     StatefulInteractiveElement, Styled, div, px,
 };
 use std::collections::{HashMap, HashSet};
@@ -79,6 +79,8 @@ pub struct SortHeaderRowProps<'a> {
     /// body stay pixel-aligned after a drag (the pre-resize defaults match the
     /// old hardcoded `.w(px(X))` exactly — byte-identical layout until drag).
     col_widths: &'a HashMap<SortCol, Pixels>,
+    /// Stable per-window focus identities for the column resize controls.
+    resize_focus_handles: &'a HashMap<SortCol, FocusHandle>,
     /// Width of the identity column in the intrinsic process-table surface.
     name_width: Pixels,
     /// Presentation-only column cursor. It is drawn as a small accent rail so
@@ -97,9 +99,13 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
         ui_size,
         hidden_cols,
         col_widths,
+        resize_focus_handles,
         name_width,
         column_cursor,
     } = props;
+    let mount_resize_handle_with_focus = |cell, col, start_width, theme, entity| {
+        mount_resize_handle(cell, col, start_width, theme, entity, resize_focus_handles)
+    };
     // Arrow-key header navigation operates on the rendered column projection
     // (canonical order minus hidden). Computed once per frame and shared by
     // every cell's key handler via a cloned `Rc` (the listeners are 'static).
@@ -142,7 +148,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
         .child(name_header);
     if !hidden_cols.contains(&SortCol::User) {
         let w = header_col_width(col_widths, SortCol::User);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("common.user"),
@@ -162,7 +168,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Pid) {
         let w = header_col_width(col_widths, SortCol::Pid);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.pid"),
@@ -182,7 +188,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Threads) {
         let w = header_col_width(col_widths, SortCol::Threads);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("common.threads"),
@@ -202,7 +208,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::StartTime) {
         let w = header_col_width(col_widths, SortCol::StartTime);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.start"),
@@ -222,7 +228,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::State) {
         let w = header_col_width(col_widths, SortCol::State);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("common.status"),
@@ -253,7 +259,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     if !hidden_cols.contains(&SortCol::Cpu) {
         let w = header_col_width(col_widths, SortCol::Cpu);
         h = h
-            .child(mount_resize_handle(
+            .child(mount_resize_handle_with_focus(
                 sort_cell(SortCellProps {
                     theme,
                     label: i18n::t("common.cpu"),
@@ -288,7 +294,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Memory) {
         let w = header_col_width(col_widths, SortCol::Memory);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("common.memory"),
@@ -308,7 +314,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Swap) {
         let w = header_col_width(col_widths, SortCol::Swap);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.swap"),
@@ -328,7 +334,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Pss) {
         let w = header_col_width(col_widths, SortCol::Pss);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.pss"),
@@ -348,7 +354,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::DiskRead) {
         let w = header_col_width(col_widths, SortCol::DiskRead);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.disk_read"),
@@ -368,7 +374,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::DiskWrite) {
         let w = header_col_width(col_widths, SortCol::DiskWrite);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.disk_write"),
@@ -388,7 +394,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Network) {
         let w = header_col_width(col_widths, SortCol::Network);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.network"),
@@ -408,7 +414,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::CpuTime) {
         let w = header_col_width(col_widths, SortCol::CpuTime);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.cpu_time"),
@@ -428,7 +434,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Fds) {
         let w = header_col_width(col_widths, SortCol::Fds);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.fds"),
@@ -448,7 +454,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
     }
     if !hidden_cols.contains(&SortCol::Nice) {
         let w = header_col_width(col_widths, SortCol::Nice);
-        h = h.child(mount_resize_handle(
+        h = h.child(mount_resize_handle_with_focus(
             sort_cell(SortCellProps {
                 theme,
                 label: i18n::t("proc.nice"),

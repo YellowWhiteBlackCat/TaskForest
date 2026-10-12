@@ -204,16 +204,16 @@ pub(crate) fn format_engine_usage(
 }
 
 pub(crate) fn facet_unavailable_text(reason: &ProcessInsightUnavailable) -> String {
-    match reason {
+    let key = match reason {
         ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied)
         | ProcessInsightUnavailable::Provider(FailureKind::RequiresEscalation) => {
-            "permission denied"
+            "proc_insights.permission_denied"
         }
         ProcessInsightUnavailable::Provider(FailureKind::Unsupported)
         | ProcessInsightUnavailable::Submission(SubmissionErrorKind::UnsupportedCapability) => {
-            "unsupported"
+            "proc_insights.unsupported_provider"
         }
-        _ => "unavailable",
-    }
-    .to_string()
+        _ => "proc_insights.unavailable",
+    };
+    t(key).to_string()
 }

@@ -17,6 +17,7 @@ use taskmanager_application::system_timeline::{
     TimelineMetric, TimelineSelection, TimelineStatistic,
 };
 use taskmanager_assets::embedded_fonts;
+use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::fixture::dashboard_history::seed_system_dashboard_history;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
@@ -245,10 +246,13 @@ fn dashboard_marker_waits_for_live_readiness_and_prepares_exact_target() {
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000);
     assert!(evidence.scenario_ready());
     assert_eq!(panel, Some(DashboardPanel::Events));
-    let events = evidence
+    let seeds = evidence
         .take_event_history_fixture()
         .expect("event-center capture supplies shared history");
-    assert_eq!(dashboard.events.unread_count(&events), 2);
+    let mut shell = DirectTrackState::default();
+    shell.replace_alert_event_history(seeds);
+    let events = shell.projection().alert_center.event_history();
+    assert_eq!(dashboard.events.unread_count(events), 2);
 }
 
 #[test]

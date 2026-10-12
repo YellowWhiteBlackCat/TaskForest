@@ -30,16 +30,18 @@ impl RootView {
 
     /// Apply a candidate width to a processes-table column through the same clamp
     /// the shared table crate's `resize_cols` enforces (`[10px, 1200px]`;
-    /// sub-floor and <1px jitter dropped). Used by the per-handle `on_drag_move`
-    /// handler; the <1px jitter rule prevents redundant writes (and re-renders)
-    /// for sub-pixel mouse noise. `Name` is non-resizable — the handle is never
-    /// mounted on it, so this is never called with `Name` from the drag path;
+    /// sub-floor and <1px jitter dropped). Used by the per-handle pointer and
+    /// keyboard-step handlers; the <1px jitter rule prevents redundant writes
+    /// (and re-renders) for sub-pixel mouse noise. `Name` is non-resizable —
+    /// the handle is never mounted on it, so this is never called with `Name`;
     /// calling it directly is a no-op for `Name` (the clamp still runs but the
     /// result is never applied to a fixed `.w(..)` — Name keeps its `flex_grow`
     /// sizing).
     pub fn resize_proc_col(&mut self, col: SortCol, size: Pixels, cx: &mut Context<Self>) {
         let old = self.proc_col_width(col);
-        if let Some(clamped) = clamp_proc_col_width(size, old) {
+        if let Some(clamped) = clamp_proc_col_width(size, old)
+            && clamped != old
+        {
             self.processes_state.col_widths.insert(col, clamped);
             cx.notify();
         }

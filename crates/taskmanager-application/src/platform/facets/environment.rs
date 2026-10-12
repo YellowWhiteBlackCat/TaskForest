@@ -8,8 +8,8 @@ use std::sync::Arc;
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestTracking,
-    RequestTrackingError,
+    CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestScope,
+    RequestTracking, RequestTrackingError,
 };
 
 use crate::{
@@ -92,7 +92,12 @@ impl CapabilityRequest for SessionControlRequest {
     const CAPABILITY: CapabilityId = CapabilityId::SESSION_CONTROL;
 
     fn runtime_tracking(&self) -> Result<RequestTracking, RequestTrackingError> {
-        super::opaque_target_tracking(self.session_id.as_str())
+        if !self.identity.is_valid() {
+            return Err(RequestTrackingError::MissingTargetIdentity);
+        }
+        let identity = serde_json::to_string(&self.identity)
+            .map_err(|_| RequestTrackingError::MissingTargetIdentity)?;
+        RequestScope::try_from_str(&identity).map(RequestTracking::Target)
     }
 }
 

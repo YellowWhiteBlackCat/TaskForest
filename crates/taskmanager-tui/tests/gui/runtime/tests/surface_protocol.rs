@@ -12,13 +12,23 @@
 //! (`binding_matrix.rs`, `overlays.rs`).
 
 use super::super::*;
-use ratatui::crossterm::event::KeyModifiers;
+use std::time::Duration;
+
+use ratatui::crossterm::event::{Event, KeyModifiers};
+use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::alerts::{
+    AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
+};
 use taskmanager_core::core::services::{ServiceLogLevelFilter, ServiceLogTimeFilter};
 
+use super::super::seam::seam_support::apply_terminal_event;
 use crate::command_palette::{
     TUI_SURFACE_PROTOCOL, TuiSurfaceAction, TuiSurfaceArm, TuiSurfaceScope,
 };
+use crate::health_review::HealthReviewMode;
+
+const TEST_FRAME: Rect = Rect::new(0, 0, 80, 24);
 
 fn press_char(app: &mut crate::TuiApp, character: char) -> Option<PlatformEffect> {
     handle_key(
@@ -51,9 +61,7 @@ fn overlay_open(app: &crate::TuiApp, action: TuiSurfaceAction) -> bool {
         TuiSurfaceAction::ToggleAbout => app.about_open(),
         TuiSurfaceAction::ToggleHealth => app.health_open(),
         TuiSurfaceAction::ToggleContainers => app.containers_open(),
-        TuiSurfaceAction::EditAlertRule(_)
-        | TuiSurfaceAction::SelectHealthReview(_)
-        | TuiSurfaceAction::HealthSelfTest(_)
+        TuiSurfaceAction::SelectHealthReview(_)
         | TuiSurfaceAction::OpenRepository
         | TuiSurfaceAction::OpenSystemInformation
         | TuiSurfaceAction::CopyInformation
@@ -121,12 +129,13 @@ fn app_with_service_log() -> crate::TuiApp {
 /// A new protocol chord must extend this pin deliberately.
 #[test]
 fn protocol_declares_exactly_the_historical_chords_per_scope() {
-    let expected: [(TuiSurfaceScope, &[char]); 5] = [
+    let expected: [(TuiSurfaceScope, &[char]); 6] = [
         (TuiSurfaceScope::About, &['a', 'c', 'i', 'r']),
         (TuiSurfaceScope::SystemInformation, &['c']),
         (TuiSurfaceScope::Settings, &['c', 'h', 'i', 'p']),
         (TuiSurfaceScope::StatusOverlay, &['c', 'h', 'i']),
         (TuiSurfaceScope::ServiceLogPanel, &['f', 'l', 'p', 't']),
+        (TuiSurfaceScope::HealthReview, &['e', 'p', 'q', 's', 'w']),
     ];
     for (scope, chords) in expected {
         let declared: Vec<char> = arms_in(scope).iter().map(|arm| arm.chord).collect();
@@ -178,17 +187,66 @@ fn protocol_chords_overlapping_the_registry_are_declared_deliberately() {
     overlap.dedup();
     // About owns `a` to close; it masks the global affinity action.
     // Health owns `e` to review events; the modal masks the bare-page command.
+    // Health review's `e` and `w` are declared in the protocol and the local
+    // registry, but the owning modal prevents them from double-routing.
     // `t` (TUI-013) is deliberate: the service-log panel consumes its `t`
     // (cycle time filter) first while it owns input, and the registry's `t`
     // arm is scoped to the Performance·Disk page — the two can never route
     // one press twice (same masking invariant the `c h i p` overlaps ride).
     assert_eq!(
         overlap,
-        [
-            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'm', 'o', 'p', 'r', 't', 'w', 'x', 'y'
-        ],
+        ['a', 'c', 'e', 'f', 'h', 'i', 'p', 'r', 't', 'w'],
         "every chord declared in both layers must be listed here on purpose"
     );
+}
+
+#[test]
+fn health_rule_authoring_and_transfer_gestures_are_unavailable() {
+    let mut app = app_with_overlay(TuiSurfaceAction::ToggleHealth);
+    let initial = app.projection().alert_center.managed_rules().to_vec();
+    let transfer_json = export_alert_rules_json(&[AlertRuleTransferEntry::new(
+        AlertRule::new(
+            "unsupported-custom-rule",
+            AlertMetric::CpuUsagePercent,
+            AlertSeverity::Warning,
+            72.0,
+            Duration::from_secs(9),
+            4.0,
+        ),
+        true,
+    )])
+    .expect("valid transfer fixture");
+
+    for chord in [
+        'n', 'd', 'm', 'u', 'o', 'f', 'b', 'g', 'l', 'v', 't', 'y', 'a', 'r',
+    ] {
+        assert!(press_char(&mut app, chord).is_none());
+    }
+    assert_eq!(app.projection().alert_center.managed_rules(), initial);
+    assert!(press_char(&mut app, 'r').is_none());
+    let _ = apply_terminal_event(&mut app, Event::Paste(transfer_json), TEST_FRAME);
+    assert_eq!(app.projection().alert_center.managed_rules(), initial);
+
+    assert!(press_char(&mut app, ' ').is_none());
+    assert_eq!(
+        app.projection().alert_center.managed_rules()[0].enabled,
+        !initial[0].enabled,
+        "the selected-rule toggle remains available"
+    );
+}
+
+#[test]
+fn health_review_smart_shortcuts_are_unavailable() {
+    let mut app = app_with_overlay(TuiSurfaceAction::ToggleHealth);
+    assert!(press_char(&mut app, 'w').is_none());
+    assert_eq!(app.health_review.mode, HealthReviewMode::Storage);
+
+    for chord in ['z', 'x'] {
+        assert!(press_char(&mut app, chord).is_none());
+        assert!(app.health_open(), "Health review keeps input ownership");
+        assert_eq!(app.health_review.mode, HealthReviewMode::Storage);
+        assert!(app.shell.pending_smart_self_test().is_none());
+    }
 }
 
 // ── settings-form protocol arms ───────────────────────────────────────────
@@ -390,11 +448,10 @@ fn about_protocol_routes_repository_and_independent_information_without_global_c
 
 #[test]
 fn event_review_native_navigation_reaches_every_complete_transition_in_compact_view() {
-    use crate::health_review::HealthReviewMode;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use taskmanager_core::core::alerts::AlertEventKind;
     let mut app = crate::demo_app();
-    crate::demo::apply_capture_scene_override(&mut app, "event-center");
+    crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "event-center");
     let events = app.projection().alert_center.event_history().to_vec();
     assert!(
         events
@@ -409,12 +466,15 @@ fn event_review_native_navigation_reaches_every_complete_transition_in_compact_v
     for (index, event) in events.iter().enumerate() {
         assert_eq!(app.health_review.selected, index);
         let text = event_review_frame(&app, 54, 16);
-        assert!(text.contains(&format!("Event {}", event.id)), "{text}");
+        assert!(
+            text.contains(&format!("Event {}", event.id.get())),
+            "{text}"
+        );
         assert!(
             text.contains(&format!("{:.1}", event.alert.value)),
             "{text}"
         );
-        assert!(text.contains(&event.alert.rule_id), "{text}");
+        assert!(text.contains(event.alert.rule_id.as_str()), "{text}");
         assert!(text.contains("h / Esc Close"), "{text}");
         let effect = handle_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
         assert!(effect.is_none());

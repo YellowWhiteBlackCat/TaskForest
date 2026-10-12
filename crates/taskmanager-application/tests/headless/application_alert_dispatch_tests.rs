@@ -1,10 +1,10 @@
 use super::*;
-use taskmanager_core::alerts::{AlertMetric, AlertSeverity};
+use taskmanager_core::alerts::{AlertInstanceId, AlertMetric, AlertSeverity, AlertTargetIdentity};
 
 fn alert(instance: &str, severity: AlertSeverity) -> Alert {
     Alert {
-        instance_id: instance.to_owned(),
-        rule_id: "r".to_owned(),
+        instance_id: AlertInstanceId::new(instance.into(), AlertTargetIdentity::System),
+        rule_id: instance.into(),
         target: "t".to_owned(),
         metric: AlertMetric::CpuUsagePercent,
         severity,
@@ -96,7 +96,10 @@ fn request_carries_typed_severity_and_instance() {
     let request = dispatcher
         .dispatch_new(&[], &[alert("cpu-0", AlertSeverity::Critical)], 1_000)
         .remove(0);
-    assert_eq!(request.instance_id, "cpu-0");
+    assert_eq!(
+        request.instance_id,
+        AlertInstanceId::new("cpu-0".into(), AlertTargetIdentity::System)
+    );
     assert_eq!(request.severity, AlertSeverity::Critical);
     assert_eq!(request.target, "t");
 }

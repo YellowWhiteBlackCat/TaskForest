@@ -157,7 +157,7 @@ fn menu_row_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let label = item.label.clone();
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let fill = menu_row_background(highlighted, palette);
     // Dim ink for the honest unavailable state; body ink otherwise. The role

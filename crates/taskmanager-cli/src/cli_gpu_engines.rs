@@ -100,6 +100,7 @@ fn feature_key() -> &'static str {
         EscalationFeature::MemorySmbios => "memory_smbios",
         EscalationFeature::PackagePowerRapl => "package_power_rapl",
         EscalationFeature::CpuMsr => "cpu_msr",
+        EscalationFeature::StorageSelfTest => "storage_self_test",
     }
 }
 

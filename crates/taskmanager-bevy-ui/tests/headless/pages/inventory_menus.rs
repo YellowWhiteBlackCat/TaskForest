@@ -11,7 +11,7 @@ use bevy::input::keyboard::KeyCode;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage, PlatformEffect};
 use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_core::core::startup::{
     StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
@@ -59,6 +59,10 @@ fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
 fn session_item(id: &str, user: &str) -> SessionItem {
     SessionItem {
         id: id.to_owned().into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: id.parse().unwrap_or(1),
+        }),
         uid: 1000,
         user: user.to_owned(),
         seat: Some("seat0".to_owned()),
@@ -168,12 +172,11 @@ fn the_sessions_menu_freezes_disconnect_and_lock_verbs() {
         .first()
         .map(|session| (**session).clone())
         .expect("fixture session");
+    let identity = session.identity().expect("fixture identity");
     let mut modal = SessionMenuModal::default();
 
     assert!(crate::pages::sessions::menu::open_for(
-        &mut modal,
-        &shell,
-        &session.id,
+        &mut modal, &shell, &identity,
     ));
     let spec = modal
         .session
@@ -320,7 +323,7 @@ fn session_bidirectional_control_channel_flow() {
     let Some(PlatformEffect::SessionControl(target)) = effect else {
         panic!("expected SessionControl platform effect, got {effect:?}");
     };
-    assert_eq!(target.session_id.as_str(), "c2");
+    assert_eq!(target.identity.session_id.as_str(), "c2");
     assert_eq!(target.action, SessionControlAction::Disconnect);
 
     // 2. Inbound: platform returns completed outcome
@@ -333,7 +336,7 @@ fn session_bidirectional_control_channel_flow() {
             observed_at_ms: 10,
             event: SessionEvent::Control(SessionControlOutcome {
                 request_id: target.request_id,
-                session_id: target.session_id.clone(),
+                identity: target.identity.clone(),
                 action: target.action,
                 result: Ok(()),
             }),
@@ -345,7 +348,7 @@ fn session_bidirectional_control_channel_flow() {
     assert!(
         shell
             .feedback_text()
-            .contains("Session c2 Disconnect completed"),
+            .contains("Session c2 Disconnect request accepted"),
         "feedback notice updated: {}",
         shell.feedback_text()
     );

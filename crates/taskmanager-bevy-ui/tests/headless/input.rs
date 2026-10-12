@@ -24,6 +24,7 @@ use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -88,7 +89,7 @@ fn input_app(shell: ShellApp) -> App {
     crate::pages::process_tree::register(&mut app);
     crate::pages::history::scene::register(&mut app);
     app.insert_resource(WindowPalette {
-        inner: crate::palette::ui_palette(&Theme::dark()),
+        inner: crate::palette::ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<HistoryProjectionResource>();
     app.insert_non_send(FrontendTrack {
@@ -144,16 +145,27 @@ fn delete_arms_the_shared_gate_and_y_confirms_to_the_end_task_effect() {
         shell.confirmation_kind()
     );
     assert!(
-        app.world().resource::<PendingEffects>().0.is_empty(),
-        "arming emits no platform effect"
+        !app.world()
+            .resource::<PendingEffects>()
+            .0
+            .iter()
+            .any(|effect| matches!(effect, PlatformEffect::EndTask(_))),
+        "arming does not enqueue the gated end-task effect"
     );
 
     press(&mut app, KeyCode::KeyY, Some("y"));
     app.update();
     let effects = &app.world().resource::<PendingEffects>().0;
     assert!(
-        matches!(effects.as_slice(), [PlatformEffect::EndTask(_)]),
-        "the gate confirm must re-emit the frozen end-task effect, got {effects:?}"
+        effects
+            .iter()
+            .filter_map(|effect| match effect {
+                PlatformEffect::EndTask(_) => Some(()),
+                _ => None,
+            })
+            .count()
+            == 1,
+        "the gate confirm must re-emit exactly one frozen end-task effect, got {effects:?}"
     );
     let shell = &app.world().non_send::<FrontendTrack>().shell;
     assert!(
@@ -271,8 +283,12 @@ fn escape_dismisses_the_gate_without_an_effect() {
     let shell = &app.world().non_send::<FrontendTrack>().shell;
     assert!(shell.pending_confirmation().is_none(), "Escape dismisses");
     assert!(
-        app.world().resource::<PendingEffects>().0.is_empty(),
-        "dismissal never submits"
+        !app.world()
+            .resource::<PendingEffects>()
+            .0
+            .iter()
+            .any(|effect| matches!(effect, PlatformEffect::EndTask(_))),
+        "Escape does not enqueue the gated end-task effect"
     );
 }
 
@@ -342,10 +358,19 @@ fn the_process_action_chord_opens_the_applications_menu_and_commits_through_the_
         "a committed menu closes"
     );
     let effects = app.world().resource::<PendingEffects>().0.clone();
-    let Some(PlatformEffect::ExecuteBatch(intent)) = effects.first() else {
-        panic!("the menu's verb crosses the effect bridge, got {effects:?}");
-    };
-    assert_eq!(intent.action, ProcessBatchAction::Suspend);
+    let batch_effects = effects
+        .iter()
+        .filter_map(|effect| match effect {
+            PlatformEffect::ExecuteBatch(intent) => Some(intent),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        batch_effects.len(),
+        1,
+        "the process action menu submits exactly one batch effect, got {effects:?}"
+    );
+    assert_eq!(batch_effects[0].action, ProcessBatchAction::Suspend);
 }
 
 #[test]
@@ -627,6 +652,15 @@ fn press_ctrl(app: &mut App, key: KeyCode, text: Option<&str>) {
         .reset_all();
 }
 
+fn press_platform(app: &mut App, key: KeyCode, text: Option<&str>) {
+    press(app, KeyCode::SuperLeft, None);
+    press(app, key, text);
+    app.update();
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .reset_all();
+}
+
 fn query_of(app: &App) -> String {
     app.world().non_send::<FrontendTrack>().shell.query.clone()
 }
@@ -774,10 +808,9 @@ fn text_input_clear_actions() {
 
 #[test]
 fn search_editor_binds_no_clipboard_chords() {
-    // TextSelection is declared `Unsupported`: no system-clipboard read/write
-    // is wired, so the search editor binds no clipboard chords. Ctrl+C/X/V
-    // must leave the shell-owned query untouched rather than edit a private
-    // buffer that never reaches the OS clipboard.
+    // Search owns only its query editing chords. The separate read-only
+    // selection surface provides copy; search must not treat Ctrl+C/X/V as
+    // edits to its shell-owned query.
     let mut app = input_app(shell_with_selection());
     app.update();
     app.update();
@@ -797,6 +830,34 @@ fn search_editor_binds_no_clipboard_chords() {
         query_of(&app),
         "clip",
         "Ctrl+V must not paste from any private buffer"
+    );
+}
+
+#[test]
+fn platform_c_copies_the_active_text_selection() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+    app.world_mut()
+        .resource_mut::<crate::text_selection::TextSelectionState>()
+        .select_range(
+            Entity::from_raw_u32(501).unwrap(),
+            "cpu-fact".into(),
+            "AMD Ryzen 9".into(),
+            4..9,
+        );
+
+    press_platform(&mut app, KeyCode::KeyC, None);
+
+    app.world_mut().resource_scope(|world, mut clipboard: bevy::ecs::change_detection::Mut<crate::text_selection::ClipboardPort>| {
+        let mut track = world.non_send_mut::<FrontendTrack>();
+        crate::text_selection::flush_clipboard(&mut clipboard, &mut track.shell, |_text| Ok(()));
+    });
+    assert_eq!(
+        app.world()
+            .resource::<crate::text_selection::ClipboardPort>()
+            .get_text(),
+        Some("Ryzen")
     );
 }
 
@@ -898,7 +959,14 @@ fn diagnostic_review_owns_keys_until_dismissed() {
             .diagnostic()
             .is_none()
     );
-    assert!(app.world().resource::<PendingEffects>().0.is_empty());
+    assert!(
+        app.world()
+            .resource::<PendingEffects>()
+            .0
+            .iter()
+            .all(|effect| matches!(effect, PlatformEffect::ProcessInsights(_))),
+        "diagnostic review emits no platform effect; independent ProcessInsights may remain queued"
+    );
 }
 
 #[test]
@@ -929,8 +997,12 @@ fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
         press(&mut app, KeyCode::KeyR, Some("R"));
         app.update();
         assert!(
-            app.world().resource::<PendingEffects>().0.is_empty(),
-            "modified R cannot submit Run or an unready Restart"
+            !app.world()
+                .resource::<PendingEffects>()
+                .0
+                .iter()
+                .any(|effect| matches!(effect, PlatformEffect::SetupScript(_))),
+            "modified R cannot enqueue Run or an unready Restart"
         );
     }
     app.world_mut()
@@ -939,8 +1011,19 @@ fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
     press(&mut app, KeyCode::KeyR, Some("r"));
     app.update();
     let effects = &app.world().resource::<PendingEffects>().0;
-    assert_eq!(effects.len(), 1);
     assert!(
-        matches!(&effects[0], PlatformEffect::SetupScript(request) if request.action == SetupScriptAction::Run)
+        effects
+            .iter()
+            .filter_map(|effect| match effect {
+                PlatformEffect::SetupScript(request)
+                    if request.action == SetupScriptAction::Run =>
+                {
+                    Some(())
+                }
+                _ => None,
+            })
+            .count()
+            == 1,
+        "plain R queues exactly one setup Run effect, got {effects:?}"
     );
 }

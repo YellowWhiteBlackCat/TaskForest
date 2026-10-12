@@ -18,13 +18,14 @@ use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
 use taskmanager_core::core::process::ProcessItem;
-use taskmanager_shell::process_semantic_key;
+use taskmanager_shell::{ProcessRowAggregate, process_semantic_key};
 use taskmanager_ui_contract::{
-    GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowInput, SemanticSnapshot,
-    SemanticSnapshotBuilder,
+    GraphSummary, ModalInput, ProcessAggregateSemantics, ProcessGroupRowInput, ProcessRowInput,
+    SemanticSnapshot, SemanticSnapshotBuilder,
 };
 
 use crate::TuiApp;
+use crate::process_view::ProcessRow;
 use taskmanager_application::{PendingConfirmation, SurfaceKind};
 
 /// Maximum number of process rows published to the semantic tree (GPUI/Iced
@@ -46,6 +47,7 @@ enum TuiSemanticRow {
         name: String,
         expanded: bool,
         selected: bool,
+        aggregate: Box<ProcessAggregateSemantics>,
     },
 }
 
@@ -110,13 +112,20 @@ impl TuiApp {
                     name,
                     expanded,
                     selected,
+                    aggregate,
                 } => {
-                    builder = builder.process_group_row(ProcessGroupRowInput {
-                        id,
-                        name,
-                        expanded,
-                        selected,
-                    });
+                    builder = builder.process_group_row_with_semantics(
+                        ProcessGroupRowInput {
+                            id,
+                            name,
+                            expanded,
+                            selected,
+                        },
+                        None,
+                        true,
+                        true,
+                        *aggregate,
+                    );
                 }
             }
         }
@@ -156,25 +165,24 @@ impl TuiApp {
                     visible.materialize_row(ids, index).map(|row| (index, row))
                 })
                 .map(|(index, row)| match row {
-                    crate::process_view::ProcessRow::Group {
+                    ProcessRow::Group {
                         name,
                         label,
                         count,
                         expanded,
+                        aggregate,
                         ..
                     } => TuiSemanticRow::Group {
                         id: name,
                         name: format!("{label} ({count})"),
                         expanded,
                         selected: index == self.selected,
+                        aggregate: Box::new(aggregate_semantics(&aggregate)),
                     },
-                    crate::process_view::ProcessRow::TreeNode { process, .. } => {
-                        TuiSemanticRow::Process {
-                            process: Box::new(process.clone()),
-                            selected: index == self.selected
-                                || self.shell.is_process_selected(process),
-                        }
-                    }
+                    ProcessRow::TreeNode { process, .. } => TuiSemanticRow::Process {
+                        process: Box::new(process.clone()),
+                        selected: index == self.selected || self.shell.is_process_selected(process),
+                    },
                 })
                 .collect()
         })
@@ -389,6 +397,20 @@ impl TuiApp {
             | crate::TuiInputScope::DetailsPanel
             | crate::TuiInputScope::Content => None,
         }
+    }
+}
+
+fn aggregate_semantics(aggregate: &ProcessRowAggregate) -> ProcessAggregateSemantics {
+    ProcessAggregateSemantics {
+        cpu: aggregate.cpu().clone(),
+        memory: aggregate.memory().clone(),
+        memory_pss: aggregate.memory_pss().clone(),
+        swap: aggregate.swap().clone(),
+        disk_read: aggregate.disk_read().clone(),
+        disk_write: aggregate.disk_write().clone(),
+        cpu_time: aggregate.cpu_time().clone(),
+        threads: aggregate.threads().clone(),
+        fds: aggregate.fds().clone(),
     }
 }
 

@@ -351,7 +351,7 @@ fn lookup_helpers_fail_closed() {
     );
 }
 
-/// The duration spelling pins the shell contract on both sides of a day.
+/// The duration output uses the shared localized compact template.
 #[test]
 fn duration_pins_the_shell_contract() {
     let rows = |secs: u64| {
@@ -365,9 +365,26 @@ fn duration_pins_the_shell_contract() {
     fn cpu_time(rows: &[ProcessDetailsRowVm]) -> Option<&str> {
         detail_value(rows, ProcessDetailsField::CpuTime).as_str()
     }
-    assert_eq!(cpu_time(&rows(90)), Some("00h 01m"));
-    assert_eq!(cpu_time(&rows(3_690)), Some("01h 01m"));
-    assert_eq!(cpu_time(&rows(86_400 + 3_600)), Some("1d 01h 00m"));
+    for (language, under_day, one_hour, over_day) in [
+        (
+            crate::i18n::Language::En,
+            "00h 01m",
+            "01h 01m",
+            "1d 01h 00m",
+        ),
+        (
+            crate::i18n::Language::Zh,
+            "00小时 01分钟",
+            "01小时 01分钟",
+            "1天 01小时 00分钟",
+        ),
+    ] {
+        crate::i18n::set_language(language);
+        assert_eq!(cpu_time(&rows(90)), Some(under_day));
+        assert_eq!(cpu_time(&rows(3_690)), Some(one_hour));
+        assert_eq!(cpu_time(&rows(86_400 + 3_600)), Some(over_day));
+    }
+    crate::i18n::set_language(crate::i18n::Language::En);
 }
 
 /// The start-time datetime pins the authoritative `date -u` outputs

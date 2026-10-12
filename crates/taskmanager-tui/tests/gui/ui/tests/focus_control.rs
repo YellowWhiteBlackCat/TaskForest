@@ -28,7 +28,7 @@ fn focused_control(app: &TuiApp) -> (TuiFocusTarget, TuiFocusControl) {
 fn keyboard_capture_uses_the_normal_tab_owner_and_a_visible_details_viewport() {
     use crate::ui::frame_plan::TuiPageLayout;
     let mut app = demo_app();
-    crate::demo::apply_capture_scene_override(&mut app, "keyboard-focus");
+    crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "keyboard-focus");
     for (width, height) in [(120, 36), (54, 16)] {
         let plan = TuiFramePlan::build(&app, Rect::new(0, 0, width, height));
         assert_eq!(plan.focus.target, TuiFocusTarget::ApplicationsDetails);
@@ -125,6 +125,7 @@ fn batch_menu_plan_tracks_the_highlighted_item() {
 fn session_and_startup_menu_plans_track_the_highlighted_item() {
     let mut app = demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
+    super::acceptance_support::install_demo_session_incarnations(&mut app);
     assert!(app.open_session_menu(), "the demo exposes a session menu");
     app.session_menu_move(1);
     assert_eq!(

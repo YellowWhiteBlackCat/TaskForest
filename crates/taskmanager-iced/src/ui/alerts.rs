@@ -4,7 +4,7 @@
 //! the frontend-local managed list ([`crate::app::alerts`]), current values
 //! come from the typed snapshot accessors (an unobserved metric renders the
 //! localized `None`, never a fabricated `0`), and the active-alert banner
-//! reads the shell-owned `alert_active` evaluation mirror — the view never
+//! reads the shell-owned active-alert collection — the view never
 //! evaluates alerts itself. Vocabulary reuses the shared `alerts.*` /
 //! `alert.*` catalog keys the TUI suggestions overlay and the GPUI rule
 //! manager already consume.

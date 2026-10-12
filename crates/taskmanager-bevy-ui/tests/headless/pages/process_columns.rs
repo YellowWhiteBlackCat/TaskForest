@@ -20,6 +20,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::{
     ProcessColumnToggleId, ProcessColumnsModalChanged, ProcessColumnsModalOverlay,
@@ -71,7 +72,7 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
     app.init_resource::<Assets<Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
 
     let target_proc = test_proc(4242, "cargo");
@@ -127,6 +128,36 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
     // Verify PID is now in ProcessHiddenColumns
     let hidden = app.world().resource::<ProcessHiddenColumns>();
     assert!(hidden.0.contains("PID"), "PID is in hidden columns");
+
+    let user_toggle = {
+        let world = app.world_mut();
+        world
+            .query_filtered::<(Entity, &ProcessColumnToggleId), ()>()
+            .iter(world)
+            .find(|(_, id)| id.0 == "User")
+            .map(|(entity, _)| entity)
+            .expect("User column toggle button exists")
+    };
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: user_toggle,
+        });
+    app.update();
+    let hidden = app.world().resource::<ProcessHiddenColumns>();
+    assert!(hidden.0.contains("PID"));
+    assert!(hidden.0.contains("User"));
+    let overlay_count = {
+        let world = app.world_mut();
+        world
+            .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
+            .iter(world)
+            .count()
+    };
+    assert_eq!(
+        overlay_count, 1,
+        "the multi-select column menu stays open after each toggle"
+    );
 
     // 3. Reset columns
     app.world_mut()

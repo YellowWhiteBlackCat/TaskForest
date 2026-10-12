@@ -9,7 +9,13 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::DeviceId;
+use crate::core::device_state::DevicePresence;
 use crate::core::metrics::{DiskMetrics, SystemSnapshot};
+use crate::core::storage::StorageIdentityStability;
+
+mod identity;
+pub use identity::{AlertEventId, AlertInstanceId, AlertRuleId, AlertTargetIdentity};
 
 mod transfer;
 pub use transfer::{
@@ -125,7 +131,7 @@ impl AlertMetric {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlertRule {
     /// Stable identifier. Duplicate IDs are ignored by [`AlertEngine::new`].
-    pub id: String,
+    pub id: AlertRuleId,
     pub metric: AlertMetric,
     pub severity: AlertSeverity,
     pub threshold: f32,
@@ -147,7 +153,7 @@ impl AlertRule {
         hysteresis: f32,
     ) -> Self {
         Self {
-            id: id.into(),
+            id: AlertRuleId::new(id),
             metric,
             severity,
             threshold,
@@ -167,9 +173,9 @@ impl AlertRule {
 /// One currently-active rule instance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Alert {
-    /// De-duplication key (`<rule id>:<target>`).
-    pub instance_id: String,
-    pub rule_id: String,
+    /// Structured, collision-free active-instance identity.
+    pub instance_id: AlertInstanceId,
+    pub rule_id: AlertRuleId,
     pub target: String,
     pub metric: AlertMetric,
     pub severity: AlertSeverity,
@@ -195,7 +201,7 @@ pub enum AlertEventKind {
 /// cleared without retaining a second previous-active snapshot.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlertEvent {
-    pub id: u64,
+    pub id: AlertEventId,
     pub kind: AlertEventKind,
     pub alert: Alert,
     pub observed_at_ms: u64,
@@ -213,7 +219,7 @@ struct RuleState {
 
 #[derive(Debug, Clone)]
 struct Signal {
-    key_target: String,
+    target: AlertTargetIdentity,
     display_target: String,
     value: f32,
 }
@@ -222,7 +228,8 @@ struct Signal {
 #[derive(Debug, Clone, Default)]
 pub struct AlertEngine {
     rules: Vec<AlertRule>,
-    states: HashMap<String, RuleState>,
+    states: HashMap<AlertInstanceId, RuleState>,
+    trusted_disk_instances: HashSet<AlertInstanceId>,
 }
 
 impl AlertEngine {
@@ -233,7 +240,7 @@ impl AlertEngine {
         let rules = rules
             .into_iter()
             .filter(|rule| {
-                !rule.id.trim().is_empty()
+                !rule.id.as_str().trim().is_empty()
                     && rule.threshold.is_finite()
                     && rule.hysteresis.is_finite()
                     && ids.insert(rule.id.clone())
@@ -242,11 +249,20 @@ impl AlertEngine {
         Self {
             rules,
             states: HashMap::new(),
+            trusted_disk_instances: HashSet::new(),
         }
     }
 
     pub fn rules(&self) -> &[AlertRule] {
         &self.rules
+    }
+
+    /// Disk instance identities whose storage owner was trusted in the most
+    /// recent evaluation, including targets with a temporarily unavailable
+    /// SMART scalar. Delivery cooldowns use this to retire stale identities.
+    #[must_use]
+    pub fn trusted_disk_instances(&self) -> &HashSet<AlertInstanceId> {
+        &self.trusted_disk_instances
     }
 
     /// Evaluate one snapshot and return the complete, de-duplicated active list.
@@ -256,15 +272,18 @@ impl AlertEngine {
     pub fn evaluate(&mut self, snapshot: &SystemSnapshot) -> Vec<Alert> {
         let now_ms = snapshot.timestamp_ms;
         let mut active = Vec::new();
-        let mut seen_instances = HashSet::new();
-        let mut emitted_instances = HashSet::new();
+        let mut seen_instances: HashSet<AlertInstanceId> = HashSet::new();
+        let mut emitted_instances: HashSet<AlertInstanceId> = HashSet::new();
+        let mut trusted_disk_instances = HashSet::new();
 
         for rule in &self.rules {
-            for signal in signals(rule, snapshot)
+            let (signals, trusted) = signals(rule, snapshot);
+            trusted_disk_instances.extend(trusted);
+            for signal in signals
                 .into_iter()
                 .filter(|signal| signal.value.is_finite())
             {
-                let instance_id = format!("{}:{}", rule.id, signal.key_target);
+                let instance_id = AlertInstanceId::new(rule.id.clone(), signal.target);
                 seen_instances.insert(instance_id.clone());
                 let state = self.states.entry(instance_id.clone()).or_default();
                 let clear_threshold = rule.threshold - rule.hysteresis;
@@ -305,46 +324,54 @@ impl AlertEngine {
         // A removed disk or unavailable sensor must not leave a stale active or
         // pending instance behind. It starts a fresh duration if it reappears.
         self.states.retain(|key, _| seen_instances.contains(key));
+        self.trusted_disk_instances = trusted_disk_instances;
         active.sort_by(|a, b| a.instance_id.cmp(&b.instance_id));
         active
     }
 
     pub fn clear(&mut self) {
         self.states.clear();
+        self.trusted_disk_instances.clear();
     }
 }
 
-fn signals(rule: &AlertRule, snapshot: &SystemSnapshot) -> Vec<Signal> {
+fn signals(rule: &AlertRule, snapshot: &SystemSnapshot) -> (Vec<Signal>, Vec<AlertInstanceId>) {
     match rule.metric {
         AlertMetric::CpuUsagePercent => snapshot
             .cpu
             .current_global_usage_pct()
             .map(|value| {
-                vec![Signal {
-                    key_target: "system".into(),
-                    display_target: "CPU".into(),
-                    value,
-                }]
+                (
+                    vec![Signal {
+                        target: AlertTargetIdentity::System,
+                        display_target: "CPU".into(),
+                        value,
+                    }],
+                    Vec::new(),
+                )
             })
             .unwrap_or_default(),
         AlertMetric::MemoryUsagePercent => snapshot
             .memory
             .used_percentage_observed()
             .map(|value| {
-                vec![Signal {
-                    key_target: "system".into(),
-                    display_target: "Memory".into(),
-                    value,
-                }]
+                (
+                    vec![Signal {
+                        target: AlertTargetIdentity::System,
+                        display_target: "Memory".into(),
+                        value,
+                    }],
+                    Vec::new(),
+                )
             })
             .unwrap_or_default(),
         AlertMetric::DiskTemperatureC => {
-            disk_signals(rule, &snapshot.disks, |disk| disk.smart_temperature_c)
+            disk_signals(rule, snapshot, |disk| disk.smart_temperature_c)
         }
         AlertMetric::SmartPercentUsed => {
-            disk_signals(rule, &snapshot.disks, |disk| disk.smart_percent_used)
+            disk_signals(rule, snapshot, |disk| disk.smart_percent_used)
         }
-        AlertMetric::SmartCriticalWarning => disk_signals(rule, &snapshot.disks, |disk| {
+        AlertMetric::SmartCriticalWarning => disk_signals(rule, snapshot, |disk| {
             disk.smart_critical_warning
                 .map(|warning| if warning { 1.0 } else { 0.0 })
         }),
@@ -353,40 +380,69 @@ fn signals(rule: &AlertRule, snapshot: &SystemSnapshot) -> Vec<Signal> {
 
 fn disk_signals(
     rule: &AlertRule,
-    disks: &[DiskMetrics],
+    snapshot: &SystemSnapshot,
     value: impl Fn(&DiskMetrics) -> Option<f32>,
-) -> Vec<Signal> {
-    disks
-        .iter()
-        .enumerate()
-        .filter_map(|(index, disk)| {
-            let stable = if !disk.device_id.trim().is_empty() {
-                disk.device_id.trim()
-            } else if !disk.name.trim().is_empty() {
-                disk.name.trim()
-            } else {
-                return value(disk).map(|metric| Signal {
-                    key_target: format!("disk-{index}"),
-                    display_target: format!("Disk {}", index + 1),
-                    value: metric,
-                });
-            };
-            let matches_target = rule.target.as_ref().is_none_or(|target| {
-                target == stable || target == disk.name.trim() || target == disk.device_id.trim()
+) -> (Vec<Signal>, Vec<AlertInstanceId>) {
+    let mut device_counts = HashMap::<&str, usize>::new();
+    for disk in &snapshot.disks {
+        let id = disk.device_id.trim();
+        if !id.is_empty() {
+            *device_counts.entry(id).or_default() += 1;
+        }
+    }
+
+    let mut signals = Vec::new();
+    let mut trusted_instances = Vec::new();
+    for disk in &snapshot.disks {
+        let device_id_text = disk.device_id.trim();
+        if disk.identity_stability == StorageIdentityStability::Unknown
+            || device_id_text.is_empty()
+            || device_counts.get(device_id_text) != Some(&1)
+            || !disk.device_generation.is_valid()
+        {
+            continue;
+        }
+
+        let device_id = DeviceId::new(device_id_text);
+        let lifecycle_is_accepted = snapshot
+            .device_lifecycles
+            .get(device_id.as_str())
+            .is_some_and(|lifecycle| {
+                lifecycle.presence == DevicePresence::Present
+                    && lifecycle.generation == disk.device_generation
             });
-            matches_target.then(|| {
-                value(disk).map(|metric| Signal {
-                    key_target: stable.to_string(),
-                    display_target: if disk.name.trim().is_empty() {
-                        stable.to_string()
-                    } else {
-                        disk.name.clone()
-                    },
-                    value: metric,
-                })
-            })?
-        })
-        .collect()
+        if !lifecycle_is_accepted {
+            continue;
+        }
+
+        let target_identity = AlertTargetIdentity::Storage {
+            device_id: device_id.clone(),
+            generation: disk.device_generation,
+        };
+        let matches_target = rule
+            .target
+            .as_ref()
+            .is_none_or(|target| target == device_id.as_str() || target == disk.name.trim());
+        if !matches_target {
+            continue;
+        }
+        trusted_instances.push(AlertInstanceId::new(
+            rule.id.clone(),
+            target_identity.clone(),
+        ));
+        if let Some(metric) = value(disk) {
+            signals.push(Signal {
+                target: target_identity,
+                display_target: if disk.name.trim().is_empty() {
+                    device_id.to_string()
+                } else {
+                    disk.name.clone()
+                },
+                value: metric,
+            });
+        }
+    }
+    (signals, trusted_instances)
 }
 
 #[cfg(test)]

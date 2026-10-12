@@ -30,6 +30,8 @@ use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
 
 #[path = "process_render/grouped_render.rs"]
 mod grouped_render;
+#[path = "process_render/responsive_projection.rs"]
+mod responsive_projection;
 
 fn wait_for_config_outcome(app: &mut TuiApp) {
     let drain = app
@@ -574,7 +576,7 @@ fn empty_tables_render_honest_empty_states() {
 }
 
 #[test]
-fn applications_empty_state_answers_the_search_question() {
+fn applications_empty_state_panel_separates_unreported_from_query_mismatch() {
     let mut app = crate::demo_app();
     seed_projection_fact(
         &mut app.shell,
@@ -780,7 +782,7 @@ fn localized_body_string_changes_when_language_switches() {
 fn process_table_renders_the_full_column_projection() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
-    let text = frame_text(&app, 150, 36);
+    let text = frame_text(&app, 240, 36);
     // The widened header covers the advanced columns (GPUI column parity).
     // The labels come from the shell's SortCol single source (label()).
     for header in [

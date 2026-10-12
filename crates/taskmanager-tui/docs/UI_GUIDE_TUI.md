@@ -1,7 +1,7 @@
 # TUI (TaskForest-T) 前端架构与开发指南
 
 本文定义 `taskmanager-tui` 前端的字符网格模型、终端无头渲染与键盘优先交互纪律。
-跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
+跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](../../../docs/UI_COMPONENT_ARCHITECTURE.md)。
 
 ## 1. 核心思维：终端字符网格与状态快照驱动
 

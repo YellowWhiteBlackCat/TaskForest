@@ -8,27 +8,19 @@ Per-feature privilege-escalation seam with the unprivileged default policy.
 
 The crate owns capability requests, authorization state, exact installed-helper
 readiness and the fixed Linux polkit/pkexec crossings. It does not grant blanket
-privilege or execute provider I/O. The Windows UAC transport seam (ADR-035
-stage 2) owns the typed transport-fact vocabulary, the pure fact→outcome
-mapping, the install-fact readiness probe, and the pure launch layer (helper
-command-line builder + one-shot reply-channel naming); the runas call group
-lives in the audited `taskmanager-windows-api` boundary and the production
-driver in `taskmanager-platform-windows`, both feeding this mapping — the
-crossing is compile-verified for `x86_64-pc-windows-msvc` and the fixed helper
-is part of the Windows MSI beside the GPUI executable; native success/denial is
-not claimed until a Windows desktop receipt exists. macOS authorization is typed in the `authorization` module
-(transport facts, pure mappings, install probe; `aarch64-apple-darwin`
-cross-check passes for this crate); the Security-framework crossing itself
-stays unwired (`Unsupported`) until a signed privileged-helper ADR exists.
+privilege or execute provider I/O. The Windows UAC transport vocabulary
+(ADR-035) and the typed macOS authorization module live here; the per-platform
+transport facts (helper shipping, compile verification, receipt-before-claim)
+are specified in [`docs/PLATFORM_TRANSPORTS.md`](docs/PLATFORM_TRANSPORTS.md).
 
 ## Contract and verification
 
 Every feature is direct, requires escalation or unsupported. Prompt refusal,
 authorization-service failure, missing installation and helper protocol failure
-are distinct outcomes. Readiness requires the exact `pkexec + policy + executable
-helper` triple and never launches a prompt; the Windows readiness gate reads
-install facts only (missing install is `HelperUnavailable`, never a prompt).
-Verify fixture classification plus explicit on-box success/denial receipts.
+are distinct outcomes; readiness gates, the `HelperUnavailable` rule and the
+per-platform transport facts are specified in
+[`docs/PLATFORM_TRANSPORTS.md`](docs/PLATFORM_TRANSPORTS.md). Verify fixture
+classification plus explicit on-box success/denial receipts.
 
 ## Module map
 
@@ -36,8 +28,16 @@ Verify fixture classification plus explicit on-box success/denial receipts.
 src/authorization.rs       typed authorization vocabulary (starts UnprivilegedGate)
 src/polkit/gate.rs         PolkitGate: pkexec + policy + executable verification
 │                          (the only Linux authorization authority)
-├── polkit/{msr,rapl,smbios,process_control,net_launcher,setup}.rs
+├── polkit/{msr,rapl,smbios,process_control,net_launcher,smart_self_test,setup}.rs
 │                          per-capability helper clients
 └── polkit/bounded_runner.rs  polkit/json_reader.rs   bounded execution and envelopes
 src/uac.rs                 Windows UAC runas transport vocabulary (ADR-035)
 ```
+
+## Docs
+
+- [`docs/PLATFORM_TRANSPORTS.md`](docs/PLATFORM_TRANSPORTS.md) — Windows UAC, macOS
+  authorization and Linux polkit transport detail.
+- [`PERMISSION_MODEL`](../../docs/PERMISSION_MODEL.md) and
+  [ADR-023](../../adr/023-per-feature-privilege-escalation-framework.md) — permission model
+  and escalation framework.

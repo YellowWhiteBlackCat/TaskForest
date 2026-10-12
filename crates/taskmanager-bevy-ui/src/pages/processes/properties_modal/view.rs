@@ -5,7 +5,7 @@ use super::{
     ProcessPropertiesFacet, ProcessPropertiesFooter, ProcessPropertiesOverlay,
     ProcessPropertiesPanel, ProcessPropertiesScrollHint, ProcessPropertiesSection,
     ProcessPropertiesTab, ProcessPropertiesView, on_authorize, on_facet,
-    on_properties_dismiss_activated, on_refresh, on_tab,
+    on_properties_dismiss_activated, on_refresh,
 };
 use crate::palette::{UiPalette, space_4, space_8, space_12};
 use crate::widgets::chart::{CurveMeasurement, CurvePaintAccess, paint_curve_at_size};
@@ -18,10 +18,10 @@ use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap,
-    JustifyContent, Node, Overflow, PositionType, ScrollPosition, UiRect, percent, px,
+    JustifyContent, Node, Overflow, PositionType, ScrollPosition, UiRect, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Button, ScrollArea};
+use bevy::ui_widgets::{Button, ScrollArea, Tab, TabList};
 use std::sync::Arc;
 use taskmanager_application::{
     ProcessInsightFacet, i18n::t, process_details_vm::ProcessDetailsField,
@@ -59,12 +59,12 @@ pub(super) fn properties_modal_scene(
     let title = format!("{} · {}", t("dialog.properties"), view.target.name);
     let subtitle = format!("PID: {}", view.target.pid);
     let tabs: Vec<Box<dyn Scene>> = ProcessPropertiesSection::ALL.into_iter().map(|section| {
-        Box::new(bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())) }
-            Button ProcessPropertiesTab(section) ControlVisual(ControlTone::Surface, {section == view.section}) on(on_tab)
+        Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
+            Tab ProcessPropertiesTab(section) ControlVisual(ControlTone::Surface, {section == view.section})
             Children [ Text({section.label().to_owned()}) TextRole(Role::Body) ] }) as Box<dyn Scene>
     }).collect();
     let facets: Vec<Box<dyn Scene>> = if view.section == ProcessPropertiesSection::Insights {
-        ProcessInsightFacet::ALL.into_iter().map(|facet| Box::new(bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())) }
+        ProcessInsightFacet::ALL.into_iter().map(|facet| Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Button ProcessPropertiesFacet(facet) ControlVisual(ControlTone::Surface, {facet == view.facet}) on(on_facet)
             Children [ Text({process_insight_facet_label(facet).to_owned()}) TextRole(Role::Caption) ] }) as Box<dyn Scene>).collect()
     } else {
@@ -132,17 +132,17 @@ pub(super) fn properties_modal_scene(
     }
     let mut actions: Vec<Box<dyn Scene>> = Vec::new();
     if view.section == ProcessPropertiesSection::Insights && view.live {
-        actions.push(Box::new(bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())) }
+        actions.push(Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Button ProcessPropertiesAction::Refresh ControlVisual(ControlTone::Surface, false) on(on_refresh)
             Children [ Text({t("common.refresh").to_owned()}) TextRole(Role::Body) ] }));
     }
     if view.authorize_network {
-        actions.push(Box::new(bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())) }
+        actions.push(Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Button ProcessPropertiesAction::AuthorizeNetwork ControlVisual(ControlTone::Surface, true) on(on_authorize)
             Children [ Text({t("proc_insights.enable_network_capture").to_owned()}) TextRole(Role::Body)
                 TextLayout { linebreak: LineBreak::WordBoundary } Node { min_width: px(0.0) } ] }));
     }
-    actions.push(Box::new(bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::horizontal(px(space_8())) }
+    actions.push(Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
         Button ProcessPropertiesDismissButton ControlVisual(ControlTone::Surface, true) on(on_properties_dismiss_activated)
         Children [ Text({t("common.close").to_owned()}) TextRole(Role::Body) ] }));
     bsn! {
@@ -158,8 +158,12 @@ pub(super) fn properties_modal_scene(
                 Text(title) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::WordBoundary }
                     Node { width: percent(100), min_width: px(0.0), max_height: px(48.0), flex_shrink: 0.0, overflow: Overflow::clip() } --
                 Text(subtitle) TextRole(Role::Caption) Node { flex_shrink: 0.0 } --
+                // The headless tab-list widget: shared tablist/tab roles,
+                // roving arrow-key focus and typed ValueChange selection; the
+                // presentation state stays the sole section authority.
                 Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap,
-                    row_gap: px(space_4()), column_gap: px(space_4()), flex_shrink: 0.0 } Children [{tabs}] --
+                    row_gap: px(space_4()), column_gap: px(space_4()), flex_shrink: 0.0 }
+                TabList on(super::sync_selected_tab) Children [{tabs}] --
                 Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap,
                     row_gap: px(space_4()), column_gap: px(space_4()), flex_shrink: 0.0 } Children [{facets}] --
                 Node { width: percent(100), min_width: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0),

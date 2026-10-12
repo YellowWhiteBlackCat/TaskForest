@@ -44,7 +44,12 @@ use taskmanager_application::i18n::t;
 
 use crate::app::Message;
 
+mod geometry;
 mod program;
+pub(crate) use geometry::{
+    area_path, line_path, scaled_y, scaled_y_in_range, series_point_runs, series_point_runs_for,
+    series_point_runs_in_range, series_point_runs_windowed, smooth_area_path, smooth_line_path,
+};
 
 /// Stroke width for each series polyline.
 const SERIES_STROKE_WIDTH: f32 = 1.6;
@@ -374,6 +379,8 @@ pub(crate) struct ChartOpts {
     pub vlines: usize,
     /// Alpha multiplier applied to the token-derived grid color.
     pub grid_alpha: f32,
+    /// Emphasize the 25/50/75/100% reference levels over the quiet grid.
+    pub reference_lines: bool,
     /// Stroke width of the series polylines.
     pub stroke_width: f32,
 }
@@ -386,7 +393,19 @@ impl ChartOpts {
         hlines: 4,
         vlines: 6,
         grid_alpha: 0.48,
+        reference_lines: false,
         stroke_width: SERIES_STROKE_WIDTH,
+    };
+
+    /// Performance chart grid tuned to the GPUI profile: four horizontal
+    /// divisions, five vertical rules, a faint token-derived grid, and
+    /// emphasized quarter levels.
+    pub(crate) const PERFORMANCE: Self = Self {
+        hlines: 4,
+        vlines: 5,
+        grid_alpha: 0.13,
+        reference_lines: true,
+        stroke_width: 1.5,
     };
 }
 
@@ -409,23 +428,83 @@ pub(crate) fn draw_grid_opts(
     color: Color,
     opts: ChartOpts,
 ) {
-    let stroke = Stroke::default()
-        .with_width(1.0)
-        .with_color(color.scale_alpha(opts.grid_alpha));
+    for rule in grid_rules(opts) {
+        let alpha = if rule.emphasized {
+            (opts.grid_alpha * 2.0).min(0.6)
+        } else {
+            opts.grid_alpha
+        };
+        let stroke = Stroke::default()
+            .with_width(1.0)
+            .with_color(color.scale_alpha(alpha));
+        match rule.axis {
+            GridRuleAxis::Horizontal => {
+                let y = size.height * rule.position;
+                frame.stroke(
+                    &Path::line(Point::new(0.0, y), Point::new(size.width, y)),
+                    stroke,
+                );
+            }
+            GridRuleAxis::Vertical => {
+                let x = size.width * rule.position;
+                frame.stroke(
+                    &Path::line(Point::new(x, 0.0), Point::new(x, size.height)),
+                    stroke,
+                );
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GridRuleAxis {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct GridRule {
+    pub axis: GridRuleAxis,
+    /// A normalized position from the left for vertical rules or top for
+    /// horizontal rules.
+    pub position: f32,
+    pub emphasized: bool,
+}
+
+/// The exact normalized grid drawn by [`draw_grid_opts`]. Kept pure so the
+/// performance profile can be compared with the shared graph contract
+/// without needing renderer pixel inspection.
+#[must_use]
+pub(crate) fn grid_rules(opts: ChartOpts) -> Vec<GridRule> {
+    let mut rules = Vec::with_capacity(
+        opts.hlines
+            .saturating_add(opts.vlines)
+            .saturating_add(if opts.reference_lines { 4 } else { 0 }),
+    );
     for index in 1..=opts.hlines {
-        let y = size.height * index as f32 / (opts.hlines + 1) as f32;
-        frame.stroke(
-            &Path::line(Point::new(0.0, y), Point::new(size.width, y)),
-            stroke,
-        );
+        rules.push(GridRule {
+            axis: GridRuleAxis::Horizontal,
+            position: index as f32 / (opts.hlines + 1) as f32,
+            emphasized: false,
+        });
     }
     for index in 1..=opts.vlines {
-        let x = size.width * index as f32 / (opts.vlines + 1) as f32;
-        frame.stroke(
-            &Path::line(Point::new(x, 0.0), Point::new(x, size.height)),
-            stroke,
-        );
+        rules.push(GridRule {
+            axis: GridRuleAxis::Vertical,
+            position: index as f32 / (opts.vlines + 1) as f32,
+            emphasized: false,
+        });
     }
+    if opts.reference_lines {
+        for value in [0.25_f32, 0.5, 0.75, 1.0] {
+            rules.push(GridRule {
+                axis: GridRuleAxis::Horizontal,
+                position: 1.0 - value,
+                emphasized: true,
+            });
+        }
+    }
+    rules
 }
 
 /// The y-axis tick ladder: `[max, max / 2, 0]` — the three labels that make a
@@ -556,6 +635,7 @@ pub(crate) fn draw_readout_pill(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
     x: f32,
+    anchor_y: Option<f32>,
     content: Option<&str>,
     grid_color: Color,
     readout: ReadoutColors,
@@ -567,18 +647,96 @@ pub(crate) fn draw_readout_pill(
             .with_color(grid_color.scale_alpha(0.7)),
     );
 
-    let Some(content) = content else {
+    let (Some(content), Some(anchor_y)) = (content, anchor_y.filter(|value| value.is_finite()))
+    else {
         return;
     };
     let font_size = 11.0;
     let text_width = crate::text_metrics::measured_text_width(content, font_size);
-    let pill_width = text_width + 12.0;
-    let pill_height = 18.0;
-    let pill_x = (x - pill_width / 2.0).clamp(2.0, (size.width - pill_width - 2.0).max(2.0));
-    let pill_y = 4.0;
+    draw_value_pill(
+        frame,
+        data_point_badge_bounds(size, Point::new(x, anchor_y), text_width),
+        content,
+        grid_color,
+        readout,
+    );
+}
+
+/// Place a measured value pill beside a data point. It prefers the upper side
+/// of the point, flips below near the top edge, and clamps both axes so long
+/// labels stay inside short and narrow canvases.
+#[must_use]
+pub(crate) fn data_point_badge_bounds(size: Size, anchor: Point, text_width: f32) -> Rectangle {
+    let width = (text_width.max(0.0) + 12.0).min(size.width.max(0.0));
+    let height = 18.0_f32.min(size.height.max(0.0));
+    let max_x = (size.width - width).max(0.0);
+    let max_y = (size.height - height).max(0.0);
+    let x = (anchor.x - width / 2.0).clamp(0.0, max_x);
+    let above = anchor.y - height - 6.0;
+    let below = anchor.y + 6.0;
+    let y = if above >= 0.0 {
+        above.min(max_y)
+    } else if below <= max_y {
+        below
+    } else {
+        (anchor.y - height / 2.0).clamp(0.0, max_y)
+    };
+    Rectangle {
+        x,
+        y,
+        width,
+        height,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LatestBadgeStyle {
+    cpu_color: Color,
+    memory_color: Color,
+    grid_color: Color,
+    readout: ReadoutColors,
+}
+
+fn draw_latest_badge(
+    frame: &mut canvas::Frame<iced::Renderer>,
+    size: Size,
+    content: Option<&str>,
+    anchor: Option<LatestReadoutAnchor>,
+    sample_count: usize,
+    style: LatestBadgeStyle,
+) {
+    let (Some(content), Some(anchor)) = (content, anchor) else {
+        return;
+    };
+    let text_width = crate::text_metrics::measured_text_width(content, 11.0);
+    let point = Point::new(
+        sample_x(anchor.index, sample_count, size.width),
+        scaled_y(anchor.value, 100.0, size.height),
+    );
+    let point_color = match anchor.series {
+        ReadoutSeries::Cpu => style.cpu_color,
+        ReadoutSeries::Memory => style.memory_color,
+    };
+    frame.fill(&Path::circle(point, 2.5), point_color);
+    draw_value_pill(
+        frame,
+        data_point_badge_bounds(size, point, text_width),
+        content,
+        style.grid_color,
+        style.readout,
+    );
+}
+
+fn draw_value_pill(
+    frame: &mut canvas::Frame<iced::Renderer>,
+    bounds: Rectangle,
+    content: &str,
+    grid_color: Color,
+    readout: ReadoutColors,
+) {
     let pill = Path::rounded_rectangle(
-        Point::new(pill_x, pill_y),
-        Size::new(pill_width, pill_height),
+        Point::new(bounds.x, bounds.y),
+        bounds.size(),
         iced::border::Radius::from(8.0),
     );
     frame.fill(&pill, readout.bg);
@@ -588,11 +746,13 @@ pub(crate) fn draw_readout_pill(
             .with_width(1.0)
             .with_color(grid_color.scale_alpha(0.6)),
     );
+    let content =
+        crate::text_metrics::truncate_to_width(content, (bounds.width - 12.0).max(0.0), 11.0);
     frame.fill_text(canvas::Text {
         content: content.to_string(),
-        position: Point::new(pill_x + pill_width / 2.0, pill_y + pill_height / 2.0),
+        position: Point::new(bounds.center_x(), bounds.center_y()),
         color: readout.fg,
-        size: Pixels(font_size),
+        size: Pixels(11.0),
         align_x: iced::advanced::text::Alignment::Center,
         align_y: iced::alignment::Vertical::Center,
         ..canvas::Text::default()
@@ -628,10 +788,16 @@ fn draw_hover_readout(
             );
         }
     }
+    let anchor_y = cpu
+        .get(index)
+        .filter(|value| value.is_finite())
+        .or_else(|| memory.get(index).filter(|value| value.is_finite()))
+        .map(|value| scaled_y(*value, 100.0, size.height));
     draw_readout_pill(
         frame,
         size,
         x,
+        anchor_y,
         readout_text(cpu, memory, index).as_deref(),
         grid_color,
         readout,
@@ -659,243 +825,70 @@ pub(crate) fn readout_text(cpu: &[f32], memory: &[f32], index: usize) -> Option<
     }
 }
 
-/// The Catmull-Rom tension for [`smooth_line_path`] (matches GPUI's
-/// `SMOOTH_TENSION` — the curve passes through the sample points).
-const SMOOTH_TENSION: f32 = 1.0 / 6.0;
-
-/// Build the smooth open path through `points`: each segment becomes a cubic
-/// Bezier whose control points come from the neighbouring samples
-/// (Catmull-Rom → Bezier conversion). Returns `None` for fewer than three
-/// vertices (the spline needs a neighbour on both sides of at least one
-/// segment). Pure function so the spline geometry is unit-tested headlessly.
+/// The stable badge in the latest-value corner uses each series' newest
+/// finite sample independently; a trailing gap in one series cannot erase the
+/// other series' current value.
 #[must_use]
-pub(crate) fn smooth_line_path(points: &[Point]) -> Option<Path> {
-    if points.len() < 3 || !points_are_finite(points) {
-        return None;
+pub(crate) fn latest_readout_text(cpu: &[f32], memory: &[f32]) -> Option<String> {
+    let latest_finite = |samples: &[f32]| {
+        samples
+            .iter()
+            .rev()
+            .copied()
+            .find(|value| value.is_finite())
+    };
+    match (latest_finite(cpu), latest_finite(memory)) {
+        (Some(cpu), Some(memory)) => Some(format!(
+            "{} {:.0}% · {} {:.0}%",
+            t("common.cpu"),
+            cpu,
+            t("common.memory"),
+            memory
+        )),
+        (Some(cpu), None) => Some(format!("{cpu:.0}%")),
+        (None, Some(memory)) => Some(format!("{memory:.0}%")),
+        (None, None) => None,
     }
-    Some(Path::new(|builder| {
-        builder.move_to(points[0]);
-        for index in 0..points.len() - 1 {
-            let previous = points[index.saturating_sub(1)];
-            let start = points[index];
-            let end = points[index + 1];
-            let next = points.get(index + 2).copied().unwrap_or(end);
-            let ctrl_a = Point::new(
-                start.x + (end.x - previous.x) * SMOOTH_TENSION,
-                start.y + (end.y - previous.y) * SMOOTH_TENSION,
-            );
-            let ctrl_b = Point::new(
-                end.x - (next.x - start.x) * SMOOTH_TENSION,
-                end.y - (next.y - start.y) * SMOOTH_TENSION,
-            );
-            builder.bezier_curve_to(ctrl_a, ctrl_b, end);
-        }
-    }))
 }
 
-/// Build the closed smooth area polygon: the spline down the top edge,
-/// closing square to this run's baseline corners. Returns `None` for fewer
-/// than three vertices.
+/// The most recent finite point used to anchor the idle latest-value badge.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LatestReadoutAnchor {
+    pub(crate) index: usize,
+    pub(crate) value: f32,
+    pub(crate) series: ReadoutSeries,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReadoutSeries {
+    Cpu,
+    Memory,
+}
+
+/// Pick the newest finite point across both series; ties favor CPU so the
+/// badge stays attached to a stable primary series when both end together.
 #[must_use]
-pub(crate) fn smooth_area_path(points: &[Point], baseline_y: f32) -> Option<Path> {
-    if points.len() < 3 || !baseline_y.is_finite() || !points_are_finite(points) {
-        return None;
+pub(crate) fn latest_readout_anchor(cpu: &[f32], memory: &[f32]) -> Option<LatestReadoutAnchor> {
+    let latest = |samples: &[f32], series| {
+        samples
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, value)| value.is_finite())
+            .map(|(index, value)| LatestReadoutAnchor {
+                index,
+                value: *value,
+                series,
+            })
+    };
+    match (
+        latest(cpu, ReadoutSeries::Cpu),
+        latest(memory, ReadoutSeries::Memory),
+    ) {
+        (Some(cpu), Some(memory)) if memory.index > cpu.index => Some(memory),
+        (Some(cpu), _) => Some(cpu),
+        (None, memory) => memory,
     }
-    let first = points[0];
-    let last = points[points.len() - 1];
-    Some(Path::new(|builder| {
-        builder.move_to(first);
-        for index in 0..points.len() - 1 {
-            let previous = points[index.saturating_sub(1)];
-            let start = points[index];
-            let end = points[index + 1];
-            let next = points.get(index + 2).copied().unwrap_or(end);
-            let ctrl_a = Point::new(
-                start.x + (end.x - previous.x) * SMOOTH_TENSION,
-                start.y + (end.y - previous.y) * SMOOTH_TENSION,
-            );
-            let ctrl_b = Point::new(
-                end.x - (next.x - start.x) * SMOOTH_TENSION,
-                end.y - (next.y - start.y) * SMOOTH_TENSION,
-            );
-            builder.bezier_curve_to(ctrl_a, ctrl_b, end);
-        }
-        builder.line_to(Point::new(last.x, baseline_y));
-        builder.line_to(Point::new(first.x, baseline_y));
-        builder.close();
-    }))
-}
-
-/// Build the open polyline path through `points`. Returns `None` for fewer
-/// than two vertices (no strokeable segment). Shared with the trend strip so
-/// the two widgets cannot drift apart on polyline construction.
-pub(crate) fn line_path(points: &[Point]) -> Option<Path> {
-    if points.len() < 2 || !points_are_finite(points) {
-        return None;
-    }
-    let first = points[0];
-    Some(Path::new(|builder| {
-        builder.move_to(first);
-        for point in &points[1..] {
-            builder.line_to(*point);
-        }
-    }))
-}
-
-/// Build the closed area polygon: the polyline followed back along the
-/// baseline (`y = baseline_y`) so the fill reads as "area under the curve".
-/// Returns `None` for fewer than two vertices. Shared with the device headline
-/// graph and the per-core cell sparkline so every area fill closes back along
-/// the same baseline.
-pub(crate) fn area_path(points: &[Point], baseline_y: f32) -> Option<Path> {
-    if points.len() < 2 || !baseline_y.is_finite() || !points_are_finite(points) {
-        return None;
-    }
-    let first = points[0];
-    let last = points[points.len() - 1];
-    Some(Path::new(|builder| {
-        builder.move_to(first);
-        for point in &points[1..] {
-            builder.line_to(*point);
-        }
-        builder.line_to(Point::new(last.x, baseline_y));
-        builder.line_to(Point::new(first.x, baseline_y));
-        builder.close();
-    }))
-}
-
-/// Whether every point is safe to pass to iced/lyon's path builder.
-fn points_are_finite(points: &[Point]) -> bool {
-    points
-        .iter()
-        .all(|point| point.x.is_finite() && point.y.is_finite())
-}
-
-/// Project `samples` scaled to `max` into finite contiguous runs inside `size`.
-///
-/// Same geometry as the 0–100 percentage chart, but for series whose unit is
-/// not a percentage (e.g. disk/network bytes/sec): each value maps to
-/// `value / max` of the frame height. `max <= 0` (or all-zero samples) anchors
-/// every point at the baseline — the honest idle state, never a fabricated
-/// mid-line.
-///
-/// The frame origin is the top-left and y grows downward, so `0` maps to the
-/// bottom edge (`y = height`) and `max` to the top edge (`y = 0`). Samples
-/// spread evenly across the width left→right (oldest→newest); values are
-/// clamped to `[0, max]` so an out-of-range reading cannot escape the frame.
-///
-/// A non-finite sample is an authoritative history gap. It ends the current
-/// run while retaining its chronological slot in the x projection; the next
-/// finite sample starts a new run at its original x. This prevents both an
-/// invalid lyon point and the more subtle lie of filtering gaps and drawing a
-/// line or area across missing evidence.
-///
-/// Empty/all-gap input yields no runs. Edge gaps likewise create no fabricated
-/// vertices.
-#[must_use]
-pub(crate) fn series_point_runs_for(samples: &[f32], size: Size, max: f32) -> Vec<Vec<Point>> {
-    series_point_runs_with(samples, size, 0.0, max, &|index| {
-        sample_x(index, samples.len(), size.width)
-    })
-}
-
-/// The windowed projection: the same value normalization and NaN-gap
-/// splitting as [`series_point_runs_for`], but the x coordinates come from the
-/// caller's [`WindowSlots`] grid — the identical mapping the chart's hover
-/// resolves through, so a capacity-windowed graph and its readout cannot
-/// disagree about where a sample sits.
-#[must_use]
-pub(crate) fn series_point_runs_windowed(
-    samples: &[f32],
-    size: Size,
-    max: f32,
-    slots: &WindowSlots,
-) -> Vec<Vec<Point>> {
-    series_point_runs_with(samples, size, 0.0, max, &|index| slots.x(index))
-}
-
-/// The shared run splitter behind both projections: finite contiguous runs of
-/// points, y from [`scaled_y`], x from the injected slot mapping.
-/// Complete recorded windows retain signed magnitude coordinates and gaps.
-#[must_use]
-pub(crate) fn series_point_runs_in_range(
-    samples: &[f32],
-    size: Size,
-    min: f32,
-    max: f32,
-) -> Vec<Vec<Point>> {
-    series_point_runs_with(samples, size, min, max, &|index| {
-        sample_x(index, samples.len(), size.width)
-    })
-}
-
-fn series_point_runs_with(
-    samples: &[f32],
-    size: Size,
-    min: f32,
-    max: f32,
-    x_of: &dyn Fn(usize) -> f32,
-) -> Vec<Vec<Point>> {
-    let count = samples.len();
-    if count == 0 {
-        return Vec::new();
-    }
-    let height = finite_nonnegative(size.height);
-    let mut runs = Vec::new();
-    let mut current = Vec::new();
-    for (index, &raw) in samples.iter().enumerate() {
-        if !raw.is_finite() {
-            if !current.is_empty() {
-                runs.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-        let x = x_of(index);
-        let y = scaled_y_in_range(raw, min, max, height);
-        current.push(Point::new(x, y));
-    }
-    if !current.is_empty() {
-        runs.push(current);
-    }
-    runs
-}
-
-/// The y-coordinate for one value under the exact normalization
-/// [`series_point_runs_for`] applies: `0` at the baseline, `max` at the top
-/// edge, out-of-range values clamped inside the frame, and a non-positive or
-/// non-finite ceiling (or value) anchoring at the baseline — the honest idle
-/// state, never a fabricated mid-line. Pure so a hover dot provably lands on
-/// the drawn sample.
-#[must_use]
-pub(crate) fn scaled_y(value: f32, max: f32, height: f32) -> f32 {
-    scaled_y_in_range(value, 0.0, max, height)
-}
-
-#[must_use]
-pub(crate) fn scaled_y_in_range(value: f32, min: f32, max: f32, height: f32) -> f32 {
-    let height = finite_nonnegative(height);
-    let floor = if min.is_finite() { min.min(0.0) } else { 0.0 };
-    let ceiling = if max.is_finite() { max.max(floor) } else { 0.0 };
-    let span = f64::from(ceiling) - f64::from(floor);
-    if !value.is_finite() || span <= 0.0 {
-        return height;
-    }
-    height * (1.0 - ((f64::from(value) - f64::from(floor)) / span).clamp(0.0, 1.0) as f32)
-}
-
-fn finite_nonnegative(value: f32) -> f32 {
-    if value.is_finite() {
-        value.max(0.0)
-    } else {
-        0.0
-    }
-}
-
-/// Project normalized `[0,100]` percentage samples into finite contiguous
-/// runs — the percentage-specialization of [`series_point_runs_for`].
-#[must_use]
-pub(crate) fn series_point_runs(samples: &[f32], size: Size) -> Vec<Vec<Point>> {
-    series_point_runs_for(samples, size, 100.0)
 }
 
 #[cfg(test)]

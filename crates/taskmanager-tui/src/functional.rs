@@ -29,11 +29,11 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
             route: "health.alert-rules.toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
-            route: "health.alert-rules.authoring",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
+            reason: "CORE-04 keeps managed alert-rule authoring unsupported in the TUI",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
-            route: "health.alerts.transfer",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
+            reason: "CORE-04 keeps alert-rule import and export unsupported in the TUI",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Local {
             route: "health.active-alerts",

@@ -7,6 +7,7 @@ use taskmanager_core::core::process::ProcessItem;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use taskmanager_shell::BatchFoldOutput;
+use taskmanager_shell::app::alert_rows::AlertRowFamily;
 
 use super::super::ProcessControlAction;
 use super::{
@@ -183,11 +184,13 @@ impl RootView {
                 .clone()
                 .unwrap_or_default(),
         );
-        if self
-            .selected_session
-            .as_ref()
-            .is_some_and(|id| !self.sessions().iter().any(|session| session.id == *id))
-        {
+        if self.selected_session.as_ref().is_some_and(|identity| {
+            self.sessions()
+                .iter()
+                .filter(|session| session.identity().as_ref() == Some(identity))
+                .count()
+                != 1
+        }) {
             self.selected_session = None;
         }
     }
@@ -339,9 +342,13 @@ impl RootView {
         if !output.changes.snapshot_recorded {
             return;
         }
-        let next = self.projection().alert_active.clone();
+        let projection = self.projection();
+        let revision = projection
+            .alert_row_projection_generation(AlertRowFamily::Active)
+            .data_revision()
+            .get();
         self.materialized
-            .replace_active_alerts(self.projection().refresh_count, next);
+            .replace_active_alerts(revision, projection.alert_center.active_alerts().to_vec());
         let notifications = self.shell.drain_alert_notifications();
         self.submit_alert_notifications(notifications);
     }

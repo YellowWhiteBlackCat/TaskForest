@@ -1,4 +1,5 @@
 //! Complete health groups over typed cached facts; unavailable values stay explicit.
+use super::smart::smart_self_test_failure_i18n_key;
 use super::{bytes, device_status_i18n_key, fan_rpm, power_w_precise, temperature_c_precise};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::device_state::DeviceStatus;
@@ -133,42 +134,49 @@ pub fn storage_groups(
         if !observed {
             continue;
         }
+        let mut rows = vec![
+            row(
+                "common.status",
+                format!(
+                    "{:?} · {}",
+                    report.report.phase,
+                    t(device_status_i18n_key(report.report.state.status))
+                ),
+            ),
+            row(
+                "health.progress",
+                report
+                    .report
+                    .progress_pct
+                    .map(|value| format!("{value:.0}%"))
+                    .unwrap_or_else(missing),
+            ),
+            row(
+                "health.lifetime_hours",
+                report
+                    .report
+                    .lifetime_hours
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(missing),
+            ),
+            row(
+                "health.first_error_lba",
+                report
+                    .report
+                    .first_error_lba
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(missing),
+            ),
+        ];
+        if let Some(failure) = report.report.failure {
+            rows.push(row(
+                "health.errors",
+                t(smart_self_test_failure_i18n_key(failure)),
+            ));
+        }
         groups.push(HealthReviewGroup {
             title: format!("{} · {}", t("health.smart_self_test"), report.display_name),
-            rows: vec![
-                row(
-                    "common.status",
-                    format!(
-                        "{:?} · {}",
-                        report.report.phase,
-                        t(device_status_i18n_key(report.report.state.status))
-                    ),
-                ),
-                row(
-                    "health.progress",
-                    report
-                        .report
-                        .progress_pct
-                        .map(|value| format!("{value:.0}%"))
-                        .unwrap_or_else(missing),
-                ),
-                row(
-                    "health.lifetime_hours",
-                    report
-                        .report
-                        .lifetime_hours
-                        .map(|value| value.to_string())
-                        .unwrap_or_else(missing),
-                ),
-                row(
-                    "health.first_error_lba",
-                    report
-                        .report
-                        .first_error_lba
-                        .map(|value| value.to_string())
-                        .unwrap_or_else(missing),
-                ),
-            ],
+            rows,
         });
     }
     groups

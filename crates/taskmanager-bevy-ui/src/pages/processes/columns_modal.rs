@@ -18,7 +18,7 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    PositionType, UiRect, Val, percent, px,
+    PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -80,7 +80,7 @@ pub(crate) struct ProcessColumnToggleId(pub(crate) &'static str);
 /// Scene for the "Choose columns" button mounted in the processes toolbar.
 pub(crate) fn choose_columns_button_scene(palette: &UiPalette) -> impl Scene + use<> {
     let label = t("proc.choose_columns");
-    let height = palette.control_height_px;
+    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {
@@ -205,7 +205,7 @@ pub(crate) fn columns_modal_scene(
                         Children [
 
                                 Node {
-                                    height: px(palette.control_height_px),
+                                    height: rem(palette.control_height_rem),
                                     padding: UiRect::axes(Val::Px(space_16()), Val::Px(space_4())),
                                     align_items: AlignItems::Center,
                                     justify_content: JustifyContent::Center,
@@ -220,7 +220,7 @@ pub(crate) fn columns_modal_scene(
                             --
 
                                 Node {
-                                    height: px(palette.control_height_px),
+                                    height: rem(palette.control_height_rem),
                                     padding: UiRect::axes(Val::Px(space_16()), Val::Px(space_4())),
                                     align_items: AlignItems::Center,
                                     justify_content: JustifyContent::Center,

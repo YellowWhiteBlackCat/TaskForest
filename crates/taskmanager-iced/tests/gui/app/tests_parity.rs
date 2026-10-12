@@ -24,7 +24,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::ProcessSignal;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -42,6 +42,16 @@ use taskmanager_theme::tokens::UiSize;
 #[test]
 fn user_row_menu_opens_selects_and_routes_actions() {
     let mut app = IcedApp::demo();
+    let mut sessions = app.shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .get_mut(1)
+        .expect("the demo Users projection has a second session");
+    let expected_session_id = session.id.clone();
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 42,
+    });
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
     let _ = app.update(Message::SelectPage(AppPage::Users));
     assert_eq!(app.user_menu_row(), None);
 
@@ -50,13 +60,18 @@ fn user_row_menu_opens_selects_and_routes_actions() {
     assert_eq!(app.user_menu_row(), Some(1));
     assert_eq!(app.shell.selected, 1);
 
-    // A menu action routes through the shared session-control path and closes
-    // the menu.
+    // A menu action arms the shared confirmation for the selected session and
+    // closes the menu without submitting a platform effect.
     let _ = app.update(Message::RequestSessionControl(
         SessionControlAction::Disconnect,
     ));
     assert_eq!(app.user_menu_row(), None);
-    assert!(app.shell.feedback_text().contains("Demo mode"));
+    let pending = app
+        .shell
+        .pending_session()
+        .expect("the selected session must wait for explicit confirmation");
+    assert_eq!(pending.action, SessionControlAction::Disconnect);
+    assert_eq!(pending.session.id, expected_session_id);
 
     // Escape closes an open menu without touching the selection.
     let _ = app.update(Message::OpenUserRowMenu(0));
@@ -281,7 +296,10 @@ fn applications_column_menu_changes_only_the_iced_table_projection() {
     let _ = crate::ui::view(&app);
 
     let _ = app.update(Message::ToggleProcessColumn(SortCol::Memory));
-    assert!(!app.process_columns_menu_open());
+    assert!(
+        app.process_columns_menu_open(),
+        "a column choice leaves the multi-select menu open"
+    );
     assert!(
         app.process_presentation
             .hidden_columns
@@ -289,12 +307,31 @@ fn applications_column_menu_changes_only_the_iced_table_projection() {
     );
     let _ = crate::ui::view(&app);
 
+    let _ = app.update(Message::ToggleProcessColumn(SortCol::Cpu));
+    assert!(app.process_columns_menu_open());
+    assert!(
+        app.process_presentation
+            .hidden_columns
+            .contains(&SortCol::Memory)
+    );
+    assert!(
+        app.process_presentation
+            .hidden_columns
+            .contains(&SortCol::Cpu)
+    );
+
     let _ = app.update(Message::ToggleProcessColumn(SortCol::Name));
     assert!(
         !app.process_presentation
             .hidden_columns
             .contains(&SortCol::Name)
     );
+    assert!(
+        app.process_columns_menu_open(),
+        "the mandatory Name column has no toggle effect and does not dismiss the menu"
+    );
+    let _ = app.update(Message::CloseProcessColumnsMenu);
+    assert!(!app.process_columns_menu_open());
 }
 
 #[test]
@@ -557,7 +594,10 @@ fn demo_constructor_exposes_shared_fixture_data_without_platform_io() {
     );
 
     let _ = app.update(Message::RequestSessionControl(SessionControlAction::Lock));
-    assert!(app.shell.feedback_text().contains("Demo mode"));
+    assert!(
+        app.shell.pending_session().is_none(),
+        "the selected-index Users action has no frozen identity and must fail closed"
+    );
 }
 
 #[test]

@@ -23,8 +23,8 @@ fn declaration_is_total_and_every_difference_is_registered() {
 }
 
 /// The terminal-limit set is pinned: one native (emulator-owned selection),
-/// the registered divergences, and the two typed absences. A new difference
-/// cannot appear silently.
+/// the keyboard-native but non-equivalent controls, and the two typed
+/// absences. A new difference cannot appear silently.
 #[test]
 fn the_terminal_limit_set_is_pinned() {
     let declaration = capability_declaration();
@@ -41,12 +41,25 @@ fn the_terminal_limit_set_is_pinned() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(divergent, ["toast", "scrollbar", "focus-visible"]);
+    assert_eq!(
+        divergent,
+        [
+            "modal-overlay",
+            "toast",
+            "text-input",
+            "search-input",
+            "switch",
+            "slider",
+            "segmented-control",
+            "scrollbar",
+            "focus-visible",
+        ]
+    );
     let unsupported: Vec<&str> = declaration
         .entries
         .iter()
         .filter(|entry| matches!(entry.support, CapabilitySupport::Unsupported { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(unsupported, ["tooltip", "slider", "column-drag-resize"]);
+    assert_eq!(unsupported, ["tooltip", "column-drag-resize"]);
 }

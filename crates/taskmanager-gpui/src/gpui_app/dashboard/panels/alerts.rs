@@ -17,7 +17,7 @@ use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::core::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -152,7 +152,7 @@ fn apply_adjustment(
     *rule != before
 }
 
-fn adjust_root(view: &mut RootView, target_id: String, adjustment: RuleAdjustment) {
+fn adjust_root(view: &mut RootView, target_id: AlertRuleId, adjustment: RuleAdjustment) {
     let targets = target_options(&view.system_snapshot().disks);
     let Some(mut managed) = view
         .projection()
@@ -173,7 +173,7 @@ fn adjust_root(view: &mut RootView, target_id: String, adjustment: RuleAdjustmen
 struct AdjustmentControlProps<'a> {
     theme: &'a Theme,
     index: usize,
-    rule_id: String,
+    rule_id: AlertRuleId,
     id_prefix: &'static str,
     label: &'static str,
     value: String,

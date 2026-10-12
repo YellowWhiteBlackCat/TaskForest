@@ -28,6 +28,7 @@ mod priority_choice;
 use priority_choice::{PriorityChoice, selection_hint};
 mod process_menu;
 
+pub(crate) mod aggregate_projection;
 pub(crate) mod page;
 mod projection;
 
@@ -458,17 +459,24 @@ fn header_cell(
                 .width(Length::Shrink)
                 .into(),
         };
+    let sort_action = Message::SortBy(column);
     let sort_button = button(
         container(label)
             .width(Length::Fill)
             .align_x(column_alignment(column)),
     )
-    .on_press(Message::SortBy(column))
+    .on_press(sort_action.clone())
     .style(move |_theme, status| theme::header_button_style(theme_snapshot, status, active))
     .padding([2.0, 4.0])
     .width(Length::Fixed(width));
+    let sort_button = focus::focusable_control(
+        theme_snapshot,
+        FocusTarget::ProcessSortHeader(column),
+        sort_button.into(),
+        sort_action,
+    );
     if !column_resizable(column) {
-        return sort_button.into();
+        return sort_button;
     }
     // Resize edge: a `mouse_area` strip over the cell's trailing edge. The
     // strip's press is captured before the sort button underneath sees the
@@ -522,6 +530,10 @@ pub(crate) fn localized_sort_column_label(column: SortCol) -> &'static str {
         SortCol::Nice => t("proc.nice"),
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/applications_header_tests.rs"]
+mod applications_header_tests;
 
 /// Intrinsic width of the Applications table content. Iced's scrollable
 /// defaults to a shrink-to-fit content strategy; without an explicit width a

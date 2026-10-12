@@ -44,7 +44,7 @@ trap 'exit 130' INT TERM
 
 usage() {
     printf '%s\n' \
-        "usage: $0 {status|verify|install|uninstall} {perf|net|process|smbios|rapl|msr} [--staging DIR]" \
+        "usage: $0 {status|verify|install|uninstall} {perf|net|process|smbios|rapl|msr|smart-self-test} [--staging DIR]" \
         "  status    read-only host inspection" \
         "  verify    require both exact artifacts to be installed" \
         "  install   root-only, conflict-safe installation" \
@@ -101,6 +101,14 @@ configure_feature() {
             POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
             HELPER_ID="POLKIT-MSR-HELPER"
             POLICY_ID="POLKIT-MSR-POLICY"
+            ;;
+        smart-self-test)
+            HELPER_SRC="$REPO_ROOT/target/release/taskmanager-smart-self-test-helper"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-smart-self-test-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy"
+            HELPER_ID="POLKIT-SMART-SELF-TEST-HELPER"
+            POLICY_ID="POLKIT-SMART-SELF-TEST-POLICY"
             ;;
         *)
             usage >&2

@@ -26,6 +26,11 @@ use taskmanager_shell::{
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 
+use super::aggregate_display::{
+    cpu_aggregate_compact, cpu_aggregate_summary, memory_aggregate_compact,
+    memory_aggregate_summary,
+};
+
 /// Stable expansion-set key for one category bucket (the shared neutral
 /// implementation): the `category:`-prefixed [`ProcessCategory::stable_key`],
 /// which can never collide with a normalized app-group name.
@@ -173,8 +178,14 @@ pub struct RowCellText {
     pub user: String,
     pub pid: String,
     pub status_label: String,
+    /// Full status text used by the aggregate tooltip.
     pub cpu: String,
+    /// Bounded cell text keeps partial/stale coverage visible at narrow widths.
+    pub cpu_compact: String,
+    /// Full status text used by the aggregate tooltip.
     pub memory: String,
+    /// Bounded cell text keeps partial/stale coverage visible at narrow widths.
+    pub memory_compact: String,
     pub swap: String,
     pub pss: String,
     pub disk_read: String,
@@ -204,10 +215,31 @@ impl RowCellText {
                 .process_identity
                 .map_or_else(String::new, |identity| identity.pid().to_string()),
             status_label: super::cells::status_label(&row.status),
-            cpu: optional_f32_dash(row.cpu, format_cpu_percent),
-            memory: row.mem.map_or_else(
-                || "\u{2014}".to_string(),
-                |bytes| format_memory(units, bytes),
+            cpu: row.cpu_aggregate.as_ref().map_or_else(
+                || optional_f32_dash(row.cpu, format_cpu_percent),
+                cpu_aggregate_summary,
+            ),
+            cpu_compact: row.cpu_aggregate.as_ref().map_or_else(
+                || optional_f32_dash(row.cpu, format_cpu_percent),
+                cpu_aggregate_compact,
+            ),
+            memory: row.memory_aggregate.as_ref().map_or_else(
+                || {
+                    row.mem.map_or_else(
+                        || "\u{2014}".to_string(),
+                        |bytes| format_memory(units, bytes),
+                    )
+                },
+                |metric| memory_aggregate_summary(metric, units),
+            ),
+            memory_compact: row.memory_aggregate.as_ref().map_or_else(
+                || {
+                    row.mem.map_or_else(
+                        || "\u{2014}".to_string(),
+                        |bytes| format_memory(units, bytes),
+                    )
+                },
+                |metric| memory_aggregate_compact(metric, units),
             ),
             swap: row.swap.map_or_else(
                 || "\u{2014}".to_string(),
@@ -385,7 +417,7 @@ pub(crate) fn structural_arrow_action(
 }
 
 /// Localized aggregate-row label for one category bucket.
-fn category_label(category: ProcessCategory) -> &'static str {
+pub(crate) fn category_label(category: ProcessCategory) -> &'static str {
     match category {
         ProcessCategory::Application => i18n::t("proc.category_apps"),
         ProcessCategory::Background => i18n::t("proc.category_background"),

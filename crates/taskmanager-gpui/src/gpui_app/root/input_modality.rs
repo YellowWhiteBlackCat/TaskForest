@@ -41,34 +41,61 @@ impl InputModality {
     pub(super) fn observe_pointer(&mut self) -> bool {
         self.replace(Self::Pointer)
     }
+
+    /// Clear a modality decision when its window or focused target leaves the
+    /// active render lifecycle.
+    pub(super) fn clear_after_focus_lifecycle(&mut self) -> bool {
+        self.replace(Self::Programmatic)
+    }
 }
 
 impl RootView {
-    /// Install one pre-action keyboard observer for this exact window. This
-    /// complements element capture for keys (notably Tab) that GPUI resolves to
-    /// actions before low-level listeners run. The subscription and modality both
-    /// remain Root-owned; the WindowId filter prevents cross-window updates.
-    pub(super) fn ensure_input_modality_key_interceptor(
+    /// Install the input and focus-lifecycle observers for this exact window.
+    /// The pre-action keyboard interceptor complements element capture for keys
+    /// (notably Tab) that GPUI resolves to actions first. The activation and
+    /// focus-lost observers clear stale rings when the window blurs or its
+    /// focused target is unmounted. All subscriptions and modality remain
+    /// Root-owned; the WindowId filter prevents cross-window keyboard updates.
+    pub(super) fn ensure_input_modality_observers(
         &mut self,
-        window: &Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.input_modality_key_subscription.is_some() {
-            return;
+        if self.input_modality_key_subscription.is_none() {
+            let window_id = window.window_handle().window_id();
+            let weak = cx.entity().downgrade();
+            self.input_modality_key_subscription =
+                Some(cx.intercept_keystrokes(move |_event, event_window, cx| {
+                    if event_window.window_handle().window_id() != window_id {
+                        return;
+                    }
+                    let _ = weak.update(cx, |view, cx| {
+                        if view.input_modality.observe_keyboard() {
+                            cx.notify();
+                        }
+                    });
+                }));
         }
-        let window_id = window.window_handle().window_id();
-        let weak = cx.entity().downgrade();
-        self.input_modality_key_subscription =
-            Some(cx.intercept_keystrokes(move |_event, event_window, cx| {
-                if event_window.window_handle().window_id() != window_id {
-                    return;
-                }
-                let _ = weak.update(cx, |view, cx| {
-                    if view.input_modality.observe_keyboard() {
+
+        if self.input_modality_activation_subscription.is_none() {
+            self.input_modality_activation_subscription =
+                Some(cx.observe_window_activation(window, |view, window, cx| {
+                    if !window.is_window_active()
+                        && view.input_modality.clear_after_focus_lifecycle()
+                    {
                         cx.notify();
                     }
-                });
-            }));
+                }));
+        }
+
+        if self.input_modality_focus_lost_subscription.is_none() {
+            self.input_modality_focus_lost_subscription =
+                Some(cx.on_focus_lost(window, |view, _window, cx| {
+                    if view.input_modality.clear_after_focus_lifecycle() {
+                        cx.notify();
+                    }
+                }));
+        }
     }
 
     pub(super) fn capture_input_modality_key_down(

@@ -1,9 +1,12 @@
 use super::*;
+use crate::core::DeviceGeneration;
 use crate::core::FailureKind;
+use crate::core::device_state::{DeviceLifecycle, DevicePresence};
 use crate::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, MemoryMetrics, MemoryScalarObservations,
     ScalarObservation,
 };
+use crate::core::storage::StorageIdentityStability;
 
 fn disk_metrics(
     device_id: &str,
@@ -14,6 +17,8 @@ fn disk_metrics(
 ) -> DiskMetrics {
     let mut disk = DiskMetrics::new(name);
     disk.device_id = device_id.to_owned();
+    disk.device_generation = DeviceGeneration::INITIAL;
+    disk.identity_stability = StorageIdentityStability::Persistent;
     disk.smart_temperature_c = temperature_c;
     disk.smart_percent_used = percent_used;
     disk.smart_critical_warning = critical_warning;
@@ -62,7 +67,10 @@ fn cpu_requires_duration_and_repeated_evaluation_is_deduplicated() {
 
     let repeated = engine.evaluate(&snapshot(7_000, 93.0, 0.0));
     assert_eq!(repeated.len(), 1);
-    assert_eq!(repeated[0].instance_id, "resource-hot:system");
+    assert_eq!(
+        repeated[0].instance_id,
+        super::AlertInstanceId::new("resource-hot".into(), super::AlertTargetIdentity::System,)
+    );
     assert_eq!(repeated[0].active_since_ms, 6_000);
 }
 
@@ -104,6 +112,14 @@ fn memory_disk_temperature_and_smart_thresholds_are_platform_neutral() {
         Some(92.0),
         Some(true),
     )];
+    snap.device_lifecycles.insert(
+        "wwid-1".into(),
+        DeviceLifecycle {
+            presence: DevicePresence::Present,
+            generation: DeviceGeneration::INITIAL,
+            ..DeviceLifecycle::default()
+        },
+    );
     let rules = [
         rule(AlertMetric::MemoryUsagePercent, 0, 5.0),
         AlertRule::new(
@@ -133,10 +149,10 @@ fn memory_disk_temperature_and_smart_thresholds_are_platform_neutral() {
     ];
     let alerts = AlertEngine::new(rules).evaluate(&snap);
     assert_eq!(alerts.len(), 4);
-    assert!(alerts.iter().any(|a| a.rule_id == "resource-hot"));
-    assert!(alerts.iter().any(|a| a.rule_id == "disk-hot"));
-    assert!(alerts.iter().any(|a| a.rule_id == "smart-wear"));
-    assert!(alerts.iter().any(|a| a.rule_id == "smart-warning"));
+    assert!(alerts.iter().any(|a| a.rule_id.as_str() == "resource-hot"));
+    assert!(alerts.iter().any(|a| a.rule_id.as_str() == "disk-hot"));
+    assert!(alerts.iter().any(|a| a.rule_id.as_str() == "smart-wear"));
+    assert!(alerts.iter().any(|a| a.rule_id.as_str() == "smart-warning"));
 }
 
 #[test]
@@ -153,9 +169,19 @@ fn missing_disk_sensor_drops_active_state_and_target_filter_is_honored() {
     let mut engine = AlertEngine::new([targeted]);
     let mut snap = snapshot(0, 0.0, 0.0);
     snap.disks = vec![
-        disk_metrics("", "ignored", Some(99.0), None, None),
-        disk_metrics("", "wanted", Some(80.0), None, None),
+        disk_metrics("ignored-device", "ignored", Some(99.0), None, None),
+        disk_metrics("wanted-device", "wanted", Some(80.0), None, None),
     ];
+    for device_id in ["ignored-device", "wanted-device"] {
+        snap.device_lifecycles.insert(
+            device_id.into(),
+            DeviceLifecycle {
+                presence: DevicePresence::Present,
+                generation: DeviceGeneration::INITIAL,
+                ..DeviceLifecycle::default()
+            },
+        );
+    }
     assert!(engine.evaluate(&snap).is_empty());
     snap.timestamp_ms = 1_000;
     assert_eq!(engine.evaluate(&snap).len(), 1);
@@ -318,7 +344,7 @@ fn alert_rule_merge_conflict_policies_are_atomic_and_ordered() {
     assert_eq!(kept.replaced, 0);
     assert_eq!(kept.kept_existing, 1);
     assert_eq!(kept.entries[0], existing[0]);
-    assert_eq!(kept.entries[2].rule.id, "new");
+    assert_eq!(kept.entries[2].rule.id.as_str(), "new");
 
     let replaced = merge_alert_rule_entries(
         &existing,

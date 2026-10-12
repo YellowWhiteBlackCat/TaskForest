@@ -13,6 +13,8 @@ use ratatui::backend::TestBackend;
 use taskmanager_application::i18n::{self, Language};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::session::SessionIncarnation;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 use crate::TuiApp;
 
@@ -471,7 +473,19 @@ fn open_service_log_panel(app: &mut TuiApp) -> bool {
 
 fn open_session_menu(app: &mut TuiApp) -> bool {
     go_to(app, AppPage::Users);
+    install_demo_session_incarnations(app);
     app.open_session_menu()
+}
+
+pub(crate) fn install_demo_session_incarnations(app: &mut TuiApp) {
+    let mut sessions = app.projection().sessions.clone().unwrap_or_default();
+    for (index, session) in sessions.iter_mut().enumerate() {
+        session.incarnation = Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: u64::try_from(index + 1).unwrap_or(1),
+        });
+    }
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
 }
 
 fn open_startup_menu(app: &mut TuiApp) -> bool {
@@ -514,8 +528,7 @@ fn open_batch_confirmation(app: &mut TuiApp) -> bool {
 }
 
 fn open_session_control_confirmation(app: &mut TuiApp) -> bool {
-    go_to(app, AppPage::Users);
-    if !app.open_session_menu() {
+    if !open_session_menu(app) {
         return false;
     }
     app.session_menu_select();

@@ -14,8 +14,8 @@ use crate::platform::{
 use crate::{ControlRequestId, RefreshRequest, StartupControlRequest};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal};
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity};
+use taskmanager_core::core::target::ServiceId;
 
 /// Immutable service-control target captured when a destructive service action
 /// (Stop / Restart / Disable) is requested. The provider-issued id and action
@@ -34,7 +34,7 @@ pub struct ServiceControlTarget {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionControlTarget {
     pub request_id: ControlRequestId,
-    pub session_id: SessionId,
+    pub identity: SessionIdentity,
     pub action: SessionControlAction,
 }
 

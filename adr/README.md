@@ -58,6 +58,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [051](051-four-frontend-products-zero-ui-features.md) | Four frontend products, zero UI features | Each frontend is an independent product crate + bin over the shared `taskmanager-cli` harness; `ui-*` features and every frontend conditional in shared layers are deleted; `cfg` is platform-axis only. | Frontend, Release, Layering |
 | [052](052-private-capture-run-isolation.md) | UUID-scoped private capture runs | Each background capture owns a UUID-scoped D-Bus/Wayland/KWin/runtime/binary/receipt namespace, a cgroup-supervised process tree and an atomic locked publication pointer; dual-run isolation is a release gate. | Frontend, Safety, Release |
 | [053](053-product-expected-capability-surface.md) | Product-expected capability surface | The product declares the expected capability identities and the runtime catalog seeds a typed `Unsupported` absence for every unregistered expected capability; "no entry" is never a product answer. | Capability, Observation |
+| [054](054-terminal-semantics-and-gui-accessibility-receipts.md) | Terminal semantics and GUI accessibility receipts | Shared semantic row inputs belong to `ui-contract`; TUI relies on its terminal emulator's native tree, while GUI native receipts require a real target-platform assistive-technology consumer. | Frontend, Accessibility |
 
 ## Decision chains
 
@@ -84,6 +85,9 @@ existing ADRs: cross-references and history depend on stable numbers.
 - ADR-053 extends ADR-009's absent-capability handle to the catalog: every
   product-expected capability answers with a real source or a typed absence,
   which is the shape ADR-043/044 capability-absence claims use.
+- ADR-054 distinguishes shared semantic inputs from native accessibility
+  evidence: TUI does not own its terminal emulator's tree, and GUI receipt
+  claims require a real platform-matched assistive-technology consumer.
 
 ## Find by topic
 
@@ -96,6 +100,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | Privilege & escalation | 023, 035, 048 |
 | Audited unsafe boundaries | 022, 024, 025, 031 |
 | Frontend & UI | 017, 020, 026, 027, 028, 029, 032, 037, 038, 039, 040, 041, 042, 046, 050, 051, 052 |
+| Accessibility & semantic output | 054 |
 | Runtime scheduling | 008, 033 |
 | Storage & persistence | 010, 036 |
 | Release & packaging | 006, 028, 029, 044, 045, 051 |

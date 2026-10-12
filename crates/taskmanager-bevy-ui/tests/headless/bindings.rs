@@ -18,4 +18,11 @@ fn binding_declaration_is_complete_for_bevy() {
             .map(|(_, status)| *status),
         Some(BindingCoverageStatus::Bound("F9"))
     );
+    assert_eq!(
+        report
+            .iter()
+            .find(|(command, _)| *command == CommandId::ShowSystemAbout)
+            .map(|(_, status)| *status),
+        Some(BindingCoverageStatus::Bound("Ctrl+A"))
+    );
 }

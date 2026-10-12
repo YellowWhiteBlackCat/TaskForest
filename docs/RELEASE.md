@@ -21,14 +21,11 @@ Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
 四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台
-的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed
-`Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency` 或
-`TemporarilyUnavailable` 呈现（这五个是 `platform-contract::CapabilityStatus` 的真实变体名）；
-`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 是不同轴，不得
-混用。平台按 typed 原因诚实降级是产品承诺的一部分，不得用空值、静态占位或未接线按钮把它写成
-正式版功能。能力身份承诺面由产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明：runtime
-catalog 为每个平台未注册的期望身份发布 typed 缺席 descriptor（`Unsupported`、无 provider
-归属），"无条目"不是合法的产品答案；机制与不可逆性见
+的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以
+typed 能力状态作答（五种 `CapabilityStatus` 不可用变体与两轴规则见
+[GLOSSARY](GLOSSARY.md)），不得用空值、静态占位或未接线按钮把它写成正式版功能。能力身份
+承诺面（`CapabilityId::EXPECTED_SURFACE`）的作答机制见
+[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 与
 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 
 只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应
@@ -174,10 +171,11 @@ RC 编号。打 RC tag 前必须满足：
 | `portability.yml` | PR、main push、手动、月度 | Windows（PR/main 阻塞）与 macOS（手动/月度 advisory）原生边界检查 |
 | `packaging.yml` | 仅 `workflow_call` | 构建和验证 Linux/Windows 多架构产物 |
 | `rehearsal.yml` | 手动 | 同时排练 Linux 与 Windows，不发布 |
-| `release.yml` | `v*` tag、指定已有 tag 手动 | history/precheck → packaging → 单一发布 |
+| `release.yml` | `v*` tag、指定已有 tag 手动 | 当前树与上一稳定 tag 以来的历史预检 → packaging → 单一发布 |
 
-Release 只把 `contents: write` 授予发布 job。可复用 workflow 只接收两个显式 Windows
-签名 secret，不继承其他仓库 secret。
+Release 只把 `contents: write` 授予发布 job。可复用 workflow 显式接收 shared UI kit 的
+只读依赖凭据和两个 Windows 签名 secret，不继承其他仓库 secret。依赖凭据只在 `cargo fetch`
+期间由临时 Git helper 使用，依赖拉取结束后即清理。
 
 ## 发布事务
 

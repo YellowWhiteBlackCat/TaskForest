@@ -1,90 +1,18 @@
 //! Typed command, key, and modifier vocabulary.
 
-use crate::AppAction;
-
 pub(crate) mod spec;
 
-/// Stable command identity shared by every frontend.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CommandId {
-    FocusSearch,
-    PageUp,
-    PageDown,
-    /// ArrowDown: advance the process selection by a single row.
-    ArrowDown,
-    /// ArrowUp: retreat the process selection by a single row.
-    ArrowUp,
-    FocusNext,
-    FocusPrevious,
-    ShowPerformance,
-    ShowApplications,
-    ShowServices,
-    ShowSystem,
-    ShowStartup,
-    ShowUsers,
-    ShowAppHistory,
-    /// Alt+8: open the alerts-management surface (the route itself is
-    /// frontend-owned; every shape decides how the page renders).
-    ShowAlerts,
-    Refresh,
-    EndTask,
-    OpenProperties,
-    ShowSystemAbout,
-    Dismiss,
-    /// Enter: confirm the active confirmation dialog (End Task / service / batch).
-    Confirm,
-    TogglePause,
-    ToggleSidebar,
-    /// Home: jump to the first visible process row.
-    MoveToFirst,
-    /// End: jump to the last visible process row.
-    MoveToLast,
-    /// Ctrl+C: copy the current selected row's summary to the clipboard.
-    CopySelectedRow,
-}
+pub use spec::{CommandId, CommandPaletteDisposition, CommandPaletteExclusionReason};
 
-impl CommandId {
-    /// Every command in canonical order, derived from the single spec table
-    /// (`spec::COMMAND_SPECS`) — never a hand-maintained second list.
-    pub const ALL: [Self; spec::COMMAND_SPECS.len()] = {
-        let mut ids = [Self::FocusSearch; spec::COMMAND_SPECS.len()];
-        let mut index = 0;
-        while index < spec::COMMAND_SPECS.len() {
-            ids[index] = spec::COMMAND_SPECS[index].id;
-            index += 1;
-        }
-        ids
-    };
-
-    /// The spec row for this command. The table is the single source for
-    /// per-command metadata; a `CommandId` variant without a row is an
-    /// authoring error caught by the spec-coverage test.
-    #[must_use]
-    pub(crate) fn spec(self) -> &'static spec::CommandSpec {
-        spec::COMMAND_SPECS
-            .iter()
-            .find(|row| row.id == self)
-            .expect("command spec table covers every CommandId")
-    }
-
-    #[must_use]
-    pub fn action(self) -> AppAction {
-        self.spec().action
-    }
-
-    /// i18n key of the shared command label (buttons, menus, shortcuts,
-    /// TUI help) resolved through the application locale catalog.
-    #[must_use]
-    pub fn label_key(self) -> &'static str {
-        self.spec().label_key
-    }
-
-    /// i18n key of the shared command description (help overlays and the
-    /// command palette) resolved through the application locale catalog.
-    #[must_use]
-    pub fn description_key(self) -> &'static str {
-        self.spec().description_key
-    }
+/// Commands suitable for a command-palette entry, in registry order.
+///
+/// Frontends may add their own local actions after these shared commands;
+/// toolkit executors remain owned by each frontend.
+#[must_use = "the returned iterator contains the available command-palette entries"]
+pub fn command_palette_commands() -> impl Iterator<Item = CommandId> {
+    CommandId::ALL
+        .into_iter()
+        .filter(|command| command.palette_disposition().is_available())
 }
 
 /// Key values used by the default command map.

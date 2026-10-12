@@ -28,7 +28,12 @@ Windows 的 host 刷新曾把主机线程总数放在外部脚本快照里；当
 - `OpenProcess` / `GetProcessTimes` / `TerminateProcess`：读取高精度创建时间，并且只在
   创建时间与冻结身份相等时终止同一拥有的进程句柄；PID 本身永远不是授权凭据。
 - `WTSEnumerateSessionsW` / `WTSQuerySessionInformationW` / `WTSLogoffSession`：有界读取
-  WTS 会话、用户名和站名，并执行本地会话注销；WTS 分配由 RAII 私有释放。
+  WTS 会话、用户名、站名及 `WTSSessionInfoEx` Level 1 的 `LogonTime`，并执行本地会话
+  注销；WTS 分配由 RAII 私有释放。Level 必须为 1、返回的 SessionId 必须与查询 ID 相同，
+  LogonTime 必须是正的 100 ns tick 值。它作为 per-logon 身份比较证据，不作为展示时间，也
+  不被描述为系统保证唯一的 generation 或 session handle；任何缺失、权限拒绝或格式异常都
+  不得回退为裸 SessionId 控制目标。该信息类在 Windows Vista / Server 2008 不受支持，
+  对应行保留展示并把 session inventory 标记为 Partial。
 - `GetLogicalProcessorInformationEx(RelationProcessorPackage/RelationCache)`：有界读取
   socket 数与 L1/L2/L3 cache relationship；只输出聚合 KiB，不输出 group mask 或原始
   记录指针。
@@ -51,7 +56,8 @@ Windows 的 host 刷新曾把主机线程总数放在外部脚本快照里；当
 
 边界根使用 `#![deny(unsafe_op_in_unsafe_fn)]`，每个 `unsafe` 块带 `// SAFETY:` 说明，
 公开 API 只返回 typed 值（`SystemPerformance`、`ServiceStartMode`、`KnownFolder`、
-`WindowsSession`、`WindowsProcessorTopology`、`WindowsNetworkAdapter`、`WindowsGpuAdapter`、
+`WindowsSession`、`WindowsSessionIncarnation`、`WindowsSessionIdentity`、
+`WindowsProcessorTopology`、`WindowsNetworkAdapter`、`WindowsGpuAdapter`、
 `ProcessPriorityClass`、路径、创建时间、SMBIOS 原始字节向量）
 和 `WindowsApiError`。HANDLE、指针、UTF-16 缓冲以及 Windows 生成绑定类型都不得跨 crate
 边界。唯一生产消费者是
@@ -84,6 +90,13 @@ Windows host lane 只用 `sysinfo` + 该 native query。CPU static facts、NIC m
   `GetLogicalProcessorInformationEx` 只在 provider 构造/硬件刷新边界产生 socket/cache
   facts。网络 provider 复用 `sysinfo` 的地址/operational state，并用 `GetIfTable2` 补 link
   speed；任何查询失败都保留 typed failure。
+- WTS session row 的 LogonTime 查询失败时保留显示行，但不创建 session identity；清单将该
+  来源报告为 Partial。每个注销请求都在最终 native dispatch 前重新查询完整
+  `(SessionId, LogonTime)`，仅相等时调用 `WTSLogoffSession`。WTS 注销 API 本身只接收数字
+  SessionId，查询和注销不是原子操作，不能承诺消除二者间 SessionId 被重用的窄竞态。
+- `LockWorkStation` 无 session 参数且只作用于调用进程的交互桌面。只有目标的 SessionId 与
+  LogonTime 都匹配当前进程 WTS session 时才可调用；其它 session 返回 typed Unsupported，
+  不得把调用会话锁屏报告成所选行已锁定。成功仅代表异步请求已启动，不代表锁屏完成。
 
 这些改动不扩大 unsafe 根；它们只减少重复扫描、保留真实失败语义，并把安全 wrapper 的
 输出继续限制在 typed 值和 bounded collection 内。
@@ -98,7 +111,10 @@ Windows host lane 只用 `sysinfo` + 该 native query。CPU static facts、NIC m
 本 ADR 不批准通用 Win32 FFI、COM、PDH、WMI、ETW、进程亲和/挂起/资源控制或 UAC helper。
 本次新增的 topology/adapter-information 调用组是固定的 bounded exceptions，不构成通用
 counter、WMI 或 adapter framework 的授权。
-已登记的精确 End/Kill 只允许使用创建时间二次核验；不能借此扩展为任意进程控制。SCM
+已登记的精确 End/Kill 只允许使用创建时间二次核验；不能借此扩展为任意进程控制。WTS
+LogonTime 是可重查的 per-logon 证据，但 Microsoft 未承诺其为唯一 generation，且
+`WTSLogoffSession` 只接收 SessionId，dispatch 前重查不能构成原子身份绑定；不得将该 seam
+描述成无竞态保证。`LockWorkStation` 不能锁定任意 WTS target。SCM
 start mode 仍只能做上述 partial update；其它服务配置字段找不到成熟 safe crate 时保持
 typed `Unsupported`。只有另一个可独立审计的最小 ABI 才能提交新的 ADR、反向防火墙和
 对应回归门禁。
@@ -119,7 +135,9 @@ provider（typed `Unsupported`，目录描述符诚实存在），MCDM 保留为
 2. 架构门禁将其加入 unsafe allowlist、panic scan、safe-seam scan 和 reverse firewall。
 3. Linux 目标返回 typed `Unsupported`，Windows 目标通过 `cargo check`；真实 Windows
    数字（含 CPU topology/cache、link speed）、配置恢复、Known Folder、WTS、进程权限和启动项权限必须由 required Windows
-   native-safety receipt 执行，未取得 runner 回执前仍保持 on-box-unverified。
+   native-safety receipt 执行，未取得 runner 回执前仍保持 on-box-unverified。WTS receipt 验证
+   同一登录的 LogonTime 可重复读取、Level/SessionId/非零校验及 token 缺失/权限拒绝的 fail-closed
+   行为；不得在真实桌面 receipt 中实际注销或锁定用户会话，拒绝路径由注入式行为测试验证。
 4. `tests/logic/workspace_architecture_test/dependency_firewall/frontend_safety.rs` 扫描
    Windows adapter 全部 Rust 源码，禁止重新出现命令解释器遥测 token；这条规则覆盖测试
    和开发辅助代码，不只是生产模块。

@@ -5,12 +5,15 @@ memory	memory	1180x780	gnome-dark
 disk	disk	1180x780	gnome-dark
 network	network	1180x780	gnome-dark
 gpu	gpu	1180x780	gnome-dark
+gpu-zh	gpu	1180x780	gnome-dark
 npu	npu	1180x780	gnome-dark
 battery	battery	1180x780	gnome-dark
 fan	fan	1180x780	gnome-dark
 service-details	service-details	1180x780	gnome-dark
 health-modal	health	1180x780	gnome-dark
 cpu-compact	cpu	720x480	gnome-dark
+cpu-facts	cpu-facts	1180x780	gnome-dark
+cpu-facts-compact	cpu-facts	720x480	gnome-dark
 applications-compact	applications	720x480	gnome-dark
 services	services	1180x780	gnome-dark
 services-compact	services	720x480	gnome-dark
@@ -26,6 +29,7 @@ memory-compact	memory	720x480	gnome-dark
 disk-compact	disk	720x480	gnome-dark
 network-compact	network	720x480	gnome-dark
 gpu-compact	gpu	720x480	gnome-dark
+gpu-zh-compact	gpu	720x480	gnome-dark
 npu-compact	npu	720x480	gnome-dark
 battery-compact	battery	720x480	gnome-dark
 fan-compact	fan	720x480	gnome-dark
@@ -46,6 +50,8 @@ first-run	first-run	1180x780	gnome-dark
 first-run-compact	first-run	720x480	gnome-dark
 process-details	process-details	1180x780	gnome-dark
 process-details-compact	process-details	720x480	gnome-dark
+process-context-menu	process-context-menu	1180x780	gnome-dark
+process-context-menu-compact	process-context-menu	720x480	gnome-dark
 process-properties-performance	process-properties-performance	1180x780	gnome-dark
 process-properties-performance-compact	process-properties-performance	720x480	gnome-dark
 process-insights	process-insights	1180x780	gnome-dark
@@ -99,6 +105,8 @@ process-tree-confirm	process-tree-confirm	1180x780	gnome-dark
 process-tree-confirm-compact	process-tree-confirm	720x480	gnome-dark
 process-batch-confirm	process-batch-confirm	1180x780	gnome-dark
 process-batch-confirm-compact	process-batch-confirm	720x480	gnome-dark
+users-session-confirmation	users-session-confirmation	1180x780	gnome-dark
+users-session-confirmation-compact	users-session-confirmation	720x480	gnome-dark
 smart-self-test-confirm	smart-self-test-confirm	1180x780	gnome-dark
 smart-self-test-confirm-compact	smart-self-test-confirm	720x480	gnome-dark
 process-memory-pss-swap	process-memory-pss-swap	1180x780	gnome-dark

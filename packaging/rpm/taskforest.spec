@@ -54,6 +54,7 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/libexec/taskforest-smbios-helper
 /usr/libexec/taskforest-rapl-helper
 /usr/libexec/taskforest-msr-helper
+/usr/libexec/taskforest-smart-self-test-helper
 /usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop
 /usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml
 %dir /usr/share/taskforest
@@ -65,6 +66,7 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy
 %dir /usr/share/licenses/taskforest
 /usr/share/licenses/taskforest/LICENSE

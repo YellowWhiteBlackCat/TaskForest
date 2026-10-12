@@ -34,7 +34,7 @@ use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
 };
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
 
@@ -42,23 +42,23 @@ use super::process_rows::ProcessRowId;
 use super::sort_axis::sort_axis;
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
+use crate::fixture::DirectTrackSeedFact;
 use taskmanager_core::core::process::ProcessLiveKey;
 
 mod inventory_sort;
 mod process_selection;
 mod process_viewing;
+mod session_control;
 
 pub use process_selection::identity_range;
 use taskmanager_application::{
-    AlertEvaluation, ControlRequestId, DesktopNotificationRequest, GpuEngineRowsState,
-    ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome, MsrReadoutState, NetworkEscalationState,
-    PersistentApplicationHistoryRecorder, PlatformEventBatch, ProcessAffinityState,
-    ProcessBatchState, ProcessEvent, RaplPowerState, RequestAttemptId, ShellUiActionIntent,
-    ShellUiActionState, SmartSelfTestState, SmbiosMemoryState,
+    AlertEvaluation, AlertEventSeed, AlertRuleEditResult, ControlRequestId,
+    DesktopNotificationRequest, GpuEngineRowsState, ManagedAlertRuleEdit, MsrReadoutState,
+    NetworkEscalationState, PersistentApplicationHistoryRecorder, PlatformEventBatch,
+    ProcessAffinityState, ProcessBatchState, ProcessEvent, RaplPowerState, RequestAttemptId,
+    ShellUiActionIntent, ShellUiActionState, SmartSelfTestState, SmbiosMemoryState,
 };
-use taskmanager_core::core::alerts::{
-    Alert, AlertEvent, AlertRuleTransferError, NotificationPolicy,
-};
+use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
 use taskmanager_core::core::history::HistoryRecordSink;
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -239,17 +239,25 @@ impl DirectTrackState {
         }
     }
 
-    pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::DirectTrackSeedFact) {
+    pub(crate) fn seed_fixture_fact(&mut self, fact: DirectTrackSeedFact) {
         match fact {
-            crate::fixture::DirectTrackSeedFact::NpuInventory(snapshot) => {
-                self.projection.npu_inventory = Some(snapshot);
+            DirectTrackSeedFact::NpuInventory(snapshot) => {
+                self.projection.seed_npu_inventory_fixture(snapshot);
                 self.projection.system_revision = self.projection.system_revision.saturating_add(1);
             }
-            crate::fixture::DirectTrackSeedFact::Processes(processes) => {
+            DirectTrackSeedFact::Processes(processes) => {
                 self.projection.processes = Some(std::sync::Arc::new(processes));
                 self.projection.processes_observed_at_ms = 0;
                 self.projection.process_revision =
                     self.projection.process_revision.saturating_add(1);
+            }
+            DirectTrackSeedFact::Sessions(sessions) => {
+                self.projection.sessions = sessions;
+                self.projection.sessions_revision =
+                    self.projection.sessions_revision.saturating_add(1);
+            }
+            DirectTrackSeedFact::SessionsSource(source) => {
+                self.projection.sessions_source = source;
             }
         }
     }
@@ -387,8 +395,11 @@ impl DirectTrackState {
     pub fn edit_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        self.projection.alert_center.edit_rules(edit)
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
+        let result = self.projection.alert_center.edit_rules(edit)?;
+        self.projection
+            .record_alert_projection_changes(result.changes);
+        Ok(result)
     }
 
     pub fn set_alert_policy(&mut self, policy: NotificationPolicy) {
@@ -398,14 +409,21 @@ impl DirectTrackState {
     /// Clear the shared alert transition history without changing the active
     /// evaluator or notification policy.
     pub fn clear_alert_event_history(&mut self) {
-        self.projection.alert_center.clear_event_history();
+        let changes = self.projection.alert_center.clear_event_history();
+        self.projection.record_alert_projection_changes(changes);
     }
 
     /// Install deterministic alert transition history through the direct
     /// track's fixture boundary; production events still come only from the
     /// shared evaluator.
-    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEvent>) {
-        self.projection.alert_center.replace_event_history(events);
+    pub fn replace_alert_event_history(&mut self, events: Vec<AlertEventSeed>) {
+        let changes = self.projection.alert_center.replace_event_history(events);
+        self.projection.record_alert_projection_changes(changes);
+    }
+
+    pub fn reset_alert_center(&mut self) {
+        let changes = self.projection.alert_center.reset();
+        self.projection.record_alert_projection_changes(changes);
     }
 
     #[must_use]
@@ -414,17 +432,13 @@ impl DirectTrackState {
         snapshot: &SystemSnapshot,
         observed_at_ms: u64,
     ) -> AlertEvaluation {
-        self.projection
+        let evaluation = self
+            .projection
             .alert_center
-            .evaluate(snapshot, observed_at_ms)
-    }
-
-    /// Commit a synchronous alert-rule evaluation through a named reducer.
-    /// Returns the new revision used by renderer materialization.
-    pub fn accept_alert_evaluation(&mut self, active: Vec<Alert>) -> u64 {
-        self.projection.alert_active = active;
-        self.projection.refresh_count = self.projection.refresh_count.saturating_add(1);
-        self.projection.refresh_count
+            .evaluate(snapshot, observed_at_ms);
+        self.projection
+            .record_alert_projection_changes(evaluation.changes);
+        evaluation
     }
 
     pub fn begin_process_control(
@@ -768,13 +782,26 @@ impl DirectTrackState {
     }
 
     #[must_use]
-    pub fn begin_session_control(&mut self) -> ControlRequestId {
-        self.projection.session_control_requests.begin()
+    pub fn begin_session_control(
+        &mut self,
+        identity: SessionIdentity,
+        action: SessionControlAction,
+    ) -> ControlRequestId {
+        self.projection
+            .session_control_requests
+            .begin(identity, action)
     }
 
     #[must_use]
-    pub fn accept_session_control(&mut self, request_id: ControlRequestId) -> bool {
-        self.projection.session_control_requests.accept(request_id)
+    pub fn accept_session_control(
+        &mut self,
+        request_id: ControlRequestId,
+        identity: &SessionIdentity,
+        action: SessionControlAction,
+    ) -> bool {
+        self.projection
+            .session_control_requests
+            .accept(request_id, identity, action)
     }
 
     #[must_use]

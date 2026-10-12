@@ -104,6 +104,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       # This is the same cheap fail-fast entry point developers run locally.
       # It completes before GUI packages, Cargo caches, or workspace builds.
       # The release helper binaries do not exist in this policy job yet, so
@@ -113,8 +117,14 @@ jobs:
         env:
           SKIP_INSTALL_MANAGER_SMOKE: "1"
         run: timeout --kill-after=10s 300s bash scripts/quality/local-gates.sh quick
-      # Dependency audit needs neither Rust compilation nor Linux GUI libraries.
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      # Keep the audit on the runner so it can reuse the private Git dependency
+      # fetched above without passing credentials into a Docker action.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2
+          fallback: none
+      - name: Audit dependency policy
+        run: cargo deny check
 
   lint:
     name: Linux (clippy)
@@ -135,6 +145,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -187,6 +201,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
@@ -217,6 +235,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -249,6 +271,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:

@@ -12,6 +12,7 @@ use crate::ui::applications::{
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{SortCol, SortDir};
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 use super::super::process_projection::ProcessProjection;
 use taskmanager_application::AppPage;

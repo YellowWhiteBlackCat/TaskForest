@@ -8,9 +8,9 @@ use crate::OptCallback;
 use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Task, Window, div,
-    px,
+    AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, FocusHandle, InteractiveElement,
+    IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
+    Styled, Task, Window, div, px,
 };
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Palette};
@@ -63,6 +63,7 @@ pub struct ToastState {
     id: u64,
     message: SharedString,
     kind: ToastKind,
+    dismiss_focus: FocusHandle,
     auto_dismiss: Option<Duration>,
     _task: Option<Task<()>>,
 }
@@ -73,12 +74,13 @@ impl ToastState {
         id: u64,
         message: impl Into<SharedString>,
         kind: ToastKind,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> Self {
         Self {
             id,
             message: message.into(),
             kind,
+            dismiss_focus: cx.focus_handle().tab_stop(true),
             auto_dismiss: None,
             _task: None,
         }
@@ -121,6 +123,7 @@ impl ToastState {
 impl EventEmitter<ToastEvent> for ToastState {}
 
 /// Builder for one rendered toast card.
+#[derive(IntoElement)]
 pub struct Toast {
     state: Entity<ToastState>,
     palette: Palette,
@@ -147,9 +150,9 @@ impl Toast {
 
 impl RenderOnce for Toast {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let (message, kind) = self
-            .state
-            .read_with(cx, |state, _| (state.message(), state.kind()));
+        let (message, kind, dismiss_focus) = self.state.read_with(cx, |state, _| {
+            (state.message(), state.kind(), state.dismiss_focus.clone())
+        });
         let palette = self.palette;
         let accent = kind.color(&palette);
         let on_dismiss = self.on_dismiss.clone();
@@ -180,8 +183,23 @@ impl RenderOnce for Toast {
                 el.child(
                     div()
                         .id("tm-toast-dismiss")
+                        .debug_selector(|| "tm-toast-dismiss".into())
+                        .track_focus(&dismiss_focus)
+                        .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
                         .cursor_pointer()
                         .text_color(crate::theme_binding::hsla(palette.fg_muted))
+                        .on_key_down({
+                            let on_dismiss = on_dismiss.clone();
+                            move |event: &KeyDownEvent, window, cx| {
+                                let stroke = &event.keystroke;
+                                if !stroke.modifiers.modified()
+                                    && matches!(stroke.key.as_str(), "enter" | "space")
+                                {
+                                    cx.stop_propagation();
+                                    on_dismiss(window, cx);
+                                }
+                            }
+                        })
                         .on_click(move |_event: &ClickEvent, window, cx| {
                             on_dismiss(window, cx);
                         })

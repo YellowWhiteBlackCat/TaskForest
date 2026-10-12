@@ -5,7 +5,9 @@
 mod action;
 mod alert_center;
 mod alert_dispatch;
-pub use alert_center::{AlertCenter, AlertEvaluation};
+pub use alert_center::{
+    AlertCenter, AlertEvaluation, AlertEventSeed, AlertProjectionChanges, AlertRuleEditResult,
+};
 pub use alert_dispatch::AlertDispatcher;
 
 /// Maximum number of container summaries a frontend materializes in its
@@ -92,7 +94,10 @@ pub use boot_baseline::{
     BootBaselineRecordKind, BootBaselineRequest, BootBaselineRequestId, BootBaselineState,
     BootBaselineSubmission,
 };
-pub use command::{CommandId, KeyChord, KeyCode, KeyParseError, Modifiers};
+pub use command::{
+    CommandId, CommandPaletteDisposition, CommandPaletteExclusionReason, KeyChord, KeyCode,
+    KeyParseError, Modifiers, command_palette_commands,
+};
 pub use config_runtime::{
     ConfigBootstrap, ConfigBootstrapFallback, ConfigClient, ConfigCoordinator, ConfigDrain,
     ConfigPublication, ConfigPublicationId, ConfigPublicationOutcome, ConfigRecovery,
@@ -106,8 +111,9 @@ pub use config_store::{
     MAX_CONFIG_BYTES,
 };
 pub use control::{
-    ControlRequestId, LatestControlRequest, LatestServiceControlRequest, ServiceControlOutcome,
-    SessionControlOutcome, SessionControlRequest, StartupControlOutcome, StartupControlRequest,
+    ControlRequestId, LatestControlRequest, LatestServiceControlRequest,
+    LatestSessionControlRequest, ServiceControlOutcome, SessionControlOutcome,
+    SessionControlRequest, StartupControlOutcome, StartupControlRequest,
 };
 pub use device_lifecycle::{
     DeviceLifecycleApplyResult, DeviceLifecycleChange, DeviceLifecycleChangeKind,

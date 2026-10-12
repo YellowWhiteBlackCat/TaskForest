@@ -8,9 +8,10 @@
 //! cells render as one `Rich` span run: a single widget with the same fixed
 //! width and wrapping behavior as the plain `text` cell it replaces.
 
-use iced::widget::text::{Rich, Span};
 use iced::{Element, Length};
 use taskmanager_core::core::text::match_ranges_ascii_ci;
+use zhuge_ui_core::text::{SearchTextRun, project_byte_ranges};
+use zhuge_ui_kit_iced::text::highlighted;
 
 use crate::app::Message;
 use taskmanager_theme::Theme;
@@ -23,32 +24,8 @@ use taskmanager_theme::Theme;
 /// code point; the slicing re-checks with `get` so a matcher regression can
 /// never panic on a non-boundary range.
 #[must_use]
-pub fn highlight_segments(text: &str, query: &str) -> Vec<(String, bool)> {
-    let ranges = match_ranges_ascii_ci(text, query.trim());
-    if ranges.is_empty() {
-        return vec![(text.to_string(), false)];
-    }
-
-    let mut segments = Vec::new();
-    let mut cursor = 0;
-    for range in ranges {
-        let end = range.end;
-        if range.start > cursor {
-            segments.push((text[cursor..range.start].to_string(), false));
-        }
-        match text.get(range) {
-            Some(matched) => segments.push((matched.to_string(), true)),
-            None => {
-                segments.push((text[cursor..].to_string(), false));
-                return segments;
-            }
-        }
-        cursor = end;
-    }
-    if cursor < text.len() {
-        segments.push((text[cursor..].to_string(), false));
-    }
-    segments
+pub(crate) fn cell_runs(text: &str, query: &str) -> Vec<SearchTextRun> {
+    project_byte_ranges(text, match_ranges_ascii_ci(text, query.trim()))
 }
 
 /// Render one table cell. While search is inactive (or the query empty) this
@@ -71,14 +48,15 @@ pub fn cell(
     let accent = crate::theme_binding::color(palette.accent);
     let foreground = crate::theme_binding::color(palette.fg);
 
-    let spans: Vec<Span<'static, ()>> = highlight_segments(text, query)
-        .into_iter()
-        .map(|(segment, matched)| {
-            Span::new(segment).color(if matched { accent } else { foreground })
-        })
-        .collect();
-
-    Rich::with_spans(spans).width(width).into()
+    highlighted(
+        cell_runs(text, query)
+            .into_iter()
+            .map(|run| (run.text, run.highlighted)),
+        foreground,
+        accent,
+    )
+    .width(width)
+    .into()
 }
 
 #[cfg(test)]

@@ -92,6 +92,34 @@ impl LinuxStorageTelemetryCollector {
     }
 }
 
+fn reset_reappeared_smart_facts(
+    state: &mut DiskCollectionState,
+    metrics: &mut [DiskMetrics],
+    reappeared: &[DeviceId],
+) {
+    if reappeared.is_empty() {
+        return;
+    }
+    let reappeared = reappeared
+        .iter()
+        .map(DeviceId::as_str)
+        .collect::<HashSet<_>>();
+    for disk in metrics
+        .iter_mut()
+        .filter(|disk| reappeared.contains(disk.device_id.as_str()))
+    {
+        // Collection precedes lifecycle reconciliation. Remove the previous
+        // generation's capability immediately and force a fresh observation.
+        disk.smart_self_test_capabilities = Default::default();
+    }
+    state
+        .smart_cache
+        .retain(|identity, _| !reappeared.contains(identity.as_str()));
+    state
+        .smart_source_cache
+        .retain(|identity, _| !reappeared.contains(identity.as_str()));
+}
+
 impl Default for LinuxStorageTelemetryCollector {
     fn default() -> Self {
         Self::new()
@@ -123,6 +151,7 @@ impl LinuxSystemDomainCollector for LinuxStorageTelemetryCollector {
             refresh,
             now_ms,
         );
+        reset_reappeared_smart_facts(&mut self.state, &mut metrics, &lifecycle_delta.reappeared);
         self.reset_absent_devices(&lifecycle_delta.newly_absent);
         self.scalar_state
             .reset_generations(&lifecycle_delta.reappeared);

@@ -7,11 +7,17 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 
-use crate::{TuiApp, TuiTheme};
+use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
 use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 
-pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+pub(super) fn render(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    input_scope: TuiInputScope,
+) {
     let state = if app.paused() {
         t("common.paused_badge")
     } else {
@@ -22,31 +28,27 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         format!(" {state} "),
         Style::new().fg(theme.color(Color::Black)).bg(style),
     );
-    let alert_span: Option<Span<'static>> =
-        (!app.shell.projection().alert_active.is_empty()).then(|| {
-            let count = app.shell.projection().alert_active.len();
-            let worst = app
-                .shell
-                .projection()
-                .alert_active
-                .iter()
-                .map(|alert| alert.severity)
-                .max()
-                .unwrap_or(AlertSeverity::Info);
-            let color = match worst {
-                AlertSeverity::Critical => theme.danger,
-                AlertSeverity::Warning => theme.warn,
-                AlertSeverity::Info => theme.good,
-            };
-            Span::styled(
-                format!(
-                    " {} ",
-                    t("alerts.active").replacen("{}", &count.to_string(), 1)
-                ),
-                Style::new().fg(theme.color(Color::Black)).bg(color),
-            )
-        });
-    let shortcut_span = Span::styled(t("footer.shortcuts"), Style::new().fg(theme.dim));
+    let active_alerts = app.shell.projection().alert_center.active_alerts();
+    let alert_span: Option<Span<'static>> = (!active_alerts.is_empty()).then(|| {
+        let count = active_alerts.len();
+        let worst = active_alerts
+            .iter()
+            .map(|alert| alert.severity)
+            .max()
+            .unwrap_or(AlertSeverity::Info);
+        let color = match worst {
+            AlertSeverity::Critical => theme.danger,
+            AlertSeverity::Warning => theme.warn,
+            AlertSeverity::Info => theme.good,
+        };
+        Span::styled(
+            format!(
+                " {} ",
+                t("alerts.active").replacen("{}", &count.to_string(), 1)
+            ),
+            Style::new().fg(theme.color(Color::Black)).bg(color),
+        )
+    });
     let (marker, feedback_color) =
         app.shell
             .feedback_notice()
@@ -76,7 +78,12 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         format!(" {marker}{feedback}  "),
         Style::new().fg(feedback_color),
     ));
-    spans.push(shortcut_span);
+    if input_scope != TuiInputScope::LocalSurface(TuiSurfaceKind::Health) {
+        spans.push(Span::styled(
+            t("footer.shortcuts"),
+            Style::new().fg(theme.dim),
+        ));
+    }
     let lines = vec![Line::from(spans)];
     frame.render_widget(
         Paragraph::new(lines)

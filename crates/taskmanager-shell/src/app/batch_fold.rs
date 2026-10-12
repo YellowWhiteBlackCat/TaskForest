@@ -384,7 +384,12 @@ impl SystemProjectionStore {
         if changes.sessions {
             self.sessions_revision = self.sessions_revision.saturating_add(1);
         }
-        if changes.hardware || changes.telemetry || changes.containers || changes.dynamic_devices {
+        if changes.hardware
+            || changes.telemetry
+            || changes.containers
+            || changes.dynamic_devices
+            || changes.npu_inventory
+        {
             self.system_revision = self.system_revision.saturating_add(1);
             changes.system = true;
         }

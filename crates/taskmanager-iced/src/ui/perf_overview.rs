@@ -4,6 +4,7 @@
 //! without duplicating it (the history graph already carries both series).
 
 use super::*;
+use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::cpu_idle_state_summary;
 use taskmanager_shell::presentation::cpu_interrupt_compact_summary;
 use taskmanager_shell::presentation::cpu_power_limits_summary;
@@ -103,6 +104,7 @@ fn cpu_detail(
     let extent = perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation);
     let per_core_composes = chart_layout == projection::CpuChartLayout::AggregateWithPerCore
         && budget.vertical.carries_core_stack();
+    let chart_extent = extent.for_primary_chart(per_core_composes);
     let chart_height = if per_core_composes {
         // GPUI's CPU page pins the headline tier to a fixed height so the
         // per-core matrix composes INSIDE the first viewport (ICED-024-7/8);
@@ -117,15 +119,18 @@ fn cpu_detail(
         // floor (GPUI MAIN_GRAPH_MIN_HEIGHT parity).
         Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
     };
-    let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(8);
+    let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(4);
     chart_content = chart_content.push(cpu_performance_chart(app, theme_snapshot, chart_height));
     // Vertical ladder (GPUI parity): the per-chart summary rows drop
     // explicitly at the Floor rung — before the headline floor is touched.
     if budget.vertical.carries_core_stack() {
         chart_content = chart_content.push(column(cpu::cpu_graph_summary_elements(app)).spacing(2));
     }
-    let chart_content = chart_content.height(extent.length());
-    let mut left = vec![
+    let chart_content = chart_content.height(chart_extent.length());
+    // The Charts rung keeps the 300px headline intact and admits the first
+    // core row by tightening only the gaps inside its CPU fact band.
+    let observation_spacing = if per_core_composes { 4.0 } else { 12.0 };
+    let mut observation_band = column![
         overview_gauges(app),
         // The utilization readout is carried by the CPU gauge directly above —
         // repeating it here made the strip read as two stacked rows for one
@@ -140,7 +145,8 @@ fn cpu_detail(
             temperature_source,
             theme_snapshot,
         ),
-    ];
+    ]
+    .spacing(observation_spacing);
     if let Some(load) = app
         .shell
         .projection()
@@ -148,20 +154,26 @@ fn cpu_detail(
         .as_ref()
         .and_then(|snapshot| snapshot.load_average.as_ref())
     {
-        left.push(
-            text(load_average_summary(load))
-                .size(f32::from(tokens::FONT_12))
-                .into(),
-        );
+        observation_band = observation_band
+            .push(text(load_average_summary(load)).size(f32::from(tokens::FONT_12)));
     }
-    let chart_panel = perf_layout::graph_card(theme_snapshot, chart_content.into(), extent);
+    let mut left = vec![observation_band.into()];
+    let chart_panel = perf_layout::graph_card_with_padding(
+        theme_snapshot,
+        chart_content.into(),
+        chart_extent,
+        if per_core_composes { 4 } else { 8 },
+    );
     match chart_layout {
         projection::CpuChartLayout::AggregateWithPerCore => {
-            left.push(performance_graph_resolution_selector(
-                theme_snapshot,
-                app.graph_data_points(),
-            ));
-            left.push(chart_panel);
+            let selector =
+                performance_graph_resolution_selector(theme_snapshot, app.graph_data_points());
+            if per_core_composes {
+                left.push(column![selector, chart_panel].spacing(0).into());
+            } else {
+                left.push(selector);
+                left.push(chart_panel);
+            }
             // The below band renders from the Core rung up (GPUI parity).
             if budget.vertical.carries_core_stack() {
                 // The family-trend strip is the Strip-frame carrier of the
@@ -177,13 +189,33 @@ fn cpu_detail(
         }
         projection::CpuChartLayout::AggregateOnly => left.push(chart_panel),
     }
-    if let Some(card) = cpu::rapl_power_card(app, theme_snapshot) {
-        left.push(card);
+    if !per_core_composes {
+        // RAPL/MSR facts remain in the independently scrollable stats rail;
+        // their duplicate detail cards yield the standard core viewport.
+        if let Some(card) = cpu::rapl_power_card(app, theme_snapshot) {
+            left.push(card);
+        }
+        if let Some(card) = cpu::msr_readouts_card(app, theme_snapshot) {
+            left.push(card);
+        }
     }
-    if let Some(card) = cpu::msr_readouts_card(app, theme_snapshot) {
-        left.push(card);
+    if per_core_composes {
+        // Give the complete core matrix the one elastic residual slot after
+        // its fixed facts and headline chart have taken their intrinsic size.
+        left = vec![
+            column(left)
+                .spacing(0)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into(),
+        ];
     }
     let (title, subtitle, stats) = cpu_memory_header_and_stats(app, PerfDevice::Cpu);
+    let authorization_footer = if per_core_composes {
+        cpu::authorization_actions_footer(app, theme_snapshot)
+    } else {
+        None
+    };
     perf_layout::main_with_stats(
         theme_snapshot,
         perf_layout::DetailHeader {
@@ -196,7 +228,7 @@ fn cpu_detail(
         perf_layout::DetailBody {
             left,
             stats,
-            footer: None,
+            footer: authorization_footer,
         },
         budget,
         perf_layout::DetailExtent::Fill,
@@ -342,6 +374,10 @@ pub(crate) fn cpu_memory_header_and_stats(
             .brand
             .clone()
             .unwrap_or_else(|| t("common.collecting_telemetry").to_string());
+        let hardware = app.shell.projection().hardware.as_ref();
+        let logical_cores = cpu
+            .logical_cores
+            .or_else(|| hardware.and_then(|hardware| hardware.cpu_cores));
         let mut stats = vec![
             StatRow::text(
                 t("common.utilization"),
@@ -357,13 +393,25 @@ pub(crate) fn cpu_memory_header_and_stats(
             StatRow::text(t("common.uptime"), Some(duration(snapshot.uptime_secs))),
             StatRow::text(
                 t("common.cores"),
-                match (cpu.physical_cores, cpu.logical_cores) {
+                match (cpu.physical_cores, logical_cores) {
                     (Some(physical), Some(logical)) => Some(format!("{physical} / {logical}")),
-                    _ => None,
+                    (Some(physical), None) => Some(format!("{physical} / {MISSING_VALUE}")),
+                    (None, Some(logical)) => Some(format!("{MISSING_VALUE} / {logical}")),
+                    (None, None) => None,
                 },
             ),
         ];
-        if let Some(hardware) = app.shell.projection().hardware.as_ref() {
+        if let Some(row) = cpu::cpu_core_temperature_row(cpu) {
+            stats.push(row);
+        }
+        if let Some(hardware) = hardware {
+            stats.extend(cpu::heterogeneous_core_rows(&hardware.core_breakdown));
+            if let Some(frequency_mhz) = hardware.base_freq_mhz.filter(|value| *value > 0) {
+                stats.push(StatRow::text(
+                    t("system.field.base_frequency"),
+                    Some(format!("{frequency_mhz} MHz")),
+                ));
+            }
             if let Some(sockets) = hardware.sockets {
                 stats.push(StatRow::text(
                     t("system.field.sockets"),

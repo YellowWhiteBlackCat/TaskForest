@@ -19,7 +19,7 @@ use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
 
-use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectScope};
+use crate::command_palette::{ROW_TARGET_SHORTCUT, TUI_LOCAL_COMMANDS, TuiDirectScope};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::{FeedbackSource, shell_local_bindings};
 
@@ -233,6 +233,7 @@ fn enter_opens_the_declared_row_target_on_each_page() {
 
     let mut users = crate::demo_app();
     select_page(&mut users, AppPage::Users);
+    super::session_control::install_test_incarnations(&mut users);
     let _ = press_enter(&mut users);
     assert_eq!(
         users.local_surface_kind(),
@@ -535,11 +536,11 @@ fn d_toggles_the_directory_scan_only_on_the_disk_device() {
 // ── help / palette parity with the registry ──────────────────────────────
 
 /// Matrix clauses (b) and (c): every registry row appears in the palette with
-/// exactly the declared executability, and in the help overlay with the
-/// declared label (the English catalog's localized copy equals the registry's
-/// const label — or falls back to it verbatim).
+/// exactly the declared executability, except the structural `Enter` row
+/// target, which appears only in Help. Every row remains in Help with the
+/// declared or intentionally consolidated label.
 #[test]
-fn palette_and_help_carry_every_registry_row_with_declared_executability() {
+fn palette_and_help_carry_registry_rows_without_a_structural_enter_duplicate() {
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
@@ -548,23 +549,27 @@ fn palette_and_help_carry_every_registry_row_with_declared_executability() {
     let help = crate::ui::help::help_rows();
     for command in TUI_LOCAL_COMMANDS {
         let shortcut = command.binding.shortcut;
-        // The shared router's `Enter` (Properties) legitimately coexists with
-        // the registry's row-target `Enter`, so a row is identified by its
-        // full declared (shortcut, label) pair, not by the chord alone.
-        let matches_declaration = |row: &&crate::CommandPaletteRow| {
+        let matches_declaration = |row: &crate::CommandPaletteRow| {
             row.shortcut == shortcut && row.label == command.binding.label
         };
-        let row = palette
-            .iter()
-            .find(matches_declaration)
-            .unwrap_or_else(|| panic!("the palette must list the declared row {shortcut:?}"));
-        assert_eq!(
-            row.local_action, command.palette_action,
-            "palette executability must equal the registry declaration for {shortcut:?}"
-        );
         help.iter()
             .find(|row| row.shortcut == shortcut && row.label == command.binding.label)
             .unwrap_or_else(|| panic!("help must advertise the declared row {shortcut:?}"));
+        if shortcut == ROW_TARGET_SHORTCUT {
+            assert!(
+                !palette.iter().any(matches_declaration),
+                "the palette's structural Enter key must not duplicate its row target"
+            );
+        } else {
+            let row = palette
+                .iter()
+                .find(|row| matches_declaration(row))
+                .unwrap_or_else(|| panic!("the palette must list the declared row {shortcut:?}"));
+            assert_eq!(
+                row.local_action, command.palette_action,
+                "palette executability must equal the registry declaration for {shortcut:?}"
+            );
+        }
     }
 }
 

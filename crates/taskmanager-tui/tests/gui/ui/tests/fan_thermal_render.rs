@@ -238,7 +238,7 @@ fn fan_panel_admits_the_system_thermal_group_only_as_a_whole_group() {
 fn fan_capture_fixture_paints_named_thermal_zones_and_an_unread_dash() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Fan;
-    crate::demo::seed_fan_capture_sensors(&mut app);
+    crate::demo::fixtures::seed_fan_capture_sensors(&mut app);
 
     let text = frame_text(&app, 120, 36);
     for expected in [

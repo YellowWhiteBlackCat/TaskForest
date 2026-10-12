@@ -26,7 +26,7 @@ use taskmanager_ui::data::key_value_row::KeyValueRow;
 
 use super::msr_readouts::MsrReadoutsModel;
 use super::package_power::PackagePowerModel;
-use super::{EscalationReadouts, format_uptime, stats::CpuDetailsStats};
+use super::{EscalationReadouts, stats::CpuDetailsStats};
 
 pub(super) fn render_pinned(
     theme: &Theme,
@@ -181,8 +181,14 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
     col.child(kv_row(
         theme,
         i18n::t("common.up_time"),
-        &format_uptime(snap.uptime_secs),
+        &uptime_display_value(snap.uptime_secs),
     ))
+}
+
+/// Keep the CPU readout on the shared locale-aware duration presentation used
+/// by the other frontends; this function owns no duration formatting rules.
+fn uptime_display_value(seconds: u64) -> String {
+    i18n::format_duration(seconds)
 }
 
 /// A clean label-left / value-right details row (Win11 TM / Mission Center style):

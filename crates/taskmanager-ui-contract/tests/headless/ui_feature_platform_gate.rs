@@ -641,11 +641,10 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// W25-A batch promoted `power.thermal-throttle-events` from its surveyed
 /// `Unsupported` gap to the four shapes' real CPU-counter surfaces (GPUI
 /// reference; Iced/TUI/Bevy ported) with one fresh anchor per shape.
-/// The W28-A batch registered `memory.process-swap-charge` as the single
-/// authority for the per-process swap charge the four shapes already render,
-/// anchored the Iced and TUI Apps-table swap cells on their real tests, and
-/// recorded the GPUI and Bevy cells as explicit `pending` gaps (no
-/// discoverable test proves the observed charge there yet).
+/// W28-A registered `memory.process-swap-charge` as the single authority for
+/// the per-process swap charge rendered by all four shapes. Iced and TUI were
+/// anchored in W28-A; W28-P closed the initial GPUI and Bevy pending gaps with
+/// tests that assert the observed charge and the honest dash for missing data.
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();

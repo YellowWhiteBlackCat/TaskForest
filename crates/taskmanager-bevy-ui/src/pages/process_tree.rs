@@ -16,7 +16,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::ui::prelude::{AlignItems, FlexDirection, Node, UiRect, Val, percent, px};
+use bevy::ui::prelude::{FlexDirection, Node, UiRect, percent, px, rem};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
@@ -24,7 +24,6 @@ use taskmanager_application::process_category_projection::category_expansion_key
 use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 use taskmanager_shell::{
     ProcessRowId, ProcessTreeRow, SortCol, SortDir, app_tree_expansion_key_for_identity,
     process_semantic_key, project_process_tree_rows,
@@ -32,10 +31,12 @@ use taskmanager_shell::{
 
 use crate::app::{FrontendTrack, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole, WindowPalette};
 use taskmanager_shell::ShellApp;
+
+mod aggregate;
+use aggregate::row_scene;
 
 /// Stable expansion state for the Applications tree.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -237,61 +238,6 @@ fn category_label(category: ProcessCategory) -> String {
     }
 }
 
-/// Minimal themed row scene. The full page will add selection and observer
-/// components when this projection is mounted into the route.
-pub(crate) fn row_scene(row: &ProcessTreeRowView<'_>, palette: &UiPalette) -> impl Scene + use<> {
-    let mut label = if row.member_count > 1 || row.item.is_none() {
-        format!("{} · {}", row.label, row.member_count)
-    } else {
-        row.label.clone()
-    };
-    if let (Some(cpu), Some(memory)) = (&row.cpu, &row.memory) {
-        label.push_str(&format!(
-            " · {} · {}",
-            metric_text(cpu.current_value().map(|value| format!("{value:.1}%"))),
-            metric_text(memory.current_value().map(|value| bytes(*value))),
-        ));
-    }
-    let left_padding = space_8() * (row.depth as f32 + 1.0);
-    let semantic = SemanticAddress(stable_semantic_address("process-tree", &row.semantic_key));
-    let toggle = row.key.map_or_else(
-        || {
-            row.expansion_key
-                .clone()
-                .map(ProcessTreeToggle::UnknownGroup)
-        },
-        |key| match key {
-            ProcessRowId::Category(category) => Some(ProcessTreeToggle::Category(category)),
-            ProcessRowId::Application(identity) => Some(ProcessTreeToggle::Application(identity)),
-            ProcessRowId::Process(identity) if row.has_children => {
-                Some(ProcessTreeToggle::Process(identity))
-            }
-            ProcessRowId::Process(_) => None,
-        },
-    );
-    bsn! {
-        Node {
-            width: percent(100),
-            height: px(palette.control_height_px),
-            align_items: AlignItems::Center,
-            padding: UiRect::left(Val::Px(left_padding)),
-        }
-        ProcessTreeRowMarker({ toggle })
-        Button
-        on(on_tree_row_activated)
-        SemanticAddress({ semantic.0.clone() })
-        Children [
-             Text(label) TextRole(Role::Body) Pickable::IGNORE
-        ]
-    }
-}
-
-/// Format one aggregate cell. A missing current value renders the shared
-/// unavailable-value dash, never a fabricated zero.
-fn metric_text(value: Option<String>) -> String {
-    value.unwrap_or_else(|| MISSING_VALUE.to_owned())
-}
-
 #[derive(Event, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum TreeExpansionCommand {
     #[default]
@@ -305,7 +251,7 @@ fn tree_expansion_button(
     action: TreeExpansionCommand,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! {Node {min_height:px(palette.control_height_px),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeExpansionControl({action}) on(on_tree_expansion_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
+    bsn! {Node {min_height:rem(palette.control_height_rem),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeExpansionControl({action}) on(on_tree_expansion_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
 }
 fn on_tree_expansion_activated(
     event: On<bevy::ui_widgets::Activate>,
@@ -384,7 +330,7 @@ fn close_button(palette: &UiPalette) -> impl Scene + use<> {
     window_button(t("common.close"), false, palette)
 }
 fn window_button(label: &'static str, open: bool, palette: &UiPalette) -> impl Scene + use<> {
-    bsn! {Node {min_height:px(palette.control_height_px),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeWindowControl(open) on(on_window_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
+    bsn! {Node {min_height:rem(palette.control_height_rem),padding:UiRect::horizontal(px(space_8())),flex_shrink:0.0} Button TreeWindowControl(open) on(on_window_activated) Children [Text(label) TextRole(Role::Caption) Pickable::IGNORE]}
 }
 fn on_window_activated(
     event: On<bevy::ui_widgets::Activate>,

@@ -1,5 +1,5 @@
 use taskmanager_core::{
-    SessionControlAction, SessionId, SessionItem, StartupBootEvidenceSnapshot, StartupEntry,
+    SessionControlAction, SessionIdentity, SessionItem, StartupBootEvidenceSnapshot, StartupEntry,
 };
 use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 
@@ -25,7 +25,7 @@ pub trait SessionInventoryProvider: Send + 'static {
 pub trait SessionControlProvider: Send + 'static {
     fn control(
         &mut self,
-        session_id: &SessionId,
+        identity: &SessionIdentity,
         action: SessionControlAction,
     ) -> Result<(), ProviderFailure>;
 }

@@ -44,6 +44,8 @@ pub struct ContextMenuState {
     /// this subscriber `open` stays `true` and the menu renders forever —
     /// the regression this field locks out.
     dismiss_subscription: Option<Subscription>,
+    /// Window activation observer owned by this stable element state.
+    _activation_subscription: Subscription,
 }
 
 /// A wrapper element that opens a popup menu at the right-click position.
@@ -104,12 +106,26 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
-        let state = window.use_state(cx, |_window, cx| ContextMenuState {
-            open: false,
-            bounds: Bounds::default(),
-            menu: None,
-            focus_handle: cx.focus_handle().tab_stop(true),
-            dismiss_subscription: None,
+        let state = window.use_state(cx, |window, cx| {
+            let activation_subscription =
+                cx.observe_window_activation(window, |state: &mut ContextMenuState, window, cx| {
+                    if window.is_window_active() || !state.open {
+                        return;
+                    }
+                    state.focus_handle.focus(window);
+                    state.open = false;
+                    state.menu = None;
+                    state.dismiss_subscription = None;
+                    cx.notify();
+                });
+            ContextMenuState {
+                open: false,
+                bounds: Bounds::default(),
+                menu: None,
+                focus_handle: cx.focus_handle().tab_stop(true),
+                dismiss_subscription: None,
+                _activation_subscription: activation_subscription,
+            }
         });
         let (open, menu) = state.read_with(cx, |state, _| (state.open, state.menu.clone()));
 

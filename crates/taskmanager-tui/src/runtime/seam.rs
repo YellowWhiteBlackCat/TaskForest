@@ -23,8 +23,10 @@ use std::ffi::OsStr;
 use std::io;
 use std::time::{Duration, Instant};
 use taskmanager_application::AppAction;
+use taskmanager_application::i18n::current_language;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
+use super::capture_profile::CaptureProfileReceipt;
 use ratatui::Terminal;
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::MouseButton;
@@ -160,12 +162,6 @@ pub(crate) fn apply_terminal_event_with_plan(
         }
         Event::Paste(text) => {
             if app.paste_saved_views(&text) {
-                return EventReaction {
-                    dirty: true,
-                    effect: None,
-                };
-            }
-            if app.paste_alert_rules(&text) {
                 return EventReaction {
                     dirty: true,
                     effect: None,
@@ -448,9 +444,10 @@ impl RefreshPacing {
 /// `pub(crate)` (test-only) so the crate's registered test modules — not only
 /// the runtime module tree — can drive the production loop with a counting
 /// backend and a scripted event source.
-/// Run the terminal loop with the capability profile resolved by the
-/// composition edge.  The wrapper above keeps existing deterministic tests
-/// on a stable Unicode/true-color profile without touching global env state.
+/// Run the terminal loop with a profile resolver. Production resolves each
+/// painted frame from the composition-edge signal snapshot and current UI
+/// language; deterministic tests provide a fixed profile without touching
+/// global environment state.
 pub(super) fn run_event_loop_with_profile<B: Backend, E: TerminalEventSource>(
     terminal: &mut Terminal<B>,
     app: &mut TuiApp,
@@ -458,13 +455,13 @@ pub(super) fn run_event_loop_with_profile<B: Backend, E: TerminalEventSource>(
     mut events: E,
     demo: bool,
     capture_marker: Option<&OsStr>,
-    terminal_profile: TuiTerminalProfile,
+    mut terminal_profile: impl FnMut() -> TuiTerminalProfile,
 ) -> io::Result<()>
 where
     B::Error: BackendErrorIntoIo,
 {
     let mut pacing = RefreshPacing::starting(Instant::now());
-    let mut capture_marked = false;
+    let mut capture_profile_receipt = CaptureProfileReceipt::new(capture_marker);
     // The frame area the user currently SEES: captured from every paint and
     // used to project pointer clicks onto the painted rows (a resize updates
     // it on the next paint, which the resize event itself forces).
@@ -571,7 +568,9 @@ where
             // The terminal palette is rebuilt from the runtime theme
             // parameters on every paint, so a settings change re-skins the
             // TUI on the next draw.
-            let theme = TuiTheme::from_params_with_profile(app.theme_params, terminal_profile);
+            let profile = terminal_profile();
+            let language = current_language();
+            let theme = TuiTheme::from_params_with_profile(app.theme_params, profile);
             let mut painted_plan = None;
             terminal
                 .draw(|frame| {
@@ -585,25 +584,17 @@ where
             if let Some(plan) = painted_plan {
                 committed_plan = plan;
             }
+            capture_profile_receipt.record_frame(profile, language);
             pending_draw = false;
         }
         if demo
-            && !capture_marked
+            && capture_profile_receipt.pending()
             && !app.memory_capture_scroll_pending
             && crate::demo::capture::scene_capture_ready(app)
             && (!crate::demo::persisted_history_capture_requested()
                 || crate::ui::history_capture_frame_ready(app, &committed_plan))
-            && let Some(path) = capture_marker
         {
-            std::fs::write(
-                path,
-                format!(
-                    "TUI_CAPTURE_MARKER event=demo_data_ready mode=demo\n\
-             TUI_CAPTURE_MARKER event=frame_ready page={}\n",
-                    capture_page_name(app.page())
-                ),
-            )?;
-            capture_marked = true;
+            capture_profile_receipt.write_frame_ready(capture_page_name(app.page()))?;
         }
         if events.poll(EVENT_POLL)? {
             // A keypress or resize always repaints on the next cycle (the

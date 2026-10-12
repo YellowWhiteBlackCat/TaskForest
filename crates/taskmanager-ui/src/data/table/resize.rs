@@ -8,9 +8,9 @@
 //! interaction without making the reference layer depend on a page model.
 
 use gpui::{
-    AnyElement, App, AppContext, Context, Div, DragMoveEvent, ElementId, EntityId,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, Render, Stateful,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    AnyElement, App, AppContext, Context, Div, DragMoveEvent, ElementId, EntityId, FocusHandle,
+    InteractiveElement, IntoElement, KeyBinding, MouseButton, ParentElement, Pixels, Point, Render,
+    Stateful, StatefulInteractiveElement, Styled, Window, actions, div, px,
 };
 use taskmanager_theme::Palette;
 
@@ -26,6 +26,23 @@ pub const COLUMN_RESIZE_MIN_WIDTH: f32 = 10.0;
 
 /// Reference upper bound for a resizable column.
 pub const COLUMN_RESIZE_MAX_WIDTH: f32 = 1200.0;
+
+/// Keyboard width change per resize-handle step.
+pub const COLUMN_RESIZE_KEYBOARD_STEP: f32 = 10.0;
+
+/// Key context for a focused resize handle.
+pub const COLUMN_RESIZE_CONTEXT: &str = "TaskManagerColumnResize";
+
+actions!(column_resize, [ColumnResizeNarrower, ColumnResizeWider]);
+
+/// Register the resize-handle arrow keys. The child resize context takes
+/// precedence over the enclosing table's column-navigation bindings.
+pub(super) fn init(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new("left", ColumnResizeNarrower, Some(COLUMN_RESIZE_CONTEXT)),
+        KeyBinding::new("right", ColumnResizeWider, Some(COLUMN_RESIZE_CONTEXT)),
+    ]);
+}
 
 /// Typed payload carried by a column-width drag.
 ///
@@ -154,7 +171,52 @@ where
         })
 }
 
+/// Add the focus and keyboard-step behavior to a resize handle owned by a
+/// stateful table. The left/right keys are consumed here so the table's
+/// column-navigation bindings do not also run for a focused resize target.
+pub fn column_resize_handle_with_keyboard<FStart, FMove, FFinish, FStep>(
+    props: ColumnResizeHandleProps<FStart, FMove, FFinish>,
+    focus_handle: FocusHandle,
+    on_resize_step: FStep,
+) -> Stateful<Div>
+where
+    FStart: Fn(&mut App) + 'static,
+    FMove: Fn(&DragMoveEvent<ColumnResizeDrag>, &mut App) + 'static,
+    FFinish: Fn(&mut App) + 'static,
+    FStep: Fn(ColumnResizeStep, &mut App) + 'static,
+{
+    let ring = props.palette.ring;
+    let on_resize_narrower = std::rc::Rc::new(on_resize_step);
+    let on_resize_wider = on_resize_narrower.clone();
+    column_resize_handle(props)
+        .key_context(COLUMN_RESIZE_CONTEXT)
+        .track_focus(&focus_handle)
+        .focus(move |style| style.border_color(crate::theme_binding::hsla(ring)))
+        .on_action(move |_: &ColumnResizeNarrower, _window, cx| {
+            cx.stop_propagation();
+            on_resize_narrower(ColumnResizeStep::Narrower, cx);
+        })
+        .on_action(move |_: &ColumnResizeWider, _window, cx| {
+            cx.stop_propagation();
+            on_resize_wider(ColumnResizeStep::Wider, cx);
+        })
+}
+
+/// Direction of one keyboard resize step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColumnResizeStep {
+    /// Reduce the current width by [`COLUMN_RESIZE_KEYBOARD_STEP`].
+    Narrower,
+    /// Increase the current width by [`COLUMN_RESIZE_KEYBOARD_STEP`].
+    Wider,
+}
+
 impl<D: super::TableDelegate> super::TableState<D> {
+    fn resize_focus_handle(&self, ix: usize) -> Option<FocusHandle> {
+        let key = &self.col_groups.get(ix)?.column.key;
+        self.resize_focus_handles.get(key).cloned()
+    }
+
     /// Apply the reference width transition to one live column group.
     pub(crate) fn resize_cols(&mut self, ix: usize, size: Pixels, cx: &mut Context<Self>) {
         if !self.col_resizable {
@@ -167,7 +229,9 @@ impl<D: super::TableDelegate> super::TableState<D> {
             return;
         }
         let old_width = col_group.width;
-        if let Some(width) = clamp_column_width(size, old_width) {
+        if let Some(width) = clamp_column_width(size, old_width)
+            && width != old_width
+        {
             col_group.width = width;
             cx.notify();
         }
@@ -208,6 +272,9 @@ impl<D: super::TableDelegate> super::TableState<D> {
         let Some(col_group) = self.col_groups.get(ix) else {
             return div().into_any_element();
         };
+        let Some(focus_handle) = self.resize_focus_handle(ix) else {
+            return div().into_any_element();
+        };
         if !self.col_resizable || !col_group.is_resizable() {
             return div().into_any_element();
         }
@@ -216,40 +283,67 @@ impl<D: super::TableDelegate> super::TableState<D> {
         let move_state = cx.entity();
         let start_state = move_state.clone();
         let finish_state = move_state.clone();
+        let step_state = move_state.clone();
         let palette = self.palette;
 
-        column_resize_handle(ColumnResizeHandleProps {
-            id: ("resizable-handle", ix).into(),
-            owner,
-            column: ix,
-            start_width: col_group.width,
-            palette,
-            on_drag_start: move |cx: &mut App| {
-                start_state.update(cx, |table, _| {
-                    table.resize_anchor_x = None;
-                });
+        column_resize_handle_with_keyboard(
+            ColumnResizeHandleProps {
+                id: ("resizable-handle", ix).into(),
+                owner,
+                column: ix,
+                start_width: col_group.width,
+                palette,
+                on_drag_start: move |cx: &mut App| {
+                    start_state.update(cx, |table, _| {
+                        table.resize_anchor_x = None;
+                    });
+                },
+                on_drag_move: move |event: &DragMoveEvent<ColumnResizeDrag>, cx: &mut App| {
+                    let drag = *event.drag(cx);
+                    if drag.owner != owner {
+                        return;
+                    }
+                    let position = event.event.position;
+                    move_state.update(cx, |table, cx| {
+                        let Some(col_group) = table.col_groups.get(drag.column).cloned() else {
+                            return;
+                        };
+                        let new_width = width_from_drag(
+                            drag.start_width,
+                            &mut table.resize_anchor_x,
+                            position.x,
+                        );
+                        table.resizing_col = Some(drag.column);
+                        table.resize_cols(drag.column, new_width, cx);
+                        table.scroll_table_by_col_resizing(position, &col_group);
+                    });
+                },
+                on_drag_finish: move |cx: &mut App| {
+                    finish_state.update(cx, |table, cx| table.finish_col_resize(cx));
+                },
             },
-            on_drag_move: move |event: &DragMoveEvent<ColumnResizeDrag>, cx: &mut App| {
-                let drag = *event.drag(cx);
-                if drag.owner != owner {
-                    return;
-                }
-                let position = event.event.position;
-                move_state.update(cx, |table, cx| {
-                    let Some(col_group) = table.col_groups.get(drag.column).cloned() else {
+            focus_handle,
+            move |step, cx: &mut App| {
+                step_state.update(cx, |table, cx| {
+                    let Some(width) = table.col_groups.get(ix).map(|group| group.width) else {
                         return;
                     };
-                    let new_width =
-                        width_from_drag(drag.start_width, &mut table.resize_anchor_x, position.x);
-                    table.resizing_col = Some(drag.column);
-                    table.resize_cols(drag.column, new_width, cx);
-                    table.scroll_table_by_col_resizing(position, &col_group);
+                    let delta = match step {
+                        ColumnResizeStep::Narrower => -COLUMN_RESIZE_KEYBOARD_STEP,
+                        ColumnResizeStep::Wider => COLUMN_RESIZE_KEYBOARD_STEP,
+                    };
+                    table.resize_cols(ix, width + px(delta), cx);
+                    if table
+                        .col_groups
+                        .get(ix)
+                        .is_some_and(|group| group.width != width)
+                    {
+                        table.resizing_col = Some(ix);
+                        table.finish_col_resize(cx);
+                    }
                 });
             },
-            on_drag_finish: move |cx: &mut App| {
-                finish_state.update(cx, |table, cx| table.finish_col_resize(cx));
-            },
-        })
+        )
         .into_any_element()
     }
 

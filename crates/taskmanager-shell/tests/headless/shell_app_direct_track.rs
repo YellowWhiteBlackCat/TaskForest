@@ -1,11 +1,17 @@
 use super::*;
+use crate::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 use taskmanager_application::LatestControlRequest;
 use taskmanager_application::ServiceControlOutcome;
+use taskmanager_application::{
+    ControlRequestId, InteractionEvent, PendingConfirmation, PlatformEffect,
+    SessionControlConfirmation, SessionControlTarget,
+};
 use taskmanager_core::SessionId;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_core::core::target::ServiceId;
 
 /// Deterministic fixture: pid N carries start token N*10, so every identity
@@ -354,4 +360,86 @@ fn direct_track_uses_one_state_for_inventory_outcomes_and_runtime_notices() {
         crate::app::FeedbackLifecycle::UntilReplaced
     );
     assert_eq!(notice.text(), "history writer degraded");
+}
+
+fn session_item(id: &str, created_monotonic_usec: u64) -> SessionItem {
+    SessionItem {
+        id: id.into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "direct-track-test-boot".into(),
+            created_monotonic_usec,
+        }),
+        uid: 1000,
+        user: "test-user".into(),
+        seat: Some("seat0".into()),
+        tty: Some("tty7".into()),
+        remote: false,
+        timestamp: None,
+    }
+}
+
+fn arm_session_confirmation(
+    track: &mut DirectTrackState,
+    session: SessionItem,
+) -> ControlRequestId {
+    let identity = session.identity().expect("fixture has complete identity");
+    let action = SessionControlAction::Disconnect;
+    let request_id = track.begin_session_control(identity, action);
+    let _ = track.interaction.reduce(InteractionEvent::ArmConfirmation(
+        PendingConfirmation::SessionControl(SessionControlConfirmation {
+            request_id,
+            session,
+            action,
+        }),
+    ));
+    request_id
+}
+
+#[test]
+fn direct_track_session_confirmation_consumes_the_exact_shared_intent_once() {
+    let mut track = DirectTrackState::default();
+    let session = session_item("7", 700);
+    seed_direct_track_fact(
+        &mut track,
+        DirectTrackSeedFact::Sessions(Some(vec![session.clone()])),
+    );
+    let identity = session.identity().expect("fixture has complete identity");
+    let request_id = arm_session_confirmation(&mut track, session);
+
+    assert_eq!(
+        track.confirm_session_control(),
+        Some(PlatformEffect::SessionControl(SessionControlTarget {
+            request_id,
+            identity,
+            action: SessionControlAction::Disconnect,
+        }))
+    );
+    assert_eq!(track.confirm_session_control(), None);
+    assert!(track.interaction.pending_confirmation().is_none());
+}
+
+#[test]
+fn direct_track_session_confirmation_dismisses_missing_duplicate_and_replaced_targets() {
+    let frozen = session_item("7", 700);
+    let replacements = [
+        None,
+        Some(vec![frozen.clone(), frozen.clone()]),
+        Some(vec![session_item("7", 701)]),
+    ];
+
+    for sessions in replacements {
+        let mut track = DirectTrackState::default();
+        seed_direct_track_fact(&mut track, DirectTrackSeedFact::Sessions(sessions));
+        arm_session_confirmation(&mut track, frozen.clone());
+
+        assert_eq!(track.confirm_session_control(), None);
+        assert!(track.interaction.pending_confirmation().is_none());
+        assert!(
+            track
+                .projection()
+                .session_control_requests
+                .pending()
+                .is_none()
+        );
+    }
 }

@@ -1,9 +1,9 @@
 //! Stateless System dashboard backed by typed, RootView-owned UI state.
 
 use std::collections::HashSet;
-use taskmanager_application::AlertEvaluation;
+use taskmanager_application::AlertEventSeed;
+use taskmanager_application::AlertRuleEditResult;
 use taskmanager_application::ManagedAlertRuleEdit;
-use taskmanager_application::ManagedAlertRuleEditOutcome;
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, SystemPageSection, TimelineSelection,
 };
@@ -24,8 +24,12 @@ use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::timeline::TimelineGraphCache;
 use taskmanager_application::DesktopNotificationRequest;
 use taskmanager_application::i18n::alert_severity_label;
-use taskmanager_core::core::{Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity};
+use taskmanager_core::core::{
+    Alert, AlertEvent, AlertEventId, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId,
+    AlertSeverity, AlertTargetIdentity,
+};
 use taskmanager_shell::SortDir;
+use taskmanager_shell::app::alert_rows::AlertRowFamily;
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,7 +49,7 @@ pub enum EventFilter {
 
 #[derive(Clone, Debug, Default)]
 pub struct EventCenterState {
-    read_ids: HashSet<u64>,
+    read_through: Option<AlertEventId>,
     pub filter: EventFilter,
 }
 
@@ -53,7 +57,10 @@ impl EventCenterState {
     pub fn unread_count(&self, events: &[AlertEvent]) -> usize {
         events
             .iter()
-            .filter(|event| !self.read_ids.contains(&event.id))
+            .filter(|event| {
+                self.read_through
+                    .is_none_or(|read_through| event.id > read_through)
+            })
             .count()
     }
 
@@ -71,20 +78,23 @@ impl EventCenterState {
     }
 
     pub fn mark_all_read(&mut self, events: &[AlertEvent]) {
-        self.read_ids.extend(events.iter().map(|event| event.id));
+        if let Some(max_id) = events.iter().map(|event| event.id).max() {
+            self.read_through = Some(max_id);
+        }
     }
 
     pub fn clear(&mut self) {
-        self.read_ids.clear();
+        self.read_through = None;
     }
 
     /// Deterministic event history used by the capture fixture. The caller
     /// installs this into the shared shell alert authority; this function
-    /// only constructs owned domain events and keeps no local copy.
-    pub fn capture_event_fixture() -> Vec<AlertEvent> {
+    /// only constructs owned event seeds and keeps no local copy.
+    pub fn capture_event_fixture() -> Vec<AlertEventSeed> {
+        let cpu_rule_id = AlertRuleId::new("capture-cpu");
         let warning = Alert {
-            instance_id: "capture-cpu:system".into(),
-            rule_id: "capture-cpu".into(),
+            instance_id: AlertInstanceId::new(cpu_rule_id.clone(), AlertTargetIdentity::System),
+            rule_id: cpu_rule_id,
             target: "CPU".into(),
             metric: AlertMetric::CpuUsagePercent,
             severity: AlertSeverity::Warning,
@@ -92,22 +102,22 @@ impl EventCenterState {
             threshold: 90.0,
             active_since_ms: 3_590_000,
         };
-        let activated = AlertEvent {
-            id: 1,
+        let activated = AlertEventSeed {
             kind: AlertEventKind::Activated,
             alert: warning.clone(),
             observed_at_ms: 3_590_000,
         };
         let mut cleared = warning;
-        cleared.instance_id = "capture-memory:system".into();
-        cleared.rule_id = "capture-memory".into();
+        let memory_rule_id = AlertRuleId::new("capture-memory");
+        cleared.instance_id =
+            AlertInstanceId::new(memory_rule_id.clone(), AlertTargetIdentity::System);
+        cleared.rule_id = memory_rule_id;
         cleared.metric = AlertMetric::MemoryUsagePercent;
         cleared.target = "Memory".into();
         cleared.value = 74.0;
         vec![
             activated,
-            AlertEvent {
-                id: 2,
+            AlertEventSeed {
                 kind: AlertEventKind::Cleared,
                 alert: cleared,
                 observed_at_ms: 3_560_000,
@@ -173,28 +183,24 @@ impl RootView {
     pub fn edit_dashboard_alert_rules(
         &mut self,
         edit: ManagedAlertRuleEdit,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
-        let outcome = self.shell.edit_alert_rules(edit)?;
-        if !outcome.changed() {
-            return Ok(outcome);
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
+        let result = self.shell.edit_alert_rules(edit)?;
+        if !result.outcome.changed() {
+            return Ok(result);
         }
         let snapshot = self.system_snapshot().clone();
         let evaluation = self.shell.evaluate_alerts(
             &snapshot,
             crate::gpui_app::root::platform_submission_time_ms(),
         );
-        self.accept_alert_evaluation(evaluation);
-        Ok(outcome)
-    }
-
-    /// Accept a synchronous rule-edit evaluation into the same shared store
-    /// used by platform folds. This is not a second RootView alert authority:
-    /// render and event history consume the revision-keyed materialization.
-    pub fn accept_alert_evaluation(&mut self, evaluation: AlertEvaluation) {
-        let next = evaluation.active;
-        let revision = self.shell.accept_alert_evaluation(next.clone());
-        self.materialize_active_alerts(revision, next);
+        let projection = self.shell.projection();
+        let revision = projection
+            .alert_row_projection_generation(AlertRowFamily::Active)
+            .data_revision()
+            .get();
+        self.materialize_active_alerts(revision, projection.alert_center.active_alerts().to_vec());
         self.submit_alert_notifications(evaluation.notifications);
+        Ok(result)
     }
 
     /// Submit desktop notifications for newly-fired alerts (BN-07). The

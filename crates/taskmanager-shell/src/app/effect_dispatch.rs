@@ -165,14 +165,24 @@ pub fn queue_effect_result(
             }
             vec![submission]
         }
-        PlatformEffect::SessionControl(target) => vec![platform.submit_session_control(
-            SessionControlRequest {
-                request_id: target.request_id,
-                session_id: target.session_id.clone(),
-                action: target.action,
-            },
-            now_ms,
-        )],
+        PlatformEffect::SessionControl(target) => {
+            let identity = target.identity.clone();
+            let action = target.action;
+            let submission = platform.submit_session_control(
+                SessionControlRequest {
+                    request_id: target.request_id,
+                    identity: identity.clone(),
+                    action,
+                },
+                now_ms,
+            );
+            if submission.is_err() {
+                app.data
+                    .session_control_requests
+                    .accept(target.request_id, &identity, action);
+            }
+            vec![submission]
+        }
         PlatformEffect::StartupControl(request) => {
             vec![platform.submit_startup_control(request.clone(), now_ms)]
         }

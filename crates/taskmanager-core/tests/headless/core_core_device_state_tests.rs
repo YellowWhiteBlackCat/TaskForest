@@ -1,3 +1,5 @@
+//! test-intent: behavior
+
 use super::*;
 
 #[test]
@@ -158,6 +160,84 @@ fn absence_ttl_keeps_exact_boundary_then_prunes() {
 }
 
 #[test]
+fn expired_absence_retains_keyed_generation_until_a_later_return() {
+    let mut registry = DeviceLifecycleRegistry::new(100);
+    registry.begin_refresh();
+    assert_eq!(
+        registry
+            .observe("npu:alpha", DeviceState::healthy(10), 10)
+            .generation,
+        DeviceGeneration::INITIAL
+    );
+    registry.finish_refresh(DeviceRefreshOutcome::Complete, 10);
+
+    registry.begin_refresh();
+    registry.finish_refresh(DeviceRefreshOutcome::Complete, 20);
+    registry.begin_refresh();
+    assert_eq!(
+        registry
+            .finish_refresh(DeviceRefreshOutcome::Complete, 121)
+            .expired
+            .iter()
+            .map(DeviceId::as_str)
+            .collect::<Vec<_>>(),
+        ["npu:alpha"]
+    );
+    assert!(registry.is_empty(), "expired rows leave the live registry");
+
+    registry.begin_refresh();
+    let returned = registry.observe("npu:alpha", DeviceState::healthy(130), 130);
+    let repeated = registry.observe("npu:alpha", DeviceState::healthy(131), 131);
+    let new_identity = registry.observe("npu:beta", DeviceState::healthy(130), 130);
+    assert_eq!(returned.generation, DeviceGeneration::new(2));
+    assert_eq!(repeated.generation, DeviceGeneration::new(2));
+    assert_eq!(new_identity.generation, DeviceGeneration::INITIAL);
+    let delta = registry.finish_refresh(DeviceRefreshOutcome::Complete, 130);
+    assert_eq!(
+        delta
+            .reappeared
+            .iter()
+            .map(DeviceId::as_str)
+            .collect::<Vec<_>>(),
+        ["npu:alpha"]
+    );
+}
+
+#[test]
+fn retired_generation_memory_is_bounded_by_exact_identity() {
+    let mut registry = DeviceLifecycleRegistry::new(1);
+    for index in 0..=MAX_RETIRED_DEVICE_GENERATIONS {
+        let id = format!("device:{index:04}");
+        let now_ms = index as u64 * 10;
+        registry.begin_refresh();
+        registry.observe(id.as_str(), DeviceState::healthy(now_ms), now_ms);
+        registry.finish_refresh(DeviceRefreshOutcome::Complete, now_ms);
+        registry.begin_refresh();
+        registry.finish_refresh(DeviceRefreshOutcome::Complete, now_ms + 1);
+        registry.begin_refresh();
+        registry.finish_refresh(DeviceRefreshOutcome::Complete, now_ms + 3);
+    }
+
+    assert_eq!(
+        registry.retired_generations.len(),
+        MAX_RETIRED_DEVICE_GENERATIONS
+    );
+    assert!(!registry.retired_generations.contains_key("device:0000"));
+    let retained_id = format!("device:{:04}", MAX_RETIRED_DEVICE_GENERATIONS);
+    assert!(
+        registry
+            .retired_generations
+            .contains_key(retained_id.as_str())
+    );
+
+    registry.begin_refresh();
+    let oldest = registry.observe("device:0000", DeviceState::healthy(20_000), 20_000);
+    let retained = registry.observe(retained_id.as_str(), DeviceState::healthy(20_000), 20_000);
+    assert_eq!(oldest.generation, DeviceGeneration::INITIAL);
+    assert_eq!(retained.generation, DeviceGeneration::new(2));
+}
+
+#[test]
 fn stable_selection_resolves_after_remove_and_readd_at_new_index() {
     let mut selection = StableDeviceSelection::default();
     selection.select("disk:wwid:alpha");
@@ -217,6 +297,23 @@ fn identity_growth_is_capped_by_evicting_the_least_recently_seen() {
     );
     assert!(registry.get("net:mac:dead").is_some());
     assert!(registry.get("net:mac:01023").is_some());
+
+    registry.begin_refresh();
+    for index in 0..(MAX_TRACKED_DEVICE_IDENTITIES * 2) {
+        registry.observe(
+            format!("batch:{index:05}"),
+            DeviceState::healthy(10_000 + index as u64),
+            10_000 + index as u64,
+        );
+    }
+    assert_eq!(registry.len(), MAX_TRACKED_DEVICE_IDENTITIES);
+    assert_eq!(registry.observed.len(), MAX_TRACKED_DEVICE_IDENTITIES);
+    assert!(
+        registry
+            .observed
+            .iter()
+            .all(|id| registry.entries.contains_key(id))
+    );
 }
 
 #[test]
@@ -261,4 +358,17 @@ fn a_saturated_registry_evicts_confirmed_absent_identities_first() {
         "a present identity survives the capacity eviction"
     );
     assert!(registry.get("net:mac:churned").is_some());
+
+    registry.begin_refresh();
+    let returned = registry.observe("net:mac:00000", DeviceState::healthy(7_000), 7_000);
+    assert_eq!(returned.generation, DeviceGeneration::new(2));
+    let delta = registry.finish_refresh(DeviceRefreshOutcome::Complete, 7_000);
+    assert_eq!(
+        delta
+            .reappeared
+            .iter()
+            .map(DeviceId::as_str)
+            .collect::<Vec<_>>(),
+        ["net:mac:00000"]
+    );
 }

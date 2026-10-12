@@ -148,6 +148,39 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
     );
 }
 
+/// A window losing OS activation dismisses the transient context menu without
+/// activating its current item.
+#[gpui::test]
+async fn context_menu_closes_on_window_deactivation_without_action(cx: &mut TestAppContext) {
+    cx.update(super::super::popup::init);
+    let activations = Rc::new(RefCell::new(0));
+    let window = cx.add_window(|_window, _cx| ContextMenuCloseHarness {
+        activations: activations.clone(),
+    });
+
+    let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+    vcx.update(|window, cx| {
+        window.activate_window();
+        window.draw(cx).clear();
+    });
+    let open_at = point(px(128.0), px(32.0));
+    vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
+    vcx.update(|window, cx| window.draw(cx).clear());
+    let popup = vcx.debug_bounds("tm-popup").expect("menu must open");
+    let item_center = point(popup.left() + px(40.0), popup.top() + px(17.0));
+
+    vcx.deactivate_window();
+    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.simulate_click(item_center, Modifiers::none());
+    vcx.update(|window, cx| window.draw(cx).clear());
+
+    assert_eq!(
+        *activations.borrow(),
+        0,
+        "window deactivation must dismiss without running the menu action"
+    );
+}
+
 #[derive(Default)]
 struct Harness;
 

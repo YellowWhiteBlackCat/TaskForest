@@ -6,6 +6,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+#[cfg(target_os = "linux")]
+use taskmanager_core::core::smart::self_test::SmartSelfTestSupport;
 use taskmanager_core::core::smart::self_test::{
     SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
 };
@@ -16,7 +18,7 @@ use taskmanager_platform_contract::ProviderFailure;
 
 use super::transport::{
     SmartctlDeviceType, command_output_is_permission_denied, command_output_requests_device_type,
-    smartctl_device_path, smartctl_self_test_strategy_for_connection,
+    parse_smartctl_json, smartctl_device_path, smartctl_self_test_strategy_for_connection,
 };
 #[cfg(target_os = "linux")]
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
@@ -122,6 +124,26 @@ fn execute_start_strategy<T>(
     execute_for_connection(disk_name, connection, revalidate, attempt)
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn execute_start_with_capability_preflight<T>(
+    disk_name: &str,
+    connection: StorageConnection,
+    kind: SmartSelfTestKind,
+    mut revalidate: impl FnMut() -> Result<(), ProviderFailure>,
+    mut inspect_support: impl FnMut(&str, SmartctlDeviceType, SmartSelfTestKind) -> StrategyAttempt<()>,
+    mut start: impl FnMut(&str, SmartctlDeviceType, SmartSelfTestKind) -> StrategyAttempt<T>,
+) -> Result<T, StrategyFailure> {
+    execute_start_strategy(
+        disk_name,
+        connection,
+        &mut revalidate,
+        |device, device_type| inspect_support(device, device_type, kind),
+    )?;
+    execute_start_strategy(disk_name, connection, revalidate, |device, device_type| {
+        start(device, device_type, kind)
+    })
+}
+
 fn execute_poll_strategy<T>(
     disk_name: &str,
     connection: StorageConnection,
@@ -163,11 +185,16 @@ pub(crate) fn start_smart_self_test_for_connection(
     connection: StorageConnection,
     kind: SmartSelfTestKind,
     now_ms: u64,
-    revalidate: impl FnMut() -> Result<(), ProviderFailure>,
+    mut revalidate: impl FnMut() -> Result<(), ProviderFailure>,
 ) -> Result<SmartSelfTestReport, ProviderFailure> {
-    match execute_start_strategy(disk_name, connection, revalidate, |device, device_type| {
-        start_attempt(device, device_type, kind)
-    }) {
+    match execute_start_with_capability_preflight(
+        disk_name,
+        connection,
+        kind,
+        &mut revalidate,
+        inspect_self_test_support_attempt,
+        start_attempt,
+    ) {
         Ok(()) => Ok(SmartSelfTestReport {
             state: DeviceState::healthy(now_ms),
             phase: SmartSelfTestPhase::Running,
@@ -177,6 +204,58 @@ pub(crate) fn start_smart_self_test_for_connection(
         }),
         Err(StrategyFailure::Report(failure)) => Ok(failed_report(failure, now_ms)),
         Err(StrategyFailure::Provider(failure)) => Err(failure),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn inspect_self_test_support_attempt(
+    device: &str,
+    device_type: SmartctlDeviceType,
+    kind: SmartSelfTestKind,
+) -> StrategyAttempt<()> {
+    let mut command = Command::new("smartctl");
+    command.args(["--json=c", "--capabilities"]);
+    if let Some(device_type) = device_type.argument() {
+        command.args(["-d", device_type]);
+    }
+    command.arg(device);
+    match run_with_timeout(&mut command, SMART_SELF_TEST_TIMEOUT) {
+        Ok(output) if smartctl_exit_allows_command(output.status.code()) => {
+            let support = String::from_utf8(output.stdout)
+                .ok()
+                .and_then(|text| parse_smartctl_json(&text))
+                .map_or(SmartSelfTestSupport::Unknown, |observation| {
+                    observation.self_test_capabilities.support_for(kind)
+                });
+            match support {
+                SmartSelfTestSupport::Supported => StrategyAttempt::Success(()),
+                SmartSelfTestSupport::Unsupported => {
+                    StrategyAttempt::Failed(SmartSelfTestFailure::Unsupported)
+                }
+                SmartSelfTestSupport::Unknown => {
+                    StrategyAttempt::Failed(SmartSelfTestFailure::SupportUnknown)
+                }
+            }
+        }
+        Ok(output) if command_output_is_permission_denied(&output.stdout, &output.stderr) => {
+            StrategyAttempt::Failed(SmartSelfTestFailure::PermissionDenied)
+        }
+        Ok(output) if command_output_requests_device_type(&output.stdout, &output.stderr) => {
+            StrategyAttempt::RetryableDeviceType
+        }
+        Ok(_) => StrategyAttempt::Failed(SmartSelfTestFailure::ProviderUnavailable),
+        Err(BoundedCommandError::Spawn(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+            StrategyAttempt::Failed(SmartSelfTestFailure::MissingTool)
+        }
+        Err(BoundedCommandError::Spawn(error))
+            if error.kind() == std::io::ErrorKind::PermissionDenied =>
+        {
+            StrategyAttempt::Failed(SmartSelfTestFailure::PermissionDenied)
+        }
+        Err(BoundedCommandError::TimedOut) => {
+            StrategyAttempt::Failed(SmartSelfTestFailure::TimedOut)
+        }
+        Err(_) => StrategyAttempt::Failed(SmartSelfTestFailure::ProviderUnavailable),
     }
 }
 
@@ -400,10 +479,11 @@ const fn provider_execution_failure(failure: ProviderFailure) -> SmartSelfTestFa
         ProviderFailure::MissingDependency => SmartSelfTestFailure::MissingTool,
         ProviderFailure::TimedOut => SmartSelfTestFailure::TimedOut,
         ProviderFailure::Rejected => SmartSelfTestFailure::Rejected,
-        ProviderFailure::Unsupported
-        | ProviderFailure::IdentityChanged
-        | ProviderFailure::TemporarilyUnavailable
-        | ProviderFailure::ProviderFault => SmartSelfTestFailure::ProviderUnavailable,
+        ProviderFailure::Unsupported => SmartSelfTestFailure::Unsupported,
+        ProviderFailure::IdentityChanged => SmartSelfTestFailure::InvalidDevice,
+        ProviderFailure::TemporarilyUnavailable | ProviderFailure::ProviderFault => {
+            SmartSelfTestFailure::ProviderUnavailable
+        }
     }
 }
 
@@ -554,14 +634,19 @@ fn parse_kind(kind: &str) -> Option<SmartSelfTestKind> {
     }
 }
 
-fn failed_report(failure: SmartSelfTestFailure, now_ms: u64) -> SmartSelfTestReport {
+pub(crate) fn failed_report(failure: SmartSelfTestFailure, now_ms: u64) -> SmartSelfTestReport {
     let status = match failure {
         SmartSelfTestFailure::MissingTool => DeviceStatus::MissingTool,
         SmartSelfTestFailure::RequiresEscalation | SmartSelfTestFailure::PermissionDenied => {
             DeviceStatus::PermissionDenied
         }
-        SmartSelfTestFailure::TimedOut => DeviceStatus::Stale,
-        SmartSelfTestFailure::InvalidDevice
+        SmartSelfTestFailure::Unsupported => DeviceStatus::Unsupported,
+        SmartSelfTestFailure::SupportUnknown
+        | SmartSelfTestFailure::AuthorizationUnavailable
+        | SmartSelfTestFailure::HelperUnavailable
+        | SmartSelfTestFailure::HelperProtocolViolation
+        | SmartSelfTestFailure::TimedOut
+        | SmartSelfTestFailure::InvalidDevice
         | SmartSelfTestFailure::ProviderUnavailable
         | SmartSelfTestFailure::Rejected => DeviceStatus::Stale,
     };

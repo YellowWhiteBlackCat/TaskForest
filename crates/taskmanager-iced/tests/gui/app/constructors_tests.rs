@@ -12,9 +12,24 @@ use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarAvailability;
+use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::{LightDark, Skin};
+
+#[test]
+fn demo_feedback_is_english_before_the_shared_fixture_is_constructed() {
+    let app = IcedApp::demo();
+
+    assert_eq!(app.shell.feedback_text(), "Demo snapshot · no host actions");
+}
+
+#[test]
+fn capture_demo_feedback_uses_its_explicit_chinese_locale() {
+    let app = IcedApp::demo_for_capture_with(Some("zh".to_owned()), None);
+
+    assert_eq!(app.shell.feedback_text(), "演示快照 · 无主机操作");
+}
 
 /// The shared `TM_SKIN` testing override selects the demo/capture appearance.
 /// Unset keeps today's GNOME-dark demo default; a valid token resolves the
@@ -90,6 +105,10 @@ fn capture_device_selector_accepts_only_the_complete_performance_vocabulary() {
     assert_eq!(capture_page_from_name("services"), Some(AppPage::Services));
     assert_eq!(capture_page_from_name("startup"), Some(AppPage::Startup));
     assert_eq!(capture_page_from_name("users"), Some(AppPage::Users));
+    assert_eq!(
+        capture_page_from_name("users-session-confirmation"),
+        Some(AppPage::Users)
+    );
     assert_eq!(capture_page_from_name("system"), Some(AppPage::System));
     assert_eq!(
         capture_page_from_name("app-history"),
@@ -222,6 +241,29 @@ fn dedicated_process_and_storage_capture_targets_use_the_normal_surfaces() {
             .filesystems
             .len(),
         3
+    );
+}
+
+#[test]
+fn users_session_confirmation_capture_arms_the_shared_disconnect_gate() {
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "users-session-confirmation");
+
+    assert_eq!(app.shell.page(), AppPage::Users);
+    assert_eq!(
+        app.shell.application.interaction.confirmation_kind(),
+        Some(ConfirmationKind::SessionControl)
+    );
+    let pending = app
+        .shell
+        .pending_session()
+        .expect("capture must show the pending session confirmation");
+    assert_eq!(pending.action, SessionControlAction::Disconnect);
+    assert_eq!(pending.session.id.as_str(), "capture-session-7");
+    assert_eq!(pending.session.user, "capture-user");
+    assert!(
+        pending.session.identity().is_some(),
+        "the visible capture target must carry a provider identity"
     );
 }
 

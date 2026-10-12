@@ -51,13 +51,37 @@ pub(crate) fn cpu_rail_subtitle(cpu: &CpuMetrics) -> String {
         .map_or_else(String::new, str::to_string)
 }
 
-/// CPU caption lines: line 1 carries the headline usage (+ package
-/// temperature when observed); line 2 carries the per-core min..max
-/// temperature hint when the native provider exposes indexed readings.
+/// Compact CPU frequency keeps the native MHz clock readable and retains the
+/// explicit BogoMIPS source label when Linux only reported its calibration
+/// value.
+fn cpu_rail_frequency(cpu: &CpuMetrics) -> Option<String> {
+    let frequency = cpu.current_frequency_mhz()?;
+    Some(if cpu.frequency_source.is_bogomips() {
+        format!("{frequency}.00 BogoMIPS")
+    } else if frequency >= 1_000 {
+        format!("{:.2} GHz", frequency as f64 / 1_000.0)
+    } else {
+        format!("{frequency} MHz")
+    })
+}
+
+/// CPU caption lines: line 1 carries usage + current frequency; line 2 carries
+/// package temperature and the per-core range when those observations exist.
 pub(crate) fn cpu_rail_caption(cpu: &CpuMetrics) -> (String, String) {
     let mut cap1 = honest_pct(cpu.current_global_usage_pct());
+    let frequency = cpu_rail_frequency(cpu);
+    let has_frequency = frequency.is_some();
+    if let Some(frequency) = frequency {
+        cap1.push_str(&format!(" · {frequency}"));
+    }
+    let mut cap2_parts = Vec::new();
     if let Some(temp) = cpu.current_temperature_c() {
-        cap1.push_str(&format!(" · {:.0} \u{b0}C", temp.round()));
+        let temperature = format!("{:.0} \u{b0}C", temp.round());
+        if has_frequency {
+            cap2_parts.push(temperature);
+        } else {
+            cap1.push_str(&format!(" · {temperature}"));
+        }
     }
     let mut min = f32::INFINITY;
     let mut max = f32::NEG_INFINITY;
@@ -67,16 +91,18 @@ pub(crate) fn cpu_rail_caption(cpu: &CpuMetrics) -> (String, String) {
             max = max.max(temp);
         }
     }
-    let cap2 = if !min.is_finite() {
-        String::new()
-    } else if (max - min).abs() < 0.5 {
+    if !min.is_finite() {
+        return (cap1, cap2_parts.join(" · "));
+    }
+    let core_range = if (max - min).abs() < 0.5 {
         t("sidebar.cpu_cores").replacen("{}", &format!("{:.0}", min.round()), 1)
     } else {
         t("sidebar.cpu_cores_range")
             .replacen("{}", &format!("{:.0}", min.round()), 1)
             .replacen("{}", &format!("{:.0}", max.round()), 1)
     };
-    (cap1, cap2)
+    cap2_parts.push(core_range);
+    (cap1, cap2_parts.join(" · "))
 }
 
 /// Memory caption lines: `used / total` on the resolved unit ladder, then the
@@ -133,7 +159,9 @@ pub(crate) fn disk_rail_caption(disk: &DiskMetrics, units: UnitPrefs) -> (String
         _ => missing_value(),
     };
     let cap1 = format!("{active} · {rate}");
-    let mut parts = vec![clean_disk_name(&disk.name)];
+    // The device node is already part of the rail heading; repeat only the
+    // model (subtitle), type, and optional SMART details in the captions.
+    let mut parts = Vec::new();
     if !disk.disk_type.trim().is_empty() {
         parts.push(disk.disk_type.trim().to_string());
     }

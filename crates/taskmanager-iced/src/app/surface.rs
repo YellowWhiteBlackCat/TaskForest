@@ -300,6 +300,7 @@ impl InputScope {
                 kind,
                 ConfirmationKind::EndTask
                     | ConfirmationKind::ServiceControl
+                    | ConfirmationKind::SessionControl
                     | ConfirmationKind::SmartSelfTest
             ),
             Self::LocalSurface(_) | Self::ServiceLog | Self::Help | Self::Suggestions => true,

@@ -61,7 +61,7 @@ mod menus;
 pub(crate) mod motion;
 mod navigation;
 mod performance_state;
-mod pointer_capture;
+pub(crate) mod pointer_capture;
 mod preferences;
 mod prefs_accessors;
 mod process_menu;
@@ -81,7 +81,7 @@ mod settings_types;
 mod sidebar;
 mod snapshot_export;
 mod startup_menu;
-mod subscription;
+pub(crate) mod subscription;
 mod surface;
 mod update;
 mod viewport_state;
@@ -316,8 +316,16 @@ pub enum Message {
     ConfirmProcessBatch,
     /// The pending end-task confirmation was dismissed.
     DismissOverlay,
-    /// Request a direct action for the currently selected login session.
+    /// Request Disconnect/Lock for the currently selected login session.
     RequestSessionControl(SessionControlAction),
+    /// Request Disconnect/Lock for the exact login session frozen by its row menu.
+    RequestUserRowSessionControl(SessionControlAction),
+    /// Confirm the pending shared session-control intent.
+    ConfirmSessionControl,
+    /// Cancel the pending session-control intent without submitting it.
+    CancelSessionControl,
+    /// Close the pending session-control surface without submitting it.
+    CloseSessionControl,
     /// A Users row was right-clicked: select it and open its row context
     /// menu (Disconnect / Lock, GPUI parity).
     OpenUserRowMenu(usize),
@@ -346,6 +354,9 @@ pub enum Message {
     ConfirmStartupControl,
     /// A toolkit focusable adapter reported its focus target.
     Focus(FocusTarget),
+    /// The renderer confirmed that the app's tracked focus target is no
+    /// longer mounted in the current widget tree.
+    FocusedTargetUnmounted(FocusTarget),
     /// A real Iced frame was requested by the evidence runner.
     Frame(Instant),
     /// The current capture control was measured through the real widget tree.
@@ -356,6 +367,9 @@ pub enum Message {
     /// The native titlebar requested a close. With a live tray this is a
     /// minimize-to-tray action; without one it closes the only window.
     WindowCloseRequested,
+    /// The native window lost activation. This clears keyboard focus-visible
+    /// state and closes renderer-local context menus.
+    WindowUnfocused,
     /// The Applications table viewport moved. The view uses the absolute
     /// vertical offset to materialize only its visible row window.
     ApplicationsScrolled(iced::widget::scrollable::Viewport),

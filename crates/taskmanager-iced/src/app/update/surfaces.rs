@@ -21,6 +21,10 @@ impl IcedApp {
                 self.shell.dismiss_overlay();
                 None
             }
+            Message::CancelSessionControl | Message::CloseSessionControl => {
+                self.shell.dismiss_overlay();
+                None
+            }
             message @ (Message::OpenProcessAffinity
             | Message::ToggleProcessAffinityCpu(_)
             | Message::SelectAllProcessAffinity

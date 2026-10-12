@@ -229,16 +229,17 @@ pub enum ComponentCapability {
     ///   at invocation; bounds are clamped within the viewport.
     ContextMenu,
 
-    /// A dropdown action or selection menu anchored to a control affordance.
+    /// An action or selection menu associated with a control or surface.
     ///
-    /// - **User-facing behavior**: A transient popover menu anchored to a button
-    ///   or header (e.g. table column visibility menu, filter preset picker).
-    /// - **Interaction semantics**: Triggered via pointer click or Space/Enter on
-    ///   the anchor; Up/Down arrow navigation; Space/Enter selects or toggles;
-    ///   Escape dismisses and returns focus to the anchor.
+    /// - **User-facing behavior**: A transient menu for actions or choices
+    ///   associated with a control or the current surface.
+    /// - **Interaction semantics**: Pointer or keyboard activation opens the menu;
+    ///   keyboard users can traverse and activate items; Escape dismisses and
+    ///   returns focus to the trigger when one is available.
     /// - **Invariant expectations**: Closes on outside click or focus loss;
     ///   toggles update state atomically; multi-select menus remain open across
-    ///   individual item toggles.
+    ///   individual item toggles. Menu geometry is toolkit-specific; a shape that
+    ///   blocks interaction with background content records that difference.
     DropdownMenu,
 
     /// A lightweight transient explanation surface anchored to an element.
@@ -301,7 +302,8 @@ pub enum ComponentCapability {
     ///   detail readouts, scalar values, or log streams, enabling clipboard export.
     /// - **Interaction semantics**: Pointer drag selects character ranges;
     ///   double-click selects words; triple-click selects the whole readout;
-    ///   Ctrl/Cmd+C copies the selection to the system clipboard.
+    ///   Ctrl/Cmd+C copies the selection to the system clipboard. The focused
+    ///   GPUI reference also binds Ctrl/Cmd+A to select the whole readout.
     /// - **Invariant expectations**: At most one active text selection per window;
     ///   read-only text is never mutable; table row selection and column resize
     ///   take arbitration precedence over cell text dragging.
@@ -350,52 +352,57 @@ pub enum ComponentCapability {
 
     /// A single-choice selection control over an enumerated set.
     ///
-    /// - **User-facing behavior**: A compact button displaying the current choice
-    ///   which expands into an option list upon activation (e.g. skin, theme mode).
-    /// - **Interaction semantics**: Pointer click or Space/Enter opens option menu;
-    ///   Up/Down arrows navigate options; Enter commits choice; Escape cancels;
-    ///   Tab moves to next control.
-    /// - **Invariant expectations**: The currently selected option is always
-    ///   prominently marked; selecting the active option is an idempotent no-op;
-    ///   popover lists scroll cleanly when exceeding viewport bounds.
+    /// - **User-facing behavior**: Presents the current committed value and a
+    ///   supplied set of available typed options.
+    /// - **Interaction semantics**: Keyboard users can focus, traverse, and
+    ///   activate options; where a choice is staged, Escape cancels without
+    ///   changing the committed value. Pointer users can choose directly where
+    ///   available.
+    /// - **Invariant expectations**: At most one supplied option is committed
+    ///   (or explicit no-selection where the owner permits it); the displayed
+    ///   value reflects that choice; selecting the active value is idempotent;
+    ///   all options remain reachable when they exceed the visible area.
     Select,
 
-    /// A compact exclusive choice group.
+    /// A mutually exclusive choice group.
     ///
-    /// - **User-facing behavior**: A horizontal ribbon of mutually exclusive tabs
-    ///   or pill buttons (e.g. page navigation tabs, device category selector).
-    /// - **Interaction semantics**: Pointer click activates segment; Left/Right
-    ///   arrows navigate between segments; number shortcuts (1..7) jump directly
-    ///   to corresponding tabs.
-    /// - **Invariant expectations**: Exactly one segment is active at any time;
-    ///   active segment has high-contrast visual distinction; switching tabs
-    ///   preserves background data models without corruption.
+    /// - **User-facing behavior**: A group of mutually exclusive options with its
+    ///   current option visibly identified.
+    /// - **Interaction semantics**: Keyboard users can traverse options in display
+    ///   order and activate one; pointer input selects the targeted option where
+    ///   available.
+    /// - **Invariant expectations**: Exactly one supplied option is active;
+    ///   activation emits that option's typed value, and active state reflects
+    ///   the resulting projection.
     SegmentedControl,
 
     /// A multi-column tabular data grid with header, sorting, and row selection.
     ///
-    /// - **User-facing behavior**: Structured data table presenting rows and typed
-    ///   columns with sticky header, sort direction arrows, and selection highlights.
-    /// - **Interaction semantics**: Up/Down arrows traverse rows; Home/End jumps to
-    ///   extremes; PageUp/PageDown moves by page; pointer click selects row;
-    ///   header click toggles column sort (asc/desc/none); Enter/double-click
-    ///   triggers default row action.
-    /// - **Invariant expectations**: Columns adhere strictly to the shared
-    ///   `PROCESS_COLUMNS` contract; row identity is stable (`ProcessRowId`);
-    ///   sorting and filtering never alter underlying process identities;
-    ///   sticky header stays pinned during vertical scroll.
+    /// - **User-facing behavior**: A multi-column table rendering its supplied
+    ///   ordered rows and column definitions, with row selection and visible sort
+    ///   state for sortable columns.
+    /// - **Interaction semantics**: Keyboard navigation traverses logical row
+    ///   order; pointer input selects a row where available. Activating a sortable
+    ///   header emits its declared sort action; activating a row invokes its
+    ///   declared default action when one exists. Each shape provides a keyboard
+    ///   path to available row and column actions.
+    /// - **Invariant expectations**: Cells follow the supplied row/column
+    ///   projection; stable row identity survives sorting and filtering; row
+    ///   actions target the identity in the current projection; header and body
+    ///   cells remain aligned.
     Table,
 
     /// Pointer-driven interactive column width resizing.
     ///
-    /// - **User-facing behavior**: Draggable divider handles at the trailing edge
-    ///   of table column header cells allowing dynamic width adjustments.
-    /// - **Interaction semantics**: Pointer hover over trailing border shows
-    ///   resize cursor (<->); mousedown starts live drag session; mouseup commits
-    ///   final width; double-click auto-fits to content.
-    /// - **Invariant expectations**: Column width is bounded within `[min_width, max_width]`;
-    ///   adjacent columns adapt gracefully; frontends without pointer dragging
-    ///   (such as TUI) manage widths via fixed profiles or auto-fit allocations.
+    /// - **User-facing behavior**: A user can change a table column's width by
+    ///   dragging its header-edge resize handle.
+    /// - **Interaction semantics**: Dragging a resizable header edge changes that
+    ///   column's width; release ends the resize. Keyboard users can adjust the
+    ///   same width through a focusable step control.
+    /// - **Invariant expectations**: Width stays within the table shape's
+    ///   active resize-policy bounds, and header/body cells remain aligned.
+    ///   Fixed profiles or responsive flex distribution alone do not provide
+    ///   user-driven resizing.
     ColumnDragResize,
 
     /// Bounded-window virtualized list rendering over large collections.
@@ -408,13 +415,16 @@ pub enum ComponentCapability {
     /// the module's range helpers — so the reference shape declares
     /// [`CapabilitySupport::Ported`].
     ///
-    /// - **User-facing behavior**: Smoothly scrolling list capable of handling
-    ///   thousands of rows without latency, dropped frames, or visual tearing.
-    /// - **Interaction semantics**: Responds smoothly to mouse wheel, trackpad scroll,
-    ///   scrollbar thumb dragging, and keyboard navigation (Up/Down, PageUp/PageDown).
-    /// - **Invariant expectations**: Only visible rows plus a bounded overscan
-    ///   buffer are materialized into layout nodes (O(visible) resource bound);
-    ///   selection and focus states remain consistent across virtualization bounds.
+    /// - **User-facing behavior**: An ordered row projection renders the current
+    ///   viewport window with bounded overscan, so materialized row elements do
+    ///   not grow with the total row count.
+    /// - **Interaction semantics**: Keyboard navigation and each frontend's
+    ///   supported scroll input traverse the same logical row order, including
+    ///   rows outside the current render window.
+    /// - **Invariant expectations**: Materialization is bounded by visible rows
+    ///   plus configured overscan, independent of total collection length; logical
+    ///   order and stable row identities persist across window boundaries;
+    ///   selection and focus remain coherent with no skipped or duplicated rows.
     VirtualList,
 
     /// A hierarchical expandable and collapsible tree structure.
@@ -597,9 +607,9 @@ impl ComponentCapability {
             },
             Self::DropdownMenu => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Transient popover menu anchored to a specific control affordance for option selection or column visibility toggles",
-                keyboard_pointer_semantics: "Triggered via pointer click or Space/Enter on anchor; Up/Down arrow navigation; Space/Enter selects or toggles item; Escape closes and restores focus to anchor",
-                invariant_expectations: "Closes on outside click or focus loss; updates state atomically; does not close on item toggle if multi-selection is enabled",
+                user_facing_behavior: "Transient menu for actions or choices associated with a control or the current surface",
+                keyboard_pointer_semantics: "Pointer or keyboard activation opens the menu; keyboard users can traverse and activate items; Escape dismisses and returns focus to the trigger when one is available",
+                invariant_expectations: "Closes on outside click or focus loss; toggles update state atomically; multi-select menus remain open across individual item toggles; menu geometry is toolkit-specific, and shapes that block background interaction record that difference",
             },
             Self::Tooltip => CapabilitySemanticSpec {
                 capability: self,
@@ -628,7 +638,7 @@ impl ComponentCapability {
             Self::TextSelection => CapabilitySemanticSpec {
                 capability: self,
                 user_facing_behavior: "Continuous text selection highlighting across read-only data, detail labels, or log streams enabling clipboard export",
-                keyboard_pointer_semantics: "Pointer drag selects character ranges; double-click selects words; triple-click selects the whole readout; Ctrl/Cmd+C copies the selection to the system clipboard",
+                keyboard_pointer_semantics: "Pointer drag selects character ranges; double-click selects words; triple-click selects the whole readout; Ctrl/Cmd+C copies the selection to the system clipboard; the focused GPUI reference also binds Ctrl/Cmd+A to select the whole readout",
                 invariant_expectations: "At most one active text selection per window; read-only text is never mutable; table row selection and column resize take arbitration precedence",
             },
             Self::Switch => CapabilitySemanticSpec {
@@ -651,33 +661,33 @@ impl ComponentCapability {
             },
             Self::Select => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Single-choice picker over an enumerated set of options",
-                keyboard_pointer_semantics: "Pointer click or Space/Enter opens popover list; Up/Down arrow keys highlight options; Enter commits selection; Escape cancels; Tab moves focus",
-                invariant_expectations: "Current selection clearly displayed; selecting active choice is a no-op; popover list is bounded and scrollable when option count exceeds viewport",
+                user_facing_behavior: "Presents the current committed value and a supplied set of available typed options",
+                keyboard_pointer_semantics: "Keyboard users can focus and traverse options and activate one; where a choice is staged, Escape cancels without changing the committed value; pointer users can choose directly where available",
+                invariant_expectations: "At most one supplied option is committed, or explicit no-selection where the owner permits it; the displayed value reflects that choice; selecting the active value is idempotent; all options remain reachable when they exceed the visible area",
             },
             Self::SegmentedControl => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Compact horizontal ribbon of mutually exclusive tabs or pill buttons",
-                keyboard_pointer_semantics: "Pointer click on segment; Left/Right arrow keys traverse segments; direct digit shortcuts (1..7) activate corresponding segment",
-                invariant_expectations: "Exactly one segment active at any time; active segment has high-contrast visual distinction; switching tabs preserves background data models without corruption",
+                user_facing_behavior: "A group of mutually exclusive options with its current option visibly identified",
+                keyboard_pointer_semantics: "Keyboard users can traverse options in display order and activate one; pointer input selects the targeted option where available",
+                invariant_expectations: "Exactly one supplied option is active; activation emits that option's typed value, and active state reflects the resulting projection",
             },
             Self::Table => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Multi-column tabular data grid with sticky header, typed column cells, sorting indicator, and row selection",
-                keyboard_pointer_semantics: "Up/Down arrows navigate rows; Home/End jumps to extremes; PageUp/PageDown scrolls pages; pointer click selects row; header click sorts; Enter/double-click triggers default row action",
-                invariant_expectations: "Columns adhere strictly to shared PROCESS_COLUMNS contract; row identity is stable; sorting and filtering never alter underlying process identities; sticky header pins during scroll",
+                user_facing_behavior: "Multi-column table rendering the supplied ordered rows and column definitions, with row selection and visible sort state for sortable columns",
+                keyboard_pointer_semantics: "Keyboard navigation traverses logical row order; pointer input selects a row where available; activating a sortable header emits its declared sort action; activating a row invokes its declared default action when one exists; each shape provides a keyboard path to available row and column actions",
+                invariant_expectations: "Cells follow the supplied row/column projection; stable row identity survives sorting and filtering; row actions target the identity in the current projection; header and body cells remain aligned",
             },
             Self::ColumnDragResize => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Draggable divider handles at trailing edge of table column header cells allowing dynamic width adjustments",
-                keyboard_pointer_semantics: "Pointer hover over trailing border shows horizontal resize cursor; mousedown starts live drag session; mouseup commits final width; double-click auto-fits content",
-                invariant_expectations: "Column width clamped to [min_width, max_width]; adjacent columns adapt or shift gracefully; frontends without pointer dragging manage widths via fixed profiles or auto-fit allocations",
+                user_facing_behavior: "A user can change a table column's width by dragging its header-edge resize handle",
+                keyboard_pointer_semantics: "Dragging a resizable header edge changes that column's width; release ends the resize; keyboard users can adjust the same width through a focusable step control",
+                invariant_expectations: "Width stays within the table shape's active resize-policy bounds and header/body cells remain aligned; fixed profiles or responsive flex distribution do not deliver user-driven column resizing",
             },
             Self::VirtualList => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "High-performance virtualized list rendering over large collections with smooth scrolling",
-                keyboard_pointer_semantics: "Responds smoothly to pointer wheel, trackpad scroll, scrollbar thumb dragging, and keyboard navigation (Up/Down, PageUp/PageDown, Home/End)",
-                invariant_expectations: "Materializes only visible rows plus bounded overscan buffer (O(visible) resource bound); zero frame stutter; selection and focus remain valid across virtualization bounds",
+                user_facing_behavior: "An ordered row projection renders the current viewport window with bounded overscan, so rendered row elements do not grow with the total row count",
+                keyboard_pointer_semantics: "Keyboard navigation and each frontend's supported scroll input traverse the same logical row order, including rows outside the current render window",
+                invariant_expectations: "Materialization is bounded by visible rows plus configured overscan, independent of total collection length; logical order and stable row identities persist across window boundaries; selection and focus remain coherent with no skipped or duplicated rows",
             },
             Self::Tree => CapabilitySemanticSpec {
                 capability: self,

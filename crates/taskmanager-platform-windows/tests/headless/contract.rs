@@ -46,14 +46,16 @@ use taskmanager_core::DirectoryScanStatus;
 use taskmanager_core::DirectoryUsageSnapshot;
 use taskmanager_core::NpuInventorySnapshot;
 use taskmanager_core::ScalarAvailability;
-use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::alerts::{
+    AlertInstanceId, AlertRuleId, AlertSeverity, AlertTargetIdentity,
+};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceId, ProviderId};
 use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_core::{DeviceStatus, DirectoryScanSpec};
@@ -705,8 +707,13 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         client.submit_session_control(
             SessionControlRequest {
                 request_id: request_ids.begin(),
-                session_id: SessionId::new("contract.fixture.session"),
-                // Disconnect uses a deliberately malformed fixture identity,
+                identity: SessionIdentity {
+                    session_id: SessionId::new("contract.fixture.session"),
+                    incarnation: SessionIncarnation::WindowsWts {
+                        logon_time_100ns: 1,
+                    },
+                },
+                // Disconnect uses a deliberately malformed provider ID,
                 // so the provider returns a typed identity failure without
                 // locking or logging off a real CI session.
                 action: SessionControlAction::Disconnect,
@@ -726,7 +733,10 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         // no setup asset access.
         client.submit_desktop_notification(
             DesktopNotificationRequest {
-                instance_id: "contract-fixture".into(),
+                instance_id: AlertInstanceId::new(
+                    AlertRuleId::new("contract-fixture"),
+                    AlertTargetIdentity::System,
+                ),
                 title: "fixture".into(),
                 body: "fixture".into(),
                 severity: AlertSeverity::Warning,
@@ -1021,7 +1031,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         "session control is implemented through WTS; it must not degrade to Unsupported"
     );
     assert_eq!(
-        session_outcomes[0].session_id,
+        session_outcomes[0].identity.session_id,
         SessionId::new("contract.fixture.session")
     );
 }

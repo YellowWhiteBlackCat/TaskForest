@@ -13,7 +13,7 @@ use bevy::ecs::{
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
-use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px};
+use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px, rem};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::identity::DeviceGeneration;
@@ -22,6 +22,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::health_review::{
     HealthReviewSection, sensor_groups, storage_groups,
 };
+use taskmanager_shell::presentation::smart::self_test_intent;
 #[derive(Component, Clone)]
 pub(crate) struct HealthSelfTest(
     pub(crate) String,
@@ -104,6 +105,9 @@ pub(super) fn body(
     }).collect();
     for disk in disks {
         for kind in [SmartSelfTestKind::Short, SmartSelfTestKind::Extended] {
+            if self_test_intent(disk, kind).is_none() {
+                continue;
+            }
             let label = t(if kind == SmartSelfTestKind::Extended {
                 "health.extended_test"
             } else {
@@ -111,7 +115,7 @@ pub(super) fn body(
             });
             let id = disk.device_id.clone();
             cards.push(Box::new(bsn! {
-                Node { width: percent(100), min_height: px(palette.control_height_px), flex_shrink: 0.0, padding: UiRect::all(px(space_8())) }
+                Node { width: percent(100), min_height: rem(palette.control_height_rem), flex_shrink: 0.0, padding: UiRect::all(px(space_8())) }
                 Button HealthSelfTest(id, {disk.device_generation}, kind) ControlVisual(ControlTone::Surface, false) on(activate)
                 Children [ Text(label) TextRole(Role::Caption) ]
             }));

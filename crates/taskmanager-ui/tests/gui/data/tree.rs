@@ -3,8 +3,8 @@
 mod tests_inner {
     use crate::data::tree::{MoveDirection, Tree, TreeItem, TreePath, TreeState};
     use gpui::{
-        AppContext, Context, IntoElement, ParentElement, Render, Styled, TestAppContext, Window,
-        div,
+        AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, TestAppContext,
+        VisualTestContext, Window, div,
     };
     use taskmanager_theme::Theme;
 
@@ -29,6 +29,18 @@ mod tests_inner {
             .filter_map(|e| state.item_for_path(&e.path))
             .map(|i| i.label.to_string())
             .collect()
+    }
+
+    struct TreeHarness {
+        state: Entity<TreeState>,
+    }
+
+    impl Render for TreeHarness {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .child(Tree::new(&self.state, Theme::dark().palette()))
+        }
     }
 
     #[gpui::test]
@@ -120,6 +132,68 @@ mod tests_inner {
             // Right on an expanded folder selects its first child.
             s.select_right(cx);
             assert_eq!(s.selected_index(), Some(2));
+        });
+    }
+
+    #[gpui::test]
+    async fn keyboard_space_toggles_folder_and_preserves_selected_identity(
+        cx: &mut TestAppContext,
+    ) {
+        let state = cx.new(|cx| {
+            let mut state = TreeState::new(cx);
+            state.set_items(sample_roots(), cx);
+            state.set_selected_index(Some(0), cx);
+            state
+        });
+        cx.update(crate::init);
+        let window = cx.add_window(|_window, _cx| TreeHarness {
+            state: state.clone(),
+        });
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+            .expect("tree harness should render");
+
+        window
+            .update(cx, |_view, window, _cx| window.focus_next())
+            .expect("tree should accept focus");
+        assert!(
+            window
+                .update(cx, |_view, window, cx| window.focused(cx).is_some())
+                .expect("focused state should be readable"),
+            "the tree must be the keyboard focus target"
+        );
+
+        let mut visual = VisualTestContext::from_window(window.into(), cx);
+        visual.simulate_keystrokes("space");
+        state.read_with(&visual, |state, _| {
+            let path = TreePath::from_segments(&[0]);
+            assert!(
+                !state.is_expanded(&path),
+                "Space must collapse the selected folder"
+            );
+            assert_eq!(
+                state.selected_path(),
+                Some(&path),
+                "collapsing must keep the selected node's identity"
+            );
+            assert_eq!(
+                labels(state),
+                vec!["src", "lib.rs", "Cargo.toml", "README.md"]
+            );
+        });
+
+        visual.simulate_keystrokes("space");
+        state.read_with(&visual, |state, _| {
+            let path = TreePath::from_segments(&[0]);
+            assert!(
+                state.is_expanded(&path),
+                "Space must expand the selected folder"
+            );
+            assert_eq!(
+                state.selected_path(),
+                Some(&path),
+                "expanding must keep the selected node's identity"
+            );
+            assert_eq!(state.entries()[0].path, path);
         });
     }
 

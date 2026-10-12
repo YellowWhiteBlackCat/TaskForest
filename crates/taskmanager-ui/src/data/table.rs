@@ -31,6 +31,7 @@
 //! Selection is a single [`TableSelection`] enum (row XOR column XOR none):
 //! the gc "two Options plus a mode flag" illegal state is unrepresentable.
 
+use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -62,8 +63,9 @@ pub use columns::{
 };
 pub use model::{TableEvent, TableSelection, TableVisibleRange};
 pub use resize::{
-    COLUMN_RESIZE_HANDLE_SIZE, COLUMN_RESIZE_MAX_WIDTH, COLUMN_RESIZE_MIN_WIDTH, ColumnResizeDrag,
-    ColumnResizeHandleProps, clamp_column_width, column_resize_handle, width_from_drag,
+    COLUMN_RESIZE_HANDLE_SIZE, COLUMN_RESIZE_KEYBOARD_STEP, COLUMN_RESIZE_MAX_WIDTH,
+    COLUMN_RESIZE_MIN_WIDTH, ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
+    clamp_column_width, column_resize_handle, column_resize_handle_with_keyboard, width_from_drag,
 };
 pub use widget::Table;
 /// The table key context (navigation bindings live under it).
@@ -86,6 +88,7 @@ actions!(
 /// Register the table keymap (absorption §4.2: up/down rows, left/right
 /// columns, Home/End, Enter activates, Escape clears selection).
 pub fn init(cx: &mut App) {
+    resize::init(cx);
     cx.bind_keys([
         KeyBinding::new("escape", TableCancel, Some(TABLE_CONTEXT)),
         KeyBinding::new("up", TableSelectUp, Some(TABLE_CONTEXT)),
@@ -362,6 +365,9 @@ pub struct TableState<D: TableDelegate> {
     pub palette: Palette,
     /// Runtime column groups (width/sort/bounds).
     pub col_groups: Vec<ColGroup>,
+    /// Stable keyboard focus targets for resizable column handles, keyed by
+    /// the column identity that survives reorder and refresh.
+    resize_focus_handles: HashMap<String, FocusHandle>,
     /// Row scroll (uniform list).
     pub vertical_scroll_handle: UniformListScrollHandle,
     /// Column scroll (shared with the header).
@@ -403,6 +409,7 @@ impl<D: TableDelegate> TableState<D> {
             options: TableOptions::default(),
             palette: Theme::dark().palette(),
             col_groups: Vec::new(),
+            resize_focus_handles: HashMap::new(),
             vertical_scroll_handle: UniformListScrollHandle::new(),
             horizontal_scroll_handle: VirtualListScrollHandle::new(),
             selection: TableSelection::None,
@@ -509,7 +516,7 @@ impl<D: TableDelegate> TableState<D> {
         cx.notify();
     }
 
-    fn prepare_col_groups(&mut self, cx: &App) {
+    fn prepare_col_groups(&mut self, cx: &mut App) {
         self.col_groups = (0..self.delegate.columns_count(cx))
             .map(|col_ix| {
                 let column = self.delegate.column(col_ix, cx);
@@ -519,6 +526,19 @@ impl<D: TableDelegate> TableState<D> {
                     column: column.clone(),
                     sort: column.sort.unwrap_or_default(),
                 }
+            })
+            .collect();
+        let mut previous_handles = std::mem::take(&mut self.resize_focus_handles);
+        self.resize_focus_handles = self
+            .col_groups
+            .iter()
+            .filter(|group| group.is_resizable())
+            .map(|group| {
+                let key = group.column.key.clone();
+                let handle = previous_handles
+                    .remove(&key)
+                    .unwrap_or_else(|| cx.focus_handle().tab_stop(true));
+                (key, handle)
             })
             .collect();
         let _ = validate_leading_fixed(&self.col_groups);

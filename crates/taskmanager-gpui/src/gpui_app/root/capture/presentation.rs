@@ -4,6 +4,7 @@ use super::state::SurfacePresentation;
 use crate::gpui_app::root::{RootView, TopPage, WindowSurfaceKind};
 use crate::gpui_app::sidebar::SelectedDevice;
 use gpui::{Context, Window};
+use taskmanager_application::PendingConfirmation;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_shell::presentation::effective_smart_status;
 
@@ -28,6 +29,13 @@ fn ready(view: &RootView) -> bool {
         Some(CaptureScenario::ServiceDetailsLogs) => view
             .service_details_target()
             .is_some_and(|target| view.services().iter().any(|service| &service.id == target)),
+        Some(CaptureScenario::UsersSessionConfirmation) => {
+            view.page == TopPage::Users
+                && matches!(
+                    view.pending_confirmation(),
+                    Some(PendingConfirmation::SessionControl(_))
+                )
+        }
         Some(CaptureScenario::BatteryFanPerformance | CaptureScenario::BatteryLivePerformance) => {
             view.selected == SelectedDevice::Battery(0)
                 && !view.selected_device_missing

@@ -44,6 +44,8 @@ use taskmanager_core::core::smart::SmartSelfTestKind;
 
 #[path = "dispatch/diagnostics.rs"]
 mod diagnostics;
+#[path = "dispatch/system_about.rs"]
+mod system_about;
 
 /// One just-pressed key, normalized once for the whole arm chain: the facts
 /// every arm reads are captured here so each arm stays a predicate on
@@ -154,6 +156,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             || self.smart_self_test(press)
             || self.snapshot_export(press)
             || self.search_editing(press)
+            || self.system_about(press)
             || self.shell_char(press)
             || self.copy_chord(press)
         {
@@ -289,8 +292,6 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             && sel.is_active()
         {
             sel.clear();
-            self.commands
-                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }
@@ -466,7 +467,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .ses
             .as_ref()
             .and_then(|state| state.target.clone())
-            .or_else(|| self.shell.sorted_sessions().first().map(|s| s.id.clone()));
+            .or_else(|| crate::pages::sessions::first_session_identity(self.shell));
         target.is_some_and(|t| {
             crate::pages::sessions::menu::open_for(&mut self.modals.ses, self.shell, &t)
         })
@@ -559,16 +560,15 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         true
     }
 
-    /// Arm 3b — copy chord: Ctrl+C copies active text selection or selected row summary.
+    /// Arm 3b — copy chord: Ctrl/Cmd+C copies active text selection or selected row summary.
     fn copy_chord(&mut self, press: KeyPress) -> bool {
         if matches!(press.context, KeyboardOwner::Free)
             && press.key_code == KeyCode::KeyC
-            && press.modifiers.control
+            && (press.modifiers == Modifiers::CONTROL
+                || press.modifiers == Modifiers::new(false, false, false, true))
             && let (Some(sel), Some(clip)) = (&mut self.text_selection, &mut self.clipboard)
             && crate::text_selection::copy_selection_or_row(sel, clip, self.shell)
         {
-            self.commands
-                .trigger(crate::text_selection::TextSelectionChanged);
             self.applied = true;
             return true;
         }

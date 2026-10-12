@@ -22,6 +22,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use super::{ContainersPageBranch, container_row_model, page_branch, scene};
 use crate::app::PageContext;
@@ -135,7 +136,7 @@ fn container_row_model_formats_observed_and_unobserved_honestly() {
 #[test]
 fn containers_scene_assembles_for_all_five_branches() {
     let mut shell = ShellApp::new();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
 
     // 1. Waiting (containers is None initially)

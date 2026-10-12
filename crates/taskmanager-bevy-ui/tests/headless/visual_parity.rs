@@ -25,6 +25,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::scene::{Scene, ScenePlugin, WorldSceneExt, bsn};
 use std::path::{Path, PathBuf};
+use taskmanager_theme::tokens::UiSize;
 
 use crate::icons::{IconPlates, PLATE_ICONS, icon_rgba, icon_scene};
 use crate::palette::ui_palette;
@@ -235,7 +236,7 @@ fn strip_comments(raw: &str) -> String {
 
 #[test]
 fn bounded_fact_lines_carry_the_single_line_contract() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     // The rail's key/value row: the value must be NoWrap text under a
     // clipping, shrinkable wrapper — a long fact clips, never wraps. The
     // caller-supplied value scene follows the same bounded-line discipline

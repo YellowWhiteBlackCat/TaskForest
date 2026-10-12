@@ -140,15 +140,26 @@ impl ActionFeedback {
     /// multi-line "See 'systemctl status ...'" blob) so the status line stays a
     /// single line.
     pub fn from_result(res: &Result<(), String>, action: &'static str, name: &str) -> Self {
+        Self::from_result_with_success_template(
+            res,
+            action,
+            name,
+            i18n::t("feedback.action_succeeded"),
+        )
+    }
+
+    /// Build feedback with a caller-owned success sentence while keeping the
+    /// shared failure formatting and target details.
+    pub fn from_result_with_success_template(
+        res: &Result<(), String>,
+        action: &'static str,
+        name: &str,
+        success_template: &str,
+    ) -> Self {
         match res {
             Ok(()) => ActionFeedback {
                 is_error: false,
-                text: format_action_feedback(
-                    i18n::t("feedback.action_succeeded"),
-                    action,
-                    name,
-                    None,
-                ),
+                text: format_action_feedback(success_template, action, name, None),
             },
             Err(e) => {
                 let first = e

@@ -1,10 +1,26 @@
 use super::*;
-use taskmanager_core::core::DiskMetrics;
+use taskmanager_core::core::{
+    AlertInstanceId, AlertRuleId, AlertTargetIdentity, DeviceGeneration, DeviceId, DiskMetrics,
+};
 
 fn alert(metric: AlertMetric, target: &str) -> Alert {
+    let target_identity = if matches!(
+        metric,
+        AlertMetric::DiskTemperatureC
+            | AlertMetric::SmartPercentUsed
+            | AlertMetric::SmartCriticalWarning
+    ) {
+        AlertTargetIdentity::Storage {
+            device_id: DeviceId::new(target),
+            generation: DeviceGeneration::INITIAL,
+        }
+    } else {
+        AlertTargetIdentity::System
+    };
+    let rule_id = AlertRuleId::new("test-rule");
     Alert {
-        instance_id: format!("test:{target}"),
-        rule_id: "test-rule".to_owned(),
+        instance_id: AlertInstanceId::new(rule_id.clone(), target_identity),
+        rule_id,
         target: target.to_owned(),
         metric,
         severity: AlertSeverity::Warning,

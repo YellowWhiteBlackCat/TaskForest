@@ -16,7 +16,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, px,
+    Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -26,6 +26,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::control_error_detail;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
@@ -120,7 +121,7 @@ fn relation_section_scene(
             Box::new(bsn! {
 
                     Node {
-                        height: px(palette.control_height_px),
+                        height: rem(palette.control_height_rem),
                         padding: UiRect::horizontal(Val::Px(space_8())),
                         align_items: AlignItems::Center,
                         justify_content: JustifyContent::Center,
@@ -169,7 +170,7 @@ fn chip_button(
     Box::new(bsn! {
 
             Node {
-                height: px(palette.control_height_px),
+                height: rem(palette.control_height_rem),
                 padding: UiRect::horizontal(Val::Px(space_12())),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
@@ -213,7 +214,11 @@ pub(crate) fn service_dependencies_panel_scene(
             ]
         })
     } else if let Some(failure) = lifecycle.failure() {
-        let msg = format!("Failed to load dependencies: {failure:?}");
+        let msg = format!(
+            "{}: {}",
+            t("source.unavailable_title"),
+            control_error_detail(failure)
+        );
         Box::new(bsn! {
             Node { width: percent(100.0) }
             Children [

@@ -72,6 +72,15 @@ next mechanism; exhausting bridge mechanisms reports `BridgeLimitation`.
 MMC/UFS inventory remains supported even when ATA/SCSI/NVMe SMART is not the
 appropriate health protocol.
 
+SMART health availability and self-test support are independent facts. Core
+stores `SmartSelfTestCapabilities` per disk row and lifecycle generation, with
+`Unknown`, `Supported`, and `Unsupported` for Short, Extended, and Conveyance.
+Linux fills them only from smartctl device capability fields: ATA's
+`self_tests_supported` and `conveyance_self_test_supported`, or NVMe's
+`nvme_optional_admin_commands.self_test`. Missing capability fields stay
+Unknown; SMART health, model, device-family guesses, and tool presence never
+authorize a test. Reappearing disk generations discard cached self-test support.
+
 The Linux `SmartSelfTestPlan` is local to the Linux engine. `smartctl`, `/dev`
 paths, command arguments, JSON field names, and errno text are not shared API.
 
@@ -105,6 +114,15 @@ atomically with the job map. The application-owned
 rejects duplicate targets. Consequently a control-first stop can publish an
 empty newer batch and a late pre-stop poll cannot resurrect the job in GPUI,
 TUI, or another frontend.
+
+Starting a confirmed test requires current exact-kind support evidence. Linux
+tries the ordinary unprivileged operation; on permission denial it probes the
+fixed `StorageSelfTest` polkit crossing. The dedicated helper rechecks the
+persistent sysfs identity, reads exact per-kind support again, rechecks identity,
+and starts only the requested SMART test. User refusal, authorization not
+completed, helper absence/protocol failure, support unknown, and target identity
+change remain separate typed outcomes; no Running report is published before a
+successful command response.
 
 ## Compatibility
 

@@ -1,5 +1,8 @@
 use super::*;
+use crate::gpui_app::root::TopPage;
 use std::time::{Duration, Instant};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 
 #[gpui::test]
 async fn settings_modal_scrollbar_renders_with_valid_bounds(cx: &mut gpui::TestAppContext) {
@@ -24,6 +27,64 @@ async fn settings_modal_scrollbar_renders_with_valid_bounds(cx: &mut gpui::TestA
         "settings scrollbar must have real height: {:?}",
         bounds.size
     );
+}
+
+#[gpui::test]
+async fn users_session_confirmation_keeps_both_choices_inside_compact_bounds(
+    cx: &mut gpui::TestAppContext,
+) {
+    use gpui::{VisualTestContext, px, size};
+
+    let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
+    cx.simulate_window_resize(win.into(), size(px(720.0), px(480.0)));
+    let session = SessionItem {
+        id: "session-with-a-long-provider-issued-identifier-700".into(),
+        incarnation: Some(SessionIncarnation::LinuxLogind {
+            boot_id: "test-boot".into(),
+            created_monotonic_usec: 700,
+        }),
+        uid: 1000,
+        user: "capture-user-with-a-long-display-name-that-wraps-within-the-dialog".into(),
+        seat: Some("seat0".into()),
+        tty: Some("tty7".into()),
+        remote: false,
+        timestamp: None,
+    };
+    win.update(cx, |view, _window, cx| {
+        view.mark_telemetry_frame_ready();
+        seed_direct_track_fact(
+            &mut view.shell,
+            DirectTrackSeedFact::Sessions(Some(vec![session.clone()])),
+        );
+        let projection = view.projection().clone();
+        view.materialized.replace_sessions(
+            projection.sessions_revision,
+            projection.sessions.clone().unwrap_or_default(),
+            projection.sessions_source.clone().unwrap_or_default(),
+        );
+        view.page = TopPage::Users;
+        assert!(
+            view.request_session_control_confirmation(&session, SessionControlAction::Disconnect,)
+        );
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+
+    let mut visual = VisualTestContext::from_window(win.into(), cx);
+    let cancel = visual
+        .debug_bounds("service-control-cancel")
+        .expect("the shared session confirmation exposes Cancel");
+    let confirm = visual
+        .debug_bounds("service-control-confirm")
+        .expect("the shared session confirmation exposes Confirm");
+    assert!(cancel.size.width > px(0.0) && cancel.size.height > px(0.0));
+    assert!(confirm.size.width > px(0.0) && confirm.size.height > px(0.0));
+    assert_eq!(cancel.origin.y, confirm.origin.y);
+    assert!(cancel.right() <= confirm.origin.x);
+    assert!(cancel.origin.x >= px(0.0) && confirm.right() <= px(720.0));
+    assert!(cancel.origin.y >= px(0.0) && confirm.bottom() <= px(480.0));
 }
 
 #[gpui::test]

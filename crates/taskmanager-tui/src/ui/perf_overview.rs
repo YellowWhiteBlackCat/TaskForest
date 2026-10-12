@@ -4,31 +4,29 @@
 //! gauges, composition and shared CPU/memory history.
 //! [`render_perf_overview`] is the page entry point.
 
+use super::panel;
+use super::perf_overview_data::{
+    CpuMetricFact, CpuRailRow, cpu_brand_subtitle, cpu_core_temperature_note, cpu_gauge_value,
+    cpu_live_rail_rows, cpu_metric_facts, cpu_spec_rail_rows,
+};
+use super::render_collecting_panel;
+use super::{perf_core_grid, perf_memory};
+use crate::PerfDevice;
+use crate::TuiApp;
+use crate::TuiTheme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, Gauge, GraphType, Paragraph, Wrap};
+use taskmanager_application::MsrReadoutState;
+use taskmanager_application::RaplPowerState;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_shell::presentation::trend;
 use taskmanager_shell::presentation::{graph_summary, missing_value};
-use taskmanager_ui_contract::IconId;
-
-use super::panel;
-use super::perf_overview_data::{
-    CpuMetricFact, CpuRailRow, cpu_brand_subtitle, cpu_core_temperature_note, cpu_gauge_value,
-    cpu_live_rail_rows, cpu_metric_facts, cpu_spec_rail_rows,
-};
-use super::render_centered_state;
-use super::{perf_core_grid, perf_memory};
-use crate::PerfDevice;
-use crate::TuiApp;
-use crate::TuiTheme;
-use taskmanager_application::MsrReadoutState;
-use taskmanager_application::RaplPowerState;
 
 /// Render the selected CPU or Memory overview through its dedicated layout.
 pub(super) fn render_perf_overview(
@@ -388,14 +386,7 @@ fn render_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
     let cpu_values = trend::cpu_usage_percent(&app.history);
     let memory_values = trend::memory_usage_percent(&app.history);
     if cpu_values.len() < 2 && memory_values.len() < 2 {
-        render_centered_state(
-            frame,
-            theme,
-            area,
-            title,
-            IconId::Refresh,
-            t("perf.collecting_samples"),
-        );
+        render_collecting_panel(frame, theme, area, title, t("perf.collecting_samples"));
         return;
     }
     let cpu: Vec<(f64, f64)> = cpu_values
@@ -468,14 +459,7 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
     let title = t("perf.cpu_utilization_history");
     let samples = trend::cpu_usage_percent(&app.history);
     if samples.len() < 2 {
-        render_centered_state(
-            frame,
-            theme,
-            area,
-            title,
-            IconId::Refresh,
-            t("perf.collecting_samples"),
-        );
+        render_collecting_panel(frame, theme, area, title, t("perf.collecting_samples"));
         return;
     }
     let data: Vec<(f64, f64)> = samples

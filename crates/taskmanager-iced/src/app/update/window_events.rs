@@ -1,19 +1,25 @@
 //! Window lifecycle, capture-frame and virtual-scroll viewport messages.
 
 use crate::app::capture_state::{CaptureDataTarget, CapturePresentationFrame};
+use crate::ui::perf_layout::PERFORMANCE_STATS_RAIL_SCROLL_ID;
+use crate::ui::process_projection::ProjectedRow;
+use crate::ui::responsive::PerformancePageBudget;
 use crate::ui::system_table::bound_system_body_to_end;
 use iced::Task;
+use iced::advanced::widget::Id;
+use iced::widget::operation::{AbsoluteOffset, scroll_to};
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{AppPage, KeyCode, Modifiers};
 use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_shell::QuitReason;
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
-use super::super::{IcedApp, IcedKey, LocalSurfaceKind, Message};
+use super::super::{IcedApp, IcedKey, InputScope, LocalSurfaceKind, Message, PerfDevice};
 use crate::app::viewport_state::ViewportRegion;
 
 pub(super) fn close_latest_window() -> Task<Message> {
@@ -42,12 +48,50 @@ fn minimize_latest_window() -> Task<Message> {
     })
 }
 
+fn cpu_facts_capture_ready(app: &IcedApp) -> bool {
+    let Some(snapshot) = app.shell.projection().snapshot.as_ref() else {
+        return false;
+    };
+    let Some(hardware) = app.shell.projection().hardware.as_ref() else {
+        return false;
+    };
+    let temperature = crate::ui::perf_overview::cpu_core_temperature_summary(&snapshot.cpu);
+    hardware.core_breakdown.p_cores == 6
+        && hardware.core_breakdown.e_cores == 8
+        && hardware.core_breakdown.lp_cores == 2
+        && hardware.base_freq_mhz == Some(2_400)
+        && hardware.cpu_cores == Some(22)
+        && hardware.virt.as_deref() == Some("VT-x")
+        && snapshot.cpu.physical_cores == Some(16)
+        && snapshot.cpu.logical_cores == Some(22)
+        && temperature.is_some_and(|summary| {
+            summary.samples == 2
+                && summary.average_c.round() == 55.0
+                && summary.maximum_c.round() == 59.0
+        })
+        && [
+            snapshot.cpu.l1d_cache_kb,
+            snapshot.cpu.l1i_cache_kb,
+            snapshot.cpu.l2_cache_kb,
+            snapshot.cpu.l3_cache_kb,
+        ]
+        .iter()
+        .all(Option::is_some)
+}
+
 impl IcedApp {
     /// Apply a window-local message. Any returned task joins the common finish
     /// envelope; a real quit is recorded in the shell and projected to the
     /// single close task by that finish system.
     pub(super) fn handle_window_message(&mut self, message: Message) -> Option<Task<Message>> {
         match message {
+            Message::WindowUnfocused => {
+                self.reset_focus_visible();
+                if matches!(self.input_scope(), InputScope::ContextMenu(_)) {
+                    self.close_context_menus();
+                }
+                None
+            }
             Message::CaptureFocusPresented(visible) => {
                 if self.capture.focus_scheduled {
                     self.capture.focus_presented = visible;
@@ -83,9 +127,54 @@ impl IcedApp {
                     self.capture.scroll_requested = true;
                     return Some(bound_system_body_to_end());
                 }
+                if self.capture.data_target == CaptureDataTarget::CpuFacts
+                    && cpu_facts_capture_ready(self)
+                    && !self.capture.scroll_requested
+                {
+                    self.capture.scroll_requested = true;
+                    return Some(scroll_to(
+                        Id::new(PERFORMANCE_STATS_RAIL_SCROLL_ID),
+                        AbsoluteOffset {
+                            x: None,
+                            y: Some(f32::MAX),
+                        },
+                    ));
+                }
                 let history_presented = if self.capture.data_target != CaptureDataTarget::General {
                     let ready = if self.capture.data_target == CaptureDataTarget::Focus {
                         self.capture.focus_presented
+                    } else if self.capture.data_target
+                        == CaptureDataTarget::SessionControlConfirmation
+                    {
+                        self.shell.page() == AppPage::Users
+                            && self.shell.pending_session().is_some()
+                    } else if self.capture.data_target == CaptureDataTarget::ProcessContextMenu {
+                        self.shell.page() == AppPage::Applications
+                            && self.process_menu_identity().is_some()
+                    } else if self.capture.data_target == CaptureDataTarget::CpuFacts {
+                        self.shell.page() == AppPage::Performance
+                            && self.performance.selected_device == PerfDevice::Cpu
+                            && cpu_facts_capture_ready(self)
+                    } else if self.capture.data_target == CaptureDataTarget::ApplicationsAggregate {
+                        self.shell.page() == AppPage::Applications
+                            && self.projected_rows().rows().iter().any(|row| {
+                                matches!(
+                                    row,
+                                    ProjectedRow::GroupHeader { metrics, .. }
+                                        if matches!(
+                                            metrics.cpu().availability(),
+                                            ScalarAvailability::Partial(_)
+                                        )
+                                            && metrics.cpu().current_member_count() + 1
+                                                == metrics.cpu().member_count()
+                                            && matches!(
+                                                metrics.memory().availability(),
+                                                ScalarAvailability::Partial(_)
+                                            )
+                                            && metrics.memory().current_member_count() + 1
+                                                == metrics.memory().member_count()
+                                )
+                            })
                     } else if self.capture.data_target == CaptureDataTarget::VerticalNavigation {
                         self.nav_orientation == NavOrientation::Vertical
                             && self.shell.page() == AppPage::Applications
@@ -124,7 +213,13 @@ impl IcedApp {
                                         && evidence.critical_chain.len() >= 2
                                 })
                     } else if self.capture.data_target == CaptureDataTarget::ActiveAlerts {
-                        self.alerts_page_open() && !self.shell.projection().alert_active.is_empty()
+                        self.alerts_page_open()
+                            && !self
+                                .shell
+                                .projection()
+                                .alert_center
+                                .active_alerts()
+                                .is_empty()
                     } else if self.capture.data_target == CaptureDataTarget::AlertRules {
                         self.alerts_page_open() && !self.alerts_rules().is_empty()
                     } else if self.capture.data_target == CaptureDataTarget::Battery {
@@ -207,9 +302,33 @@ impl IcedApp {
                 } else {
                     true
                 };
+                let history_presented = history_presented
+                    && (self.capture.marker.is_none()
+                        || self.shell.page() != AppPage::Performance
+                        || self.capture.performance_viewport_observed);
                 if !self.capture.emitted && history_presented {
                     self.capture.emitted = true;
                     if let Some(path) = self.capture.marker.as_deref() {
+                        if self.is_demo() && self.shell.page() == AppPage::Performance {
+                            let viewport = self.viewport_size();
+                            let page_viewport = self.page_viewport_size();
+                            let budget = PerformancePageBudget::for_perf_frame(
+                                page_viewport,
+                                self.performance.sidebar_visible,
+                            );
+                            let target =
+                                std::env::var("TM_ICED_CAPTURE_DEVICE").unwrap_or_else(|_| {
+                                    crate::capture::device_name(self.performance.selected_device)
+                                        .to_owned()
+                                });
+                            crate::capture::append_performance_viewport_marker(
+                                path,
+                                &target,
+                                viewport,
+                                page_viewport,
+                                budget,
+                            );
+                        }
                         crate::capture::append_marker(
                             path,
                             "frame_ready",
@@ -236,6 +355,45 @@ impl IcedApp {
                                 );
                             } else {
                                 crate::capture::append_target_marker(path, page, page);
+                            }
+                            if self.capture.data_target == CaptureDataTarget::ProcessContextMenu
+                                && let Some(identity) = self.process_menu_identity()
+                            {
+                                crate::capture::append_process_context_menu_marker(path, identity);
+                            }
+                            if self.capture.data_target == CaptureDataTarget::CpuFacts
+                                && let (Some(snapshot), Some(hardware)) = (
+                                    self.shell.projection().snapshot.as_ref(),
+                                    self.shell.projection().hardware.as_ref(),
+                                )
+                            {
+                                let temperature =
+                                    crate::ui::perf_overview::cpu_core_temperature_summary(
+                                        &snapshot.cpu,
+                                    )
+                                    .map(|summary| {
+                                        (
+                                            summary.average_c.round() as i32,
+                                            summary.maximum_c.round() as i32,
+                                        )
+                                    });
+                                crate::capture::append_cpu_facts_marker(
+                                    path,
+                                    crate::capture::CpuFactsMarkerData {
+                                        core_breakdown: hardware.core_breakdown,
+                                        caches_kib: [
+                                            snapshot.cpu.l1d_cache_kb,
+                                            snapshot.cpu.l1i_cache_kb,
+                                            snapshot.cpu.l2_cache_kb,
+                                            snapshot.cpu.l3_cache_kb,
+                                        ],
+                                        base_frequency_mhz: hardware.base_freq_mhz,
+                                        physical_cores: snapshot.cpu.physical_cores,
+                                        logical_cores: snapshot.cpu.logical_cores,
+                                        virtualization: hardware.virt.as_deref(),
+                                        temperature_average_max_c: temperature,
+                                    },
+                                );
                             }
                         }
                     }
@@ -280,6 +438,12 @@ impl IcedApp {
             }
             Message::WindowResized(size) => {
                 let _ = self.viewport.resize(size);
+                if self.capture.marker.is_some()
+                    && self.is_demo()
+                    && self.shell.page() == AppPage::Performance
+                {
+                    self.capture.performance_viewport_observed = true;
+                }
                 None
             }
             Message::WindowCloseRequested => {

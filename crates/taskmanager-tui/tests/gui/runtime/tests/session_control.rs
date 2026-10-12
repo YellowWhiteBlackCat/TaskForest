@@ -4,13 +4,25 @@
 use super::super::*;
 
 use taskmanager_application::AppAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::queue_effect;
+
+pub(super) fn install_test_incarnations(app: &mut TuiApp) {
+    let mut sessions = app.projection().sessions.clone().unwrap_or_default();
+    for (index, session) in sessions.iter_mut().enumerate() {
+        session.incarnation = Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: u64::try_from(index + 1).unwrap_or(1),
+        });
+    }
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
+}
 
 #[test]
 fn enter_on_users_opens_the_action_menu_and_esc_closes_it() {
     let mut app = crate::demo_app();
+    install_test_incarnations(&mut app);
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     assert!(app.session_menu().is_none());
     let _ = handle_key(
@@ -45,6 +57,7 @@ fn enter_on_users_opens_the_action_menu_and_esc_closes_it() {
 #[test]
 fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     let mut app = crate::demo_app();
+    install_test_incarnations(&mut app);
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let _ = handle_key(
         &mut app,
@@ -84,13 +97,14 @@ fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     };
     assert_eq!(target.action, SessionControlAction::Disconnect);
     // The first demo session has id "2".
-    assert_eq!(target.session_id.as_str(), "2");
+    assert_eq!(target.identity.session_id.as_str(), "2");
     assert!(app.shell.pending_session().is_none());
 }
 
 #[test]
 fn session_confirmation_n_dismisses_without_a_platform_effect() {
     let mut app = crate::demo_app();
+    install_test_incarnations(&mut app);
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let _ = handle_key(
         &mut app,
@@ -174,6 +188,7 @@ fn session_control_round_trip_submits_through_queue_effect() {
 
     // select (menu) -> pick Disconnect (confirmation) -> y (effect) -> queue.
     let mut app = crate::demo_app();
+    install_test_incarnations(&mut app);
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let _ = handle_key(
         &mut app,
@@ -213,7 +228,7 @@ fn session_control_round_trip_submits_through_queue_effect() {
         "the menu's Disconnect pick must reach the provider"
     );
     assert_eq!(
-        request.session_id.as_str(),
+        request.identity.session_id.as_str(),
         "2",
         "the provider-issued session target must be submitted"
     );
@@ -237,6 +252,10 @@ fn menu_targets_the_sorted_session_row() {
         ProjectionSeedFact::Sessions(Some(vec![
             SessionItem {
                 id: "7".into(),
+                incarnation: Some(SessionIncarnation::LinuxLogind {
+                    boot_id: "fixture-boot".into(),
+                    created_monotonic_usec: 7,
+                }),
                 uid: 1000,
                 user: "zeta".into(),
                 seat: None,
@@ -246,6 +265,10 @@ fn menu_targets_the_sorted_session_row() {
             },
             SessionItem {
                 id: "3".into(),
+                incarnation: Some(SessionIncarnation::LinuxLogind {
+                    boot_id: "fixture-boot".into(),
+                    created_monotonic_usec: 3,
+                }),
                 uid: 1000,
                 user: "alpha".into(),
                 seat: None,

@@ -5,8 +5,7 @@
 
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
-use taskmanager_core::core::target::SessionId;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 
 use taskmanager_shell::ShellApp;
 
@@ -52,11 +51,24 @@ pub(crate) type SessionMenuModal = MenuModal<SessionMenuCtx>;
 
 /// Open the menu for one selected session, resolved through the shell's
 /// `sorted_sessions` (the single "row → target" authority).
-pub(crate) fn open_for(modal: &mut SessionMenuModal, shell: &ShellApp, target: &SessionId) -> bool {
+pub(crate) fn open_for(
+    modal: &mut SessionMenuModal,
+    shell: &ShellApp,
+    target: &SessionIdentity,
+) -> bool {
+    let rows = super::session_rows(shell);
+    if rows
+        .iter()
+        .filter(|row| row.identity.as_ref() == Some(target))
+        .count()
+        != 1
+    {
+        return false;
+    }
     let Some(session) = shell
         .sorted_sessions()
         .into_iter()
-        .find(|session| session.id == *target)
+        .find(|session| session.identity().as_ref() == Some(target))
     else {
         return false;
     };

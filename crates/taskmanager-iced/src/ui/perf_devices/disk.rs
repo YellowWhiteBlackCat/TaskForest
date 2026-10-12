@@ -8,6 +8,7 @@ use iced::Element;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
 
+use crate::ui::smart_self_test_confirmation::confirmation;
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
 };
@@ -19,6 +20,9 @@ use super::super::responsive::{
 };
 use taskmanager_theme::Theme;
 
+mod header;
+pub(crate) use header::{disk_subtitle, disk_title};
+
 /// The Performance-page per-disk panel readiness.
 #[must_use]
 pub(crate) fn disk_section_state(snapshot: Option<&SystemSnapshot>) -> tables::ListState {
@@ -26,17 +30,6 @@ pub(crate) fn disk_section_state(snapshot: Option<&SystemSnapshot>) -> tables::L
         None => tables::ListState::Loading,
         Some(snapshot) if snapshot.disks.is_empty() => tables::ListState::Empty,
         Some(_) => tables::ListState::Ready,
-    }
-}
-
-/// One disk's display identity (GPUI parity): the model when known, else the
-/// `/dev/`-stripped name — no family prefix.
-#[must_use]
-pub(crate) fn disk_title(disk: &DiskMetrics) -> String {
-    if disk.model.trim().is_empty() {
-        disk.name.trim_start_matches("/dev/").to_string()
-    } else {
-        disk.model.trim().to_string()
     }
 }
 
@@ -327,32 +320,7 @@ fn smart_footer<'a>(
     if let Some(pending) = app.shell.pending_smart_self_test()
         && pending.device_id.as_str() == disk.device_id
     {
-        return Some(
-            iced::widget::row![
-                iced::widget::text(format!(
-                    "{} {:?}?",
-                    t("health.smart_self_test"),
-                    pending.kind
-                ))
-                .size(f32::from(tokens::FONT_12)),
-                crate::ui::focus::button(
-                    theme_snapshot,
-                    crate::app::FocusTarget::ConfirmSmartSelfTest,
-                    t("common.confirm"),
-                    Message::ConfirmSmartSelfTest,
-                    true,
-                ),
-                crate::ui::focus::button(
-                    theme_snapshot,
-                    crate::app::FocusTarget::CancelSmartSelfTest,
-                    t("common.cancel"),
-                    Message::DismissOverlay,
-                    false,
-                ),
-            ]
-            .spacing(8)
-            .into(),
-        );
+        return Some(confirmation(theme_snapshot, pending));
     }
     if !smart_section_visible(disk) {
         return None;
@@ -702,20 +670,11 @@ fn disk_block<'a>(
     } = ctx;
     let temperature_samples =
         app.cached_disk_temperature_series(&disk.device_id, disk.device_generation.get());
-    let subtitle = [
-        disk.name.trim_start_matches("/dev/").trim(),
-        disk.disk_type.trim(),
-        disk.fs_type.trim(),
-    ]
-    .into_iter()
-    .filter(|part| !part.is_empty())
-    .collect::<Vec<_>>()
-    .join(" · ");
     perf_layout::main_with_stats(
         theme_snapshot,
         perf_layout::DetailHeader {
             title: disk_title(disk),
-            subtitle,
+            subtitle: disk_subtitle(disk),
             vital_line: Some(disk_vital_line(disk, app.drive_units())),
         },
         perf_layout::DetailBody {

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::session::{SessionIdentity, SessionIncarnation};
 
 #[cfg(not(target_os = "macos"))]
 #[test]
@@ -28,8 +29,14 @@ fn mac_environment_providers_degrade_honestly_off_macos() {
     // Session control (disconnect/lock) still has no safe CLI route on
     // macOS, so it completes with a typed Unsupported (stays pending).
     let mut session_control = PendingSessionControlProvider;
+    let identity = SessionIdentity {
+        session_id: "macos:session:test".into(),
+        incarnation: SessionIncarnation::WindowsWts {
+            logon_time_100ns: 1,
+        },
+    };
     assert_eq!(
-        session_control.control(&SessionId::new("1"), SessionControlAction::Lock),
+        session_control.control(&identity, SessionControlAction::Lock),
         Err(ProviderFailure::Unsupported)
     );
 }
@@ -50,8 +57,14 @@ fn mac_environment_provider_reports_native_boot_without_systemd_views() {
     assert!(snapshot.critical_chain.is_empty());
 
     let mut session_control = PendingSessionControlProvider;
+    let identity = SessionIdentity {
+        session_id: "macos:session:test".into(),
+        incarnation: SessionIncarnation::WindowsWts {
+            logon_time_100ns: 1,
+        },
+    };
     assert_eq!(
-        session_control.control(&SessionId::new("1"), SessionControlAction::Lock),
+        session_control.control(&identity, SessionControlAction::Lock),
         Err(ProviderFailure::Unsupported)
     );
 }

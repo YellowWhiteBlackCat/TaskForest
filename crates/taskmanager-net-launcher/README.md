@@ -13,23 +13,28 @@ permanent capability or own application attribution.
 
 ## Contract and verification
 
-Args: `<abstract-socket-name-hex> <iface-index>`. The app binds a randomly
-named abstract-namespace Unix socket (no filesystem path exists to create,
-seize or leak); the launcher hex-decodes the name, connects, sends the fd, and
-exits 0 after the app's one-byte ACK. The ACK read is bounded (10 s): a
-receiver that dies mid-handoff gets a typed `ack_failed` exit, never an
-immortal root process waiting on an ACK that cannot come. The app side
-additionally admits only a uid-0 peer via `SO_PEERCRED` before receiving
-(see `taskmanager-fd-bridge`).
+Args: `<abstract-socket-name-hex> <iface-index>`. Handoff is a bounded
+one-byte-ACK protocol — no daemon, no permanent capability, no general shell
+execution. The full protocol, the typed `ack_failed` rule and the uid-0
+`SO_PEERCRED` admission are specified in
+[`docs/HANDOFF_PROTOCOL.md`](docs/HANDOFF_PROTOCOL.md).
 
 ### Verification
 
-Authorization, helper identity, denial, timeout and descriptor handoff must
-remain visible to the caller. Package/polkit checks and the live on-box handoff
-receipt are separate; absence of the latter keeps the feature partial.
+Authorization, helper identity, denial, timeout and handoff visibility, plus
+the package/polkit-versus-live-receipt separation, are specified in
+[`docs/HANDOFF_PROTOCOL.md`](docs/HANDOFF_PROTOCOL.md).
 
 ## Module map
 
 ```text
 src/main.rs   single-purpose network launcher helper
 ```
+
+## Docs
+
+- [`docs/HANDOFF_PROTOCOL.md`](docs/HANDOFF_PROTOCOL.md) — the abstract-socket fd handoff,
+  bounded ACK and verification.
+- [ADR-023](../../adr/023-per-feature-privilege-escalation-framework.md) /
+  [ADR-024](../../adr/024-afpacket-boundary-crate.md) /
+  [ADR-025](../../adr/025-fd-bridge-scm-rights-boundary-crate.md) — related boundary decisions.

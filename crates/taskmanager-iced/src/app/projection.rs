@@ -2,6 +2,7 @@
 //! keyboard paths.
 
 use std::rc::Rc;
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 use taskmanager_shell::{InfoSortCol, SortDir};
 
@@ -209,7 +210,7 @@ impl IcedApp {
     pub(crate) fn performance_rail_rows(
         &self,
         devices: &[PerfDevice],
-        window: crate::ui::VirtualWindow,
+        window: VirtualWindow,
     ) -> Rc<Vec<crate::ui::perf_rail::RailRow>> {
         let fingerprint = RailProjectionFingerprint {
             system_revision: self.shell.projection().system_revision,

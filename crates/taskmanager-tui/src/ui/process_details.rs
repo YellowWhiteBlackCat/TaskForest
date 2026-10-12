@@ -7,14 +7,16 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Wrap};
+use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField};
-use taskmanager_application::{AppPage, i18n::t};
+use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::units::UnitPreferences;
 
 use super::highlight;
 use super::{kv, panel};
 use crate::TuiApp;
+use crate::process_view::{ProcessRow, VisibleProcesses};
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/process_details_support.rs"]
@@ -23,6 +25,7 @@ use crate::TuiTheme;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 
+mod aggregate;
 mod insights;
 pub(crate) use insights::{insights_lines, modal_insights_lines, network_requires_escalation};
 use taskmanager_application::process_details_vm::{
@@ -282,31 +285,24 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
     cells
 }
 
-/// Which optional columns the renderer is emitting this frame. The two
-/// adaptive columns (`Swap`, `Trend`) hide on hosts without swap and on
-/// narrow terminals respectively; the user-hidden set (`C` column menu) drops
-/// toggleable columns from every row + the header so the table stays aligned.
-/// All flags are computed once in `render_processes` and threaded through
-/// `process_cells` / `group_header_cells` / `process_header` so every row and
-/// the header agree on the column layout. Bundled so the row builders stay
-/// under clippy's argument budget.
+/// Frame-local visibility for the optional columns. Swap and Trend obey host
+/// and width facts, `hidden` carries user choices, and `order` is the visible
+/// tail subset that fits this frame. `process_table` derives that subset from
+/// `TuiApp::column_order` and shares it across widths, headers, and cells.
 #[derive(Clone, Copy)]
 pub(super) struct ColumnVisibility<'a> {
     pub(super) swap_visible: bool,
     pub(super) sparkline_visible: bool,
     pub(super) hidden: &'a std::collections::HashSet<SortCol>,
-    /// The tail columns' left-to-right display order. The column menu's
-    /// reorder gesture mutates the single `TuiApp::column_order` source this
-    /// borrows, so the header, rows, and widths can never disagree. Never
-    /// contains the always-visible PID/Name identity columns or CPU (whose
-    /// readout leads the table and owns the trend splice).
+    /// Ordered tail subset that fits the current table slot. Never contains
+    /// PID/Name/CPU, which are emitted in the fixed prefix.
     pub(super) order: &'a [SortCol],
 }
 
 impl ColumnVisibility<'_> {
-    /// Whether a column is rendered this frame: PID and Name are
-    /// always-visible identity columns; every other column obeys the
-    /// user-hide set (and Swap additionally requires a swap device).
+    /// Whether a fixed or optional column passes its visibility gates.
+    /// Optional tail emission additionally requires presence in this frame's
+    /// `order`.
     #[must_use]
     pub(super) fn visible(self, column: SortCol) -> bool {
         match column {
@@ -335,8 +331,8 @@ pub(super) struct SearchHighlight<'a> {
 pub(super) fn group_header_cells(
     name: &str,
     count: usize,
-    cpu: Option<f32>,
-    memory: Option<u64>,
+    cpu: &AggregateMetric<f32>,
+    memory: &AggregateMetric<u64>,
     expanded: bool,
     columns: ColumnVisibility,
     highlight: SearchHighlight,
@@ -366,7 +362,7 @@ pub(super) fn group_header_cells(
             highlight.search_active,
             highlight.theme,
         ),
-        Cell::from(cpu.map_or_else(|| MISSING_VALUE.to_owned(), |cpu| format!("{cpu:>5.1}%"))),
+        aggregate::cpu_cell(cpu),
     ];
     if sparkline_visible {
         // A group header aggregates many processes; it carries no single
@@ -384,7 +380,7 @@ pub(super) fn group_header_cells(
             continue;
         }
         if column == SortCol::Memory {
-            cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
+            cells.push(aggregate::memory_cell(memory));
         } else {
             cells.push(Cell::from(MISSING_VALUE));
         }
@@ -482,10 +478,9 @@ fn detail_panel_pairs_with_local_time(
     pairs
 }
 
-/// Detail panel for the selected process: frozen identity facts plus the
-/// current row's full field set. In the grouped modes the cursor ranges over
-/// a visual row list that interleaves group headers; a header has no single
-/// process, so the panel surfaces an honest hint instead of fabricating one.
+/// Detail panel for the selected Applications row: process rows show frozen
+/// identity facts and current fields, while category/application rows expose
+/// their canonical aggregate availability, coverage, and failure reason.
 /// Missing rows (empty list / cursor past the end) render the empty state.
 /// Render the detail panel with focus supplied by the immutable frame plan.
 /// The full Applications frame passes the planned focus owner so paint and
@@ -496,7 +491,7 @@ fn detail_panel_pairs_with_local_time(
 /// bytes without materializing the O(N) pointer vector.
 /// The lazy-indexed twin of
 /// [`render_process_details_with_focus_from_canonical`]: the same projection,
-/// with the visible list behind a [`crate::process_view::VisibleProcesses`]
+/// with the visible list behind [`VisibleProcesses`]
 /// on-demand accessor instead of a borrowed pointer slice. The render path
 /// (`process_table`) consumes this entry so a frame's details panel resolves
 /// its ONE row through the shell's memoized indices and never pays the O(N)
@@ -509,44 +504,51 @@ pub(super) fn render_process_details_with_focus_from_canonical_indexed(
     area: Rect,
     focused: bool,
     ids: &[ProcessTreeRow],
-    visible: &crate::process_view::VisibleProcesses<'_>,
+    visible: &VisibleProcesses<'_>,
 ) {
-    let selected = visible.id_process(ids, app.selected);
-    render_details_for_selection(frame, app, theme, area, focused, ids, selected);
+    let selected_row = visible.materialize_row(ids, app.selected);
+    render_details_for_selection(frame, app, theme, area, focused, selected_row);
 }
 
 /// The shared details dispatch: the resolved selected process paints the full
-/// panel; an unresolved selection (empty list, cursor past the end) paints
-/// the honest hint, distinguishing "no processes at all" from "the cursor is
-/// on a group header" so the hint stays honest in the grouped modes.
+/// panel, a selected canonical group row expands its availability-bearing
+/// aggregates, and an unresolved selection paints the honest empty hint.
 fn render_details_for_selection(
     frame: &mut Frame<'_>,
     app: &TuiApp,
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[ProcessTreeRow],
-    selected: Option<&ProcessItem>,
+    selected_row: Option<ProcessRow<'_>>,
 ) {
-    let Some(process) = selected else {
-        let on_group_header = app.page() == AppPage::Applications
-            && matches!(
-                ids.get(app.selected),
-                Some(ProcessTreeRow::Category { .. } | ProcessTreeRow::Application { .. })
-            );
-        let hint = if on_group_header {
-            t("tui.details_group_hint").replacen("{label}", t("empty.no_process_selected"), 1)
-        } else {
-            t("tui.details_move_hint").replacen("{label}", t("empty.no_process_selected"), 1)
-        };
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(hint, Style::new().fg(theme.dim))))
-                .block(panel(t("prop.process_details"), theme)),
+    match selected_row {
+        Some(ProcessRow::Group {
+            label,
+            count,
+            aggregate,
+            ..
+        }) => aggregate::render_group_details(
+            frame,
+            theme,
             area,
-        );
-        return;
+            &label,
+            count,
+            aggregate.cpu(),
+            aggregate.memory(),
+        ),
+        Some(ProcessRow::TreeNode { process, .. }) => {
+            render_resolved_details(frame, app, theme, area, focused, process);
+        }
+        None => {
+            let hint =
+                t("tui.details_move_hint").replacen("{label}", t("empty.no_process_selected"), 1);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(hint, Style::new().fg(theme.dim))))
+                    .block(panel(t("prop.process_details"), theme)),
+                area,
+            );
+        }
     };
-    render_resolved_details(frame, app, theme, area, focused, process);
 }
 
 /// The resolved-selection panel body: frozen identity facts plus the current

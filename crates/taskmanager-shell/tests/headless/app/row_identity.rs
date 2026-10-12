@@ -170,3 +170,49 @@ fn stale_anchor_generation_is_rejected_even_when_the_identity_survives() {
 
     assert!(!app.select_row_anchor(anchor));
 }
+
+#[test]
+fn only_process_updates_advance_the_row_generation() {
+    let mut app = crate::demo_app();
+    app.application.active_page = AppPage::Applications;
+    let anchor = app.row_anchor_at(0).expect("fixture row anchor");
+    let initial_generation = app.projection().process_projection_generation();
+    assert_eq!(anchor.generation(), initial_generation);
+
+    let services = app.projection().services.clone();
+    crate::fixture::seed_projection_fact(
+        &mut app,
+        crate::fixture::ProjectionSeedFact::Services(services),
+    );
+    let hardware = app.projection().hardware.clone().map(Box::new);
+    crate::fixture::seed_projection_fact(
+        &mut app,
+        crate::fixture::ProjectionSeedFact::Hardware(hardware),
+    );
+
+    assert_eq!(
+        app.projection().process_projection_generation(),
+        initial_generation,
+        "service and hardware updates leave the process generation unchanged"
+    );
+    assert!(
+        app.select_row_anchor(anchor),
+        "the process anchor remains valid across unrelated domain updates"
+    );
+
+    let processes = app.projection().processes_slice().to_vec();
+    crate::fixture::seed_projection_fact(
+        &mut app,
+        crate::fixture::ProjectionSeedFact::Processes(Some(processes)),
+    );
+
+    assert_eq!(
+        app.projection().process_projection_generation(),
+        initial_generation.next(),
+        "a new process snapshot advances exactly one process generation"
+    );
+    assert!(
+        !app.select_row_anchor(anchor),
+        "the previous process anchor is stale after the snapshot advances"
+    );
+}

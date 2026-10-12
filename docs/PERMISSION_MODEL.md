@@ -68,7 +68,7 @@ provider 必须遵守该不变量；只有确实无法提供原生提权的能�
 | 类别 | 典型能力 | 拒绝后的产品语义 |
 |---|---|---|
 | Direct | 进程/CPU/内存/磁盘/网络聚合、sysfs、cgroup-v2 | 字段级 unavailable/partial |
-| Requires escalation | Intel PMU、AF_PACKET、foreign-uid control、受保护 SMART/服务控制、SMBIOS 明细（type-17 内存 + type 0/1/2 身份表，entries 与 id 序列号/UUID 节点 root-only）、RAPL 包功耗（energy_uj 0400）、MSR 读数（/dev/cpu/*/msr 0600） | `RequiresEscalation`、`PermissionDenied`、`AuthorizationUnavailable`、`HelperUnavailable` 或 `HelperProtocolViolation` |
+| Requires escalation | Intel PMU、AF_PACKET、foreign-uid control、受保护 SMART 遥测、按设备明确支持种类启动 SMART self-test、服务控制、SMBIOS 明细（type-17 内存 + type 0/1/2 身份表，entries 与 id 序列号/UUID 节点 root-only）、RAPL 包功耗（energy_uj 0400）、MSR 读数（/dev/cpu/*/msr 0600） | `RequiresEscalation`、`PermissionDenied`、`AuthorizationUnavailable`、`HelperUnavailable` 或 `HelperProtocolViolation` |
 | Unsupported | 没有稳定 safe/native seam 的 provider | `Unsupported`，不伪造数字 |
 
 每个请求必须携带 capability、稳定 identity/generation、边界和取消语义；控制前后复核
@@ -76,9 +76,9 @@ provider 必须遵守该不变量；只有确实无法提供原生提权的能�
 
 ## 当前 helper 规则
 
-- `taskmanager-privilege-helper`、`taskmanager-net-launcher`、`taskmanager-process-control-helper`、
+- `taskmanager-privilege-helper`（GPU PMU target 与单独的 SMART self-test target）、`taskmanager-net-launcher`、`taskmanager-process-control-helper`、
   `taskmanager-smbios-helper`、`taskmanager-rapl-helper`、`taskmanager-msr-helper`
-  和 `taskmanager-setup-helper` 都是固定参数、单次、有界 helper；不是 shell、daemon 或通用 root API。
+  和 `taskmanager-setup-helper` 都是固定参数、单次、有界 helper；不是 shell、daemon 或通用 root API。SMART self-test helper 在提权边界再次验证持久设备身份、读取该 kind 的明确支持位，并在身份复核后才启动 smartctl。
   `taskmanager-process-control-helper` 额外接受可选的第四个参数——UAC 传输的一次性
   回传文件（必须已由应用侧独占创建，helper 只截断重写固定 JSON envelope，绝不新建路径）。
 - `PolkitGate` 对每项已接线能力精确验证 `pkexec + policy + executable helper`；provider 注册

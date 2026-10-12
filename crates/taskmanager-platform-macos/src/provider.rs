@@ -321,7 +321,7 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 ),
                 ProviderRegistration::<GpuTelemetryRequest, _>::new(
                     GPU_TELEMETRY_PROVIDER.clone(),
-                    MacGpuTelemetryProvider,
+                    MacGpuTelemetryProvider::new(),
                 ),
                 ProviderRegistration::<ContainerRollupRequest, _>::new(
                     CONTAINER_ROLLUP_PROVIDER.clone(),

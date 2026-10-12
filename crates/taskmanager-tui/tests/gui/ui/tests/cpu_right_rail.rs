@@ -247,7 +247,7 @@ fn right_rail_rows_translate_across_locales() {
             && row_paints(&zh, "核心", "16")
             && row_paints(&zh, "逻辑处理器", "22")
             && row_paints(&zh, "进程", "347")
-            && row_paints(&zh, "运行时间", "06h 42m")
+            && row_paints(&zh, "运行时间", "06小时 42分钟")
             && row_paints(&zh, "性能核（P 核）", "4")
             && zh.contains("详情"),
         "Chinese rail rows drifted:\n{zh}"

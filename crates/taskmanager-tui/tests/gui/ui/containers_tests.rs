@@ -521,3 +521,51 @@ fn users_page_renders_session_rows_through_the_shared_table() {
     assert!(text.contains("seat0"), "the seated session row paints");
     assert!(text.contains("pts/4"), "the remote session row paints");
 }
+
+#[test]
+fn panel_component_owns_the_shared_border_title_and_inner_rect() {
+    let theme = crate::TuiTheme::default();
+    let area = Rect::new(2, 1, 30, 8);
+    let mut terminal = Terminal::new(TestBackend::new(36, 12)).expect("test terminal");
+    let mut inner = Rect::ZERO;
+    terminal
+        .draw(|frame| inner = Panel::new("Fixture panel", theme).render(frame, area))
+        .expect("draw");
+
+    assert_eq!(
+        inner,
+        Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2)
+    );
+    let buffer = terminal.backend().buffer();
+    assert_eq!(buffer[(area.x, area.y)].symbol(), "┌");
+    assert_eq!(buffer[(area.right() - 1, area.bottom() - 1)].symbol(), "┘");
+    assert!(terminal.backend().to_string().contains("Fixture panel"));
+}
+
+#[test]
+fn state_panel_component_paints_empty_and_collecting_states_inside_its_panel() {
+    let theme = crate::TuiTheme::default();
+    let area = Rect::new(1, 1, 38, 8);
+    for (kind, icon, message) in [
+        (StatePanelKind::Message, None, "No disks are available"),
+        (
+            StatePanelKind::Collecting,
+            Some(IconId::Refresh),
+            "Collecting telemetry",
+        ),
+    ] {
+        let mut terminal = Terminal::new(TestBackend::new(40, 10)).expect("test terminal");
+        terminal
+            .draw(|frame| StatePanel::render(frame, theme, area, "Fixture state", kind, message))
+            .expect("draw");
+        let text = terminal.backend().to_string();
+        assert!(text.contains("Fixture state"));
+        assert!(text.contains(message));
+        if let Some(icon) = icon {
+            assert!(text.contains(theme.glyph(icon)));
+        } else {
+            assert!(!text.contains(theme.glyph(IconId::CircleX)));
+            assert!(!text.contains(theme.glyph(IconId::Refresh)));
+        }
+    }
+}

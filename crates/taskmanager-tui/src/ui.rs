@@ -74,6 +74,7 @@ use taskmanager_ui_contract::IconId;
 use crate::PerfDevice;
 use crate::TuiApp;
 use crate::TuiTheme;
+use containers::Panel;
 
 use units::{memory_text_pref, observed_percentage};
 
@@ -121,11 +122,17 @@ pub(crate) fn render_with_plan(
         // The shared shell has not committed a complete immutable frame yet.
         // Keep chrome stable, but do not let page-local Option fallbacks make
         // a partial platform batch look like a real first frame.
-        render_loading(frame, theme, chrome.body, t("common.telemetry_warming_up"));
+        render_collecting_panel(
+            frame,
+            theme,
+            chrome.body,
+            t("common.loading"),
+            t("common.telemetry_warming_up"),
+        );
     } else {
         render_body(frame, app, theme, plan);
     }
-    footer::render(frame, app, theme, chrome.footer);
+    footer::render(frame, app, theme, chrome.footer, plan.input_scope);
 
     // Modal z-order: destructive confirmations first, then the TUI-local
     // overlays, then the shared informational overlays. Only one modal is
@@ -448,67 +455,6 @@ fn selector_strip_line(instances: Vec<SelectorInstance>, width: usize) -> Vec<Sp
     spans
 }
 
-/// A typed table with an honest empty state instead of a bare header.
-pub(super) fn render_empty_panel(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    area: Rect,
-    title: &str,
-    message: &str,
-) {
-    render_centered_state(frame, theme, area, title, IconId::CircleX, message);
-}
-
-/// Render a small, centered state treatment inside a bordered panel. Keeping
-/// the icon and message in the same helper makes loading, empty and unavailable
-/// surfaces read as one product language instead of unrelated bare paragraphs.
-pub(super) fn render_centered_state(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    area: Rect,
-    title: &str,
-    icon: IconId,
-    message: &str,
-) {
-    let block = panel(title, theme);
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    if inner.width == 0 || inner.height == 0 {
-        return;
-    }
-    let state_height = inner.height.min(2);
-    let state_area = Rect {
-        x: inner.x,
-        y: inner.y + inner.height.saturating_sub(state_height) / 2,
-        width: inner.width,
-        height: state_height,
-    };
-    let lines = if state_area.height >= 2 {
-        vec![
-            Line::from(Span::styled(
-                format!("  {}  ", theme.glyph(icon)),
-                Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(message, Style::new().fg(theme.dim))),
-        ]
-    } else {
-        // A three-row panel has only one inner line. Preserve the state text
-        // there instead of rendering only the icon and silently dropping the
-        // diagnostic the user needs.
-        vec![Line::from(vec![
-            Span::styled(
-                format!("{} ", theme.glyph(icon)),
-                Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(message, Style::new().fg(theme.dim)),
-        ])]
-    };
-    frame.render_widget(
-        Paragraph::new(lines).alignment(Alignment::Center),
-        state_area,
-    );
-}
-
 /// Complete geometry and interaction projection for a table render. Callers
 /// name every axis so width/header/selection values cannot drift through a
 /// positional argument list.
@@ -616,20 +562,23 @@ fn header_row<'a, const N: usize>(
     Row::new(cells).bottom_margin(1)
 }
 
-pub(super) fn panel(title: &str, theme: TuiTheme) -> Block<'_> {
-    Block::new()
-        .title(format!(" {title} "))
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.border))
+pub(super) fn panel(title: &str, theme: TuiTheme) -> Block<'static> {
+    Panel::new(title, theme).block()
 }
 
-fn render_loading(frame: &mut Frame<'_>, theme: TuiTheme, area: Rect, message: &str) {
-    render_centered_state(
+pub(super) fn render_collecting_panel(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    area: Rect,
+    title: &str,
+    message: &str,
+) {
+    containers::StatePanel::render(
         frame,
         theme,
         area,
-        t("common.loading"),
-        IconId::Refresh,
+        title,
+        containers::StatePanelKind::Collecting,
         message,
     );
 }

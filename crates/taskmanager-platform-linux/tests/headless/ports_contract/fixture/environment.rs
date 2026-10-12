@@ -58,7 +58,7 @@ impl SessionInventoryProvider for FakeProvider {
 impl SessionControlProvider for FakeProvider {
     fn control(
         &mut self,
-        session_id: &SessionId,
+        target: &SessionIdentity,
         action: SessionControlAction,
     ) -> Result<(), ProviderFailure> {
         if let Some(gate) = &self.control_gate {
@@ -66,7 +66,7 @@ impl SessionControlProvider for FakeProvider {
         }
         thread::sleep(self.delay);
         if let Ok(mut controls) = self.session_controls.lock() {
-            controls.push((session_id.to_string(), action));
+            controls.push((target.session_id.to_string(), action));
         }
         Err(ProviderFailure::PermissionDenied)
     }

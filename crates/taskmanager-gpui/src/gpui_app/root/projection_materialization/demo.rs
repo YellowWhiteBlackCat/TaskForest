@@ -2,6 +2,7 @@
 
 use super::ProjectionMaterialization;
 use taskmanager_shell::SystemProjectionStore;
+use taskmanager_shell::app::alert_rows::AlertRowFamily;
 
 impl ProjectionMaterialization {
     /// Install a deterministic shell projection for the standalone GPUI demo.
@@ -66,6 +67,13 @@ impl ProjectionMaterialization {
         if let Some(npu_inventory) = projection.npu_inventory.clone() {
             self.replace_npu_inventory(system_revision, Some(npu_inventory));
         }
-        self.replace_active_alerts(system_revision, projection.alert_active.clone());
+        let active_alert_revision = projection
+            .alert_row_projection_generation(AlertRowFamily::Active)
+            .data_revision()
+            .get();
+        self.replace_active_alerts(
+            active_alert_revision,
+            projection.alert_center.active_alerts().to_vec(),
+        );
     }
 }

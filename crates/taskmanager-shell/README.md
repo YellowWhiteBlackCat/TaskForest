@@ -14,120 +14,8 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 
 ## Key modules
 
-- `src/saved_views.rs` owns saved process-view identity, built-ins, typed filter/sort/columns,
-  strict JSON transfer and config projection shared by all four frontends. Native controls
-  adapt this model; persisted schema and transfer limits belong to core config.
-
-- `src/presentation/about.rs` owns the common build-metadata projection and copied
-  details. Product identity, license and repository remain owned by neutral assets.
-- `src/presentation/system_information.rs` groups cached OS, kernel, desktop and
-  hardware facts, omits unavailable rows and preserves complete copied values.
-- `src/presentation/health_review.rs` projects complete filesystem integrity,
-  sensor measurements and generation-matched SMART reports. Unknown counts and
-  denied observations remain unavailable. `fixture/health.rs` owns the shared
-  deterministic health inputs and seeds the normal storage/SMART fold.
-
-- `src/app/diagnostics.rs` freezes observed snapshot/process inventory, services, startup
-  and diagnostic facts into one sanitized application plan. Missing required observations
-  fail as unavailable; unobserved optional inventories remain null. Shared presentation
-  owns the preview summary and privacy-safe typed failure text.
-
-- `src/app/batch_fold.rs` is a typestate batch scheduler. Its compile-time
-  phases are failure seed → independent domain systems → revision advancement
-  → alert watermark → failure feedback; a caller cannot skip or reorder them.
-  The domain-system registry owns disjoint data families and is order-independent.
-- Batch activity is `Idle | Updated`, not an inferred combination of local
-  booleans. Independent `BatchFoldChanges` remain ECS-style invalidation facts.
-- `src/app/lifecycle.rs` owns one typed lifecycle reducer for the one-way quit
-  transition and the sole `FeedbackState`. Background activity and point-of-action notices are separate;
-  notices carry source, severity and an explicit replacement/platform-batch
-  lifetime, so live updates cannot erase a control, settings or clipboard result.
-- `src/app/platform_feedback.rs` is the only platform-fold side-effect reducer:
-  it updates activity, publishes typed failure/control notices, ingests shared
-  history and performs selection/service-log hygiene.
-- Each frontend track owns exactly one application dependency lifecycle:
-  `ShellApp` for Iced/TUI/Bevy and `DirectTrackState` for GPUI. `OpenServiceLog`
-  owns only the feed plus its lifecycle; identity is projected from the
-  lifecycle. Effect dispatch begins a typed admission attempt before submission
-  and upgrades or rejects that exact attempt.
-- Each track caches the read-only runtime capability snapshot through one named
-  reducer. GPU-engine presentation combines that status with the application
-  request session in one shared fold; the session is the sole accepted payload
-  authority, and renderers retain no enable bool or failure-detail mirror.
-- The same tracks privately own one `RequestSessions` component for affinity
-  reads, process batches, SMART self-tests, GPU-engine acquisition, process-network
-  escalation and command/reveal/URL actions. The shared fold emits correlated
-  typed terminals once; this component filters wrong-target, wrong-capability,
-  replaced, closed, late and duplicate terminals before renderer history,
-  feedback, payload projection or invalidation can observe them.
-- Each track also privately owns exactly one `SystemProjectionStore`. Renderers use
-  `projection()` only; there is no `data_mut`, `projection_mut`, or public writable field.
-  Production facts enter through `apply_platform_batch` and named control/alert reducers.
-  `fixture::ProjectionSeedFact` and its domain-scoped editors are the deterministic
-  demo/capture/test seam and never expose the store itself.
-- The store's `AlertCenter` is the sole full managed-rule authority on each
-  track. `ShellApp` and `DirectTrackState` expose only immutable managed rules
-  and the same typed edit command; frontends cannot replace engine rules or
-  persist enabled-state mirrors.
-- The same `AlertCenter` also owns bounded activated/cleared event history;
-  GPUI's event panel and Iced's event overlay consume its immutable slice,
-  while filter/read state remains renderer-local.
-- Effect submission folds through `NoSubmission | Rejected | Accepted`; partial
-  multi-facet success remains accepted while every rejected facet is reported.
-- Inline input ownership is one `ShellInputMode::{Content, Search, Help,
-  Suggestions}` machine. Frontends cannot construct parallel open states.
-- Each correlated domain is folded in ascending `EventSequence`; application
-  projections use ascending typed revision with stable same-revision order.
-  Cross-domain sequence is deliberately not a winner because runtime delivery
-  is fair across control/observation classes rather than globally sequence-sorted.
-- Inventory failures are explicitly seeded before independent domain snapshots,
-  so a successful snapshot in the same batch is authoritative; final failure
-  feedback runs only after data and revision phases.
-- `src/history.rs` maps correlated application outcomes into the telemetry store;
-  it does not own a second history representation.
-- `src/app/selection.rs`, `sorting.rs`, `process_control.rs` and `effects.rs` own shared interaction.
-- Shared dangerous gates consume application `InteractionState`; parallel `pending_*` mirrors are
-  forbidden. The GPUI direct track owns that same machine inside `DirectTrackState`;
-  its renderer-local window surface never stores shared semantic payloads.
-- The direct track's inventory outcomes and runtime notices are fields of the
-  same `FeedbackState`; there is no parallel feedback holder. Single-process
-  completions are emitted once by the batch fold and reduced into the notice
-  lifecycle rather than retained in a second projection slot.
-- `ProcessRowId` distinguishes structural category rows, PID-less application
-  aggregates and real process rows. An application root PID is a live tree
-  lookup key; batch submission freezes its exact leaf-first descendant scope.
-- `ProcessTreeRow` is the sole cacheable category/tree structure: shell owns
-  row order, depth, parentage, expansion, identity, and availability-bearing
-  group aggregates; frontends only adapt it to their renderer.
-- `ProcessControlAvailability` is the sole action-surface projection for
-  process-control target scope, exact live count, identity readiness and
-  explicit capability failure. `process_control_intent` freezes the matching
-  atomic request at this boundary; frontends never rebuild tree, batch or stale
-  selection targets.
-- `ProcessRowId`/`ProcessRowAnchor` are the row identity seam:
-  process-backed rows use the shell-owned `ProcessRowIdentity` wrapper around
-  the core `ProcessIdentity`, while
-  `ProcessProjectionGeneration` rejects stale renderer geometry. There is no
-  compatibility row-key API.
-- `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral projections, including the
-  product-first GPU display identity that keeps hardware names separate from driver names.
-- `src/presentation/privilege_center.rs` folds helper capability/request states once for all
-  four renderers. Authorization is offered only when the catalog exposes a usable request
-  seam; GPU actions retain the observed device identity.
-- GPU history retains typed utilization/scalar/engine query windows. The shared chart-metric
-  selection model in `presentation/gpu_chart_metric.rs` owns the
-  telemetry-store
-  series vocabulary, typed availability gating (unavailable series project explicit, never zero
-  or hidden), default Utilization, fixed-order cycling, and generation-reset reconcile as one
-  pure per-window session state. All supported frontends consume this projection, and the headline
-  window read (`gpu_chart_metric_history`) is one generation-scoped typed dispatch over the
-  store's `gpu_metric_point_series_for`: the same `GpuChartMetric::value` fold the gate uses,
-  consumed by Iced/TUI through the shell history and by GPUI's direct track through its own
-  `LiveGraphHistory` view of the same store — no frontend keeps a second sampling fold.
-
-The System timeline adapter implements the application read port over the
-authoritative telemetry rings. Window, gap and summary rules stay in application;
-frontends receive immutable projections and hold only native rendering caches.
+- `src/app.rs` owns the per-track `SystemProjectionStore`; `src/app/batch_fold/`
+  folds platform batches through typed phases into shared projections.
 
 ## Contract and verification
 
@@ -149,9 +37,12 @@ src/app/batch_fold/                 event folding: failure seed → domain syste
 │                                   → alert watermark → feedback
 src/app/direct_track/               process inventory, sorting, selection (GPUI track)
 src/app/process_rows/               cacheable category/tree structure and row identity
+src/app/device_rows.rs              family-qualified device identities and row revisions
+src/app/inventory_rows.rs           typed service/startup/session row identity and anchors
 src/app/request_sessions.rs         per-track typed request-session instances
 src/app/lifecycle.rs                ShellLifecycleState (quit and feedback)
 src/app/effects.rs  effect_dispatch.rs     effect generation and dispatch
+src/app/fixture_seed.rs             fixture facts enter through shell-owned reducers
 src/app/confirmation_gates.rs       dangerous-action confirmation gates
 src/app/process_control.rs  process_requests.rs  process action and request handling
 src/app/frame.rs  input_mode.rs  selection.rs  search_input.rs
@@ -175,3 +66,24 @@ src/process_filter.rs               process filter predicates
 src/memory.rs                       memory presentation helpers
 src/fixture/ (cpu_topology dashboard_history inventory process_insights setup smbios_memory) deterministic demo/capture/test seam
 ```
+
+## Docs
+
+- [`docs/BATCH_FOLD.md`](docs/BATCH_FOLD.md) — typestate batch phases, fold ordering,
+  feedback lifecycle and inventory failure seeding.
+- [`docs/TRACK_OWNERSHIP.md`](docs/TRACK_OWNERSHIP.md) — per-frontend track lifecycles,
+  capability snapshots, request sessions, store and alert authority.
+- [`docs/PROCESS_ROWS.md`](docs/PROCESS_ROWS.md) — row identity, tree structure and
+  process-control availability seams.
+- [`docs/PRESENTATION.md`](docs/PRESENTATION.md) — saved views, presentation projections,
+  privilege center, GPU chart metric session and the system timeline adapter.
+- [`STATE_OWNERSHIP`](../../docs/STATE_OWNERSHIP.md) — cross-crate state ledger;
+  [ADR-027](../../adr/027-renderer-independent-shell-state.md) — renderer-independent shell state.
+
+## Shared semantic rows
+
+See [`docs/SEMANTIC_ROWS.md`](docs/SEMANTIC_ROWS.md) for the ordered shell-to-ui-contract adapter, row identity behavior, and typed process measurement handoff.
+
+## Device row identities
+
+See [`docs/DEVICE_ROWS.md`](docs/DEVICE_ROWS.md) for family-qualified identity, lifecycle admission, generation, and row revision behavior.

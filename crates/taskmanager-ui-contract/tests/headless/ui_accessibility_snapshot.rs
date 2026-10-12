@@ -1,8 +1,11 @@
 use super::*;
 use crate::{
     AccessibilityBridge, AccessibilityBridgeCapability, AccessibilityBridgeError,
-    DetachedAccessibilityBridge, SemanticNodeIssue, SemanticSnapshotError,
+    DetachedAccessibilityBridge, ProcessAggregateSemantics, ProcessRowBehavior,
+    ProcessRowObservations, SemanticNodeIssue, SemanticSnapshotError,
 };
+use taskmanager_core::core::process::aggregate::{aggregate_f32, aggregate_u64};
+use taskmanager_core::core::{FailureKind, ScalarAvailability, ScalarObservation};
 
 fn sample_rows() -> [ProcessRowInput; 2] {
     [
@@ -110,6 +113,224 @@ fn structural_process_group_rows_publish_tree_state_without_fake_metrics() {
     assert!(group.supports_action(SemanticAction::Select));
     assert!(group.supports_action(SemanticAction::Collapse));
     assert!(!group.supports_action(SemanticAction::Expand));
+}
+
+#[test]
+fn typed_process_row_observations_preserve_current_and_retained_truth() {
+    let cpu = ScalarObservation::partial(0.0, 41, FailureKind::PermissionDenied);
+    let memory = ScalarObservation::stale(0, 39, FailureKind::TemporarilyUnavailable);
+    let snapshot = SemanticSnapshotBuilder::new(9)
+        .process_row_with_semantics(
+            ProcessRowInput {
+                id: String::from("typed-process"),
+                name: String::from("typed process"),
+                cpu_percent: Some(0.0),
+                memory_percent: None,
+                selected: true,
+            },
+            ProcessRowBehavior::NonActionable,
+            Some(ProcessRowObservations::new(cpu, memory)),
+        )
+        .build()
+        .expect("typed process observations must validate");
+
+    let row = snapshot
+        .get(&SemanticNodeId::owned("row:typed-process"))
+        .expect("typed process row is retained");
+    let observations = row
+        .process_row_observations()
+        .expect("typed observations stay on the semantic row");
+    assert_eq!(observations.cpu_percentage(), &cpu);
+    assert_eq!(observations.memory_bytes(), &memory);
+    assert_eq!(
+        observations.cpu_percentage().availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+    assert_eq!(observations.cpu_percentage().current_value(), Some(&0.0));
+    assert_eq!(observations.cpu_percentage().last_success_ms(), Some(41));
+    assert_eq!(
+        observations.memory_bytes().availability(),
+        ScalarAvailability::Stale(FailureKind::TemporarilyUnavailable)
+    );
+    assert_eq!(observations.memory_bytes().current_value(), None);
+    assert_eq!(observations.memory_bytes().last_known_value(), Some(&0));
+    assert_eq!(observations.memory_bytes().last_success_ms(), Some(39));
+    assert_eq!(row.state().selected, Some(false));
+    assert!(!row.supports_action(SemanticAction::Focus));
+    assert!(!row.supports_action(SemanticAction::Select));
+}
+
+#[test]
+fn typed_aggregate_semantics_keep_availability_coverage_and_observation() {
+    let cases = [
+        (
+            "zero",
+            vec![ScalarObservation::available(0.0_f32, 7)],
+            ScalarAvailability::Available,
+            Some(0.0),
+            Some(0.0),
+            1,
+            1,
+            1,
+            Some(999),
+        ),
+        (
+            "partial",
+            vec![
+                ScalarObservation::available(2.0_f32, 10),
+                ScalarObservation::default(),
+            ],
+            ScalarAvailability::Partial(FailureKind::TemporarilyUnavailable),
+            Some(2.0),
+            Some(2.0),
+            2,
+            1,
+            1,
+            Some(999),
+        ),
+        (
+            "stale",
+            vec![ScalarObservation::stale(
+                4.0_f32,
+                8,
+                FailureKind::TemporarilyUnavailable,
+            )],
+            ScalarAvailability::Stale(FailureKind::TemporarilyUnavailable),
+            None,
+            Some(4.0),
+            1,
+            0,
+            1,
+            Some(8),
+        ),
+        (
+            "unknown",
+            vec![ScalarObservation::default()],
+            ScalarAvailability::Unknown,
+            None,
+            None,
+            1,
+            0,
+            0,
+            None,
+        ),
+        (
+            "permission denied",
+            vec![ScalarObservation::unavailable(
+                FailureKind::PermissionDenied,
+            )],
+            ScalarAvailability::Unavailable(FailureKind::PermissionDenied),
+            None,
+            None,
+            1,
+            0,
+            0,
+            None,
+        ),
+        (
+            "unavailable",
+            vec![ScalarObservation::unavailable(
+                FailureKind::TemporarilyUnavailable,
+            )],
+            ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable),
+            None,
+            None,
+            1,
+            0,
+            0,
+            None,
+        ),
+    ];
+
+    for (
+        name,
+        observations,
+        availability,
+        current,
+        last_known,
+        members,
+        current_members,
+        known_members,
+        last_success,
+    ) in cases
+    {
+        let cpu = aggregate_f32(observations.iter(), 999).expect("one aggregate member");
+        let expected_cpu = cpu.clone();
+        let memory_observations: Vec<_> = observations
+            .iter()
+            .map(|observation| match observation.availability() {
+                ScalarAvailability::Available => ScalarObservation::available(
+                    observation.current_value().copied().unwrap_or_default() as u64,
+                    observation.last_success_ms().unwrap_or_default(),
+                ),
+                ScalarAvailability::Partial(failure) => ScalarObservation::partial(
+                    observation.current_value().copied().unwrap_or_default() as u64,
+                    observation.last_success_ms().unwrap_or_default(),
+                    failure,
+                ),
+                ScalarAvailability::Stale(failure) => ScalarObservation::stale(
+                    observation.last_known_value().copied().unwrap_or_default() as u64,
+                    observation.last_success_ms().unwrap_or_default(),
+                    failure,
+                ),
+                ScalarAvailability::Unavailable(failure) => ScalarObservation::unavailable(failure),
+                ScalarAvailability::Unknown => ScalarObservation::default(),
+            })
+            .collect();
+        let memory = aggregate_u64(memory_observations.iter(), 999).expect("one aggregate member");
+        let expected_memory = memory.clone();
+        let semantics = ProcessAggregateSemantics {
+            cpu,
+            memory: memory.clone(),
+            memory_pss: memory.clone(),
+            swap: memory.clone(),
+            disk_read: memory.clone(),
+            disk_write: memory.clone(),
+            cpu_time: memory.clone(),
+            threads: memory.clone(),
+            fds: memory,
+        };
+        let snapshot = SemanticSnapshotBuilder::new(10)
+            .process_group_row_with_semantics(
+                ProcessGroupRowInput {
+                    id: format!("aggregate-{name}"),
+                    name: format!("aggregate {name}"),
+                    expanded: false,
+                    selected: true,
+                },
+                Some(String::from("group-expansion")),
+                true,
+                true,
+                semantics,
+            )
+            .build()
+            .expect("typed aggregate group must validate");
+        let node = snapshot
+            .get(&SemanticNodeId::owned(format!(
+                "group-row:aggregate-{name}"
+            )))
+            .expect("aggregate semantic row is retained");
+        let semantic = node
+            .process_aggregate_semantics()
+            .expect("aggregate values stay attached to the row");
+        let cpu = semantic.cpu();
+        assert_eq!(cpu.availability(), availability, "{name}");
+        assert_eq!(cpu.current_value().copied(), current, "{name}");
+        assert_eq!(cpu.last_known_value().copied(), last_known, "{name}");
+        assert_eq!(cpu.observation().last_success_ms(), last_success, "{name}");
+        assert_eq!(cpu.member_count(), members, "{name}");
+        assert_eq!(cpu.current_member_count(), current_members, "{name}");
+        assert_eq!(cpu.known_member_count(), known_members, "{name}");
+        assert_eq!(semantic.memory(), &expected_memory, "{name}");
+        assert_eq!(semantic.memory_pss(), &expected_memory, "{name}");
+        assert_eq!(semantic.swap(), &expected_memory, "{name}");
+        assert_eq!(semantic.disk_read(), &expected_memory, "{name}");
+        assert_eq!(semantic.disk_write(), &expected_memory, "{name}");
+        assert_eq!(semantic.cpu_time(), &expected_memory, "{name}");
+        assert_eq!(semantic.threads(), &expected_memory, "{name}");
+        assert_eq!(semantic.fds(), &expected_memory, "{name}");
+        assert_eq!(expected_cpu.member_count(), members, "{name}");
+    }
 }
 
 #[test]

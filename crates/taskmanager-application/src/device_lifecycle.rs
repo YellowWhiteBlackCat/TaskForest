@@ -7,11 +7,14 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
+use taskmanager_core::core::device_state::DeviceLifecycleRegistry;
 use taskmanager_core::{
     DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState, DeviceStatus,
     GpuTelemetryObservation, NetworkTelemetryObservation, PowerSupplySnapshot,
     SensorCenterSnapshot, StorageTelemetryObservation,
 };
+
+mod npu;
 
 /// Application-facing lifecycle state.
 ///
@@ -37,6 +40,7 @@ pub enum DeviceLifecyclePartition {
     SystemGpu,
     Sensors,
     PowerSupplies,
+    NpuInventory,
 }
 
 /// One stable application read-model row.
@@ -87,6 +91,9 @@ pub enum DeviceLifecycleProjectionIssue {
         stable_id: DeviceId,
         retained: DeviceGeneration,
         observed: DeviceGeneration,
+    },
+    DuplicateStableId {
+        stable_id: DeviceId,
     },
     MissingWithoutConfirmedDisconnect {
         stable_id: DeviceId,
@@ -198,7 +205,7 @@ impl DeviceLifecycleDiagnosticHistory {
 }
 
 /// Stateful, platform-neutral application projection.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DeviceLifecycleProjection {
     partitions: BTreeMap<DeviceLifecyclePartition, DeviceLifecyclePartitionState>,
     owners: BTreeMap<DeviceId, DeviceLifecyclePartition>,
@@ -208,6 +215,10 @@ pub struct DeviceLifecycleProjection {
     /// reappears, is confirmed disconnected, or is retired at the ceiling.
     missing_unconfirmed_order: VecDeque<DeviceId>,
     devices: BTreeMap<DeviceId, ProjectedDeviceLifecycle>,
+    /// NPU discovery is a separate request/response lane rather than one of
+    /// the five lifecycle telemetry partitions. This core registry supplies the
+    /// incarnation generation before the accepted snapshot reaches shell.
+    npu_registry: DeviceLifecycleRegistry,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -648,6 +659,7 @@ fn issue_stable_id(issue: &DeviceLifecycleProjectionIssue) -> &str {
     match issue {
         DeviceLifecycleProjectionIssue::EmptyStableId => "",
         DeviceLifecycleProjectionIssue::ZeroGeneration { stable_id }
+        | DeviceLifecycleProjectionIssue::DuplicateStableId { stable_id }
         | DeviceLifecycleProjectionIssue::GenerationRegressed { stable_id, .. }
         | DeviceLifecycleProjectionIssue::MissingWithoutConfirmedDisconnect { stable_id, .. }
         | DeviceLifecycleProjectionIssue::OwnershipConflict { stable_id, .. } => stable_id.as_str(),

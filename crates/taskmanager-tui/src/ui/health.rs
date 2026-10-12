@@ -7,8 +7,8 @@
 //!   from the typed snapshot / rollup / hardware facts. Missing telemetry
 //!   renders a dim "collecting" marker, never a fabricated healthy verdict.
 //! - **Alert rules**: the canonical application-owned managed rules, including
-//!   disabled entries. Threshold suggestions remain on the dedicated `T`
-//!   overlay and cannot become a second editable rule authority.
+//!   disabled entries. The terminal may toggle a rule, while authoring and
+//!   transfer remain unsupported. Threshold suggestions stay read-only.
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -29,6 +29,7 @@ use super::health_data::{
     network_value, network_verdict, storage_value, storage_verdict,
 };
 use crate::TuiApp;
+use crate::health_review::HealthReviewMode;
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/health_support.rs"]
@@ -47,12 +48,12 @@ pub(super) fn render_health_overlay_at(
 ) {
     let inner =
         Modal::new(theme, IconId::Health, t("health.system_health_alerts")).render(frame, popup);
-    if app.health_review.mode != crate::health_review::HealthReviewMode::Rules {
+    if app.health_review.mode != HealthReviewMode::Rules {
         super::health_review::render(frame, app, theme, inner);
         return;
     }
 
-    let [summary, rules, editor, events, footer] = if inner.height >= 28 {
+    let [summary, rules, details, events, footer] = if inner.height >= 28 {
         Layout::vertical([
             Constraint::Length(11),
             Constraint::Length(6),
@@ -83,23 +84,22 @@ pub(super) fn render_health_overlay_at(
         render_device_summary(frame, app, theme, summary);
     }
     render_alert_rules(frame, app, theme, rules);
-    render_rule_editor(frame, app, theme, editor);
+    render_selected_rule_details(frame, app, theme, details);
     if events.height > 0 {
         render_alert_events(frame, app, theme, events);
     }
     frame.render_widget(
         Paragraph::new(vec![
-            Line::from("n Add d Remove m Metric v Severity p Active"),
-            Line::from("u/o Threshold · f/b Duration · g/l Hysteresis"),
-            Line::from("t Target y Export a Merge r Replace e Events"),
-            Line::from("Up/Down Enter Toggle h / Esc Close w/s Health"),
+            Line::from("p Active · e Events · w/s Device review"),
+            Line::from("q Rules · Up/Down Select"),
+            Line::from("Enter/Space Toggle · h / Esc Close"),
         ])
         .style(Style::new().fg(theme.dim)),
         footer,
     );
 }
 
-fn render_rule_editor(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+fn render_selected_rule_details(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let Some(managed) = app
         .projection()
         .alert_center

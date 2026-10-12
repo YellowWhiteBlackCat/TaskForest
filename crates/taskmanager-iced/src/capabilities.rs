@@ -29,9 +29,26 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (ModalOverlay, Ported),
         // The single Iced-local context-menu slot (app/surface.rs).
         (ContextMenu, Ported),
-        // The column menu anchored to the table header.
-        (DropdownMenu, Ported),
-        (Tooltip, Ported),
+        // The column menu is anchored to its table-header trigger. Outside
+        // dismissal captures the same press before it can activate the
+        // background target; the GPUI reference forwards that press.
+        (
+            DropdownMenu,
+            Divergent {
+                reason: "Iced captures the outside dismissal press so the background target does not activate; GPUI forwards that same press to the background target",
+            },
+        ),
+        // Behavior anchor: ui::perf_rail::tests::tooltip_behavior_tests::
+        // mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click_or_escape
+        // drives the actual focusable rail-card tooltip through Iced widget events.
+        (
+            Tooltip,
+            Divergent {
+                reason: "Iced widget::tooltip opens immediately on pointer hover and closes on \
+                         pointer exit; it has no keyboard-focus trigger and ignores \
+                         pointer-click and Escape dismissal",
+            },
+        ),
         (
             Toast,
             Divergent {

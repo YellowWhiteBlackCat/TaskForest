@@ -45,7 +45,7 @@ fn toggling_a_rule_flips_the_shared_engine_membership_and_back() {
     assert!(
         after
             .iter()
-            .any(|managed| { managed.rule.id == "cpu-high" && !managed.enabled }),
+            .any(|managed| { managed.rule.id.as_str() == "cpu-high" && !managed.enabled }),
         "the disabled rule stays in the canonical managed list"
     );
     assert_eq!(
@@ -315,11 +315,11 @@ fn import_alert_rules_replaces_rules_correctly() {
     let outcome = app
         .import_alert_rules(&json, AlertRuleImportMode::Replace)
         .expect("import should succeed");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
 
     let managed = app.alerts_rules();
     assert_eq!(managed.len(), 1);
-    assert_eq!(managed[0].rule.id, "custom-cpu-rule");
+    assert_eq!(managed[0].rule.id.as_str(), "custom-cpu-rule");
     assert_eq!(managed[0].rule.threshold, 95.0);
     assert!(managed[0].enabled);
 }
@@ -363,16 +363,19 @@ fn import_alert_rules_merges_with_replace_existing_policy() {
             AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
         )
         .expect("merge import should succeed");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
 
     let managed = app.alerts_rules();
     assert_eq!(managed.len(), initial_count + 1);
-    let cpu = managed.iter().find(|m| m.rule.id == "cpu-high").unwrap();
+    let cpu = managed
+        .iter()
+        .find(|m| m.rule.id.as_str() == "cpu-high")
+        .unwrap();
     assert_eq!(cpu.rule.threshold, 75.0);
     assert!(!cpu.enabled);
     let new_m = managed
         .iter()
-        .find(|m| m.rule.id == "brand-new-rule")
+        .find(|m| m.rule.id.as_str() == "brand-new-rule")
         .unwrap();
     assert_eq!(new_m.rule.threshold, 85.0);
     assert!(new_m.enabled);
@@ -434,7 +437,7 @@ fn import_rules_message_applies_and_reports_notice() {
     }));
 
     assert_eq!(app.alerts_rules().len(), 1);
-    assert_eq!(app.alerts_rules()[0].rule.id, "imported-cpu");
+    assert_eq!(app.alerts_rules()[0].rule.id.as_str(), "imported-cpu");
 
     let notice = app.shell.feedback_notice().expect("notice was reported");
     assert_eq!(notice.source(), FeedbackSource::Clipboard);
@@ -465,12 +468,12 @@ fn add_alert_rule_appends_new_rule_and_enables_it() {
         2.0,
     );
     let outcome = app.add_alert_rule(rule.clone()).expect("add succeeds");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
     assert_eq!(app.alerts_rules().len(), initial_count + 1);
     let added = app
         .alerts_rules()
         .iter()
-        .find(|m| m.rule.id == "author-custom-cpu")
+        .find(|m| m.rule.id.as_str() == "author-custom-cpu")
         .expect("rule was added");
     assert_eq!(added.rule.threshold, 92.0);
     assert!(added.enabled);
@@ -491,7 +494,7 @@ fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
     assert!(
         !app.alerts_rules()
             .iter()
-            .find(|m| m.rule.id == "cpu-high")
+            .find(|m| m.rule.id.as_str() == "cpu-high")
             .unwrap()
             .enabled
     );
@@ -505,11 +508,11 @@ fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
         3.0,
     );
     let outcome = app.update_alert_rule(updated).expect("update succeeds");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
     let managed = app
         .alerts_rules()
         .iter()
-        .find(|m| m.rule.id == "cpu-high")
+        .find(|m| m.rule.id.as_str() == "cpu-high")
         .unwrap();
     assert_eq!(managed.rule.threshold, 82.5);
     assert_eq!(managed.rule.severity, AlertSeverity::Warning);
@@ -529,24 +532,38 @@ fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
     let missing_outcome = app
         .update_alert_rule(non_existent)
         .expect("update call succeeds");
-    assert_eq!(missing_outcome, ManagedAlertRuleEditOutcome::MissingTarget);
+    assert_eq!(
+        missing_outcome.outcome,
+        ManagedAlertRuleEditOutcome::MissingTarget
+    );
 }
 
 #[test]
 fn remove_alert_rule_deletes_rule_by_id() {
     let mut app = crate::IcedApp::demo();
-    assert!(app.alerts_rules().iter().any(|m| m.rule.id == "cpu-high"));
+    assert!(
+        app.alerts_rules()
+            .iter()
+            .any(|m| m.rule.id.as_str() == "cpu-high")
+    );
 
     let outcome = app
         .remove_alert_rule("cpu-high".into())
         .expect("remove succeeds");
-    assert_eq!(outcome, ManagedAlertRuleEditOutcome::Applied);
-    assert!(app.alerts_rules().iter().all(|m| m.rule.id != "cpu-high"));
+    assert_eq!(outcome.outcome, ManagedAlertRuleEditOutcome::Applied);
+    assert!(
+        app.alerts_rules()
+            .iter()
+            .all(|m| m.rule.id.as_str() != "cpu-high")
+    );
 
     let missing_outcome = app
         .remove_alert_rule("cpu-high".into())
         .expect("remove call succeeds");
-    assert_eq!(missing_outcome, ManagedAlertRuleEditOutcome::MissingTarget);
+    assert_eq!(
+        missing_outcome.outcome,
+        ManagedAlertRuleEditOutcome::MissingTarget
+    );
 }
 
 #[test]
@@ -571,7 +588,7 @@ fn add_rule_message_applies_and_reports_notice() {
     assert!(
         app.alerts_rules()
             .iter()
-            .any(|m| m.rule.id == "msg-added-rule")
+            .any(|m| m.rule.id.as_str() == "msg-added-rule")
     );
 
     let notice = app.shell.feedback_notice().expect("success notice");
@@ -594,7 +611,11 @@ fn remove_rule_message_applies_and_reports_notice() {
     let _ = app.update(Message::Alerts(AlertsMessage::RemoveRule {
         rule_id: "cpu-high".into(),
     }));
-    assert!(app.alerts_rules().iter().all(|m| m.rule.id != "cpu-high"));
+    assert!(
+        app.alerts_rules()
+            .iter()
+            .all(|m| m.rule.id.as_str() != "cpu-high")
+    );
 
     let notice = app.shell.feedback_notice().expect("success notice");
     assert_eq!(notice.source(), FeedbackSource::Interaction);

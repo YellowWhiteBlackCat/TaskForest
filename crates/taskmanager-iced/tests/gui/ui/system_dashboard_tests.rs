@@ -52,8 +52,8 @@ fn summary_fold_tracks_the_live_projection() {
     );
     assert_eq!(
         model.active_alerts,
-        app.shell.projection().alert_active.len(),
-        "the alerts card mirrors the shell's live evaluation mirror"
+        app.shell.projection().alert_center.active_alerts().len(),
+        "the alerts card mirrors the shell's live evaluation"
     );
     // Whatever the demo snapshot observes, the CPU fold is either the honest
     // dash or a formatted percentage — never a fabricated zero from absence.

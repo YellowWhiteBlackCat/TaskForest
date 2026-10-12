@@ -29,10 +29,13 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::image::Image;
+use bevy::math::Vec2;
+use bevy::picking::Pickable;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::scene::{EntityCommandsSceneExt, Scene, bsn};
+use bevy::text::{InlineBox, InlineBoxKind};
 use bevy::ui::prelude::{Node, px};
-use bevy::ui::widget::ImageNode;
+use bevy::ui::widget::{ImageNode, InlineImage};
 use taskmanager_assets::UI_ICON_RGBA_SIZE;
 use taskmanager_assets::ui_icon_rgba;
 use taskmanager_icons::path;
@@ -184,6 +187,7 @@ pub(crate) fn stamp_icon_plate(
 /// [`IconPlates::build`].
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(stamp_icon_plate);
+    app.add_observer(stamp_inline_icon);
 }
 
 /// Startup: decode the bundled bitmap table into the image store. Chained
@@ -211,4 +215,70 @@ pub(crate) fn icon_scene(icon: IconId, size: f32, ink: Color) -> Box<dyn Scene> 
         IconPlate({ icon })
         IconInk({ ink })
     })
+}
+
+/// Marker naming the semantic icon a TEXT-FLOW entity draws. The entity is a
+/// child of a text node: bevy_text reserves its `InlineBox` inside the text
+/// layout, so the icon flows, clips and aligns with the glyphs as one line —
+/// not a flex sibling that can be orphaned from its label. The `Default` impl
+/// exists only for the bsn! template mechanism.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct InlineIcon(pub(crate) IconId);
+
+impl Default for InlineIcon {
+    fn default() -> Self {
+        Self(IconId::Cpu)
+    }
+}
+
+/// The text-flow icon scene: an in-flow `InlineBox` child of a text entity
+/// carrying the inline + ink markers. The stamp observer turns it into a
+/// tinted [`InlineImage`]; a missing bitmap is zero reserved space — not a
+/// panic and not a glyph. `Pickable::IGNORE` keeps the flow box from
+/// intercepting clicks aimed at the button the text belongs to.
+pub(crate) fn inline_icon_scene(icon: IconId, size: f32, ink: Color) -> Box<dyn Scene> {
+    Box::new(bsn! {
+        InlineBox { kind: InlineBoxKind::InFlow, size: Vec2::splat(size) }
+        InlineIcon({ icon })
+        IconInk({ ink })
+        Pickable::IGNORE
+    })
+}
+
+/// Observer: stamp the bitmap handle and tint as an inline icon lands. The
+/// text-flow counterpart of [`stamp_icon_plate`] — the handle is runtime
+/// state, the flow box geometry is already declared by the scene, and the
+/// engine's `update_inline_image_boxes` keeps the box size on the bitmap.
+pub(crate) fn stamp_inline_icon(
+    trigger: On<Add<InlineIcon>>,
+    plates: Option<Res<IconPlates>>,
+    marks: Query<&InlineIcon>,
+    inks: Query<&IconInk>,
+    boxes: Query<&InlineBox>,
+    mut commands: Commands,
+) {
+    let entity = trigger.event().entity;
+    let ink = inks.get(entity).map(|ink| ink.0).unwrap_or_default();
+    let icon = marks.get(entity).ok().map(|mark| mark.0);
+    let image = icon
+        .and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)))
+        .unwrap_or_default();
+    // `InlineImage` itself is NOT bsn-declarable in 0.20: its `Option<f32>`
+    // extent fields have no template support upstream, so neither a field
+    // patch nor a whole-value patch compiles. The declared `InlineBox` stays
+    // the geometry authority; this observer only completes the async bitmap
+    // payload on the already-declared entity — a typed stamp, not a second
+    // scene path.
+    let extent = boxes
+        .get(entity)
+        .map(|flow_box| flow_box.size.x)
+        .unwrap_or_default();
+    let plate = InlineImage {
+        color: ink,
+        image,
+        width: Some(extent),
+        height: Some(extent),
+        ..InlineImage::default()
+    };
+    commands.entity(entity).insert(plate);
 }

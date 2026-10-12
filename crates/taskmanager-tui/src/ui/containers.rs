@@ -9,10 +9,11 @@
 //! containers renders "no containers running", and per-container readings
 //! that are unavailable render as `—`, never a fabricated zero.
 //!
-//! This module also hosts two shared presentation contracts. The modal
-//! contract ([`Modal`] — the `Clear` + bordered, titled host block — and
-//! [`KeyHint`], the footer chord-hint vocabulary with the typed
-//! [`KeyHintTone`] chord palette) serves every overlay surface. The
+//! This module also hosts shared presentation contracts. [`Panel`] owns the
+//! common bordered title frame, while [`StatePanel`] provides passive empty
+//! and collecting content inside it. [`Modal`] owns the `Clear` + overlay
+//! host; [`KeyHint`] owns the footer chord vocabulary and typed tone palette.
+//! The
 //! [`render_windowed_table`] contract serves the row-table pages
 //! (Applications / Services / Startup / Users): one bordered-table-with-window
 //! paint (window clipping, selection highlight, column layout) with the
@@ -35,7 +36,6 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_ui_contract::IconId;
 
 use super::frame_plan::TablePanelProjection;
-use super::{panel, render_empty_panel};
 use crate::TuiApp;
 
 #[cfg(test)]
@@ -44,6 +44,103 @@ pub(crate) mod containers_support;
 use crate::TuiTheme;
 use crate::ui::{DeviceHealth, classify_device_state};
 use taskmanager_shell::SortDir;
+
+/// Shared bordered panel. It owns only its title frame; body geometry and
+/// content remain with the page that supplies the rectangle.
+pub(super) struct Panel<'a> {
+    title: &'a str,
+    theme: TuiTheme,
+}
+
+impl<'a> Panel<'a> {
+    pub(super) const fn new(title: &'a str, theme: TuiTheme) -> Self {
+        Self { title, theme }
+    }
+
+    pub(super) fn block(&self) -> Block<'static> {
+        Block::new()
+            .title(format!(" {} ", self.title))
+            .borders(Borders::ALL)
+            .border_style(Style::new().fg(self.theme.border))
+    }
+
+    /// Paint the shared title frame and return its interior for caller-owned
+    /// content. Panels are passive: they do not claim focus or keyboard input.
+    pub(super) fn render(&self, frame: &mut Frame<'_>, area: Rect) -> Rect {
+        let block = self.block();
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        inner
+    }
+}
+
+/// Presentation state for passive panels with current TUI page consumers.
+/// Input ownership stays with the enclosing page; these states never create a
+/// focus target or request lifecycle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StatePanelKind {
+    Message,
+    Collecting,
+}
+
+/// A centered, non-interactive state treatment inside the common panel frame.
+pub(super) struct StatePanel;
+
+impl StatePanel {
+    pub(super) fn render(
+        frame: &mut Frame<'_>,
+        theme: TuiTheme,
+        area: Rect,
+        title: &str,
+        kind: StatePanelKind,
+        message: &str,
+    ) {
+        let inner = Panel::new(title, theme).render(frame, area);
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
+        let state_height = match kind {
+            StatePanelKind::Message => 1,
+            StatePanelKind::Collecting => inner.height.min(2),
+        };
+        let state_area = Rect {
+            x: inner.x,
+            y: inner.y + inner.height.saturating_sub(state_height) / 2,
+            width: inner.width,
+            height: state_height,
+        };
+        let lines = match kind {
+            StatePanelKind::Message => {
+                vec![Line::from(Span::styled(
+                    message,
+                    Style::new().fg(theme.dim),
+                ))]
+            }
+            StatePanelKind::Collecting if state_area.height >= 2 => vec![
+                Line::from(Span::styled(
+                    format!("  {}  ", theme.glyph(IconId::Refresh)),
+                    Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(Span::styled(message, Style::new().fg(theme.dim))),
+            ],
+            StatePanelKind::Collecting => {
+                // Keep the diagnostic visible in a three-row panel with only
+                // one interior line instead of dropping it behind the icon.
+                vec![Line::from(vec![
+                    Span::styled(
+                        format!("{} ", theme.glyph(IconId::Refresh)),
+                        Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(message, Style::new().fg(theme.dim)),
+                ])]
+            }
+        };
+        frame.render_widget(
+            Paragraph::new(lines).alignment(Alignment::Center),
+            state_area,
+        );
+    }
+}
 
 /// The shared modal host: `Clear` plus a bordered, titled overlay block.
 /// Presentation only — the popup `Rect` arrives from the caller and the inner
@@ -272,11 +369,12 @@ pub(super) fn render_windowed_table<'a>(
     row_cells: impl FnMut(usize) -> Row<'a>,
 ) -> WindowedTableOutcome {
     if props.panel.total == 0 {
-        render_empty_panel(
+        StatePanel::render(
             frame,
             props.theme,
             props.state_area,
             props.title,
+            StatePanelKind::Message,
             props.state_message,
         );
         return WindowedTableOutcome::StatePanel;
@@ -298,7 +396,7 @@ pub(super) fn render_windowed_table<'a>(
         .column_spacing(props.column_spacing)
         .highlight_symbol("› ")
         .highlight_spacing(HighlightSpacing::Always)
-        .block(panel(props.title, props.theme));
+        .block(Panel::new(props.title, props.theme).block());
     let mut state = TableState::default().with_selected(Some(props.panel.window.selected));
     frame.render_stateful_widget(table, props.panel.area, &mut state);
     WindowedTableOutcome::Table

@@ -1,6 +1,6 @@
 # 跨前端 UI 场景平权审计总纲
 
-前端平权的唯一判定标准是能力与场景的 1:1 全射。GPUI 作为基准发布表面，其拥有的全部 54 个专用交互场景均属于产品必须作答的业务契约。任何一端缺失对应入口或像素实证，均属于未平权的缺陷状态。
+前端平权的唯一判定标准是能力与场景的 1:1 全射。GPUI 作为基准发布表面，其拥有的全部 55 个专用交互场景均属于产品必须作答的业务契约。任何一端缺失对应入口或像素实证，均属于未平权的缺陷状态。
 
 ## 场景全景审计与当前状态
 
@@ -25,6 +25,7 @@
 | | `process-tree-confirm` | 结束完整进程树连带确认框 | Aligned | Aligned | Aligned |
 | | `process-batch-confirm` | 批量终止多个选中进程确认框 | Aligned | Aligned | Aligned |
 | | `smart-self-test-confirm` | 磁盘 SMART 自检二次确认框 | Aligned | Aligned | Aligned |
+| | `users-session-confirmation` | 用户会话断开/锁定的冻结目标确认框 | Aligned | Aligned | Aligned |
 | 存储与硬件诊断 | `storage-health` | 文件系统健康、只读与错误状态及 SMART 自检报告 | Aligned | Aligned | Aligned |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Aligned | Aligned | Aligned |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Aligned | Aligned | Aligned |
@@ -65,6 +66,6 @@
 
 ## 平权推进与收敛机制
 
-1. **绝对基准**：本表 54 个场景 Token 属于硬性全集，任何针对 GPUI 场景的扩充必须同步在此登记。
+1. **绝对基准**：本表 55 个场景 Token 属于硬性全集，任何针对 GPUI 场景的扩充必须同步在此登记。
 2. **状态推进**：每一端新增场景时，必须同时满足代码状态机接线、单测断言、场景矩阵收录、真实 Wayland 截图生成四项要求，才允许将状态标记从 `Pending` 升级为 `Aligned`。
 3. **闭环守护**：质量门禁通过静态脚本机械校验本表完整性，严防场景描述遗漏或拼写漂移。

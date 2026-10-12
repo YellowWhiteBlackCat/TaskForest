@@ -9,8 +9,10 @@
 
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
+mod semantic;
 mod tree;
 
+pub use semantic::append_process_semantic_rows;
 pub use tree::{
     APP_TREE_EXPANSION_KEY_PREFIX, ProcessRowAggregate, ProcessTreeRow, app_tree_expansion_key,
     app_tree_expansion_key_for_identity, project_process_tree_rows,

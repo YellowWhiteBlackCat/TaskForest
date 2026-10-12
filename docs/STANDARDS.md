@@ -5,9 +5,8 @@
 1. **分层 safe-Rust**（ADR-022/024/025/031，权威记录见 `docs/PERMISSION_MODEL.md` Boundary 1）：
    业务/产品 crate 一律 `#![forbid(unsafe_code)]`；`unsafe` **仅存在于四个审计边界
    crate**——`taskmanager-perf-ioctl`（perf_event_open）、`taskmanager-afpacket`（AF_PACKET）、
-   `taskmanager-fd-bridge`（SCM_RIGHTS）、`taskmanager-windows-api`（最小 Windows
-   performance/locale/Known Folder/exact-process/WTS/SCM、processor topology/cache、NIC
-   metadata API）。safe-Rust 门禁扫描生产 `src` 树；`tests/` 下的独立集成测试二进制不属于
+   `taskmanager-fd-bridge`（SCM_RIGHTS）、`taskmanager-windows-api`（最小 Windows API 面，
+   能力清单见 `docs/PERMISSION_MODEL.md` Boundary 1）。safe-Rust 门禁扫描生产 `src` 树；`tests/` 下的独立集成测试二进制不属于
    产品 crate 的 safe-Rust 面，其中的 `unsafe` 必须自文档化（例：
    `crates/taskmanager-tui/tests/headless/perf_budget_alloc_tests.rs` 的计数分配器，无法放进
    `forbid(unsafe_code)` 的库）。每个边界 crate：根带 `#![deny(unsafe_op_in_unsafe_fn)]`（非 `forbid`）、

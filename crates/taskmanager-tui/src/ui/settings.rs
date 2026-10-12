@@ -1,9 +1,10 @@
 //! Settings overlay: a keyboard-driven preferences form.
 //!
 //! The form owns seven fields (skin × 4, mode × 4, high contrast, UI font,
-//! mono font, density, language). Navigation is Tab / arrow keys, values
-//! change with Left/Right, Enter submits a client-local patch through the
-//! background configuration coordinator, and Esc cancels. The language
+//! mono font, density, language). Navigation is Tab / arrow keys, choice and
+//! bounded range values step with Left/Right, Space toggles boolean fields,
+//! Enter submits a client-local patch through the background configuration
+//! coordinator, and Esc cancels. The language
 //! choice persists through `Config::language` (`"en"`/`"zh"` tokens, G-22):
 //! saving writes the token and applies it to the process-global i18n bundle,
 //! and the composition-edge restore re-applies it at startup.
@@ -256,13 +257,27 @@ impl SettingsForm {
             .min(SETTINGS_FIELDS - 1);
     }
 
-    /// Step the focused field's value by `delta` (wrapping). The high-contrast
-    /// toggle flips on any step.
+    /// Whether the focused setting is a keyboard switch that accepts Space.
+    /// Range and choice fields keep their Left/Right stepping contract, while
+    /// permission-center rows are actions rather than switches.
+    #[must_use]
+    pub(crate) const fn focused_switch(&self) -> bool {
+        matches!(self.field, 2 | 8..=24 | 26 | 29)
+    }
+
+    /// Step the focused field's value by `delta`. Discrete Slider adaptations
+    /// clamp at their endpoints; enumerated choices continue to wrap, and
+    /// boolean switches flip on any step.
     pub fn step_value(&mut self, delta: isize) {
         let wrap = |current: usize, delta: isize, len: usize| {
             let len = len as isize;
             let next = (current as isize + delta).rem_euclid(len);
             next as usize
+        };
+        let clamp = |current: usize, delta: isize, len: usize| {
+            current
+                .saturating_add_signed(delta)
+                .min(len.saturating_sub(1))
         };
         match self.field {
             0 => self.skin = wrap(self.skin, delta, Skin::ALL.len()),
@@ -272,7 +287,7 @@ impl SettingsForm {
             4 => self.mono_font = wrap(self.mono_font, delta, FONT_LABELS.len()),
             5 => self.density = wrap(self.density, delta, DENSITY_TOKENS.len()),
             6 => self.language = wrap(self.language, delta, LANGUAGE_TOKENS.len()),
-            7 => self.refresh = wrap(self.refresh, delta, REFRESH_MS.len()),
+            7 => self.refresh = clamp(self.refresh, delta, REFRESH_MS.len()),
             8..=17 => {
                 let index = self.field - 8;
                 self.show[index] = !self.show[index];
@@ -282,17 +297,17 @@ impl SettingsForm {
                 self.units[index] = !self.units[index];
             }
             24 => self.gray_zero = !self.gray_zero,
-            25 => self.graph_points = wrap(self.graph_points, delta, GRAPH_POINTS.len()),
+            25 => self.graph_points = clamp(self.graph_points, delta, GRAPH_POINTS.len()),
             26 => self.notify_enabled = !self.notify_enabled,
             27 => {
-                self.quiet_start = wrap(
+                self.quiet_start = clamp(
                     usize::from(self.quiet_start),
                     delta,
                     usize::from(QUIET_HOURS_MAX),
                 ) as u8
             }
             28 => {
-                self.quiet_end = wrap(
+                self.quiet_end = clamp(
                     usize::from(self.quiet_end),
                     delta,
                     usize::from(QUIET_HOURS_MAX),

@@ -16,9 +16,10 @@ carries a blanket capability (no `setcap` / `setuid`). Boundary 3 classifies
 every telemetry/control domain as *direct* (pure safe Rust, no privilege) or
 *requires escalation* (needs a capability/syscall an unprivileged user lacks).
 
-The remaining escalation domains include Intel i915 per-engine utilization
+The escalation domains include Intel i915 per-engine utilization
 (PMU), per-process network rates (`AF_PACKET` / `CAP_NET_RAW`), ATA/SATA SMART
-(`smartctl`, often root), control of foreign-uid processes
+telemetry (`smartctl`, often root), SMART self-test control on a selected disk,
+control of foreign-uid processes
 (`CAP_KILL` / `CAP_SYS_PTRACE`), and system service start/stop (systemd polkit
 / OpenRC root). Each remains **honestly typed-degraded**
 (`PermissionDenied` / `Unsupported`, never a fabricated number or zero) — but
@@ -43,13 +44,14 @@ features and the contract for probing them, plus the honest default gate.
 
 `#![forbid(unsafe_code)]`, no dependencies beyond `std`/`core`:
 
-- `enum EscalationFeature { IntelPmu, PerProcessNet, AtaSmart,
-  ForeignProcessControl, SystemServiceControl }` — the escalation-column
+- `enum EscalationFeature { IntelPmu, PerProcessNet, AtaSmart, StorageSelfTest,
+  ForeignProcessControl, SystemServiceControl, MemorySmbios, PackagePowerRapl,
+  CpuMsr }` — the escalation-column
   features from Boundary 3, one variant per domain so the UI can offer exactly
   that prompt. `Debug + Clone + Copy + Eq + Hash`.
 - `enum EscalationDenialReason { Unsupported, PermissionDenied,
-  HelperUnavailable }` — typed reason a feature is denied, so callers react
-  without string parsing.
+  AuthorizationUnavailable, HelperUnavailable, HelperProtocolViolation }` —
+  typed reason a feature is denied, so callers react without string parsing.
 - `enum EscalationAvailability { Available, RequiresEscalation(EscalationFeature),
   Denied { reason: EscalationDenialReason } }` — the typed probe result. Honesty
   red line: missing data is a typed variant, never a fabricated value or zero.
@@ -96,17 +98,16 @@ already accepts it as a leaf crate with no internal deps.
 
 ## Consequences
 
-- **Positive:** the escalation path is named and typed. Wiring
-  `PrivilegeGate` into the PMU provider / CLI / per-process-net path has
-  a single, documented contract to implement against, and the honest default
-  (`UnprivilegedGate`) keeps every escalation feature correctly typed-degraded
-  until then — no behaviour changes today.
-- **Honest cost / remaining:** installed-package helper/policy deployment,
-  successful live authorization receipts, Windows/macOS helpers, and a richer
-  session gate that reports `Available` after a real helper result remain open.
-  `UnprivilegedGate` is still the safe default for features without an
-  operational helper; missing or refused helper results remain typed and never
-  become fabricated data.
+- **Positive:** the escalation path is named and typed. Each Linux helper uses
+  a fixed operation, a separate policy and a bounded request/response contract.
+  SMART self-test control is a separate feature from health telemetry and its
+  privileged helper revalidates persistent identity and exact test-kind support.
+- **Honest cost / remaining:** installed-package helper/policy deployment and
+  successful live authorization receipts remain required evidence for new
+  helper operations. Windows/macOS helpers and a richer session gate that
+  reports `Available` after a real helper result remain open. `UnprivilegedGate`
+  is still the safe default for features without an operational helper; missing
+  or refused helper results remain typed and never become fabricated data.
 - **No fabrication:** the framework cannot emit `Available` for an escalation
   feature until a real gate is wired, and `UnprivilegedGate` provably returns
   `RequiresEscalation` for every variant (asserted by the crate's unit tests
@@ -122,12 +123,12 @@ already accepts it as a leaf crate with no internal deps.
   asserts the crate exists, carries `#![forbid(unsafe_code)]`, and that
   `UnprivilegedGate::probe` returns `RequiresEscalation` for every
   `EscalationFeature` variant.
-- **Operational boundaries:** the Intel PMU helper and AF_PACKET launcher
-  are operational seams, and `taskmanager-process-control-helper` now covers
-  one identity-checked foreign-process operation per pkexec invocation. The
-  Linux process provider invokes it only after a typed direct permission
-  denial. The installed-package helper/policy and successful foreign-uid
-  on-box receipt remain open; Windows/macOS equivalents and a richer session
+- **Operational boundaries:** Linux has fixed helpers for Intel PMU, AF_PACKET,
+  process control, SMBIOS, RAPL, MSR and SMART self-test control. The SMART
+  provider invokes its dedicated helper only after direct permission denial;
+  the helper verifies the target again before the test command. Package/policy
+  deployment and successful live authorization receipts remain a separate
+  release-evidence requirement. Windows/macOS equivalents and a richer session
   gate remain unavailable until their native helper paths are implemented and
   validated.
 

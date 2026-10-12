@@ -13,6 +13,8 @@ use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::SortDir;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
+#[path = "tests/aggregate_display.rs"]
+mod aggregate_display;
 #[path = "tests/category.rs"]
 mod category;
 #[path = "tests/keyboard_tree_nav.rs"]
@@ -27,6 +29,8 @@ mod projection_cache;
 mod readability;
 #[path = "tests/scroll_behavior.rs"]
 mod scroll_behavior;
+#[path = "tests/search_input.rs"]
+mod search_input;
 
 use gpui::{
     AppContext, Context, Entity, InteractiveElement, IntoElement, Keystroke, Modifiers,

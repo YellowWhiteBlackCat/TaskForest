@@ -8,14 +8,16 @@
 ```text
 AGENTS.md                顶层工程章程：全局使命、不变量、权威路由
   ↓ 展开（不得重定义）
-docs/*.md                管总：分类总纲，每篇不超过 200 行
+docs/*.md                共性总纲：跨 crate 的分类章程，每篇不超过 200 行
   ↓ 展开（不得重定义）
 crates/*/README.md       crate 自述：Role / Boundary / Module map /
                          Contract and verification
+  ↓ 展开（不得重定义）
+crates/*/docs/*.md       crate 专题章程：单个 crate 的深层细节，由其 README 引用
 ```
 
 - 上层说"是什么、为什么"，下层说"在哪、怎么做"；下层可以展开上层事实，但不能重新
-  定义上层契约。
+  定义上层契约。根目录只保留共性：crate 专属内容下沉到该 crate 自己的 `docs/`。
 - 一项事实只有一个权威来源，其他文件只链接。
 - `adr/` 记录不可逆决策；不要通读，先查索引 [../adr/README.md](../adr/README.md)。
 - 全仓行话（轨、generation、同异律、ingress…）定义在 [GLOSSARY.md](GLOSSARY.md)。
@@ -31,7 +33,7 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 | 改平台采集 / 新增数据源 | [CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 对应能力行、[platform-contract](../crates/taskmanager-platform-contract/README.md)、对应平台 adapter README | 006 007 009 010 011 013 043 044 |
 | 改调度 / 并发 / 事件投递 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[platform-runtime README](../crates/taskmanager-platform-runtime/README.md) | 008 033 |
 | 改历史 / 图表数据 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[telemetry-store](../crates/taskmanager-telemetry-store/README.md)、[history-store](../crates/taskmanager-history-store/README.md) | 014 036 |
-| 改前端交互 / UI 组件 | [ARCH](ARCH.md) §8、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、shell / ui / ui-contract / 对应前端 README | 017 020 026 027 028 038 039 042 046 051 |
+| 改前端交互 / UI 组件 | [ARCH](ARCH.md) §8、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、[SHARED_UI_PACKAGES](SHARED_UI_PACKAGES.md)、shell / ui / ui-contract / 对应前端 README | 017 020 026 027 028 038 039 042 046 051 |
 | 改弹性布局 / 密集详情 / 响应式预算 | [ELASTIC_LAYOUT_PLAYBOOK](ELASTIC_LAYOUT_PLAYBOOK.md)、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、[QUALITY_GATES](QUALITY_GATES.md) | 038 039 |
 | 动权限 / unsafe / helper | [PERMISSION_MODEL](PERMISSION_MODEL.md)、[escalation](../crates/taskmanager-escalation/README.md) 与对应 helper README | 018 019 022 023 024 025 031 035 048 049 |
 | 改宿主组合 / 窗口 / 托盘 | [HOST_ARCHITECTURE](HOST_ARCHITECTURE.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[app-host](../crates/taskmanager-app-host/README.md)、[platform-native](../crates/taskmanager-platform-native/README.md) | 029 032 037 040 051 |
@@ -59,9 +61,10 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 | 平台采集策略 | [CROSSPLATFORM_STRATEGY.md](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST.md](TELEMETRY_MANIFEST.md) |
 | 可用性和失败语义 | [SCALAR_AVAILABILITY.md](SCALAR_AVAILABILITY.md) |
 | Wire 与领域事实边界 | [WIRE_DOMAIN_BOUNDARIES.md](WIRE_DOMAIN_BOUNDARIES.md) |
+| 跨产品共享 UI 包扩展与升级 | [SHARED_UI_PACKAGES.md](SHARED_UI_PACKAGES.md) |
 | UI 组件 | [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md) |
 | 弹性布局流程 | [ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md) |
-| 前端章程与专有指南 | [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)、[UI_GUIDE_GPUI.md](UI_GUIDE_GPUI.md)、[UI_GUIDE_ICED.md](UI_GUIDE_ICED.md)、[UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md)、[UI_GUIDE_TUI.md](UI_GUIDE_TUI.md) |
+| 前端章程与专有指南 | [bevy-ui 章程](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)、[bevy-ui 指南](../crates/taskmanager-bevy-ui/docs/UI_GUIDE_BEVY_UI.md)、[GPUI 指南](../crates/taskmanager-gpui/docs/UI_GUIDE_GPUI.md)、[Iced 指南](../crates/taskmanager-iced/docs/UI_GUIDE_ICED.md)、[TUI 指南](../crates/taskmanager-tui/docs/UI_GUIDE_TUI.md)（crate 专属文档下沉在各前端 crate 的 `docs/`，由其 README 引用） |
 | 术语表 | [GLOSSARY.md](GLOSSARY.md) |
 | 跨前端场景平权审计 | [UI_PARITY_AUDIT.md](UI_PARITY_AUDIT.md) |
 | 产品和桌面身份 | [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md) |
@@ -107,4 +110,7 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 - "能编译""fixture 通过"和"截图存在"都不等于目标平台或发布完成。
 - 新增 `docs/*.md` 必须从本页路由，否则成为孤儿文档；crate README 必须保留
   Role / Boundary / Contract and verification 三段并维护 Module map 与真实模块树一致。
+- crate 专属文档放在 `crates/*/docs/`（UPPER_SNAKE 命名，每篇 ≤200 行），只能写该 crate
+  当前有效的事实，且必须从该 crate README 的 `Docs` 段链接，不得成为孤儿；根 `docs/` 不收
+  单个 crate 的专属内容。
 - 所有本地链接、文档行数和公开边界由 CI 机械检查（`scripts/quality/doc_governance_guard.py`）。

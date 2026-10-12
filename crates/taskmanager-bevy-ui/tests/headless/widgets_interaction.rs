@@ -19,6 +19,7 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use crate::palette::ui_palette;
 use crate::widgets::menu::{
@@ -124,7 +125,7 @@ fn menu_cancel_is_always_available_and_empty_lists_are_inert() {
 
 #[test]
 fn menu_scene_fills_only_the_cursor_row_and_keeps_the_text_census_stable() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let spec = two_row_spec();
 
     let mut app = headless_scene_app();

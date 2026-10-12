@@ -63,7 +63,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::PointerPressed
         | Message::TextSelectionClaimed(_)
         | Message::SearchBackspace
-        | Message::Focus(_)) => MessageDomain::Input(message),
+        | Message::Focus(_)
+        | Message::FocusedTargetUnmounted(_)) => MessageDomain::Input(message),
 
         message @ (Message::SelectPage(_)
         | Message::SelectPerfDevice(_)
@@ -128,6 +129,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::ConfirmEndTask
         | Message::ConfirmProcessBatch
         | Message::RequestSessionControl(_)
+        | Message::RequestUserRowSessionControl(_)
+        | Message::ConfirmSessionControl
         | Message::RequestProcessNetworkEscalation
         | Message::OpenUserRowMenu(_)
         | Message::CloseUserRowMenu
@@ -142,6 +145,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::SearchProcessOnline) => MessageDomain::Control(message),
 
         message @ (Message::DismissOverlay
+        | Message::CancelSessionControl
+        | Message::CloseSessionControl
         | Message::OpenProcessAffinity
         | Message::ToggleProcessAffinityCpu(_)
         | Message::SelectAllProcessAffinity
@@ -222,7 +227,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::StartupScrolled(_)
         | Message::UsersScrolled(_)
         | Message::WindowResized(_)
-        | Message::WindowCloseRequested) => MessageDomain::Window(message),
+        | Message::WindowCloseRequested
+        | Message::WindowUnfocused) => MessageDomain::Window(message),
     }
 }
 

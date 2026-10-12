@@ -63,7 +63,7 @@
 - **四端 / 对等前端（peer frontends）**：GPUI（当前发布形态）、Iced、TUI、Bevy 共享
   同一应用投影，互不拥有业务事实（[ARCH](ARCH.md)）。
 - **平权 / 对等（parity）**：包含前端轴与平台轴两根独立维度。**平台轴**：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency`、`TemporarilyUnavailable`（均为 `platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。平台按 typed 原因诚实降级是 parity 的达成形态。**前端轴（一碗水端平）**：包含三个不可替代的递进层级：
-  1. *数据契约平权*：共享数据模型，由 `feature_evidence.tsv` 的 50 项 headless 锚点验证；
+  1. *数据契约平权*：共享数据模型，由 `feature_evidence.tsv` 验证 50 个 feature ID 在四端各自的 headless 锚点（共 200 格）；
   2. *场景交互深度平权*：完整提供同等的交互分支（进程详情诊断 Tab、二次确认弹窗、错误与提权态、搜索高亮）；
   3. *视觉像素实证平权*：四端接入自动化无感截屏流水线，在 `capture_*_scenarios.tsv` 矩阵中输出经过哈希与几何校验的真实像素回执。
   Headless 单测仅证明数据契约层，不能作为全量端平的依据。当视觉场景矩阵存在非对称时，前端仍处于对齐推进中。不得表述为四端「跨平台功能完全对等」或 Linux-only 能力「跨平台可用」，缺口不得用 `0`、空值或静态占位表示（[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[ARCH §8](ARCH.md)）。

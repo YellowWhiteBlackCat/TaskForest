@@ -28,6 +28,7 @@ use taskmanager_core::core::services::{
 };
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::app::OpenServiceLog;
+use taskmanager_theme::tokens::UiSize;
 
 use super::log_panel::{
     LogPanelRepaintRequired, ServiceLogControlAction, log_fingerprint, log_panel_key,
@@ -193,7 +194,7 @@ fn painted_panel(shell: &ShellApp) -> Vec<(crate::window::Role, String)> {
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
-    let palette = crate::palette::ui_palette(&Theme::dark());
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
     let scene = super::log_panel::service_log_panel_scene(shell, &palette);
     let world = app.world_mut();
     let root = world

@@ -3,6 +3,7 @@
 //! Service details modal behavior in Bevy.
 
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_theme::tokens::UiSize;
 
 use super::details_modal::{ServiceDetailsModalState, service_details_modal_scene};
 use taskmanager_theme::Theme;
@@ -36,6 +37,6 @@ fn service_details_modal_state_open_and_close() {
 fn service_details_modal_scene_renders_without_panic() {
     let service = dummy_service();
     let theme = Theme::default();
-    let palette = crate::palette::ui_palette(&theme);
+    let palette = crate::palette::ui_palette(&theme, UiSize::Standard);
     let _scene = service_details_modal_scene(&service, &palette);
 }

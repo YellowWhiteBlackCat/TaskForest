@@ -8,16 +8,24 @@
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
-use bevy::asset::{AssetPlugin, Assets};
+use bevy::asset::{AssetApp, AssetPlugin, Assets};
+use bevy::ecs::hierarchy::Children;
+use bevy::ecs::query::Has;
+use bevy::image::Image;
+use bevy::picking::Pickable;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
-use bevy::ui::widget::Text;
+use bevy::text::{InlineBox, InlineBoxKind};
+use bevy::ui::widget::{InlineImage, Text};
 use bevy::ui::{Node, Val};
 use bevy::ui_widgets::Button;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
+use taskmanager_ui_contract::IconId;
 
 use super::menu::{MenuItem, MenuSpec, MenuState, menu_scene_at};
-use super::table::{header_scene, row_scene};
+use super::table::{SortProjection, header_scene, row_scene};
+use crate::icons::{IconPlates, inline_icon_scene, stamp_inline_icon};
 use crate::palette::{space_12, ui_palette};
 use crate::widgets::controls::{ControlTone, ControlVisual, pill_scene};
 use crate::widgets::table::visible_columns;
@@ -49,7 +57,7 @@ fn text_census(app: &mut App, scene: impl bevy::scene::Scene) -> Vec<String> {
 
 #[test]
 fn menu_scene_spawns_one_row_per_entry_plus_title() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let spec = MenuSpec {
         title: "Row actions".to_owned(),
         items: vec![
@@ -78,7 +86,7 @@ fn menu_scene_spawns_one_row_per_entry_plus_title() {
 fn table_header_spawns_one_cell_per_contract_column() {
     let columns: Vec<_> = visible_columns(&[]);
     let mut app = headless_scene_app();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let texts = text_census(&mut app, header_scene(&columns, None, &palette));
     assert_eq!(
         texts.len(),
@@ -86,6 +94,93 @@ fn table_header_spawns_one_cell_per_contract_column() {
         "one header cell per contract column, no duplicates"
     );
     assert_eq!(texts[0], "Name", "the identity column leads");
+}
+
+#[test]
+fn sorted_header_flows_the_direction_plate_inside_the_label_text() {
+    let columns: Vec<_> = visible_columns(&[]);
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let sort = Some(SortProjection {
+        column: "CPU",
+        descending: false,
+    });
+    let mut app = headless_scene_app();
+    let world = app.world_mut();
+    world
+        .spawn_scene(header_scene(&columns, sort, &palette))
+        .expect("the header scene resolves without assets");
+
+    let mut texts = world.query::<(&Text, &Children)>();
+    let label_children: Vec<bevy::ecs::entity::Entity> = texts
+        .iter(world)
+        .find(|(text, _)| text.0 == "CPU")
+        .expect("the sorted column's label spawns")
+        .1
+        .iter()
+        .copied()
+        .collect();
+
+    let mut inline = world.query::<(&InlineBox, Option<&InlineImage>)>();
+    let flow: Vec<_> = label_children
+        .iter()
+        .filter_map(|child| inline.get(world, *child).ok())
+        .collect();
+    assert_eq!(flow.len(), 1, "exactly one direction plate rides the label");
+    let (box_, stamped) = flow[0];
+    assert_eq!(
+        box_.kind,
+        InlineBoxKind::InFlow,
+        "the plate takes space in the text layout, not out-of-flow"
+    );
+    assert!(
+        box_.size.x > 0.0 && box_.size.y > 0.0,
+        "the plate reserves real space"
+    );
+    assert!(
+        stamped.is_none(),
+        "the bitmap handle is async payload: the declared scene never fabricates one"
+    );
+}
+
+#[test]
+fn inline_icon_stamps_a_typed_bitmap_payload_on_the_declared_flow_box() {
+    let mut app = headless_scene_app();
+    app.add_observer(stamp_inline_icon);
+    app.init_asset::<Image>();
+    let (plates, handle) = {
+        let world = app.world_mut();
+        let mut images = world.resource_mut::<Assets<Image>>();
+        let plates = IconPlates::build(&mut images);
+        let handle = plates.handle(IconId::Cpu).expect("the Cpu plate decodes");
+        (plates, handle)
+    };
+    app.insert_resource(plates);
+
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(inline_icon_scene(
+            IconId::Cpu,
+            16.0,
+            bevy::color::Color::WHITE,
+        ))
+        .expect("the inline icon scene resolves")
+        .id();
+    app.update();
+
+    let world = app.world_mut();
+    let (box_, image, pickable) = world
+        .query::<(&InlineBox, &InlineImage, Has<Pickable>)>()
+        .get(world, root)
+        .expect("the inline icon entity survives the stamp");
+    assert_eq!(box_.kind, InlineBoxKind::InFlow);
+    assert_eq!(image.image, handle, "the semantic plate handle is stamped");
+    assert_eq!(
+        image.width,
+        Some(16.0),
+        "the extent follows the declared box"
+    );
+    assert_eq!(image.height, Some(16.0));
+    assert!(pickable, "the flow box never intercepts button clicks");
 }
 
 #[test]
@@ -103,7 +198,7 @@ fn table_row_spawns_one_cell_per_column_in_order() {
 
 #[test]
 fn pill_scene_keeps_token_padding_and_interaction_markers_on_one_root() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let mut app = headless_scene_app();
     let world = app.world_mut();
     let root = world

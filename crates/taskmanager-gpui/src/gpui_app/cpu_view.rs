@@ -358,18 +358,6 @@ fn readout(theme: &Theme, label: &str, value: String, primary: bool) -> Div {
         )
 }
 
-pub fn format_uptime(secs: u64) -> String {
-    let d = secs / 86400;
-    let h = (secs % 86400) / 3600;
-    let m = (secs % 3600) / 60;
-    let s = secs % 60;
-    if d > 0 {
-        format!("{}:{:02}:{:02}:{:02}", d, h, m, s)
-    } else {
-        format!("{:02}:{:02}:{:02}", h, m, s)
-    }
-}
-
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_gpui_app_cpu_view_topology_tests.rs"]
 mod topology_tests;

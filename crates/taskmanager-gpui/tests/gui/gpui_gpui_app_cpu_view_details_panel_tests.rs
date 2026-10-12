@@ -1,5 +1,6 @@
 use super::*;
 use taskmanager_application::MsrReadoutSession;
+use taskmanager_application::i18n::Language;
 use taskmanager_core::core::hardware::CpuIdentity;
 use taskmanager_core::core::metrics::CpuPackageMetrics;
 use taskmanager_core::core::metrics::CpuPerformancePolicy;
@@ -25,6 +26,25 @@ fn values_of(rows: &[(String, String)], key: &'static str) -> Vec<String> {
         .filter(|(k, _)| k == i18n::t(key))
         .map(|(_, v)| v.clone())
         .collect()
+}
+
+/// The pinned CPU details row delegates to the application duration
+/// presentation, which keeps its numeric precision while resolving units in
+/// the active locale.
+#[test]
+fn cpu_uptime_readout_uses_shared_duration_presentation_in_both_locales() {
+    let prior = i18n::current_language();
+
+    i18n::set_language(Language::En);
+    let english = uptime_display_value(90_061);
+
+    i18n::set_language(Language::Zh);
+    let chinese = uptime_display_value(90_061);
+
+    i18n::set_language(prior);
+
+    assert_eq!(english, "1d 01h 01m");
+    assert_eq!(chinese, "1天 01小时 01分钟");
 }
 
 /// Absent facts do not consume a row in the fixed, non-scrolling detail rail.

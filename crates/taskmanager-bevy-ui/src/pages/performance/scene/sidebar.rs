@@ -69,7 +69,7 @@ fn cpu_metric_cell_scene(
         Node {
             flex_grow: 1.0,
             flex_shrink: 1.0,
-            min_width: px(palette.control_height_px * 3.5),
+            min_width: rem(palette.control_height_rem * 3.5),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_2()),
@@ -184,7 +184,7 @@ fn activity_graph_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let height = height.max(1.0);
-    let width = palette.control_height_px * 2.0;
+    let width = palette.control_height_px() * 2.0;
     let segments = line_segments(samples, width, height, MAX_CHART_POINTS);
     Box::new(bsn! {
         Node {
@@ -226,11 +226,11 @@ fn sidebar_activity_scene(
     color: bevy::color::Color,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
-    let height = palette.control_height_px * 1.35;
+    let height = palette.control_height_px() * 1.35;
     let graph = activity_graph_scene(samples, color, height, palette);
     Box::new(bsn! {
         Node {
-            width: px(palette.control_height_px * 3.0),
+            width: rem(palette.control_height_rem * 3.0),
             height: px(height),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
@@ -240,7 +240,7 @@ fn sidebar_activity_scene(
              @{ crate::icons::icon_scene(icon, 16.0, palette.dim_color) } --
 
                 Node {
-                    width: px(palette.control_height_px * 2.0),
+                    width: rem(palette.control_height_rem * 2.0),
                     height: px(height),
                 }
                 Children [

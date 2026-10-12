@@ -12,6 +12,7 @@
 //! palette typography without a compositor.
 
 use std::sync::{Arc, Mutex};
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::{App, Plugin};
@@ -19,7 +20,7 @@ use bevy::asset::AssetPlugin;
 use bevy::ecs::query::With;
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
-use bevy::text::{FontSize, TextColor, TextFont};
+use bevy::text::{RemSize, TextColor, TextFont};
 use bevy::ui::widget::Text;
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
@@ -30,7 +31,6 @@ use taskmanager_platform_contract::{
     EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
-use taskmanager_theme::tokens;
 use taskmanager_theme::{LightDark, Skin, Theme};
 
 use super::appearance::resolve_demo_theme;
@@ -142,7 +142,7 @@ fn headless_window_app(runtime: &'static SharedRuntime) -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime,
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     app
@@ -233,17 +233,22 @@ fn text_role_observer_stamps_palette_typography() {
     assert_eq!(summary_style.len(), 1);
     let (role, font, ink) = summary_style[0];
     assert_eq!(role.0, Role::Caption, "the summary line is caption-styled");
-    let FontSize::Px(size) = font.font_size else {
-        panic!("caption size must resolve to px");
-    };
+    let standard = ui_palette(&Theme::dark(), UiSize::Standard);
     assert_eq!(
-        size,
-        f32::from(tokens::FONT_CAPTION),
-        "the observer stamped the caption type token"
+        font.font_size, standard.caption.font_size,
+        "the observer stamped the palette caption metrics verbatim"
+    );
+    assert_eq!(
+        font.font_size
+            .eval(bevy::math::Vec2::ZERO, RemSize(standard.rem_px)),
+        UiSize::Standard.caption_font_size().0,
+        "the caption resolves to the Standard caption token (12px floor)"
     );
     assert_eq!(
         ink.0.to_srgba(),
-        ui_palette(&Theme::dark()).dim_color.to_srgba(),
+        ui_palette(&Theme::dark(), UiSize::Standard)
+            .dim_color
+            .to_srgba(),
         "the observer stamped the dim ink token"
     );
 }
@@ -270,8 +275,8 @@ fn tm_skin_override_resolves_the_demo_theme() {
     assert_eq!(dark.skin, Skin::Gnome);
     assert_eq!(dark.mode, LightDark::Dark);
     assert_ne!(
-        ui_palette(&default).window_clear,
-        ui_palette(&dark).window_clear,
+        ui_palette(&default, UiSize::Standard).window_clear,
+        ui_palette(&dark, UiSize::Standard).window_clear,
         "gnome-dark must repaint the window backdrop"
     );
 

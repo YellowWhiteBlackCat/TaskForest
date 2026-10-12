@@ -8,6 +8,7 @@ use ratatui::{Terminal, backend::TestBackend};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage, ConfigDrain};
 use taskmanager_core::core::metrics::SmartAvailability;
+use taskmanager_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn key(app: &mut TuiApp, code: KeyCode) {
@@ -85,7 +86,7 @@ fn native_sidebar_keys_edit_specific_rows_and_fixed_actions_fit_every_viewport()
 #[test]
 fn selected_disk_is_identity_bound_and_removed_editor_controls_do_not_redirect() {
     let mut app = crate::demo_app();
-    crate::demo::apply_capture_scene_override(&mut app, "device-hotplug");
+    crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "device-hotplug");
     let mut snapshot = app
         .projection()
         .snapshot
@@ -94,6 +95,10 @@ fn selected_disk_is_identity_bound_and_removed_editor_controls_do_not_redirect()
         .clone();
     for disk in &mut snapshot.disks {
         disk.smart_availability = SmartAvailability::Available;
+        disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+            short: SmartSelfTestSupport::Supported,
+            ..Default::default()
+        };
     }
     seed_projection_fact(
         &mut app.shell,

@@ -286,7 +286,7 @@ impl RootView {
         Some(super::platform_lists::session_outcome_feedback(
             outcome.result,
             outcome.action,
-            outcome.session_id.as_str(),
+            outcome.identity.session_id.as_str(),
         ))
     }
 }

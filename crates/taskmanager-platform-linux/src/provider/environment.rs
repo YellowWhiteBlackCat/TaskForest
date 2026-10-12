@@ -1,10 +1,9 @@
 //! Linux startup-entry and session providers.
 
 use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
-    SessionControlAction, SessionId, SessionItem, StartupBootEvidenceSnapshot, StartupEntry,
-};
+use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     SessionControlProvider, SessionInventoryProvider, StartupControlProvider,
@@ -99,42 +98,18 @@ impl SessionInventoryProvider for NativeSessionProvider {
 impl SessionControlProvider for NativeSessionProvider {
     fn control(
         &mut self,
-        session_id: &SessionId,
+        target: &SessionIdentity,
         action: SessionControlAction,
     ) -> Result<(), ProviderFailure> {
         #[cfg(target_os = "linux")]
         {
-            let result = match action {
-                SessionControlAction::Disconnect => {
-                    self.manager.terminate_session(session_id.as_str())
-                }
-                SessionControlAction::Lock => self.manager.lock_session(session_id.as_str()),
-            };
-            result.map_err(|error| classify_session_control_error(&error))
+            self.manager.control(target, action)
         }
         #[cfg(not(target_os = "linux"))]
         {
-            let _ = (session_id, action);
+            let _ = (target, action);
             Err(ProviderFailure::TemporarilyUnavailable)
         }
-    }
-}
-
-fn classify_session_control_error(error: &str) -> ProviderFailure {
-    let lower = error.to_ascii_lowercase();
-    if lower.contains("permission denied") || lower.contains("access denied") {
-        ProviderFailure::PermissionDenied
-    } else if lower.contains("timed out") || lower.contains("timeout") {
-        ProviderFailure::TimedOut
-    } else if lower.contains("no session") || lower.contains("unknown session") {
-        ProviderFailure::IdentityChanged
-    } else if lower.contains("no such file")
-        || lower.contains("not supported")
-        || lower.contains("unsupported")
-    {
-        ProviderFailure::TemporarilyUnavailable
-    } else {
-        ProviderFailure::Rejected
     }
 }
 

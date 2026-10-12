@@ -29,7 +29,8 @@
 //! The actual OS-native prompt invocations for the privileged helpers live in
 //! the [`polkit`] submodule (the operational crossing): it drives `pkexec` and
 //! parses each helper's typed JSON contract (perf PMU, net launcher, foreign
-//! process control, SMBIOS memory, RAPL package power). The SEAM in THIS file
+//! process control, SMBIOS memory, RAPL package power, MSR readout, and SMART
+//! self-test control). The SEAM in THIS file
 //! stays pure — no capability grant, no elevated-process launch — so the
 //! workspace gate that
 //! requires `lib.rs` itself to be free of `pkexec`/`Command::new` keeps
@@ -102,6 +103,10 @@ pub enum EscalationFeature {
     /// ATA/SATA SMART via `smartctl /dev/sd*`, which frequently needs root.
     /// NVMe-only SMART stays in the direct column (`/sys/class/nvme`).
     AtaSmart,
+    /// SMART self-test control on one persistent, generation-bound disk.
+    /// Each operation uses a fixed helper and its own polkit action; the
+    /// helper rechecks the live disk identity before starting the command.
+    StorageSelfTest,
     /// Process control (kill / nice / affinity / resource limits) of
     /// foreign-uid processes — `CAP_KILL` / `CAP_SYS_PTRACE` / `setpriority`
     /// for other users. Same-uid control stays direct.
@@ -139,12 +144,13 @@ impl EscalationFeature {
     /// workspace architecture gate, so the enum variants, the
     /// `docs/PERMISSION_MODEL.md` Boundary-3 table, and every test that must
     /// cover "all escalation features" can never again drift to different
-    /// counts (a prior workspace gate hardcoded 5 of 7 variants and silently
-    /// missed two). Adding a variant requires appending it here too.
-    pub const ALL: [EscalationFeature; 8] = [
+    /// counts (a prior workspace gate hardcoded too few variants and silently
+    /// missed later features). Adding a variant requires appending it here too.
+    pub const ALL: [EscalationFeature; 9] = [
         EscalationFeature::IntelPmu,
         EscalationFeature::PerProcessNet,
         EscalationFeature::AtaSmart,
+        EscalationFeature::StorageSelfTest,
         EscalationFeature::ForeignProcessControl,
         EscalationFeature::SystemServiceControl,
         EscalationFeature::MemorySmbios,

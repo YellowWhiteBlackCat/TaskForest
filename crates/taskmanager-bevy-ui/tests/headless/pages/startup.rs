@@ -10,6 +10,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -158,7 +159,7 @@ fn headless_startup_app() -> (App, Arc<ScriptedEvents>) {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime,
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     (app, events)
@@ -217,7 +218,7 @@ fn status_line(app: &mut App) -> String {
 }
 
 fn selected_row_target(app: &mut App) -> Option<String> {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let highlight = palette.nav_active_bg.to_srgba();
     app.world_mut()
         .query_filtered::<(&StartupRowMarker, &BackgroundColor), ()>()
@@ -328,7 +329,7 @@ fn cursor_moves_clamp_at_the_table_bounds() {
 
 #[test]
 fn enabled_chips_map_to_distinct_token_tints() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     assert_eq!(enabled_chip(true), EnabledChip::Positive);
     assert_eq!(enabled_chip(false), EnabledChip::Idle);
     let positive = chip_fill(EnabledChip::Positive, &palette).to_srgba();

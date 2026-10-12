@@ -22,9 +22,12 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         TextSelection, Toast, Tooltip, Tree, VirtualList,
     };
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
-        // Full-screen overlays with Clear (confirmations, help, menus)
-        // port the reference modal semantics within the cell grid.
-        (ModalOverlay, Ported),
+        (
+            ModalOverlay,
+            Divergent {
+                reason: "keyboard focus is trapped and Escape cancels; terminal popups have no outside-click scrim dismissal",
+            },
+        ),
         // The keyboard action menus on targeted rows (process/service/
         // session/startup/batch) are this shape's context-menu surface.
         (ContextMenu, Ported),
@@ -43,10 +46,18 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 reason: "transient feedback renders through the shared footer activity line",
             },
         ),
-        // The command-palette filter field is this shape's text input:
-        // char push/pop editing with type-to-filter semantics.
-        (TextInput, Ported),
-        (SearchInput, Ported),
+        (
+            TextInput,
+            Divergent {
+                reason: "search accepts end-appends and tail Backspace; there is no frontend-owned Left/Right/Home/End cursor, selection, mid-string insertion, or Delete",
+            },
+        ),
+        (
+            SearchInput,
+            Divergent {
+                reason: "typing filters the live process projection and Escape clears it; Left/Right/Home/End, selection, mid-string insertion, and Delete lack a frontend-owned cursor",
+            },
+        ),
         // Selection belongs to the terminal emulator, not the app.
         (
             TextSelection,
@@ -54,21 +65,28 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 via: "terminal emulator selection",
             },
         ),
-        // Settings fields are keyboard toggles over persisted tokens.
-        (Switch, Ported),
+        (
+            Switch,
+            Divergent {
+                reason: "settings switches toggle with Space or Left/Right; pointer activation and disabled switch states are not represented",
+            },
+        ),
         (
             Slider,
-            Unsupported {
-                reason: "no analog drag axis in the terminal; bounded choices render as \
-                         selectable lists",
+            Divergent {
+                reason: "settings values use bounded discrete keyboard steps; there is no continuous pointer drag or interpolation",
             },
         ),
         // Column-visibility toggles carry the checkbox semantic.
         (Checkbox, Ported),
         // Skin/mode/font selections over enumerated token lists.
         (Select, Ported),
-        // The page tabs (1..7) are the segmented choice group.
-        (SegmentedControl, Ported),
+        (
+            SegmentedControl,
+            Divergent {
+                reason: "no generic segmented group is rendered; page/resource selection uses navigation and TUI-003 bindings without a segment traversal contract",
+            },
+        ),
         (Table, Ported),
         (
             ColumnDragResize,

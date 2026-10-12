@@ -1,5 +1,6 @@
 //! Typed demo/capture appearance resolution.
 
+use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 /// The light reference skin the capture gate has always rendered, and the
@@ -63,4 +64,17 @@ pub(super) fn demo_theme_from_env() -> Theme {
     let value = std::env::var("TM_SKIN").ok();
     let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
     resolve_demo_theme(value.as_deref(), high_contrast)
+}
+
+/// Read the shared `TM_UI_SIZE` capture override (`Small`/`Standard`/`Large`,
+/// case-insensitive, same token vocabulary as the persisted config). The
+/// capture matrix exercises the UI-size ladder through the same env seam
+/// `TM_SKIN` uses; unset or invalid resolves the readability-first Standard.
+pub(super) fn demo_ui_size_from_env() -> UiSize {
+    std::env::var("TM_UI_SIZE")
+        .ok()
+        .as_deref()
+        .map(str::trim)
+        .map(UiSize::from_config_token)
+        .unwrap_or(UiSize::Standard)
 }

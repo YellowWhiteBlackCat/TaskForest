@@ -1,8 +1,8 @@
 # 自有 UI 组件层总纲
 
-TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primitives。
-`taskmanager-ui` 是 GPUI 的自有组件层；Iced、TUI 和 Bevy 各自维护符合自身生命
-周期的组件层，四者只复用语义、资产和 token，不共享会泄漏 toolkit 状态的 widget。
+TaskForest 拥有皮肤、文案、图标、列定义、业务投影与命令映射；GPUI 组件归 `taskmanager-ui`。
+Bevy/Iced 基础组件与纯文本、窗口算法和中立 surface 值统一归共享仓库 `libs/zhuge-ui-kit`（`zhuge-ui-kit-bevy`、`zhuge-ui-kit-iced`、`zhuge-ui-core`、`zhuge-ui-tokens`），直接导入 owner，不留转发或重复实现。
+共享依赖由根 Cargo.toml 固定 Git rev，本地用 patch 联调；各产品保留独立锁文件、平台 feature 和原生 widget 状态，共享包只提供通用行为、token 与纯算法。
 
 ## 边界
 
@@ -30,9 +30,9 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 
 每个组件必须有键盘路径、焦点可见态、语义名称/角色/状态、窄窗口行为和失败/禁用表达。
 危险操作只提交 typed intent；确认框关闭、取消和 Escape 不产生副作用。
-只读详情值通过 `SelectableText` 提供鼠标拖选、Ctrl/Cmd+A、Ctrl/Cmd+C，并在 Linux 鼠标
-释放时同步主选择区；同一窗口只有一个活动文本选择，新选择必须清除旧高亮。密集表格必须
-先解决与行选择、双击和列拖动的仲裁，不能直接套用。
+只读详情 `SelectableText` 提供指针选择和 Ctrl/Cmd+C，GPUI 另有 Ctrl/Cmd+A；Iced 保留 Ctrl+A
+给行摘要，多行日志逐行选择、Linux Iced 释放时同步 PRIMARY；TUI 交终端处理。Bevy 点击选整段、
+无区间/可见高亮，登记 `Divergent`；应用自有选区每窗口单项，新选清旧；密集表格先解决行选择、双击、列拖宽仲裁。
 
 ## 参考语义与组件挂载
 
@@ -123,7 +123,7 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
   key/value、toolbar 和 scroll primitives；重复第二次的几何/状态语义必须下沉到对应
   toolkit 的组件层：GPUI 进入 `taskmanager-ui`，Iced 进入
   `taskmanager-iced/src/ui/components.rs`，Bevy 进入 `taskmanager-bevy-ui/src/widgets.rs`
-  （100% `bsn!` 场景适配器，见 [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)）。
+  （100% `bsn!` 场景适配器，见 [BEVY_UI_FRONTEND.md](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)）。
 - 特化不是豁免：新增 wrapper 先说明数据或交互边界，并补窄窗口、焦点和失败态回归；不得用
   import alias、改名 re-export 或跨 crate forwarding facade 绕过组件边界；跨层类型必须从
   其 owner crate 的显式模块路径导入。

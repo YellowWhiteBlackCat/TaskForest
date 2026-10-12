@@ -3,6 +3,8 @@
 //! column, and the active-sort header. Extracted from `ui.rs` so no single
 //! renderer file exceeds the source line budget; behavior unchanged.
 
+use std::collections::HashSet;
+
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -134,7 +136,13 @@ pub(super) fn render_processes(
         .processes
         .as_ref()
         .map(|items| items.as_slice());
-    let mut panel_title = t("tui.processes_title").to_owned();
+    let title_budget = table_area.width.saturating_sub(4);
+    let long_title = t("tui.processes_title");
+    let mut panel_title = if title_budget < 80 {
+        compact_process_title(long_title)
+    } else {
+        long_title.to_owned()
+    };
     for summary in [
         uninterruptible_process_summary(processes),
         process_anomaly_summary(processes),
@@ -187,11 +195,20 @@ pub(super) fn render_processes(
         let anchor_pid = visible
             .id_process(ids, app.selected)
             .map(|process| process.pid);
+        let column_spacing = u16::from(table_area.width >= COLUMN_GUTTER_WIDE_WIDTH) + 1;
+        let responsive_order = fit_process_columns(
+            table_area.width,
+            column_spacing,
+            swap_visible,
+            sparkline_visible,
+            &app.hidden_columns,
+            &app.column_order,
+        );
         let columns = process_details::ColumnVisibility {
             swap_visible,
             sparkline_visible,
             hidden: &app.hidden_columns,
-            order: &app.column_order,
+            order: &responsive_order,
         };
         let column_visible = |column: SortCol| columns.visible(column);
         let mut widths = vec![
@@ -206,7 +223,8 @@ pub(super) fn render_processes(
         // header and rows paint, so a reordered or hidden column can never
         // desynchronize the layout.
         widths.extend(
-            app.column_order
+            columns
+                .order
                 .iter()
                 .filter(|column| column_visible(**column))
                 .map(|column| Constraint::Length(reorderable_column_width(*column))),
@@ -259,7 +277,7 @@ pub(super) fn render_processes(
                 // truncating trailing columns (the 150-col budget cannot: the
                 // full header projection test pins that narrow terminals keep
                 // every column at the one-blank gutter).
-                column_spacing: u16::from(table_area.width >= COLUMN_GUTTER_WIDE_WIDTH) + 1,
+                column_spacing,
                 state_area: table_area,
                 state_message,
             },
@@ -271,8 +289,7 @@ pub(super) fn render_processes(
                     label,
                     depth,
                     count,
-                    cpu,
-                    memory,
+                    aggregate,
                     expanded,
                     row_key: _,
                 }) => {
@@ -280,8 +297,8 @@ pub(super) fn render_processes(
                     Row::new(process_details::group_header_cells(
                         &label,
                         count,
-                        cpu.current_value().copied(),
-                        memory.current_value().copied(),
+                        aggregate.cpu(),
+                        aggregate.memory(),
                         expanded,
                         columns,
                         process_details::SearchHighlight {
@@ -345,6 +362,68 @@ pub(super) fn render_processes(
             visible,
         );
     });
+}
+
+/// Select a whole localized compact title from the existing title's complete
+/// action groups. The compact hint keeps the page name and Enter action; it
+/// never clips a chord or its label halfway through.
+fn compact_process_title(long_title: &str) -> String {
+    let mut groups = long_title.split(" · ");
+    let page = groups.next().unwrap_or(long_title);
+    groups.nth(3).map_or_else(
+        || page.to_owned(),
+        |enter_hint| format!("{page} · {enter_hint}"),
+    )
+}
+
+/// Fit the user's ordered tail columns into this frame's table slot. PID,
+/// Name, and CPU are the fixed prefix; each optional column is admitted as a
+/// complete cell only while the next ordered column still fits. Returned
+/// state is frame-local and never changes the user's hide/order preferences.
+fn fit_process_columns(
+    table_width: u16,
+    column_spacing: u16,
+    swap_visible: bool,
+    sparkline_visible: bool,
+    user_hidden: &HashSet<SortCol>,
+    user_order: &[SortCol],
+) -> Vec<SortCol> {
+    let mut order = Vec::with_capacity(user_order.len());
+    let prefix_columns = 3 + usize::from(sparkline_visible);
+    let mut used_width =
+        7_u16
+            .saturating_add(16)
+            .saturating_add(8)
+            .saturating_add(if sparkline_visible {
+                u16::try_from(super::sparkline::SPARKLINE_MAX_SAMPLES).unwrap_or(u16::MAX)
+            } else {
+                0
+            })
+            .saturating_add(column_spacing.saturating_mul(
+                u16::try_from(prefix_columns.saturating_sub(1)).unwrap_or(u16::MAX),
+            ));
+    let available_width = table_width.saturating_sub(2);
+    let mut accepting_tail = true;
+
+    for &column in user_order {
+        if matches!(column, SortCol::Pid | SortCol::Name | SortCol::Cpu)
+            || user_hidden.contains(&column)
+            || (column == SortCol::Swap && !swap_visible)
+        {
+            continue;
+        }
+        if !accepting_tail {
+            continue;
+        }
+        let next_width = column_spacing.saturating_add(reorderable_column_width(column));
+        if used_width.saturating_add(next_width) <= available_width {
+            used_width = used_width.saturating_add(next_width);
+            order.push(column);
+        } else {
+            accepting_tail = false;
+        }
+    }
+    order
 }
 /// Tint a row that is a member of the batch-control multi-select set (but is
 /// not the keyboard anchor, which the table's own highlight already paints).

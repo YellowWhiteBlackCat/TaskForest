@@ -456,6 +456,19 @@ fn device_multi_graph_factory_composes_the_caption_and_canvas() {
     );
 }
 
+/// The production mini legend reserves shaped glyph widths, so proportional
+/// Latin and CJK labels do not inherit a character-count approximation.
+#[test]
+fn device_multi_legend_uses_shaped_widths_for_proportional_and_cjk_labels() {
+    let wide_latin = multi::legend_label_width("WW");
+    let narrow_latin = multi::legend_label_width("ii");
+    let cjk = multi::legend_label_width("读写");
+
+    assert!(wide_latin.is_finite() && wide_latin > narrow_latin);
+    assert!(narrow_latin.is_finite() && narrow_latin > 0.0);
+    assert!(cjk.is_finite() && cjk > 0.0);
+}
+
 /// The Fill-height two-series factory routes BOTH branches of the shared
 /// compact/wide height policy ([`primary_graph_height`]). The canvas child's
 /// `Length` is observable through iced's construction rule — `Column::push`

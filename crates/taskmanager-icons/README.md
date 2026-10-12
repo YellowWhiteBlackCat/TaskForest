@@ -28,9 +28,8 @@ theme tokens.
 ## Contract and verification
 
 The registry is neutral unconditionally — the dependency table names no
-toolkit. Verify every `IconId` has an asset/fallback and that color comes
-from the consumer theme; product rules live in
-`../../docs/UI_COMPONENT_ARCHITECTURE.md`.
+toolkit. Neutrality checks and the verification route are specified in
+[`docs/MATERIALIZATION.md`](docs/MATERIALIZATION.md).
 
 ## Module map
 
@@ -39,3 +38,11 @@ src/path.rs                    IconId → asset path + embedded bytes table
 ```
 
 IconId → shared SVG → per-toolkit materialization; text glyphs never fake icons.
+
+## Docs
+
+- [`docs/MATERIALIZATION.md`](docs/MATERIALIZATION.md) — the IconId → asset → frontend
+  materialization matrix and verification.
+- [ADR-017](../../adr/017-own-ui-component-layer.md) and
+  [ADR-051](../../adr/051-four-frontend-products-zero-ui-features.md) — owned component
+  layer and frontend products.

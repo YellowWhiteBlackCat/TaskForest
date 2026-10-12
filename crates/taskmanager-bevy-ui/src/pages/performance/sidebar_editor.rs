@@ -15,7 +15,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::widget::Text;
-use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px};
+use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px, rem};
 use bevy::ui_widgets::{Activate, Button};
 use std::sync::Arc;
 use taskmanager_application::{ConfigSubmissionStatus, ConfigSubmitError};
@@ -159,7 +159,7 @@ pub(crate) fn button(
     action: SidebarAction,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(px(space_8())) }
+    bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::all(px(space_8())) }
     BackgroundColor({palette.content_bg}) Button SidebarControl({action}) on(activate)
     Children [ Text(label) TextRole(Role::Caption) Pickable::IGNORE ] }
 }

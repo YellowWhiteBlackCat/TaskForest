@@ -134,7 +134,7 @@ fn merge_conflict_policies_are_atomic_and_ordered() {
     assert_eq!(kept.replaced, 0);
     assert_eq!(kept.kept_existing, 1);
     assert_eq!(kept.entries[0], existing[0]);
-    assert_eq!(kept.entries[2].rule.id, "new");
+    assert_eq!(kept.entries[2].rule.id.as_str(), "new");
 
     let replaced = merge_alert_rule_entries(
         &existing,

@@ -2,12 +2,24 @@
 
 use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestSupport,
+};
 use taskmanager_core::core::storage_health::FilesystemBackingKind;
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
 use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorDescriptor,
-    SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale, SmartSelfTestKind,
-    SmartSelfTestPhase, SmartSelfTestReport,
+    SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
+};
+
+use taskmanager_application::{
+    CorrelatedEvent, PlatformEventBatch, PlatformEventContext, SmartEvent, SmartObservationBatch,
+    StorageHealthEvent,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId,
 };
 
 #[derive(Clone, Debug)]
@@ -143,6 +155,11 @@ pub fn health_fixture() -> HealthFixture {
             disk.mount_point = "/".into();
             disk.fs_type = "ext4".into();
             disk.smart_availability = SmartAvailability::Available;
+            disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+                short: SmartSelfTestSupport::Supported,
+                extended: SmartSelfTestSupport::Supported,
+                conveyance: SmartSelfTestSupport::Unsupported,
+            };
             disk.smart_state = DeviceState::healthy(now);
             disk.smart_temperature_c = Some(39.0);
             disk.apply_scalar_observations(DiskScalarObservations {
@@ -168,55 +185,89 @@ pub fn health_fixture() -> HealthFixture {
 /// facts and the normal revisioned storage/SMART fold. No native command runs.
 pub fn seed_shell_health(app: &mut crate::ShellApp) {
     use crate::fixture::{ProjectionSeedFact, seed_projection_fact};
-    use taskmanager_application::{
-        CorrelatedEvent, PlatformEventBatch, PlatformEventContext, SmartEvent,
-        SmartObservationBatch, SmartStateRevision, StorageHealthEvent,
-    };
-    use taskmanager_core::core::system_health::SmartSelfTestObservation;
-    use taskmanager_platform_contract::{
-        CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId,
-    };
+
     let fixture = health_fixture();
     if let Some(mut snapshot) = app.projection().snapshot.clone() {
         snapshot.disks = vec![fixture.selected_disk.clone()];
         seed_projection_fact(app, ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))));
     }
     seed_projection_fact(app, ProjectionSeedFact::Sensors(Some(fixture.sensors)));
-    let Some(request_id) = RequestId::new(1) else {
-        return;
-    };
-    let context = |capability| PlatformEventContext {
-        request_id,
-        capability,
-        provider: None,
-        sequence: EventSequence::new(1),
-        observed_at_ms: 1_700_000_000_000,
-    };
     let mut batch = PlatformEventBatch::default();
     batch.storage_health_events.push(CorrelatedEvent::new(
-        context(CapabilityId::STORAGE_HEALTH),
+        fixture_event_context(CapabilityId::STORAGE_HEALTH),
         StorageHealthEvent::Snapshot(CompositeSourceSnapshot::new(
             fixture.filesystems,
             Vec::new(),
         )),
     ));
     let (current, _) = app.projection().smart_projection();
-    let revision = current.revision().checked_next().unwrap_or_default();
-    batch.smart_events.push(CorrelatedEvent::new(
-        context(CapabilityId::SMART),
-        SmartEvent::Batch(SmartObservationBatch {
-            revision: SmartStateRevision::new(revision.get()),
-            subject: None,
-            observations: vec![SmartSelfTestObservation {
-                device_id: fixture.selected_disk.device_id.into(),
-                device_generation: fixture.selected_disk.device_generation,
-                device_key: fixture.selected_disk.name.into(),
-                display_name: fixture.selected_disk.model,
-                report: fixture.smart_report,
-            }],
-            issues: Vec::new(),
-            ended: Vec::new(),
-        }),
-    ));
+    if let Some(revision) = current.revision().checked_next() {
+        push_smart_observation_batch(
+            &mut batch,
+            SmartObservationBatch {
+                revision,
+                subject: None,
+                observations: vec![SmartSelfTestObservation {
+                    device_id: fixture.selected_disk.device_id.into(),
+                    device_generation: fixture.selected_disk.device_generation,
+                    device_key: fixture.selected_disk.name.into(),
+                    display_name: fixture.selected_disk.model,
+                    report: fixture.smart_report,
+                }],
+                issues: Vec::new(),
+                ended: Vec::new(),
+            },
+        );
+    }
     app.apply_platform_batch(batch);
 }
+
+/// Add explicit self-test support to synthetic disk rows for capture and
+/// behavior fixtures. The ordinary demo snapshot keeps support unknown.
+pub fn seed_smart_self_test_capabilities(app: &mut crate::ShellApp) {
+    use crate::fixture::{ProjectionSeedFact, seed_projection_fact};
+
+    let Some(mut snapshot) = app.projection().snapshot.clone() else {
+        return;
+    };
+    for disk in &mut snapshot.disks {
+        disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+            short: SmartSelfTestSupport::Supported,
+            extended: SmartSelfTestSupport::Supported,
+            conveyance: SmartSelfTestSupport::Unsupported,
+        };
+    }
+    seed_projection_fact(app, ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))));
+}
+
+/// Inject one typed SMART observation batch through the normal shell reducer.
+///
+/// This fixture seam deliberately shares the application's monotonic revision
+/// gate with live provider events, so tests and captures cannot resurrect an
+/// older report through a second projection path.
+pub fn seed_smart_observation_batch(app: &mut crate::ShellApp, smart: SmartObservationBatch) {
+    let mut batch = PlatformEventBatch::default();
+    push_smart_observation_batch(&mut batch, smart);
+    app.apply_platform_batch(batch);
+}
+
+fn push_smart_observation_batch(batch: &mut PlatformEventBatch, smart: SmartObservationBatch) {
+    batch.smart_events.push(CorrelatedEvent::new(
+        fixture_event_context(CapabilityId::SMART),
+        SmartEvent::Batch(smart),
+    ));
+}
+
+fn fixture_event_context(capability: CapabilityId) -> PlatformEventContext {
+    PlatformEventContext {
+        request_id: RequestId::MIN,
+        capability,
+        provider: None,
+        sequence: EventSequence::new(1),
+        observed_at_ms: 1_700_000_000_000,
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/headless/fixture_health.rs"]
+mod tests;

@@ -72,6 +72,24 @@ pub(crate) fn wire_debounced_search(
                 *seq += 1;
                 *seq
             };
+            // Clearing a search is a semantic reset, so bypass the typing
+            // debounce. The sequence bump above invalidates any older
+            // non-empty query still waiting on its timer.
+            if value.is_empty() {
+                let root = root.clone();
+                let seq = seq.clone();
+                let write = write.clone();
+                cx.spawn(async move |_this, cx| {
+                    if *seq.borrow() == my {
+                        let _ = root.update(cx, |rv, cx| {
+                            write(rv, value);
+                            cx.notify();
+                        });
+                    }
+                })
+                .detach();
+                return;
+            }
             let root = root.clone();
             let seq = seq.clone();
             let write = write.clone();
@@ -95,6 +113,7 @@ pub(super) fn init_search_entity(cx: &mut Context<RootView>) -> Entity<TextInput
     let entity = cx.new(|cx| {
         let mut state = TextInputState::new(cx);
         state.set_placeholder(i18n::t("search.processes"), cx);
+        state.set_clean_on_escape(true, cx);
         state
     });
     wire_debounced_search(&entity, cx, |rv, value| rv.set_process_query(&value));

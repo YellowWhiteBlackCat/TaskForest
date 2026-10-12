@@ -19,7 +19,7 @@ use bevy::app::App;
 use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::query::With;
 use bevy::input::keyboard::KeyCode;
-use bevy::ui_widgets::Activate;
+use bevy::ui_widgets::{Activate, SelectedTab, ValueChange};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
@@ -29,6 +29,7 @@ use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_theme::Theme;
 
@@ -109,7 +110,7 @@ fn headless_shell_app() -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime: scripted_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
     app
@@ -293,7 +294,7 @@ fn nav_labels_consume_the_shared_page_descriptor() {
 
 #[test]
 fn nav_highlight_model_uses_two_distinct_theme_surfaces() {
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let active = nav_item_background(true, &palette);
     let idle = nav_item_background(false, &palette);
     assert_eq!(active, palette.accent);
@@ -387,7 +388,7 @@ fn route_change_restyles_the_nav_rail_through_the_observer() {
         .map(|(target, fill)| (target.0, fill.0))
         .collect::<Vec<_>>();
     assert_eq!(rail.len(), Page::ALL.len(), "one rail item per page");
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     for (page, fill) in rail {
         let expected = nav_item_background(page == Page::Processes, &palette);
         assert_eq!(
@@ -452,26 +453,34 @@ fn nav_button_activation_moves_the_real_route_and_remounts_content() {
 }
 
 #[test]
-fn nav_button_activation_applies_the_page_action_to_the_shell() {
-    // Pointer navigation must follow the same rule as the keyboard chord: the
-    // shell page tracks the visible page, so `CommandScope` derivation in the
-    // shell's own routers stays correct no matter how the page was reached
+fn nav_tab_selection_applies_the_page_action_to_the_shell() {
+    // Pointer/keyboard tab selection arrives through the headless widget's
+    // `ValueChange` event (the same seam the settings rows exercise); route
+    // changes must follow the same rule as the keyboard chord: the shell page
+    // tracks the visible page, so `CommandScope` derivation in the shell's
+    // own routers stays correct no matter how the page was reached
     // (BEVY_UI_FRONTEND.md input seam).
     let mut app = headless_shell_app();
     app.update();
     app.update();
 
-    let services = {
+    let (strip, services) = {
         let world = app.world_mut();
         let mut nav = world.query::<(Entity, &NavTarget)>();
-        nav.iter(world)
+        let services = nav
+            .iter(world)
             .find(|(_, target)| target.0 == Page::Services)
             .map(|(entity, _)| entity)
-            .expect("the services nav item is a button scene")
+            .expect("the services nav item is a tab scene");
+        let mut strips = world.query_filtered::<Entity, With<crate::navigation::NavigationStrip>>();
+        let strip = strips.single(world).expect("one navigation strip");
+        (strip, services)
     };
-    app.world_mut()
-        .commands()
-        .trigger(Activate { entity: services });
+    app.world_mut().commands().trigger(ValueChange {
+        source: strip,
+        value: Some(services),
+        is_final: true,
+    });
     app.update();
     app.update();
 
@@ -489,6 +498,13 @@ fn nav_button_activation_applies_the_page_action_to_the_shell() {
             .is_empty(),
         "a page switch emits no platform effect"
     );
+    // The strip mirrors the route authority back into the widget state.
+    let selected = app
+        .world_mut()
+        .query::<&SelectedTab>()
+        .single(app.world())
+        .expect("the strip carries the widget selection state");
+    assert_eq!(selected.0, Some(services), "selection mirrors the route");
 }
 
 #[test]

@@ -1,12 +1,14 @@
 use taskmanager_application::{
-    LatestControlRequest, PlatformEvent, PlatformHandle, SessionControlRequest, SessionEvent,
-    StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest, StartupInventoryRequest,
+    LatestSessionControlRequest, PlatformEvent, PlatformHandle, SessionControlRequest,
+    SessionEvent, StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest,
+    StartupInventoryRequest,
 };
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
 use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::{
     CapabilityId, EventEnvelope, PartialSourceSnapshot, RequestEnvelope, RequestId,
 };
@@ -129,8 +131,15 @@ fn shared_environment_runtime_preserves_typed_control_outcome() {
         fixed_clock,
     )
     .expect("environment workers start");
-    let mut controls = LatestControlRequest::default();
-    let control_id = controls.begin();
+    let identity = SessionIdentity::new(
+        SessionId::new("fixture-session"),
+        SessionIncarnation::WindowsWts {
+            logon_time_100ns: 11,
+        },
+    )
+    .expect("fixture session identity");
+    let mut controls = LatestSessionControlRequest::default();
+    let control_id = controls.begin(identity.clone(), SessionControlAction::Lock);
     handle
         .session_control()
         .expect("session control port")
@@ -140,7 +149,7 @@ fn shared_environment_runtime_preserves_typed_control_outcome() {
             submitted_at_ms: 1,
             payload: SessionControlRequest {
                 request_id: control_id,
-                session_id: SessionId::new("fixture-session"),
+                identity: identity.clone(),
                 action: SessionControlAction::Lock,
             },
         })
@@ -155,6 +164,7 @@ fn shared_environment_runtime_preserves_typed_control_outcome() {
         event.outcome,
         Ok(PlatformEvent::Sessions(SessionEvent::Control(ref outcome)))
             if outcome.request_id == control_id
+                && outcome.identity == identity
                 && outcome.result == Err(FailureKind::PermissionDenied)
     ));
 }

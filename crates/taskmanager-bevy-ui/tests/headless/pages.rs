@@ -10,6 +10,7 @@
 
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::UiSize;
 
 use crate::app::{Page, PageContext, page_scene};
 use crate::palette::{UiPalette, ui_palette};
@@ -28,7 +29,7 @@ impl Fixture {
         Self {
             sidebar: Default::default(),
             shell: ShellApp::new(),
-            palette: ui_palette(&Theme::dark()),
+            palette: ui_palette(&Theme::dark(), UiSize::Standard),
             history: crate::pages::history::HistoryProjectionResource::default(),
         }
     }

@@ -31,6 +31,7 @@ use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
     ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
 };
+use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -452,7 +453,10 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
         process(20, "beta"),
         process(30, "gamma"),
     ];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update(); // flush the scene spawn, bootstrap, and Add triggers
 
     let links = row_links(&mut app);
@@ -473,13 +477,14 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
     );
     let down_plates = app
         .world_mut()
-        .query::<&crate::icons::IconPlate>()
+        .query::<&crate::icons::InlineIcon>()
         .iter(app.world())
         .filter(|plate| plate.0 == IconId::NavigateDown)
         .count();
     assert!(
         down_plates >= 1,
-        "the default CPU-descending sort is marked by the semantic direction plate"
+        "the default CPU-descending sort is marked by the semantic direction plate, \
+         flowing inline with the column label"
     );
     assert_eq!(count_line(&mut app), count_line_text(3, ""));
 }
@@ -487,7 +492,10 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
 #[test]
 fn details_panel_mounts_and_follows_the_selected_identity() {
     let items = vec![process(10, "alpha"), process(20, "beta")];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
 
     let detail_roots = app
@@ -539,7 +547,10 @@ fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
         process(20, "beta"),
         process(30, "gamma"),
     ];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
     app.init_resource::<SelectionLog>();
     app.add_observer(record_selection);
@@ -557,7 +568,7 @@ fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
     );
 
     // The selected wrapper wears the palette's selected fill; the others none.
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let fills = app
         .world_mut()
         .query_filtered::<(&ProcessRowLink, &bevy::ui::BackgroundColor), ()>()
@@ -593,7 +604,10 @@ fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
 
 #[test]
 fn selection_on_an_empty_table_is_rejected_without_side_effects() {
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), ShellApp::new());
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        ShellApp::new(),
+    );
     app.update();
     app.init_resource::<SelectionLog>();
     app.add_observer(record_selection);
@@ -626,7 +640,10 @@ fn scroll_intent_rebuilds_the_window_and_clamps() {
             item
         })
         .collect();
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
 
     fire_seam(&mut app, |root| ProcessScrollIntent {
@@ -665,7 +682,10 @@ fn query_commit_replaces_the_shell_query_and_refilters_the_rows() {
         process(20, "beta-alloy"),
         process(30, "gamma"),
     ];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
 
     fire_seam(&mut app, |root| ProcessQueryCommit {
@@ -694,7 +714,10 @@ fn query_commit_replaces_the_shell_query_and_refilters_the_rows() {
 #[test]
 fn a_query_commit_that_matches_nothing_renders_the_match_empty_state() {
     let items = vec![process(10, "alpha")];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
     fire_seam(&mut app, |root| ProcessQueryCommit {
         entity: root,
@@ -713,7 +736,10 @@ fn a_query_commit_that_matches_nothing_renders_the_match_empty_state() {
 #[test]
 fn a_drain_fold_rebuilds_rows_and_idle_frames_do_not() {
     let items = vec![process(10, "alpha"), process(20, "beta")];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
     let before = row_links(&mut app);
     assert_eq!(before.len(), 2);
@@ -757,7 +783,10 @@ fn the_rows_root_survives_its_own_bootstrap_and_seams() {
     // input after any sequence of seam events — the sweep must never eat the
     // chrome it rebuilds into.
     let items: Vec<ProcessItem> = (0..12).map(|pid| process(pid, "p")).collect();
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
     fire_seam(&mut app, |root| ProcessScrollIntent {
         entity: root,
@@ -808,7 +837,7 @@ fn the_search_input_displays_the_shell_query() {
     let _ = shell.apply_action(AppAction::FocusSearch);
     shell.push_search_char('a');
     shell.push_search_char('l');
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell);
+    let mut app = headless_page_app(ui_palette(&Theme::dark(), UiSize::Standard), shell);
     app.update();
     let world = app.world_mut();
     let input = world
@@ -904,7 +933,10 @@ fn multi_select_processes_arms_batch_confirmation_gate() {
 #[test]
 fn process_sort_header_mounts_and_routes_sort_activation() {
     let items = vec![process(20, "beta"), process(10, "alpha")];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
     app.update();
 
     let headers: Vec<_> = app
@@ -941,7 +973,7 @@ fn process_properties_modal_opens_and_dismisses_via_button_and_escape() {
     app.init_resource::<Assets<Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
 
     let target_proc = test_proc(4242, "cargo");

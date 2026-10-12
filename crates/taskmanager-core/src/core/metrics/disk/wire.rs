@@ -8,6 +8,7 @@ use super::{
 };
 use crate::core::device_state::DeviceState;
 use crate::core::smart::SmartProviderFailureKind;
+use crate::core::smart::SmartSelfTestCapabilities;
 use crate::core::storage::{
     StorageConnection, StorageDeviceKind, StorageIdentityStability, StorageInterconnect,
     StorageProtocol,
@@ -220,6 +221,8 @@ struct DiskMetricsWire {
     smart_provider: Option<ProviderId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_failure: Option<SmartProviderFailureKind>,
+    #[serde(default)]
+    smart_self_test_capabilities: SmartSelfTestCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_temperature_c: Option<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -330,6 +333,7 @@ impl Serialize for DiskMetrics {
             smart_state: self.smart_state,
             smart_provider: self.smart_provider.clone(),
             smart_failure: self.smart_failure,
+            smart_self_test_capabilities: self.smart_self_test_capabilities,
             smart_temperature_c: self.smart_temperature_c,
             smart_temperature_sensors_c: self.smart_temperature_sensors_c.clone(),
             smart_critical_warning: self.smart_critical_warning,
@@ -430,6 +434,7 @@ impl<'de> Deserialize<'de> for DiskMetrics {
             smart_state: wire.smart_state,
             smart_provider: wire.smart_provider,
             smart_failure: wire.smart_failure,
+            smart_self_test_capabilities: wire.smart_self_test_capabilities,
             smart_temperature_c: wire.smart_temperature_c,
             smart_temperature_sensors_c: wire.smart_temperature_sensors_c,
             smart_critical_warning: wire.smart_critical_warning,

@@ -1,24 +1,59 @@
-//! Single declarative source for per-command metadata — the command spec
-//! table ("one fact, one authority" for the command vocabulary).
+//! The single application-owned command registry.
 //!
-//! Every derived surface reads this one table: [`CommandId::ALL`]'s
-//! canonical order, [`CommandId::action`], the router's default bindings
-//! and enable rules, and the i18n keys behind the shared label/description
-//! copy the shell resolves through the application catalog. Presentation
-//! data the application layer cannot own (the semantic icon vocabulary)
-//! stays in `taskmanager-ui-contract`, keyed by the same [`CommandId`].
-//! Adding a command is: one enum variant in `command.rs`, one row here,
-//! one icon arm in `ui-contract`, and the locale keys in `locales/*.json`.
+//! The registry macro declares each identity and its neutral behavior metadata
+//! together. It generates the public command enum, the canonical ID array, and
+//! the router/help/palette metadata rows from the same entries. Frontend
+//! executors, icons, and shape-local actions remain outside this crate.
 
+use super::{KeyChord, KeyCode, Modifiers};
 use crate::router::{CommandBinding, CommandContext, CommandScope};
-use crate::{
-    AppAction, AppPage, CommandId, FocusDirection, KeyChord, KeyCode, Modifiers, RefreshRequest,
-    SelectionDirection,
-};
+use crate::{AppAction, AppPage, FocusDirection, RefreshRequest, SelectionDirection};
+
+/// Whether a shared command is suitable for a generic command-palette entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommandPaletteDisposition {
+    /// A palette may offer the command; a frontend still owns its executor.
+    Available,
+    /// Keep the command on its contextual keyboard or frontend-local route.
+    Excluded(CommandPaletteExclusionReason),
+}
+
+impl CommandPaletteDisposition {
+    /// Whether the shared command is available to a generic palette.
+    #[must_use]
+    pub const fn is_available(self) -> bool {
+        matches!(self, Self::Available)
+    }
+
+    /// The typed reason when this command is excluded from a generic palette.
+    #[must_use]
+    pub const fn exclusion_reason(self) -> Option<CommandPaletteExclusionReason> {
+        match self {
+            Self::Available => None,
+            Self::Excluded(reason) => Some(reason),
+        }
+    }
+}
+
+/// Why a shared command stays out of a generic command palette.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommandPaletteExclusionReason {
+    /// The command moves a cursor or selection within the active list.
+    ContextualNavigation,
+    /// The command moves focus between controls.
+    FocusTraversal,
+    /// The command is destructive and must use its confirmation route.
+    ConfirmationRequired,
+    /// The command only has meaning while an overlay is active.
+    OverlayLifecycle,
+    /// The route depends on a frontend-owned surface.
+    FrontendOwnedSurface,
+    /// The command operates on a currently selected row and clipboard.
+    SelectionContext,
+}
 
 /// When the router may fire a command, expressed against the runtime
-/// [`CommandContext`]. The enable rule is per-command data carried by the
-/// spec table, not a hand-maintained match arm in the router.
+/// CommandContext. The enable rule belongs to the same row as the command.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CommandEnableRule {
     /// Always enabled inside its scope.
@@ -48,10 +83,8 @@ impl CommandEnableRule {
     }
 }
 
-/// One row of per-command metadata: identity, typed action, default chord
-/// and scope, enable rule, and the i18n keys for the shared label and
-/// description copy.
-#[derive(Clone, Copy, Debug)]
+/// One command's neutral routing and presentation metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CommandSpec {
     pub id: CommandId,
     pub action: AppAction,
@@ -61,278 +94,367 @@ pub(crate) struct CommandSpec {
     pub enable: CommandEnableRule,
     pub label_key: &'static str,
     pub description_key: &'static str,
+    pub palette: CommandPaletteDisposition,
 }
 
 impl CommandSpec {
-    /// The router binding this row prescribes.
+    /// The router binding prescribed by this row.
     #[must_use]
     pub(crate) const fn binding(self) -> CommandBinding {
         CommandBinding::new(self.id, KeyChord::new(self.key, self.modifiers), self.scope)
     }
 }
 
-/// The command vocabulary in canonical order. The slice length (never a
-/// literal count) sizes every derived array: [`CommandId::ALL`] and the
-/// router's `DEFAULT_BINDINGS`.
-pub(crate) const COMMAND_SPECS: &[CommandSpec] = &[
-    CommandSpec {
-        id: CommandId::FocusSearch,
-        action: AppAction::FocusSearch,
-        key: KeyCode::F,
-        modifiers: Modifiers::CONTROL,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.focus_search.label",
-        description_key: "command.focus_search.description",
-    },
-    CommandSpec {
-        id: CommandId::PageUp,
-        action: AppAction::MoveSelection(SelectionDirection::PageUp),
-        key: KeyCode::PageUp,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.page_up.label",
-        description_key: "command.page_up.description",
-    },
-    CommandSpec {
-        id: CommandId::PageDown,
-        action: AppAction::MoveSelection(SelectionDirection::PageDown),
-        key: KeyCode::PageDown,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.page_down.label",
-        description_key: "command.page_down.description",
-    },
-    CommandSpec {
-        id: CommandId::ArrowDown,
-        action: AppAction::MoveSelection(SelectionDirection::Next),
-        key: KeyCode::ArrowDown,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.arrow_down.label",
-        description_key: "command.arrow_down.description",
-    },
-    CommandSpec {
-        id: CommandId::ArrowUp,
-        action: AppAction::MoveSelection(SelectionDirection::Previous),
-        key: KeyCode::ArrowUp,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.arrow_up.label",
-        description_key: "command.arrow_up.description",
-    },
-    CommandSpec {
-        id: CommandId::FocusNext,
-        action: AppAction::MoveFocus(FocusDirection::Next),
-        key: KeyCode::Tab,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.focus_next.label",
-        description_key: "command.focus_next.description",
-    },
-    CommandSpec {
-        id: CommandId::FocusPrevious,
-        action: AppAction::MoveFocus(FocusDirection::Previous),
-        key: KeyCode::Tab,
-        modifiers: Modifiers::SHIFT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.focus_previous.label",
-        description_key: "command.focus_previous.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowPerformance,
-        action: AppAction::SelectPage(AppPage::Performance),
-        key: KeyCode::Digit1,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_performance.label",
-        description_key: "command.show_performance.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowApplications,
-        action: AppAction::SelectPage(AppPage::Applications),
-        key: KeyCode::Digit2,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_applications.label",
-        description_key: "command.show_applications.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowServices,
-        action: AppAction::SelectPage(AppPage::Services),
-        key: KeyCode::Digit3,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_services.label",
-        description_key: "command.show_services.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowSystem,
-        action: AppAction::SelectPage(AppPage::System),
-        key: KeyCode::Digit4,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_system.label",
-        description_key: "command.show_system.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowStartup,
-        action: AppAction::SelectPage(AppPage::Startup),
-        key: KeyCode::Digit5,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_startup.label",
-        description_key: "command.show_startup.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowUsers,
-        action: AppAction::SelectPage(AppPage::Users),
-        key: KeyCode::Digit6,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_users.label",
-        description_key: "command.show_users.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowAppHistory,
-        action: AppAction::SelectPage(AppPage::AppHistory),
-        key: KeyCode::Digit7,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_app_history.label",
-        description_key: "command.show_app_history.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowAlerts,
-        action: AppAction::OpenAlerts,
-        key: KeyCode::Digit8,
-        modifiers: Modifiers::ALT,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.show_alerts.label",
-        description_key: "command.show_alerts.description",
-    },
-    CommandSpec {
-        id: CommandId::Refresh,
-        action: AppAction::Refresh(RefreshRequest::Processes),
-        key: KeyCode::F5,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.refresh.label",
-        description_key: "command.refresh.description",
-    },
-    CommandSpec {
-        id: CommandId::EndTask,
-        action: AppAction::RequestEndTask,
-        key: KeyCode::Delete,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::RequiresSelection,
-        label_key: "command.end_task.label",
-        description_key: "command.end_task.description",
-    },
-    CommandSpec {
-        id: CommandId::OpenProperties,
-        action: AppAction::OpenProperties,
-        key: KeyCode::Enter,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::RequiresSelection,
-        label_key: "command.open_properties.label",
-        description_key: "command.open_properties.description",
-    },
-    CommandSpec {
-        id: CommandId::ShowSystemAbout,
-        action: AppAction::OpenSystemAbout,
-        key: KeyCode::A,
-        modifiers: Modifiers::CONTROL,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::NoOverlay,
-        label_key: "command.show_system_about.label",
-        description_key: "command.show_system_about.description",
-    },
-    CommandSpec {
-        id: CommandId::Dismiss,
-        action: AppAction::DismissOverlay,
-        key: KeyCode::Escape,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::OverlayOnly,
-        label_key: "command.dismiss.label",
-        description_key: "command.dismiss.description",
-    },
-    CommandSpec {
-        id: CommandId::Confirm,
-        action: AppAction::ConfirmEndTask,
-        key: KeyCode::Enter,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::Dialog,
-        enable: CommandEnableRule::OverlayOnly,
-        label_key: "command.confirm.label",
-        description_key: "command.confirm.description",
-    },
-    CommandSpec {
-        id: CommandId::TogglePause,
-        action: AppAction::TogglePause,
-        key: KeyCode::Space,
-        modifiers: Modifiers::CONTROL,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.toggle_pause.label",
-        description_key: "command.toggle_pause.description",
-    },
-    CommandSpec {
-        id: CommandId::ToggleSidebar,
-        action: AppAction::ToggleSidebar,
-        key: KeyCode::F9,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::Always,
-        label_key: "command.toggle_sidebar.label",
-        description_key: "command.toggle_sidebar.description",
-    },
-    CommandSpec {
-        id: CommandId::MoveToFirst,
-        action: AppAction::MoveSelection(SelectionDirection::First),
-        key: KeyCode::Home,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.move_to_first.label",
-        description_key: "command.move_to_first.description",
-    },
-    CommandSpec {
-        id: CommandId::MoveToLast,
-        action: AppAction::MoveSelection(SelectionDirection::Last),
-        key: KeyCode::End,
-        modifiers: Modifiers::NONE,
-        scope: CommandScope::ProcessList,
-        enable: CommandEnableRule::NotTextInput,
-        label_key: "command.move_to_last.label",
-        description_key: "command.move_to_last.description",
-    },
-    CommandSpec {
-        id: CommandId::CopySelectedRow,
-        action: AppAction::CopySelectedRow,
-        key: KeyCode::C,
-        modifiers: Modifiers::CONTROL,
-        scope: CommandScope::Global,
-        enable: CommandEnableRule::NoOverlay,
-        label_key: "command.copy_selected_row.label",
-        description_key: "command.copy_selected_row.description",
-    },
-];
+macro_rules! define_command_registry {
+    (
+        $(
+            $(#[$variant_meta:meta])*
+            $variant:ident: (
+                $action:expr,
+                $key:expr,
+                $modifiers:expr,
+                $scope:expr,
+                $enable:expr,
+                $label_key:literal,
+                $description_key:literal,
+                $palette:expr
+            ),
+        )+
+    ) => {
+        /// Stable command identities shared by every frontend.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+        #[repr(usize)]
+        pub enum CommandId {
+            $(
+                $(#[$variant_meta])*
+                $variant,
+            )+
+        }
+
+        /// Command metadata in the same order as CommandId::ALL.
+        pub(crate) const COMMAND_SPECS: &[CommandSpec] = &[
+            $(
+                CommandSpec {
+                    id: CommandId::$variant,
+                    action: $action,
+                    key: $key,
+                    modifiers: $modifiers,
+                    scope: $scope,
+                    enable: $enable,
+                    label_key: $label_key,
+                    description_key: $description_key,
+                    palette: $palette,
+                },
+            )+
+        ];
+
+        impl CommandId {
+            /// Every registered command in canonical order.
+            pub const ALL: [Self; COMMAND_SPECS.len()] = [
+                $(Self::$variant,)+
+            ];
+
+            /// The shared application action associated with this command.
+            #[must_use]
+            pub fn action(self) -> AppAction {
+                self.spec().action
+            }
+
+            /// i18n key of the shared command label.
+            #[must_use]
+            pub fn label_key(self) -> &'static str {
+                self.spec().label_key
+            }
+
+            /// i18n key of the shared command description.
+            #[must_use]
+            pub fn description_key(self) -> &'static str {
+                self.spec().description_key
+            }
+
+            /// Shared generic-palette disposition for this command.
+            #[must_use]
+            pub fn palette_disposition(self) -> CommandPaletteDisposition {
+                self.spec().palette
+            }
+
+            /// The spec row is indexed by the registry-generated enum
+            /// discriminant. The enum and this table come from this one macro
+            /// invocation, so every valid ID has exactly one row.
+            #[must_use]
+            pub(crate) fn spec(self) -> &'static CommandSpec {
+                &COMMAND_SPECS[self as usize]
+            }
+        }
+    };
+}
+
+define_command_registry! {
+    FocusSearch: (
+        AppAction::FocusSearch,
+        KeyCode::F,
+        Modifiers::CONTROL,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.focus_search.label",
+        "command.focus_search.description",
+        CommandPaletteDisposition::Available
+    ),
+    PageUp: (
+        AppAction::MoveSelection(SelectionDirection::PageUp),
+        KeyCode::PageUp,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.page_up.label",
+        "command.page_up.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::ContextualNavigation)
+    ),
+    PageDown: (
+        AppAction::MoveSelection(SelectionDirection::PageDown),
+        KeyCode::PageDown,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.page_down.label",
+        "command.page_down.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::ContextualNavigation)
+    ),
+    /// ArrowDown: advance the process selection by a single row.
+    ArrowDown: (
+        AppAction::MoveSelection(SelectionDirection::Next),
+        KeyCode::ArrowDown,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.arrow_down.label",
+        "command.arrow_down.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::ContextualNavigation)
+    ),
+    /// ArrowUp: retreat the process selection by a single row.
+    ArrowUp: (
+        AppAction::MoveSelection(SelectionDirection::Previous),
+        KeyCode::ArrowUp,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.arrow_up.label",
+        "command.arrow_up.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::ContextualNavigation)
+    ),
+    FocusNext: (
+        AppAction::MoveFocus(FocusDirection::Next),
+        KeyCode::Tab,
+        Modifiers::NONE,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.focus_next.label",
+        "command.focus_next.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::FocusTraversal)
+    ),
+    FocusPrevious: (
+        AppAction::MoveFocus(FocusDirection::Previous),
+        KeyCode::Tab,
+        Modifiers::SHIFT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.focus_previous.label",
+        "command.focus_previous.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::FocusTraversal)
+    ),
+    ShowPerformance: (
+        AppAction::SelectPage(AppPage::Performance),
+        KeyCode::Digit1,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_performance.label",
+        "command.show_performance.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowApplications: (
+        AppAction::SelectPage(AppPage::Applications),
+        KeyCode::Digit2,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_applications.label",
+        "command.show_applications.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowServices: (
+        AppAction::SelectPage(AppPage::Services),
+        KeyCode::Digit3,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_services.label",
+        "command.show_services.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowSystem: (
+        AppAction::SelectPage(AppPage::System),
+        KeyCode::Digit4,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_system.label",
+        "command.show_system.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowStartup: (
+        AppAction::SelectPage(AppPage::Startup),
+        KeyCode::Digit5,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_startup.label",
+        "command.show_startup.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowUsers: (
+        AppAction::SelectPage(AppPage::Users),
+        KeyCode::Digit6,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_users.label",
+        "command.show_users.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowAppHistory: (
+        AppAction::SelectPage(AppPage::AppHistory),
+        KeyCode::Digit7,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_app_history.label",
+        "command.show_app_history.description",
+        CommandPaletteDisposition::Available
+    ),
+    /// Alt+8 opens a frontend-owned alerts-management surface.
+    ShowAlerts: (
+        AppAction::OpenAlerts,
+        KeyCode::Digit8,
+        Modifiers::ALT,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.show_alerts.label",
+        "command.show_alerts.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::FrontendOwnedSurface)
+    ),
+    Refresh: (
+        AppAction::Refresh(RefreshRequest::Processes),
+        KeyCode::F5,
+        Modifiers::NONE,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.refresh.label",
+        "command.refresh.description",
+        CommandPaletteDisposition::Available
+    ),
+    EndTask: (
+        AppAction::RequestEndTask,
+        KeyCode::Delete,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::RequiresSelection,
+        "command.end_task.label",
+        "command.end_task.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::ConfirmationRequired)
+    ),
+    OpenProperties: (
+        AppAction::OpenProperties,
+        KeyCode::Enter,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::RequiresSelection,
+        "command.open_properties.label",
+        "command.open_properties.description",
+        CommandPaletteDisposition::Available
+    ),
+    ShowSystemAbout: (
+        AppAction::OpenSystemAbout,
+        KeyCode::A,
+        Modifiers::CONTROL,
+        CommandScope::Global,
+        CommandEnableRule::NoOverlay,
+        "command.show_system_about.label",
+        "command.show_system_about.description",
+        CommandPaletteDisposition::Available
+    ),
+    Dismiss: (
+        AppAction::DismissOverlay,
+        KeyCode::Escape,
+        Modifiers::NONE,
+        CommandScope::Global,
+        CommandEnableRule::OverlayOnly,
+        "command.dismiss.label",
+        "command.dismiss.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::OverlayLifecycle)
+    ),
+    /// Enter confirms the active confirmation dialog.
+    Confirm: (
+        AppAction::ConfirmEndTask,
+        KeyCode::Enter,
+        Modifiers::NONE,
+        CommandScope::Dialog,
+        CommandEnableRule::OverlayOnly,
+        "command.confirm.label",
+        "command.confirm.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::OverlayLifecycle)
+    ),
+    TogglePause: (
+        AppAction::TogglePause,
+        KeyCode::Space,
+        Modifiers::CONTROL,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.toggle_pause.label",
+        "command.toggle_pause.description",
+        CommandPaletteDisposition::Available
+    ),
+    ToggleSidebar: (
+        AppAction::ToggleSidebar,
+        KeyCode::F9,
+        Modifiers::NONE,
+        CommandScope::Global,
+        CommandEnableRule::Always,
+        "command.toggle_sidebar.label",
+        "command.toggle_sidebar.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::FrontendOwnedSurface)
+    ),
+    /// Home jumps to the first visible process row.
+    MoveToFirst: (
+        AppAction::MoveSelection(SelectionDirection::First),
+        KeyCode::Home,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.move_to_first.label",
+        "command.move_to_first.description",
+        CommandPaletteDisposition::Available
+    ),
+    /// End jumps to the last visible process row.
+    MoveToLast: (
+        AppAction::MoveSelection(SelectionDirection::Last),
+        KeyCode::End,
+        Modifiers::NONE,
+        CommandScope::ProcessList,
+        CommandEnableRule::NotTextInput,
+        "command.move_to_last.label",
+        "command.move_to_last.description",
+        CommandPaletteDisposition::Available
+    ),
+    /// Ctrl+C copies the selected row through a frontend-owned clipboard seam.
+    CopySelectedRow: (
+        AppAction::CopySelectedRow,
+        KeyCode::C,
+        Modifiers::CONTROL,
+        CommandScope::Global,
+        CommandEnableRule::NoOverlay,
+        "command.copy_selected_row.label",
+        "command.copy_selected_row.description",
+        CommandPaletteDisposition::Excluded(CommandPaletteExclusionReason::SelectionContext)
+    ),
+}

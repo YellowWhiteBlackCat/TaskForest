@@ -11,7 +11,7 @@ use std::time::Instant;
 use gpui::{
     App, AppContext, Axis, Bounds, ClickEvent, Context, Entity, IntoElement, Modifiers,
     MouseButton, MouseClickEvent, MouseDownEvent, MouseUpEvent, ParentElement, Render, Styled,
-    TestAppContext, Window, div, point, px,
+    TestAppContext, VisualTestContext, Window, div, point, px,
 };
 
 use taskmanager_theme::Theme;
@@ -137,6 +137,16 @@ struct TestRoot;
 impl Render for TestRoot {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
+    }
+}
+
+struct TableHarness {
+    state: Entity<TableState<TestDelegate>>,
+}
+
+impl Render for TableHarness {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        Table::new(&self.state, Theme::dark().palette())
     }
 }
 
@@ -668,6 +678,98 @@ async fn column_resize_clamps_width(cx: &mut TestAppContext) {
     });
 }
 
+#[gpui::test]
+async fn focused_resize_handle_steps_width_and_obeys_declared_bounds(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let table = setup(cx);
+    let width_events = Rc::new(RefCell::new(Vec::<Vec<gpui::Pixels>>::new()));
+    let sink = width_events.clone();
+    cx.update(|cx| {
+        cx.subscribe(&table, move |_, event: &TableEvent, _| {
+            if let TableEvent::ColumnWidthsChanged(widths) = event {
+                sink.borrow_mut().push(widths.clone());
+            }
+        })
+        .detach();
+    });
+    let window = cx.add_window(|_window, _cx| TableHarness {
+        state: table.clone(),
+    });
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("table harness should render");
+
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    let focus_handle = table.read_with(&visual, |table, _| {
+        table
+            .resize_focus_handles
+            .get("name")
+            .cloned()
+            .expect("resizable columns own a stable keyboard handle")
+    });
+    visual.update(|window, _| focus_handle.focus(window));
+    assert!(
+        visual.update(|window, _| focus_handle.is_focused(window)),
+        "the column resize handle must accept keyboard focus"
+    );
+
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(210.0),
+        "Right must increase the focused name column by one step"
+    );
+    assert_eq!(
+        width_events
+            .borrow()
+            .first()
+            .expect("keyboard resize must publish its width snapshot")
+            .as_slice(),
+        &[px(100.0), px(210.0), px(100.0), px(100.0)],
+        "a keyboard width change must publish the complete typed column-width snapshot"
+    );
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(200.0),
+        "Left must decrease the focused name column by one step"
+    );
+
+    for _ in 0..19 {
+        visual.simulate_keystrokes("left");
+    }
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(super::COLUMN_RESIZE_MIN_WIDTH),
+        "repeated Left steps must stop at the declared minimum"
+    );
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(super::COLUMN_RESIZE_MIN_WIDTH),
+        "Left at the minimum must not move below the declared bound"
+    );
+
+    for _ in 0..119 {
+        visual.simulate_keystrokes("right");
+    }
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(super::COLUMN_RESIZE_MAX_WIDTH),
+        "repeated Right steps must stop at the declared maximum"
+    );
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        table.read_with(&visual, |table, _| table.col_groups[1].width),
+        px(super::COLUMN_RESIZE_MAX_WIDTH),
+        "Right at the maximum must not move beyond the declared bound"
+    );
+    assert_eq!(
+        width_events.borrow().len(),
+        140,
+        "each effective step must publish once, while boundary no-ops publish nothing"
+    );
+}
+
 #[test]
 fn column_resize_anchors_the_first_pointer_sample() {
     let mut anchor = None;
@@ -757,17 +859,6 @@ async fn table_virtualizes_10000_rows(cx: &mut TestAppContext) {
         elapsed < std::time::Duration::from_secs(10),
         "10k-row draw took {elapsed:?}"
     );
-}
-
-struct TableHarness {
-    state: Entity<TableState<TestDelegate>>,
-}
-
-impl Render for TableHarness {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let palette = Theme::dark().palette();
-        div().size_full().child(Table::new(&self.state, palette))
-    }
 }
 
 /// 附录 A-2 regression: after `refresh()` shrinks the column set, header

@@ -7,16 +7,16 @@
 //! GPUI keeps its Containers page renderer-specific). The complete managed
 //! rule list and its enabled choices remain in the shell's application-owned
 //! `AlertCenter`; this frontend only submits semantic edits. The view never
-//! evaluates alerts; it reads the shell's typed rule and `alert_active`
+//! evaluates alerts; it reads the shell's typed rule and active-alert
 //! projections.
 
 use taskmanager_application::{
-    AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
-    PlatformEffect,
+    AlertRuleEditResult, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
+    ManagedAlertRuleEditOutcome, PlatformEffect,
 };
 use taskmanager_core::core::alerts::{
-    AlertRule, AlertRuleTransferEntry, AlertRuleTransferError, export_alert_rules_json,
-    import_alert_rules_json,
+    AlertRule, AlertRuleId, AlertRuleTransferEntry, AlertRuleTransferError,
+    export_alert_rules_json, import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
@@ -90,7 +90,7 @@ pub enum AlertsMessage {
     ClosePage,
     /// Toggle one managed rule by stable identity.
     ToggleRule {
-        rule_id: String,
+        rule_id: AlertRuleId,
     },
     /// Export managed alert rules to the clipboard or report notice.
     ExportRules,
@@ -109,12 +109,12 @@ pub enum AlertsMessage {
     },
     AddDefaultRule,
     AdjustRule {
-        rule_id: String,
+        rule_id: AlertRuleId,
         adjustment: RuleAdjustment,
     },
     /// Remove one durable alert rule by stable identity.
     RemoveRule {
-        rule_id: String,
+        rule_id: AlertRuleId,
     },
 }
 
@@ -228,7 +228,7 @@ impl IcedApp {
             }
             AlertsMessage::RemoveRule { rule_id } => {
                 match self.remove_alert_rule(rule_id) {
-                    Ok(ManagedAlertRuleEditOutcome::Applied) => {
+                    Ok(result) if result.outcome == ManagedAlertRuleEditOutcome::Applied => {
                         self.shell.report_notice(
                             FeedbackSource::Interaction,
                             FeedbackSeverity::Success,
@@ -238,7 +238,7 @@ impl IcedApp {
                                 .replace("{target}", t("alerts.manage")),
                         );
                     }
-                    Ok(ManagedAlertRuleEditOutcome::MissingTarget) => {
+                    Ok(result) if result.outcome == ManagedAlertRuleEditOutcome::MissingTarget => {
                         self.shell.report_notice(
                             FeedbackSource::Interaction,
                             FeedbackSeverity::Warning,
@@ -246,7 +246,7 @@ impl IcedApp {
                             t("feedback.target_changed").to_string(),
                         );
                     }
-                    Ok(ManagedAlertRuleEditOutcome::Unchanged) => {}
+                    Ok(_) => {}
                     Err(error) => {
                         self.shell.report_notice(
                             FeedbackSource::Interaction,
@@ -307,7 +307,7 @@ impl IcedApp {
         &mut self,
         json: &str,
         mode: AlertRuleImportMode,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         let entries = import_alert_rules_json(json)?;
         let rules: Vec<ManagedAlertRule> =
             entries.into_iter().map(ManagedAlertRule::from).collect();
@@ -319,7 +319,7 @@ impl IcedApp {
     pub fn add_alert_rule(
         &mut self,
         rule: AlertRule,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         self.shell
             .edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
     }
@@ -328,7 +328,7 @@ impl IcedApp {
     pub fn update_alert_rule(
         &mut self,
         rule: AlertRule,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         let enabled = self
             .alerts_rules()
             .iter()
@@ -343,8 +343,8 @@ impl IcedApp {
     /// Remove one durable alert rule by stable identity.
     pub fn remove_alert_rule(
         &mut self,
-        rule_id: String,
-    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        rule_id: AlertRuleId,
+    ) -> Result<AlertRuleEditResult, AlertRuleTransferError> {
         self.shell
             .edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
     }
@@ -352,7 +352,7 @@ impl IcedApp {
     /// Toggle one canonical managed rule through the semantic reducer. An
     /// missing stable target (a stale row widget after an import/removal) is
     /// an honest no-op and cannot mutate the rule that moved into its place.
-    fn toggle_alert_rule(&mut self, rule_id: String) -> Option<PlatformEffect> {
+    fn toggle_alert_rule(&mut self, rule_id: AlertRuleId) -> Option<PlatformEffect> {
         let _ = self
             .shell
             .edit_alert_rules(ManagedAlertRuleEdit::Toggle { rule_id });
@@ -371,7 +371,7 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 /// One rendered rule row (pure seam the headless tests assert on).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AlertRuleRowModel {
-    pub rule_id: String,
+    pub rule_id: AlertRuleId,
     pub metric: AlertMetric,
     pub metric_label: String,
     pub severity: AlertSeverity,
@@ -454,11 +454,12 @@ fn current_value_text(rule: &AlertRule, snapshot: Option<&SystemSnapshot>) -> St
     )
 }
 
-/// Project the shell's active-alert mirror into banner lines.
+/// Project the shell's active-alert collection into banner lines.
 pub(crate) fn active_alert_lines(app: &crate::IcedApp) -> Vec<ActiveAlertLine> {
     app.shell
         .projection()
-        .alert_active
+        .alert_center
+        .active_alerts()
         .iter()
         .map(|alert| ActiveAlertLine {
             severity: alert.severity,

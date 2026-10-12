@@ -9,6 +9,7 @@ use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+use zhuge_ui_core::virtual_list::VirtualWindow;
 
 // --- Round-3 ProcessProjection fingerprint cache ---------------------------
 
@@ -267,7 +268,7 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     let startup = app.startup_projection().0;
     let users = app.users_projection().0;
     let devices = vec![PerfDevice::Cpu, PerfDevice::Memory];
-    let window = crate::ui::VirtualWindow::for_rows(devices.len(), 0.0, 800.0, 96.0, 0.0);
+    let window = VirtualWindow::for_rows(devices.len(), 0.0, 800.0, 96.0, 0.0);
     let rail = app.performance_rail_rows(&devices, window);
 
     app.performance.sidebar_visible = !app.performance.sidebar_visible;
@@ -346,7 +347,7 @@ fn system_revision_rebuilds_only_the_performance_rail_domain() {
     let processes = app.projected_table_model().0;
     let services = app.services_projection("").0;
     let devices = vec![PerfDevice::Cpu, PerfDevice::Memory];
-    let window = crate::ui::VirtualWindow::for_rows(devices.len(), 0.0, 800.0, 96.0, 0.0);
+    let window = VirtualWindow::for_rows(devices.len(), 0.0, 800.0, 96.0, 0.0);
     let rail = app.performance_rail_rows(&devices, window);
 
     seed_projection_fact(

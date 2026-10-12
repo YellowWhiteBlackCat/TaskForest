@@ -5,10 +5,11 @@
 use gpui::{
     AnyElement, Div, InteractiveElement, IntoElement, ParentElement, Stateful, Styled, div,
 };
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_core::core::{
     DeviceId, DeviceStatus, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
 };
+use taskmanager_shell::presentation::smart::self_test_supported;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::absolute;
@@ -46,10 +47,11 @@ pub(crate) fn self_test_action(
     disk: Option<&DiskMetrics>,
     enabled: bool,
     callbacks: &SystemHealthCallbacks,
-) -> AnyElement {
-    let Some(disk) = disk.filter(|_| enabled) else {
-        return disabled_action(theme, label, id).into_any_element();
-    };
+) -> Option<AnyElement> {
+    let disk = disk.filter(|disk| self_test_supported(disk, kind))?;
+    if !enabled {
+        return Some(disabled_action(theme, label, id).into_any_element());
+    }
     let request = SmartSelfTestConfirmationRequest {
         device_id: DeviceId::new(disk.device_id.clone()),
         device_generation: disk.device_generation,
@@ -62,16 +64,18 @@ pub(crate) fn self_test_action(
         kind,
     };
     let callback = callbacks.request_confirmation.clone();
-    elements::pill(
-        theme,
-        id,
-        &label,
-        false,
-        false,
-        move |window, cx| callback(request.clone(), window, cx),
-        |_, _, _| {},
+    Some(
+        elements::pill(
+            theme,
+            id,
+            &label,
+            false,
+            false,
+            move |window, cx| callback(request.clone(), window, cx),
+            |_, _, _| {},
+        )
+        .into_any_element(),
     )
-    .into_any_element()
 }
 
 pub(crate) fn self_test_card(
@@ -85,9 +89,7 @@ pub(crate) fn self_test_card(
         .map(|report| copy(SystemHealthText::SmartPhase(report.phase)))
         .unwrap_or_else(|| copy(SystemHealthText::Unavailable));
     let state = report.map_or(DeviceStatus::Unsupported, |report| report.state.status);
-    let can_request = disk
-        .is_some_and(|disk| disk.smart_availability == SmartAvailability::Available)
-        && report.is_none_or(|report| report.phase != SmartSelfTestPhase::Running);
+    let can_request = report.is_none_or(|report| report.phase != SmartSelfTestPhase::Running);
     let mut details = div()
         .mt(length(tokens::SPACE_7))
         .flex()
@@ -172,30 +174,35 @@ pub(crate) fn self_test_card(
                 .text_color(hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::ConfirmationRequired)),
         )
-        .child(
-            div()
+        .child({
+            let mut actions = div()
                 .mt(length(tokens::SPACE_6))
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(definite_length(tokens::SPACE_6))
-                .child(self_test_action(
-                    theme,
-                    copy(SystemHealthText::ShortTest),
-                    "health-short-test",
-                    SmartSelfTestKind::Short,
-                    disk,
-                    can_request,
-                    callbacks,
-                ))
-                .child(self_test_action(
-                    theme,
-                    copy(SystemHealthText::ExtendedTest),
-                    "health-extended-test",
-                    SmartSelfTestKind::Extended,
-                    disk,
-                    can_request,
-                    callbacks,
-                )),
-        )
+                .gap(definite_length(tokens::SPACE_6));
+            if let Some(action) = self_test_action(
+                theme,
+                copy(SystemHealthText::ShortTest),
+                "health-short-test",
+                SmartSelfTestKind::Short,
+                disk,
+                can_request,
+                callbacks,
+            ) {
+                actions = actions.child(action);
+            }
+            if let Some(action) = self_test_action(
+                theme,
+                copy(SystemHealthText::ExtendedTest),
+                "health-extended-test",
+                SmartSelfTestKind::Extended,
+                disk,
+                can_request,
+                callbacks,
+            ) {
+                actions = actions.child(action);
+            }
+            actions
+        })
 }

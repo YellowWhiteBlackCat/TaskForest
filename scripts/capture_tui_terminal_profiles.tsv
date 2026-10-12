@@ -1,0 +1,9 @@
+name	term	colorterm	no_color	lc_all	lc_ctype	lc_messages	lang	glyph_override	expected_language	expected_glyphs	expected_color
+zh-dumb	dumb	<unset>	<unset>	<unset>	<unset>	<unset>	zh_CN.UTF-8	<unset>	zh	ascii	monochrome
+zh-explicit-ascii	xterm-256color	<unset>	<unset>	<unset>	<unset>	<unset>	zh_CN.UTF-8	ascii	zh	ascii	ansi256
+zh-nonutf-locale	xterm-256color	<unset>	<unset>	<unset>	<unset>	<unset>	zh_CN	<unset>	zh	unicode	ansi256
+zh-missing-locale	xterm-256color	<unset>	<unset>	<unset>	<unset>	zh_CN	<unset>	<unset>	zh	unicode	ansi256
+color-16	xterm	<unset>	<unset>	<unset>	<unset>	<unset>	en_US.UTF-8	<unset>	en	unicode	ansi16
+color-256	xterm-256color	<unset>	<unset>	<unset>	<unset>	<unset>	en_US.UTF-8	<unset>	en	unicode	ansi256
+color-truecolor	xterm-256color	truecolor	<unset>	<unset>	<unset>	<unset>	en_US.UTF-8	<unset>	en	unicode	truecolor
+color-no-color	xterm-256color	<unset>	1	<unset>	<unset>	<unset>	en_US.UTF-8	<unset>	en	unicode	monochrome

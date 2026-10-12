@@ -1,7 +1,10 @@
 use super::*;
+use crate::keys::IcedKey;
 use taskmanager_application::PlatformEffect;
+use taskmanager_application::{KeyCode, Modifiers};
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
+use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 
@@ -71,6 +74,16 @@ fn service_and_startup_row_menus_preserve_provider_identity() {
 #[test]
 fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
     let mut app = IcedApp::demo();
+    let mut sessions = app.shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .get_mut(1)
+        .expect("the demo Users projection has a second session");
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 42,
+    });
+    let expected_identity = session.identity().expect("fixture identity");
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
     let _ = app.update(Message::SelectPage(AppPage::Users));
     let _ = app.update(Message::OpenUserRowMenu(1));
     let expected_id = app
@@ -85,11 +98,67 @@ fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
         ProjectionSeedFact::Sessions(Some(reordered_sessions)),
     );
 
-    let Some(PlatformEffect::SessionControl(target)) =
-        app.request_user_menu_action(SessionControlAction::Lock)
-    else {
-        panic!("the frozen Users menu should emit a session-control effect");
-    };
-    assert_eq!(target.session_id, expected_id);
+    assert!(
+        app.handle_control_message(Message::RequestUserRowSessionControl(
+            SessionControlAction::Lock,
+        ))
+        .is_none()
+    );
+    let pending = app
+        .shell
+        .pending_session()
+        .expect("the row-menu pick arms a visible confirmation");
+    assert_eq!(pending.action, SessionControlAction::Lock);
+    assert_eq!(
+        pending.session.identity().as_ref(),
+        Some(&expected_identity)
+    );
     assert!(app.user_menu_session().is_none());
+
+    let Some(PlatformEffect::SessionControl(target)) =
+        app.handle_control_message(Message::ConfirmSessionControl)
+    else {
+        panic!("explicit confirmation should emit the frozen session-control effect");
+    };
+    assert_eq!(target.identity.session_id, expected_id);
+    assert_eq!(target.identity, expected_identity);
+    assert!(app.shell.pending_session().is_none());
+}
+
+#[test]
+fn users_session_confirmation_cancel_close_and_escape_submit_nothing() {
+    let mut app = IcedApp::demo();
+    let mut sessions = app.shell.projection().sessions.clone().unwrap_or_default();
+    let session = sessions
+        .first_mut()
+        .expect("the demo Users projection has a session");
+    session.incarnation = Some(SessionIncarnation::LinuxLogind {
+        boot_id: "fixture-boot".into(),
+        created_monotonic_usec: 42,
+    });
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
+    let _ = app.update(Message::SelectPage(AppPage::Users));
+    let _ = app.update(Message::SelectRow(0));
+
+    for dismiss in [
+        Message::CancelSessionControl,
+        Message::CloseSessionControl,
+        Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+            KeyCode::Escape,
+            Modifiers::NONE,
+        ))),
+    ] {
+        assert!(
+            app.handle_control_message(Message::RequestSessionControl(
+                SessionControlAction::Disconnect,
+            ))
+            .is_none()
+        );
+        assert!(app.shell.pending_session().is_some());
+        let _ = app.update(dismiss);
+        assert!(
+            app.shell.pending_session().is_none(),
+            "cancel, close, and Escape dismiss without confirming"
+        );
+    }
 }

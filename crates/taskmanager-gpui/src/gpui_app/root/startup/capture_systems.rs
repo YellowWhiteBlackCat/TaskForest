@@ -1,5 +1,6 @@
 //! Capture-only systems applied after one accepted platform batch.
 
+use crate::gpui_app::processes_view::rows::expand_all;
 use gpui::Context;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
@@ -7,15 +8,21 @@ use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
 use taskmanager_core::core::DiagnosticBundleError;
 use taskmanager_core::core::DiagnosticBundleErrorKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_core::core::process::ProcessCategory;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
+use taskmanager_shell::app::alert_rows::AlertRowFamily;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_direct_memory_inventory;
 
+use super::super::capture::session_control_fixture;
 use super::super::{
     CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
     WindowSurfaceKind,
@@ -125,9 +132,18 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     if view.capture_evidence.apps_group_expanded_requested() {
         configure_category_apps(view);
         view.set_process_query("capture-browser");
-        crate::gpui_app::processes_view::rows::expand_all(view);
+        expand_all(view);
         let (rows, _, _) = view.processes_projection();
-        let expanded = rows.iter().any(|row| row.depth >= 3)
+        let aggregate_partial = rows.iter().any(|row| {
+            row.cpu_aggregate
+                .as_ref()
+                .is_some_and(|cpu| matches!(cpu.availability(), ScalarAvailability::Partial(_)))
+                && row.memory_aggregate.as_ref().is_some_and(|memory| {
+                    matches!(memory.availability(), ScalarAvailability::Partial(_))
+                })
+        });
+        let expanded = aggregate_partial
+            && rows.iter().any(|row| row.depth >= 3)
             && rows
                 .iter()
                 .filter(|row| row.process_identity.is_some())
@@ -235,6 +251,42 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     // live privileged read: the seed is a no-op unless capture evidence is
     // enabled.
     let _ = view.capture_evidence.seed_msr_readout(&mut view.shell);
+    if view
+        .capture_evidence
+        .session_control_confirmation_requested()
+    {
+        let session = session_control_fixture();
+        seed_direct_track_fact(
+            &mut view.shell,
+            DirectTrackSeedFact::Sessions(Some(vec![session.clone()])),
+        );
+        seed_direct_track_fact(
+            &mut view.shell,
+            DirectTrackSeedFact::SessionsSource(Some(vec![SourceStatus {
+                provider: ProviderId::borrowed("capture.sessions"),
+                outcome: SourceOutcome::Available,
+                item_count: 1,
+            }])),
+        );
+        let projection = view.projection();
+        view.materialized.replace_sessions(
+            projection.sessions_revision,
+            projection.sessions.clone().unwrap_or_default(),
+            projection.sessions_source.clone().unwrap_or_default(),
+        );
+        view.page = TopPage::Users;
+        view.selected_session = session.identity();
+        let armed =
+            view.request_session_control_confirmation(&session, SessionControlAction::Disconnect);
+        let visible_intent = matches!(
+            view.pending_confirmation(),
+            Some(PendingConfirmation::SessionControl(intent))
+                if intent.session.identity() == session.identity()
+                    && intent.action == SessionControlAction::Disconnect
+        );
+        view.capture_evidence
+            .mark_session_control_confirmation_ready(armed && visible_intent);
+    }
     if let Some(snapshot) = view.capture_evidence.system_hardware_npu_fixture() {
         seed_direct_memory_inventory(&mut view.shell);
         seed_direct_track_fact(&mut view.shell, DirectTrackSeedFact::NpuInventory(snapshot));
@@ -253,16 +305,23 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     }
     if view.capture_evidence.active_alert_capture_enabled() {
         let mut snapshot = view.system_snapshot().clone();
-        let mut active = Vec::new();
         for elapsed in [0, 10_000] {
             snapshot.timestamp_ms = snapshot.timestamp_ms.saturating_add(elapsed);
-            active = view
-                .shell
-                .evaluate_alerts(&snapshot, snapshot.timestamp_ms)
-                .active;
+            let _ = view.shell.evaluate_alerts(&snapshot, snapshot.timestamp_ms);
         }
+        let active = view
+            .shell
+            .projection()
+            .alert_center
+            .active_alerts()
+            .to_vec();
         let ready = !active.is_empty();
-        let revision = view.shell.accept_alert_evaluation(active.clone());
+        let revision = view
+            .shell
+            .projection()
+            .alert_row_projection_generation(AlertRowFamily::Active)
+            .data_revision()
+            .get();
         view.materialize_active_alerts(revision, active);
         if ready {
             view.capture_evidence.mark_active_alert_ready();

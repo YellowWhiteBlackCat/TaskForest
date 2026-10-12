@@ -8,6 +8,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
 use taskmanager_app_host::NativeAppHost;
+use taskmanager_application::i18n::current_language;
 use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
@@ -16,10 +17,12 @@ use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
-use crate::{TuiApp, TuiTerminalProfile, TuiTheme};
+use crate::terminal::TuiTerminalSignals;
+use crate::{TuiApp, TuiTheme};
 
 use crate::render;
 
+mod capture_profile;
 mod keys;
 mod modals;
 mod navigation;
@@ -208,10 +211,10 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         );
     }
     let capture_marker = std::env::var_os("TM_TUI_CAPTURE_MARKER_FILE");
-    // Resolve terminal capabilities once at the native composition edge. The
-    // event loop and every renderer consume this value; no component reads
-    // TERM/locale or makes its own color/glyph guess.
-    let terminal_profile = TuiTerminalProfile::detect();
+    // Capture terminal signals once at the native composition edge. Each
+    // painted frame resolves glyph mode from this snapshot and the current
+    // shared UI language; no renderer reads TERM/locale or guesses.
+    let terminal_signals = TuiTerminalSignals::detect();
     // The full cycle — drain, pacing, draw decision, event application,
     // quit — lives behind the runtime seam (`runtime/seam.rs`), generic over
     // the terminal backend and the event source so it is drivable headlessly
@@ -237,7 +240,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
             seam::CrosstermEventSource,
             demo,
             capture_marker.as_deref(),
-            terminal_profile,
+            || terminal_signals.resolve(current_language()),
         );
         let _ = ratatui::crossterm::execute!(
             std::io::stdout(),
@@ -323,6 +326,10 @@ pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) -> Option<Pla
             app.settings_form.step_value(-1);
         }
         ratatui::crossterm::event::KeyCode::Right => {
+            app.begin_settings_edit();
+            app.settings_form.step_value(1);
+        }
+        ratatui::crossterm::event::KeyCode::Char(' ') if app.settings_form.focused_switch() => {
             app.begin_settings_edit();
             app.settings_form.step_value(1);
         }

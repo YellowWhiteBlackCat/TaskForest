@@ -80,6 +80,7 @@ KWIN_RUNTIME=""
 KWIN_ROOT=""
 KWIN_SOCKET=""
 KWIN_DISPLAY=""
+KWIN_RECEIVER_PID=""
 NIRI_PARENT_WAYLAND="$HOST_DISPLAY"
 
 mkdir -p "$RUN_DIR" "$RUNTIME_DIR/config" "$RUNTIME_DIR/data" \
@@ -118,6 +119,7 @@ terminate_owned() {
 cleanup() {
   terminate_owned "$APP_PID" "$APP_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
+  terminate_owned "$KWIN_RECEIVER_PID" ""
   terminate_owned "$KWIN_PID" "$KWIN_PGID"
   if [ -n "$KWIN_ROOT" ] && [ -d "$KWIN_ROOT" ]; then
     case "$KWIN_ROOT" in
@@ -139,7 +141,7 @@ trap 'exit 143' TERM
 mkdir -p "$RUNTIME_DIR" "$RUN_DIR/bin"
 chmod 700 "$RUNTIME_DIR"
 
-for command in cargo file git jq niri rustc sha256sum setsid stat timeout; do
+for command in cargo file git jq niri qdbus6 rustc sha256sum setsid stat timeout; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'required capture command is unavailable: %s\n' "$command" >&2
     exit 2
@@ -350,7 +352,7 @@ hotkey-overlay {
     skip-at-startup
 }
 output "winit" {
-    scale 1
+  scale 1
 }
 window-rule {
     match app-id="$APP_ID"
@@ -406,6 +408,7 @@ start_capture_host() {
     tail -20 "$kwin_log" >&2
     return 1
   fi
+
   NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
   printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
 }
@@ -456,6 +459,108 @@ if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
   exit 1
 fi
 
+maximize_nested_niri_host() {
+  [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] || return 0
+  local kwin_script="$RUN_DIR/maximize-niri-host.js"
+  local kwin_receipt="$RUN_DIR/maximize-niri-host.txt"
+  local kwin_ready="$RUN_DIR/maximize-niri-host.ready"
+  local script_id=""
+  local script_loaded="false"
+  cat >"$kwin_script" <<'JS'
+try {
+    var windows = workspace.stackingOrder;
+    var selected = null;
+    var normalCount = 0;
+    for (var i = 0; i < windows.length; i++) {
+        if (windows[i].normalWindow) {
+            normalCount += 1;
+            if (selected === null) selected = windows[i];
+        }
+    }
+    if (selected !== null) {
+        selected.setMaximize(true, true);
+        callDBus("io.github.YellowWhiteBlackCat.TaskForest.CaptureReceipt", "/Capture",
+            "io.github.YellowWhiteBlackCat.CaptureReceipt", "publish",
+            "TASKFOREST_WINDOW status=maximize-requested caption=" + selected.caption +
+                " normal=" + selected.normalWindow + " windows=" + windows.length +
+                " normal_count=" + normalCount + " width=" + selected.width +
+                " height=" + selected.height);
+    } else {
+        callDBus("io.github.YellowWhiteBlackCat.TaskForest.CaptureReceipt", "/Capture",
+            "io.github.YellowWhiteBlackCat.CaptureReceipt", "publish",
+            "TASKFOREST_WINDOW status=not-found windows=" + windows.length +
+                " normal_count=" + normalCount + " width=0 height=0");
+    }
+} catch (error) {
+    callDBus("io.github.YellowWhiteBlackCat.TaskForest.CaptureReceipt", "/Capture",
+        "io.github.YellowWhiteBlackCat.CaptureReceipt", "publish",
+        "TASKFOREST_WINDOW status=error reason=" + String(error).replace(/[ \\t]+/g, "_") +
+            " width=0 height=0");
+}
+JS
+  for _ in $(seq 1 40); do
+    if qdbus6 org.kde.KWin /Scripting >"$RUN_DIR/kwin-scripting-interface.txt" 2>&1; then
+      break
+    fi
+    sleep 0.1
+  done
+  if ! qdbus6 org.kde.KWin /Scripting >"$RUN_DIR/kwin-scripting-interface.txt" 2>&1; then
+    printf 'private KWin scripting D-Bus interface did not become ready\n' >&2
+    return 1
+  fi
+  rm -f "$kwin_receipt" "$kwin_ready"
+  timeout --kill-after=3s 10s python3 "$REPO/scripts/receive_kwin_window_receipt.py" \
+    "$kwin_receipt" "$kwin_ready" >"$RUN_DIR/kwin-receiver.out" \
+    2>"$RUN_DIR/kwin-receiver.err" &
+  KWIN_RECEIVER_PID=$!
+  for _ in $(seq 1 40); do
+    [ -f "$kwin_ready" ] && break
+    sleep 0.1
+  done
+  if [ ! -f "$kwin_ready" ]; then
+    printf 'private KWin host-window receipt receiver did not start\n' >&2
+    return 1
+  fi
+  qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript \
+    "$kwin_script" "taskforest-capture-maximize-niri" \
+    >"$RUN_DIR/kwin-script-load.out" 2>"$RUN_DIR/kwin-script-load.err" || true
+  script_id="$(tr -d '[:space:]' <"$RUN_DIR/kwin-script-load.out")"
+  script_loaded="$(qdbus6 org.kde.KWin /Scripting \
+    org.kde.kwin.Scripting.isScriptLoaded taskforest-capture-maximize-niri \
+    2>/dev/null || printf 'false')"
+  if [ -z "$script_id" ] || [ "$script_loaded" != "true" ]; then
+    printf 'private KWin did not load its nested Niri maximize script\n' >&2
+    return 1
+  fi
+  qdbus6 org.kde.KWin "/Scripting/Script${script_id}" \
+    >"$RUN_DIR/kwin-script-introspection.txt" \
+    2>"$RUN_DIR/kwin-script-introspection.err" || true
+  if ! qdbus6 org.kde.KWin "/Scripting/Script${script_id}" \
+    org.kde.kwin.Script.run >"$RUN_DIR/kwin-script-run.out" \
+    2>"$RUN_DIR/kwin-script-run.err"; then
+    printf 'private KWin could not maximize its nested Niri host window\n' >&2
+    cat "$RUN_DIR/kwin-script-run.out" >&2
+    return 1
+  fi
+  if ! wait "$KWIN_RECEIVER_PID"; then
+    KWIN_RECEIVER_PID=""
+    printf 'private KWin did not report the nested Niri host window\n' >&2
+    cat "$RUN_DIR/kwin-receiver.err" >&2
+    exit 1
+  fi
+  KWIN_RECEIVER_PID=""
+  if ! grep -Eq '^TASKFOREST_WINDOW status=maximize-requested .+ width=[1-9][0-9]* height=[1-9][0-9]*$' \
+    "$kwin_receipt"; then
+    printf 'private KWin returned an invalid nested Niri host-window receipt\n' >&2
+    cat "$kwin_receipt" >&2
+    exit 1
+  fi
+  printf 'kwin_maximize_script_id=%s\n' "$script_id" >>"$METADATA"
+  cp "$kwin_receipt" "$RUN_DIR/kwin-niri-host-window.txt"
+}
+
+maximize_nested_niri_host || exit 1
+
 NIRI_OUTPUTS_TMP="$RUN_DIR/niri-outputs.json.tmp"
 OUTPUT_READY=0
 for _ in $(seq 1 30); do
@@ -472,21 +577,46 @@ done
   printf 'nested Niri output receipt failed; evidence retained at %s\n' "$RUN_DIR" >&2
   exit 1
 }
+if [ -n "$KWIN_RECEIVER_PID" ]; then
+  if ! wait "$KWIN_RECEIVER_PID"; then
+    KWIN_RECEIVER_PID=""
+    printf 'private KWin did not report the nested Niri host window\n' >&2
+    cat "$RUN_DIR/kwin-receiver.err" >&2
+    cat "$RUN_DIR/kwin-script-run.err" >&2
+    exit 1
+  fi
+  KWIN_RECEIVER_PID=""
+  if ! grep -Eq '^TASKFOREST_WINDOW .+ width=[1-9][0-9]* height=[1-9][0-9]*$' \
+    "$RUN_DIR/maximize-niri-host.txt"; then
+    printf 'private KWin returned an invalid nested Niri host-window receipt\n' >&2
+    cat "$RUN_DIR/maximize-niri-host.txt" >&2
+    exit 1
+  fi
+fi
 NIRI_OUTPUT_LOGICAL="$(jq -r 'if type == "object" then .winit.logical else .[0].logical end as $logical | if ($logical.width and $logical.height) then "\($logical.width)x\($logical.height)" else empty end' "$NIRI_OUTPUTS")"
 [ -n "$NIRI_OUTPUT_LOGICAL" ] || {
   printf 'nested Niri output has no logical dimensions\n' >&2
   exit 1
 }
+NIRI_OUTPUT_WIDTH="$(jq -r 'if type == "object" then .winit.logical.width else .[0].logical.width end' "$NIRI_OUTPUTS")"
+NIRI_OUTPUT_HEIGHT="$(jq -r 'if type == "object" then .winit.logical.height else .[0].logical.height end' "$NIRI_OUTPUTS")"
+if [ "$NIRI_OUTPUT_WIDTH" -lt 1600 ] || [ "$NIRI_OUTPUT_HEIGHT" -lt 900 ]; then
+  printf 'private nested Niri output is undersized: %sx%s (need at least 1600x900)\n' \
+    "$NIRI_OUTPUT_WIDTH" "$NIRI_OUTPUT_HEIGHT" >&2
+  cat "$NIRI_OUTPUTS" >&2
+  tail -40 "$RUN_DIR/kwin-wayland.log" >&2
+  exit 1
+fi
 sed -i "s/^nested_output_logical=.*/nested_output_logical=$NIRI_OUTPUT_LOGICAL/" "$METADATA"
 
 capture_one() {
   local name="$1" device="$2" window_size="$3" skin="$4"
-  # A "-zh" scenario-name suffix renders the localized surface (ICED-002
+  # A "-zh" or "-zh-compact" scenario-name suffix renders the localized surface (ICED-002
   # geometry evidence): the launch reads XDG_CONFIG_HOME/taskmanager/config.json
   # (JSON, serde), whose shared language token is "en"/"zh".
   local locale=""
   case "$name" in
-  *-zh) locale="zh" ;;
+  *-zh|*-zh-compact) locale="zh" ;;
   esac
   local scenario_dir="$RUN_DIR/$name"
   local log="$scenario_dir/app.log"
@@ -505,6 +635,9 @@ capture_one() {
   local page=performance
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
+  users-session-confirmation) page=users ;;
+  process-context-menu) page=applications ;;
+  cpu-facts) page=performance ;;
   application-history-replay) page=app-history ;;
   system-hardware|system-dashboard|history-60m|sensor-center|storage-health) page=system ;;
   service-details|service-details-logs|services-search-highlight) page=services ;;
@@ -584,7 +717,13 @@ capture_one() {
 
       for _ in $(seq 1 120); do
         if grep -q "ICED_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$markers" 2>/dev/null \
-          && grep -q "ICED_CAPTURE_MARKER event=target_ready mode=demo page=$page device=$device" "$markers" 2>/dev/null; then
+          && grep -q "ICED_CAPTURE_MARKER event=target_ready mode=demo page=$page device=$device" "$markers" 2>/dev/null \
+          && { [ "$device" != "process-context-menu" ] \
+            || grep -Eq '^ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=process-context-menu pid=[1-9][0-9]* start_token=[1-9][0-9]*$' "$markers" 2>/dev/null; } \
+          && { [ "$device" != "cpu-facts" ] \
+            || grep -q "ICED_CAPTURE_MARKER event=cpu_facts_ready mode=demo page=performance device=cpu-facts rail=stats-end core_breakdown=6/8/2 cache_kib=64/64/1024/16384 base_frequency_mhz=2400 core_counts=16/22 virtualization=VT-x core_temperature_c=55/59" "$markers" 2>/dev/null; } \
+          && { [ "$page" != "performance" ] \
+            || grep -q "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device=$device " "$markers" 2>/dev/null; }; then
           marker_ready=1
           break
         fi
@@ -720,10 +859,11 @@ APPEARANCE_CONTROL="$(awk -F '\t' '
   printf 'appearance_receipt=%s\n' "${APPEARANCE_RECEIPT#"$REPO/"}"
 } >>"$METADATA"
 
-# Hashing and inspecting the complete 31-image matrix is bounded work, but can
-# exceed thirty seconds on a loaded developer host. Keep the validator finite
-# while giving the full receipt a stable local budget.
-PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 scripts/validate_iced_matrix.py \
+# The current canonical matrix has 198 images. visual_content_receipt fully
+# decodes each PNG in Python, so the old 120-second budget sized for the former
+# 31-image matrix could reject a complete capture. Keep validation finite while
+# leaving headroom under the supervisor's 30-minute run bound.
+PYTHONDONTWRITEBYTECODE=1 timeout 900s python3 scripts/validate_iced_matrix.py \
   --matrix "$VALIDATOR_MATRIX" \
   --manifest "$VALIDATOR_MANIFEST" \
   --run-dir "$RUN_DIR" \

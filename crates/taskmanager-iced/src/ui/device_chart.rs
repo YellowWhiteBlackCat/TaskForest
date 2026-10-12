@@ -338,7 +338,11 @@ impl canvas::Program<Message> for DeviceChart {
             // cursor is over, never beside it (GPUI hover parity).
             let slots = WindowSlots::spread(samples.len(), size.width);
             let x = slots.x(index);
-            if let Some(&value) = samples.get(index).filter(|value| value.is_finite()) {
+            let value = samples
+                .get(index)
+                .copied()
+                .filter(|value| value.is_finite());
+            if let Some(value) = value {
                 draw_hover_sample_mark(
                     frame,
                     size,
@@ -348,10 +352,12 @@ impl canvas::Program<Message> for DeviceChart {
                     grid_color,
                 );
             }
+            let anchor_y = value.map(|value| scaled_y_in_range(value, min, max, size.height));
             draw_readout_pill(
                 frame,
                 size,
                 x,
+                anchor_y,
                 device_readout_text(scale, samples, index).as_deref(),
                 grid_color,
                 readout,

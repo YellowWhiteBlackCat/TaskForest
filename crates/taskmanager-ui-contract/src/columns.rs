@@ -6,6 +6,8 @@
 //! enums (GPUI `SortCol`, the Iced/TUI column models) map their variants onto
 //! these tokens and delegate the shared semantics here instead of carrying
 //! private copies that drift.
+//! Resize limits remain with each table shape's resize policy; they are not
+//! per-column facts in this shared vocabulary.
 //!
 //! The `id` tokens are spelled exactly like the persisted process-view
 //! sort/hidden-columns config tokens, so persisted settings, the contract,

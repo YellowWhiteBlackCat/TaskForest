@@ -26,8 +26,19 @@ use crate::primitives::scrollbar::{SCROLLBAR_WIDTH, Scrollbar, ScrollbarShow};
 
 /// The popup key context (navigation bindings live under it).
 pub const POPUP_CONTEXT: &str = "TaskManagerPopup";
+/// The key context owned by an unopened dropdown trigger.
+pub const DROPDOWN_TRIGGER_CONTEXT: &str = "TaskManagerDropdownTrigger";
 
-actions!(popup, [PopupUp, PopupDown, PopupConfirm, PopupCancel]);
+actions!(
+    popup,
+    [
+        PopupUp,
+        PopupDown,
+        PopupConfirm,
+        PopupCancel,
+        DropdownTriggerActivate
+    ]
+);
 
 /// Register the popup navigation keymap.
 pub fn init(cx: &mut App) {
@@ -36,6 +47,16 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("down", PopupDown, Some(POPUP_CONTEXT)),
         KeyBinding::new("enter", PopupConfirm, Some(POPUP_CONTEXT)),
         KeyBinding::new("escape", PopupCancel, Some(POPUP_CONTEXT)),
+        KeyBinding::new(
+            "enter",
+            DropdownTriggerActivate,
+            Some(DROPDOWN_TRIGGER_CONTEXT),
+        ),
+        KeyBinding::new(
+            "space",
+            DropdownTriggerActivate,
+            Some(DROPDOWN_TRIGGER_CONTEXT),
+        ),
     ]);
 }
 
@@ -61,6 +82,9 @@ pub struct MenuItem {
     pub disabled: bool,
     /// Checked items draw a check mark on the right.
     pub checked: bool,
+    /// Whether activation toggles this item's checked state and keeps the
+    /// menu open for additional choices.
+    checkable: bool,
     /// Activated handler (runs on click/Enter).
     pub action: OptCallback,
 }
@@ -76,6 +100,7 @@ impl MenuItem {
             label: label.into(),
             disabled: false,
             checked: false,
+            checkable: false,
             action: Some(Rc::new(action)),
         }
     }
@@ -94,10 +119,19 @@ impl MenuItem {
         self
     }
 
-    /// Mark the item checked.
+    /// Set the item's visible checked state. This does not change dismissal
+    /// behavior; use [`Self::checkable`] for a persistent toggle.
     #[must_use]
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
+        self
+    }
+
+    /// Set whether activation toggles this item's checked state and keeps the
+    /// menu open for additional choices.
+    #[must_use]
+    pub fn checkable(mut self, checkable: bool) -> Self {
+        self.checkable = checkable;
         self
     }
 }
@@ -264,26 +298,41 @@ impl PopupMenuState {
         cx.notify();
     }
 
-    /// Activate the selected item: run its action and dismiss.
-    pub fn confirm_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Activate the selected item and report whether the popup should close.
+    /// Checkable choices flip their visible state and keep the popup open so
+    /// several choices can be changed in one pass.
+    pub fn confirm_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(ix) = self.selected else {
-            return;
+            return true;
         };
-        let action = match &self.items.get(ix) {
-            Some(MenuEntry::Item(item)) if !item.disabled => item.action.clone(),
-            _ => None,
+        let (action, checkable) = match self.items.get(ix) {
+            Some(MenuEntry::Item(item)) if !item.disabled => (item.action.clone(), item.checkable),
+            _ => return true,
         };
         if let Some(action) = action {
             action(window, cx);
+        }
+        if checkable {
+            if let Some(MenuEntry::Item(item)) = self.items.get_mut(ix) {
+                item.checked = !item.checked;
+            }
+            cx.notify();
+            false
+        } else {
+            true
         }
     }
 
     /// Dismiss the menu and restore the trigger focus (absorption 3.3-B).
     pub fn dismiss(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Notify the host first so dropdown/context-menu state stops mounting
+        // this popup, then restore its trigger as the final focus decision for
+        // this event. Restoring before `DismissEvent` lets the host's removal
+        // of the focused popup erase the trigger focus in the same frame.
+        cx.emit(DismissEvent);
         if let Some(handle) = &self.action_context {
             handle.focus(window);
         }
-        cx.emit(DismissEvent);
     }
 }
 
@@ -360,10 +409,11 @@ impl Render for PopupMenuState {
                 let state = state.clone();
                 move |_: &PopupConfirm, window, cx| {
                     state.update(cx, |state, cx| {
-                        state.confirm_selected(window, cx);
-                        // Desktop convention: choosing with Enter closes the
-                        // menu (the mouse path already confirms + dismisses).
-                        state.dismiss(window, cx);
+                        if state.confirm_selected(window, cx) {
+                            // Ordinary items close on Enter. Checkable items
+                            // remain available for additional choices.
+                            state.dismiss(window, cx);
+                        }
                     });
                 }
             })
@@ -438,8 +488,9 @@ impl Render for PopupMenuState {
                                     }
                                     state.update(cx, |state, cx| {
                                         state.selected = Some(ix);
-                                        state.confirm_selected(window, cx);
-                                        state.dismiss(window, cx);
+                                        if state.confirm_selected(window, cx) {
+                                            state.dismiss(window, cx);
+                                        }
                                     });
                                 }
                             })

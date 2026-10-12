@@ -1,9 +1,13 @@
 use super::help_support::render_help_overlay;
+use super::render_command_palette_at;
 use super::*;
+use crate::TuiSurfaceKind;
 use crate::demo_app;
+use crate::ui::frame_plan::{TuiFocusControl, TuiFocusOrder, TuiFocusPlan, TuiFocusTarget};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_application::CommandId;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::presentation::command_help;
 
@@ -19,6 +23,26 @@ fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
         .draw(|frame| render_help_overlay(frame, app, crate::TuiTheme::default(), frame.area()))
+        .expect("draw");
+    terminal.backend().to_string()
+}
+
+fn palette_frame_text(app: &TuiApp, width: u16, height: u16) -> String {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    set_language(Language::En);
+    let theme = crate::TuiTheme::default();
+    let popup = Rect::new(2, 1, width.saturating_sub(4), height.saturating_sub(2));
+    let focus = TuiFocusPlan {
+        target: TuiFocusTarget::LocalSurface(TuiSurfaceKind::CommandPalette),
+        order: TuiFocusOrder::None,
+        control: TuiFocusControl::Viewport,
+    };
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).expect("test terminal");
+    terminal
+        .draw(|frame| render_command_palette_at(frame, app, theme, focus, popup))
         .expect("draw");
     terminal.backend().to_string()
 }
@@ -50,16 +74,40 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
     assert!(shortcuts.contains(&"s"));
     assert!(shortcuts.contains(&"S"));
     // Every shared command except the explicitly-unbound commands is still
-    // represented, plus the five terminal-only bindings and the TUI-local
-    // overlay bindings.
+    // represented. OpenProperties is folded into the TUI's one contextual
+    // row-target line, followed by the local bindings.
     let shared_count = command_help()
         .into_iter()
-        .filter(|help| !crate::bindings::is_deliberately_unbound(help.command))
+        .filter(|help| {
+            !crate::bindings::is_deliberately_unbound(help.command)
+                && help.command != CommandId::OpenProperties
+        })
         .count();
     assert_eq!(
         rows.len(),
         shared_count + 5 + crate::command_palette::TUI_LOCAL_COMMANDS.len() + 2
     );
+}
+
+#[test]
+fn help_buffer_shows_one_contextual_enter_row_and_palette_omits_row_target() {
+    let mut app = demo_app();
+    app.toggle_help();
+    let help = frame_text(&app, 120, 36);
+    let enter_rows: Vec<&str> = help.lines().filter(|line| line.contains("Enter")).collect();
+    assert_eq!(enter_rows.len(), 1, "{help}");
+    assert!(
+        enter_rows[0].contains("Properties / actions"),
+        "the combined Enter row must remain readable on one physical line:\n{help}"
+    );
+
+    app.open_command_palette();
+    for character in "Enter".chars() {
+        app.palette_push_char(character);
+    }
+    let palette = palette_frame_text(&app, 120, 32);
+    assert!(palette.contains("Properties"), "{palette}");
+    assert!(!palette.contains("Properties / actions"), "{palette}");
 }
 
 #[test]

@@ -42,10 +42,11 @@ pub mod units;
 
 pub use alerts::{
     ALERT_EVENT_FILE_SCHEMA, ALERT_EVENT_FILE_VERSION, Alert, AlertEngine, AlertEvent,
-    AlertEventExportError, AlertEventKind, AlertMetric, AlertRule, AlertSeverity,
-    InsufficientReason, MAX_ALERT_EVENTS, RollingStatSnapshot,
-    SUGGESTION_CONFIDENCE_HIGH_MIN_SAMPLES, SUGGESTION_MIN_SAMPLES, SUGGESTION_SIGMA_K,
-    SuggestedThreshold, SuggestionBasis, SuggestionConfidence, export_alert_events_json,
+    AlertEventExportError, AlertEventId, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule,
+    AlertRuleId, AlertSeverity, AlertTargetIdentity, InsufficientReason, MAX_ALERT_EVENTS,
+    RollingStatSnapshot, SUGGESTION_CONFIDENCE_HIGH_MIN_SAMPLES, SUGGESTION_MIN_SAMPLES,
+    SUGGESTION_SIGMA_K, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
+    export_alert_events_json,
 };
 pub use appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 pub use cpu_codename::{CpuVendor, classify_cpu_codename};
@@ -155,10 +156,11 @@ pub use services::{
     detect_ordering_cycles, detect_requirement_cycles, is_ordering_acyclic, is_requirement_acyclic,
     service_exit_status_label,
 };
-pub use session::{SessionControlAction, SessionItem};
+pub use session::{SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem};
 pub use setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 pub use smart::self_test::{
-    SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestCapabilities, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,
+    SmartSelfTestReport, SmartSelfTestSupport,
 };
 pub use smart::{AtaSmartAttribute, DiskSmart, SmartProviderFailureKind};
 pub use source::{SourceOutcome, SourceStatus};

@@ -1,10 +1,17 @@
 use super::*;
 use crate::core::alerts::{AlertMetric, AlertSeverity};
+use crate::core::{DeviceGeneration, DeviceId};
 
 fn alert(instance: &str, severity: AlertSeverity) -> Alert {
     Alert {
-        instance_id: instance.to_owned(),
-        rule_id: "r".to_owned(),
+        instance_id: AlertInstanceId::new(
+            "r".into(),
+            AlertTargetIdentity::Storage {
+                device_id: DeviceId::new(instance),
+                generation: DeviceGeneration::INITIAL,
+            },
+        ),
+        rule_id: "r".into(),
         target: "t".to_owned(),
         metric: AlertMetric::CpuUsagePercent,
         severity,
@@ -162,6 +169,8 @@ fn cooldown_history_retires_instances_that_can_no_longer_affect_a_verdict() {
         gate.last_notified_ms.len() <= 11,
         "only identities inside the cooldown window may remain tracked"
     );
-    assert!(!gate.last_notified_ms.contains_key("device-1"));
-    assert!(gate.last_notified_ms.contains_key("device-100"));
+    let expired = alert("device-1", AlertSeverity::Info);
+    let retained = alert("device-100", AlertSeverity::Info);
+    assert!(!gate.last_notified_ms.contains_key(&expired.instance_id));
+    assert!(gate.last_notified_ms.contains_key(&retained.instance_id));
 }

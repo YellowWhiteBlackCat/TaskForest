@@ -63,6 +63,8 @@ MANAGER_DESTINATIONS = (
     "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy",
     "/usr/libexec/taskforest-process-control-helper",
     "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy",
+    "/usr/libexec/taskforest-smart-self-test-helper",
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy",
 )
 PROVIDER_SEPARATOR = " or "
 COMMON_DEB_PROVIDER = "packaging/debian/build-deb-common.sh"

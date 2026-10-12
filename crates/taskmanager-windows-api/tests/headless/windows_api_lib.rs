@@ -32,7 +32,19 @@ fn native_queries_are_typed_unsupported_off_windows() {
         Err(WindowsApiError::Unsupported)
     );
     assert_eq!(enumerate_sessions(), Err(WindowsApiError::Unsupported));
-    assert_eq!(logoff_session(1), Err(WindowsApiError::Unsupported));
+    let session_identity = WindowsSessionIdentity::new(
+        1,
+        WindowsSessionIncarnation::new(1).expect("nonzero fixture token"),
+    )
+    .expect("nonzero fixture session");
+    assert_eq!(
+        logoff_session(session_identity),
+        Err(WindowsApiError::Unsupported)
+    );
+    assert_eq!(
+        lock_current_session(session_identity),
+        Err(WindowsApiError::Unsupported)
+    );
     assert_eq!(processor_topology(), Err(WindowsApiError::Unsupported));
     assert_eq!(
         enumerate_network_adapters(),

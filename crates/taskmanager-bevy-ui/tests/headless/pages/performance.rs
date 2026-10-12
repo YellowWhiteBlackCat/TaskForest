@@ -18,6 +18,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -76,7 +77,9 @@ use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
 use taskmanager_core::core::DeviceGeneration;
 use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
+};
 use taskmanager_platform_contract::RequestEnvelope;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::presentation::trend::window;
@@ -535,7 +538,7 @@ pub(super) fn headless_perf_app() -> App {
     app.add_plugins(HeadlessFrontendPlugins);
     app.add_plugins(FrontendWindowPlugin {
         runtime: scripted_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.init_resource::<Assets<Font>>();
     app
@@ -605,7 +608,7 @@ fn content_spawns_from_a_cold_context_with_strip_markers() {
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
     app.init_resource::<Assets<Font>>();
     let shell = ShellApp::new();
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let history = crate::pages::history::HistoryProjectionResource::default();
     let context = PageContext {
         sidebar: &Default::default(),
@@ -718,7 +721,7 @@ fn metric_selector_activation_promotes_one_bsn_card_in_place() {
         "the unselected card stays mounted but leaves the compact viewport"
     );
 
-    let expected_active = ui_palette(&Theme::dark()).nav_active_bg;
+    let expected_active = ui_palette(&Theme::dark(), UiSize::Standard).nav_active_bg;
     let memory_fill = {
         let world = app.world_mut();
         let mut buttons = world.query::<(&PerformanceFocusButton, &BackgroundColor)>();
@@ -766,7 +769,7 @@ fn compact_device_activation_updates_local_state_and_shared_curve_focus() {
         "top-level device activation reuses the existing curve focus authority"
     );
 
-    let expected_active = ui_palette(&Theme::dark()).nav_active_bg;
+    let expected_active = ui_palette(&Theme::dark(), UiSize::Standard).nav_active_bg;
     let memory_fill = {
         let world = app.world_mut();
         let mut buttons = world.query::<(&PerformanceDeviceButton, &BackgroundColor)>();
@@ -797,7 +800,7 @@ fn performance_controls_paint_hover_pressed_and_selected_tokens() {
             .map(|(entity, _)| entity)
             .expect("the memory curve selector is mounted as a button")
     };
-    let palette = ui_palette(&Theme::dark());
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
 
     app.world_mut()
         .entity_mut(memory_button)
@@ -1044,6 +1047,10 @@ fn smart_self_test_request_arms_confirmation_and_confirm_emits_effect() {
     disk.name = "nvme0n1".to_owned();
     disk.model = "Samsung SSD 980 Pro".to_owned();
     disk.device_generation = DeviceGeneration::new(2);
+    disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+        short: SmartSelfTestSupport::Supported,
+        ..Default::default()
+    };
 
     let snapshot = SystemSnapshot {
         disks: vec![disk],
@@ -1094,6 +1101,10 @@ fn key_t_on_performance_page_arms_smart_self_test_for_disk() {
     disk.name = "nvme0n1".to_owned();
     disk.model = "Fast NVMe".to_owned();
     disk.device_generation = DeviceGeneration::new(1);
+    disk.smart_self_test_capabilities = SmartSelfTestCapabilities {
+        short: SmartSelfTestSupport::Supported,
+        ..Default::default()
+    };
 
     let snapshot = SystemSnapshot {
         disks: vec![disk],

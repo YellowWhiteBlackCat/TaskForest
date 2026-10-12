@@ -7,6 +7,8 @@
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
 use std::rc::Rc;
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 // Shared locale catalog for the Users-page body chrome (column headers, action
 // buttons, Yes/No) that was previously hard-coded English.
 use taskmanager_application::RefreshRequest;
@@ -27,10 +29,7 @@ use super::tables::{
 };
 use super::tables::{ListState, message_panel, source_notice_banner, source_state_panel};
 use super::virtual_list::{ColumnWidth, TableColumn};
-use super::{
-    VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
-    virtual_table_key, virtual_table_row,
-};
+use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 use taskmanager_application::AppPage;
 use taskmanager_shell::InfoSortCol;
 use taskmanager_shell::InfoTable;
@@ -154,82 +153,40 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let body_rows = Rc::clone(&rows);
             let body_open_menu = open_menu_session.clone();
             let columns = users_columns();
-            let table_body = iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
-                let rows = Rc::clone(&body_rows);
-                let open_menu_session = body_open_menu.clone();
+            let row_style = UserRowStyle {
+                table_theme,
+                columns,
+                row_padding,
+                compact,
+            };
+            let table_body = if body_open_menu.is_some() {
+                // Iced's Lazy overlay adapter does not forward widget
+                // operations from nested overlays. Keep the bounded Users
+                // window direct while its row menu is open so the focus
+                // request can reach the menu's actual action target.
                 virtual_table_body(window, Length::Fill, move |start, end| {
-                    rows.get(start..end)
-                        .unwrap_or(&[])
-                        .iter()
-                        .enumerate()
-                        .map(|(offset, session)| {
-                            let index = start + offset;
-                            let is_selected = index == selected;
-                            let zebra = crate::theme::zebra_index(index);
-                            let remote_cell: Element<
-                                'static,
-                                Message,
-                                iced::Theme,
-                                iced::Renderer,
-                            > = {
-                                let mut cell = text(remote_text(session.remote))
-                                    .width(columns.remote.length());
-                                if session.remote {
-                                    cell = cell.color(crate::theme_binding::color(
-                                        table_theme.palette().accent,
-                                    ));
-                                }
-                                cell.into()
-                            };
-                            let row = row![
-                                text(session.id.to_string()).width(columns.session.length()),
-                                text(session.user.clone()).width(columns.name.length()),
-                                text(optional_text(session.seat.as_deref()))
-                                    .width(columns.seat.length()),
-                                text(optional_text(session.tty.as_deref()))
-                                    .width(columns.tty.length()),
-                                remote_cell,
-                                text(optional_text(session.timestamp.as_deref()))
-                                    .width(columns.logon.length()),
-                            ]
-                            .spacing(8)
-                            .padding(row_padding)
-                            .width(Length::Fill);
-                            let row = focus::selectable_row_with_menu(
-                                &table_theme,
-                                AppPage::Users,
-                                index,
-                                container(row)
-                                    .style(move |_| {
-                                        theme::row_style(&table_theme, is_selected, zebra)
-                                    })
-                                    .width(Length::Fill)
-                                    .into(),
-                                Message::OpenUserRowMenu(index),
-                            );
-                            let row = if open_menu_session.as_deref() == Some(session.id.as_str()) {
-                                // The open menu floats on its own row: anchored
-                                // by the popover primitive and dismissed by an
-                                // outside press without touching what's below.
-                                let panel = user_menu_panel(table_theme, session.id.to_string());
-                                crate::ui::components::Popover::new(
-                                    row,
-                                    panel,
-                                    Message::CloseUserRowMenu,
-                                )
-                                .into()
-                            } else {
-                                row
-                            };
-                            virtual_table_row(row, inventory_row_height(compact))
-                        })
-                        .collect()
+                    user_rows_in_window(body_rows, body_open_menu, start..end, selected, row_style)
                 })
-            });
+            } else {
+                iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
+                    let rows = Rc::clone(&body_rows);
+                    let open_menu_session = body_open_menu.clone();
+                    virtual_table_body(window, Length::Fill, move |start, end| {
+                        user_rows_in_window(
+                            rows,
+                            open_menu_session,
+                            start..end,
+                            selected,
+                            row_style,
+                        )
+                    })
+                })
+                .into()
+            };
             let table = virtual_table(
                 app.users_scroll_id(),
                 header.into(),
-                table_body.into(),
+                table_body,
                 Length::Fill,
                 iced::widget::scrollable::Direction::Vertical(
                     iced::widget::scrollable::Scrollbar::default(),
@@ -263,10 +220,80 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     .into()
 }
 
+/// Build the visible Users rows for one bounded virtual window.
+#[derive(Clone, Copy)]
+struct UserRowStyle {
+    table_theme: Theme,
+    columns: UsersColumns,
+    row_padding: iced::Padding,
+    compact: bool,
+}
+
+fn user_rows_in_window(
+    rows: Rc<Vec<UserRow>>,
+    open_menu_session: Option<String>,
+    window: std::ops::Range<usize>,
+    selected: usize,
+    style: UserRowStyle,
+) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
+    let UserRowStyle {
+        table_theme,
+        columns,
+        row_padding,
+        compact,
+    } = style;
+    rows.get(window.start..window.end)
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+        .map(|(offset, session)| {
+            let index = window.start + offset;
+            let is_selected = index == selected;
+            let zebra = crate::theme::zebra_index(index);
+            let remote_cell: Element<'static, Message, iced::Theme, iced::Renderer> = {
+                let mut cell = text(remote_text(session.remote)).width(columns.remote.length());
+                if session.remote {
+                    cell = cell.color(crate::theme_binding::color(table_theme.palette().accent));
+                }
+                cell.into()
+            };
+            let row = row![
+                text(session.id.to_string()).width(columns.session.length()),
+                text(session.user.clone()).width(columns.name.length()),
+                text(optional_text(session.seat.as_deref())).width(columns.seat.length()),
+                text(optional_text(session.tty.as_deref())).width(columns.tty.length()),
+                remote_cell,
+                text(optional_text(session.timestamp.as_deref())).width(columns.logon.length()),
+            ]
+            .spacing(8)
+            .padding(row_padding)
+            .width(Length::Fill);
+            let row = focus::selectable_row_with_menu(
+                &table_theme,
+                AppPage::Users,
+                index,
+                container(row)
+                    .style(move |_| theme::row_style(&table_theme, is_selected, zebra))
+                    .width(Length::Fill)
+                    .into(),
+                Message::OpenUserRowMenu(index),
+            );
+            let row = if open_menu_session.as_deref() == Some(session.id.as_str()) {
+                // The open menu floats on its own row: anchored by the
+                // popover primitive and dismissed by an outside press.
+                let panel = user_menu_panel(table_theme, session.id.to_string());
+                crate::ui::components::Popover::new(row, panel, Message::CloseUserRowMenu).into()
+            } else {
+                row
+            };
+            virtual_table_row(row, inventory_row_height(compact))
+        })
+        .collect()
+}
+
 /// The floating Users-row context menu panel (Disconnect / Lock, GPUI
 /// parity). Mounted by the popover primitive on the row that opened it; each
-/// entry routes through the same shared session-control path as the
-/// action-bar buttons. Self-owned so the row's lazy body can retain it.
+/// entry arms the shared confirmation from that menu's frozen session.
 fn user_menu_panel(
     theme_snapshot: Theme,
     session_id: String,
@@ -282,14 +309,14 @@ fn user_menu_panel(
                     theme_snapshot,
                     FocusTarget::UserRowMenuDisconnect,
                     t("users.disconnect").to_string(),
-                    Message::RequestSessionControl(SessionControlAction::Disconnect),
+                    Message::RequestUserRowSessionControl(SessionControlAction::Disconnect),
                     false,
                 ),
                 focus::dynamic_button_owned(
                     theme_snapshot,
                     FocusTarget::UserRowMenuLock,
                     t("users.lock").to_string(),
-                    Message::RequestSessionControl(SessionControlAction::Lock),
+                    Message::RequestUserRowSessionControl(SessionControlAction::Lock),
                     false,
                 ),
                 focus::dynamic_button_owned(
@@ -315,6 +342,47 @@ fn session_action_bar<'a>(
     shell: &ShellApp,
     rows: &[UserRow],
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    if let Some(pending) = shell.pending_session() {
+        let action = match pending.action {
+            SessionControlAction::Disconnect => t("users.disconnect"),
+            SessionControlAction::Lock => t("users.lock"),
+        };
+        let prompt = format!(
+            "{} session {} ({})?",
+            action, pending.session.id, pending.session.user
+        );
+        return row![
+            text(prompt)
+                .size(f32::from(tokens::FONT_12))
+                .color(theme::muted_text_color(theme_snapshot))
+                .width(Length::Fill),
+            focus::button(
+                theme_snapshot,
+                FocusTarget::ConfirmSessionControl,
+                t("common.confirm"),
+                Message::ConfirmSessionControl,
+                false,
+            ),
+            focus::button(
+                theme_snapshot,
+                FocusTarget::CancelSessionControl,
+                t("common.cancel"),
+                Message::CancelSessionControl,
+                false,
+            ),
+            focus::button(
+                theme_snapshot,
+                FocusTarget::CloseSessionControl,
+                t("chrome.close"),
+                Message::CloseSessionControl,
+                false,
+            ),
+        ]
+        .spacing(8)
+        .padding(4)
+        .into();
+    }
+
     let enabled = rows.get(shell.selected).is_some();
     let selected = rows.get(shell.selected).map_or_else(
         || t("hint.select_session").to_string(),
@@ -384,11 +452,11 @@ fn session_feedback_line<'a>(
     let text_value = match detail {
         Some(detail) => t("feedback.action_failed_detail")
             .replace("{action}", action)
-            .replace("{target}", outcome.session_id.as_str())
+            .replace("{target}", outcome.identity.session_id.as_str())
             .replace("{detail}", detail),
-        None => t("feedback.action_succeeded")
+        None => t("feedback.session_request_accepted")
             .replace("{action}", action)
-            .replace("{target}", outcome.session_id.as_str()),
+            .replace("{target}", outcome.identity.session_id.as_str()),
     };
     let color = match outcome.result {
         Ok(()) => crate::theme_binding::color(theme_snapshot.palette().success),

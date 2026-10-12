@@ -8,17 +8,18 @@ use taskmanager_application::i18n::{Language, set_language};
 
 #[test]
 fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports() {
-    use crate::demo::apply_capture_scene_override;
+    use crate::demo::capture_overrides::apply_capture_scene_override;
     let mut app = demo_app();
     apply_capture_scene_override(&mut app, "active-alert");
     assert!(app.health_open());
     let alert = app
         .shell
         .projection()
-        .alert_active
+        .alert_center
+        .active_alerts()
         .first()
         .expect("evaluated CPU alert");
-    assert_eq!(alert.rule_id, "cpu-high");
+    assert_eq!(alert.rule_id.as_str(), "cpu-high");
     assert_eq!(alert.value, 94.0);
     assert_eq!(alert.threshold, 90.0);
     for (width, height) in [(120, 36), (54, 16)] {
@@ -33,7 +34,7 @@ fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports()
 fn battery_capture_contains_measured_charge_power_voltage_and_history() {
     for scene in ["battery-fan-performance", "battery-live-performance"] {
         let mut app = demo_app();
-        crate::demo::apply_capture_scene_override(&mut app, scene);
+        crate::demo::capture_overrides::apply_capture_scene_override(&mut app, scene);
         let power = app
             .projection()
             .power_supplies
@@ -68,7 +69,7 @@ fn smart_capture_keeps_failed_source_guidance_visible_at_both_sizes() {
         ("smart-permission", "Grant device access"),
     ] {
         let mut app = demo_app();
-        crate::demo::apply_capture_scene_override(&mut app, scene);
+        crate::demo::capture_overrides::apply_capture_scene_override(&mut app, scene);
         for (width, height) in [(120, 36), (54, 16)] {
             let text = review_frame(&app, width, height);
             assert!(text.contains(guidance), "{scene} {width}x{height}: {text}");
@@ -79,7 +80,10 @@ fn smart_capture_keeps_failed_source_guidance_visible_at_both_sizes() {
 #[test]
 fn failed_startup_units_are_visible_as_a_complete_group_at_both_sizes() {
     let mut app = demo_app();
-    crate::demo::apply_capture_scene_override(&mut app, "startup-failure-evidence");
+    crate::demo::capture_overrides::apply_capture_scene_override(
+        &mut app,
+        "startup-failure-evidence",
+    );
     for (width, height) in [(120, 36), (54, 16)] {
         let text = review_frame(&app, width, height);
         for unit in [
@@ -103,7 +107,7 @@ fn hotplug_capture_adds_a_generation_bound_device_and_keeps_old_inventory() {
         .disks[0]
         .device_id
         .clone();
-    crate::demo::apply_capture_scene_override(&mut app, "device-hotplug");
+    crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "device-hotplug");
     let disks = &app
         .projection()
         .snapshot
@@ -134,7 +138,7 @@ fn hotplug_capture_adds_a_generation_bound_device_and_keeps_old_inventory() {
 
 #[test]
 fn settings_capture_scenes_use_the_normal_keyboard_form_and_reveal_the_requested_row() {
-    use crate::demo::apply_capture_scene_override;
+    use crate::demo::capture_overrides::apply_capture_scene_override;
     for (scene, field, label) in [
         ("settings-zero-gray", 24, "Gray out zero"),
         ("settings-switch-focus", 2, "High contrast"),
@@ -194,7 +198,7 @@ fn about_reviews_application_metadata_and_keeps_system_information_separate() {
 
 #[test]
 fn capture_scene_overrides_activate_expected_state() {
-    use crate::demo::apply_capture_scene_override;
+    use crate::demo::capture_overrides::apply_capture_scene_override;
     use taskmanager_application::{AppPage, ConfirmationKind};
 
     let mut app = demo_app();

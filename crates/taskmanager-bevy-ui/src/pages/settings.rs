@@ -54,6 +54,7 @@ use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInte
 use taskmanager_core::config::Config;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
+use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
@@ -67,7 +68,9 @@ use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::appearance::PreferredColorScheme;
 
 mod choices;
-use choices::{capacity_entries, language_entries, refresh_entries, theme_entries};
+use choices::{
+    capacity_entries, language_entries, refresh_entries, theme_entries, ui_size_entries,
+};
 
 mod privilege_center;
 use privilege_center::privileges_section_scene;
@@ -132,6 +135,9 @@ pub(crate) struct ThemePreferences {
     /// Explicit skin choice, or `None` to follow default GNOME skin.
     pub(crate) skin: Option<Skin>,
     pub(crate) hc: bool,
+    /// UI-size axis for the rem type ladder; `Standard` until the persisted
+    /// config (or a settings choice) resolves another step.
+    pub(crate) ui_size: UiSize,
     pub(crate) observed_appearance: Option<DesktopAppearance>,
 }
 
@@ -214,6 +220,7 @@ pub(crate) enum SettingsField {
     HistoryCapacity(usize),
     HistoryPersistence(bool),
     GrayZeroValues(bool),
+    UiSize(UiSize),
     #[default]
     PauseTelemetry,
 }
@@ -279,6 +286,7 @@ pub(crate) fn apply_persisted_config(
         }
 
         prefs.hc = config.hc;
+        prefs.ui_size = UiSize::from_config_token(&config.ui_size);
         apply_preferences(prefs, palette, clear);
     }
 
@@ -465,6 +473,25 @@ fn settings_choice_observer(
                 cfg.gray_zero_values = enabled;
             });
         }
+        SettingsField::UiSize(size) => {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
+                prefs.ui_size = size;
+                apply_preferences(
+                    prefs,
+                    &mut appearance.palette,
+                    appearance.clear.as_deref_mut(),
+                );
+            } else {
+                // Headless composition (no settings plugin): re-resolve from
+                // the live palette's mode, the same simplification the theme
+                // row makes through `apply_theme`.
+                let mode = palette_mode(&appearance.palette.inner).unwrap_or(LightDark::Dark);
+                appearance.palette.inner = ui_palette(&theme_for_mode(mode), size);
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.ui_size = size.config_token().to_string();
+            });
+        }
         SettingsField::PauseTelemetry => {
             // Guarded so a repeated activation is a no-op, not a double flip.
             if track.shell.paused() != change.event().value {
@@ -482,7 +509,7 @@ pub(crate) fn apply_preferences(
     clear: Option<&mut ClearColor>,
 ) {
     let theme = prefs.resolve_theme();
-    palette.inner = ui_palette(&theme);
+    palette.inner = ui_palette(&theme, prefs.ui_size);
     if let Some(clear) = clear {
         clear.0 = palette.inner.window_clear;
     }
@@ -492,7 +519,7 @@ pub(crate) fn apply_preferences(
 /// camera clear color is absent in the headless composition and stays
 /// untouched there.
 fn apply_theme(mode: LightDark, palette: &mut WindowPalette, clear: Option<&mut ClearColor>) {
-    palette.inner = ui_palette(&theme_for_mode(mode));
+    palette.inner = ui_palette(&theme_for_mode(mode), UiSize::Standard);
     if let Some(clear) = clear {
         clear.0 = palette.inner.window_clear;
     }
@@ -548,6 +575,11 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             },
         ),
         radio_row(
+            "UI size",
+            ui_size_entries(context.palette.ui_size),
+            context.palette.ui_size.config_token(),
+        ),
+        radio_row(
             "Refresh interval",
             refresh_entries(interval),
             &format!(
@@ -591,7 +623,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+            Node { min_height: px(context.palette.control_height_px() + space_8()), flex_shrink: 0.0 }
             SettingsHeading
             Children [ Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ] --
             Node {
@@ -603,7 +635,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             SettingsBody
             Children [ { rows } ] --
 
-                Node { min_height: px(context.palette.control_height_px + space_8()), flex_shrink: 0.0 }
+                Node { min_height: px(context.palette.control_height_px() + space_8()), flex_shrink: 0.0 }
                 SettingsFooter
                 Children [
                     Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")

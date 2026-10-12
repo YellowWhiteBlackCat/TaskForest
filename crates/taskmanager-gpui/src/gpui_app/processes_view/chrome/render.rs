@@ -66,6 +66,8 @@ pub struct ProcessesViewProps<'a> {
     pub swap_auto_hidden: bool,
     pub batch_history_available: bool,
     pub col_widths: &'a HashMap<SortCol, Pixels>,
+    /// Stable per-column focus handles owned by the window-local process state.
+    pub resize_focus_handles: &'a HashMap<SortCol, gpui::FocusHandle>,
     /// The actual page-content width after navigation rail and page padding.
     /// The horizontal content extent is derived from this viewport and the
     /// live column widths, so a resize never leaves a stale scroll range.
@@ -166,6 +168,7 @@ pub fn render_processes(
         swap_auto_hidden,
         batch_history_available,
         col_widths,
+        resize_focus_handles,
         viewport_width,
         processes_scroll,
         horizontal_scroll,
@@ -224,6 +227,7 @@ pub fn render_processes(
                 ui_size,
                 hidden_cols: &render_hidden_cols,
                 col_widths,
+                resize_focus_handles,
                 name_width,
                 column_cursor,
             })

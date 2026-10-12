@@ -13,6 +13,8 @@ use taskmanager_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupImpact,
     StartupImpactEvidence, StartupScope, StartupSource,
 };
+use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp};
@@ -23,10 +25,7 @@ use super::tables::{
     message_panel, plain_header_cell, source_notice_banner, source_state_panel,
 };
 use super::virtual_list::{ColumnWidth, TableColumn};
-use super::{
-    VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
-    virtual_table_key, virtual_table_row,
-};
+use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};

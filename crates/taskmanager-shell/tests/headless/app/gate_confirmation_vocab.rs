@@ -9,7 +9,7 @@ use super::super::*;
 use taskmanager_application::AppAction;
 use taskmanager_core::core::process::ProcessBatchAction;
 use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 
 #[test]
 fn armed_service_gate_confirms_and_dismisses_through_handle_local_char() {
@@ -71,7 +71,14 @@ fn armed_batch_gate_confirms_and_dismisses_through_handle_local_char() {
 #[test]
 fn armed_session_gate_confirms_and_dismisses_through_handle_local_char() {
     let mut app = crate::demo_app();
-    let session = app.data.sessions.as_ref().expect("demo sessions")[0].clone();
+    let session = SessionItem {
+        id: "windows:session:fixture".into(),
+        incarnation: Some(SessionIncarnation::WindowsWts {
+            logon_time_100ns: 1,
+        }),
+        ..SessionItem::default()
+    };
+    app.data.sessions = Some(vec![session.clone()]);
     assert!(app.select_session_control(&session, SessionControlAction::Lock));
     assert!(app.pending_session().is_some());
 
@@ -90,7 +97,10 @@ fn armed_session_gate_confirms_and_dismisses_through_handle_local_char() {
     let PlatformEffect::SessionControl(target) = *effect else {
         panic!("the session gate emitted the wrong platform effect");
     };
-    assert_eq!(target.session_id.as_str(), session.id.as_str());
+    assert_eq!(
+        target.identity,
+        session.identity().expect("trusted session identity")
+    );
     assert!(app.pending_session().is_none());
 }
 

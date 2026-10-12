@@ -36,12 +36,17 @@ esac
 
 skip_build=0
 out_dir=""
+pair_id="standalone"
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --skip-build) skip_build=1 ;;
     --out)
         shift
         out_dir="${1:-}"
+        ;;
+    --pair-id)
+        shift
+        pair_id="${1:-}"
         ;;
     *)
         echo "unknown argument '$1'" >&2
@@ -50,12 +55,16 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+if [[ ! "$pair_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+    echo "invalid --pair-id '$pair_id'" >&2
+    exit 2
+fi
 
 if ! timeout 5s python3 --version >/dev/null 2>&1; then
     echo "Python 3 interpreter is unavailable" >&2
     exit 2
 fi
-for command in cargo git sha256sum timeout; do
+for command in cargo git rustc sha256sum timeout; do
     if ! command -v "$command" >/dev/null 2>&1; then
         echo "required command is unavailable: $command" >&2
         exit 2
@@ -67,6 +76,7 @@ export CARGO_BUILD_JOBS
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 head="$(git rev-parse --short=12 HEAD 2>/dev/null || echo no-git)"
+rust="$(rustc -V)"
 if [ -n "$(git status --porcelain)" ]; then
     worktree=dirty
 else
@@ -89,6 +99,18 @@ if [ ! -x "$binary" ]; then
     exit 2
 fi
 
+# Bind the capture to the exact product inputs used by the Iced companion
+# route. Both applications start on Performance/CPU and inherit the same
+# explicit TM_SKIN / TM_SKIN_HC settings; the frame dimensions below are the
+# actual compositor output dimensions.
+source_manifest="$out_dir/source-manifest.tsv"
+timeout --kill-after=10s 60 python3 scripts/frontend_source_manifest.py \
+    --frontend gpui --repo-root "$repo" --output "$source_manifest" || exit 2
+source_manifest_sha256="$(sha256sum "$source_manifest" | awk '{print $1}')"
+binary_sha256="$(sha256sum "$binary" | awk '{print $1}')"
+theme="${TM_SKIN:-native-default}"
+high_contrast="${TM_SKIN_HC:-0}"
+
 # The app opens a real window on the desktop and exits after the capture.
 timeout --kill-after=10s 60 "$binary" --capture-window "$out_dir"
 app_rc=$?
@@ -101,6 +123,12 @@ png="$out_dir/capture.png"
 metadata="$out_dir/capture-metadata.txt"
 [ -f "$png" ] || { echo "capture-windows: missing $png" >&2; exit 2; }
 [ -f "$metadata" ] || { echo "capture-windows: missing $metadata" >&2; exit 2; }
+window_size="$(awk -F= '$1 == "window_size" { print $2; exit }' "$metadata")"
+png_sha256="$(awk -F= '$1 == "png_sha256" { print $2; exit }' "$metadata")"
+if [[ ! "$window_size" =~ ^[0-9]+x[0-9]+$ || ! "$png_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "capture-windows: metadata has invalid window size or PNG hash" >&2
+    exit 2
+fi
 
 # PNG signature + non-blank content + sha256 consistency.
 timeout --kill-after=10s 60 python3 - "$out_dir" <<'PY'
@@ -150,6 +178,20 @@ command=bash scripts/capture-windows.sh
 timestamp=$stamp
 git_head=$head
 worktree=$worktree
+rust=$rust
+frontend=gpui
+target=windows
+scenario=performance-cpu
+pair_id=$pair_id
+theme=$theme
+high_contrast=$high_contrast
+requested_window_size=1180x780
+window_size=$window_size
+png_sha256=$png_sha256
+binary=target/debug/taskforest-g.exe
+binary_sha256=$binary_sha256
+source_manifest=source-manifest.tsv
+source_manifest_sha256=$source_manifest_sha256
 app_exit=$app_rc
 host=$(hostname 2>/dev/null || echo unknown)
 capture_api=windows.graphics.capture (windows-capture)

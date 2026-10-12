@@ -154,9 +154,23 @@ def content_violations(root: Path, files: list[Path]) -> list[str]:
     return findings
 
 
-def history_violations(root: Path) -> list[str]:
+def history_violations(root: Path, since_ref: str | None = None) -> list[str]:
     findings: list[str] = []
-    for item in git_lines(root, "rev-list", "--objects", "--all"):
+    if since_ref is None:
+        object_range = ["--all"]
+        log_range: list[str] = []
+    else:
+        ancestor = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", since_ref, "HEAD"],
+            capture_output=True,
+            timeout=30,
+        )
+        if ancestor.returncode != 0:
+            return [f"history baseline is not an ancestor of HEAD: {since_ref}"]
+        object_range = [f"{since_ref}..HEAD"]
+        log_range = [f"{since_ref}..HEAD"]
+
+    for item in git_lines(root, "rev-list", "--objects", *object_range):
         _, _, name = item.partition(" ")
         normalized = name.replace("\\", "/")
         if normalized == "docs/screenshots/README.md":
@@ -168,7 +182,10 @@ def history_violations(root: Path) -> list[str]:
 
     emails = {
         line.strip().lower()
-        for line in git_lines(root, "log", "--all", "--format=%ae%n%ce")
+        for line in git_lines(
+            root, "log", *(["--all"] if since_ref is None else []),
+            "--format=%ae%n%ce", *log_range
+        )
         if line.strip()
     }
     if any(not allowed_email(address) for address in emails):
@@ -176,11 +193,13 @@ def history_violations(root: Path) -> list[str]:
     return findings
 
 
-def validate(root: Path, include_history: bool) -> list[str]:
+def validate(
+    root: Path, include_history: bool, history_since: str | None = None
+) -> list[str]:
     files = current_tracked_files(root)
     findings = path_violations(root, files) + content_violations(root, files)
-    if include_history:
-        findings.extend(history_violations(root))
+    if include_history or history_since is not None:
+        findings.extend(history_violations(root, history_since))
     return findings
 
 
@@ -205,22 +224,53 @@ def self_test() -> None:
         unit = root / "device@.service"
         unit.write_text("after=network.target\n", encoding="utf-8")
         assert content_violations(root, [unit]) == []
+    with tempfile.TemporaryDirectory(prefix="public-repo-history-guard-") as directory:
+        root = Path(directory)
+
+        def run_git(*arguments: str) -> None:
+            subprocess.run(
+                ["git", "-C", str(root), *arguments], check=True, timeout=30
+            )
+
+        run_git("init", "-q")
+        run_git("config", "user.name", "Public Guard Test")
+        run_git("config", "user.email", "noreply@github.com")
+        private_doc = root / "docs/TODO.md"
+        private_doc.parent.mkdir()
+        private_doc.write_text("old private ledger\n", encoding="utf-8")
+        run_git("add", "docs/TODO.md")
+        run_git("commit", "-qm", "old baseline")
+        run_git("tag", "baseline")
+        private_doc.unlink()
+        run_git("add", "-u")
+        run_git("commit", "-qm", "remove old private doc")
+        assert history_violations(root)
+        assert history_violations(root, "baseline") == []
+        private_doc.write_text("new private ledger\n", encoding="utf-8")
+        run_git("add", "docs/TODO.md")
+        run_git("commit", "-qm", "add new private doc")
+        private_doc.unlink()
+        run_git("add", "-u")
+        run_git("commit", "-qm", "remove new private doc")
+        assert history_violations(root, "baseline")
     print("public-repo-guard self-test: PASS")
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--history", action="store_true")
+    history = parser.add_mutually_exclusive_group()
+    history.add_argument("--history", action="store_true")
+    history.add_argument("--history-since", metavar="REF")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
     if args.self_test:
         self_test()
         return 0
-    findings = validate(args.repo_root.resolve(), args.history)
+    findings = validate(args.repo_root.resolve(), args.history, args.history_since)
     for finding in findings:
         print(f"public repository violation: {finding}")
-    mode = " + history" if args.history else ""
+    mode = " + history" if args.history else (f" + history since {args.history_since}" if args.history_since else "")
     print(f"public-repo-guard{mode}: {'FAIL' if findings else 'PASS'} ({len(findings)} finding(s))")
     return 1 if findings else 0
 

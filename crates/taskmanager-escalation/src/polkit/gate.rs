@@ -25,6 +25,7 @@ impl PrivilegeGate for PolkitGate {
             EscalationFeature::MemorySmbios => probe_smbios_helper(),
             EscalationFeature::PackagePowerRapl => probe_rapl_helper(),
             EscalationFeature::CpuMsr => probe_msr_helper(),
+            EscalationFeature::StorageSelfTest => probe_storage_self_test_helper(),
             // Features without an operational helper stay on the honest
             // unprivileged default rather than claiming a helper we lack.
             other => EscalationAvailability::RequiresEscalation(other),
@@ -97,6 +98,28 @@ const RAPL_ACTION_INSTALLED: &str =
 #[cfg(target_os = "linux")]
 const MSR_ACTION_INSTALLED: &str =
     "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy";
+
+#[cfg(target_os = "linux")]
+const SMART_SELF_TEST_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy";
+
+#[cfg(target_os = "linux")]
+fn probe_storage_self_test_helper() -> EscalationAvailability {
+    probe_installed_crossing_at(
+        EscalationFeature::StorageSelfTest,
+        pkexec_location(),
+        std::path::Path::new(SMART_SELF_TEST_ACTION_INSTALLED),
+        std::path::Path::new(super::smart_self_test::SMART_SELF_TEST_HELPER_PATH),
+        0,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn probe_storage_self_test_helper() -> EscalationAvailability {
+    EscalationAvailability::Denied {
+        reason: EscalationDenialReason::Unsupported,
+    }
+}
 
 #[cfg(target_os = "linux")]
 fn probe_net_launcher() -> EscalationAvailability {

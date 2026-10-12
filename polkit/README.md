@@ -4,7 +4,7 @@ This directory ships the polkit authorization policies for TaskForest's
 per-feature privilege-escalation helpers (ADR-023; [`../docs/PERMISSION_MODEL.md`](../docs/PERMISSION_MODEL.md)
 Boundary 2).
 
-It authorizes **six** privileged operations, each behind its own action + helper
+It authorizes **seven** privileged operations, each behind its own action + helper
 binary so the privileged attack surface stays one-feature/one-capability:
 
 1. reading the Intel i915/xe GPU performance-monitoring unit via
@@ -22,7 +22,10 @@ binary so the privileged attack surface stays one-feature/one-capability:
    derive per-package watt figures (`taskforest-rapl-helper`); and
 6. reading the verified Intel MSR readouts — package temperature, P-state
    multipliers, P-state core voltage — from the root-only `/dev/cpu/*/msr`
-   nodes via plain `pread` file I/O (`taskforest-msr-helper`, ADR-048).
+   nodes via plain `pread` file I/O (`taskforest-msr-helper`, ADR-048); and
+7. starting one explicitly requested SMART self-test after checking the exact
+   device-reported kind and revalidating the persistent disk identity
+   (`taskforest-smart-self-test-helper`).
 
 In all cases the main TaskForest app never holds privilege: it receives typed
 results (the PMU read or process-control result) or an owned fd (the AF_PACKET
@@ -53,6 +56,9 @@ crate names and are mapped at install time (see
 - `io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy.in` — polkit
   action for the read-only MSR readout helper
   (`io.github.YellowWhiteBlackCat.TaskForest.msr-helper`).
+- `io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy.in` — polkit
+  action for one SMART self-test start
+  (`io.github.YellowWhiteBlackCat.TaskForest.smart-self-test`).
 
 Action ids share the same reverse-DNS namespace as the desktop app ids, so the
 `.policy` installed filename always matches its action id. The first-run-setup
@@ -75,7 +81,7 @@ removal procedure, and host receipt are authoritative in
 
 The `org.freedesktop.policykit.exec.path` annotation in each policy and the
 helper argument must match exactly. A package or approved install manager may
-publish the six declared policy/helper pairs only after their manifest rows
+publish the seven declared policy/helper pairs only after their manifest rows
 and receipts exist.
 
 ## Why `pkexec` + polkit (security rationale)

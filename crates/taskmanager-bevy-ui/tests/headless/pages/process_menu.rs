@@ -18,6 +18,7 @@ use taskmanager_platform_contract::{
 };
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
+use taskmanager_theme::tokens::UiSize;
 
 use crate::menu_modal::ActionMenuContext;
 use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
@@ -350,7 +351,7 @@ fn test_process_menu_mouse_activation_and_scrim_dismiss() {
     app.init_resource::<Assets<Font>>();
     app.add_plugins(FrontendWindowPlugin {
         runtime: crate::runtime::demo_platform_runtime(),
-        palette: ui_palette(&Theme::dark()),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
 
     let mut shell = ShellApp::new();

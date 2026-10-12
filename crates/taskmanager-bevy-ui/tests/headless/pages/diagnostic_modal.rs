@@ -14,6 +14,7 @@ use taskmanager_application::first_run::FirstRunController;
 use taskmanager_core::core::diagnostics::DiagnosticBundleErrorKind;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::{self, ProjectionSeedFact, seed_projection_fact};
+use taskmanager_theme::tokens::UiSize;
 
 fn diagnostic_app() -> App {
     let mut app = App::new();
@@ -294,7 +295,7 @@ fn a_diagnostic_open_before_root_mount_is_rendered_after_the_root_arrives() {
             .is_none()
     );
     app.insert_resource(WindowPalette {
-        inner: crate::palette::ui_palette(&Theme::dark()),
+        inner: crate::palette::ui_palette(&Theme::dark(), UiSize::Standard),
     });
     app.world_mut().spawn((Node::default(), AppShellRoot));
     app.update();

@@ -57,9 +57,7 @@
 //!   historical TUI/Iced spelling byte-for-byte and converges the GPUI
 //!   dialog's previously hardcoded decimal MB readouts onto the shared
 //!   ladder.
-//! * `CpuTime` keeps the majority duration spelling (`01h 01m` /
-//!   `1d 01h 00m`), pinned to the `taskmanager-shell` presentation
-//!   contract.
+//! * `CpuTime` uses the shared locale-aware compact hour/minute duration.
 //! * `Nice` keeps the majority signed spelling (`+10` / `0` / `-5`).
 //! * `StartTime` renders the full UTC wall-clock `YYYY-MM-DD HH:MM:SS`
 //!   (the GPUI dialog spelling, previously the only end showing a complete
@@ -72,6 +70,7 @@
 //!   `0`, `0.0%`, or empty string. A whitespace-only `Cmdline`
 //!   is missing (the majority TUI/Iced dash-on-empty semantics).
 
+use crate::i18n;
 use std::path::Path;
 
 use taskmanager_core::core::process::ProcessItem;
@@ -166,7 +165,7 @@ pub enum ProcessDetailsField {
     PageFaults,
     /// Start time, UTC `YYYY-MM-DD HH:MM:SS`. All ends.
     StartTime,
-    /// Cumulative CPU time, `01h 01m` / `1d 01h 00m`. TUI panel, Iced overview.
+    /// Cumulative CPU time using the shared locale-aware compact duration.
     CpuTime,
     /// Disk read rate (`/s` suffix). TUI panel, performance tabs.
     DiskReadRate,
@@ -536,17 +535,10 @@ fn format_nice(nice: i32) -> String {
     }
 }
 
-/// `00h 01m` / `1d 01h 00m` — the majority CPU-time duration spelling,
-/// pinned to the `taskmanager-shell::presentation::duration` string contract.
+/// CPU time shares the localized compact duration spelling used by shell
+/// presentation.
 fn format_duration_hm(seconds: u64) -> String {
-    let days = seconds / 86_400;
-    let hours = (seconds % 86_400) / 3_600;
-    let minutes = (seconds % 3_600) / 60;
-    if days > 0 {
-        format!("{days}d {hours:02}h {minutes:02}m")
-    } else {
-        format!("{hours:02}h {minutes:02}m")
-    }
+    i18n::format_duration(seconds)
 }
 
 /// Format a non-zero epoch second using only injected local-time rules.

@@ -23,13 +23,14 @@ impl IcedApp {
             Message::ConfirmEndTask => self.shell.confirm_end_task(),
             Message::ConfirmProcessBatch => self.shell.confirm_process_batch(),
             Message::RequestSessionControl(action) => {
-                if self.user_menu_session().is_some() {
-                    self.request_user_menu_action(action)
-                } else {
-                    self.close_context_menus();
-                    self.shell.request_session_control(action)
-                }
+                self.arm_selected_session_control(action);
+                None
             }
+            Message::RequestUserRowSessionControl(action) => {
+                self.arm_user_menu_session_control(action);
+                None
+            }
+            Message::ConfirmSessionControl => self.shell.confirm_session_control(),
             Message::RequestProcessNetworkEscalation => {
                 self.queue(ShellApp::request_process_network_escalation());
                 None

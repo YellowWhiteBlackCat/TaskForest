@@ -45,6 +45,7 @@ mod selection;
 mod selectors;
 pub(crate) mod service_log;
 mod sidebar;
+mod smart_self_test;
 mod snapshot_export;
 mod startup_control;
 mod surface;
@@ -111,11 +112,11 @@ use taskmanager_ui_contract::navigation::NavOrientation;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
-    AlertRuleImportMode, DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
-};
-use taskmanager_application::{
     AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
     RefreshRequest, i18n::t,
+};
+use taskmanager_application::{
+    DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
 };
 use taskmanager_cli::{FrontendHandlers, run};
 use taskmanager_core::core::appearance::DesktopAppearance;
@@ -228,7 +229,6 @@ pub struct TuiApp {
     /// Alert-rule selection index in the health overlay. Clamped against the
     /// projection's managed-rules count during access.
     pub health_rule_selection: usize,
-    pub(crate) alert_import_mode: Option<AlertRuleImportMode>,
     pub(crate) health_review: health_review::HealthReviewState,
     /// The locale-neutral category/app/type expansion keys whose headers are
     /// currently expanded on the Applications page. Toggled by activating a
@@ -369,7 +369,6 @@ impl TuiApp {
             system_history_window: SystemHistoryWindow::FifteenMinutes,
             memory_capture_scroll_pending: false,
             health_rule_selection: 0,
-            alert_import_mode: None,
             health_review: health_review::HealthReviewState::default(),
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
@@ -536,6 +535,10 @@ impl TuiApp {
         let page_before = self.page();
         let query_before = self.query.clone();
         let leaving_anchor = self.capture_page_row_anchor();
+        let query_anchor = match leaving_anchor.as_ref() {
+            Some(selection::PageRowAnchor::Application(anchor)) => Some(anchor.clone()),
+            _ => None,
+        };
         let effect = self.shell.handle_local_key(event);
         if self.page() != page_before {
             self.remember_page_row_anchor(page_before, leaving_anchor);
@@ -550,11 +553,7 @@ impl TuiApp {
             self.chart_cursor = None;
         }
         if self.page() == AppPage::Applications && self.query != query_before {
-            // Drop the stale detail identity before the cursor re-derives its
-            // row: the reconciliation then falls back to the positional anchor
-            // instead of chasing a row the old query had selected.
-            self.shell.set_row_selection(None, None);
-            self.reconcile_applications_cursor();
+            self.reconcile_query_application_anchor(query_anchor);
         }
         if self.shell.interaction_surface().is_some()
             || self.shell.help_open()
@@ -574,10 +573,14 @@ impl TuiApp {
     /// panel and any partial service-log owner release the keyboard.
     pub fn handle_local_char(&mut self, character: char, modifiers: Modifiers) -> InputDispatch {
         let query_before = self.query.clone();
+        let query_anchor = if self.page() == AppPage::Applications {
+            self.selected_application_row_anchor()
+        } else {
+            None
+        };
         let effect = self.shell.handle_local_char(character, modifiers);
         if self.page() == AppPage::Applications && self.query != query_before {
-            self.shell.set_row_selection(None, None);
-            self.reconcile_applications_cursor();
+            self.reconcile_query_application_anchor(query_anchor);
         }
         if self.shell.interaction_surface().is_some()
             || self.shell.help_open()
@@ -618,7 +621,6 @@ impl TuiApp {
             self.dismiss_local_surface_kind(TuiSurfaceKind::Health);
         } else {
             self.health_rule_selection = 0;
-            self.alert_import_mode = None;
             self.health_review = health_review::HealthReviewState::default();
             self.open_local_surface(TuiSurface::Health);
         }

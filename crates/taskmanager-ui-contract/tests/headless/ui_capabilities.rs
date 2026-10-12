@@ -301,3 +301,22 @@ fn every_capability_has_explicit_toolkit_neutral_semantic_specification() {
         );
     }
 }
+
+#[test]
+fn text_selection_and_column_resize_specs_use_delivered_owner_rules() {
+    let text = ComponentCapability::TextSelection.semantic_spec();
+    assert!(text.keyboard_pointer_semantics.contains("Ctrl/Cmd+A"));
+    assert!(text.keyboard_pointer_semantics.contains("Ctrl/Cmd+C"));
+
+    let resize = ComponentCapability::ColumnDragResize.semantic_spec();
+    assert!(
+        resize
+            .invariant_expectations
+            .contains("resize-policy bounds")
+    );
+    assert!(
+        !resize
+            .invariant_expectations
+            .contains("column's declared minimum")
+    );
+}

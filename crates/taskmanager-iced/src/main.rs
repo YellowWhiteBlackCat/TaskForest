@@ -2,7 +2,8 @@
 //!
 //! Thin by law: it hands this product's capability set to the shared CLI
 //! harness (`taskmanager_cli::run`). The iced product has no `--snapshot`
-//! capability (TUI's) and no `--capture-window` capability (Windows GPUI's).
+//! capability (TUI's); on Windows its `--capture-window` helper captures only
+//! the exact marker-identified `taskforest-i` window with Windows.Graphics.Capture.
 
 #![forbid(unsafe_code)]
 // The GUI product must not allocate a console when launched from the Start
@@ -11,7 +12,12 @@
 // terminal echo is given up.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+use taskmanager_cli::run::CaptureHandler;
 use taskmanager_cli::{FrontendHandlers, run};
+
+#[cfg(target_os = "windows")]
+#[path = "capture_windows.rs"]
+mod capture_windows;
 
 /// Launch the iced frontend. The desktop `app_id` is accepted and ignored so
 /// the CLI surface stays uniform across products (the iced window identity
@@ -28,13 +34,28 @@ fn run_gui(app_id: Option<String>, demo: bool) {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn capture_window(out: &std::path::Path) -> Result<(), String> {
+    capture_windows::run(out)
+}
+
+#[cfg(target_os = "windows")]
+fn capture_window_handler() -> Option<CaptureHandler> {
+    Some(capture_window)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn capture_window_handler() -> Option<CaptureHandler> {
+    None
+}
+
 fn main() {
     run(
         "taskforest-i",
         FrontendHandlers {
             run_gui,
             snapshot_text: None,
-            capture_window: None,
+            capture_window: capture_window_handler(),
         },
     );
 }

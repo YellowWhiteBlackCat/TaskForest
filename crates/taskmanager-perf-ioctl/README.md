@@ -23,3 +23,9 @@ real privileged PMU success still requires a target-machine receipt.
 src/lib.rs    perf_event_open ABI (#[repr(C)]) → typed per-engine usage;
               pure constant ABI face (Miri gate, fuzz-exempt)
 ```
+
+## Docs
+
+- [`docs/AUDIT_NOTES.md`](docs/AUDIT_NOTES.md) — boundary ownership, typed outcomes and
+  verification.
+- [ADR-022](../../adr/022-audited-perf-boundary-crate.md) — audited perf boundary.

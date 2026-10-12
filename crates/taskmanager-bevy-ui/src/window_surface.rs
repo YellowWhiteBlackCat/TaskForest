@@ -29,7 +29,7 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::UiSystems;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, FlexWrap, JustifyContent, Node,
-    Overflow, PositionType, UiRect, Val, percent, px,
+    Overflow, PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
@@ -361,11 +361,11 @@ pub(crate) fn modal_scene(
                 flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()), padding: UiRect::all(Val::Px(space_24())), border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)) }
             BackgroundColor({ palette.panel_fill })
             Children [
-                Node { min_height: px(palette.control_height_px), flex_shrink: 0.0 } ModalHeading
+                Node { min_height: rem(palette.control_height_rem), flex_shrink: 0.0 } ModalHeading
                 Children [ Text(title) TextRole(Role::Heading) ] --
                 Node { flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0), min_width: px(0.0), overflow: Overflow::scroll_y() }
                 ScrollArea ModalBody Children [ @{ body } ] --
-                Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: Val::Px(space_8()), row_gap: Val::Px(space_8()), min_height: px(palette.control_height_px), flex_shrink: 0.0 }
+                Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: Val::Px(space_8()), row_gap: Val::Px(space_8()), min_height: rem(palette.control_height_rem), flex_shrink: 0.0 }
                 ModalFooter Children [ { actions } ]
             ]
         ]

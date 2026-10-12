@@ -2,6 +2,38 @@ use super::*;
 
 const SIZE: Size = Size::new(200.0, 100.0);
 
+#[test]
+fn performance_grid_uses_faint_gpui_divisions_and_quarter_reference_levels() {
+    let opts = ChartOpts::PERFORMANCE;
+    assert_eq!(opts.hlines, 4);
+    assert_eq!(opts.vlines, 5);
+    assert_eq!(opts.grid_alpha, 0.13);
+    assert!(opts.reference_lines);
+
+    let rules = grid_rules(opts);
+    let horizontal = rules
+        .iter()
+        .filter(|rule| rule.axis == GridRuleAxis::Horizontal && !rule.emphasized)
+        .map(|rule| rule.position)
+        .collect::<Vec<_>>();
+    let vertical = rules
+        .iter()
+        .filter(|rule| rule.axis == GridRuleAxis::Vertical)
+        .map(|rule| rule.position)
+        .collect::<Vec<_>>();
+    let reference = rules
+        .iter()
+        .filter(|rule| rule.axis == GridRuleAxis::Horizontal && rule.emphasized)
+        .map(|rule| rule.position)
+        .collect::<Vec<_>>();
+    assert_eq!(horizontal, [0.2, 0.4, 0.6, 0.8]);
+    assert_eq!(
+        vertical,
+        [1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0, 4.0 / 6.0, 5.0 / 6.0]
+    );
+    assert_eq!(reference, [0.75, 0.5, 0.25, 0.0]);
+}
+
 fn single_run(samples: &[f32]) -> Vec<Point> {
     let mut runs = series_point_runs(samples, SIZE);
     assert_eq!(runs.len(), 1, "finite samples form one continuous run");
@@ -29,6 +61,70 @@ fn samples_map_to_width_evenly_with_zero_at_the_bottom() {
     assert_eq!(points[0], Point::new(0.0, 100.0)); // 0%   → bottom-left
     assert_eq!(points[1], Point::new(100.0, 50.0)); // 50% → middle
     assert_eq!(points[2], Point::new(200.0, 0.0)); // 100% → top-right
+}
+
+#[test]
+fn latest_badge_uses_newest_finite_samples_and_stays_inside_short_canvases() {
+    let latest = latest_readout_text(&[10.0, f32::NAN, 60.0], &[20.0, f32::INFINITY]);
+    let latest = latest.expect("one current sample per available series");
+    assert!(
+        latest.contains("60%"),
+        "CPU uses its newest finite value: {latest}"
+    );
+    assert!(
+        latest.contains("20%"),
+        "memory keeps its newest finite value before the trailing gap: {latest}"
+    );
+    assert_eq!(latest.matches(" · ").count(), 1);
+    assert_eq!(latest_readout_text(&[f32::NAN], &[f32::INFINITY]), None);
+    assert_eq!(
+        latest_readout_anchor(&[10.0, f32::NAN, 60.0], &[20.0, f32::INFINITY]),
+        Some(LatestReadoutAnchor {
+            index: 2,
+            value: 60.0,
+            series: ReadoutSeries::Cpu,
+        }),
+        "the idle readout badge tracks the newest finite sample point"
+    );
+    assert_eq!(
+        latest_readout_anchor(&[10.0], &[20.0, 30.0]),
+        Some(LatestReadoutAnchor {
+            index: 1,
+            value: 30.0,
+            series: ReadoutSeries::Memory,
+        }),
+        "a newer secondary sample owns the anchor when its series extends farther"
+    );
+    assert_eq!(
+        latest_readout_anchor(&[], &[f32::INFINITY]),
+        None,
+        "non-finite tails do not create a fabricated anchor"
+    );
+
+    let size = Size::new(50.0, 22.0);
+    let bounds = data_point_badge_bounds(size, Point::new(50.0, 11.0), 120.0);
+    assert!(
+        bounds.width > 0.0
+            && bounds.height > 0.0
+            && bounds.x >= 0.0
+            && bounds.y >= 0.0
+            && bounds.x + bounds.width <= size.width
+            && bounds.y + bounds.height <= size.height,
+        "the sample-anchored pill is clipped inside a short chart: {bounds:?}"
+    );
+    let top_edge = data_point_badge_bounds(Size::new(120.0, 60.0), Point::new(60.0, 1.0), 24.0);
+    assert!(
+        top_edge.y > 1.0,
+        "a top-edge sample flips its pill below: {top_edge:?}"
+    );
+    let bottom_edge = data_point_badge_bounds(Size::new(120.0, 60.0), Point::new(60.0, 59.0), 24.0);
+    assert!(
+        bottom_edge.x >= 0.0
+            && bottom_edge.y >= 0.0
+            && bottom_edge.x + bottom_edge.width <= 120.0
+            && bottom_edge.y + bottom_edge.height <= 60.0,
+        "a bottom-edge sample keeps its pill inside the chart: {bottom_edge:?}"
+    );
 }
 
 #[test]

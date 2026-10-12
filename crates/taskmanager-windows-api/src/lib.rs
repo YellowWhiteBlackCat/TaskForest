@@ -126,7 +126,8 @@ pub use process_network::{
 pub use process_tree::{WindowsProcessJob, assign_and_resume_suspended_process};
 pub use runas::{RunasLaunchOutcome, interactive_session_available, run_elevated_and_wait};
 pub use sessions::{
-    WindowsSession, WindowsSessionState, enumerate_sessions, lock_workstation, logoff_session,
+    WindowsSession, WindowsSessionIdentity, WindowsSessionIncarnation, WindowsSessionState,
+    enumerate_sessions, lock_current_session, logoff_session,
 };
 pub use single_instance::{InstanceEvent, InstanceMutex, signal_named_event};
 pub use smbios::{query_smbios_processor_max_mhz, raw_smbios_table};

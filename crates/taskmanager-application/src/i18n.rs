@@ -24,6 +24,7 @@
 //! and typed/results diagnostics; sentence order belongs here in locale
 //! templates so shared UI remains independent of platform commands.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -72,6 +73,13 @@ const UNINIT: u8 = 2;
 
 static LANG: AtomicU8 = AtomicU8::new(UNINIT);
 
+// Temporary language for synchronous fixture construction. Unlike the
+// process-wide selection, this override cannot race another frontend's locale
+// while a shared demo projection resolves catalog text.
+std::thread_local! {
+    static LANGUAGE_OVERRIDE: Cell<Option<Language>> = const { Cell::new(None) };
+}
+
 const fn lang_to_u8(l: Language) -> u8 {
     match l {
         Language::En => EN,
@@ -87,18 +95,52 @@ const fn u8_to_lang(v: u8) -> Language {
 }
 
 /// Set the active language at runtime. Idempotent; visible on the next render
-/// that calls [`t`]. Thread-safe (one relaxed store). The Settings modal's
-/// Language pills call this + `cx.notify()` so the whole shell re-renders
-/// localized on the next frame.
+/// that calls [`t`]. A scoped [`with_language`] call keeps this change local to
+/// that synchronous operation; otherwise it updates the shared atomic language.
+/// The Settings modal's Language pills call this + `cx.notify()` so the whole
+/// shell re-renders localized on the next frame.
 pub fn set_language(l: Language) {
+    let scoped = LANGUAGE_OVERRIDE.with(|language| {
+        if language.get().is_some() {
+            language.set(Some(l));
+            true
+        } else {
+            false
+        }
+    });
+    if scoped {
+        return;
+    }
     LANG.store(lang_to_u8(l), Ordering::Relaxed);
 }
 
-/// The active language. On the very first call this seeds the global from
+/// Resolve catalog text under a temporary language on this thread without
+/// changing the process-wide language. The override also contains
+/// `set_language` calls made by synchronous construction paths, and nesting
+/// restores the prior scoped value on return or unwind.
+pub fn with_language<T>(language: Language, operation: impl FnOnce() -> T) -> T {
+    let previous = LANGUAGE_OVERRIDE.with(|current| current.replace(Some(language)));
+    let _restore = LanguageOverrideRestore(previous);
+    operation()
+}
+
+struct LanguageOverrideRestore(Option<Language>);
+
+impl Drop for LanguageOverrideRestore {
+    fn drop(&mut self) {
+        LANGUAGE_OVERRIDE.with(|current| current.set(self.0));
+    }
+}
+
+/// The scoped language on this thread, if present; otherwise the active shared
+/// language. On the very first unscoped call this seeds the global from
 /// [`detect_language`] (compare-exchange on the `UNINIT` sentinel; first writer
 /// wins — concurrent detectors resolve to the same host value, so the winner is
 /// irrelevant). Subsequent calls just read the stored value.
 pub fn current_language() -> Language {
+    if let Some(language) = LANGUAGE_OVERRIDE.with(Cell::get) {
+        return language;
+    }
     if LANG.load(Ordering::Relaxed) == UNINIT {
         let detected = lang_to_u8(detect_language());
         let _ = LANG.compare_exchange(UNINIT, detected, Ordering::Relaxed, Ordering::Relaxed);
@@ -218,6 +260,25 @@ pub fn t(key: &'static str) -> &'static str {
     // Missing entirely: hand the key literal back so the UI degrades to a
     // recognizable (if ugly) string instead of panicking.
     key
+}
+
+/// Format an hour/minute duration with locale-specific units. The numeric
+/// fields stay zero-padded so compact readouts remain stable across locales.
+#[must_use]
+pub fn format_duration(seconds: u64) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    if days > 0 {
+        t("duration.days_hours_minutes")
+            .replace("{days}", &days.to_string())
+            .replace("{hours}", &format!("{hours:02}"))
+            .replace("{minutes}", &format!("{minutes:02}"))
+    } else {
+        t("duration.hours_minutes")
+            .replace("{hours}", &format!("{hours:02}"))
+            .replace("{minutes}", &format!("{minutes:02}"))
+    }
 }
 
 #[cfg(test)]

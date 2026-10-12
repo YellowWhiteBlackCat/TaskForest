@@ -5,6 +5,7 @@
 //! process-properties overlay into an opaque iced
 //! layer so page input cannot leak through the modal.
 
+use crate::ui::smart_self_test_confirmation::confirmation;
 use iced::widget::{column, container, opaque, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
@@ -13,9 +14,7 @@ use taskmanager_core::core::alerts::{
 };
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::smart::self_test_intent;
-use taskmanager_shell::presentation::{
-    device_status_i18n_key, effective_smart_status, has_smart_fields,
-};
+use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
@@ -25,7 +24,6 @@ use crate::ui::components::key_value_rows;
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::SmartSelfTestPhase;
 use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::metrics::SmartAvailability;
 
 pub(crate) mod alerts;
 pub(crate) use alerts::*;
@@ -91,33 +89,7 @@ pub(super) fn smart_overlay<'a>(
                     if let Some(pending) = app.shell.pending_smart_self_test()
                         && pending.device_id.as_str() == disk.device_id
                     {
-                        let confirm_bar = row![
-                            text(format!(
-                                "{} {:?} {} {}?",
-                                t("common.confirm"),
-                                pending.kind,
-                                t("health.smart_self_test"),
-                                pending.display_name
-                            ))
-                            .size(f32::from(tokens::FONT_12)),
-                            focus::button(
-                                app.theme(),
-                                FocusTarget::ConfirmSmartSelfTest,
-                                t("common.confirm"),
-                                Message::ConfirmSmartSelfTest,
-                                true,
-                            ),
-                            focus::button(
-                                app.theme(),
-                                FocusTarget::CancelSmartSelfTest,
-                                t("common.cancel"),
-                                Message::DismissOverlay,
-                                false,
-                            ),
-                        ]
-                        .spacing(8)
-                        .align_y(iced::Alignment::Center);
-                        col = col.push(confirm_bar);
+                        col = col.push(confirmation(app.theme(), pending));
                     } else {
                         let (smart_obs, _) = app.shell.projection().smart_projection();
                         let report = smart_obs
@@ -128,38 +100,43 @@ pub(super) fn smart_overlay<'a>(
 
                         let is_running =
                             report.is_some_and(|r| r.phase == SmartSelfTestPhase::Running);
-                        let can_test = !is_running
-                            && (disk.smart_availability == SmartAvailability::Available
-                                || has_smart_fields(disk));
+                        let short_intent = self_test_intent(disk, SmartSelfTestKind::Short);
+                        let extended_intent = self_test_intent(disk, SmartSelfTestKind::Extended);
 
-                        let mut test_row = row![
-                            text(t("health.smart_self_test")).size(f32::from(tokens::FONT_12)),
+                        let mut test_column = column![
+                            text(t("health.smart_self_test"))
+                                .size(f32::from(tokens::FONT_12))
+                                .width(Length::Fill),
                         ]
-                        .spacing(8)
-                        .align_y(iced::Alignment::Center);
+                        .spacing(4)
+                        .width(Length::Fill);
 
-                        if can_test {
-                            test_row = test_row
-                                .push(focus::ghost_button(
+                        if !is_running {
+                            let mut actions = row![].spacing(8);
+                            let mut has_actions = false;
+                            if let Some(intent) = short_intent {
+                                actions = actions.push(focus::ghost_button(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestShort { index },
                                     t("health.short_test"),
-                                    Message::RequestSmartSelfTest(self_test_intent(
-                                        disk,
-                                        SmartSelfTestKind::Short,
-                                    )),
-                                ))
-                                .push(focus::ghost_button(
+                                    Message::RequestSmartSelfTest(intent),
+                                ));
+                                has_actions = true;
+                            }
+                            if let Some(intent) = extended_intent {
+                                actions = actions.push(focus::ghost_button(
                                     app.theme(),
                                     FocusTarget::SmartSelfTestExtended { index },
                                     t("health.extended_test"),
-                                    Message::RequestSmartSelfTest(self_test_intent(
-                                        disk,
-                                        SmartSelfTestKind::Extended,
-                                    )),
+                                    Message::RequestSmartSelfTest(intent),
                                 ));
+                                has_actions = true;
+                            }
+                            if has_actions {
+                                test_column = test_column.push(actions);
+                            }
                         } else if is_running {
-                            test_row = test_row.push(
+                            test_column = test_column.push(
                                 text(t("health.phase_running")).size(f32::from(tokens::FONT_12)),
                             );
                         }
@@ -169,7 +146,7 @@ pub(super) fn smart_overlay<'a>(
                             if let Some(pct) = r.progress_pct {
                                 report_info.push_str(&format!(" ({pct:.0}%)"));
                             }
-                            test_row = test_row.push(
+                            test_column = test_column.push(
                                 text(report_info).size(f32::from(tokens::FONT_11)).style(
                                     move |_| iced::widget::text::Style {
                                         color: Some(theme::muted_text_color(app.theme())),
@@ -178,7 +155,7 @@ pub(super) fn smart_overlay<'a>(
                             );
                         }
 
-                        col = col.push(test_row);
+                        col = col.push(test_column);
                     }
 
                     col.into()

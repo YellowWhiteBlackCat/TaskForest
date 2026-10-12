@@ -1,14 +1,15 @@
 //! Terminal capability profile and presentation fallbacks.
 //!
-//! A terminal is not a pixel surface.  The TUI therefore resolves the small
-//! set of capabilities that affect its rendering contract once at the
-//! composition edge and passes the value down as data.  Renderers do not read
-//! the environment, guess from a widget, or silently emit a glyph/color that
-//! the selected terminal profile cannot carry.
+//! A terminal is not a pixel surface. The TUI captures terminal signals once
+//! at the composition edge and resolves the small set of capabilities that
+//! affect each frame from those signals and the shared UI language. Renderers
+//! do not read the environment, guess from a widget, or silently emit a
+//! glyph/color that the selected terminal profile cannot carry.
 
 use std::env;
 
 use ratatui::style::Color;
+use taskmanager_application::i18n::{Language, current_language};
 use taskmanager_shell::presentation::icon_glyph;
 use taskmanager_ui_contract::IconId;
 
@@ -35,6 +36,50 @@ pub enum TuiGlyphMode {
     Ascii,
 }
 
+/// Terminal signals captured at the native composition edge. Glyph policy is
+/// resolved from this immutable snapshot and the current shared UI language,
+/// so changing language in Settings updates the next painted frame without
+/// re-reading process environment state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TuiTerminalSignals {
+    term: Option<String>,
+    color_term: Option<String>,
+    no_color: bool,
+    glyph_override: Option<String>,
+    locale: Option<String>,
+}
+
+impl TuiTerminalSignals {
+    /// Capture the terminal inputs once at the native composition edge.
+    #[must_use]
+    pub(crate) fn detect() -> Self {
+        Self {
+            term: env::var("TERM").ok(),
+            color_term: env::var("COLORTERM").ok(),
+            no_color: env::var("NO_COLOR").is_ok(),
+            glyph_override: env::var("TM_TUI_GLYPHS").ok(),
+            locale: env::var("LC_ALL")
+                .ok()
+                .or_else(|| env::var("LC_CTYPE").ok())
+                .or_else(|| env::var("LANG").ok()),
+        }
+    }
+
+    /// Resolve capabilities for the current UI language. This is cheap and
+    /// pure; callers may repeat it when the language changes.
+    #[must_use]
+    pub(crate) fn resolve(&self, language: Language) -> TuiTerminalProfile {
+        TuiTerminalProfile::from_signals(
+            self.term.as_deref(),
+            self.color_term.as_deref(),
+            self.no_color,
+            self.glyph_override.as_deref(),
+            self.locale.as_deref(),
+            language,
+        )
+    }
+}
+
 /// Immutable capabilities that affect terminal-cell presentation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TuiTerminalProfile {
@@ -52,22 +97,12 @@ impl Default for TuiTerminalProfile {
 }
 
 impl TuiTerminalProfile {
-    /// Resolve the profile once from process environment at the native
-    /// composition edge.  Tests and remote hosts should use
-    /// [`Self::from_signals`] instead of mutating global environment state.
+    /// Resolve from the captured process environment and current UI language.
+    /// The live runtime retains captured terminal signals and re-resolves after
+    /// a language change without reading environment state again.
     #[must_use]
     pub fn detect() -> Self {
-        Self::from_signals(
-            env::var("TERM").ok().as_deref(),
-            env::var("COLORTERM").ok().as_deref(),
-            env::var("NO_COLOR").is_ok(),
-            env::var("TM_TUI_GLYPHS").ok().as_deref(),
-            env::var("LC_ALL")
-                .ok()
-                .or_else(|| env::var("LC_CTYPE").ok())
-                .or_else(|| env::var("LANG").ok())
-                .as_deref(),
-        )
+        TuiTerminalSignals::detect().resolve(current_language())
     }
 
     /// Build a profile from already-read terminal signals.  The arguments are
@@ -80,6 +115,7 @@ impl TuiTerminalProfile {
         no_color: bool,
         glyph_override: Option<&str>,
         locale: Option<&str>,
+        language: Language,
     ) -> Self {
         let dumb = term.is_some_and(|value| value.eq_ignore_ascii_case("dumb"));
         let color = if no_color || dumb {
@@ -100,10 +136,11 @@ impl TuiTerminalProfile {
             Some(value) if value == "ascii" => TuiGlyphMode::Ascii,
             Some(value) if value == "unicode" => TuiGlyphMode::Unicode,
             _ if dumb => TuiGlyphMode::Ascii,
+            _ if language == Language::Zh => TuiGlyphMode::Unicode,
             _ if locale.is_some_and(is_utf8_locale) => TuiGlyphMode::Unicode,
-            // A missing locale is not evidence that Unicode is safe.  The
-            // explicit override remains available for modern terminals whose
-            // locale is not exported by the host launcher.
+            // For English, a missing locale is not evidence that Unicode is
+            // safe. The explicit override remains available for modern
+            // terminals whose locale is not exported by the host launcher.
             _ => TuiGlyphMode::Ascii,
         };
 
@@ -116,6 +153,24 @@ impl TuiTerminalProfile {
         match self.glyphs {
             TuiGlyphMode::Unicode => icon_glyph(icon),
             TuiGlyphMode::Ascii => ascii_glyph(icon),
+        }
+    }
+
+    /// Stable receipt label for the resolved color capability.
+    pub(crate) const fn color_name(self) -> &'static str {
+        match self.color {
+            TuiColorMode::TrueColor => "truecolor",
+            TuiColorMode::Ansi256 => "ansi256",
+            TuiColorMode::Ansi16 => "ansi16",
+            TuiColorMode::Monochrome => "monochrome",
+        }
+    }
+
+    /// Stable receipt label for the resolved glyph repertoire.
+    pub(crate) const fn glyphs_name(self) -> &'static str {
+        match self.glyphs {
+            TuiGlyphMode::Unicode => "unicode",
+            TuiGlyphMode::Ascii => "ascii",
         }
     }
 

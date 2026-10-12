@@ -15,9 +15,9 @@ use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_ev
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
 
 /// A scripted source: pops the queued items; once empty, `poll` fails
@@ -84,125 +84,6 @@ fn quit_key_exits_the_loop_cleanly() {
     );
     assert!(outcome.is_ok());
     assert!(app.should_quit(), "'q' must set the shared quit flag");
-}
-
-#[test]
-fn health_rule_keys_edit_the_selected_rule_and_import_only_when_explicitly_armed() {
-    use ratatui::crossterm::event::KeyCode;
-    let mut app = crate::demo_app();
-    app.toggle_health();
-    let initial = app.projection().alert_center.managed_rules().to_vec();
-    for character in ['n', 'u', 'f', 'l', 'v'] {
-        apply_terminal_event(
-            &mut app,
-            key(KeyCode::Char(character), KeyEventKind::Press),
-            TEST_FRAME,
-        );
-    }
-    let rules = app.projection().alert_center.managed_rules();
-    assert_eq!(rules.len(), initial.len() + 1);
-    let rule = &rules.last().expect("normal key created rule").rule;
-    assert_eq!(rule.threshold, 86.0);
-    assert_eq!(rule.for_duration, Duration::from_secs(6));
-    assert_eq!(rule.hysteresis, 4.0);
-    assert_eq!(rule.severity, AlertSeverity::Critical);
-    let json = app.export_alert_rules().expect("complete transfer");
-    apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('d'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    assert_eq!(app.projection().alert_center.managed_rules(), initial);
-    apply_terminal_event(&mut app, Event::Paste(json.clone()), TEST_FRAME);
-    assert_eq!(
-        app.projection().alert_center.managed_rules(),
-        initial,
-        "unarmed paste is inert"
-    );
-    apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('r'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    apply_terminal_event(&mut app, Event::Paste(json), TEST_FRAME);
-    assert_eq!(
-        app.projection().alert_center.managed_rules().len(),
-        initial.len() + 1
-    );
-    let before = app.projection().alert_center.managed_rules().to_vec();
-    apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('r'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    apply_terminal_event(&mut app, Event::Paste("invalid json".into()), TEST_FRAME);
-    assert_eq!(app.projection().alert_center.managed_rules(), before);
-    assert!(app.alert_import_mode.is_none());
-}
-
-#[test]
-fn health_review_keys_visit_integrity_and_sensor_groups_then_arm_an_exact_self_test() {
-    set_language(Language::En);
-    use crate::health_review::HealthReviewMode;
-    use ratatui::crossterm::event::KeyCode;
-    use taskmanager_core::core::smart::SmartSelfTestKind;
-    use taskmanager_shell::fixture::health::seed_shell_health;
-    let mut app = crate::demo_app();
-    seed_shell_health(&mut app.shell);
-    app.toggle_health();
-    apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('w'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    assert_eq!(app.health_review.mode, HealthReviewMode::Storage);
-    let groups = crate::ui::health_review::groups(&app);
-    assert_eq!(groups.len(), 4);
-    for index in 1..groups.len() {
-        apply_terminal_event(
-            &mut app,
-            key(KeyCode::Down, KeyEventKind::Press),
-            TEST_FRAME,
-        );
-        assert_eq!(app.health_review.selected, index);
-    }
-    apply_terminal_event(&mut app, key(KeyCode::Up, KeyEventKind::Press), TEST_FRAME);
-    assert_eq!(
-        app.health_review.selected, 2,
-        "moving back from the final group works"
-    );
-    apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('s'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    assert_eq!(app.health_review.mode, HealthReviewMode::Sensors);
-    let groups = crate::ui::health_review::groups(&app);
-    assert_eq!(groups.len(), 4);
-    assert!(groups.iter().any(|group| {
-        group
-            .rows
-            .iter()
-            .any(|row| row.value.contains("Unavailable"))
-    }));
-    let disk = app.projection().snapshot.as_ref().expect("snapshot").disks[0].clone();
-    let reaction = apply_terminal_event(
-        &mut app,
-        key(KeyCode::Char('x'), KeyEventKind::Press),
-        TEST_FRAME,
-    );
-    assert!(
-        reaction.effect.is_none(),
-        "arming does not submit a platform command"
-    );
-    assert!(!app.health_open(), "confirmation owns subsequent input");
-    let pending = app
-        .shell
-        .pending_smart_self_test()
-        .expect("normal confirmation");
-    assert_eq!(pending.device_id.as_str(), disk.device_id);
-    assert_eq!(pending.device_generation, disk.device_generation);
-    assert_eq!(pending.kind, SmartSelfTestKind::Extended);
 }
 
 #[test]
@@ -569,6 +450,14 @@ fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
     // must not move the selection; the help overlay likewise.
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
+    let mut sessions = app.projection().sessions.clone().expect("demo sessions");
+    for (index, session) in sessions.iter_mut().enumerate() {
+        session.incarnation = Some(SessionIncarnation::LinuxLogind {
+            boot_id: "fixture-boot".into(),
+            created_monotonic_usec: u64::try_from(index + 1).unwrap_or(1),
+        });
+    }
+    seed_projection_fact(&mut app.shell, ProjectionSeedFact::Sessions(Some(sessions)));
     let session = app
         .projection()
         .sessions
@@ -856,9 +745,8 @@ fn seam_event_loop_esc_dismisses_feedback_notice() {
 /// The supervised capture path writes its typed frame identity once demo data
 /// is ready: driving the production loop in demo mode with a marker path
 /// records `demo_data_ready` plus the live page the frame shows. This is the
-/// TUI's `mc07-tui-capture-visual` anchor — a single supervised frame with no
-/// scenario table, so the anchor proves the frame-marker contract rather than
-/// a per-scenario capture matrix.
+/// TUI's `mc07-tui-capture-visual` anchor, which proves the frame-marker
+/// contract separately from terminal-profile matrix receipts.
 #[test]
 fn capture_marker_records_the_typed_demo_frame_identity() {
     let marker = crate::ui::test_support::repo_temp_dir()

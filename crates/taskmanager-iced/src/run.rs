@@ -115,6 +115,12 @@ pub fn run(demo: bool) -> iced::Result {
         move || {
             if demo {
                 let mut app = IcedApp::demo_for_capture();
+                if let Some(path) = std::env::var_os("TM_ICED_CAPTURE_MARKER_FILE") {
+                    crate::capture::append_process_marker(
+                        std::path::Path::new(&path),
+                        std::process::id(),
+                    );
+                }
                 if crate::capture::persisted_history_requested() {
                     app.request_history_frontend(true);
                     app.install_history_frontend_connector(host.history_frontend_connector());

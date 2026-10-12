@@ -21,7 +21,7 @@ use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
-use bevy::ui::{BackgroundColor, UiRect};
+use bevy::ui::{BackgroundColor, UiRect, rem};
 use bevy::ui::{ComputedNode, FlexDirection, Node, ScrollPosition, Val, percent, px};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
@@ -89,7 +89,7 @@ fn control_scene(
     command: SystemInformationCommand,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! { Node { min_height: px(palette.control_height_px), padding: UiRect::all(Val::Px(space_8())) } BackgroundColor({ palette.content_bg }) Button SystemInformationControl({ command }) on(activate)
+    bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::all(Val::Px(space_8())) } BackgroundColor({ palette.content_bg }) Button SystemInformationControl({ command }) on(activate)
     Children [ Text(label) TextRole(Role::Body) Pickable::IGNORE ] }
 }
 
