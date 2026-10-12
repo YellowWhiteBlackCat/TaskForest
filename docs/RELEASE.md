@@ -171,10 +171,11 @@ RC 编号。打 RC tag 前必须满足：
 | `portability.yml` | PR、main push、手动、月度 | Windows（PR/main 阻塞）与 macOS（手动/月度 advisory）原生边界检查 |
 | `packaging.yml` | 仅 `workflow_call` | 构建和验证 Linux/Windows 多架构产物 |
 | `rehearsal.yml` | 手动 | 同时排练 Linux 与 Windows，不发布 |
-| `release.yml` | `v*` tag、指定已有 tag 手动 | history/precheck → packaging → 单一发布 |
+| `release.yml` | `v*` tag、指定已有 tag 手动 | 当前树与上一稳定 tag 以来的历史预检 → packaging → 单一发布 |
 
-Release 只把 `contents: write` 授予发布 job。可复用 workflow 只接收两个显式 Windows
-签名 secret，不继承其他仓库 secret。
+Release 只把 `contents: write` 授予发布 job。可复用 workflow 显式接收 shared UI kit 的
+只读依赖凭据和两个 Windows 签名 secret，不继承其他仓库 secret。依赖凭据只在 `cargo fetch`
+期间由临时 Git helper 使用，依赖拉取结束后即清理。
 
 ## 发布事务
 

@@ -37,5 +37,6 @@ jobs:
       linux: ${{ inputs.linux }}
       windows: ${{ inputs.windows }}
     secrets:
+      SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
       WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}

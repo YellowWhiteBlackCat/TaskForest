@@ -67,8 +67,9 @@ jobs:
       - name: Verify tag shape and version equality
         env:
           ALLOW_MISMATCH: ${{ inputs.allow_version_mismatch || false }}
+          RELEASE_TAG: ${{ steps.resolve-tag.outputs.tag }}
         run: |
-          tag="${{ steps.resolve-tag.outputs.tag }}"
+          tag="$RELEASE_TAG"
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
           if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "tag '$tag' is not semver (vX.Y.Z[-pre])" >&2; exit 1
@@ -78,15 +79,28 @@ jobs:
             echo "tag '$tag' does not match Cargo.toml version '$version'" >&2
             echo "bump Cargo.toml (and Cargo.lock) or set allow_version_mismatch" >&2; exit 1
           fi
-      # Reject an invalid tag/version before spending time on the full history
-      # scan or any Cargo metadata work.
+      - name: Resolve previous stable release tag
+        id: previous_release
+        env:
+          RELEASE_TAG: ${{ steps.resolve-tag.outputs.tag }}
+        run: |
+          previous_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' "${RELEASE_TAG}^")"
+          printf 'tag=%s\n' "$previous_tag" >>"$GITHUB_OUTPUT"
+      # Reject an invalid tag/version before scanning history since the prior
+      # stable release or doing Cargo metadata work.
       - name: Public repository and history guard
+        env:
+          PREVIOUS_RELEASE_TAG: ${{ steps.previous_release.outputs.tag }}
         run: |
           python3 scripts/quality/public_repo_guard.py
-          python3 scripts/quality/public_repo_guard.py --history
+          python3 scripts/quality/public_repo_guard.py --history-since "$PREVIOUS_RELEASE_TAG"
       # `cargo metadata --locked` fails the moment the committed Cargo.lock
       # does not satisfy the manifest, proving the tag builds reproducibly.
       - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - run: cargo metadata --locked --format-version 1 >/dev/null
       # Every host-installed path must stay allowlisted before a release
       # ships new package layouts (same guard as the CI blocking gate).
@@ -111,5 +125,6 @@ jobs:
       release_tag: ${{ needs.precheck.outputs.tag }}
       prerelease: ${{ needs.precheck.outputs.prerelease == 'true' }}
     secrets:
+      SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
       WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
