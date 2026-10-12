@@ -96,7 +96,7 @@ impl ShellApp {
     /// Capture the selected startup entry and produce a renderer-neutral
     /// enable/disable action. The selected [`StartupEntry`] is frozen into the
     /// request so a later inventory refresh cannot silently change the target
-    /// (mirrors [`Self::request_session_control`]). No frontend may invoke a
+    /// (mirrors [`Self::select_session_control`]). No frontend may invoke a
     /// startup tool directly. Like GPUI's `request_startup_control_confirmation`,
     /// every Enable/Disable is GATED behind an explicit confirmation: this sets
     /// [`Self::pending_startup`] and returns `None`; the frontend's confirm
