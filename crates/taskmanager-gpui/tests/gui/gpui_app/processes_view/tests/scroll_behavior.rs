@@ -65,6 +65,30 @@ fn offset_pair(
     })
 }
 
+fn first_visible_process_row(vcx: &mut VisualTestContext) -> gpui::Bounds<gpui::Pixels> {
+    [
+        "tm-proc-row-root:0",
+        "tm-proc-row-root:1",
+        "tm-proc-row-root:2",
+        "tm-proc-row-root:3",
+        "tm-proc-row-root:4",
+        "tm-proc-row-root:5",
+        "tm-proc-row-root:6",
+        "tm-proc-row-root:7",
+        "tm-proc-row-root:8",
+        "tm-proc-row-root:9",
+        "tm-proc-row-root:10",
+        "tm-proc-row-root:11",
+        "tm-proc-row-root:12",
+        "tm-proc-row-root:13",
+        "tm-proc-row-root:14",
+        "tm-proc-row-root:15",
+    ]
+    .into_iter()
+    .find_map(|selector| vcx.debug_bounds(selector))
+    .expect("the virtualized body must retain a visible process row")
+}
+
 /// A real wheel over a body row must move only the vertical list. A native
 /// horizontal/Shift-normalized wheel must move only the one horizontal owner.
 /// This catches the old post-bubble guard, which ran after GPUI had already
@@ -97,9 +121,7 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
     );
 
     super::draw(cx, win);
-    let body = vcx
-        .debug_bounds("tm-proc-row-root:0")
-        .expect("the body row remains rendered after vertical scrolling");
+    let body = first_visible_process_row(&mut vcx);
     let hit_body_h = point(body.origin.x + px(100.0), body.center().y);
     vcx.simulate_event(wheel(
         hit_body_h,
@@ -138,9 +160,7 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
     );
 
     super::draw(cx, win);
-    let body = vcx
-        .debug_bounds("tm-proc-row-root:0")
-        .expect("the body row must remain available for Shift-wheel");
+    let body = first_visible_process_row(&mut vcx);
     let (_, v_before_shift) = offset_pair(&view, cx);
     let hit_shift = point(body.origin.x + px(100.0), body.center().y);
     vcx.simulate_event(wheel(

@@ -6,9 +6,9 @@
 //!
 //! This is the in-process self-capture route: no external tool, no PowerShell,
 //! no new audited boundary crate. The pixels come from the real DirectX
-//! compositor frame of the actual app window — not the test renderer, which is
-//! a no-op in gpui 0.2.2 (`src/platform/test/window.rs: draw() {}`), so this
-//! is the only in-process path that yields real pixels.
+//! compositor frame of the actual app window. Headless visual tests render
+//! through a separate test renderer and do not capture the user's composited
+//! window.
 //!
 //! `zed-scap` 0.0.8-zed (gpui's optional screen-capture dependency) does not
 //! compile against either published `windows-capture` version, so this module
@@ -22,7 +22,7 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_app_host::WindowPresentation;
 use taskmanager_assets::product::GPUI_NAME;
 
-use gpui::{App, Application, AsyncApp};
+use gpui::{App, AsyncApp};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use sha2::{Digest, Sha256};
 use tracing::{error, info};
@@ -64,7 +64,7 @@ pub fn run(out: &Path) -> Result<(), String> {
     let local_time_rules = host.local_time_rules();
     let platform_factory = host.clone();
     let history_factory = host.clone();
-    Application::new()
+    gpui::application()
         .with_assets(TaskManagerAssets)
         .run(move |cx: &mut App| {
             if let Err(composition_error) = crate::gpui_app::init(
@@ -99,7 +99,7 @@ pub fn run(out: &Path) -> Result<(), String> {
             let task = cx.spawn(async move |cx: &mut AsyncApp| {
                 let result = capture_after_first_frames(&out, cx).await;
                 record_outcome(&outcome_task, result);
-                let _ = cx.update(|cx| cx.quit());
+                cx.update(|cx| cx.quit());
             });
             task.detach();
         });
@@ -144,7 +144,7 @@ async fn capture_after_first_frames(out: &Path, cx: &mut AsyncApp) -> Result<(),
 
 async fn wait_for_window(cx: &mut AsyncApp) -> Result<(), String> {
     for _ in 0..100 {
-        let count = cx.update(|cx| cx.windows().len()).unwrap_or(0);
+        let count = cx.update(|cx| cx.windows().len());
         if count > 0 {
             return Ok(());
         }
@@ -157,25 +157,23 @@ async fn wait_for_window(cx: &mut AsyncApp) -> Result<(), String> {
 /// the capture target can be bound to our own window.
 async fn window_hwnd(cx: &mut AsyncApp) -> Result<isize, String> {
     for _ in 0..20 {
-        let found = cx
-            .update(|cx| {
-                let mut hwnd = None;
-                for handle in cx.windows() {
-                    let _ = handle.update(cx, |_, window, _| {
-                        let Ok(raw) = window.window_handle() else {
-                            return;
-                        };
-                        if let RawWindowHandle::Win32(win32) = raw.as_raw() {
-                            hwnd = Some(win32.hwnd.get());
-                        }
-                    });
-                    if hwnd.is_some() {
-                        break;
+        let found = cx.update(|cx| {
+            let mut hwnd = None;
+            for handle in cx.windows() {
+                let _ = handle.update(cx, |_, window, _| {
+                    let Ok(raw) = window.window_handle() else {
+                        return;
+                    };
+                    if let RawWindowHandle::Win32(win32) = raw.as_raw() {
+                        hwnd = Some(win32.hwnd.get());
                     }
+                });
+                if hwnd.is_some() {
+                    break;
                 }
-                hwnd
-            })
-            .unwrap_or(None);
+            }
+            hwnd
+        });
         if let Some(hwnd) = found {
             return Ok(hwnd);
         }

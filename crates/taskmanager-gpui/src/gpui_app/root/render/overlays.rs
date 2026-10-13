@@ -537,7 +537,7 @@ pub(super) fn warmup_retry_button(
 
     if focus_on_mount {
         let focus = state.read(cx).focus_handle().clone();
-        window.defer(cx, move |window, _cx| focus.focus(window));
+        window.defer(cx, move |window, cx| focus.focus(window, cx));
     }
 
     let root = cx.entity().downgrade();

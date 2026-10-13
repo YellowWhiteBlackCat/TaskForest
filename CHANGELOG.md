@@ -6,6 +6,18 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.2.2] — 2026-10-13
+
+### 安全
+
+- 更新 `rustls` 至 `0.23.45`，修复 [GHSA-2mjx-qc3c-rqvc](https://github.com/advisories/GHSA-2mjx-qc3c-rqvc) 中的 TLS 1.3 握手消息加密级别校验漏洞。
+
+### 变更
+
+- 更新全部 Cargo 锁文件中受现有 SemVer 与 Rust 1.99 工具链约束的依赖至最新稳定兼容版本。
+- GPUI 后端迁至 GPUI Kit `0.7.3` 锁定的 GPUI `0.3.9`；关闭 Kit 自带组件和资产层，继续使用 TaskForest 的组件与主题。
+- 启用 GPUI 支持的平台默认、次像素和灰度文字渲染模式，并持久化用户选择。
+
 ## [0.2.1] — 2026-10-12
 
 ### 新增

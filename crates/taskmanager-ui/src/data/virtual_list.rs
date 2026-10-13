@@ -143,7 +143,7 @@ impl ScrollbarHandle for VirtualListScrollHandle {
     }
 
     fn max_offset(&self) -> Size<Pixels> {
-        self.base_handle.max_offset()
+        self.base_handle.max_offset().into()
     }
 
     fn viewport(&self) -> Bounds<Pixels> {

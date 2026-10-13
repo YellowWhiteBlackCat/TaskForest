@@ -115,7 +115,7 @@ fn draw_frame(
     snapshot: ProcessTelemetrySnapshot,
 ) -> gpui::WindowHandle<ThreadsCardView> {
     let window = cx.add_window(move |_w, _cx| ThreadsCardView { snapshot, first: 0 });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     window
 }
@@ -218,7 +218,7 @@ fn a_second_page_paints_real_rows_beyond_the_materialization_limit(cx: &mut Test
         snapshot,
         first: 200,
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut view = VisualTestContext::from_window(window.into(), cx);
     assert!(

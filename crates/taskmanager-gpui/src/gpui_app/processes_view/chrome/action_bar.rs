@@ -407,7 +407,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
         ProcessActionSurface::Standalone => content.push(
             div()
                 .min_w(gpui::px(0.0))
-                .flex_shrink()
+                .flex_shrink(1.0)
                 .truncate()
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.fg_dim))

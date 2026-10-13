@@ -194,7 +194,7 @@ fn history_table(
                         .collect::<Vec<_>>()
                 },
             )
-            .track_scroll(scroll.clone())
+            .track_scroll(&scroll)
             .with_sizing_behavior(ListSizingBehavior::Auto)
             .id("app-history-list")
             .debug_selector(|| "tm-app-history-list".to_string())

@@ -83,7 +83,7 @@ async fn mc01_dynamic_readout_case_battery_and_fan_pages_paint_typed_dynamic_dev
         v.selected = SelectedDevice::Fan(0);
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(vcx.debug_bounds("tm-perf-title").is_some());
     assert!(vcx.debug_bounds("tm-perf-stat:0").is_some());
 }

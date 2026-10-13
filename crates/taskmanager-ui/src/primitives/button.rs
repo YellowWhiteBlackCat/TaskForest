@@ -29,6 +29,7 @@ fn press_shadow() -> Vec<BoxShadow> {
         blur_radius: px(2.0),
         spread_radius: px(0.0),
         color: gpui::Hsla::black().alpha(0.08),
+        inset: false,
     }]
 }
 use taskmanager_theme::Palette;

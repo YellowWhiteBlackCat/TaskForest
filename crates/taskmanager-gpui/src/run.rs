@@ -1,6 +1,6 @@
 //! GPUI-only toolkit event loop over the shared native app-host seam.
 
-use gpui::{App, Application};
+use gpui::App;
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_assets::product;
 use tracing::{error, info};
@@ -21,7 +21,7 @@ fn run_demo(app_id: Option<String>) {
         frontend = product::GPUI_NAME,
         "Starting TaskForest demo frontend..."
     );
-    Application::new()
+    gpui::application()
         .with_assets(TaskManagerAssets)
         .run(move |cx: &mut App| {
             crate::gpui_app::init_demo(cx, app_id);
@@ -41,9 +41,7 @@ fn run_production(app_id: Option<String>) {
     let local_time_rules = host.local_time_rules();
     let platform_factory = host.clone();
 
-    register_in_process_capture();
-
-    Application::new()
+    gpui::application()
         .with_assets(TaskManagerAssets)
         .run(move |cx: &mut App| {
             if let Err(composition_error) = crate::gpui_app::init(
@@ -112,19 +110,4 @@ fn resolve_startup_runtime(host: &NativeAppHost) -> Option<crate::gpui_app::Star
         service_log_export_client,
         history_connector,
     })
-}
-
-/// Install the in-process frame-capture seam consumed by the window-capture
-/// runtime, with the same bounded five-second handoff as before.
-fn register_in_process_capture() {
-    use taskmanager_app_host::register_in_process_capture;
-
-    register_in_process_capture(Box::new(|output| {
-        let (tx, rx) = std::sync::mpsc::sync_channel(1);
-        gpui::request_window_frame_capture_with_channel(output.to_path_buf(), tx);
-        match rx.recv_timeout(std::time::Duration::from_secs(5)) {
-            Ok(res) => res,
-            Err(e) => Err(format!("in-process capture timed out: {e}")),
-        }
-    }));
 }

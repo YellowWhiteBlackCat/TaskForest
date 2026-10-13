@@ -109,7 +109,7 @@ async fn first_run_review_pins_actions_outside_the_real_scroll_owner(
             cx.notify();
         })
         .expect("explicit setup");
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("render");
         let mut visual = VisualTestContext::from_window(win.into(), cx);
         let viewport = visual
@@ -127,12 +127,12 @@ async fn first_run_review_pins_actions_outside_the_real_scroll_owner(
         );
         if height <= 480.0 {
             assert!(
-                handle.max_offset().height > px(0.0),
+                handle.max_offset().y > px(0.0),
                 "the complete descriptor remains reachable through scrolling"
             );
         }
         handle.set_offset(gpui::point(px(0.0), px(-80.0)));
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("scroll");
         let after = visual
             .debug_bounds("tm-first-run-actions")

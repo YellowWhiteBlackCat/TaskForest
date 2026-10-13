@@ -15,7 +15,7 @@ fn tones_are_palette_derived_and_distinct() {
 #[gpui::test]
 async fn badge_renders_for_every_tone(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }

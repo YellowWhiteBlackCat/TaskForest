@@ -256,9 +256,6 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
 const CPU_VERTICAL_CHROME: f32 = 124.0;
 /// The headline card's ceiling while the per-core matrix is visible.
 const HEADLINE_CAP_WITH_MATRIX: f32 = 200.0;
-/// Reserved bottom breathing room in the shared fixed Performance viewport.
-const CPU_BOTTOM_SAFETY: f32 = 8.0;
-
 fn cpu_matrix_headline_height(
     layout: PerformancePageBudget,
     matrix_min_height: f32,
@@ -269,8 +266,7 @@ fn cpu_matrix_headline_height(
     if layout.content_height <= 0.0 {
         return Some(HEADLINE_CAP_WITH_MATRIX);
     }
-    let available =
-        layout.content_height - CPU_VERTICAL_CHROME - matrix_min_height - CPU_BOTTOM_SAFETY;
+    let available = layout.content_height - CPU_VERTICAL_CHROME - matrix_min_height;
     (available >= HEADLINE_COMPANION_FLOOR).then(|| available.min(HEADLINE_CAP_WITH_MATRIX))
 }
 

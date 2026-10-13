@@ -95,7 +95,7 @@ fn draw_frame(cx: &mut TestAppContext, snapshot: ProcessTelemetrySnapshot) {
     let theme = Theme::dark();
     let card = gpu_engines_card(&theme, &snapshot.gpu, &labels(), 480.0);
     let window = cx.add_window(|_w, _cx| EngineCardView { card });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 

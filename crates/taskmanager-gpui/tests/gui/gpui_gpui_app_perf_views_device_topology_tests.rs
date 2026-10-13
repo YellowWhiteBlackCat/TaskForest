@@ -35,7 +35,7 @@ fn wrapped_root(cx: &mut TestAppContext) -> (gpui::WindowHandle<RootView>, gpui:
 }
 
 fn draw(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 

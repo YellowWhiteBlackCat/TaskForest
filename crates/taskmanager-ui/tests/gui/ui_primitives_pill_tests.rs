@@ -4,7 +4,7 @@ use taskmanager_theme::Theme;
 #[gpui::test]
 async fn pill_renders_both_states(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }

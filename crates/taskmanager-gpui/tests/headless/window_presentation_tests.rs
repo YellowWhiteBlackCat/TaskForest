@@ -1,10 +1,12 @@
 use super::*;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellAnchor;
-use taskmanager_app_host::LayerShellFallbackPolicy;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellKeyboardInteractivity;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellLayer;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellMargins;
-use taskmanager_app_host::LayerShellOutput;
 // The neutral presentation contract is platform-independent, but the module
 // above imports `LayerShellSpec` only for Linux (its only live consumer).
 // Import it here from the app-host contract directly so these headless
@@ -12,8 +14,9 @@ use taskmanager_app_host::LayerShellOutput;
 // re-import exists.
 use taskmanager_app_host::LayerShellSpec;
 
+#[cfg(target_os = "linux")]
 #[test]
-fn neutral_layer_profile_reaches_gpui_without_losing_role_or_policy() {
+fn neutral_layer_profile_maps_to_gpui_layer_shell_fields() {
     let spec = LayerShellSpec::new("taskforest.panel")
         .expect("valid namespace")
         .with_layer(LayerShellLayer::Overlay)
@@ -22,28 +25,26 @@ fn neutral_layer_profile_reaches_gpui_without_losing_role_or_policy() {
         .with_margins(LayerShellMargins::new(1, 2, 3, 4))
         .with_exclusive_zone(32)
         .expect("valid exclusive zone")
-        .with_keyboard_interactivity(LayerShellKeyboardInteractivity::OnDemand)
-        .with_output(LayerShellOutput::named("DP-1").expect("valid output name"))
-        .with_fallback(LayerShellFallbackPolicy::Unavailable);
+        .with_keyboard_interactivity(LayerShellKeyboardInteractivity::OnDemand);
 
-    let gpui::WindowPresentation::LayerShell(options) =
-        to_gpui(&WindowPresentation::layer_shell(spec))
+    let gpui::WindowKind::LayerShell(options) = to_gpui(&WindowPresentation::layer_shell(spec))
     else {
         panic!("layer-shell contract must remain a layer-shell GPUI request");
     };
 
-    assert_eq!(options.namespace(), "taskforest.panel");
-    assert_eq!(options.layer(), gpui::LayerShellLayer::Overlay);
-    assert_eq!(options.anchor(), 0b0011);
-    assert_eq!(options.size(), (1_280, 720));
-    assert_eq!(options.margins(), (1, 2, 3, 4));
-    assert_eq!(options.exclusive_zone(), 32);
+    use gpui::layer_shell::{Anchor, KeyboardInteractivity, Layer};
+    assert_eq!(options.namespace, "taskforest.panel");
+    assert_eq!(options.layer, Layer::Overlay);
+    assert!(options.anchor.contains(Anchor::TOP | Anchor::RIGHT));
+    assert_eq!(options.exclusive_zone, Some(gpui::px(32.0)));
     assert_eq!(
-        options.keyboard_interactivity(),
-        gpui::LayerShellKeyboardInteractivity::OnDemand
+        options.margin,
+        Some((gpui::px(1.0), gpui::px(2.0), gpui::px(3.0), gpui::px(4.0)))
     );
-    assert_eq!(options.output(), Some("DP-1"));
-    assert_eq!(options.fallback(), LayerShellFallback::Unavailable);
+    assert_eq!(
+        options.keyboard_interactivity,
+        KeyboardInteractivity::OnDemand
+    );
 }
 
 #[test]

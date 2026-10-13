@@ -14,12 +14,14 @@ intents. Providers and native I/O remain in platform runtime and app-host; no
 renderer or keyboard handler reads process files, native handles or host clocks.
 Local dates use the app-host time-zone observation and shared pure formatters.
 
-The desktop host preserves the complete standalone shell. On Linux/Wayland,
+The desktop host preserves the complete standalone shell. It uses GPUI Kit's
+version-matched GPUI snapshot while retaining TaskForest's own component and
+theme layers. On Linux/Wayland,
 `TASKFOREST_WINDOW_HOST=layer-shell` requests the app-host presentation
 contract's layer-shell Dashboard widget (profile owned by
 `taskmanager-app-host`, see its
 [`docs/WINDOW_PRESENTATION.md`](../taskmanager-app-host/docs/WINDOW_PRESENTATION.md)).
-Patched GPUI owns the protocol role and configure/ack
+The pinned GPUI snapshot owns the protocol role and configure/ack
 lifecycle; unavailable protocols follow the explicit standalone fallback. Iced
 and Bevy retain their independent host adapters.
 

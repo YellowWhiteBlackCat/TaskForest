@@ -6,9 +6,9 @@ pkgdesc='Eye-friendly native system monitor built with GPUI'
 arch=('x86_64' 'aarch64')
 url='https://github.com/YellowWhiteBlackCat/TaskForest'
 license=('Apache-2.0')
-# gpui 0.2.2's blade backend dlopens libvulkan at runtime (no ELF NEEDED entry,
-# verified via ldd), so the app is non-functional without the loader even though
-# it is not a hard link — hence vulkan-icd-loader in depends, not optdepends.
+# GPUI Kit 0.7.3's GPUI 0.3.9 WGPU/Vulkan backend loads libvulkan at runtime
+# (no ELF NEEDED entry, verified via ldd), so the app needs the loader even
+# though it is not a hard link — hence vulkan-icd-loader is a hard dependency.
 depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'vulkan-icd-loader')
 optdepends=('smartmontools: ATA/SATA/NVMe S.M.A.R.T. attributes and self-tests'
             'nvme-cli: extra NVMe endurance/power-on-hours data'

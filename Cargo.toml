@@ -15,7 +15,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -87,27 +87,19 @@ strip = "debuginfo"
 [patch.crates-io]
 # Linux system clipboard must retain the strict Wayland dependency closure.
 bevy_clipboard = { path = "./patches/bevy_clipboard" }
-proc-macro-error2 = { path = "./patches/proc-macro-error2" }
-# Vendored gpui 0.2.2 patch (strict Wayland): upstream declares the
-# Linux `xkbcommon` dependency with `features = ["wayland", "x11"]`
-# unconditionally, so every binary links `-lxkbcommon-x11` even in a
-# wayland-only build. The patch moves `xkbcommon/x11` behind gpui's own `x11`
-# feature (enabled only by the dev-only `test-support`), so production links
-# zero X11 system libraries.
-gpui = { path = "./patches/gpui" }
+# Vendored GPUI Kit 0.7.3 manifest-only patch: remove Linux x11 from both
+# platform feature selectors so every GPUI backend path stays Wayland-only.
+# All GPUI Kit and GPUI sources remain upstream unchanged.
+gpui-kit = { path = "./patches/gpui-kit" }
 # Vendored cryoglyph 0.1.0 compatibility patch: its public API is unchanged,
 # but its glyph cache uses the fixed lru 0.18.2 panic-safety implementation.
 cryoglyph = { path = "./patches/cryoglyph" }
-# Vendored blade-graphics 0.7.1 patch (fixed-size descriptor sub-pools): the
-# upstream Vulkan descriptor allocator grew pools by `COUNT_BASE.pow(k)` up
-# to 4096 sets, which Intel's driver mapped at ~50 MiB each and which the reset
-# path never shrank. Following upstream's 0.8.x architecture, the vendored copy
-# replaces exponential growth with a linear sub-pool list: each sub-pool allocates
-# a fixed, bounded budget (COUNT_BASE sets), and reset clears each sub-pool in
-# place via vkResetDescriptorPool without reallocating. The public API is unchanged.
-blade-graphics = { path = "./patches/blade-graphics" }
 
 [workspace.dependencies]
+
+# Keep TaskForest's existing `gpui::` imports while using GPUI Kit's pinned,
+# version-matched GPUI snapshot. The Kit component and asset layers are off.
+gpui = { package = "gpui-kit", version = "0.7.3", default-features = false }
 
 # Shared UI packages use one Git revision per product.
 zhuge-ui-core = { git = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git", rev = "7bd25ea87739c926ff230e0b0da4d0f107ce000d", version = "0.1" }

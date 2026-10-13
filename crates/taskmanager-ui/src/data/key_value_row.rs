@@ -192,7 +192,7 @@ impl KeyValueRow {
             // end instead of pushing past the panel and clipping mid-string
             // at the window edge.
             label = label.flex_1().truncate();
-            value = value.flex_shrink().max_w_full();
+            value = value.flex_shrink(1.0).max_w_full();
         }
         if self.value_align_right {
             // A value column is a single-line readout. Without the shared

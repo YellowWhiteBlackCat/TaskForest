@@ -252,7 +252,7 @@ impl TooltipHostState {
             let delay = TOOLTIP_DELAY.saturating_sub(self.hover_elapsed().unwrap_or_default());
             let this = cx.entity();
             self._task = Some(window.spawn(cx, async move |cx| {
-                gpui::Timer::after(delay).await;
+                cx.background_executor().timer(delay).await;
                 this.update(cx, |state, cx| {
                     if !state.dismissed {
                         state.visibility = tooltip_step(
@@ -265,8 +265,7 @@ impl TooltipHostState {
                             cx.notify();
                         }
                     }
-                })
-                .ok();
+                });
             }));
         }
         window.refresh();

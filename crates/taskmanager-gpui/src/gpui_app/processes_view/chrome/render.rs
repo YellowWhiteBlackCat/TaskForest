@@ -97,12 +97,11 @@ pub struct ProcessesViewProps<'a> {
     pub presentation: ProcessChromePresentation,
 }
 
-/// GPUI 0.2.2 lets an x-scroller cross-feed a vertical wheel into its x axis
-/// when the child list consumed the y delta. Keep the two axes independent:
-/// real horizontal input (including platform-normalized Shift+wheel) remains
-/// horizontal, while a normal vertical wheel is left to the uniform list and
-/// stopped before the x parent. The platform adapters normalize Shift+wheel
-/// into `delta.x`; remapping it here would happen after the child list already
+/// Keep the two scroll axes independent: a normal vertical wheel is left to
+/// the uniform list and stopped before the x parent, while real horizontal
+/// input (including platform-normalized Shift+wheel) remains horizontal. The
+/// platform adapters normalize Shift+wheel into `delta.x`; remapping it here
+/// would happen after the child list already
 /// consumed `delta.y` and would create a diagonal scroll.
 fn vertical_wheel_guard() -> impl Fn(&ScrollWheelEvent, &mut Window, &mut gpui::App) {
     move |event: &ScrollWheelEvent, window, cx| {
@@ -205,7 +204,7 @@ pub fn render_processes(
     let content_width =
         process_table_content_width(hidden_cols, horizontal_viewport_width, col_widths);
     let horizontal_overflow =
-        content_width > horizontal_viewport_width || horizontal_scroll.max_offset().width > px(0.0);
+        content_width > horizontal_viewport_width || horizontal_scroll.max_offset().x > px(0.0);
     let render_hidden_cols = Rc::new(hidden_cols.clone());
     let horizontal_scroll = horizontal_scroll.clone();
     let processes_scroll = processes_scroll.clone();
@@ -324,13 +323,12 @@ pub fn render_processes(
                 })
                 .collect::<Vec<_>>()
         })
-        .track_scroll(processes_scroll.clone())
+        .track_scroll(&processes_scroll)
         .w(content_width)
         .flex_1()
         .min_h(px(0.0));
-        // GPUI 0.2.2 applies the same cross-axis fallback to a y-only
-        // uniform_list: a pure horizontal delta becomes vertical movement
-        // unless this field is set on the y owner as well as on the x owner.
+        // UniformList has no Div axis-restriction method, so set its style
+        // refinement to keep horizontal gestures from moving this y-only list.
         process_list.style().restrict_scroll_to_axis = Some(true);
         process_list.into_any_element()
     };
@@ -351,7 +349,7 @@ pub fn render_processes(
         .child(header)
         .child(body);
 
-    let mut horizontal_viewport = div()
+    let horizontal_viewport = div()
         .id("procs-table-horizontal-viewport")
         .debug_selector(|| "tm-procs-table-horizontal-viewport".to_string())
         .flex()
@@ -362,11 +360,8 @@ pub fn render_processes(
         .overflow_x_scroll()
         .track_scroll(&horizontal_scroll)
         .on_scroll_wheel(vertical_wheel_guard())
+        .restrict_scroll_to_axis()
         .child(table_content);
-    // The local GPUI 0.2.2 patch contains this upstream style field but does
-    // not expose Zed's public fluent builder. Set the field directly so a
-    // vertical wheel cannot be cross-fed into this x-only owner.
-    horizontal_viewport.style().restrict_scroll_to_axis = Some(true);
 
     let body_frame = div()
         .id("procs-table-body-frame")

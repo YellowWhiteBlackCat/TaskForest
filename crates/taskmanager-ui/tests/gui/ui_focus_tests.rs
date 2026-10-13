@@ -54,7 +54,7 @@ impl Render for TestRoot {
 async fn modal_trap_keeps_tab_inside_and_restores_trigger(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, cx| TestRoot::new(cx));
     cx.update(ensure_support);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Focus the trigger via its handle (deterministic), then open a
@@ -63,11 +63,11 @@ async fn modal_trap_keeps_tab_inside_and_restores_trigger(cx: &mut TestAppContex
     let trigger = window
         .read_with(&vcx, |root, _| root.trigger_focus.clone())
         .unwrap();
-    vcx.update(|window, _| {
+    vcx.update(|window, cx| {
         window.activate_window();
-        trigger.focus(window);
+        trigger.focus(window, cx);
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let trigger_was_focused = window
         .update(cx, |_, window, _| trigger.is_focused(window))
         .unwrap();
@@ -83,7 +83,7 @@ async fn modal_trap_keeps_tab_inside_and_restores_trigger(cx: &mut TestAppContex
         root.modal_open = true;
         cx.notify();
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let in_modal = window
         .update(cx, |_, window, _| {
@@ -98,9 +98,7 @@ async fn modal_trap_keeps_tab_inside_and_restores_trigger(cx: &mut TestAppContex
     // Tab / Shift-Tab must wrap inside the modal scope, never the inert page.
     for keystroke in ["tab", "shift-tab"] {
         for _ in 0..64 {
-            let _ = window.update(cx, |_, window, cx| {
-                window.dispatch_keystroke(Keystroke::parse(keystroke).unwrap(), cx);
-            });
+            cx.dispatch_keystroke(window.into(), Keystroke::parse(keystroke).unwrap());
             let in_modal = window
                 .update(cx, |_, window, _| {
                     window
@@ -119,7 +117,7 @@ async fn modal_trap_keeps_tab_inside_and_restores_trigger(cx: &mut TestAppContex
         root.modal_open = false;
         cx.notify();
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let trigger_focused = window
         .update(cx, |_, window, _| trigger.is_focused(window))
@@ -197,13 +195,13 @@ async fn restore_after_trigger_destroyed_blurs_instead_of_panicking(cx: &mut Tes
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let handle = trigger.read_with(cx, |view, _| view.focus.clone());
     window
-        .update(cx, |_, window, _| {
+        .update(cx, |_, window, cx| {
             window.activate_window();
-            handle.focus(window);
+            handle.focus(window, cx);
         })
         .unwrap();
     drop(handle);
@@ -217,7 +215,7 @@ async fn restore_after_trigger_destroyed_blurs_instead_of_panicking(cx: &mut Tes
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Destroy the trigger: drop the entity and our clone; the frame
@@ -230,7 +228,7 @@ async fn restore_after_trigger_destroyed_blurs_instead_of_panicking(cx: &mut Tes
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Closing the modal must not panic; the restore target is gone, so
@@ -244,7 +242,7 @@ async fn restore_after_trigger_destroyed_blurs_instead_of_panicking(cx: &mut Tes
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let focused = window
         .update(cx, |_, window, cx| window.focused(cx))

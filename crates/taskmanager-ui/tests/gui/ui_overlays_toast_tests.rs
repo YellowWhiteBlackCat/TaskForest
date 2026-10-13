@@ -84,7 +84,7 @@ async fn auto_dismiss_timer_emits_dismissed_event_with_its_toast_id(cx: &mut Tes
     let executor = cx.executor();
     executor.allow_parking();
     cx.run_until_parked();
-    gpui::Timer::after(Duration::from_millis(30)).await;
+    cx.executor().timer(Duration::from_millis(30)).await;
     executor.forbid_parking();
     cx.run_until_parked();
 
@@ -115,7 +115,7 @@ async fn dismiss_control_accepts_pointer_click_without_emitting_auto_dismiss(
     });
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let dismiss_bounds = vcx
         .debug_bounds("tm-toast-dismiss")
         .expect("dismiss control must render");
@@ -149,8 +149,8 @@ async fn dismiss_control_is_a_keyboard_tab_stop_and_activates_with_enter(cx: &mu
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.update(|window, cx| {
         window.activate_window();
-        window.draw(cx).clear();
-        window.focus_next();
+        window.draw(cx).clear(cx);
+        window.focus_next(cx);
     });
     assert!(
         vcx.update(|window, _| focus_handle.is_focused(window)),

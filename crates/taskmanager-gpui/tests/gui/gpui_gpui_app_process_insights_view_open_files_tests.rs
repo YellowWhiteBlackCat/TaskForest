@@ -109,7 +109,7 @@ fn draw_frame(
     snapshot: ProcessTelemetrySnapshot,
 ) -> gpui::WindowHandle<OpenFilesCardView> {
     let window = cx.add_window(move |_w, _cx| OpenFilesCardView { snapshot });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     window
 }

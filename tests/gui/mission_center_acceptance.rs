@@ -10,7 +10,7 @@ fn root(cx: &mut TestAppContext) -> WindowHandle<RootView> {
 }
 
 fn draw(cx: &mut TestAppContext, window: WindowHandle<RootView>) {
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -80,7 +80,7 @@ async fn hardware_details_scroll_when_sections_exceed_the_viewport(cx: &mut Test
     draw(cx, window);
     view.read_with(cx, |view, _cx| {
         assert!(
-            view.system_scroll.max_offset().height > gpui::px(0.0),
+            view.system_scroll.max_offset().y > gpui::px(0.0),
             "hardware details must scroll when the section cards exceed the viewport"
         );
         assert!(

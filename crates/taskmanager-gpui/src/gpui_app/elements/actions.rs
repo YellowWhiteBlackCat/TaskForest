@@ -307,8 +307,8 @@ impl ToolBtn {
         // absolute overlay UNDER the label (idle → sidebar_card_bg, hovered →
         // translucent accent tint eased in). The overlay stays a descendant
         // of the focusable shell — a keyed animation id that changes between
-        // frames on a focused element's ancestor path breaks gpui 0.2.2 key
-        // dispatch, so the animation never wraps the shell.
+        // frames on a focused element's ancestor path breaks key dispatch, so
+        // the animation never wraps the shell.
         if self.enabled {
             let base = theme.sidebar_card_bg;
             let hover = theme.hover_bg();

@@ -144,8 +144,10 @@ fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Co
                 // Let several 200 ms telemetry ticks settle before the
                 // native active-window request, without sleeping the UI
                 // thread or blocking the compositor.
-                gpui::Timer::after(Duration::from_millis(1_200)).await;
-                let _ = root.update(cx, |view, cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(1_200))
+                    .await;
+                root.update(cx, |view, cx| {
                     view.capture_evidence.mark_window_capture_settled();
                     if !view.capture_evidence.window_capture_submission_requested() {
                         return;
@@ -288,7 +290,7 @@ impl Render for RootView {
                 else {
                     return;
                 };
-                focus.focus(window);
+                focus.focus(window, cx);
                 if focus.is_focused(window) {
                     let _ = weak.update(cx, |view, cx| {
                         let viewport = view.dialog_scroll.settings.bounds();

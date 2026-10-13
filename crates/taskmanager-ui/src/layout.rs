@@ -240,7 +240,7 @@ pub fn bounded_scroll_region(
         .min_h(px(0.0))
         .w_full()
         .max_h(max_height)
-        .flex_shrink()
+        .flex_shrink(1.0)
         .overflow_y_scroll()
         .child(scroll_content(body))
 }
@@ -307,7 +307,7 @@ pub fn bounded_scroll_region_with_rail(
         .w_full()
         .when_some(width, |frame, width| frame.w(width).max_w(width))
         .max_h(max_height)
-        .flex_shrink()
+        .flex_shrink(1.0)
         .child(viewport)
         .child(
             ScrollbarRail::vertical(scrollbar_id, scrollbar_selector, Rc::new(scroll), palette)

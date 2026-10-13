@@ -3,7 +3,7 @@
 ## Role
 
 TaskForest's own GPUI component layer (ADR-017 Phase 3/4): primitives,
-inputs, and overlays built directly on gpui, taskmanager-theme (`Palette`),
+inputs, and overlays built on GPUI Kit's GPUI re-export, taskmanager-theme (`Palette`),
 taskmanager-icons, and taskmanager-ui-contract. No `gpui_component`.
 
 This crate is the SEMANTIC REFERENCE SOURCE for the parallel component

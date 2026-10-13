@@ -717,8 +717,8 @@ impl RenderOnce for Tree {
                     },
                 )
                 .size_full()
-                .flex_grow()
-                .track_scroll(scroll_handle)
+                .flex_grow(1.0)
+                .track_scroll(&scroll_handle)
                 .with_sizing_behavior(ListSizingBehavior::Auto)
                 .into_any_element(),
             )

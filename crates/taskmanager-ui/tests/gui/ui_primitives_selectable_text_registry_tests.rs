@@ -32,7 +32,7 @@ async fn repeated_closed_windows_leave_no_selection_registry_residue(cx: &mut Te
     for _ in 0..12 {
         let window = cx.add_window(|_window, _cx| RegistryHarness);
         cx.simulate_window_resize(window.into(), size(px(240.0), px(80.0)));
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("registry harness draws");
         let mut visual = VisualTestContext::from_window(window.into(), cx);
         let selectable = visual

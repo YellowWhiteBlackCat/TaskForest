@@ -149,11 +149,11 @@ mod tests_inner {
         let window = cx.add_window(|_window, _cx| TreeHarness {
             state: state.clone(),
         });
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("tree harness should render");
 
         window
-            .update(cx, |_view, window, _cx| window.focus_next())
+            .update(cx, |_view, window, cx| window.focus_next(cx))
             .expect("tree should accept focus");
         assert!(
             window
@@ -254,7 +254,7 @@ mod tests_inner {
         let window = cx.add_window(|_window, _cx| Harness {
             state: state.clone(),
         });
-        let _ = cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear());
+        let _ = cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx));
     }
 
     #[test]

@@ -95,7 +95,7 @@ async fn accepted_inventory_wraps_inside_measured_card_bounds(cx: &mut gpui::Tes
         (480.0, 960.0),
     ] {
         cx.simulate_window_resize(win.into(), size(px(width), px(height)));
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         let mut visual = VisualTestContext::from_window(win.into(), cx);
         let card = visual

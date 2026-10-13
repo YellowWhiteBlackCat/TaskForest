@@ -44,12 +44,14 @@ pub fn card_shadow(t: &Theme) -> Vec<BoxShadow> {
             offset: Point::new(px(0.0), px(CARD_SHADOW_AMBIENT_DROP)),
             blur_radius: px(CARD_SHADOW_AMBIENT_BLUR),
             spread_radius: px(0.0),
+            inset: false,
         },
         BoxShadow {
             color: hsla(ink),
             offset: Point::new(px(0.0), px(1.0)),
             blur_radius: px(4.0),
             spread_radius: px(0.0),
+            inset: false,
         },
     ]
 }

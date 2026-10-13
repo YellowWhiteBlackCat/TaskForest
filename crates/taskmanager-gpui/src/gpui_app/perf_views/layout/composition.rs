@@ -26,8 +26,8 @@ pub(super) fn performance_split(theme: &Theme, left: Div, stats: Div, stats_widt
         .size_full()
         .bg(fill(theme.window_bg))
         .child(
-            left.flex_grow()
-                .flex_shrink()
+            left.flex_grow(1.0)
+                .flex_shrink(1.0)
                 .w_full()
                 .min_w(px(0.0))
                 .min_h(px(0.0))

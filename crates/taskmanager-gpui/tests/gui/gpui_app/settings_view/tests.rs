@@ -13,7 +13,7 @@ mod tests_inner {
     // same reason.
     use gpui::{
         AppContext, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled,
-        TestAppContext, VisualTestContext, Window, div, px, size,
+        TestAppContext, TextRenderingMode, VisualTestContext, Window, div, px, size,
     };
 
     use super::super::fonts::effective_font_summary;
@@ -32,8 +32,8 @@ mod tests_inner {
     #[cfg(target_os = "linux")]
     use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
     use taskmanager_core::core::config::{
-        STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
-        WINDOW_DECORATIONS_SYSTEM,
+        STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_GRAYSCALE,
+        TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_SYSTEM,
     };
     use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::setup::SetupScriptInfo;
@@ -233,7 +233,7 @@ mod tests_inner {
             full: true,
             deco_only: false,
         });
-        window.update(|window, cx| window.draw(cx).clear());
+        window.update(|window, cx| window.draw(cx).clear(cx));
 
         let general = window
             .debug_bounds("settings.group_general")
@@ -333,7 +333,7 @@ mod tests_inner {
             full: true,
             deco_only: false,
         });
-        window.update(|window, cx| window.draw(cx).clear());
+        window.update(|window, cx| window.draw(cx).clear(cx));
 
         window
             .debug_bounds("tm-settings-privilege-center")
@@ -396,7 +396,7 @@ mod tests_inner {
             full: true,
             deco_only: false,
         });
-        window.update(|window, cx| window.draw(cx).clear());
+        window.update(|window, cx| window.draw(cx).clear(cx));
 
         for id in ["gpu-engines", "smbios-memory", "rapl-power", "msr-readouts"] {
             let state: &'static str =
@@ -440,7 +440,7 @@ mod tests_inner {
                 full: true,
                 deco_only: false,
             });
-            settings_window.update(|window, cx| window.draw(cx).clear());
+            settings_window.update(|window, cx| window.draw(cx).clear(cx));
 
             settings_window
                 .debug_bounds("first-run-open-from-settings")
@@ -450,7 +450,7 @@ mod tests_inner {
         let (_, action_window) = cx.add_window_view(|_window, _cx| OptionalSetupHarness {
             root_view: root_view.clone(),
         });
-        action_window.update(|window, cx| window.draw(cx).clear());
+        action_window.update(|window, cx| window.draw(cx).clear(cx));
         let action = action_window
             .debug_bounds("first-run-open-from-settings")
             .expect("optional setup action must be rendered as a real control");
@@ -473,7 +473,7 @@ mod tests_inner {
             full: true,
             deco_only: false,
         });
-        window.update(|window, cx| window.draw(cx).clear());
+        window.update(|window, cx| window.draw(cx).clear(cx));
         let light = window
             .debug_bounds("mode-light")
             .expect("Light product preview must render");
@@ -509,7 +509,7 @@ mod tests_inner {
         })
         .unwrap();
         cx.simulate_window_resize(win.into(), size(px(720.0), px(480.0)));
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
 
         let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -554,11 +554,10 @@ mod tests_inner {
         );
     }
 
-    /// Published GPUI 0.2.2 cannot change text rasterization. The unsupported
-    /// choices stay visible as disabled capability evidence, but a real pointer
-    /// activation must not change the persisted/live token.
+    /// Text-rendering choices update both the stored preference and GPUI's live
+    /// application mode through the real Settings event path.
     #[gpui::test]
-    async fn unsupported_text_rendering_choices_are_visible_but_inert(cx: &mut TestAppContext) {
+    async fn text_rendering_choices_apply_to_gpui_and_persist(cx: &mut TestAppContext) {
         let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
         let win = cx.add_window(|_window, _cx| SettingsHarness {
             root_view: root_view.clone(),
@@ -566,25 +565,39 @@ mod tests_inner {
             deco_only: false,
         });
         let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
 
         let default_mode = vcx
             .debug_bounds("text-rendering-default")
             .expect("platform default text mode must render");
         let subpixel = vcx
             .debug_bounds("text-rendering-subpixel")
-            .expect("unsupported subpixel choice must remain visible");
+            .expect("subpixel choice must render");
         let grayscale = vcx
             .debug_bounds("text-rendering-grayscale")
-            .expect("unsupported grayscale choice must remain visible");
+            .expect("grayscale choice must render");
         assert!(default_mode.origin.x < subpixel.origin.x);
         assert!(subpixel.origin.x < grayscale.origin.x);
 
         vcx.simulate_click(subpixel.center(), Default::default());
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(root_view.read_with(cx, |view, _| {
-            view.presentation_snapshot().text_rendering() == TEXT_RENDERING_PLATFORM_DEFAULT
+            view.presentation_snapshot().text_rendering() == TEXT_RENDERING_SUBPIXEL
         }));
+        assert_eq!(
+            cx.update(|app| app.text_rendering_mode()),
+            TextRenderingMode::Subpixel
+        );
+
+        vcx.simulate_click(grayscale.center(), Default::default());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
+        assert!(root_view.read_with(cx, |view, _| {
+            view.presentation_snapshot().text_rendering() == TEXT_RENDERING_GRAYSCALE
+        }));
+        assert_eq!(
+            cx.update(|app| app.text_rendering_mode()),
+            TextRenderingMode::Grayscale
+        );
     }
 
     /// The Startup-page select records the window's live token through its
@@ -600,16 +613,16 @@ mod tests_inner {
             deco_only: false,
         });
         let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         // Seed a baseline different from the default so each activation is
         // observable (not a no-op "already selected" choice).
         root_view.update(cx, |v, cx| {
             v.set_startup_page_preference(SharedString::from(STARTUP_PAGE_PROCESSES), cx);
         });
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
 
         // Open the select menu through the rendered trigger.
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         let trigger = vcx
             .debug_bounds("startup-page:trigger")
             .expect("select renders");
@@ -619,7 +632,7 @@ mod tests_inner {
             Default::default(),
         );
         vcx.simulate_click(trigger.center(), Default::default());
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             vcx.debug_bounds("tm-popup").is_some(),
             "clicking the select trigger must open the menu"
@@ -627,7 +640,7 @@ mod tests_inner {
 
         // Arrow to the third option (Processes) and confirm.
         vcx.simulate_keystrokes("down down down enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             root_view.read_with(cx, |v, _| {
                 v.presentation_snapshot().startup_page() == STARTUP_PAGE_PROCESSES
@@ -639,15 +652,15 @@ mod tests_inner {
         // keydown exercises its explicit dropdown activation action.
 
         // Reopen and choose the first option (Remember last).
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         vcx.simulate_keystrokes("enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             vcx.debug_bounds("tm-popup").is_some(),
             "Enter on the restored select trigger must reopen the menu"
         );
         vcx.simulate_keystrokes("down enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             root_view.read_with(cx, |v, _| {
                 v.presentation_snapshot().startup_page() == STARTUP_PAGE_REMEMBER
@@ -673,7 +686,7 @@ mod tests_inner {
             deco_only: true,
         });
         let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
 
         let trigger = vcx
             .debug_bounds("window-decorations:trigger")
@@ -684,7 +697,7 @@ mod tests_inner {
             Default::default(),
         );
         vcx.simulate_click(trigger.center(), Default::default());
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             vcx.debug_bounds("tm-popup").is_some(),
             "clicking the select trigger must open the menu"
@@ -693,7 +706,7 @@ mod tests_inner {
         // The menu cursor starts unselected; the first Down lands on the
         // FIRST option, so three downs + Enter activate the third (Custom).
         vcx.simulate_keystrokes("down down down enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             root_view.read_with(cx, |v, _| {
                 v.presentation_snapshot().window_decorations() == WINDOW_DECORATIONS_CUSTOM
@@ -705,15 +718,15 @@ mod tests_inner {
 
         // Reopen and restore the System sentinel (negotiation default): the
         // first Up lands on the LAST option, so three ups reach the first.
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         vcx.simulate_keystrokes("enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             vcx.debug_bounds("tm-popup").is_some(),
             "Enter on the restored select trigger must reopen the menu"
         );
         vcx.simulate_keystrokes("up up up enter");
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(
             root_view.read_with(cx, |v, _| {
                 v.presentation_snapshot().window_decorations().is_empty()

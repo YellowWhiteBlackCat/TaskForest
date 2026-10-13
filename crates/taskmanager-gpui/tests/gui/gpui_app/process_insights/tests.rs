@@ -126,7 +126,7 @@ async fn capture_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestApp
     });
     for viewport in [(1180.0, 780.0), (720.0, 480.0)] {
         cx.simulate_window_resize(window.into(), size(px(viewport.0), px(viewport.1)));
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
 }
@@ -153,7 +153,7 @@ async fn escalation_pill_renders_for_requires_escalation_and_submits_on_click(
         net_escalation: NetworkEscalationState::Closed,
         entity: entity.clone(),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -161,7 +161,7 @@ async fn escalation_pill_renders_for_requires_escalation_and_submits_on_click(
         .debug_bounds("process-insights-net-escalation")
         .expect("the escalation pill must render for a RequiresEscalation traffic failure");
     vcx.simulate_click(pill_bounds.center(), Default::default());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     // No platform client exists in this harness: the submission degrades to
     // the typed RuntimeStopped failure (never a silent no-op).
@@ -428,7 +428,7 @@ async fn failed_escalation_state_renders_the_clickable_retry_pill(cx: &mut gpui:
         }),
         entity: entity.clone(),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -438,7 +438,7 @@ async fn failed_escalation_state_renders_the_clickable_retry_pill(cx: &mut gpui:
     // The retry affordance stays clickable: clicking re-submits through the
     // same RootView path (no platform client here → typed failure again).
     vcx.simulate_click(pill_bounds.center(), Default::default());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let escalation = entity.read_with(cx, |view, _| *view.shell.network_escalation_state());
     assert!(
@@ -471,7 +471,7 @@ fn independent_missing_and_pending_messages_paint_their_own_facet(cx: &mut TestA
         net_escalation: NetworkEscalationState::Closed,
         entity,
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut view = gpui::VisualTestContext::from_window(window.into(), cx);
     for selector in [

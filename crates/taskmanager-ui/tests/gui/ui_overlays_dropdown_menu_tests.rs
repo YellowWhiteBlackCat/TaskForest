@@ -21,7 +21,7 @@ async fn menu_entity_is_cached_across_draws_and_reopens(cx: &mut TestAppContext)
     // Many draws (request_layout every frame): the builder must never
     // run while the menu is closed — no entity churn, no popup.
     for _ in 0..4 {
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -42,7 +42,7 @@ async fn menu_entity_is_cached_across_draws_and_reopens(cx: &mut TestAppContext)
     // popup renders. (Toggle-close and outside-dismiss of the popup are
     // covered by the popup's own dismiss tests.)
     vcx.simulate_click(point(px(960.0), px(540.0)), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         1,
@@ -55,7 +55,7 @@ async fn menu_entity_is_cached_across_draws_and_reopens(cx: &mut TestAppContext)
 
     // More draws while open: the cached entity is reused, no rebuilds.
     for _ in 0..2 {
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
     }
     assert_eq!(
         *builds.borrow(),
@@ -83,14 +83,14 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.update(|window, cx| {
         window.activate_window();
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
     });
 
     let trigger = vcx
         .debug_bounds("dropdown-toggle-trigger")
         .expect("dropdown trigger must render");
     vcx.simulate_click(trigger.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let popup = vcx.debug_bounds("tm-popup").expect("menu must open");
     assert!(
         vcx.update(|window, _cx| menu_focus
@@ -112,9 +112,9 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
     let first = point(popup.left() + px(40.0), popup.top() + px(17.0));
     let second = point(popup.left() + px(40.0), popup.top() + px(43.0));
     vcx.simulate_click(first, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(second, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         toggles.borrow().as_slice(),
         &[0, 1],
@@ -127,7 +127,7 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
     );
 
     vcx.simulate_keystrokes("escape");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         toggles.borrow().as_slice(),
         &[0, 1],
@@ -148,7 +148,7 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
     // A pointer activation provides a direct open-state check after Escape:
     // if the popup stayed mounted this would close it and leave builds at 1.
     vcx.simulate_click(trigger.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(
         vcx.update(|window, _cx| menu_focus
             .borrow()
@@ -162,7 +162,7 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
         "Escape must close the popup before the trigger can open it again"
     );
     vcx.simulate_keystrokes("escape");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(
         vcx.update(|window, cx| window.focused(cx).is_some()),
         "Escape should leave focus on the dropdown trigger"
@@ -172,7 +172,7 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
         "Escape clears the dropdown's owning open state"
     );
     vcx.simulate_keystrokes("enter");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         3,
@@ -180,14 +180,14 @@ async fn checked_choices_stay_open_and_escape_restores_trigger_focus(cx: &mut Te
     );
 
     vcx.simulate_click(point(px(700.0), px(400.0)), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         toggles.borrow().as_slice(),
         &[0, 1],
         "outside dismissal must not activate a checkable menu item"
     );
     vcx.simulate_keystrokes("enter");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         4,
@@ -205,13 +205,13 @@ async fn outside_click_dismisses_dropdown_and_activates_background_target(cx: &m
         activations: activations.clone(),
     });
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     let trigger = vcx
         .debug_bounds("outside-click-dropdown-trigger")
         .expect("dropdown trigger must render");
     vcx.simulate_click(trigger.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(
         vcx.debug_bounds("tm-popup").is_some(),
         "the dropdown is open before the background click"
@@ -221,7 +221,7 @@ async fn outside_click_dismisses_dropdown_and_activates_background_target(cx: &m
         .debug_bounds("outside-click-background-target")
         .expect("background control must render beneath the dropdown");
     vcx.simulate_click(background.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     assert_eq!(
         *activations.borrow(),
@@ -233,7 +233,7 @@ async fn outside_click_dismisses_dropdown_and_activates_background_target(cx: &m
 #[gpui::test]
 async fn dropdown_renders(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }

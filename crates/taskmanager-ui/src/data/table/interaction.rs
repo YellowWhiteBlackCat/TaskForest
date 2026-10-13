@@ -188,7 +188,6 @@ impl<D: TableDelegate> TableState<D> {
         &mut self,
         rows_count: usize,
         visible_end: usize,
-        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let threshold = self.delegate.load_more_threshold();
@@ -202,8 +201,8 @@ impl<D: TableDelegate> TableState<D> {
             return;
         }
         self.loading_more = true;
-        self._load_more_task = cx.spawn_in(window, async move |view, window| {
-            let _ = view.update_in(window, |view, _window, cx| {
+        self._load_more_task = cx.spawn(async move |view, cx| {
+            let _ = view.update(cx, |view, cx| {
                 // Notify only when `load_more` actually grew the data: a
                 // no-op `load_more` (static tables) must not queue a redraw,
                 // otherwise the dispatch → task → notify → redraw → dispatch

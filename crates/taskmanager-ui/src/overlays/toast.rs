@@ -106,8 +106,8 @@ impl ToastState {
         self.auto_dismiss = Some(duration);
         let this = cx.entity();
         self._task = Some(cx.spawn(async move |_this, cx| {
-            gpui::Timer::after(duration).await;
-            let _ = this.update(cx, |toast, cx| {
+            cx.background_executor().timer(duration).await;
+            this.update(cx, |toast, cx| {
                 cx.emit(ToastEvent::Dismissed { id: toast.id });
                 cx.notify();
             });

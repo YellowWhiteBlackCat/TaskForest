@@ -54,7 +54,7 @@ impl SectionHeader {
             )
             .child(
                 div()
-                    .flex_grow()
+                    .flex_grow(1.0)
                     .h(px(1.0))
                     .bg(crate::theme_binding::fill(self.palette.border)),
             );

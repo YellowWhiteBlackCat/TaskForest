@@ -30,7 +30,7 @@ fn wrapped_root(cx: &mut TestAppContext) -> (gpui::WindowHandle<RootView>, gpui:
 }
 
 fn draw(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -66,7 +66,7 @@ async fn services_page_paints_rows_for_each_provided_service(cx: &mut TestAppCon
         );
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     for sel in ["tm-svc-row:0", "tm-svc-row:1", "tm-svc-row:2"] {
         let r = vcx
             .debug_bounds(sel)

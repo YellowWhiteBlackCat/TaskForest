@@ -13,7 +13,7 @@ async fn settings_modal_scrollbar_renders_with_valid_bounds(cx: &mut gpui::TestA
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
     let scrollbar_bounds = vcx.debug_bounds("tm-settings-scrollbar");
@@ -69,7 +69,7 @@ async fn users_session_confirmation_keeps_both_choices_inside_compact_bounds(
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(win.into(), cx);
@@ -127,7 +127,7 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(win.into(), cx);
@@ -152,7 +152,7 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
     let first_value = visual
         .debug_bounds("system-about-selectable-value-0")
         .expect("system information values must use shared selectable text");
-    assert!(handle.max_offset().height > px(0.0));
+    assert!(handle.max_offset().y > px(0.0));
     assert!(copy.size.width < actions.size.width / 2.0);
     assert!(actions.bottom() < viewport_before.top());
     assert!(first_title.bottom() <= first_card.top());
@@ -178,7 +178,7 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
         touch_phase: TouchPhase::Moved,
     });
     assert!(handle.offset().y < offset_before.y);
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let viewport_after = visual
         .debug_bounds("tm-system-about-scroll")
@@ -201,7 +201,7 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
 #[gpui::test]
 async fn cold_start_mask_tracks_the_typed_frame_lifecycle(cx: &mut gpui::TestAppContext) {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -214,7 +214,7 @@ async fn cold_start_mask_tracks_the_typed_frame_lifecycle(cx: &mut gpui::TestApp
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert!(
         vcx.debug_bounds("tm-telemetry-ready-body").is_some(),
@@ -230,7 +230,7 @@ async fn prolonged_warmup_exposes_a_focusable_retry_surface(cx: &mut gpui::TestA
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
     assert!(

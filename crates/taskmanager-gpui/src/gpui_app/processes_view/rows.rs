@@ -663,7 +663,7 @@ pub fn proc_row_with_layout(
             });
         })
         // Focusable so clicking a row routes keyboard focus here (the row's own
-        // on_key_down then handles Space and ArrowUp/Down/Left/Right). gpui 0.2.2 lays uniform_list
+        // on_key_down then handles Space and ArrowUp/Down/Left/Right). GPUI lays uniform_list
         // rows out as independent roots, so a key handler on the list itself wouldn't
         // reliably receive bubbled row key events — hence per-row handlers.
         //

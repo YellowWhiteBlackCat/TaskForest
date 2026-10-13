@@ -90,8 +90,8 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
     // overlay UNDER the content (idle → base, hovered → translucent accent
     // tint eased in, active → solid accent). The overlay must stay a
     // DESCENDANT of the focusable shell: a keyed animation id that changes
-    // between frames on a focused element's ancestor path breaks gpui 0.2.2
-    // key dispatch, so the animation never wraps the shell (same pattern as
+    // between frames on a focused element's ancestor path breaks key
+    // dispatch, so the animation never wraps the shell (same pattern as
     // the process-row selection rail: absolute child, paints beneath).
     let base = t.sidebar_card_bg;
     let hover = t.accent.with_alpha(0.12);
@@ -226,7 +226,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             // The label is the only shrinking child inside a tab. Its zero
             // minimum width lets a long locale ellipsize without pushing the
             // icon or trailing controls outside the bounded navigation region.
-            tab.child(elements::truncated_text(i18n::t(display)).flex_shrink())
+            tab.child(elements::truncated_text(i18n::t(display)).flex_shrink(1.0))
         })
 }
 
@@ -242,7 +242,7 @@ pub fn gear_btn(
     // The gear background is a keyed 120ms transition painted by an absolute
     // overlay under the icon (transparent → translucent accent tint, eased in
     // on hover) — a descendant of the focusable shell, never wrapping it (see
-    // `tab` for the gpui 0.2.2 key-dispatch constraint).
+    // `tab` to preserve focus-path key dispatch).
     let transparent = Color::TRANSPARENT;
     let hover_bg = t.accent.with_alpha(0.12);
     div()

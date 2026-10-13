@@ -95,13 +95,18 @@ pub fn modal_context_focused(window: &Window) -> bool {
         .any(|context| context.contains(MODAL_CONTEXT))
 }
 
-fn apply_target(target: FocusTarget, state: Option<&DialogFocusState>, window: &mut Window) {
+fn apply_target(
+    target: FocusTarget,
+    state: Option<&DialogFocusState>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     match target {
         FocusTarget::ModalScope => {
             if let Some(state) = state {
-                state.scope.focus(window);
+                state.scope.focus(window, cx);
             } else {
-                window.blur();
+                window.blur(cx);
             }
         }
         FocusTarget::Restore(expected_token) => {
@@ -109,12 +114,12 @@ fn apply_target(target: FocusTarget, state: Option<&DialogFocusState>, window: &
                 .and_then(|state| state.trigger.as_ref())
                 .filter(|(token, _)| *token == expected_token)
             {
-                trigger.focus(window);
+                trigger.focus(window, cx);
             } else {
-                window.blur();
+                window.blur(cx);
             }
         }
-        FocusTarget::Clear => window.blur(),
+        FocusTarget::Clear => window.blur(cx),
     }
 }
 
@@ -122,8 +127,8 @@ fn move_focus(direction: TraversalDirection, window: &mut Window, cx: &mut App) 
     let mut cycle = MODAL_FOCUS_POLICY.begin_cycle();
     loop {
         match direction {
-            TraversalDirection::Next => window.focus_next(),
-            TraversalDirection::Previous => window.focus_prev(),
+            TraversalDirection::Next => window.focus_next(cx),
+            TraversalDirection::Previous => window.focus_prev(cx),
         }
 
         match cycle.observe(modal_context_focused(window)) {
@@ -135,7 +140,7 @@ fn move_focus(direction: TraversalDirection, window: &mut Window, cx: &mut App) 
                     .try_global::<DialogFocusRegistry>()
                     .and_then(|registry| registry.by_window.get(&window_id))
                     .cloned();
-                apply_target(target, state.as_ref(), window);
+                apply_target(target, state.as_ref(), window, cx);
                 return;
             }
         }
@@ -171,7 +176,12 @@ pub fn begin_modal(window: &mut Window, cx: &mut App) -> FocusHandle {
     cx.global_mut::<DialogFocusRegistry>()
         .by_window
         .insert(window_id, state.clone());
-    apply_target(MODAL_FOCUS_POLICY.initial_target(), Some(&state), window);
+    apply_target(
+        MODAL_FOCUS_POLICY.initial_target(),
+        Some(&state),
+        window,
+        cx,
+    );
     scope
 }
 
@@ -207,6 +217,7 @@ pub fn restore_modal(window: &mut Window, cx: &mut App) {
         MODAL_FOCUS_POLICY.restore_target(restore_token),
         Some(&state),
         window,
+        cx,
     );
 }
 

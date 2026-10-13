@@ -133,15 +133,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-      # gpui links against xkbcommon on Linux; the runner image ships the
-      # runtime lib but not always the -dev link flags, so install it
-      # explicitly (idempotent if already present). mold is the link-time
-      # accelerator behind the workflow-level RUSTFLAGS.
+      # GPUI's font-kit backend needs fontconfig development metadata, and
+      # GPUI links against xkbcommon on Linux. The runner image does not
+      # guarantee either -dev package, so install both explicitly. mold is
+      # the link-time accelerator behind workflow-level RUSTFLAGS.
       - name: Install Linux GUI system deps and mold
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev mold
+          libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy
@@ -199,7 +199,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev mold
+          libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Fetch private shared UI kit dependency
         env:
@@ -233,7 +233,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev mold
+          libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Fetch private shared UI kit dependency
         env:
@@ -269,7 +269,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev mold
+          libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Fetch private shared UI kit dependency
         env:

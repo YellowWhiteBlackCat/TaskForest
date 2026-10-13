@@ -69,7 +69,7 @@ async fn dashboard_cards_stay_inside_the_bounded_review_viewport(cx: &mut TestAp
             .unwrap();
         let mut reached = HashSet::new();
         for _ in 0..4 {
-            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
                 .unwrap();
             let first = win
                 .read_with(cx, |view, _| {
@@ -127,7 +127,7 @@ async fn dashboard_cards_stay_inside_the_bounded_review_viewport(cx: &mut TestAp
             );
         }
         for window in SystemHistoryWindow::ALL {
-            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
                 .unwrap();
             let mut visual = VisualTestContext::from_window(win.into(), cx);
             let control = visual

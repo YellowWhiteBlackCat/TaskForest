@@ -50,7 +50,7 @@ async fn cpu_page_paints_one_cell_per_reported_core(cx: &mut TestAppContext) {
             });
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     for (index, selector) in [
         (0, "tm-perf-core:0"),
         (1, "tm-perf-core:1"),

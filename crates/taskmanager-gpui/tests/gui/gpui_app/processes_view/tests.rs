@@ -65,7 +65,7 @@ fn wrapped_root(cx: &mut TestAppContext) -> (WindowHandle<RootView>, Entity<Root
 }
 
 fn draw(cx: &mut TestAppContext, win: WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -92,7 +92,7 @@ fn focus_sort_header_cell(
     view: &Entity<RootView>,
 ) {
     for _ in 0..64 {
-        win.update(cx, |_root, window, _cx| window.focus_next())
+        win.update(cx, |_root, window, cx| window.focus_next(cx))
             .unwrap();
         let before = view.read_with(cx, |v, _cx| v.process_sort().0);
         cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
@@ -296,7 +296,7 @@ async fn process_search_highlight_keeps_name_row_geometry_stable(cx: &mut TestAp
         v.set_process_query("f");
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     let highlighted_row = vcx
         .debug_bounds("tm-proc-row-root:0")
@@ -724,7 +724,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
             entity: root,
         }
     });
-    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(host.into(), cx);
     let r = vcx
@@ -829,7 +829,7 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
             entity: root,
         }
     });
-    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(host.into(), cx);
     let image = vcx
@@ -855,7 +855,7 @@ async fn debug_bounds_probe(cx: &mut TestAppContext) {
         }
     }
     let host = cx.add_window(|_w, _cx| Probe);
-    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(host.into(), cx);
     assert!(
@@ -946,7 +946,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
             selected: true,
         }
     });
-    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(host.into(), cx);
     let row_bounds = vcx
@@ -979,7 +979,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
             selected: false,
         }
     });
-    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(host.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(host.into(), cx);
     assert!(
@@ -1017,7 +1017,7 @@ async fn status_filter_segmented_keyboard_moves_the_typed_bucket_and_rows(cx: &m
     // the typed bucket on ArrowRight (the sort-header probe pattern).
     let mut reached = false;
     for _ in 0..64 {
-        win.update(cx, |_root, window, _cx| window.focus_next())
+        win.update(cx, |_root, window, cx| window.focus_next(cx))
             .unwrap();
         cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
         if view.read_with(cx, |v, _cx| v.process_status_filter()) != ProcessStatusFilter::All {

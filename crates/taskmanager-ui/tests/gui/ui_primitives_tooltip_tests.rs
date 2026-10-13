@@ -54,7 +54,7 @@ fn hover_delay_gates_visibility() {
 #[gpui::test]
 async fn tooltip_renders_around_trigger(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }
@@ -68,7 +68,7 @@ async fn keyboard_focus_shows_tooltip_and_escape_dismisses_it(cx: &mut TestAppCo
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.update(|window, cx| {
         window.activate_window();
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
     });
     assert!(
         vcx.debug_bounds("tooltip-probe").is_none(),
@@ -76,16 +76,16 @@ async fn keyboard_focus_shows_tooltip_and_escape_dismisses_it(cx: &mut TestAppCo
     );
 
     vcx.update(|window, cx| {
-        window.focus_next();
-        window.draw(cx).clear();
+        window.focus_next(cx);
+        window.draw(cx).clear(cx);
     });
     let probe = vcx
         .debug_bounds("tooltip-probe")
         .expect("keyboard focus must show tooltip content");
     vcx.simulate_keystrokes("escape");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(probe.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     assert_eq!(
         *clicks.borrow(),
@@ -103,9 +103,9 @@ async fn pointer_click_dismisses_a_focused_tooltip(cx: &mut TestAppContext) {
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.update(|window, cx| {
         window.activate_window();
-        window.draw(cx).clear();
-        window.focus_next();
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
+        window.focus_next(cx);
+        window.draw(cx).clear(cx);
     });
     let trigger = vcx
         .debug_bounds("tooltip-trigger")
@@ -115,9 +115,9 @@ async fn pointer_click_dismisses_a_focused_tooltip(cx: &mut TestAppContext) {
         .expect("keyboard focus must show tooltip content");
 
     vcx.simulate_click(trigger.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(probe.center(), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     assert_eq!(
         *clicks.borrow(),

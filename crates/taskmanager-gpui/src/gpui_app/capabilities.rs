@@ -1,8 +1,8 @@
 //! The GPUI shape's component/surface capability declaration (CORE-08).
 //!
 //! GPUI is the REFERENCE shape (GPUI-05): `taskmanager-ui` builds every
-//! capability in the registry directly on gpui — gpui 0.2.2 ships none of
-//! them — so this declaration marks each capability
+//! capability in the registry directly on GPUI primitives; GPUI Kit's
+//! component feature remains disabled. This declaration marks each capability
 //! [`CapabilitySupport::Reference`], with one audited exception: a capability
 //! registered as a semantic contract
 //! ([`ComponentCapability::is_semantic_contract`]) has

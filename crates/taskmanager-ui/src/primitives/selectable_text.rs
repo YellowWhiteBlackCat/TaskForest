@@ -44,7 +44,7 @@ pub fn init(cx: &mut App) {
         // GPUI invokes this after the window has left its registry. Defer the
         // weak-reference sweep once more so the closed window's keyed element
         // state has also released its final strong entity handle.
-        let subscription = cx.on_window_closed(|cx| {
+        let subscription = cx.on_window_closed(|cx, _window_id| {
             cx.defer(|cx| {
                 cx.global_mut::<SelectionRegistry>().prune_released();
             });
@@ -433,7 +433,7 @@ impl Element for SelectableTextElement {
                 let index = down_layout
                     .index_for_position(event.position)
                     .unwrap_or_else(|index| index);
-                focus_handle.focus(window);
+                focus_handle.focus(window, cx);
                 activate_selection(window.window_handle().window_id(), &down_state, cx);
                 down_state.update(cx, |state, cx| state.begin(index, event.click_count, cx));
                 cx.stop_propagation();

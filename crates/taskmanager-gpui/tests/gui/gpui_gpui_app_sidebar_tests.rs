@@ -199,7 +199,7 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
         cx.notify();
     })
     .unwrap();
-    cx.update_window(*win, |_, window, cx| window.draw(cx).clear())
+    cx.update_window(*win, |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(*win, cx);

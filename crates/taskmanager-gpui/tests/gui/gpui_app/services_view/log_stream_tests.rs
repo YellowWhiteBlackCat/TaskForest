@@ -58,7 +58,7 @@ fn open_details(cx: &mut TestAppContext) -> (gpui::WindowHandle<RootView>, gpui:
 }
 
 fn draw(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -102,9 +102,8 @@ fn seed_stream(
 /// The painted stream, end to end: the same four-severity batch paints four
 /// rows at the default `All` level, while a dialog whose painted level control
 /// was advanced to `Errors` before the batch arrives paints only the error
-/// row. The absence half uses a fresh window because `debug_bounds` keeps the
-/// last frame that painted a selector, so a disappeared element is only
-/// observable as "never painted in this window".
+/// row. Bounds from each draw describe that frame, so the filter transition
+/// also proves that lower-severity rows disappear from the same window.
 #[gpui::test]
 async fn service_details_paints_the_stream_rows_and_the_level_filter_drops_lower_rows(
     cx: &mut TestAppContext,
@@ -137,14 +136,9 @@ async fn service_details_paints_the_stream_rows_and_the_level_filter_drops_lower
         vcx.debug_bounds("tm-svc-log-line:4").is_none(),
         "only the four projected entries may paint"
     );
-    drop(vcx);
-
-    // Window 2: the user-facing control is the production one — click the
-    // painted level pill (All → Errors) before the batch arrives; the drawn
-    // rows must follow the shared filter.
-    let (win, view) = open_details(cx);
-    draw(cx, win);
-    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    // The user-facing control is the production one — click the painted level
+    // pill (All → Errors) before the batch arrives; the drawn rows must follow
+    // the shared filter.
     let pill = vcx
         .debug_bounds("service-logs-level")
         .expect("the level filter control must be painted");

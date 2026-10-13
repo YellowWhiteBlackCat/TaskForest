@@ -199,7 +199,7 @@ impl PopupMenuState {
         self.position = position;
         let menu = cx.new(|_| self);
         menu.read_with(cx, |menu, _| menu.focus_handle.clone())
-            .focus(window);
+            .focus(window, cx);
         menu
     }
 
@@ -331,7 +331,7 @@ impl PopupMenuState {
         // of the focused popup erase the trigger focus in the same frame.
         cx.emit(DismissEvent);
         if let Some(handle) = &self.action_context {
-            handle.focus(window);
+            handle.focus(window, cx);
         }
     }
 }
@@ -498,7 +498,7 @@ impl Render for PopupMenuState {
                                 Some(icon_id) => div().child(icon(icon_id).size(px(14.0))),
                                 None => div(),
                             }))
-                            .child(div().flex_grow().child(item.label.clone()))
+                            .child(div().flex_grow(1.0).child(item.label.clone()))
                             .child(div().w(px(14.0)).flex_shrink_0().child(if item.checked {
                                 div().child(
                                     icon(IconId::EndTask)

@@ -377,12 +377,12 @@ pub(crate) fn render_chart(
             // Companion mode: the section NEVER grows — a grown section
             // around a capped card would pile dead space under the card.
             // It only shrinks, yielding the card toward its companion floor.
-            Some(_) => section.flex_shrink(),
+            Some(_) => section.flex_shrink(1.0),
             // Headline-only pages still grow into the viewport, but the
             // section must yield when a page also admits a lower band. The
             // card's tier floor remains the hard lower bound; a non-shrinking
             // section was the source of the old bottom-overlap behaviour.
-            None => section.flex_auto().flex_shrink(),
+            None => section.flex_auto().flex_shrink(1.0),
         },
         ChartTier::Secondary => section.flex_auto().min_h(length(spec.tier.min_height())),
         ChartTier::Compact => section
@@ -544,7 +544,7 @@ fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) ->
                 Some(max_height) => card
                     .h(max_height)
                     .min_h(px(HEADLINE_COMPANION_FLOOR))
-                    .flex_shrink(),
+                    .flex_shrink(1.0),
                 None => card.flex_1().min_h(length(tier.min_height())),
             }
         }
@@ -773,7 +773,7 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
                 // Intrinsic width, shrinkable, capped: a long model name
                 // truncates inside its own slot and can never widen the
                 // whole split or overlap the context slot.
-                .flex_shrink()
+                .flex_shrink(1.0)
                 .max_w(length(PERFORMANCE_TITLE_MAX_WIDTH))
                 .text_size(font_size(tokens::FONT_26))
                 .font_weight(font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD))
@@ -782,8 +782,8 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
         .child(
             elements::truncated_text(&subtitle)
                 .debug_selector(|| "tm-perf-subtitle-text".to_string())
-                .flex_grow()
-                .flex_shrink()
+                .flex_grow(1.0)
+                .flex_shrink(1.0)
                 .min_w(px(0.0))
                 .text_right()
                 .text_size(font_size(tokens::FONT_16))

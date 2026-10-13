@@ -136,7 +136,7 @@ async fn mc07_skins_case_modal_renders_shared_rows_for_every_skin_and_mode(
                 cx.notify();
             })
             .unwrap();
-            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
                 .unwrap();
             let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
             assert!(

@@ -42,7 +42,7 @@ async fn replay_without_a_query_never_takes_over_the_live_graphs(cx: &mut TestAp
         assert!(!view.history_replay_visible());
         cx.notify();
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -135,7 +135,7 @@ async fn real_replay_keeps_toolbar_and_viewport_bounds_and_reaches_last_curve(
             view.history_replay_scroll
                 .set_offset(gpui::point(px(0.0), px(0.0)))
         });
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("draw");
         let mut visual = VisualTestContext::from_window(window.into(), cx);
         let controls = visual
@@ -164,10 +164,10 @@ async fn real_replay_keeps_toolbar_and_viewport_bounds_and_reaches_last_curve(
             "the toolbar precedes the body vertically"
         );
         window
-            .update(cx, |_view, window, _cx| window.focus_next())
+            .update(cx, |_view, window, cx| window.focus_next(cx))
             .expect("focus route");
         cx.dispatch_keystroke(window.into(), Keystroke::parse("end").expect("end"));
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("scroll draw");
         let mut visual = VisualTestContext::from_window(window.into(), cx);
         assert_eq!(
@@ -188,7 +188,7 @@ async fn real_replay_keeps_toolbar_and_viewport_bounds_and_reaches_last_curve(
             "the full last curve fits after normal End navigation: {last:?} in {viewport:?}"
         );
         view.update(cx, |view, _cx| view.page = TopPage::AppHistory);
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("application history draw");
         let mut visual = VisualTestContext::from_window(window.into(), cx);
         for selector in [

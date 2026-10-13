@@ -72,7 +72,7 @@
   "settings.text_default": "平台默认",
   "settings.text_subpixel": "次像素",
   "settings.text_grayscale": "灰度",
-  "settings.text_rendering_unavailable": "当前发布版 GPUI 不支持次像素和灰度模式；正在使用平台默认设置。",
+  "settings.text_rendering_fallback": "表面不支持次像素渲染时，GPUI 会回退为灰度渲染。",
   "settings.text_rendering_unavailable_generic": "此前端不支持次像素和灰度模式；正在使用平台默认设置。",
   "settings.devices": "设备",
   "settings.apps": "应用",

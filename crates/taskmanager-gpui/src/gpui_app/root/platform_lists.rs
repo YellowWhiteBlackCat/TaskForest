@@ -97,10 +97,14 @@ impl RootView {
             self.request_refresh(RefreshRequest::Sessions);
             let root = cx.entity();
             cx.spawn(async move |_this, cx| {
-                gpui::Timer::after(std::time::Duration::from_millis(600)).await;
-                let _ = root.update(cx, |v, _cx| v.request_refresh(RefreshRequest::Sessions));
-                gpui::Timer::after(std::time::Duration::from_millis(1200)).await;
-                let _ = root.update(cx, |v, _cx| v.request_refresh(RefreshRequest::Sessions));
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(600))
+                    .await;
+                root.update(cx, |v, _cx| v.request_refresh(RefreshRequest::Sessions));
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(1200))
+                    .await;
+                root.update(cx, |v, _cx| v.request_refresh(RefreshRequest::Sessions));
             })
             .detach();
         }

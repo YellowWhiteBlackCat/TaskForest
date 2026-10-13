@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-ui"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -20,13 +20,13 @@ test-support = []
 # theme binding (`theme_binding`, ADR-051): the token→gpui conversions and
 # window/appearance/font/animation helpers live here, not in the neutral
 # theme crate.
-gpui = { version = "0.2.2", default-features = false }
+gpui = { workspace = true }
 taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 
 [dev-dependencies]
-gpui = { version = "0.2.2", default-features = false, features = ["test-support"] }
+gpui = { workspace = true, features = ["test-support"] }
 
 [lib]
 name = "taskmanager_ui"

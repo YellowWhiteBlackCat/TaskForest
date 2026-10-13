@@ -32,7 +32,7 @@ fn draw_isolation_frame(cx: &mut TestAppContext, isolation: ProcessIsolation) {
     };
     let card = isolation_card(&theme, &snapshot.isolation, &labels(), 480.0);
     let window = cx.add_window(|_w, _cx| IsolationCardView { card });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 

@@ -156,13 +156,13 @@ async fn scroll_regions_keep_sibling_bounds_and_retain_real_overflow(cx: &mut Te
         short_handle: short_handle.clone(),
     });
     cx.simulate_window_resize(window.into(), size(px(320.0), px(180.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     assert_eq!(long_handle.bounds().size.height, px(90.0));
     assert_eq!(short_handle.bounds().size.height, px(90.0));
-    assert!(long_handle.max_offset().height > px(0.0));
-    assert_eq!(short_handle.max_offset().height, px(0.0));
+    assert!(long_handle.max_offset().y > px(0.0));
+    assert_eq!(short_handle.max_offset().y, px(0.0));
 }
 
 struct ScrollRailHarness {
@@ -241,7 +241,7 @@ async fn scroll_region_with_rail_moves_only_content_after_a_real_wheel(cx: &mut 
         handle: handle.clone(),
     });
     cx.simulate_window_resize(window.into(), size(px(220.0), px(180.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -255,7 +255,7 @@ async fn scroll_region_with_rail_moves_only_content_after_a_real_wheel(cx: &mut 
         .debug_bounds("tm-test-rail-content")
         .expect("the scrolling marker must render");
 
-    assert!(handle.max_offset().height > px(0.0));
+    assert!(handle.max_offset().y > px(0.0));
     assert_eq!(rail_before.size.width, px(SCROLLBAR_WIDTH));
     assert_eq!(rail_before.right(), viewport_before.right());
     assert_eq!(rail_before.origin.y, viewport_before.top());
@@ -282,7 +282,7 @@ async fn scroll_region_with_rail_moves_only_content_after_a_real_wheel(cx: &mut 
         offset_after.y < offset_before.y,
         "a real wheel must move the tracked content owner"
     );
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let viewport_after = visual
@@ -313,7 +313,7 @@ async fn overlay_rail_reserves_no_layout_width_and_still_scrolls(cx: &mut TestAp
         handle: handle.clone(),
     });
     cx.simulate_window_resize(window.into(), size(px(220.0), px(180.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -373,7 +373,7 @@ async fn bounded_scroll_region_keeps_rail_fixed_after_a_real_wheel(cx: &mut Test
         handle: handle.clone(),
     });
     cx.simulate_window_resize(window.into(), size(px(220.0), px(220.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -390,7 +390,7 @@ async fn bounded_scroll_region_keeps_rail_fixed_after_a_real_wheel(cx: &mut Test
     assert_eq!(viewport_before.size.width, px(180.0));
     assert_eq!(rail_before.origin.y, viewport_before.origin.y);
     assert_eq!(rail_before.bottom(), viewport_before.bottom());
-    assert!(handle.max_offset().height > px(0.0));
+    assert!(handle.max_offset().y > px(0.0));
 
     let offset_before = handle.offset();
     visual.simulate_event(vertical_wheel(viewport_before.center()));
@@ -399,7 +399,7 @@ async fn bounded_scroll_region_keeps_rail_fixed_after_a_real_wheel(cx: &mut Test
         offset_after.y < offset_before.y,
         "a real wheel must move bounded dialog content"
     );
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let viewport_after = visual
@@ -463,7 +463,7 @@ async fn fixed_header_column_keeps_header_outside_the_real_scroll_owner(cx: &mut
         handle: handle.clone(),
     });
     cx.simulate_window_resize(window.into(), size(px(220.0), px(220.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -479,13 +479,13 @@ async fn fixed_header_column_keeps_header_outside_the_real_scroll_owner(cx: &mut
     assert_eq!(header_before.size.width, px(72.0));
     assert_eq!(viewport_before.size.width, px(180.0));
     assert!(header_before.bottom() < viewport_before.top());
-    assert!(handle.max_offset().height > px(0.0));
+    assert!(handle.max_offset().y > px(0.0));
 
     let offset_before = handle.offset();
     visual.simulate_event(vertical_wheel(viewport_before.center()));
     let offset_after = handle.offset();
     assert!(offset_after.y < offset_before.y);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let header_after = visual

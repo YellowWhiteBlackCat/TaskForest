@@ -1,7 +1,7 @@
 use super::{
     DEFAULT_APP_ID, FontAvailability, font_pref_from_config, mode_from_token, page_from_token,
     page_token, resolve_app_id, resolve_startup_page, skin_from_token, startup_page_from_token,
-    text_rendering_from_token,
+    text_rendering_from_token, text_rendering_mode_from_token,
 };
 use super::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, LightDark, Skin, TEXT_RENDERING_PLATFORM_DEFAULT,
@@ -84,19 +84,28 @@ fn color_scheme_tokens_preserve_system_and_legacy_modes() {
 }
 
 #[test]
-fn every_text_rendering_token_falls_back_to_platform_default_until_gpui_supports_it() {
+fn text_rendering_tokens_map_to_supported_gpui_modes_and_unknown_values_fall_back() {
+    use gpui::TextRenderingMode;
     use taskmanager_core::core::config::{TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_SUBPIXEL};
     assert_eq!(
         text_rendering_from_token(TEXT_RENDERING_SUBPIXEL),
-        TEXT_RENDERING_PLATFORM_DEFAULT
+        TEXT_RENDERING_SUBPIXEL
     );
     assert_eq!(
         text_rendering_from_token("GRAYSCALE"),
-        TEXT_RENDERING_PLATFORM_DEFAULT
+        TEXT_RENDERING_GRAYSCALE
     );
     assert_eq!(
         text_rendering_from_token(TEXT_RENDERING_GRAYSCALE),
-        TEXT_RENDERING_PLATFORM_DEFAULT
+        TEXT_RENDERING_GRAYSCALE
+    );
+    assert_eq!(
+        text_rendering_mode_from_token(TEXT_RENDERING_SUBPIXEL),
+        TextRenderingMode::Subpixel
+    );
+    assert_eq!(
+        text_rendering_mode_from_token(TEXT_RENDERING_GRAYSCALE),
+        TextRenderingMode::Grayscale
     );
     assert_eq!(
         text_rendering_from_token("cleartype"),
@@ -106,6 +115,10 @@ fn every_text_rendering_token_falls_back_to_platform_default_until_gpui_supports
     assert_eq!(
         text_rendering_from_token(""),
         TEXT_RENDERING_PLATFORM_DEFAULT
+    );
+    assert_eq!(
+        text_rendering_mode_from_token("future"),
+        TextRenderingMode::PlatformDefault
     );
 }
 

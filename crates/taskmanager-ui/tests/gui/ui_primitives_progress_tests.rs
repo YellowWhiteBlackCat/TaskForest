@@ -13,7 +13,7 @@ fn determinate_value_is_clamped() {
 #[gpui::test]
 async fn progress_renders_both_modes(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }

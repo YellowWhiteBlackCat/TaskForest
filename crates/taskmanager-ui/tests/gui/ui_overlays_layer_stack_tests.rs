@@ -61,7 +61,7 @@ async fn push_close_via_backfill(cx: &mut TestAppContext) {
         let stack = cx.new(|_| LayerStack::new());
         Harness { stack }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let id = window
@@ -144,7 +144,7 @@ async fn modal_mask_covers_the_window_and_panel_stays_inside(cx: &mut TestAppCon
             })
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mask = {
@@ -208,7 +208,7 @@ async fn mask_right_click_does_not_close_but_left_click_does(cx: &mut TestAppCon
             })
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);

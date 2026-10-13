@@ -188,7 +188,7 @@ async fn apps_column_resize_handle_steps_width_within_declared_bounds(cx: &mut T
             .cloned()
             .expect("each resizable process column owns a stable focus target")
     });
-    visual.update(|window, _| focus_handle.focus(window));
+    visual.update(|window, cx| focus_handle.focus(window, cx));
     assert!(
         visual.update(|window, _| focus_handle.is_focused(window)),
         "the process resize control must accept keyboard focus"
