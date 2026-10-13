@@ -131,7 +131,8 @@ jobs:
       - name: Install build and packaging deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libxkbcommon-dev rpm file mold
+          sudo apt-get install -y --no-install-recommends \
+            libfontconfig1-dev libxkbcommon-dev rpm file mold
       - uses: dtolnay/rust-toolchain@1.99.0
         with:
           targets: ${{ matrix.musl_target }}
