@@ -1,7 +1,11 @@
 use super::*;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellAnchor;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellKeyboardInteractivity;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellLayer;
+#[cfg(target_os = "linux")]
 use taskmanager_app_host::LayerShellMargins;
 // The neutral presentation contract is platform-independent, but the module
 // above imports `LayerShellSpec` only for Linux (its only live consumer).
