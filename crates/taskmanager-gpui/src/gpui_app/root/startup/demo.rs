@@ -31,7 +31,7 @@ pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
     theme.window_transparent = cfg!(target_os = "linux");
     let app_id = resolve_app_id(custom_app_id);
     let presentation = WindowPresentation::standalone();
-    let options = WindowOptions {
+    let mut options = WindowOptions {
         titlebar: Some(TitlebarOptions {
             title: Some(product::GPUI_NAME.into()),
             ..Default::default()
@@ -46,9 +46,15 @@ pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
         window_background: background_appearance(&theme),
         app_id: Some(app_id),
         window_min_size: Some(size(px(responsive::MIN_WIDTH), px(responsive::MIN_HEIGHT))),
-        presentation: crate::window_presentation::to_gpui(&presentation),
         ..Default::default()
     };
+    if let Err(error) =
+        crate::window_presentation::apply_to_window_options(&presentation, &mut options, cx)
+    {
+        error!(%error, "demo GPUI window presentation is unavailable");
+        cx.quit();
+        return;
+    }
 
     let window_result = cx.open_window(options, move |window, cx| {
         window.set_window_title(product::GPUI_NAME);
@@ -56,7 +62,9 @@ pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
         let weak = entity.downgrade();
         cx.spawn(async move |cx: &mut gpui::AsyncApp| {
             loop {
-                gpui::Timer::after(std::time::Duration::from_millis(200)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(200))
+                    .await;
                 if weak.upgrade().is_none() {
                     break;
                 }

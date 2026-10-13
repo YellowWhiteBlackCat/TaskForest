@@ -286,7 +286,11 @@ async fn cpu_matrix_hides_whole_below_row_floors_and_headline_fills(cx: &mut Tes
             .expect("normal CPU final core");
         assert!(
             last.bottom() <= viewport.bottom() - px(4.0),
-            "normal CPU matrix must keep its bottom safety band: last={last:?}, viewport={viewport:?}"
+            "normal CPU matrix must keep its bottom safety band: last={last:?}, viewport={viewport:?}, title={:?}, readouts={:?}, chart={:?}, matrix={:?}",
+            vcx.debug_bounds("tm-perf-title"),
+            vcx.debug_bounds("tm-cpu-readouts"),
+            vcx.debug_bounds("tm-perf-chart-card:cpu-headline-graph"),
+            vcx.debug_bounds("tm-cpu-per-core-matrix"),
         );
     }
 }

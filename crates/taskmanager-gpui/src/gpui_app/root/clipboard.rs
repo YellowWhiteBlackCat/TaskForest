@@ -29,7 +29,7 @@ impl RootView {
     /// Write `text` to the system clipboard (when `Some`) and set a transient
     /// `local_feedback_toast` toast confirming the copy (or reporting there was nothing
     /// to copy). `cx` derefs to `&App`, so `cx.write_to_clipboard` targets the
-    /// gpui platform clipboard directly — the real write path in gpui 0.2.2
+    /// GPUI platform clipboard directly — the real write path
     /// (`App::write_to_clipboard` + `ClipboardItem::new_string`).
     pub(super) fn finish_copy(
         &mut self,

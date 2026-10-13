@@ -6,9 +6,9 @@
 //!
 //! This is the in-process self-capture route: no external tool, no PowerShell,
 //! no new audited boundary crate. The pixels come from the real DirectX
-//! compositor frame of the actual app window — not the test renderer, which is
-//! a no-op in gpui 0.2.2 (`src/platform/test/window.rs: draw() {}`), so this
-//! is the only in-process path that yields real pixels.
+//! compositor frame of the actual app window. Headless visual tests render
+//! through a separate test renderer and do not capture the user's composited
+//! window.
 //!
 //! `zed-scap` 0.0.8-zed (gpui's optional screen-capture dependency) does not
 //! compile against either published `windows-capture` version, so this module

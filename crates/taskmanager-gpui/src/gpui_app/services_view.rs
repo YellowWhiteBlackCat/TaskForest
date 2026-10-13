@@ -88,7 +88,7 @@ pub(crate) fn focus_search(
     let Some(input) = view.services_search.as_ref() else {
         return false;
     };
-    input.read(cx).focus_handle().clone().focus(window);
+    input.read(cx).focus_handle().clone().focus(window, cx);
     true
 }
 

@@ -72,7 +72,7 @@
   "settings.text_default": "Platform default",
   "settings.text_subpixel": "Subpixel",
   "settings.text_grayscale": "Grayscale",
-  "settings.text_rendering_unavailable": "Subpixel and grayscale modes are unavailable in the published GPUI build; platform default is active.",
+  "settings.text_rendering_fallback": "Subpixel rendering may fall back to grayscale when the surface cannot support it.",
   "settings.text_rendering_unavailable_generic": "Subpixel and grayscale modes are not available in this frontend; platform default is active.",
   "settings.devices": "Devices",
   "settings.apps": "Apps",

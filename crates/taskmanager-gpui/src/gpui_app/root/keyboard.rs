@@ -95,11 +95,11 @@ fn command_context(view: &RootView, window: &Window) -> CommandContext {
 /// on the first Apps render). Returns `false` when the input has not rendered
 /// yet, so the caller can enqueue a typed destination in
 /// `pending_search_focus`.
-fn focus_process_search(view: &RootView, window: &mut Window, cx: &App) -> bool {
+fn focus_process_search(view: &RootView, window: &mut Window, cx: &mut App) -> bool {
     let Some(input) = view.search_input.as_ref() else {
         return false;
     };
-    input.read(cx).focus_handle().clone().focus(window);
+    input.read(cx).focus_handle().clone().focus(window, cx);
     true
 }
 
@@ -244,8 +244,8 @@ fn apply_app_action(
 ) {
     match action {
         AppAction::FocusSearch => focus_search(view, window, cx),
-        AppAction::MoveFocus(FocusDirection::Next) => window.focus_next(),
-        AppAction::MoveFocus(FocusDirection::Previous) => window.focus_prev(),
+        AppAction::MoveFocus(FocusDirection::Next) => window.focus_next(cx),
+        AppAction::MoveFocus(FocusDirection::Previous) => window.focus_prev(cx),
         AppAction::MoveSelection(direction) => {
             let preserve = event.keystroke.modifiers.control || event.keystroke.modifiers.shift;
             move_process_page(view, direction, preserve);
@@ -334,7 +334,8 @@ impl RootView {
             let retry_surface = view.telemetry_warmup_phase().allows_retry();
             if retry_surface && key == "tab" {
                 if let Some(button) = view.telemetry_warmup_retry_button.as_ref() {
-                    button.read(cx).focus_handle().focus(window);
+                    let focus_handle = button.read(cx).focus_handle().clone();
+                    focus_handle.focus(window, cx);
                 }
                 cx.stop_propagation();
             } else if retry_surface && matches!(key, "enter" | "space") {

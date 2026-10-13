@@ -25,18 +25,19 @@ pub(super) fn wrapped_root(cx: &mut TestAppContext) -> (WindowHandle<RootView>, 
 }
 
 pub(super) fn draw(cx: &mut TestAppContext, win: WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
-/// Advance past the 100ms search debounce and run any pending timer tasks, so
-/// tests asserting on the debounced query can read the settled value.
-fn settle_search_debounce(cx: &mut TestAppContext) {
-    // gpui::Timer is smol::Timer (wall clock): sleep past the debounce for
-    // real, then drain the executor so the spawned update task runs before
-    // the assertions below.
-    std::thread::sleep(std::time::Duration::from_millis(150));
-    cx.executor().run_until_parked();
+/// Let the real 100ms timer resolve, then drain the foreground update queued
+/// by the debounce task before asserting the per-window query.
+async fn settle_search_debounce(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    cx.executor()
+        .timer(std::time::Duration::from_millis(125))
+        .await;
+    cx.executor().forbid_parking();
+    cx.run_until_parked();
 }
 
 /// Prime a window into a clean, Input-free page so keyboard dispatch paths are
@@ -93,7 +94,7 @@ async fn dialog_in_one_window_leaves_the_other_window_focus_independent(cx: &mut
     // A: focus the trigger, then open Settings.
     let trigger_a = win_a
         .update(cx, |_root, window, cx| {
-            window.focus_next();
+            window.focus_next(cx);
             window
                 .focused(cx)
                 .expect("window A exposes a first tab stop")
@@ -118,7 +119,7 @@ async fn dialog_in_one_window_leaves_the_other_window_focus_independent(cx: &mut
     // A's dialog, and its Tab cycle must advance normally (not wrap inside A's
     // trap).
     win_b
-        .update(cx, |_root, window, _cx| window.focus_next())
+        .update(cx, |_root, window, cx| window.focus_next(cx))
         .unwrap();
     assert!(
         !taskmanager_modal_focused(cx, win_b),
@@ -183,7 +184,7 @@ async fn each_window_closes_only_its_own_dialog(cx: &mut TestAppContext) {
 
     let trigger_a = win_a
         .update(cx, |_root, window, cx| {
-            window.focus_next();
+            window.focus_next(cx);
             window
                 .focused(cx)
                 .expect("window A exposes a first tab stop")
@@ -191,7 +192,7 @@ async fn each_window_closes_only_its_own_dialog(cx: &mut TestAppContext) {
         .unwrap();
     let trigger_b = win_b
         .update(cx, |_root, window, cx| {
-            window.focus_next();
+            window.focus_next(cx);
             window
                 .focused(cx)
                 .expect("window B exposes a first tab stop")
@@ -257,7 +258,7 @@ async fn dialog_focus_recovers_after_switching_window_and_back(cx: &mut TestAppC
 
     let trigger_a = win_a
         .update(cx, |_root, window, cx| {
-            window.focus_next();
+            window.focus_next(cx);
             window
                 .focused(cx)
                 .expect("window A exposes a first tab stop")
@@ -273,7 +274,7 @@ async fn dialog_focus_recovers_after_switching_window_and_back(cx: &mut TestAppC
     // "Switch away": B takes and moves focus, then the dispatch pipeline runs
     // in B. A's trap and dialog state must be untouched by B's activity.
     win_b
-        .update(cx, |_root, window, _cx| window.focus_next())
+        .update(cx, |_root, window, cx| window.focus_next(cx))
         .unwrap();
     cx.dispatch_keystroke(win_b.into(), Keystroke::parse("tab").unwrap());
     let b_focus = focused_handle(cx, win_b).expect("B keeps a focused tab stop");
@@ -383,7 +384,7 @@ async fn apps_search_typing_is_isolated_per_window(cx: &mut TestAppContext) {
     // B: focus B's own search box (click) and type.
     click_own_text_input(cx, win_b);
     cx.simulate_input(win_b.into(), "fire");
-    settle_search_debounce(cx);
+    settle_search_debounce(cx).await;
     assert_eq!(
         view_b.read_with(cx, |view, _cx| view.process_query().to_owned()),
         "fire",
@@ -398,7 +399,7 @@ async fn apps_search_typing_is_isolated_per_window(cx: &mut TestAppContext) {
     // Reverse: A's search box updates only A; B keeps its own query.
     click_own_text_input(cx, win_a);
     cx.simulate_input(win_a.into(), "rust");
-    settle_search_debounce(cx);
+    settle_search_debounce(cx).await;
     assert_eq!(
         view_a.read_with(cx, |view, _cx| view.process_query().to_owned()),
         "rust",
@@ -431,7 +432,7 @@ async fn services_search_typing_is_isolated_per_window(cx: &mut TestAppContext) 
 
     click_own_text_input(cx, win_b);
     cx.simulate_input(win_b.into(), "networkd");
-    settle_search_debounce(cx);
+    settle_search_debounce(cx).await;
     assert_eq!(
         view_b.read_with(cx, |view, _cx| view.services_state.query.clone()),
         "networkd",
@@ -445,7 +446,7 @@ async fn services_search_typing_is_isolated_per_window(cx: &mut TestAppContext) 
 
     click_own_text_input(cx, win_a);
     cx.simulate_input(win_a.into(), "cron");
-    settle_search_debounce(cx);
+    settle_search_debounce(cx).await;
     assert_eq!(
         view_a.read_with(cx, |view, _cx| view.services_state.query.clone()),
         "cron",

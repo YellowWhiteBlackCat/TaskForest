@@ -42,7 +42,7 @@ fn step_settings_slider(cx: &mut TestAppContext, win: WindowHandle<RootView>, ke
             .read(cx)
             .focus_handle()
             .clone();
-        handle.focus(window);
+        handle.focus(window, cx);
     })
     .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse(keystrokes).unwrap());
@@ -378,7 +378,7 @@ async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
     fn toggle_focused(cx: &mut TestAppContext, win: WindowHandle<RootView>, id: &'static str) {
         win.update(cx, |root, window, cx| {
             let handle = root.settings_switches[id].read(cx).focus_handle().clone();
-            handle.focus(window);
+            handle.focus(window, cx);
         })
         .unwrap();
         cx.dispatch_keystroke(win.into(), Keystroke::parse("enter").unwrap());

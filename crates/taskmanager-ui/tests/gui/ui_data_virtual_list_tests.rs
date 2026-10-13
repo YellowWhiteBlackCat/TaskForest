@@ -263,7 +263,7 @@ async fn empty_item_render_measures_to_default_size(cx: &mut TestAppContext) {
         view,
         results: results.clone(),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let results = results.borrow();

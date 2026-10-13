@@ -130,7 +130,7 @@ pub(super) fn device_row(
         // animated overlay UNDER the content (keyed 120ms transition) — a
         // descendant of the focusable shell, never wrapping it (a keyed
         // animation id that changes between frames on a focused element's
-        // ancestor path breaks gpui 0.2.2 key dispatch; the same absolute-
+        // ancestor path breaks key dispatch; the same absolute-
         // child pattern as the process-row selection rail).
         .bg(fill(Color::TRANSPARENT))
         .relative()

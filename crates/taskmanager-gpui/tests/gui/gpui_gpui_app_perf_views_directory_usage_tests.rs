@@ -177,7 +177,7 @@ fn wrapped_panel(
 #[gpui::test]
 async fn disk_page_paints_one_scan_pill_per_mounted_partition(cx: &mut TestAppContext) {
     let (win, _view) = wrapped_panel(cx, two_partition_disk());
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("fixture draw");
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -210,7 +210,7 @@ async fn disk_page_renders_bounded_report_rows_with_typed_unreadable_entries(
         v.replace_directory_usage_for_test(Some(snapshot));
         cx.notify();
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("fixture draw");
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     for selector in [
@@ -233,7 +233,7 @@ async fn clicking_a_scan_pill_without_a_platform_worker_is_a_state_preserving_no
     cx: &mut TestAppContext,
 ) {
     let (win, view) = wrapped_panel(cx, two_partition_disk());
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("fixture draw");
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let pill_bounds = vcx

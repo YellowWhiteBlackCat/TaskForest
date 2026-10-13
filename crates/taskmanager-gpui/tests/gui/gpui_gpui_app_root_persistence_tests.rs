@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use taskmanager_application::i18n::Language;
 use taskmanager_core::core::alerts::NotificationPolicy;
 use taskmanager_core::core::alerts::QuietHours;
-use taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT;
 use taskmanager_shell::ProcessViewing;
 use taskmanager_shell::SortDir;
 
@@ -36,7 +35,7 @@ fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut
 
     assert_eq!(config.mode, COLOR_SCHEME_DARK);
     assert_eq!(config.startup_page, STARTUP_PAGE_PROCESSES);
-    assert_eq!(config.text_rendering, TEXT_RENDERING_PLATFORM_DEFAULT);
+    assert_eq!(config.text_rendering, TEXT_RENDERING_SUBPIXEL);
     assert_eq!(config.graph_data_points, 600);
 }
 

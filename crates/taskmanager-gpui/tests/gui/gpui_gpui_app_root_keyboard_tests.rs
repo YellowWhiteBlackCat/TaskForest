@@ -18,21 +18,21 @@ fn root(cx: &mut TestAppContext) -> WindowHandle<RootView> {
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     // gpui dispatches key events down from the window root TO the focused
     // node; focusing the first tab stop (a titlebar tab under `#root`)
     // puts the root `on_key_down` handler on the dispatch path.
-    win.update(cx, |_view, window, _cx| window.focus_next())
+    win.update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     win
 }
 
 fn collecting_root(cx: &mut TestAppContext) -> WindowHandle<RootView> {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
-    win.update(cx, |_view, window, _cx| window.focus_next())
+    win.update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     win
 }
@@ -52,7 +52,7 @@ async fn f1_toggles_help_overlay_and_renders_shared_command_rows(cx: &mut TestAp
     cx.dispatch_keystroke(win.into(), Keystroke::parse("f1").unwrap());
     assert!(help_open(cx, win), "F1 must open the help overlay");
 
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -170,7 +170,7 @@ async fn session_confirmation_enter_and_escape_use_the_shared_gate(cx: &mut Test
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     cx.dispatch_keystroke(win.into(), Keystroke::parse("tab").unwrap());
@@ -195,7 +195,7 @@ async fn session_confirmation_enter_and_escape_use_the_shared_gate(cx: &mut Test
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse("escape").unwrap());
     assert!(
@@ -231,7 +231,7 @@ async fn question_is_suppressed_while_a_text_input_is_focused(cx: &mut TestAppCo
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse("ctrl-f").unwrap());
     cx.run_until_parked();
@@ -427,7 +427,7 @@ async fn escape_dismisses_confirmation_modal(cx: &mut TestAppContext) {
 async fn f5_refreshes_processes_without_panic(cx: &mut TestAppContext) {
     let win = root(cx);
     cx.dispatch_keystroke(win.into(), Keystroke::parse("f5").unwrap());
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert!(
         win.read_with(cx, |view, _cx| !view.telemetry_frame_state.is_collecting())

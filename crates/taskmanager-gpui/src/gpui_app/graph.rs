@@ -410,7 +410,12 @@ fn paint_paths(window: &mut Window, paints: &[GraphPaint]) {
 
 impl GraphPaint {
     fn paint_translated(&self, window: &mut Window, offset: Point<Pixels>) {
-        window.paint_path(self.path.translate(offset), self.color);
+        let mut path = self.path.clone();
+        path.bounds.origin += offset;
+        for vertex in &mut path.vertices {
+            vertex.xy_position += offset;
+        }
+        window.paint_path(path, self.color);
     }
 }
 

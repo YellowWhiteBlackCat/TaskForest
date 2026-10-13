@@ -89,11 +89,7 @@ impl RenderOnce for Icon {
         // reads its own style.text.color, never a parent's). Inherit the
         // composed ancestor text style — the same fallback the gc Icon
         // rendering used (window.text_style().color at layout time).
-        let has_own_color = element
-            .style()
-            .text
-            .as_ref()
-            .is_some_and(|text| text.color.is_some());
+        let has_own_color = element.style().text.color.is_some();
         if !has_own_color {
             element = element.text_color(window.text_style().color);
         }

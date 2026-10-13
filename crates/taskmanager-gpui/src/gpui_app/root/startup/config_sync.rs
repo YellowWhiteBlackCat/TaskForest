@@ -1,5 +1,8 @@
 //! GPUI projection and non-blocking fold of shared configuration publications.
 
+use std::borrow::BorrowMut;
+
+use gpui::{App, Context};
 use taskmanager_core::core::config::sidebar::normalize_sidebar_preferences;
 
 use super::super::{
@@ -9,7 +12,7 @@ use super::super::{
 use super::{
     AsyncApp, ConfigClient, Duration, RootView, SharedString, WeakEntity, apply_process_config,
     config_from_view, i18n, normalize_graph_data_points, startup_page_from_token,
-    text_rendering_from_token,
+    text_rendering_from_token, text_rendering_mode_from_token,
 };
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigPublicationOutcome;
@@ -23,7 +26,11 @@ use taskmanager_core::core::config::Config;
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens::UiSize;
 
-pub(super) fn apply_root_persisted_projection(view: &mut RootView, cfg: &Config) {
+pub(super) fn apply_root_persisted_projection(
+    view: &mut RootView,
+    cfg: &Config,
+    cx: &mut Context<RootView>,
+) {
     let mut next = view.presentation_snapshot();
     next.appearance = view.resolved_persisted_appearance(cfg);
     if let Some(density) = super::super::persistence::density_from_token(&cfg.density) {
@@ -31,6 +38,8 @@ pub(super) fn apply_root_persisted_projection(view: &mut RootView, cfg: &Config)
     }
     next.appearance.ui_size = UiSize::from_config_token(&cfg.ui_size);
     next.appearance.text_rendering = text_rendering_from_token(&cfg.text_rendering);
+    BorrowMut::<App>::borrow_mut(cx)
+        .set_text_rendering_mode(text_rendering_mode_from_token(&cfg.text_rendering));
     next.appearance.language = cfg.language.as_deref().and_then(i18n::Language::from_code);
     next.startup_page = SharedString::from(startup_page_from_token(&cfg.startup_page));
     // Window-frame policy: normalize the persisted token through the typed
@@ -91,7 +100,7 @@ pub(super) fn apply_root_runtime_config(
 ) {
     let history_preference_changed =
         view.history_runtime.enabled_next_start() != cfg.history_persistence;
-    apply_root_persisted_projection(view, cfg);
+    apply_root_persisted_projection(view, cfg, cx);
     if history_preference_changed {
         view.history_runtime.request(cfg.history_persistence);
         view.sync_history_persistence_sink();

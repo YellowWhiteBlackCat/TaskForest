@@ -13,7 +13,7 @@ use taskmanager_core::core::{
 use taskmanager_theme::Theme;
 
 fn draw(cx: &mut TestAppContext, window: WindowHandle<RootView>) {
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("startup test window must draw");
 }
 

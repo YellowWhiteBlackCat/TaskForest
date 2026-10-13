@@ -108,7 +108,7 @@ async fn process_column_picker_keeps_checkboxes_open_and_restores_trigger_focus(
 }
 
 fn draw(vcx: &mut VisualTestContext) {
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 }
 
 fn click_column(vcx: &mut VisualTestContext, popup: Bounds<gpui::Pixels>, row: usize) {

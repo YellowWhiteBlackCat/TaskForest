@@ -69,7 +69,7 @@ impl ScrollbarHandle for ScrollHandle {
     }
 
     fn max_offset(&self) -> Size<Pixels> {
-        self.max_offset()
+        self.max_offset().into()
     }
 
     fn viewport(&self) -> Bounds<Pixels> {

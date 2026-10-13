@@ -3,7 +3,8 @@
 //! Status / CPU / Memory / Disk read / Disk write, each with a ▲/▼ direction indicator),
 //! click-to-select rows, and an action bar
 //! (End task / Kill / Suspend / Resume). Search + the 8-signal right-click menu come
-//! later (gpui 0.2.2 ships no text_input or popover, so those need custom building).
+//! Search and context menus use TaskForest-owned components and presentation
+//! contracts; GPUI Kit's component feature remains disabled.
 //!
 //! **State ownership:** collapse/expand + affinity dialog state
 //! live as fields on `RootView` (prefixed `processes_`), threaded into

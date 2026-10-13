@@ -536,7 +536,7 @@ where
             if !should_refresh {
                 return;
             }
-            // Rate gate (see `scene_cache`): gpui 0.2.2 repaints the whole
+            // Rate gate (see `scene_cache`): a root refresh redraws the whole
             // window per refresh and pointer events can outpace any display,
             // so crosshair-follow refreshes are capped. The slot is only
             // updated when the refresh goes through — a gated-out event

@@ -1,7 +1,7 @@
 // TaskForest Windows resource script.
 //
 // Embeds the app icon as the executable's PRIMARY icon at resource id 1.
-// gpui 0.2.2's Windows backend (platform/windows/platform.rs `load_icon`) calls
+// GPUI 0.3.9's Windows backend (`platform.rs::load_icon`) calls
 // LoadImageW(exe_module, MAKEINTRESOURCE(1), IMAGE_ICON, ...) and installs the
 // result as the window-class `hIcon` — i.e. the taskbar / alt-tab / titlebar
 // icon. Windows Explorer independently shows the LOWEST-id icon for the .exe

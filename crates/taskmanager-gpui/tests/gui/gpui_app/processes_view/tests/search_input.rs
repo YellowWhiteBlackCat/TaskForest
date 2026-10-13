@@ -19,7 +19,7 @@ async fn settle_debounced_search(cx: &mut TestAppContext) {
     // cannot resolve it. Wait beyond the real 100 ms debounce, then drain the
     // scheduled RootView update.
     cx.executor().allow_parking();
-    gpui::Timer::after(Duration::from_millis(125)).await;
+    cx.executor().timer(Duration::from_millis(125)).await;
     cx.executor().forbid_parking();
     cx.run_until_parked();
 }
@@ -67,8 +67,8 @@ async fn escape_clears_apps_query_restores_rows_and_preserves_frozen_selection(
         "the actual row click freezes beta's stable process identity"
     );
 
-    vcx.update(|window, _cx| search_focus.focus(window));
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| search_focus.focus(window, cx));
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(
         search.read_with(cx, |search, _cx| search.clean_on_escape()),
         "the production Apps SearchInput opts into Escape-clears"

@@ -176,14 +176,14 @@ fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
     use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
 
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
-    root.update(cx, |view, _cx| {
+    root.update(cx, |view, cx| {
         // An unknown (future / hand-edited) token fails closed to System, and
         // the snapshot is normalized to the canonical empty sentinel.
         let config = Config {
             window_decorations: "glass".into(),
             ..Config::default()
         };
-        apply_root_persisted_projection(view, &config);
+        apply_root_persisted_projection(view, &config, cx);
         assert_eq!(
             view.window_decorations_pref,
             WindowDecorationsPreference::System
@@ -196,7 +196,7 @@ fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
             window_decorations: WINDOW_DECORATIONS_CUSTOM.into(),
             ..Config::default()
         };
-        apply_root_persisted_projection(view, &config);
+        apply_root_persisted_projection(view, &config, cx);
         assert_eq!(
             view.window_decorations_pref,
             WindowDecorationsPreference::Custom

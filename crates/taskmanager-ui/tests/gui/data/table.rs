@@ -548,13 +548,13 @@ async fn visible_rows_changed_skips_measurement_frame(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn load_more_is_gated_by_inflight_lock(cx: &mut TestAppContext) {
     let table = cx.new(|cx| TableState::new(TestDelegate::standard(10), cx));
-    with_window(cx, |window, cx| {
+    with_window(cx, |_window, cx| {
         table.update(cx, |table, cx| {
             // Near the bottom (rows 10, threshold 20 → any end triggers).
-            table.load_more_if_need(10, 5, window, cx);
+            table.load_more_if_need(10, 5, cx);
             assert!(table.loading_more, "in-flight lock must be armed");
             // Second trigger while in flight: blocked (A-8).
-            table.load_more_if_need(10, 9, window, cx);
+            table.load_more_if_need(10, 9, cx);
             assert!(
                 table.loading_more,
                 "in-flight lock must block duplicate dispatch"
@@ -573,17 +573,17 @@ async fn load_more_is_gated_by_inflight_lock(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn load_more_respects_threshold_and_eof(cx: &mut TestAppContext) {
     let table = cx.new(|cx| TableState::new(TestDelegate::standard(100), cx));
-    with_window(cx, |window, cx| {
+    with_window(cx, |_window, cx| {
         table.update(cx, |table, cx| {
             // Visible end far from the bottom: no dispatch.
-            table.load_more_if_need(100, 10, window, cx);
+            table.load_more_if_need(100, 10, cx);
             assert_eq!(table.delegate().load_more_calls, 0);
             // Near the bottom: dispatch (delegate is_eof = true).
-            table.load_more_if_need(100, 95, window, cx);
+            table.load_more_if_need(100, 95, cx);
             assert!(table.loading_more, "eof=true dispatch must arm the lock");
             // Exhausted delegate: no second dispatch while in flight.
             table.delegate_mut().eof = false;
-            table.load_more_if_need(100, 99, window, cx);
+            table.load_more_if_need(100, 99, cx);
             assert!(table.loading_more, "eof=false must not add a second task");
         });
     });
@@ -614,9 +614,9 @@ async fn noop_load_more_does_not_notify(cx: &mut TestAppContext) {
         })
         .detach();
     });
-    with_window(cx, |window, cx| {
+    with_window(cx, |_window, cx| {
         table.update(cx, |table, cx| {
-            table.load_more_if_need(3, 2, window, cx);
+            table.load_more_if_need(3, 2, cx);
             assert!(table.loading_more, "dispatch must arm the in-flight lock");
         });
     });
@@ -642,9 +642,9 @@ async fn growing_load_more_notifies(cx: &mut TestAppContext) {
         })
         .detach();
     });
-    with_window(cx, |window, cx| {
+    with_window(cx, |_window, cx| {
         table.update(cx, |table, cx| {
-            table.load_more_if_need(3, 2, window, cx);
+            table.load_more_if_need(3, 2, cx);
         });
     });
     cx.run_until_parked();
@@ -695,7 +695,7 @@ async fn focused_resize_handle_steps_width_and_obeys_declared_bounds(cx: &mut Te
     let window = cx.add_window(|_window, _cx| TableHarness {
         state: table.clone(),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("table harness should render");
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -706,7 +706,7 @@ async fn focused_resize_handle_steps_width_and_obeys_declared_bounds(cx: &mut Te
             .cloned()
             .expect("resizable columns own a stable keyboard handle")
     });
-    visual.update(|window, _| focus_handle.focus(window));
+    visual.update(|window, cx| focus_handle.focus(window, cx));
     assert!(
         visual.update(|window, _| focus_handle.is_focused(window)),
         "the column resize handle must accept keyboard focus"
@@ -843,7 +843,7 @@ async fn table_virtualizes_10000_rows(cx: &mut TestAppContext) {
         state: state.clone(),
     });
     let start = Instant::now();
-    let _ = cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear());
+    let _ = cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx));
     let elapsed = start.elapsed();
 
     // The headless test window is 1920x1080; at 28px rows only ~39 rows are
@@ -872,7 +872,7 @@ async fn render_th_skips_stale_indices_after_refresh_shrinks(cx: &mut TestAppCon
         state: state.clone(),
     });
     let draw = |cx: &mut TestAppContext| {
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     };
     draw(cx);
@@ -926,7 +926,7 @@ async fn mouse_release_outside_window_finishes_column_resize(cx: &mut TestAppCon
         })
         .detach();
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Simulate an in-progress drag whose pointer has left the window.
@@ -1072,13 +1072,13 @@ async fn row_right_click_menu_mounts_dispatches_and_clears(cx: &mut TestAppConte
         state: state.clone(),
     });
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     // Right-click a body row (below the header): the menu must mount,
     // anchored exactly at the click position (no entrance animation).
     let open_at = point(px(200.0), px(120.0));
     vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let popup = vcx
         .debug_bounds("tm-popup")
         .expect("a row right-click must open the delegate menu");
@@ -1088,7 +1088,7 @@ async fn row_right_click_menu_mounts_dispatches_and_clears(cx: &mut TestAppConte
     // Activate item 0 (body py SPACE_4 + half of the 26px row).
     let item_center = point(popup.left() + px(40.0), popup.top() + px(17.0));
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     drop(vcx);
 
     assert_eq!(
@@ -1109,7 +1109,7 @@ async fn row_right_click_menu_mounts_dispatches_and_clears(cx: &mut TestAppConte
     // ContextMenuExt host test).
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     drop(vcx);
     assert_eq!(
         *activations.borrow(),

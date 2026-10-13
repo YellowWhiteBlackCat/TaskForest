@@ -36,7 +36,7 @@ fn draw_resource_frame(cx: &mut TestAppContext, resources: ProcessResourceSnapsh
         UnitPreferences::default(),
     );
     let window = cx.add_window(|_w, _cx| ResourceCardView { card });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 

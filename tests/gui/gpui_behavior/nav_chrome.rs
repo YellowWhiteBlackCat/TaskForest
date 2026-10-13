@@ -39,7 +39,7 @@ fn render_in_mode(cx: &mut TestAppContext, server_decorations: bool) -> WindowHa
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     win
 }
@@ -95,7 +95,7 @@ async fn mc05_sidebar_edit_case_sidebar_edit_click_updates_the_exact_device_over
     drop(visual);
 
     assert!(win.read_with(cx, |view, _| view.sidebar_edit_mode).unwrap());
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(win.into(), cx);
@@ -126,7 +126,7 @@ async fn mc05_sidebar_order_case_configured_sidebar_order_drives_wide_and_compac
         view.set_sidebar_order(vec!["memory".into(), "cpu".into()], cx);
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(win.into(), cx);
@@ -140,7 +140,7 @@ async fn mc05_sidebar_order_case_configured_sidebar_order_drives_wide_and_compac
     drop(visual);
 
     cx.simulate_window_resize(win.into(), gpui::size(gpui::px(720.0), gpui::px(480.0)));
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut visual = VisualTestContext::from_window(win.into(), cx);
     let first = visual
@@ -168,7 +168,7 @@ async fn mc05_density_case_density_setting_click_updates_the_table_geometry_cont
         .expect("settings gear renders");
     visual.simulate_click(settings.center(), Default::default());
     drop(visual);
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut visual = VisualTestContext::from_window(win.into(), cx);
@@ -203,7 +203,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         view.settings_scroll_handle().scroll_to_bottom();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -230,7 +230,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         .unwrap()
     );
 
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let network_base2 = vcx
@@ -256,7 +256,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         .unwrap()
     );
 
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let _sliding = vcx
@@ -268,7 +268,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
             .read(cx)
             .focus_handle()
             .clone();
-        handle.focus(window);
+        handle.focus(window, cx);
     })
     .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse("enter").unwrap());
@@ -287,7 +287,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
             .read(cx)
             .focus_handle()
             .clone();
-        handle.focus(window);
+        handle.focus(window, cx);
     })
     .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse("end").unwrap());
@@ -300,7 +300,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         "graph points keyboard path must reach the bounded maximum"
     );
 
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let _dynamic_scaling = vcx
@@ -312,7 +312,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
             .read(cx)
             .focus_handle()
             .clone();
-        handle.focus(window);
+        handle.focus(window, cx);
     })
     .unwrap();
     cx.dispatch_keystroke(win.into(), Keystroke::parse("enter").unwrap());
@@ -392,7 +392,7 @@ async fn mc06_about_case_system_page_about_entry_opens_independent_modal(cx: &mu
     let system = vcx.debug_bounds("System").expect("System tab renders");
     vcx.simulate_click(system.center(), Default::default());
     drop(vcx);
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     win.update(cx, |view, _window, cx| {
@@ -400,7 +400,7 @@ async fn mc06_about_case_system_page_about_entry_opens_independent_modal(cx: &mu
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -422,7 +422,7 @@ async fn mc06_about_case_system_page_about_entry_opens_independent_modal(cx: &mu
             != Some(WindowSurfaceKind::SystemAbout),
         "opening About must not alias System Information state"
     );
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -458,7 +458,7 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -505,12 +505,12 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
 async fn nav_indicator_keyed_animation_restarts_on_selection_change(cx: &mut TestAppContext) {
     let win = render_in_mode(cx, true);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let tab = vcx
         .debug_bounds("Apps")
         .expect("the Applications tab renders");
     vcx.simulate_click(tab.center(), Default::default());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     assert_eq!(
         win.read_with(cx, |view, _cx| view.page).unwrap(),

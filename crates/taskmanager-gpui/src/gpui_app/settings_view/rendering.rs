@@ -58,7 +58,7 @@ pub(crate) fn text_rendering_row(
                         token: TEXT_RENDERING_SUBPIXEL,
                         cur,
                         hovered,
-                        enabled: false,
+                        enabled: true,
                     },
                     cx,
                 ))
@@ -71,7 +71,7 @@ pub(crate) fn text_rendering_row(
                         token: TEXT_RENDERING_GRAYSCALE,
                         cur,
                         hovered,
-                        enabled: false,
+                        enabled: true,
                     },
                     cx,
                 )),
@@ -80,7 +80,7 @@ pub(crate) fn text_rendering_row(
             div()
                 .text_size(font_size(tokens::FONT_CAPTION))
                 .text_color(hsla(t.fg_dim))
-                .child(i18n::t("settings.text_rendering_unavailable")),
+                .child(i18n::t("settings.text_rendering_fallback")),
         )
 }
 struct TextRenderingPillProps<'a> {

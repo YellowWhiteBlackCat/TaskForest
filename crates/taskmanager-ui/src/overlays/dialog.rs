@@ -94,12 +94,14 @@ fn panel_shadow(palette: &Palette) -> Vec<BoxShadow> {
             offset: Point::new(px(0.0), px(4.0)),
             blur_radius: px(16.0),
             spread_radius: px(0.0),
+            inset: false,
         },
         BoxShadow {
             color: crate::theme_binding::hsla(ink),
             offset: Point::new(px(0.0), px(1.0)),
             blur_radius: px(4.0),
             spread_radius: px(0.0),
+            inset: false,
         },
     ]
 }

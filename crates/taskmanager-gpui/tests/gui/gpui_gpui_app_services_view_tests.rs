@@ -80,12 +80,12 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
         );
         cx.notify();
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     // The persistent table receives its first delegate snapshot during this
     // draw; the following frame paints the now-synchronized virtual rows.
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let plain_row = vcx
         .debug_bounds("tm-svc-row:0")
         .expect("the unfiltered service row must render");
@@ -94,7 +94,7 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
         v.services_state.query = "4".to_owned();
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     let highlighted_row = vcx
         .debug_bounds("tm-svc-row:0")
@@ -113,12 +113,9 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
 /// unit paints its own row and a status cell carrying its typed state token,
 /// a row never paints another unit's state, and the typed status filter is the
 /// painted membership authority (a filter with no member paints an empty
-/// inventory, never a placeholder row). The filtered phases use fresh windows
-/// because `debug_bounds` keeps the last frame that painted a selector, so a
-/// dropped row is only observable as "never painted in this window" — the
-/// vendored cache semantics this relies on are pinned by
-/// `debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_fact`
-/// below.
+/// inventory, never a placeholder row). Each filter transition updates the
+/// same virtual table fixture; `debug_bounds` is scoped to the current frame,
+/// so a dropped row is observable after the window updates its filter.
 #[gpui::test]
 async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppContext) {
     let services = || {
@@ -156,13 +153,13 @@ async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppCont
     // synchronized virtual rows.
     let draw = |cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>| {
         for _ in 0..2 {
-            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
                 .unwrap();
         }
     };
 
     // Unfiltered: one painted row per unit, each with its own typed state.
-    let (win, _view) = wrapped_root(cx, ServiceFilter::All, services());
+    let (win, view) = wrapped_root(cx, ServiceFilter::All, services());
     draw(cx, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     for (ix, status) in ["Active", "Failed", "Inactive"].into_iter().enumerate() {
@@ -186,8 +183,13 @@ async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppCont
     );
     drop(vcx);
 
-    // Typed status filter: only the matching unit reaches the frame.
-    let (win, _view) = wrapped_root(cx, ServiceFilter::Failed, services());
+    // Typed status filter: only the matching unit reaches the next frame of
+    // the same window.
+    view.update(cx, |v, cx| {
+        v.services_state.filter = ServiceFilter::Failed;
+        v.replace_services_for_test(services(), Vec::new());
+        cx.notify();
+    });
     draw(cx, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -202,15 +204,18 @@ async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppCont
 
     // A typed filter with no member paints an empty inventory, never a
     // placeholder row.
-    let (win, _view) = wrapped_root(
-        cx,
-        ServiceFilter::Inactive,
-        vec![service(
-            "fixture.service:active",
-            "active-unit",
-            ServiceStatus::Active,
-        )],
-    );
+    view.update(cx, |v, cx| {
+        v.services_state.filter = ServiceFilter::Inactive;
+        v.replace_services_for_test(
+            vec![service(
+                "fixture.service:active",
+                "active-unit",
+                ServiceStatus::Active,
+            )],
+            Vec::new(),
+        );
+        cx.notify();
+    });
     draw(cx, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
@@ -219,17 +224,9 @@ async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppCont
     );
 }
 
-/// Pit pin for the vendored `debug_bounds` cache: the map lives on the reused
-/// `Frame`, `Frame::clear` does not clear it, and `Frame::finish` only migrates
-/// element states — so a selector painted by ANY earlier frame of a window
-/// stays queryable. It is a cross-frame cache, never a current-frame
-/// observation; a same-window absence assertion proves nothing (it can only say
-/// "this window never painted it").
-///
-/// The filtered-row tests above depend on this fact. If this test goes red
-/// after a vendored gpui update, the map began clearing per frame: the
-/// fresh-window discipline can then be RELAXED (same-window absence becomes
-/// observable) — revise the dependent tests instead of deleting this pin.
+/// `debug_bounds` reports selectors painted in the current frame. Switching
+/// branches proves that a selector from the prior frame is absent without
+/// needing a second window.
 struct DebugBoundsPinView {
     paint: bool,
 }
@@ -258,14 +255,12 @@ impl Render for DebugBoundsPinView {
 }
 
 #[gpui::test]
-async fn debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_fact(
-    cx: &mut TestAppContext,
-) {
+async fn debug_bounds_are_scoped_to_the_current_frame(cx: &mut TestAppContext) {
     let win = cx.add_window(|_window, _cx| DebugBoundsPinView { paint: true });
     let view = win
         .entity(cx)
         .expect("window root DebugBoundsPinView entity");
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
 
@@ -280,36 +275,28 @@ async fn debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_f
         vcx.debug_bounds("tm-debug-bounds-unpinned").is_none(),
         "the unpinned branch must not paint while the pinned branch is active"
     );
-    assert!(
-        vcx.debug_bounds("tm-debug-bounds-never-painted").is_none(),
-        "a selector no frame ever painted must be absent, so the retention assertion below is discriminating"
-    );
+    assert!(vcx.debug_bounds("tm-debug-bounds-never-painted").is_none());
 
-    // The next frame renders the OTHER branch. The unpinned marker proves the
-    // new frame really ran; the pinned selector must still answer with the
-    // earlier frame's own bounds.
+    // The next frame renders the OTHER branch. Its marker proves the new
+    // frame ran, and the old branch's selector disappears from the current
+    // frame's bounds.
     view.update(cx, |view, cx| {
         view.paint = false;
         cx.notify();
     });
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert!(
         vcx.debug_bounds("tm-debug-bounds-unpinned").is_some(),
         "the second frame must render the updated view state (marker for the new branch)"
     );
-    let retained = vcx.debug_bounds("tm-debug-bounds-pin").expect(
-        "Frame::clear must keep debug_bounds: if this is empty, the vendored cache now clears per \
-         frame and the fresh-window discipline in the filtered-row tests can be relaxed",
-    );
-    assert_eq!(
-        retained, painted,
-        "the retained entry must be the earlier painted frame's own bounds, not a re-derived value"
+    assert!(
+        vcx.debug_bounds("tm-debug-bounds-pin").is_none(),
+        "a selector absent from the current frame must not leak from an earlier one"
     );
 
-    // The complement: absence is only a fact about a window that NEVER painted
-    // the selector.
+    // A separate window reports only its own frame as well.
     let fresh = cx.add_window(|_window, _cx| DebugBoundsPinView { paint: false });
-    cx.update_window(fresh.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(fresh.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut fresh_vcx = VisualTestContext::from_window(fresh.into(), cx);
     assert!(
@@ -318,6 +305,6 @@ async fn debug_bounds_retains_earlier_frames_so_removal_is_only_a_fresh_window_f
     );
     assert!(
         fresh_vcx.debug_bounds("tm-debug-bounds-pin").is_none(),
-        "a fresh window that never painted the pin reports absence; same-window absence is not observable"
+        "a window that did not paint the pin reports absence"
     );
 }

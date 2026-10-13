@@ -149,7 +149,7 @@ impl LayerStack {
         }
         let id = LayerId::mint(&mut self.next_id);
         let focus_handle = cx.focus_handle();
-        focus_handle.focus(window);
+        focus_handle.focus(window, cx);
         self.layers.push(LayerEntry {
             id,
             is_modal: true,
@@ -167,7 +167,7 @@ impl LayerStack {
     pub fn push_popup(&mut self, spec: NonModalSpec, window: &mut Window, cx: &mut App) -> LayerId {
         let id = LayerId::mint(&mut self.next_id);
         let focus_handle = cx.focus_handle();
-        focus_handle.focus(window);
+        focus_handle.focus(window, cx);
         self.layers.push(LayerEntry {
             id,
             is_modal: false,
@@ -206,7 +206,7 @@ impl LayerStack {
         // Focus the new top modal, or restore the trigger when the last
         // modal closed.
         if let Some(top_modal) = self.top_modal() {
-            top_modal.focus_handle.focus(window);
+            top_modal.focus_handle.focus(window, cx);
         } else if self.restore_armed {
             self.restore_armed = false;
             restore_modal(window, cx);

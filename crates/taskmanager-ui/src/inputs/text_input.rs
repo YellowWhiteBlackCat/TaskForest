@@ -141,8 +141,10 @@ impl BlinkCursor {
         let this = cx.entity();
         let epoch = self.epoch;
         self._task = Some(cx.spawn(async move |_this, cx| {
-            gpui::Timer::after(Duration::from_millis(300)).await;
-            let _ = this.update(cx, |cursor, cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(300))
+                .await;
+            this.update(cx, |cursor, cx| {
                 if cursor.epoch == epoch {
                     cursor.paused = false;
                     cx.notify();
@@ -495,8 +497,8 @@ impl TextInputState {
     }
 
     /// Focus the input (registers the window input handler).
-    pub fn focus(&self, window: &mut Window) {
-        self.focus_handle.focus(window);
+    pub fn focus(&self, window: &mut Window, cx: &mut App) {
+        self.focus_handle.focus(window, cx);
     }
 
     fn selected_or_all(&self) -> String {

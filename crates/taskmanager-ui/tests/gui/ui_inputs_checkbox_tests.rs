@@ -34,17 +34,17 @@ async fn keyboard_space_toggles_checkbox(cx: &mut TestAppContext) {
             events: events.clone(),
         }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let handle = window
         .read_with(&vcx, |harness, app| {
             harness.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     vcx.simulate_keystrokes("space");
     assert_eq!(
         events.borrow().as_slice(),

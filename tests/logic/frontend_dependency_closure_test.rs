@@ -64,7 +64,14 @@ fn frontend_production_closures_match_toolkit_boundaries() {
     // closure is its manifest, resolved without feature simulation: the GPUI
     // product must contain its toolkit, and every other product must be
     // provably gpui-free.
-    let forbidden_for_non_gpui = ["gpui", "taskmanager-gpui", "taskmanager-ui"];
+    let forbidden_for_non_gpui = [
+        "gpui",
+        "gpui-kit",
+        "gpui-pre",
+        "gpui-base",
+        "taskmanager-gpui",
+        "taskmanager-ui",
+    ];
 
     for (package, expects_gpui) in [
         ("taskmanager-gpui", true),
@@ -77,14 +84,22 @@ fn frontend_production_closures_match_toolkit_boundaries() {
         };
 
         if expects_gpui {
-            assert!(
-                closure.contains("gpui"),
-                "GPUI product closure lost gpui: {closure:?}"
-            );
+            for toolkit in ["gpui-kit", "gpui-base", "gpui-pre"] {
+                assert!(
+                    closure.contains(toolkit),
+                    "GPUI product closure lost {toolkit}: {closure:?}"
+                );
+            }
             assert!(
                 closure.contains("taskmanager-ui"),
                 "GPUI product closure lost taskmanager-ui: {closure:?}"
             );
+            for disabled_layer in ["gpui-component", "gpui-kit-assets"] {
+                assert!(
+                    !closure.contains(disabled_layer),
+                    "GPUI product closure unexpectedly enabled {disabled_layer}: {closure:?}"
+                );
+            }
         } else {
             for forbidden in forbidden_for_non_gpui {
                 assert!(
@@ -101,7 +116,14 @@ fn neutral_assets_have_no_toolkit_in_their_production_closure() {
     let Some(closure) = cargo_tree_packages("taskmanager-assets", "no-dev", false) else {
         return;
     };
-    for forbidden in ["gpui", "iced", "ratatui"] {
+    for forbidden in [
+        "gpui",
+        "gpui-kit",
+        "gpui-pre",
+        "gpui-base",
+        "iced",
+        "ratatui",
+    ] {
         assert!(
             !closure.contains(forbidden),
             "neutral assets reached forbidden {forbidden}: {closure:?}"
@@ -111,7 +133,14 @@ fn neutral_assets_have_no_toolkit_in_their_production_closure() {
 
 #[test]
 fn frontend_all_target_dev_closures_match_toolkit_boundaries() {
-    let forbidden_for_non_gpui = ["gpui", "taskmanager-gpui", "taskmanager-ui"];
+    let forbidden_for_non_gpui = [
+        "gpui",
+        "gpui-kit",
+        "gpui-pre",
+        "gpui-base",
+        "taskmanager-gpui",
+        "taskmanager-ui",
+    ];
 
     for (package, expects_gpui) in [
         ("taskmanager-gpui", true),
@@ -124,14 +153,22 @@ fn frontend_all_target_dev_closures_match_toolkit_boundaries() {
         };
 
         if expects_gpui {
-            assert!(
-                closure.contains("gpui"),
-                "GPUI all-target dev closure lost gpui: {closure:?}"
-            );
+            for toolkit in ["gpui-kit", "gpui-base", "gpui-pre"] {
+                assert!(
+                    closure.contains(toolkit),
+                    "GPUI all-target dev closure lost {toolkit}: {closure:?}"
+                );
+            }
             assert!(
                 closure.contains("taskmanager-gpui"),
                 "GPUI all-target dev closure lost taskmanager-gpui: {closure:?}"
             );
+            for disabled_layer in ["gpui-component", "gpui-kit-assets"] {
+                assert!(
+                    !closure.contains(disabled_layer),
+                    "GPUI all-target dev closure unexpectedly enabled {disabled_layer}: {closure:?}"
+                );
+            }
         } else {
             for forbidden in forbidden_for_non_gpui {
                 assert!(
@@ -150,6 +187,9 @@ fn neutral_assets_have_no_toolkit_in_their_all_target_dev_closure() {
     };
     for forbidden in [
         "gpui",
+        "gpui-kit",
+        "gpui-pre",
+        "gpui-base",
         "iced",
         "ratatui",
         "taskmanager-gpui",
@@ -180,6 +220,9 @@ fn bevy_frontend_closures_keep_the_read_only_composition_boundary() {
     ];
     let forbidden = [
         "gpui",
+        "gpui-kit",
+        "gpui-pre",
+        "gpui-base",
         "iced",
         "ratatui",
         "taskmanager-gpui",

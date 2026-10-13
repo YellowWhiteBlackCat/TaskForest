@@ -1,8 +1,8 @@
 //! Per-window input modality and GPUI capture adapters.
 //!
-//! GPUI 0.2.2 does not attach an input origin to `FocusHandle`, so focus-visible
-//! cannot be derived from the focused element itself. `RootView` instead owns one
-//! small state machine per window. Capture listeners update it before descendant
+//! `FocusHandle` carries no input origin, so TaskForest's keyboard-only
+//! focus-visible policy is derived from a `RootView`-owned state machine. Each
+//! window owns one small state machine. Capture listeners update it before descendant
 //! controls handle the same event, which means a Tab focus move renders its ring
 //! immediately while a pointer-driven focus change does not.
 

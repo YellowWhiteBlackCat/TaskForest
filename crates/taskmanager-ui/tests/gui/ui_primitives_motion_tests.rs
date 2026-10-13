@@ -104,7 +104,7 @@ async fn hover_bg_transition_keeps_bounds_through_hover_flips(cx: &mut TestAppCo
         }
     }
     let window = cx.add_window(|_window, _cx| Harness { hovered: false });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(window.into(), cx);
@@ -120,7 +120,7 @@ async fn hover_bg_transition_keeps_bounds_through_hover_flips(cx: &mut TestAppCo
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(window.into(), cx);
     let hovered = vcx
@@ -192,7 +192,7 @@ async fn policy_helpers_keep_layout_and_target_ids_stable(cx: &mut TestAppContex
         policy: MotionPolicy::Normal,
         hovered: true,
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(window.into(), cx);
@@ -212,7 +212,7 @@ async fn policy_helpers_keep_layout_and_target_ids_stable(cx: &mut TestAppContex
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = VisualTestContext::from_window(window.into(), cx);

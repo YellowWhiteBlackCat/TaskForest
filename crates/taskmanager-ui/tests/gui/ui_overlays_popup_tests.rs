@@ -112,7 +112,7 @@ fn open_with_host(
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     (menu, dismisses, host_subscription)
 }
@@ -183,7 +183,7 @@ async fn hover_out_keeps_last_selected_item(cx: &mut TestAppContext) {
         state
     });
     let window = cx.add_window(|_window, _cx| PopupMenuHarness { menu: menu.clone() });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -239,11 +239,11 @@ async fn escape_closes_popup_and_restores_trigger_focus(cx: &mut TestAppContext)
     window
         .update(cx, |_, window, cx| {
             window.activate_window();
-            popup_focus.focus(window);
+            popup_focus.focus(window, cx);
             cx.notify();
         })
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);

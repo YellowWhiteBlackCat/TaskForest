@@ -460,7 +460,8 @@ fn minimize_window(window: &mut Window, _cx: &mut App) {
     window.minimize_window();
 }
 fn zoom_window(window: &mut Window, _cx: &mut App) {
-    // gpui 0.2.2 has no Linux maximize API; on macOS this toggles zoom.
+    // GPUI exposes titlebar double-click as the platform-native maximize or
+    // zoom gesture; Linux has no separate public maximize request.
     window.titlebar_double_click();
 }
 

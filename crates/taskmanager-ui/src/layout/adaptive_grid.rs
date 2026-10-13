@@ -87,8 +87,8 @@ impl AdaptiveGrid {
         for child in self.children {
             grid = grid.child(
                 div()
-                    .flex_grow()
-                    .flex_shrink()
+                    .flex_grow(1.0)
+                    .flex_shrink(1.0)
                     .flex_basis(min_item_width)
                     .min_w(px(0.0))
                     .min_h(px(0.0))

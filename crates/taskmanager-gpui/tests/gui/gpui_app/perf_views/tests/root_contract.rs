@@ -211,9 +211,8 @@ async fn every_device_page_composes_through_the_shared_root(cx: &mut TestAppCont
 /// (Charts rung), then the header band and summary rows (Floor rung) — the
 /// headline card keeps its 180px floor through every rung.
 ///
-/// Each rung runs on a FRESH window (the established convention): debug
-/// selector entries persist across frames within one window, so absence
-/// assertions cannot ride a resized window that painted the element earlier.
+/// Each rung starts with an independent window at its target size so the
+/// assertion measures that budget directly instead of a resize transition.
 #[gpui::test]
 async fn vertical_runway_degrades_in_order_before_the_headline_floor(cx: &mut TestAppContext) {
     fn seed_cpu(v: &mut RootView) {

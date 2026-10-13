@@ -27,6 +27,8 @@ use taskmanager_theme::tokens;
 /// surplus height, but never compresses below this — unsatisfiable budgets
 /// hide the matrix instead (see `min_height` / the cpu_view fit check).
 pub(super) const ROW_HEIGHT: f32 = 40.0;
+/// Empty viewport space kept after the final core row, including the root gap.
+pub(super) const BOTTOM_SAFETY: f32 = 16.0;
 /// A class caption ("P-cores 4") above its rows.
 const SECTION_LABEL_HEIGHT: f32 = 16.0;
 /// Vertical gap between row-class sections (tokens::SPACE_10).
@@ -63,7 +65,7 @@ pub(super) fn min_height(stats: &CpuLiveStats, hardware: &HardwareInfo) -> f32 {
             + (row_count - 1.0).max(0.0) * INNER_GAP;
         sections += 1.0;
     }
-    total + (sections - 1.0).max(0.0) * SECTION_GAP
+    total + (sections - 1.0).max(0.0) * SECTION_GAP + BOTTOM_SAFETY
 }
 
 pub(super) fn render(
@@ -82,7 +84,7 @@ pub(super) fn render(
         // Grow with page surplus (sparkline rows get taller), but NEVER
         // shrink: a squeezed row reads as a broken page. The cpu_view fit
         // check hides the whole matrix when the floor cannot be met.
-        .flex_grow()
+        .flex_grow(1.0)
         .flex_shrink_0()
         .min_h(px(0.0))
         .gap(definite_length(tokens::SPACE_10))
@@ -112,7 +114,7 @@ pub(super) fn render(
         let mut section = div()
             .flex()
             .flex_col()
-            .flex_grow()
+            .flex_grow(1.0)
             .flex_shrink_0()
             .min_h(px(0.0))
             .gap(definite_length(tokens::SPACE_4))
@@ -146,7 +148,7 @@ pub(super) fn render(
             let mut row = div()
                 .flex()
                 .h(px(ROW_HEIGHT))
-                .flex_grow()
+                .flex_grow(1.0)
                 .flex_shrink_0()
                 .gap(px(INNER_GAP))
                 .w_full();
@@ -182,7 +184,7 @@ pub(super) fn render(
         section = section.child(rows);
         grid = grid.child(section);
     }
-    grid
+    grid.child(div().flex_none().h(px(BOTTOM_SAFETY - SECTION_GAP)))
 }
 
 fn empty_samples() -> Rc<[f32]> {

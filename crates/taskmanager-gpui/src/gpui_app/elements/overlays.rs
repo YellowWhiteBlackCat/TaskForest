@@ -185,7 +185,7 @@ pub fn dialog_overlay_width(
                 // fades in fast (DURATION_FAST), the panel fades + rises over
                 // the standard appear duration (180ms) — the Mission Center
                 // modal entrance. The panel's `pt` is an approximation of an
-                // upward slide (no transform in gpui 0.2.2): the centered
+                // upward slide (the GPUI div style has no translation): the centered
                 // panel starts ~7px low and rises into place. The ids are
                 // stable per dialog host (each host lives in its own subtree —
                 // global element ids include the ancestor path), and the
@@ -219,9 +219,10 @@ pub fn dialog_overlay_width(
 }
 
 // ── tooltip ──────────────────────────────────────────────────────────────
-// gpui 0.2.2 ships no tooltip. We build one from the same primitives the other
-// overlays use — `deferred` (raise z-order above siblings) + `anchored` (absolute
-// window-space placement). Unlike [`dialog_overlay`], a tooltip is *non-interactive*:
+// Keep TaskForest's tooltip in the owned overlay layer so its theme and pointer
+// behavior match the rest of the product. It uses `deferred` (raise z-order
+// above siblings) + `anchored` (absolute window-space placement). Unlike
+// [`dialog_overlay`], a tooltip is *non-interactive*:
 // it carries no full-size scrim, so it never intercepts pointer events over the host
 // it describes (the host stays hoverable). Only the tiny label rect participates in
 // hit-testing, which is what every OS tooltip does.

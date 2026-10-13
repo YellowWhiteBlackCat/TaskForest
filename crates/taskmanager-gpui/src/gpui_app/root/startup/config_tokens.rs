@@ -8,11 +8,12 @@
 //! stored config; [`super::init`] applies them to the theme/RootView.
 
 use crate::gpui_app::root::TopPage;
+use gpui::TextRenderingMode;
 use taskmanager_assets::product;
 use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
-    TEXT_RENDERING_PLATFORM_DEFAULT,
+    TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
 };
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, LightDark,
@@ -63,13 +64,22 @@ pub(in crate::gpui_app::root) fn color_scheme_from_token(s: &str) -> &'static st
     }
 }
 
-/// Normalize a stored text-rendering token to the only mode the published
-/// GPUI 0.2.2 renderer can actually apply. The Zed fork exposes a separate
-/// text-raster API, but crates.io GPUI does not; preserving a subpixel or
-/// grayscale token here would make Settings report a change that never reaches
-/// the renderer.
-pub(super) fn text_rendering_from_token(_token: &str) -> &'static str {
-    TEXT_RENDERING_PLATFORM_DEFAULT
+/// Normalize a stored text-rendering token to a mode supported by the pinned
+/// GPUI snapshot. Unknown values fail closed to the platform default.
+pub(super) fn text_rendering_from_token(token: &str) -> &'static str {
+    match token.trim().to_ascii_lowercase().as_str() {
+        TEXT_RENDERING_SUBPIXEL => TEXT_RENDERING_SUBPIXEL,
+        TEXT_RENDERING_GRAYSCALE => TEXT_RENDERING_GRAYSCALE,
+        _ => TEXT_RENDERING_PLATFORM_DEFAULT,
+    }
+}
+
+pub(in crate::gpui_app::root) fn text_rendering_mode_from_token(token: &str) -> TextRenderingMode {
+    match text_rendering_from_token(token) {
+        TEXT_RENDERING_SUBPIXEL => TextRenderingMode::Subpixel,
+        TEXT_RENDERING_GRAYSCALE => TextRenderingMode::Grayscale,
+        _ => TextRenderingMode::PlatformDefault,
+    }
 }
 
 /// Map persisted font tokens (`""` = bundled default, `"system"` = skin

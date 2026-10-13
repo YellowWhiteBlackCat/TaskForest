@@ -213,7 +213,7 @@ impl RootView {
         }
         let scroll = &self.history_replay_scroll;
         let step = f32::from(scroll.bounds().size.height).max(32.0);
-        let range = f32::from(scroll.max_offset().height);
+        let range = f32::from(scroll.max_offset().y);
         let mut offset = scroll.offset();
         let next = match event.keystroke.key.as_str() {
             "up" => f32::from(offset.y) + 32.0,

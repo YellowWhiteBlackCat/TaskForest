@@ -76,24 +76,24 @@ impl Render for Harness {
 async fn keyboard_enter_activates_with_keyboard_payload(cx: &mut TestAppContext) {
     let events = Rc::new(RefCell::new(Vec::<ButtonEvent>::new()));
     let window = cx.add_window(|_window, cx| Harness::new(cx, events.clone()));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Focus the button tab stop, then press Enter.
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let handle = window
         .read_with(&vcx, |harness, app| {
             harness.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     let is_focused = vcx.update(|window, _| handle.is_focused(window));
     assert!(
         is_focused,
         "button must be focused before keyboard dispatch"
     );
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_keystrokes("enter");
 
     assert_eq!(
@@ -108,7 +108,7 @@ async fn keyboard_enter_activates_with_keyboard_payload(cx: &mut TestAppContext)
 async fn pointer_click_activates_with_pointer_payload(cx: &mut TestAppContext) {
     let events = Rc::new(RefCell::new(Vec::<ButtonEvent>::new()));
     let window = cx.add_window(|_window, cx| Harness::new(cx, events.clone()));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Pointer path: use the VisualTestContext for real click dispatch.
@@ -135,11 +135,11 @@ async fn disabled_button_does_not_activate(cx: &mut TestAppContext) {
         harness.disabled = true;
         harness
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Keyboard activation is unreachable because the element is not a tab stop.
-    let _ = window.update(cx, |_, window, _| window.focus_next());
+    let _ = window.update(cx, |_, window, cx| window.focus_next(cx));
     assert!(
         window
             .update(cx, |_, window, cx| window.focused(cx))

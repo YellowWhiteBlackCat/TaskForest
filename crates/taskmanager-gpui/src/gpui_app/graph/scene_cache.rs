@@ -1,8 +1,7 @@
-//! Persistent graph-scene replay cache for gpui 0.2.2's repaint model.
+//! Persistent graph-scene replay cache for GPUI redraws.
 //!
-//! gpui 0.2.2 has no damage region: every `window.refresh()` rebuilds the
-//! whole element tree and re-runs every canvas paint closure, so a graph
-//! whose samples and bounds did not change still re-ran
+//! A root redraw re-runs the graph canvas paint closures, so a graph whose
+//! samples and bounds did not change would still re-run
 //! `build_graph_geometry` (Catmull-Rom controls + lyon tessellation of the
 //! smooth fill and stroke) on EVERY frame — hover crosshair movement cost
 //! one full re-tessellation per graph on the page. The caches that tried to
@@ -67,8 +66,8 @@ pub(crate) const MAX_GRAPH_STATIC_SCENE_ENTRIES: usize = 64;
 pub(crate) const MAX_SPARK_SCENE_ENTRIES: usize = 256;
 
 /// Minimum wall time between two hover-driven `window.refresh()` calls.
-/// gpui 0.2.2 repaints the whole window per refresh and mouse move events can
-/// arrive far faster than any display (125 Hz–1 kHz devices), so an un-gated
+/// A root refresh redraws the whole window and mouse move events can arrive far
+/// faster than any display (125 Hz–1 kHz devices), so an un-gated
 /// crosshair schedules a full-window rebuild per event. 8 ms caps the rebuild
 /// rate at 125 Hz, which every current display renders as smooth pointer
 /// tracking while leaving the frame budget for the repaint itself.
@@ -467,7 +466,7 @@ impl StoresSamples for GraphSceneEntry {
 /// layout stay out of the repaint path until the data, theme color, ambient
 /// font size, or — on a two-direction pill — the secondary direction's
 /// newest sample or a label change does. (The ambient font family is not
-/// fingerprinted by gpui 0.2.2's `TextStyle`; a family change without a size
+/// fingerprinted by the current `TextStyle` cache key; a family change without a size
 /// or color change falls back to one stale-shaped badge until the next data
 /// tick.)
 struct ValueBadgeCache {
@@ -647,6 +646,8 @@ fn draw_value_badge(
     let _ = cached.line.paint(
         point(badge_bounds.origin.x + pad_x, badge_bounds.origin.y + pad_y),
         line_height,
+        gpui::TextAlign::Left,
+        None,
         window,
         cx,
     );

@@ -22,7 +22,7 @@ fn wrapped_root(cx: &mut TestAppContext) -> (WindowHandle<RootView>, Entity<Root
 }
 
 fn draw(cx: &mut TestAppContext, win: WindowHandle<RootView>) {
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -67,7 +67,7 @@ async fn mc06_modal_focus_case_modal_traps_tab_and_restores_trigger_focus(cx: &m
 
     let trigger = win
         .update(cx, |_root, window, cx| {
-            window.focus_next();
+            window.focus_next(cx);
             window
                 .focused(cx)
                 .expect("the production shell exposes a first tab stop")
@@ -141,7 +141,7 @@ async fn mc03_apps_search_case_ctrl_f_focuses_search_and_tab_leaves_input(cx: &m
         cx.notify();
     });
     draw(cx, win);
-    win.update(cx, |_root, window, _cx| window.focus_next())
+    win.update(cx, |_root, window, cx| window.focus_next(cx))
         .unwrap();
 
     cx.dispatch_keystroke(win.into(), Keystroke::parse("ctrl-f").unwrap());
@@ -175,7 +175,7 @@ async fn mc03_apps_search_case_ctrl_f_focuses_search_and_tab_leaves_input(cx: &m
 /// includes `#root` and its `on_key_down` runs. Must be called AFTER at least one
 /// `window.draw` so the rendered frame's tab-stop list is populated.
 fn focus_first_tab_stop(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
-    win.update(cx, |_v, window, _cx| window.focus_next())
+    win.update(cx, |_v, window, cx| window.focus_next(cx))
         .unwrap();
 }
 
@@ -218,7 +218,7 @@ async fn mc06_modal_cancel_case_escape_closes_open_modals(cx: &mut TestAppContex
     })
     .unwrap();
     // Draw once so the window has a laid-out scene before dispatch.
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     focus_first_tab_stop(cx, win);
 
@@ -262,7 +262,7 @@ async fn mc00_nav_keyboard_case_alt_digit_switches_top_page(cx: &mut TestAppCont
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Pages whose bodies render NO gpui_component Input (so focus stays on the
@@ -286,7 +286,7 @@ async fn mc00_nav_keyboard_case_alt_digit_switches_top_page(cx: &mut TestAppCont
             cx.notify();
         })
         .unwrap();
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         focus_first_tab_stop(cx, win);
         cx.dispatch_keystroke(win.into(), Keystroke::parse(ks).unwrap());
@@ -307,7 +307,7 @@ async fn mc06_pause_shortcut_case_ctrl_space_toggles_pause(cx: &mut TestAppConte
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     focus_first_tab_stop(cx, win);
 
@@ -388,7 +388,7 @@ async fn mc05_sidebar_keyboard_case_f9_toggles_sidebar_visibility(cx: &mut TestA
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     focus_first_tab_stop(cx, win);
 
@@ -398,13 +398,13 @@ async fn mc05_sidebar_keyboard_case_f9_toggles_sidebar_visibility(cx: &mut TestA
     cx.dispatch_keystroke(win.into(), Keystroke::parse("f9").unwrap());
     let hidden = win.read_with(cx, |view, _cx| view.sidebar_visible).unwrap();
     assert!(!hidden, "F9 must hide the device sidebar");
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     cx.dispatch_keystroke(win.into(), Keystroke::parse("f9").unwrap());
     let restored = win.read_with(cx, |view, _cx| view.sidebar_visible).unwrap();
     assert!(restored, "a second F9 must restore the device sidebar");
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }
 
@@ -452,7 +452,7 @@ async fn f5_refreshes_process_list(cx: &mut TestAppContext) {
         cx.notify();
     })
     .unwrap();
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     focus_first_tab_stop(cx, win);
 
@@ -461,6 +461,6 @@ async fn f5_refreshes_process_list(cx: &mut TestAppContext) {
     // F5 must keep the view renderable through the refresh path: re-draw the
     // window and confirm it stays coherent instead of panicking. An exact host
     // process count is not portable; render-coherence after refresh is.
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 }

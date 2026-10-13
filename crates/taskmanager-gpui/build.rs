@@ -3,7 +3,7 @@
 //! Embeds the TaskForest app icon into the Windows executable so its taskbar /
 //! alt-tab / titlebar + Explorer file icon show the real logo instead of a
 //! generic icon. See `packaging/windows/taskmanager.rc` for why the icon is
-//! pinned to resource id 1 (gpui 0.2.2 reads exactly that).
+//! pinned to resource id 1 (the GPUI 0.3.9 Windows backend reads that id).
 //!
 //! Target-gated: `embed_resource` drives rc.exe, windres or LLVM-RC only when
 //! Cargo is producing the Windows GPUI product. Native and cross builds

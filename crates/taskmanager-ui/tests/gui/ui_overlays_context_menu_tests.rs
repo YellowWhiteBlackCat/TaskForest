@@ -10,7 +10,7 @@ use taskmanager_theme::Theme;
 #[gpui::test]
 async fn context_menu_renders(cx: &mut TestAppContext) {
     let window = cx.add_window(|_window, _cx| Harness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let _ = window.read_with(cx, |_, _| {});
 }
@@ -30,14 +30,14 @@ async fn right_click_builds_menu_exactly_once_after_many_draws(cx: &mut TestAppC
     // Many draws (request_layout every frame): the old implementation
     // registered one window-level listener per paint.
     for _ in 0..4 {
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     let position = point(px(120.0), px(120.0));
     vcx.simulate_mouse_down(position, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         1,
@@ -58,7 +58,7 @@ async fn right_click_builds_menu_exactly_once_after_many_draws(cx: &mut TestAppC
     // A second right-click opens the menu once more — still exactly one
     // build per click (no listener pile-up).
     vcx.simulate_mouse_down(position, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         2,
@@ -67,7 +67,7 @@ async fn right_click_builds_menu_exactly_once_after_many_draws(cx: &mut TestAppC
 
     // Left clicks are not right clicks: the menu must not reopen.
     vcx.simulate_click(point(px(300.0), px(300.0)), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *builds.borrow(),
         2,
@@ -92,13 +92,13 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
     });
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     // The trigger sits at the window origin (w_64 × h_16): its center.
     let open_at = point(px(128.0), px(32.0));
 
     // Right-click opens the menu at the click position.
     vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let popup = vcx.debug_bounds("tm-popup").expect("menu must open");
     // Item 0 center: body py(SPACE_4) + half of the 26px row; the
     // entrance animation rises up to 4px, which stays inside the row.
@@ -106,9 +106,9 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
 
     // Outside click closes: the item must no longer be clickable.
     vcx.simulate_click(point(px(400.0), px(300.0)), Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *activations.borrow(),
         0,
@@ -117,11 +117,11 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
 
     // Escape closes (the open path focused the menu).
     vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_keystrokes("escape");
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *activations.borrow(),
         0,
@@ -130,9 +130,9 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
 
     // Item activation runs exactly once and closes the menu.
     vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *activations.borrow(),
         1,
@@ -140,7 +140,7 @@ async fn context_menu_closes_on_outside_click_escape_and_item_activation(cx: &mu
     );
     // The same spot must not re-activate: activation closed the menu.
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         *activations.borrow(),
         1,
@@ -161,18 +161,18 @@ async fn context_menu_closes_on_window_deactivation_without_action(cx: &mut Test
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     vcx.update(|window, cx| {
         window.activate_window();
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
     });
     let open_at = point(px(128.0), px(32.0));
     vcx.simulate_mouse_down(open_at, MouseButton::Right, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let popup = vcx.debug_bounds("tm-popup").expect("menu must open");
     let item_center = point(popup.left() + px(40.0), popup.top() + px(17.0));
 
     vcx.deactivate_window();
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     vcx.simulate_click(item_center, Modifiers::none());
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     assert_eq!(
         *activations.borrow(),

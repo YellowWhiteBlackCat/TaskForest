@@ -112,7 +112,7 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
                     if window.is_window_active() || !state.open {
                         return;
                     }
-                    state.focus_handle.focus(window);
+                    state.focus_handle.focus(window, cx);
                     state.open = false;
                     state.menu = None;
                     state.dismiss_subscription = None;

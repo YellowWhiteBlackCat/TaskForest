@@ -92,11 +92,11 @@ async fn shared_switch_is_tab_reachable_and_uses_unmodified_enter_or_space(
 
     for viewport in [size(px(1180.0), px(780.0)), size(px(720.0), px(480.0))] {
         cx.simulate_window_resize(window.into(), viewport);
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
     window
-        .update(cx, |_view, window, _cx| window.focus_next())
+        .update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     assert!(
         window
@@ -127,10 +127,10 @@ async fn shared_action_excludes_disabled_control_from_tab_order(cx: &mut TestApp
         sentinel: cx.focus_handle().tab_stop(true),
         theme: Theme::dark(),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     window
-        .update(cx, |_view, window, _cx| window.focus_next())
+        .update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
 
     assert!(
@@ -140,7 +140,7 @@ async fn shared_action_excludes_disabled_control_from_tab_order(cx: &mut TestApp
         "the enabled action must be the first tab stop"
     );
     window
-        .update(cx, |_view, window, _cx| window.focus_next())
+        .update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     assert!(
         window
@@ -166,7 +166,7 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
     });
     for target in [window.into(), other.into()] {
         cx.simulate_window_resize(target, size(px(1180.0), px(780.0)));
-        cx.update_window(target, |_, window, cx| window.draw(cx).clear())
+        cx.update_window(target, |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
 
@@ -175,12 +175,12 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
         InputModality::Programmatic
     );
     window
-        .update(cx, |_view, window, _cx| {
+        .update(cx, |_view, window, cx| {
             // The window root is RootView itself now (no gc Root wrapper); the
             // two focus_next calls land inside its rendered subtree, where root
             // capture participates.
-            window.focus_next();
-            window.focus_next();
+            window.focus_next(cx);
+            window.focus_next(cx);
         })
         .unwrap();
     assert_eq!(
@@ -199,7 +199,7 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
         InputModality::Keyboard
     );
     assert!(view.read_with(cx, |view, _cx| view.input_modality.shows_focus_ring()));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     // P6: the gc-global ring token is gone; ring visibility now derives from
     // the per-frame focus-visible snapshot (`with_focus_visible` →
@@ -226,14 +226,14 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
 
     // The untouched window keeps its own modality; rendering it must not leak
     // the other window's keyboard state into its snapshot.
-    cx.update_window(other.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(other.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         other_view.read_with(cx, |view, _cx| view.input_modality),
         InputModality::Programmatic,
         "the untouched window must keep its Programmatic policy"
     );
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         view.read_with(cx, |view, _cx| view.input_modality),
@@ -255,7 +255,7 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
         !view.read_with(cx, |view, _cx| view.input_modality.shows_focus_ring()),
         "pointer focus must suppress the shared ring"
     );
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         ring_for(cx, &view, false),
@@ -268,7 +268,7 @@ async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointe
         view.read_with(cx, |view, _cx| view.input_modality),
         InputModality::Keyboard
     );
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert!(
         ring_for(cx, &view, true) > 0.0,

@@ -126,7 +126,7 @@ impl Render for WheelHarness {
 #[gpui::test]
 async fn rail_renders_full_height_hit_strip_with_thin_centered_track(cx: &mut TestAppContext) {
     let window = add_harness(cx, recording_handle(1000.0), true);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     let rail = vcx
@@ -163,7 +163,7 @@ async fn rail_renders_full_height_hit_strip_with_thin_centered_track(cx: &mut Te
 #[gpui::test]
 async fn rail_registers_no_track_selector_by_default(cx: &mut TestAppContext) {
     let window = add_harness(cx, recording_handle(1000.0), false);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     assert!(
@@ -198,7 +198,7 @@ async fn rail_click_repositions_scroll_only_when_content_overflows(cx: &mut Test
 
     let mut vcx = gpui::VisualTestContext::from_window(win_overflowing.into(), cx);
     cx.update_window(win_overflowing.into(), |_, window, cx| {
-        window.draw(cx).clear()
+        window.draw(cx).clear(cx)
     })
     .unwrap();
     click_low_in_the_rail(&mut vcx);
@@ -210,8 +210,10 @@ async fn rail_click_repositions_scroll_only_when_content_overflows(cx: &mut Test
     );
 
     let mut vcx = gpui::VisualTestContext::from_window(win_fitting.into(), cx);
-    cx.update_window(win_fitting.into(), |_, window, cx| window.draw(cx).clear())
-        .unwrap();
+    cx.update_window(win_fitting.into(), |_, window, cx| {
+        window.draw(cx).clear(cx)
+    })
+    .unwrap();
     click_low_in_the_rail(&mut vcx);
     assert_eq!(
         fitting.offset.get(),
@@ -224,7 +226,7 @@ async fn rail_click_repositions_scroll_only_when_content_overflows(cx: &mut Test
 async fn rail_drag_keeps_capture_until_release_outside_window(cx: &mut TestAppContext) {
     let handle = recording_handle(1000.0);
     let window = add_harness(cx, handle.clone(), false);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -276,11 +278,11 @@ async fn rail_hit_strip_keeps_wheel_dispatch_on_the_underlying_scroll_owner(
         let handle = handle.clone();
         move |_window, _cx| WheelHarness { handle }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     assert!(
-        handle.max_offset().height > px(0.0),
+        handle.max_offset().y > px(0.0),
         "the fixture must have a real vertical scroll range"
     );
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);

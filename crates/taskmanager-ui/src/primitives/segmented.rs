@@ -183,6 +183,7 @@ impl RenderOnce for Segmented {
                     offset: Point::default(),
                     blur_radius: px(0.0),
                     spread_radius: px(2.0),
+                    inset: false,
                 }])
             })
             // Left/Right = radiogroup nav (wrap, fire the target on_click).

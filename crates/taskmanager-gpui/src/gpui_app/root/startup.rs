@@ -3,13 +3,10 @@
 use super::graph_options::normalize_graph_data_points;
 use super::{
     ConfigClient, Duration, PlatformClient, RefreshRequest, RootView, TelemetryStore, Theme,
-    TopPage, apply_process_config, config_from_view, i18n, platform_submission_time_ms, responsive,
+    TopPage, apply_process_config, config_from_view, i18n, platform_submission_time_ms,
 };
 use crate::gpui_app::theme::{detect, forced_skin_from_env};
-use gpui::{
-    AnyWindowHandle, App, AppContext, AsyncApp, Bounds, Entity, SharedString, Timer,
-    TitlebarOptions, WeakEntity, WindowBounds, WindowDecorations, WindowOptions, point, px, size,
-};
+use gpui::{AnyWindowHandle, App, AsyncApp, SharedString, WeakEntity, WindowDecorations};
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_app_host::HistoryFrontendConnector;
 use taskmanager_app_host::HistoryFrontendConnectorStartError;
@@ -23,7 +20,6 @@ use taskmanager_application::ConfigRevision;
 use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::TelemetryRefreshPolicy;
-use taskmanager_assets::embedded_fonts;
 use taskmanager_assets::product;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
@@ -40,8 +36,8 @@ use taskmanager_theme::FontAvailability;
 use taskmanager_theme::FontPreference;
 use taskmanager_theme::Skin;
 use taskmanager_theme::{HighContrast, resolve_fonts};
-use taskmanager_ui::theme_binding::{background_appearance, detect_font_availability};
-use tracing::{error, warn};
+use taskmanager_ui::theme_binding::detect_font_availability;
+use tracing::warn;
 
 mod appearance;
 use appearance::observe_startup_appearance;
@@ -54,7 +50,7 @@ mod config_tokens;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 pub(super) use config_tokens::{
     FONT_TOKEN_SYSTEM, color_scheme_from_token, font_pref_from_config, page_token,
-    skin_preference_from_config,
+    skin_preference_from_config, text_rendering_mode_from_token,
 };
 use config_tokens::{
     apply_cfg_to_theme, resolve_app_id, resolve_startup_page, startup_page_from_token,
@@ -66,6 +62,12 @@ use config_sync::{
     apply_root_persisted_projection, drain_config_publications, initial_config_recovery_message,
     persist_config_if_due,
 };
+
+mod window;
+use window::{RootWindowInputs, make_root_builder, open_main_window, prepare_window_options};
+
+mod ui_bootstrap;
+use ui_bootstrap::bootstrap_owned_ui;
 
 /// Window-frame policy: the persisted preference picks the mode we REQUEST.
 /// `System` (the default) and `Native` both ask for server-side decorations
@@ -125,6 +127,70 @@ struct RootStartupFacts {
     local_time_rules: LocalTimeRulesObservation,
 }
 
+struct InitialConfig {
+    config: Config,
+    revision: Option<ConfigRevision>,
+    notice: Option<String>,
+}
+
+type StartupInstance = (
+    Option<Box<dyn InstanceGuard>>,
+    std::sync::mpsc::Receiver<InstanceEvent>,
+);
+
+fn read_initial_config(config_client: &mut ConfigClient) -> InitialConfig {
+    match config_client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT) {
+        ConfigBootstrap::Published(publication) => {
+            let notice = match publication.outcome() {
+                ConfigPublicationOutcome::Loaded(recovery) => {
+                    initial_config_recovery_message(*recovery)
+                }
+                _ => None,
+            };
+            InitialConfig {
+                config: publication.snapshot().as_ref().clone(),
+                revision: Some(publication.revision()),
+                notice,
+            }
+        }
+        ConfigBootstrap::Fallback { snapshot, source } => InitialConfig {
+            config: snapshot.as_ref().clone(),
+            revision: None,
+            notice: Some(
+                i18n::t("settings.config_fallback").replace("{source}", &format!("{source:?}")),
+            ),
+        },
+    }
+}
+
+fn capture_mode_enabled() -> bool {
+    std::env::var("TM_CAPTURE_EVIDENCE")
+        .ok()
+        .is_some_and(|value| !value.is_empty() && value != "0")
+        || std::env::var_os("TM_CAPTURE_SCENARIO").is_some()
+}
+
+fn continue_startup(cx: &mut App, capture_mode: bool) -> Option<StartupInstance> {
+    match acquire_instance(capture_mode) {
+        InstanceStartup::Continue { guard, events } => Some((guard, events)),
+        InstanceStartup::Secondary => {
+            cx.quit();
+            None
+        }
+    }
+}
+
+fn report_font_fallback(availability: &FontAvailability) {
+    if !availability.embedded_fonts_ready() {
+        warn!(
+            bundled_ui = availability.bundled_ui_available(),
+            bundled_mono = availability.bundled_mono_available(),
+            catalog_truncated = availability.catalog_truncated(),
+            "embedded font registration is incomplete; using verified system fallbacks"
+        );
+    }
+}
+
 fn apply_root_startup_config(
     view: &mut RootView,
     cfg: &Config,
@@ -149,7 +215,7 @@ fn apply_root_startup_config(
     view.platform_failures = facts.appearance.failures;
     view.font_availability = facts.font_availability;
     view.local_time_rules = facts.local_time_rules;
-    apply_root_persisted_projection(view, cfg);
+    apply_root_persisted_projection(view, cfg, cx);
     let mut presentation = view.presentation_snapshot();
     presentation.appearance.font = facts.font_pref;
     presentation.appearance.skin = facts.skin_preference;
@@ -184,10 +250,12 @@ fn spawn_update_loop(
         let mut tick = 0u32;
         let mut submitted_presentation = None;
         loop {
-            Timer::after(Duration::from_millis(200)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(200))
+                .await;
             tick = tick.wrapping_add(1);
             if weak.upgrade().is_none() {
-                let _ = cx.update(|app| app.quit());
+                cx.update(|app| app.quit());
                 break;
             }
             let _ = weak.update(cx, |view, cx| {
@@ -305,8 +373,6 @@ pub fn init<E>(
     runtime: StartupRuntime,
     environment: StartupEnvironment,
 ) -> Result<(), E> {
-    use taskmanager_ui::init;
-
     let StartupRuntime {
         mut config_client,
         snapshot_export_client,
@@ -331,57 +397,29 @@ pub fn init<E>(
     // harness exits cleanly as `Secondary` before it can produce markers or a
     // window receipt. This branch is reachable only through the opt-in capture
     // environment and does not weaken normal single-instance behavior.
-    let capture_mode = std::env::var("TM_CAPTURE_EVIDENCE")
-        .ok()
-        .is_some_and(|value| !value.is_empty() && value != "0")
-        || std::env::var_os("TM_CAPTURE_SCENARIO").is_some();
-    let InstanceStartup::Continue {
-        guard: instance_guard,
-        events: instance_rx,
-    } = acquire_instance(capture_mode)
-    else {
-        cx.quit();
+    let capture_mode = capture_mode_enabled();
+    let Some((instance_guard, instance_rx)) = continue_startup(cx, capture_mode) else {
         return Ok(());
     };
     // Own UI-layer bootstrap: focus registry, input/dialog/popup/table/tree
     // keymaps (P6: replaces the old `gpui_component::init`). Idempotent; runs
     // once before the window opens.
-    init(cx);
+    bootstrap_owned_ui(cx);
     // Register the bundled fonts (MiSans VF + Roboto Mono) BEFORE any
     // text shapes. The subsequent text-system probe verifies that the family
     // names actually became resolvable; an asset existing in the binary is not
     // treated as proof that toolkit registration succeeded.
-    if let Err(font_error) = cx.text_system().add_fonts(embedded_fonts()) {
-        error!(%font_error, "embedded font registration failed; falling back to system fonts");
-    }
     // Receive the initial immutable config publication from the background
     // coordinator. The bounded fallback remains typed and later ticks can
     // converge through the same publication stream.
     // Applied to the theme BEFORE WindowOptions consume it (the Mica/vibrancy
     // material depends on the skin) and to the frontend refresh interval + RootView
     // toggles/page inside the open_window closure below.
-    let (cfg, applied_config_revision, config_bootstrap_notice) = match config_client
-        .wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT)
-    {
-        ConfigBootstrap::Published(publication) => {
-            let notice = match publication.outcome() {
-                ConfigPublicationOutcome::Loaded(recovery) => {
-                    initial_config_recovery_message(*recovery)
-                }
-                _ => None,
-            };
-            (
-                publication.snapshot().as_ref().clone(),
-                Some(publication.revision()),
-                notice,
-            )
-        }
-        ConfigBootstrap::Fallback { snapshot, source } => (
-            snapshot.as_ref().clone(),
-            None,
-            Some(i18n::t("settings.config_fallback").replace("{source}", &format!("{source:?}"))),
-        ),
-    };
+    let InitialConfig {
+        config: cfg,
+        revision: applied_config_revision,
+        notice: config_bootstrap_notice,
+    } = read_initial_config(&mut config_client);
 
     let language_preference = cfg.language.as_deref().and_then(i18n::Language::from_code);
     let initial_language = language_preference.or_else(|| {
@@ -391,13 +429,10 @@ pub fn init<E>(
     });
     i18n::set_language(initial_language.unwrap_or_else(i18n::detect_language));
 
-    // Published GPUI 0.2.2 exposes no text-raster mode API. The startup
-    // mapper therefore normalizes legacy subpixel/grayscale config tokens to
-    // platform default and the Settings surface marks those modes disabled.
-
     // Native appearance observation belongs to the platform adapter. It runs
     // before window creation on its own bounded lane, so shared GPUI code never
-    // launches gsettings/defaults/reg or reads platform configuration files.
+    // launches gsettings/defaults/reg or reads platform configuration
+    // files.
     let initial_interval = TelemetryInterval::clamped(Duration::from_millis(cfg.refresh_ms));
     let telemetry_refresh_policy = TelemetryRefreshPolicy::new(initial_interval);
     // Physical retention is a product bound, not a renderer preference. GPUI
@@ -417,14 +452,7 @@ pub fn init<E>(
     // the user explicitly chose them). Availability is a one-time snapshot; the
     // RootView re-resolves against it on every skin/font change.
     let font_availability = detect_font_availability(cx);
-    if !font_availability.embedded_fonts_ready() {
-        warn!(
-            bundled_ui = font_availability.bundled_ui_available(),
-            bundled_mono = font_availability.bundled_mono_available(),
-            catalog_truncated = font_availability.catalog_truncated(),
-            "embedded font registration is incomplete; using verified system fallbacks"
-        );
-    }
+    report_font_fallback(&font_availability);
     let font_pref = font_pref_from_config(&cfg, &font_availability);
     let skin_preference = skin_preference_from_config(&cfg).or_else(forced_skin_from_env);
     theme = Theme::build(
@@ -443,62 +471,11 @@ pub fn init<E>(
     // macOS/Windows keep an opaque surface — their window servers round and
     // shadow natively.
     theme.window_transparent = cfg!(target_os = "linux");
-    // gpui-component components (input/table/menu/…) read the global ActiveTheme
-    // on their first frame; the RootView renders the window backdrop itself
-    // (P4: no gc Root wrapper). Sync the tokens now, before the window opens, so
-    // the first frame carries the resolved skin/fonts (this call only pre-warms
-    // the color/font tokens; the RootView re-syncs on every skin/font change).
-    let options = WindowOptions {
-        titlebar: Some(TitlebarOptions {
-            title: Some(product::GPUI_NAME.into()),
-            ..Default::default()
-        }),
-        window_bounds: Some(WindowBounds::Windowed(Bounds {
-            origin: point(px(120.0), px(80.0)),
-            size: responsive::initial_window_size(),
-        })),
-        // Window-frame mode per the persisted preference (`System` when the
-        // token is empty/unknown, the historical behavior): ask the compositor
-        // for the decoration mode the user picked. KDE/KWin, macOS, and
-        // Windows grant Server and draw the native titlebar + corners; the
-        // renderer then emits NO app chrome (see `render`). GNOME/Mutter and
-        // some tiling WMs force Client (CSD), and the decoration negotiation
-        // reflects that — `window_decorations()` read each frame reacts to
-        // what was actually granted, so we do NOT sniff XDG_CURRENT_DESKTOP
-        // (fragile). `window_transparent` (set below for Linux) keeps the CSD
-        // fallback's transparent rounded corners working when a compositor
-        // forces Client despite this Server request.
-        window_decorations: Some(requested_window_decorations(
-            WindowDecorationsPreference::from_config_token(&cfg.window_decorations),
-        )),
-        // Mica (Windows) / vibrancy (macOS) material when the skin calls for it;
-        // GNOME/KDE stay opaque. On Linux the surface is TRANSPARENT so the CSD
-        // fallback can paint its own rounded corners (KWin/Niri don't round a
-        // CSD surface); when Server is granted the renderer fills the root
-        // opaquely and paints no corners, so the transparency is inert there.
-        // macOS/Windows keep Opaque and let the window server round natively.
-        // `Theme::background_appearance` is the single decision point — the
-        // RootView re-applies it on skin/font switches at runtime.
-        window_background: background_appearance(&theme),
-        // Wayland app_id MUST be the app's reverse-DNS identifier and match the
-        // `.desktop` file basename (packaging/linux/io.github...TaskForestG.desktop)
-        // so the compositor (KWin/Mutter) can resolve window → desktop entry →
-        // Icon= → hicolor theme. gpui 0.2.2 has no window-icon API, so the
-        // taskbar/Dock icon comes ENTIRELY from this app_id → .desktop lookup;
-        // a bare "taskmanager" app_id matches no installed desktop file and the
-        // window falls back to a generic placeholder icon. (X11 compositors use
-        // the matching StartupWMClass in the .desktop.) The binary stays
-        // `taskmanager`; the config dir (~/.../taskmanager/) is keyed off the
-        // binary name, not the app_id, so it is unaffected.
-        app_id: Some(resolve_app_id(custom_app_id)),
-        // The window-level floor of the three-layer minimum-space doctrine
-        // (ADR-039): the compositor may not shrink the surface below the
-        // product minimum, so every inner budget (width slots, chart tiers)
-        // reasons about a BOUNDED space. Single source: the responsive
-        // constants — never a second literal here.
-        window_min_size: Some(size(px(responsive::MIN_WIDTH), px(responsive::MIN_HEIGHT))),
-        presentation: crate::window_presentation::to_gpui(&presentation),
-        ..Default::default()
+    let app_id = resolve_app_id(custom_app_id);
+    let Some((options, fallback_options)) =
+        prepare_window_options(cx, &cfg, &theme, &app_id, &presentation)
+    else {
+        return Ok(());
     };
 
     let has_explicit_page_override = std::env::var("TM_PAGE").is_ok();
@@ -513,87 +490,34 @@ pub fn init<E>(
     };
     let _ = platform.request_refresh(RefreshRequest::Dashboard, platform_submission_time_ms());
     let surface_role = crate::window_presentation::surface_role(&presentation);
-    let window_result = cx.open_window(options, move |window, cx| {
-        // gpui 0.2.2 forwards `TitlebarOptions::title` when constructing its
-        // Windows and X11 windows, but its Wayland constructor currently drops
-        // that initial field. Submit the title through the live platform window
-        // as well: on Wayland this reaches `xdg_toplevel::set_title`, while on
-        // macOS/Windows it makes the same product identity explicit and is
-        // harmlessly idempotent with the creation options above.
-        window.set_window_title(product::GPUI_NAME);
-        // theme (Copy) carries the cfg-overridden skin/mode/hc; cfg's toggles
-        // + last_page are applied to the fresh view right after construction.
-        let entity: Entity<RootView> = cx.new(|cx| {
-            let mut v = RootView::new_with_platform_and_surface_role(
-                theme,
-                telemetry,
-                telemetry_ingestor,
-                telemetry_refresh_policy,
-                platform,
-                surface_role,
-                cx,
-            );
-            v.snapshot_export.install(snapshot_export_client);
-            v.window_capture.install(window_capture_client);
-            v.diagnostic_bundle_runtime
-                .install(diagnostic_bundle_client);
-            v.service_details
-                .install_export_client(service_log_export_client);
-            apply_root_startup_config(
-                &mut v,
-                &cfg,
-                root_startup_facts,
-                has_explicit_page_override,
-                cx,
-            );
-            v
-        });
-        let weak = entity.downgrade();
-        // Single-instance (ADR-032 follow-up): hold the primary guard and
-        // pump activation requests via non-blocking try_recv in the tick loop.
-        entity.update(cx, |view, _cx| {
-            if let Some(guard) = instance_guard {
-                view.instance_guard = Some(guard);
-            }
-            view.instance_rx = Some(instance_rx);
-        });
-        if let Some(notice) = config_bootstrap_notice {
-            entity.update(cx, |view, cx| view.show_local_feedback(notice, cx));
-        }
-        // System tray (ADR-032) belongs only to the product session. Capture
-        // mode is a disposable, private-compositor process: it must not probe
-        // or register a StatusNotifierItem on either the host bus or a private
-        // watcher, and it must be able to close normally for owned cleanup.
-        if !capture_mode {
-            let tray_available = super::tray::spawn_tray_host(&entity, cx);
-            // A native titlebar close must not destroy the only window while
-            // the tray owns the process lifetime. Returning false keeps the
-            // GPUI root entity, ECS/runtime workers, single-instance guard,
-            // and tray alive; minimizing is the portable hide primitive.
-            if tray_available {
-                window.on_window_should_close(cx, |window, _cx| {
-                    window.minimize_window();
-                    false
-                });
-            }
-        }
-        let window_handle = window.window_handle();
-        spawn_update_loop(
-            cx,
-            weak,
-            window_handle,
-            config_client,
-            applied_config_revision,
-        );
-        // P4 consumption switch: the window root is our own RootView directly — no
-        // gpui_component::Root wrapper. RootView hosts the LayerStack overlay stack
-        // itself (overlays render as child views of the host; see root.rs).
-        entity
+    let root_builder = make_root_builder(RootWindowInputs {
+        theme,
+        telemetry,
+        telemetry_ingestor,
+        telemetry_refresh_policy,
+        platform,
+        cfg,
+        root_startup_facts,
+        has_explicit_page_override,
+        snapshot_export_client,
+        window_capture_client,
+        diagnostic_bundle_client,
+        service_log_export_client,
+        instance_guard,
+        instance_rx,
+        config_bootstrap_notice,
+        config_client,
+        applied_config_revision,
+        capture_mode,
+        surface_role,
     });
-    if let Err(error) = window_result {
-        error!(%error, "main GPUI window failed to open");
-        cx.quit();
-    }
-    cx.activate(true);
+    open_main_window(
+        cx,
+        options,
+        fallback_options,
+        &presentation,
+        theme,
+        root_builder,
+    );
     Ok(())
 }

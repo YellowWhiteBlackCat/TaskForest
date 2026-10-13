@@ -159,6 +159,23 @@ pub fn resolve_deferred_scroll(
                 offset
             }
         }
+        ScrollStrategy::Nearest => {
+            if axis_is_vertical(axis) {
+                if item_bounds.top() + offset.y < content_bounds.top() {
+                    point(offset.x, content_bounds.top() - item_bounds.top())
+                } else if item_bounds.bottom() + offset.y > content_bounds.bottom() {
+                    point(offset.x, content_bounds.bottom() - item_bounds.bottom())
+                } else {
+                    offset
+                }
+            } else if item_bounds.left() + offset.x < content_bounds.left() {
+                point(content_bounds.left() - item_bounds.left(), offset.y)
+            } else if item_bounds.right() + offset.x > content_bounds.right() {
+                point(content_bounds.right() - item_bounds.right(), offset.y)
+            } else {
+                offset
+            }
+        }
     }
 }
 

@@ -580,11 +580,8 @@ fn language_row(
             }),
         ))
 }
-/// Text-rendering chooser: Platform default is the only active choice in the
-/// published GPUI 0.2.2 build. Subpixel and grayscale remain visible as
-/// disabled capability evidence because their API exists only in Zed's
-/// in-tree GPUI fork; the token is normalized at startup and persistence so a
-/// click cannot claim an effect the renderer did not apply.
+/// Text-rendering chooser for the GPUI snapshot's platform-default, subpixel,
+/// and grayscale modes. Subpixel may fall back when a surface cannot support it.
 mod rendering;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/settings_view/tests.rs"]
@@ -607,9 +604,8 @@ pub(crate) use rendering::{hc_row, text_rendering_row};
 /// reports the outcome honestly through the render-time check instead of
 /// pretending the mode changed.
 ///
-/// The control is hidden off Linux: gpui 0.2.2's macOS/Windows backends
-/// ignore decoration requests (the OS always draws the frame), so offering
-/// Custom there could never be honored. The outcome-notice machinery still
+/// The control is hidden off Linux: macOS and Windows retain OS-owned window
+/// frames, so offering Custom there could never be honored. The outcome-notice machinery still
 /// covers a hand-edited config on those platforms.
 fn window_decorations_section(
     t: &Theme,

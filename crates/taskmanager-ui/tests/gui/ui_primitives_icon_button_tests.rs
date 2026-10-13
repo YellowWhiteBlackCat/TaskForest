@@ -32,18 +32,18 @@ async fn icon_button_keyboard_and_pointer_share_activation(cx: &mut TestAppConte
             events: events.clone(),
         }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Keyboard activation.
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let handle = window
         .read_with(&vcx, |harness, app| {
             harness.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     vcx.simulate_keystrokes("space");
     assert_eq!(
         events.borrow().as_slice(),

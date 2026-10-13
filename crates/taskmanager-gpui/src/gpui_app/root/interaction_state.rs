@@ -81,7 +81,7 @@ pub(crate) fn wire_debounced_search(
                 let write = write.clone();
                 cx.spawn(async move |_this, cx| {
                     if *seq.borrow() == my {
-                        let _ = root.update(cx, |rv, cx| {
+                        root.update(cx, |rv, cx| {
                             write(rv, value);
                             cx.notify();
                         });
@@ -94,9 +94,11 @@ pub(crate) fn wire_debounced_search(
             let seq = seq.clone();
             let write = write.clone();
             cx.spawn(async move |_this, cx| {
-                gpui::Timer::after(std::time::Duration::from_millis(100)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
                 if *seq.borrow() == my {
-                    let _ = root.update(cx, |rv, cx| {
+                    root.update(cx, |rv, cx| {
                         write(rv, value);
                         cx.notify();
                     });

@@ -33,7 +33,7 @@ async fn keyboard_space_toggles_switch(cx: &mut TestAppContext) {
         }
     });
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
 
     let bounds = vcx
         .debug_bounds("tm-switch")
@@ -46,7 +46,7 @@ async fn keyboard_space_toggles_switch(cx: &mut TestAppContext) {
             harness.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     vcx.simulate_keystrokes("space");
     assert_eq!(
         events.borrow().as_slice(),
@@ -72,17 +72,17 @@ async fn keyboard_enter_toggles_switch(cx: &mut TestAppContext) {
             events: events.clone(),
         }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let handle = window
         .read_with(&vcx, |harness, app| {
             harness.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     vcx.simulate_keystrokes("enter");
     vcx.simulate_keystrokes("enter");
 
@@ -139,11 +139,11 @@ async fn switch_is_reachable_through_window_tab_navigation(cx: &mut TestAppConte
             events: events.clone(),
         }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     window
-        .update(cx, |_view, window, _cx| window.focus_next())
+        .update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     assert!(
         window
@@ -177,11 +177,11 @@ async fn disabled_switch_is_excluded_from_tab_navigation(cx: &mut TestAppContext
         let state = cx.new(|cx| SwitchState::new(cx));
         DisabledHarness { state }
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     window
-        .update(cx, |_view, window, _cx| window.focus_next())
+        .update(cx, |_view, window, cx| window.focus_next(cx))
         .unwrap();
     assert!(
         !window
@@ -224,15 +224,15 @@ async fn focused_switch_reveals_itself_inside_its_real_scroll_viewport(cx: &mut 
         ScrollingHarness { state, scroll }
     });
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
-    vcx.update(|window, cx| window.draw(cx).clear());
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
     let handle = window
         .read_with(&vcx, |view, app| {
             view.state.read(app).focus_handle().clone()
         })
         .unwrap();
-    vcx.update(|window, _cx| handle.focus(window));
+    vcx.update(|window, cx| handle.focus(window, cx));
     for _ in 0..3 {
-        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.update(|window, cx| window.draw(cx).clear(cx));
     }
     window
         .read_with(&vcx, |view, app| {
@@ -241,7 +241,10 @@ async fn focused_switch_reveals_itself_inside_its_real_scroll_viewport(cx: &mut 
             let viewport = view.scroll.bounds();
             assert!(control.size.width > px(0.0) && control.size.height > px(0.0));
             assert!(
-                viewport.contains(&control.origin) && viewport.contains(&control.bottom_right()),
+                control.left() >= viewport.left()
+                    && control.top() >= viewport.top()
+                    && control.right() <= viewport.right()
+                    && control.bottom() <= viewport.bottom(),
                 "{control:?} outside {viewport:?}"
             );
             assert!(

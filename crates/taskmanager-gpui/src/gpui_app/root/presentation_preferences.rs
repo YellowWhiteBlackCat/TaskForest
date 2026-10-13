@@ -5,8 +5,11 @@
 //! Settings actions replace or mutate the typed sections here, while renderers
 //! consume immutable snapshots.
 
-use gpui::{Context, Pixels, SharedString, Window};
+use std::borrow::BorrowMut;
 
+use gpui::{App, Context, Pixels, SharedString, Window};
+
+use super::startup::text_rendering_mode_from_token;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
 use taskmanager_application::i18n;
@@ -541,6 +544,8 @@ impl super::RootView {
     }
 
     pub fn set_text_rendering(&mut self, text_rendering: &'static str, cx: &mut Context<Self>) {
+        BorrowMut::<App>::borrow_mut(cx)
+            .set_text_rendering_mode(text_rendering_mode_from_token(text_rendering));
         let mut appearance = self.presentation.appearance();
         appearance.text_rendering = text_rendering;
         self.presentation.set_appearance(appearance);

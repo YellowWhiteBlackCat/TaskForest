@@ -45,7 +45,7 @@ pub fn titlebar_border(t: &Theme, active: bool) -> gpui::Rgba {
 }
 
 // ── focus ring (WCAG 2.4.7 Focus Visible) ──────────────────────────────────
-// gpui 0.2.2 focus API, verified in gpui's src/elements/div.rs + src/window.rs:
+// The pinned GPUI element focus API provides:
 //   * `.id(..)` on a `Div` → `Stateful<Div>`, which implements BOTH
 //     `InteractiveElement` (the `.focus(|s| ..)` stateful style hook) and
 //     `StatefulInteractiveElement` (`.focusable()` + `.tab_stop(true)`).
@@ -69,9 +69,8 @@ pub fn titlebar_border(t: &Theme, active: bool) -> gpui::Rgba {
 /// 2px ring at ~0.6 alpha. Implemented as a 0-blur, 0-offset box-shadow with
 /// +2px `spread_radius`, so the ring sits OUTSIDE the element and does NOT
 /// perturb layout (unlike `border`, which would shove content inward by 2px the
-/// frame focus lands). gpui 0.2.2's `BoxShadow` has no `inset` field, so this is
-/// an outset ring — fine for chrome controls, which have titlebar breathing room
-/// around them.
+/// frame focus lands). This focus ring is an outset shadow, which works well for
+/// chrome controls with titlebar breathing room around them.
 ///
 /// This is the raw [`BoxShadow`] value for callers composing a custom
 /// [`StyleRefinement`]. For the common case prefer [`focus_ring`] — a drop-in
@@ -83,6 +82,7 @@ pub fn focus_ring_shadow(t: &Theme) -> BoxShadow {
         offset: Point::default(),
         blur_radius: px(0.0),
         spread_radius: px(2.0),
+        inset: false,
     }
 }
 

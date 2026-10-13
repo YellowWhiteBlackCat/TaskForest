@@ -25,7 +25,7 @@ fn mounted(cx: &mut TestAppContext) -> (gpui::WindowHandle<Harness>, VisualTestC
     cx.update(init);
     let window = cx.add_window(|_window, _cx| Harness);
     cx.simulate_window_resize(window.into(), size(px(320.0), px(120.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let visual = VisualTestContext::from_window(window.into(), cx);
     (window, visual)
@@ -56,7 +56,7 @@ async fn single_line_readout_stays_bounded_but_select_all_copies_full_truth(
     cx.update(init);
     let window = cx.add_window(|_window, _cx| SingleLineHarness);
     cx.simulate_window_resize(window.into(), size(px(180.0), px(80.0)));
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut visual = VisualTestContext::from_window(window.into(), cx);
     let bounds = visual
@@ -146,7 +146,7 @@ impl Render for MultiHarness {
 async fn a_window_paints_only_one_text_selection_at_a_time(cx: &mut TestAppContext) {
     cx.update(init);
     let window = cx.add_window(|_window, _cx| MultiHarness);
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut visual = VisualTestContext::from_window(window.into(), cx);
 
@@ -155,7 +155,7 @@ async fn a_window_paints_only_one_text_selection_at_a_time(cx: &mut TestAppConte
         .expect("first text must render");
     visual.simulate_click(first.center(), Modifiers::none());
     visual.simulate_keystrokes("ctrl-a");
-    visual.update(|window, cx| window.draw(cx).clear());
+    visual.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         visual
             .debug_bounds("tm-test-selectable-a-selected")
@@ -177,7 +177,7 @@ async fn a_window_paints_only_one_text_selection_at_a_time(cx: &mut TestAppConte
         Some("second value"),
         "the second element must own focus and the active selection"
     );
-    visual.update(|window, cx| window.draw(cx).clear());
+    visual.update(|window, cx| window.draw(cx).clear(cx));
     assert_eq!(
         visual
             .debug_bounds("tm-test-selectable-a-selected")

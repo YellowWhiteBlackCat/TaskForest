@@ -58,8 +58,8 @@ fn inherited_ui_font_declares_the_bundled_cjk_fallback() {
     );
 }
 
-/// Focus-visible is a modality decision, not a focus decision: GPUI 0.2.2
-/// attaches no input origin to `FocusHandle`, so the per-window state machine
+/// Focus-visible is a modality decision, not a focus decision: `FocusHandle`
+/// carries no input origin, so the per-window state machine
 /// is the sole source of the ring policy. The capture listeners call these
 /// exact transitions before descendants handle the same event, and the render
 /// snapshot consumes `shows_focus_ring()` through `Theme::with_focus_visible`.
@@ -111,7 +111,7 @@ async fn input_modality_clears_when_its_window_blurs(cx: &mut TestAppContext) {
     let window =
         cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new_demo(Theme::dark(), cx));
     let root = window.entity(cx).expect("demo RootView entity");
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("demo root should render");
 
     let mut visual = VisualTestContext::from_window(window.into(), cx);
@@ -133,7 +133,7 @@ async fn input_modality_clears_when_its_window_blurs(cx: &mut TestAppContext) {
     );
 
     visual.deactivate_window();
-    visual.update(|window, cx| window.draw(cx).clear());
+    visual.update(|window, cx| window.draw(cx).clear(cx));
     let blurred_ring_alpha = root.read_with(&visual, |view, _| {
         view.theme
             .with_focus_visible(view.input_modality.shows_focus_ring())
@@ -153,7 +153,7 @@ async fn input_modality_clears_when_focused_target_unmounts(cx: &mut TestAppCont
     let window = cx.add_window(|_window, cx| FocusTargetHarness {
         focus_handle: Some(cx.focus_handle().tab_stop(true)),
     });
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("focus-target harness should render");
 
     window
@@ -165,14 +165,14 @@ async fn input_modality_clears_when_focused_target_unmounts(cx: &mut TestAppCont
         })
         .expect("focus lifecycle window should update");
     window
-        .update(cx, |view, window, _cx| {
+        .update(cx, |view, window, cx| {
             view.focus_handle
                 .as_ref()
                 .expect("target starts mounted")
-                .focus(window);
+                .focus(window, cx);
         })
         .expect("focus target should accept focus");
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("focused target should render");
 
     assert!(
@@ -194,7 +194,7 @@ async fn input_modality_clears_when_focused_target_unmounts(cx: &mut TestAppCont
         })
         .expect("target should unmount");
     cx.run_until_parked();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("unmounted target should produce a focus-lost frame");
 
     assert!(
@@ -228,7 +228,7 @@ async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut 
         assert!(!view.sessions().is_empty());
     });
 
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .expect("demo window should render");
     let mut visual = VisualTestContext::from_window(window.into(), cx);
     let ready_body = visual
@@ -278,7 +278,7 @@ async fn desktop_widget_surface_paints_metric_cards_from_the_snapshot(cx: &mut T
         );
         cx.notify();
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let root = vcx
@@ -321,7 +321,7 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
     view.update(cx, |v, _cx| {
         v.window_decorations_pref = WindowDecorationsPreference::Native;
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     view.read_with(cx, |v, _| {
         assert!(
@@ -337,7 +337,7 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
     view.update(cx, |v, _cx| {
         v.decorations_override = Some(false);
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     view.read_with(cx, |v, _| {
         assert!(
@@ -349,7 +349,7 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
     });
 
     // The latch holds: subsequent renders do not re-notify (no toast churn).
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     view.read_with(cx, |v, _| {
         assert_eq!(
@@ -364,7 +364,7 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
         v.window_decorations_pref = WindowDecorationsPreference::System;
         v.decoration_outcome_reported = false;
     });
-    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     view.read_with(cx, |v, _| {
         assert!(!v.decoration_outcome_reported);

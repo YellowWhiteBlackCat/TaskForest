@@ -143,7 +143,7 @@ async fn landscape_services_page_keeps_table_and_chrome_inside_window(cx: &mut T
         (720.0, 480.0),
     ] {
         cx.simulate_window_resize(win.into(), size(px(width), px(height)));
-        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
 
         let mut vcx = VisualTestContext::from_window(win.into(), cx);

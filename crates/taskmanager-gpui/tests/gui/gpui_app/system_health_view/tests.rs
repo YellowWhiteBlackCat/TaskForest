@@ -74,7 +74,7 @@ async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppC
                 cx.notify();
             })
             .unwrap();
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
     }
 }

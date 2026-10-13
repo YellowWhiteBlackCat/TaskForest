@@ -168,7 +168,7 @@ pub enum Toggle {
 /// Pre-formatted display text for one row's data cells (the columns whose
 /// rendering is a pure function of the row's typed values). Filled once per
 /// projection rebuild by [`visible_rows`] — the per-frame row closure only
-/// consumes these strings, never reformats. gpui 0.2.2 rebuilds the visible
+/// consumes these strings, never reformats. GPUI rebuilds the visible
 /// rows' elements on EVERY frame (including column-band navigation frames),
 /// so the ~10 `format!` calls per row must not run per frame. The
 /// formatters stay in `super::formatting` as the single source; this struct

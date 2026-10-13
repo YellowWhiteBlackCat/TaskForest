@@ -429,7 +429,7 @@ impl RootView {
         }
         if outcome == FirstRunCompletion::Restart {
             cx.spawn(async move |_entity, cx| {
-                let _ = cx.update(|app| app.quit());
+                cx.update(|app| app.quit());
             })
             .detach();
         }

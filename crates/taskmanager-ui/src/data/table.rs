@@ -112,7 +112,7 @@ impl ScrollbarHandle for UniformListScrollHandle {
     }
 
     fn max_offset(&self) -> Size<Pixels> {
-        self.0.borrow().base_handle.max_offset()
+        self.0.borrow().base_handle.max_offset().into()
     }
 
     fn viewport(&self) -> Bounds<Pixels> {
@@ -625,7 +625,7 @@ impl<D: TableDelegate> Render for TableState<D> {
             .child(self.render_table_header(fixed_count, window, cx))
             .when(rows_count > 0 && !loading, |this| {
                 this.child(
-                    div().id("table-body").flex_grow().size_full().child(
+                    div().id("table-body").flex_grow(1.0).size_full().child(
                         uniform_list(
                             "table-uniform-list",
                             render_rows_count,
@@ -669,7 +669,7 @@ impl<D: TableDelegate> Render for TableState<D> {
                                     cx,
                                 );
 
-                                table.load_more_if_need(rows_count, visible_range.end, window, cx);
+                                table.load_more_if_need(rows_count, visible_range.end, cx);
                                 table.update_visible_range_if_need(
                                     visible_range.clone(),
                                     Axis::Vertical,
@@ -712,10 +712,10 @@ impl<D: TableDelegate> Render for TableState<D> {
                                 items
                             }),
                         )
-                        .flex_grow()
+                        .flex_grow(1.0)
                         .size_full()
                         .with_sizing_behavior(ListSizingBehavior::Auto)
-                        .track_scroll(self.vertical_scroll_handle.clone())
+                        .track_scroll(&self.vertical_scroll_handle)
                         .into_any_element(),
                     ),
                 )

@@ -43,7 +43,7 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
     cx.update_window(window.into(), |_, window, _| window.activate_window())
         .unwrap();
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     let tb = vcx
         .debug_bounds("mode:trigger")
@@ -52,7 +52,7 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     // The first draw pinned the popup anchor to the trigger; draw once
     // more so the trigger's element state is settled before the click
     // (the anchor write marks the state entity dirty for one frame).
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
 
     // Open the menu by clicking the trigger (top-left, above the popup).
@@ -63,7 +63,7 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
         Modifiers::none(),
     );
     vcx.simulate_click(trigger_bounds.center(), Modifiers::none());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert!(
         vcx.debug_bounds("tm-popup").is_some(),
@@ -75,7 +75,7 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     let first_item = point(popup.left() + px(40.0), popup.top() + px(17.0));
     vcx.simulate_mouse_move(first_item, None::<gpui::MouseButton>, Modifiers::none());
     vcx.simulate_click(first_item, Modifiers::none());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         chosen.borrow().as_slice(),
@@ -88,7 +88,7 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     // The debug bounds map retains old entries, so click the old row again
     // and prove it cannot invoke the selection callback after dismissal.
     vcx.simulate_click(first_item, Modifiers::none());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         chosen.borrow().as_slice(),
@@ -100,10 +100,10 @@ async fn select_shows_current_value_and_reports_choice(cx: &mut TestAppContext) 
     // popup's keyboard navigation. The pointer anchor remains stable across
     // the first popup's unmount, while debug bounds retain historical entries.
     vcx.simulate_click(trigger_bounds.center(), Modifiers::none());
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     vcx.simulate_keystrokes("down down enter");
-    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
         .unwrap();
     assert_eq!(
         chosen.borrow().as_slice(),

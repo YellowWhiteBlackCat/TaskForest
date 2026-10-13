@@ -161,7 +161,7 @@ pub(crate) fn spawn_refresh_loop(
             // Pause before the next refresh. Re-check the generation AND the
             // live state after the sleep so a disable / device-switch / page
             // navigation during the wait terminates the chain cleanly.
-            gpui::Timer::after(POLL_INTERVAL).await;
+            cx.background_executor().timer(POLL_INTERVAL).await;
             let still_active = weak
                 .update(cx, |v, _cx| {
                     let still_active = v.gpu_engine_polling_is_current(poll_gen)
