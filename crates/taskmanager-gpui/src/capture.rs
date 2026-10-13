@@ -99,7 +99,7 @@ pub fn run(out: &Path) -> Result<(), String> {
             let task = cx.spawn(async move |cx: &mut AsyncApp| {
                 let result = capture_after_first_frames(&out, cx).await;
                 record_outcome(&outcome_task, result);
-                let _ = cx.update(|cx| cx.quit());
+                cx.update(|cx| cx.quit());
             });
             task.detach();
         });
