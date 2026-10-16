@@ -88,6 +88,8 @@ env:
   RUSTFLAGS: -D warnings
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   linux:
@@ -140,6 +142,7 @@ jobs:
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -249,7 +252,7 @@ jobs:
           )
           for file in "${files[@]}"; do test -n "$file" && test -f "$file"; done
           sha256sum "${files[@]}" > "checksums-sha256-linux-${{ matrix.arch }}.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}-artifacts
           compression-level: 0
@@ -294,6 +297,7 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         shell: bash
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -402,7 +406,7 @@ jobs:
         run: |
           files=($(find . -maxdepth 1 -type f -name "TaskForest-*-${{ steps.version.outputs.full }}-${{ matrix.arch }}.msi" | sort))
           sha256sum "${files[@]}" | sed 's/ \*/  /' > checksums-sha256-windows-${{ matrix.arch }}.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-${{ matrix.arch }}-artifacts
           compression-level: 0
@@ -420,7 +424,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download all validated artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: '*-artifacts'
           path: release-artifacts
@@ -526,7 +530,7 @@ jobs:
             "$(basename "$msi_t_arm64")" \
             "$(basename "$msi_b_arm64")"
       - name: Attach validated artifacts to the GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.release_tag }}
           prerelease: ${{ inputs.prerelease }}

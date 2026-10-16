@@ -34,6 +34,8 @@ env:
   RUSTFLAGS: -D warnings
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   macos:
@@ -50,6 +52,7 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -103,7 +106,7 @@ jobs:
   windows:
     name: Windows (native safety receipt)
     runs-on: windows-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     # Windows native boundaries are now a required safety receipt, not an
     # advisory cross-target compile. Product telemetry still contains typed
     # unsupported domains, but every implemented native seam must execute here.
@@ -120,6 +123,7 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -136,7 +140,7 @@ jobs:
         run: cargo nextest run --locked -p taskmanager-history-store --all-targets --profile ci -j 4 --no-fail-fast
       - name: Upload native boundary receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-native-receipt
           path: windows-native-receipt.txt
@@ -148,26 +152,6 @@ jobs:
       # artifacts (the Windows product links platform-windows instead); their
       # boundary-crate edges are target-gated since 2026-08-18.
       - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-macos --profile ci -j 4
-      # Every frontend is a separate product crate (ADR-051). The default
-      # workspace build covers the GPUI product, so compile the Iced, TUI, and
-      # Bevy products explicitly; otherwise a Windows-only dependency or cfg
-      # regression can remain invisible while the native GPUI job stays green.
-      - name: Check Iced frontend on Windows
-        run: cargo check --locked -p taskmanager-iced -j 4
-      - name: Check TUI frontend on Windows
-        run: cargo check --locked -p taskmanager-tui -j 4
-      # Bevy is the fourth shipped product (`packaging.yml` builds
-      # `taskforest-b.exe` into the MSI) and the only frontend with no native
-      # Windows compile on the PR/main path; keep it warning-clean in product
-      # configuration like the Iced and TUI checks above. No `test-support`
-      # here and none needed: the workflow-level RUSTFLAGS already carry
-      # `-D warnings`, so this matches the two checks above in shape and
-      # shares their check-artifact cache.
-      - name: Check Bevy frontend on Windows
-        run: cargo check --locked -p taskmanager-bevy-ui -j 4
-      # Reduced debug builds remain useful for fallback tests; releases reject
-      # them and always use the default hardware-all profile.
-      - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4
       # Structural lint parity with the Linux clippy job (ci.yml) and the local
       # standard gate (scripts/quality/local-gates.sh): both `-W` lints are
       # allow-by-default (restriction / pedantic), so `-D warnings` alone never
@@ -181,3 +165,36 @@ jobs:
       # compile it. Placed after the native steps so a lint-only failure still
       # leaves the receipt and test evidence above intact.
       - run: cargo clippy --locked --workspace --exclude taskmanager-platform-linux --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+
+  windows-products:
+    name: Windows product check (${{ matrix.frontend }})
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - frontend: iced
+            command: cargo check --locked -p taskmanager-iced -j 4
+          - frontend: tui
+            command: cargo check --locked -p taskmanager-tui -j 4
+          - frontend: bevy
+            command: cargo check --locked -p taskmanager-bevy-ui -j 4
+          - frontend: gpui-fallback
+            command: cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
+      - name: Check ${{ matrix.frontend }} product config on Windows
+        run: ${{ matrix.command }}

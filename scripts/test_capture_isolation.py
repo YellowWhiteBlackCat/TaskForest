@@ -10,6 +10,7 @@ import signal
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -66,6 +67,83 @@ def cgroup_v2_parent(pid: int) -> Path:
     raise IsolationUnavailable("Linux cgroup v2 is unavailable")
 
 
+def probe_virtual_compositor() -> str | None:
+    """Probe if a virtual kwin compositor can initialize EGL and bind a wayland socket."""
+
+    try:
+        tmpdir = tempfile.mkdtemp(prefix="tf-probe-", dir="/tmp")
+    except (OSError, PermissionError) as err:
+        return f"cannot create probe runtime dir: {err}"
+    try:
+        runtime = Path(tmpdir)
+        runtime.chmod(0o700)
+        sock_name = "s"
+        sock_path = runtime / sock_name
+        env = os.environ.copy()
+        env.update(
+            {
+                "XDG_RUNTIME_DIR": str(runtime),
+                "WAYLAND_DISPLAY": "",
+                "DISPLAY": "",
+                "LIBGL_ALWAYS_SOFTWARE": "1",
+                "QT_QPA_PLATFORM": "wayland",
+                "QT_IM_MODULE": "none",
+                "GTK_IM_MODULE": "none",
+                "XMODIFIERS": "@im=none",
+            }
+        )
+        cmd = [
+            "kwin_wayland",
+            "--virtual",
+            f"--socket={sock_name}",
+            "--width=100",
+            "--height=100",
+            "--scale=1",
+            "--no-global-shortcuts",
+            "--no-lockscreen",
+        ]
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True,
+            )
+        except (OSError, subprocess.SubprocessError) as err:
+            return f"cannot spawn kwin_wayland: {err}"
+
+        socket_ready = False
+        error_msg = None
+        for _ in range(40):
+            if sock_path.is_socket():
+                socket_ready = True
+                break
+            if proc.poll() is not None:
+                stdout, stderr = proc.communicate()
+                error_msg = (stderr or stdout or "").strip()
+                break
+            time.sleep(0.05)
+
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            proc.wait(timeout=1.0)
+        except Exception:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                proc.wait(timeout=1.0)
+            except Exception:
+                pass
+
+        if not socket_ready:
+            return f"EGL or virtual compositor probe failed: {error_msg or 'socket did not appear within 2s'}"
+
+        return None
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 def isolation_preflight() -> str | None:
     """Return an environment reason, or None when A/B capture can run."""
 
@@ -99,6 +177,11 @@ def isolation_preflight() -> str | None:
         return str(error)
     except OSError as error:
         return f"capture cgroup parent is not writable: {parent}: {error}"
+
+    compositor_probe = probe_virtual_compositor()
+    if compositor_probe is not None:
+        return compositor_probe
+
     return None
 
 

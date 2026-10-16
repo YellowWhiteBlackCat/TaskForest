@@ -438,7 +438,12 @@ if [[ "$skip_install_manager_smoke" == "1" ]]; then
     echo "SKIP install-manager-smoke (release helper build is owned by a later gate)"
     record install-manager-smoke quick SKIP 0
 elif maybe install-manager-smoke; then
-    run_stage install-manager-smoke quick timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
+    if [[ "$tier" == "quick" && ! -x "$repo/target/release/taskmanager-privilege-helper" ]]; then
+        echo "SKIP install-manager-smoke (release helper not built yet; run 'standard' or compile helper to enable)"
+        record install-manager-smoke quick SKIP 0
+    else
+        run_stage install-manager-smoke quick timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
+    fi
 fi
 if maybe dependency-floor-self; then
     run_stage dependency-floor-self quick run_py scripts/quality/dependency_floor_guard.py --self-test
@@ -548,7 +553,8 @@ if maybe capture-isolation; then
             sed -n '1,20p' "$capture_isolation_preflight_file"
             if [[ "$preflight_rc" == "3" ]]; then
                 capture_isolation_host_ready=0
-                capture_isolation_skip_reason="private capture preflight unavailable"
+                capture_isolation_skip_reason="$(grep -m 1 '^capture isolation preflight: UNAVAILABLE:' "$capture_isolation_preflight_file" | sed 's/^capture isolation preflight: UNAVAILABLE: //')"
+                [[ -n "$capture_isolation_skip_reason" ]] || capture_isolation_skip_reason="private capture preflight unavailable"
             elif [[ "$preflight_rc" != "0" ]]; then
                 capture_isolation_host_ready=0
                 run_stage capture-isolation-preflight quick false
