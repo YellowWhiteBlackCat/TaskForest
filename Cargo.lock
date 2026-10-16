@@ -14000,7 +14000,8 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-core"
 version = "0.1.3"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=7bd25ea87739c926ff230e0b0da4d0f107ce000d#7bd25ea87739c926ff230e0b0da4d0f107ce000d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f452fdd4bff355d593ce4566656bbf5ef747e34cb6a1474bf2190dcea1575fb"
 dependencies = [
  "serde",
  "unicode-segmentation",
@@ -14009,7 +14010,8 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-kit-bevy"
 version = "0.1.0"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=7bd25ea87739c926ff230e0b0da4d0f107ce000d#7bd25ea87739c926ff230e0b0da4d0f107ce000d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b0b31f975274ed384138d01802bc6e708f56ffd2720df379c5e887eea774fca"
 dependencies = [
  "bevy",
  "parley",
@@ -14018,7 +14020,8 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-kit-iced"
 version = "0.1.0"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=7bd25ea87739c926ff230e0b0da4d0f107ce000d#7bd25ea87739c926ff230e0b0da4d0f107ce000d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1992df6d5dd6048dba622652c81e78c7509bd4b0dbf3dbbb4fb1dcc8f265d6ef"
 dependencies = [
  "iced_core",
  "iced_widget",
@@ -14029,7 +14032,8 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-tokens"
 version = "0.1.0"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=7bd25ea87739c926ff230e0b0da4d0f107ce000d#7bd25ea87739c926ff230e0b0da4d0f107ce000d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45770a98507bbc7a4dfec5bf2e75b1b764df98a1fe373e2a48981cc12cd72472"
 
 [[package]]
 name = "zlib-rs"
