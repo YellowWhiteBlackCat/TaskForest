@@ -6,6 +6,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.2.3] — 2026-10-16
+
+### 变更
+
+- **CI 工作流现代化升级**：全量 GitHub Actions 官方 Action 升级至原生 Node 24 稳定版本（`upload-artifact@v7`, `download-artifact@v8`, `action-gh-release@v3`），消除 Node 20 弃用警告。
+- **sccache 分布式编译缓存**：跨 Linux、Windows、macOS 流水线引入 `sccache` 与 GitHub Actions 存储桶后端，配合既有 `rust-cache` 建立对象级细粒度编译缓存体系。
+- **Windows CI 矩阵解耦并行化**：将 Windows 单 runner 串行检查拆分为独立的并行矩阵任务，大幅缩短 PR 原生安全回执与跨前端构建验证的耗时。
+- **本地质量门禁体验优化**：在 `local-gates.sh` 的 `quick` 模式下智能识别未构建的提权 helper 并优雅提示跳过，不再硬性打断开发者本地快速质量检查。
+- **图形与 EGL 探针增强**：`test_capture_isolation.py` 引入轻量级虚拟合成与 EGL 设备探针，在无 GPU 直通或受限容器环境下快速降级，杜绝 240 秒超时挂死。
+
 ## [0.2.2] — 2026-10-13
 
 ### 安全
