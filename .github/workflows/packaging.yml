@@ -89,7 +89,6 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   linux:
@@ -148,6 +147,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -308,6 +308,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true

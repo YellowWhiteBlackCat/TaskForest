@@ -80,7 +80,6 @@ env:
   # rust-cache line hashes the same dev-profile setting.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 # Burst dedupe: when several commits land on one ref back-to-back, only the
 # newest verdict matters — superseded in-flight runs cancel instead of
@@ -101,8 +100,6 @@ jobs:
     name: Linux (fast policy gates + dependency audit)
     runs-on: ubuntu-26.04
     timeout-minutes: 15
-    env:
-      RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.99.0
@@ -159,6 +156,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -222,6 +220,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -261,6 +260,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -304,6 +304,7 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
