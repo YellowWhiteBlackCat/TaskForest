@@ -79,6 +79,7 @@ env:
   # Shared verbatim by portability.yml and packaging.yml so every workflow's
   # rust-cache line hashes the same dev-profile setting.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  SCCACHE_GHA_ENABLED: "true"
 
 # Burst dedupe: when several commits land on one ref back-to-back, only the
 # newest verdict matters — superseded in-flight runs cancel instead of
@@ -149,6 +150,13 @@ jobs:
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -206,6 +214,13 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -239,6 +254,13 @@ jobs:
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -276,6 +298,13 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('RUSTC_WRAPPER', 'sccache');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
