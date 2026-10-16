@@ -52,7 +52,12 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
-      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -123,7 +128,12 @@ jobs:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
-      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
@@ -192,7 +202,12 @@ jobs:
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
         run: bash scripts/quality/shared-ui-git-credentials.sh fetch
-      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: taiki-e/install-action@sccache
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
