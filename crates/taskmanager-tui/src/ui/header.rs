@@ -33,6 +33,14 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             .bg(theme.accent)
             .add_modifier(Modifier::BOLD),
     )];
+    if app.is_daemon_connected {
+        spans.push(Span::styled(
+            " [Daemon] ",
+            Style::new()
+                .fg(theme.color(Color::Green))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
     if app.nav_orientation == NavOrientation::Vertical {
         spans.push(Span::styled(
             format!(

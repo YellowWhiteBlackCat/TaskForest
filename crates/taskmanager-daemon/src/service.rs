@@ -5,12 +5,14 @@ use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 #[cfg(not(windows))]
 use taskmanager_ipc::IpcConnectionHandler;
 #[cfg(not(windows))]
 use taskmanager_ipc::IpcEndpoint;
+
+use taskmanager_core::unix_millis;
 
 use crate::collector::DaemonCollector;
 use crate::config::DaemonConfig;
@@ -110,8 +112,9 @@ impl DaemonService {
                                 hub_clone,
                                 env!("CARGO_PKG_VERSION"),
                             );
-                            let now_ms = 1000;
-                            while let Ok(true) = handler.process_one_message(now_ms) {
+                            while let Ok(true) =
+                                handler.process_one_message(unix_millis(SystemTime::now()))
+                            {
                                 // continue processing frames until client drops
                             }
                         });
@@ -123,7 +126,7 @@ impl DaemonService {
                 }
 
                 // 2. Perform periodic background cadence ticks and flushes
-                let now_ms = 2000u64;
+                let now_ms = unix_millis(SystemTime::now());
                 let cadence = service.state.current_cadence();
                 let interval = match cadence {
                     DaemonCadenceMode::Active { interval_ms } => interval_ms,
@@ -157,7 +160,7 @@ impl DaemonService {
             let mut collector = DaemonCollector::new();
 
             while service.is_running() {
-                let now_ms = 2000u64;
+                let now_ms = unix_millis(SystemTime::now());
                 let cadence = service.state.current_cadence();
                 let interval = match cadence {
                     DaemonCadenceMode::Active { interval_ms } => interval_ms,

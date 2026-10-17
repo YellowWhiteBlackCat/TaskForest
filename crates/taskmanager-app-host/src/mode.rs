@@ -5,7 +5,6 @@ use std::env;
 use std::time::Duration;
 
 use taskmanager_ipc::protocol::DaemonMessage;
-#[cfg(not(windows))]
 use taskmanager_ipc::service::IpcClient;
 use taskmanager_ipc::transport::IpcEndpoint;
 
@@ -81,17 +80,34 @@ pub fn probe_endpoint(endpoint: &IpcEndpoint) -> AppHostMode {
             }
         }
         #[cfg(windows)]
+        IpcEndpoint::Windows(pipe_name) => {
+            let file = match std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(pipe_name)
+            {
+                Ok(f) => f,
+                Err(_) => return AppHostMode::Standalone,
+            };
+            let mut client = IpcClient::new(file);
+            match client.handshake("taskforest-probe", env!("CARGO_PKG_VERSION")) {
+                Ok(DaemonMessage::Welcome { daemon_version, .. }) => AppHostMode::Daemon {
+                    daemon_version,
+                    endpoint: endpoint.clone(),
+                },
+                _ => AppHostMode::Standalone,
+            }
+        }
+        #[cfg(windows)]
         IpcEndpoint::Unix(_) => AppHostMode::Standalone,
+        #[cfg(not(windows))]
         IpcEndpoint::Windows(_) => AppHostMode::Standalone,
     }
 }
 
-use crossbeam_channel::Receiver;
-#[cfg(not(windows))]
-use crossbeam_channel::bounded;
+use crossbeam_channel::{Receiver, bounded};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(not(windows))]
 use std::thread;
 use taskmanager_ipc::protocol::SubscriptionMask;
 
@@ -147,8 +163,40 @@ impl DaemonSubscriptionWorker {
 
         #[cfg(windows)]
         {
-            let _ = (endpoint, facets, interval_ms);
-            None
+            let pipe_name = match endpoint {
+                IpcEndpoint::Windows(p) => p.clone(),
+                IpcEndpoint::Unix(_) => return None,
+            };
+
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&pipe_name)
+                .ok()?;
+            let mut client = IpcClient::new(file);
+            let _welcome = client
+                .handshake("taskforest-frontend", env!("CARGO_PKG_VERSION"))
+                .ok()?;
+            let _ = client.subscribe(facets, interval_ms);
+
+            let (tx, rx) = bounded(256);
+            let running = Arc::new(AtomicBool::new(true));
+            let running_clone = Arc::clone(&running);
+
+            thread::spawn(move || {
+                while running_clone.load(Ordering::Acquire) {
+                    match client.receive_daemon_message() {
+                        Ok(msg) => {
+                            if tx.send(msg).is_err() {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+
+            Some((Self { running }, rx))
         }
     }
 

@@ -10494,6 +10494,7 @@ dependencies = [
  "pico-args",
  "serde",
  "serde_json",
+ "sysinfo 0.39.6",
  "taskmanager-core",
  "taskmanager-history-store",
  "taskmanager-ipc",

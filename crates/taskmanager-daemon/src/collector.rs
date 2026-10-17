@@ -24,6 +24,8 @@ pub struct DaemonCollector {
     last_cpu_idle: u64,
     #[cfg(target_os = "linux")]
     last_cpu_total: u64,
+    #[cfg(not(target_os = "linux"))]
+    sys: Option<sysinfo::System>,
     revision: u64,
 }
 
@@ -127,11 +129,18 @@ impl DaemonCollector {
 
     #[cfg(not(target_os = "linux"))]
     fn sample_cpu(&mut self) -> Option<f64> {
-        None
+        let sys = self.sys.get_or_insert_with(|| {
+            let mut s = sysinfo::System::new();
+            s.refresh_cpu_usage();
+            s
+        });
+        sys.refresh_cpu_usage();
+        let usage = sys.global_cpu_usage() as f64;
+        Some(usage.clamp(0.0, 100.0))
     }
 
     #[cfg(target_os = "linux")]
-    fn sample_memory(&self) -> (Option<u64>, Option<u64>) {
+    fn sample_memory(&mut self) -> (Option<u64>, Option<u64>) {
         let content = match fs::read_to_string("/proc/meminfo") {
             Ok(c) => c,
             Err(_) => return (None, None),
@@ -161,8 +170,20 @@ impl DaemonCollector {
     }
 
     #[cfg(not(target_os = "linux"))]
-    fn sample_memory(&self) -> (Option<u64>, Option<u64>) {
-        (None, None)
+    fn sample_memory(&mut self) -> (Option<u64>, Option<u64>) {
+        let sys = self.sys.get_or_insert_with(|| {
+            let mut s = sysinfo::System::new();
+            s.refresh_memory();
+            s
+        });
+        sys.refresh_memory();
+        let total = sys.total_memory();
+        let used = sys.used_memory();
+        if total > 0 {
+            (Some(used), Some(total))
+        } else {
+            (None, None)
+        }
     }
 }
 

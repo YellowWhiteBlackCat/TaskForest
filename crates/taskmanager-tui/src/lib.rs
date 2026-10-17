@@ -307,6 +307,8 @@ pub struct TuiApp {
     /// Keyed by the page the anchor belongs to; consumed on restore. Never
     /// holds a positional guess — identity-less rows are not anchored.
     page_row_anchors: std::collections::HashMap<AppPage, selection::PageRowAnchor>,
+    /// Whether the terminal session is attached to the taskforest-daemon service.
+    pub is_daemon_connected: bool,
 }
 
 impl TuiApp {
@@ -384,6 +386,7 @@ impl TuiApp {
             prefix_jump_at_micros: 0,
             prefs: AppliedPrefs::default(),
             page_row_anchors: std::collections::HashMap::new(),
+            is_daemon_connected: false,
         }
     }
 
