@@ -1,7 +1,5 @@
-//! Operating-system metric sampling engine feeding history and live IPC telemetry.
+//! Platform-neutral metrics collector trait, adapters, and persistence driver.
 
-#[cfg(target_os = "linux")]
-use std::fs;
 use std::io;
 
 use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
@@ -17,25 +15,80 @@ pub struct SystemTelemetrySnapshot {
     pub memory_total_bytes: Option<u64>,
 }
 
-/// Daemon background collector reading platform metrics and updating persistence.
-#[derive(Default)]
+/// Trait defining the platform-specific hardware sampling provider.
+pub trait MetricsCollector: Send + Sync {
+    /// Perform one sampling pass from native operating system sources.
+    fn sample(&mut self, now_ms: u64) -> SystemTelemetrySnapshot;
+}
+
+#[cfg(target_os = "linux")]
+#[path = "collector/linux.rs"]
+mod linux;
+
+#[cfg(target_os = "windows")]
+#[path = "collector/windows.rs"]
+mod windows;
+
+#[cfg(target_os = "macos")]
+#[path = "collector/macos.rs"]
+mod macos;
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[path = "collector/fallback.rs"]
+mod fallback;
+
+/// Instantiate the active platform's native metrics collector implementation.
+#[must_use]
+pub fn create_platform_collector() -> Box<dyn MetricsCollector> {
+    #[cfg(target_os = "linux")]
+    {
+        Box::new(linux::LinuxMetricsCollector::new())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(windows::WindowsMetricsCollector::new())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Box::new(macos::MacosMetricsCollector::new())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        Box::new(fallback::FallbackMetricsCollector::new())
+    }
+}
+
+/// Daemon background collector driving the platform adapter and updating persistence.
 pub struct DaemonCollector {
-    #[cfg(target_os = "linux")]
-    last_cpu_idle: u64,
-    #[cfg(target_os = "linux")]
-    last_cpu_total: u64,
-    #[cfg(not(target_os = "linux"))]
-    sys: Option<sysinfo::System>,
+    collector: Box<dyn MetricsCollector>,
     revision: u64,
+}
+
+impl Default for DaemonCollector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DaemonCollector {
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            collector: create_platform_collector(),
+            revision: 0,
+        }
     }
 
-    /// Perform one metric sampling pass from OS sources.
+    /// Construct with an explicit collector implementation (for testing or custom providers).
+    #[must_use]
+    pub fn with_collector(collector: Box<dyn MetricsCollector>) -> Self {
+        Self {
+            collector,
+            revision: 0,
+        }
+    }
+
+    /// Perform one metric sampling pass from the native OS provider and record into history.
     pub fn sample_and_record(
         &mut self,
         now_ms: u64,
@@ -43,11 +96,10 @@ impl DaemonCollector {
     ) -> io::Result<SystemTelemetrySnapshot> {
         self.revision = self.revision.wrapping_add(1);
 
-        let cpu_usage = self.sample_cpu();
-        let (mem_used, mem_total) = self.sample_memory();
+        let snapshot = self.collector.sample(now_ms);
 
         // 1. Record CPU usage history
-        if let Some(cpu) = cpu_usage {
+        if let Some(cpu) = snapshot.cpu_usage_pct {
             let cpu_key = HistorySeriesKey::system(HistoryMetric::CpuUsagePct);
             let sample = HistoricalSample {
                 revision: self.revision,
@@ -59,7 +111,8 @@ impl DaemonCollector {
         }
 
         // 2. Record Memory usage history
-        if let (Some(used), Some(total)) = (mem_used, mem_total) {
+        if let (Some(used), Some(total)) = (snapshot.memory_used_bytes, snapshot.memory_total_bytes)
+        {
             if total > 0 {
                 let mem_pct = (used as f64 / total as f64) * 100.0;
                 let mem_key = HistorySeriesKey::system(HistoryMetric::MemoryUsedPct);
@@ -73,124 +126,6 @@ impl DaemonCollector {
             }
         }
 
-        Ok(SystemTelemetrySnapshot {
-            timestamp_ms: now_ms,
-            cpu_usage_pct: cpu_usage,
-            memory_used_bytes: mem_used,
-            memory_total_bytes: mem_total,
-        })
+        Ok(snapshot)
     }
-
-    #[cfg(target_os = "linux")]
-    fn sample_cpu(&mut self) -> Option<f64> {
-        let content = fs::read_to_string("/proc/stat").ok()?;
-        let first_line = content.lines().next()?;
-        if !first_line.starts_with("cpu ") {
-            return None;
-        }
-
-        let parts: Vec<u64> = first_line
-            .split_whitespace()
-            .skip(1)
-            .filter_map(|s| s.parse().ok())
-            .collect();
-
-        if parts.len() < 4 {
-            return None;
-        }
-
-        let user = parts[0];
-        let nice = parts[1];
-        let system = parts[2];
-        let idle = parts[3];
-        let iowait = parts.get(4).copied().unwrap_or(0);
-        let irq = parts.get(5).copied().unwrap_or(0);
-        let softirq = parts.get(6).copied().unwrap_or(0);
-        let steal = parts.get(7).copied().unwrap_or(0);
-
-        let total = user + nice + system + idle + iowait + irq + softirq + steal;
-        let idle_total = idle + iowait;
-
-        if self.last_cpu_total == 0 || total <= self.last_cpu_total {
-            self.last_cpu_idle = idle_total;
-            self.last_cpu_total = total;
-            return None;
-        }
-
-        let total_delta = total - self.last_cpu_total;
-        let idle_delta = idle_total.saturating_sub(self.last_cpu_idle);
-
-        self.last_cpu_idle = idle_total;
-        self.last_cpu_total = total;
-
-        let usage = 100.0 * (1.0 - (idle_delta as f64 / total_delta as f64));
-        Some(usage.clamp(0.0, 100.0))
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn sample_cpu(&mut self) -> Option<f64> {
-        let sys = self.sys.get_or_insert_with(|| {
-            let mut s = sysinfo::System::new();
-            s.refresh_cpu_usage();
-            s
-        });
-        sys.refresh_cpu_usage();
-        let usage = sys.global_cpu_usage() as f64;
-        Some(usage.clamp(0.0, 100.0))
-    }
-
-    #[cfg(target_os = "linux")]
-    fn sample_memory(&mut self) -> (Option<u64>, Option<u64>) {
-        let content = match fs::read_to_string("/proc/meminfo") {
-            Ok(c) => c,
-            Err(_) => return (None, None),
-        };
-
-        let mut total_kb = None;
-        let mut avail_kb = None;
-
-        for line in content.lines() {
-            if line.starts_with("MemTotal:") {
-                total_kb = parse_meminfo_kb(line);
-            } else if line.starts_with("MemAvailable:") {
-                avail_kb = parse_meminfo_kb(line);
-            }
-            if total_kb.is_some() && avail_kb.is_some() {
-                break;
-            }
-        }
-
-        match (total_kb, avail_kb) {
-            (Some(tot), Some(avail)) => {
-                let used = tot.saturating_sub(avail);
-                (Some(used * 1024), Some(tot * 1024))
-            }
-            _ => (None, None),
-        }
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn sample_memory(&mut self) -> (Option<u64>, Option<u64>) {
-        let sys = self.sys.get_or_insert_with(|| {
-            let mut s = sysinfo::System::new();
-            s.refresh_memory();
-            s
-        });
-        sys.refresh_memory();
-        let total = sys.total_memory();
-        let used = sys.used_memory();
-        if total > 0 {
-            (Some(used), Some(total))
-        } else {
-            (None, None)
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn parse_meminfo_kb(line: &str) -> Option<u64> {
-    let mut parts = line.split_whitespace();
-    let _label = parts.next()?;
-    let value = parts.next()?.parse::<u64>().ok()?;
-    Some(value)
 }

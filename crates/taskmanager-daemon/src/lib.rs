@@ -20,7 +20,7 @@ pub mod persistence;
 pub mod service;
 pub mod state;
 
-pub use collector::DaemonCollector;
+pub use collector::{DaemonCollector, MetricsCollector, create_platform_collector};
 pub use config::DaemonConfig;
 pub use persistence::DaemonHistoryManager;
 pub use service::DaemonService;

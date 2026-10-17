@@ -22,4 +22,7 @@ pub use protocol::{
     ClientMessage, DaemonMessage, Frame, FrameHeader, IpcError, IpcResult, Opcode, SubscriptionMask,
 };
 pub use service::{ClientSession, IpcClient, IpcConnectionHandler, SubscriptionHub};
-pub use transport::{FramedReader, FramedWriter, IpcEndpoint};
+pub use transport::{
+    FramedReader, FramedWriter, IpcEndpoint, TransportListener, TransportStream, bind_transport,
+    connect_transport,
+};
