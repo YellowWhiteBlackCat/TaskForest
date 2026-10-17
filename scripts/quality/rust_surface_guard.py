@@ -127,6 +127,15 @@ def scan_file(path: Path, repository: Path) -> list[Violation]:
                 )
             )
     relative_path = path.relative_to(repository)
+    if path.name == "mod.rs":
+        violations.append(
+            Violation(
+                relative_path.as_posix(),
+                1,
+                "RUST-SURFACE-004",
+                "mod.rs is forbidden; use Rust 2024 foo.rs + foo/ module tree",
+            )
+        )
     if "src" in relative_path.parts:
         for match in VISIBILITY_BOOL.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
@@ -184,6 +193,7 @@ def self_test() -> int:
             "comment.rs": "/* use gpui::AppContext as _; */\n",
             "visibility_bool.rs": "struct DialogState {\n    dialog_open: bool,\n}\n",
             "visibility_comment.rs": "// struct Old { modal_open: bool }\n",
+            "mod.rs": "pub mod foo;\n",
         }
         for name, content in cases.items():
             (source / name).write_text(content, encoding="utf-8")
@@ -195,6 +205,7 @@ def self_test() -> int:
             ("src/public_alias.rs", "RUST-SURFACE-002"),
             ("src/scoped_public_alias.rs", "RUST-SURFACE-002"),
             ("src/visibility_bool.rs", "RUST-SURFACE-003"),
+            ("src/mod.rs", "RUST-SURFACE-004"),
         }
         if codes != expected:
             print(f"self-test failed: expected {expected}, found {codes}", file=sys.stderr)
