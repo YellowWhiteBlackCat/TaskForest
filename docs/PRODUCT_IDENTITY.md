@@ -65,9 +65,9 @@ polkit action id 与桌面 app id 共用同一 reverse-DNS 命名空间：
 
 ## 图标权威
 
-- 应用 SVG：`packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg`
+- 应用矢量 SVG：`crates/taskmanager-assets/assets/product/taskforest-logo.svg`（代码内嵌）与 `packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg`（安装源）
 - 托盘 SVG：`packaging/tray/taskforest-tray.svg`
-- freedesktop 图标 token：`taskforest-taskboard`
+- freedesktop 图标 token：`io.github.YellowWhiteBlackCat.TaskForest`（现代 reverse-DNS 规范）与 `taskforest-taskboard`（兼容映射）
 - 平台派生资产由 `bash packaging/regenerate-icons.sh` 统一生成。
 
 PNG、ICNS、ICO 和内嵌 RGBA 都是派生产物，不允许手工维护平台分叉。Windows EXE、MSI
@@ -75,8 +75,8 @@ PNG、ICNS、ICO 和内嵌 RGBA 都是派生产物，不允许手工维护平台
 
 ## 平台消费契约
 
-- Wayland `app_id` 与 `.desktop` 文件名一致；
-- 桌面包同时安装可执行文件、desktop entry、AppStream metadata 和图标；
+- Wayland `app_id` 与 `.desktop` 文件名及 reverse-DNS 图标全量一致；
+- 桌面包同时安装可执行文件、desktop entry、AppStream metadata 和 hicolor 阶梯图标；
 - macOS 只把完整 `.app` bundle 视为安装形态；
 - Windows MSI 使用固定 UpgradeCode，并为 GPUI 可执行文件建立开始菜单入口；
 - 用户级开发安装与系统包由不同所有权回执管理，不能互相删除文件。

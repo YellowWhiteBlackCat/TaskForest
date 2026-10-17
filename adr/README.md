@@ -59,6 +59,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [052](052-private-capture-run-isolation.md) | UUID-scoped private capture runs | Each background capture owns a UUID-scoped D-Bus/Wayland/KWin/runtime/binary/receipt namespace, a cgroup-supervised process tree and an atomic locked publication pointer; dual-run isolation is a release gate. | Frontend, Safety, Release |
 | [053](053-product-expected-capability-surface.md) | Product-expected capability surface | The product declares the expected capability identities and the runtime catalog seeds a typed `Unsupported` absence for every unregistered expected capability; "no entry" is never a product answer. | Capability, Observation |
 | [054](054-terminal-semantics-and-gui-accessibility-receipts.md) | Terminal semantics and GUI accessibility receipts | Shared semantic row inputs belong to `ui-contract`; TUI relies on its terminal emulator's native tree, while GUI native receipts require a real target-platform assistive-technology consumer. | Frontend, Accessibility |
+| [055](055-daemon-architecture-and-ipc-trust-boundary.md) | Daemon architecture, IPC trust boundary, and persistence lifecycle | Dual-mode engine: daemon owns background persistence, privilege helpers and IPC stream; frontends run unprivileged and fall back to standalone in-process collection. | Runtime, History, Privilege |
 
 ## Decision chains
 

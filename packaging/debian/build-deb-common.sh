@@ -90,10 +90,12 @@ icon_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg"
 mkdir -p "$work/usr/share/icons/hicolor/scalable/apps"
 
 install -Dm644 "$icon_src" "$work/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
+install -Dm644 "$icon_src" "$work/usr/share/icons/hicolor/scalable/apps/io.github.YellowWhiteBlackCat.TaskForest.svg"
 for size in 16 24 32 48 64 128 256 512; do
     icon_png="$repo/packaging/linux/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
     [[ -s "$icon_png" ]] || { echo "build-deb-common: missing icon ladder asset: $icon_png" >&2; exit 1; }
     install -Dm644 "$icon_png" "$work/usr/share/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
+    install -Dm644 "$icon_png" "$work/usr/share/icons/hicolor/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png"
 done
 
 # Normalize directory and file permissions.

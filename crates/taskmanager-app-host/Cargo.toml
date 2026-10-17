@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-app-host"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -18,8 +18,12 @@ taskmanager-history-store = { path = "../taskmanager-history-store" }
 taskmanager-platform-native = { path = "../taskmanager-platform-native", default-features = false }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+taskmanager-ipc = { path = "../taskmanager-ipc" }
 crossbeam-channel = "0.5"
 ctrlc = { version = "3.5", features = ["termination"] }
+
+[dev-dependencies]
+tempfile = "3.27"
 
 [features]
 default = []

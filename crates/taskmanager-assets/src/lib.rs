@@ -40,6 +40,21 @@ pub fn product_tray_icon_rgba() -> &'static [u8] {
     include_bytes!("../assets/product/taskforest-tray-22.rgba")
 }
 
+/// Canonical TaskForest official product brand logo in scalable vector SVG format.
+///
+/// Frontends render this brand asset in titlebars, sidebars, about dialogs,
+/// and splash screens without maintaining loose or drifting icon files.
+#[must_use]
+pub fn product_logo_svg() -> &'static str {
+    include_str!("../assets/product/taskforest-logo.svg")
+}
+
+/// Raw byte slice of the canonical TaskForest official brand logo SVG.
+#[must_use]
+pub fn product_logo_bytes() -> &'static [u8] {
+    include_bytes!("../assets/product/taskforest-logo.svg")
+}
+
 #[derive(Clone, Copy)]
 struct EmbeddedAsset {
     path: &'static str,

@@ -1,0 +1,13 @@
+Package: taskforest-daemon
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: __ARCH__
+Depends: polkitd
+Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/YellowWhiteBlackCat/TaskForest
+Description: Background telemetry and persistence daemon for TaskForest
+ TaskForest daemon runs as a continuous system service (systemd) providing
+ 7x24 background telemetry persistence and IPC metric streaming for TaskForest
+ frontends (GPUI, Iced, TUI, Bevy).

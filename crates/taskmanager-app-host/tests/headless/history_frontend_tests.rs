@@ -71,5 +71,6 @@ fn fixture_host(
         snapshot_export_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         window_capture_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         diagnostic_bundle_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
+        host_mode: std::sync::Arc::new(std::sync::OnceLock::new()),
     }
 }

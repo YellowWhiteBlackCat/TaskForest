@@ -66,11 +66,20 @@ tar -xf %{SOURCE0} -C %{buildroot}
 
 %files
 /usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg
+/usr/share/icons/hicolor/scalable/apps/io.github.YellowWhiteBlackCat.TaskForest.svg
 /usr/share/icons/hicolor/16x16/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/16x16/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/24x24/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/24x24/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/32x32/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/32x32/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/48x48/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/48x48/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/64x64/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/64x64/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/128x128/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/128x128/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/256x256/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/256x256/apps/io.github.YellowWhiteBlackCat.TaskForest.png
 /usr/share/icons/hicolor/512x512/apps/taskforest-taskboard.png
+/usr/share/icons/hicolor/512x512/apps/io.github.YellowWhiteBlackCat.TaskForest.png

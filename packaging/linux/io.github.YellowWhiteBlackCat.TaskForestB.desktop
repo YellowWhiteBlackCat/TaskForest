@@ -9,7 +9,7 @@ Comment[zh_CN]=基于 Bevy UI 的 Wayland 原生系统监视器
 # Keep glibc's allocator arena count bounded for the multi-threaded provider
 # runtime. This is a process-memory policy shared by the Linux UI packages.
 Exec=env MALLOC_ARENA_MAX=1 taskforest-b
-Icon=taskforest-taskboard
+Icon=io.github.YellowWhiteBlackCat.TaskForest
 Terminal=false
 Categories=System;Monitor;
 Keywords=system;monitor;task;process;performance;bevy;

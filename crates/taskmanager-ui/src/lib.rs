@@ -75,6 +75,7 @@ pub use data::{highlighter, key_value_row, row, table, tree, virtual_list};
 pub use focus::{
     ModalEscTarget, begin_modal, esc_chain_target, modal_context_focused, restore_modal, trap_modal,
 };
+pub use icons_binding::{ApplicationImageFormat, application_image, brand_logo_image, icon};
 pub use inputs::{checkbox, search_input, slider, switch, text_input};
 pub use layout::{
     BoundedScrollRailSpec, PageFrame, PageScaffold, auto_scroll_region,

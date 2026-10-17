@@ -2,7 +2,30 @@
 //! telemetry snapshots, metrics, sensors, process and process-telemetry,
 //! alerts, storage, startup, and services.
 //!
-//! Defines no operating-system behaviour and depends on no native adapter.
+//! # Architecture & Guarantees
+//!
+//! - **Platform-Neutral & Pure**: Defines no operating-system behaviour, issues no
+//!   syscalls, and performs no filesystem, network, or process I/O.
+//! - **Deterministic & Clock-Independent**: Never reads the wall clock or monotonic
+//!   clock directly (`SystemTime::now()` or `Instant::now()`). All temporal logic
+//!   receives explicit timestamps from callers.
+//! - **Safe Rust**: The entire crate is strictly `#![forbid(unsafe_code)]`.
+//!
+//! # Example
+//!
+//! ```rust
+//! use taskmanager_core::identity::ProviderId;
+//! use taskmanager_core::units::{format_memory, UnitPreferences};
+//!
+//! // Stable provider identity
+//! let provider = ProviderId::borrowed("linux.procfs");
+//! assert_eq!(provider.as_str(), "linux.procfs");
+//!
+//! // Canonical unit formatting
+//! let prefs = UnitPreferences::default();
+//! let readable = format_memory(1024 * 1024 * 1024, &prefs);
+//! assert_eq!(readable, "1.0 GiB");
+//! ```
 
 #![forbid(unsafe_code)]
 

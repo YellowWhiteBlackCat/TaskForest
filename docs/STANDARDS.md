@@ -161,3 +161,20 @@ Rust 类型/内存安全不证明任务一定结束；Python/Shell/Rust 子进�
 
 统一门禁：`timeout 30s python3 scripts/quality/automation_safety_guard.py`（`--self-test`
 自证）；执行入口见 [`QUALITY_GATES.md`](QUALITY_GATES.md)。
+
+---
+
+## 7. crates.io 独立库发布准则与跨平台铁律
+
+面向 crates.io 发行的所有 TaskForest 底层与公共库，必须恪守以下四条非妥协铁律：
+
+1. **平台无关律（Platform-Neutrality）**：领域核心库（如 `taskforest-core`、`taskforest-contract`）必须是严格平台中立的纯 safe-Rust 库（`#![forbid(unsafe_code)]`），零系统 I/O，不碰系统时钟，在 Linux、Windows、macOS、FreeBSD、Wasm 任何 target 下均保证 100% 可编译且确定性行为完全一致。
+2. **三平台对等适配律（Tri-Platform Parity）**：涉及底层 OS 能力封装的公共库（如 `taskforest-ipc`、`taskforest-daemon`），必须对 Linux、Windows、macOS 三大主流桌面操作系统提供完全对称、平权的生产级实现（Linux/macOS 走 UDS，Windows 走 Named Pipe；统一 `start_on_thread` 等 API 语义），严禁“Linux 独占、其他平台抛空/抛 panic”的假跨平台库。
+3. **平台小尾巴特化律（Platform-Suffixed Seams）**：只有显式带有平台后缀命名（如 `-linux`、`-windows`、`-macos`）的底层适配层，才允许限定在单一目标系统，且必须通过目标编译期选择（`cfg(target_os)`）或条件编译隔离，绝不污染上层通用库。
+4. **统一命名空间与防冲突矩阵**：所有对外发布的独立库统一收敛于已验证干净可用的 `taskforest-*` 命名空间（彻底避免泛化 `taskmanager` 名称冲突）：
+   - `taskforest-core`：纯领域事实、算法与规则；
+   - `taskforest-contract`：平台/前端能力契约与 SPI；
+   - `taskforest-ipc`：跨进程二进制通信与传输；
+   - `taskforest-telemetry`：时序存储与度量计算；
+   - `taskforest-daemon`：后台系统守护进程服务。
+5. **CI 强制三平台交叉门禁**：所有发布级底层库在本地与 CI 中必须强制运行 Linux (`x86_64-unknown-linux-gnu`)、Windows (`x86_64-pc-windows-gnu`)、macOS (`aarch64-apple-darwin` / `x86_64-apple-darwin`) 的交叉编译与无警告检查，任何单一平台 warning/error 直接判定门禁失败。

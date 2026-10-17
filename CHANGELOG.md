@@ -6,6 +6,29 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.3.0] — 2026-10-17
+
+### 新增
+
+- **系统守护进程 (`taskforest-daemon`) 与后台时序持久化**：
+  - 正式落地 ADR-055 架构决策，支持 7×24 小时后台连续遥测采集与时序滚动持久化，彻底突破进程退出即丢失历史记录的痛点。
+  - 拥有唯一的后台历史持久化单写锁，前端只作为非特权观察客户端连接，实现特权面与复杂 GUI 渲染栈解耦。
+  - 编写系统级与用户会话级 systemd 服务单元（`packaging/daemon/`），并打包为独立的 `TaskForest-Daemon` DEB 与 RPM 安装包。
+- **高性能跨进程二进制通信协议 (`taskmanager-ipc`)**：
+  - 基于 20 字节固定帧头（Magic `TFIP`、版本 1、Sequence、CRC32 校验码与 16 MiB 熔断保护），保障跨进程通信的极端安全与防腐。
+  - 抽象跨平台传输通道：Linux/macOS 走 Unix Domain Socket，Windows 映射 Named Pipe。
+  - 引入强类型按需采样位掩码 `SubscriptionMask`，服务端动态聚合多前端订阅集，无活跃连接时自动休眠降频。
+- **四端双模态连接引擎 (`AppHostMode`)**：
+  - 前端在 `taskmanager-app-host` 中构建智能自适应探测，优先连接本地守护进程订阅实时流；在无服务、便携运行或容器环境下自动透明保底降级为 Standalone 单进程直采模式。
+  - 构建 `DaemonSubscriptionWorker` 后台流式拉取通道，统一驱动四端（GPUI、Iced、TUI、Bevy）实时指标消费。
+- **官方品牌矢量徽标全链路接入与 XDG 逆向域名规范对齐**：
+  - 将官方绿色松树仪表盘矢量徽标收录至 `taskmanager-assets`，提供权威公开访问接口。
+  - GPUI 标题栏与侧边栏接入官方品牌 Logo 渲染；TUI 终端标题栏接入常青松树品牌徽标 `🌲 TaskForest`。
+  - 修正 Linux 打包安装路径，同时安装全套尺寸的逆向域名 hicolor 阶梯图标（`io.github.YellowWhiteBlackCat.TaskForest`），彻底消除 GNOME/KDE 任务栏与 Dock 显示空白默认齿轮的问题。
+- **crates.io 独立底层库发布标准与跨平台铁律**：
+  - `taskmanager-core` 就地升格，补齐发布元数据、Doctest、开源 Headless 范例（<50 行），固化零 I/O、零时钟纯粹性并保证确定性。
+  - 全网实时查重锁定 `taskforest-*` 独占命名矩阵，并在 `docs/STANDARDS.md` 第 7 节与 `AGENTS.md` 确立平台无关律、三平台对等适配律、平台小尾巴特化律与 SemVer 兼容性门禁。
+
 ## [0.2.3] — 2026-10-16
 
 ### 变更

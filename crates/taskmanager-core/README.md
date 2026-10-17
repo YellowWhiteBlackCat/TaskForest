@@ -1,5 +1,59 @@
 # taskmanager-core
 
+Platform-neutral domain models, policies, and algorithms for TaskForest and system monitoring tools.
+
+[![Crates.io](https://img.shields.io/crates/v/taskmanager-core.svg)](https://crates.io/crates/taskmanager-core)
+[![Documentation](https://docs.rs/taskmanager-core/badge.svg)](https://docs.rs/taskmanager-core)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+## Highlights
+
+- **100% Safe Rust**: Strictly `#![forbid(unsafe_code)]`.
+- **Zero System I/O**: Performs no filesystem access, network operations, or process spawning.
+- **Clock-Independent & Deterministic**: Never reads the system wall clock or monotonic clock directly. All temporal functions accept explicit timestamps.
+- **Rich Domain Models**: Process lineage and anomaly detection, SMART health scoring, alert rule engine, sensor topology, and canonical byte/bit unit formatting.
+
+## Usage
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+taskmanager-core = "0.2"
+```
+
+### Example: Canonical Unit Formatting
+
+```rust
+use taskmanager_core::units::{format_byte_rate, format_memory, UnitPreferences};
+
+let prefs = UnitPreferences::default();
+
+// Memory: Base-2 bytes ladder
+assert_eq!(format_memory(1_073_741_824, &prefs), "1.0 GiB");
+
+// Network: Base-10 bits rate ladder
+assert_eq!(format_byte_rate(125_000_000, &prefs), "1.0 Gb/s");
+```
+
+### Example: Alert Rule Engine
+
+```rust
+use std::time::Duration;
+use taskmanager_core::alerts::{AlertEngine, AlertMetric, AlertRule, AlertSeverity};
+
+let rule = AlertRule::new(
+    "high-memory-pressure",
+    AlertMetric::MemoryUsagePercent,
+    AlertSeverity::Warning,
+    90.0,
+    Duration::from_secs(3),
+    2.0, // 2% Hysteresis
+);
+let engine = AlertEngine::new([rule]);
+assert_eq!(engine.rules().len(), 1);
+```
+
 ## Role
 
 Platform-neutral domain facts, availability semantics, identity/lifecycle,
@@ -7,34 +61,29 @@ history, configuration and pure shared rules.
 
 ## Boundary
 
-Core owns no filesystem, process, command, window, widget, OS path or native
+Core owns no filesystem, process, command, window, widget, OS path, or native
 handle, and it never reads the wall or monotonic clock. Time-dependent rules
 receive an explicit timestamp; `time::unix_millis`/`unix_micros` only convert
 an injected `SystemTime`. Business code remains `#![forbid(unsafe_code)]`; platform extensions
 enter through typed capability models and `Unsupported`/permission outcomes.
 
 `time::LocalTimeRules` validates bounded TZif into typed offset/DST transitions;
-details in [`docs/MODULE_OWNERSHIP.md`](docs/MODULE_OWNERSHIP.md).
+details in [`docs/MODULE_OWNERSHIP.md`](https://github.com/YellowWhiteBlackCat/TaskForest/tree/main/crates/taskmanager-core/docs/MODULE_OWNERSHIP.md).
 
 ## Contract and verification
 
 `ScalarObservation`, stable identity, generation, gap-aware history,
-formatters, filters and control vocabulary are canonical here. Keep pure
-functions deterministic and verify with core tests, wire invariants and the
+formatters, filters, and control vocabulary are canonical here. Pure
+functions are deterministic and verified with core tests, wire invariants, and the
 platform boundary firewall. Clock tests use fixed supplied instants rather than
 host-time plausibility.
 
-Core evolution follows the repository hard-cutover rule
-([AGENTS.md](../../AGENTS.md), Mission and architecture): a new typed contract
-moves every caller, fixture and export in the same change, with no aliases,
-wrappers or dual semantic paths left behind.
-
 Observation value/state fields are private with named constructors; wire DTOs
 are the only external-payload ingress and canonicalize immediately. Per-domain
-rules live in [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md)
-and [`docs/WIRE_INGRESS.md`](docs/WIRE_INGRESS.md).
+rules live in [`docs/OBSERVATION_SEMANTICS.md`](https://github.com/YellowWhiteBlackCat/TaskForest/tree/main/crates/taskmanager-core/docs/OBSERVATION_SEMANTICS.md)
+and [`docs/WIRE_INGRESS.md`](https://github.com/YellowWhiteBlackCat/TaskForest/tree/main/crates/taskmanager-core/docs/WIRE_INGRESS.md).
 
-## Module map
+## Module Map
 
 ```text
 src/core.rs                     owner-module index for every fact below
@@ -60,18 +109,3 @@ src/core.rs                     owner-module index for every fact below
 ├── session.rs  setup.rs  source.rs  target.rs          session/setup/source identity
 └── identity.rs  hardware.rs  failure.rs                core identity and failure types
 ```
-
-Pure rules and typed facts only: no I/O, no clock reads, no toolkit types.
-
-## Docs
-
-- [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — scalar/group observation
-  privacy, named transitions, availability-preserving folds and fixture policy.
-- [`docs/WIRE_INGRESS.md`](docs/WIRE_INGRESS.md) — per-domain wire DTO hydration and
-  serialization rules (CPU, memory, disk, network, GPU, process, services, battery, saved views).
-- [`docs/MODULE_OWNERSHIP.md`](docs/MODULE_OWNERSHIP.md) — module ownership detail and
-  local-time rules.
-- [`STATE_OWNERSHIP`](../../docs/STATE_OWNERSHIP.md) and
-  [`SCALAR_AVAILABILITY`](../../docs/SCALAR_AVAILABILITY.md) — cross-crate ledgers;
-  [ADR-015](../../adr/015-optional-observation-semantics.md),
-  [ADR-016](../../adr/016-typed-observation-wire-invariants.md) — availability and wire invariants.

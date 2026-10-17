@@ -646,6 +646,14 @@ if maybe ui-route-table; then
     # and an unlisted ui-contract path stays fail-closed at all four.
     run_stage ui-route-table quick run_py scripts/quality/ui_evidence_route_guard.py
 fi
+if maybe semver-checks; then
+    if ! command -v cargo-semver-checks >/dev/null 2>&1; then
+        echo "SKIP semver-checks (cargo-semver-checks not installed; install with 'cargo install cargo-semver-checks')"
+        record semver-checks quick SKIP 0
+    else
+        run_stage semver-checks quick cargo semver-checks check-release -p taskmanager-core
+    fi
+fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 

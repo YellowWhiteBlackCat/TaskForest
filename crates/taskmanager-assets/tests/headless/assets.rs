@@ -11,6 +11,7 @@ use taskmanager_assets::product::TAGLINE_ZH;
 use taskmanager_assets::product::ZH_NAME;
 use taskmanager_assets::{
     EMBEDDED_FONT_FAMILIES, TASKMANAGER_ICON_PATHS, all_asset_paths, asset_bytes, embedded_fonts,
+    product_logo_bytes, product_logo_svg,
 };
 
 #[test]
@@ -102,4 +103,21 @@ fn embedded_fonts_are_valid_truetype_with_expected_families() {
     }
     assert!(EMBEDDED_FONT_FAMILIES.contains(&"MiSans VF"));
     assert!(EMBEDDED_FONT_FAMILIES.contains(&"Roboto Mono"));
+}
+
+#[test]
+fn product_logo_is_valid_svg_and_non_empty() {
+    let svg_str = product_logo_svg();
+    assert!(svg_str.contains("<svg"));
+    assert!(svg_str.contains("TaskForest"));
+
+    let bytes = product_logo_bytes();
+    assert_eq!(bytes, svg_str.as_bytes());
+
+    let options = usvg::Options::default();
+    let tree = usvg::Tree::from_data(bytes, &options);
+    assert!(
+        tree.is_ok(),
+        "product_logo_svg must parse as valid vector tree"
+    );
 }

@@ -20,3 +20,4 @@
 mod path;
 
 pub use path::{asset_bytes, path};
+pub use taskmanager_assets::{product_logo_bytes, product_logo_svg};

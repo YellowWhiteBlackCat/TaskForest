@@ -41,23 +41,15 @@ the lower document layers.
 
 ## Non-negotiable invariants
 
-- Business crates are safe Rust. `unsafe` exists only in the four audited boundary
-  crates and crosses their APIs only as typed, owned values.
-- The application is unprivileged by default. Escalation is per feature, OS-native,
-  typed, and observable; unavailable data is never fabricated as zero or success.
-- Frontends never read OS sources directly. Blocking collection stays off the UI thread;
-  rendering and keyboard paths consume the same cached projection.
-- Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is
-  an independent product crate with its own binary over the shared `taskmanager-cli`
-  harness; the workspace carries no `ui-*` features, and shared layers never gate code
-  on a frontend identity.
-- Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens,
-  and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
+- Business crates are safe Rust. `unsafe` exists only in the four audited boundary crates and crosses their APIs only as typed, owned values.
+- Tri-platform parity & crates.io rule: Published libraries must be platform-neutral or fully tri-platform (Linux/Windows/macOS parity); only platform-suffixed crates specialize; publish namespaces reserve `taskforest-*`.
+- The application is unprivileged by default. Escalation is per feature, OS-native, typed, and observable; unavailable data is never fabricated as zero or success.
+- Frontends never read OS sources directly. Blocking collection stays off the UI thread; rendering and keyboard paths consume the same cached projection.
+- Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is an independent product crate with its own binary over the shared `taskmanager-cli` harness; the workspace carries no `ui-*` features, and shared layers never gate code on a frontend identity.
+- Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens, and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
 - Windows telemetry, tests, and helpers never use PowerShell or another command interpreter.
-- Production code is panic-free by gate. Tests prove behavior and side effects, not source
-  text, vacuous assertions, or host-specific values.
-- Public-repository checks reject private paths, live captures, personal email addresses,
-  credentials, and host-specific absolute paths.
+- Production code is panic-free by gate. Tests prove behavior and side effects, not source text, vacuous assertions, or host-specific values.
+- Public-repository checks reject private paths, live captures, personal email addresses, credentials, and host-specific absolute paths.
 
 ## Authority route
 
