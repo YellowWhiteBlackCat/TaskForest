@@ -95,7 +95,7 @@ impl NamedPipeListener {
 
     /// Non-Windows stub returning unsupported error.
     #[cfg(not(windows))]
-    pub fn accept(&self) -> std::io::Result<()> {
+    pub fn accept(&self) -> std::io::Result<std::fs::File> {
         Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "Named pipes are only supported on Windows",

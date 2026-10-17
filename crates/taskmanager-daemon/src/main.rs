@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use taskmanager_daemon::config::DaemonConfig;
+use taskmanager_daemon::config::{DaemonConfig, default_daemon_history_dir};
 use taskmanager_daemon::persistence::DaemonHistoryManager;
 use taskmanager_daemon::service::DaemonService;
 use taskmanager_ipc::transport::IpcEndpoint;
@@ -61,23 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         IpcEndpoint::default_platform()
     };
 
-    let history_dir = custom_history.unwrap_or_else(|| {
-        if is_user_mode {
-            if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
-                PathBuf::from(xdg_data).join("taskforest").join("history")
-            } else if let Ok(home) = std::env::var("HOME") {
-                PathBuf::from(home)
-                    .join(".local")
-                    .join("share")
-                    .join("taskforest")
-                    .join("history")
-            } else {
-                PathBuf::from("/tmp/taskforest-user-history")
-            }
-        } else {
-            PathBuf::from("/var/lib/taskforest/history")
-        }
-    });
+    let history_dir = custom_history.unwrap_or_else(|| default_daemon_history_dir(is_user_mode));
 
     println!(
         "Starting taskforest-daemon v{}...",

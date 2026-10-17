@@ -15,7 +15,7 @@ use taskmanager_ipc::transport::TransportStream;
 use taskmanager_ipc::transport::bind_transport;
 use taskmanager_ipc::transport::{IpcEndpoint, TransportListener};
 #[cfg(target_os = "windows")]
-use taskmanager_platform_windows::NamedPipeListener;
+use taskmanager_platform_windows::WindowsNamedPipeServer;
 
 use taskmanager_platform_contract::{
     InProcessCaptureFn, NativeWindowCapture, PlatformCapabilitySurface, WindowCaptureBackend,
@@ -64,15 +64,81 @@ pub fn capability_surface() -> PlatformCapabilitySurface {
 }
 
 #[cfg(target_os = "linux")]
+#[must_use]
 pub fn native_config_path() -> PathBuf {
     use taskmanager_platform_linux::user_config_path;
     user_config_path()
 }
 
 #[cfg(target_os = "linux")]
+#[must_use]
 pub fn native_history_dir() -> PathBuf {
     use taskmanager_platform_linux::user_history_dir;
     user_history_dir()
+}
+
+#[cfg(target_os = "windows")]
+#[must_use]
+pub fn native_config_path() -> PathBuf {
+    use taskmanager_platform_windows::user_config_path;
+    user_config_path()
+}
+
+#[cfg(target_os = "windows")]
+#[must_use]
+pub fn native_history_dir() -> PathBuf {
+    use taskmanager_platform_windows::user_history_dir;
+    user_history_dir()
+}
+
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn native_config_path() -> PathBuf {
+    use taskmanager_platform_macos::user_config_path;
+    user_config_path()
+}
+
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn native_history_dir() -> PathBuf {
+    use taskmanager_platform_macos::user_history_dir;
+    user_history_dir()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[must_use]
+pub fn native_config_path() -> PathBuf {
+    PathBuf::from("taskmanager-config.json")
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[must_use]
+pub fn native_history_dir() -> PathBuf {
+    PathBuf::from("taskmanager-history")
+}
+
+/// Resolve the platform-native storage directory for background daemon continuous history.
+#[must_use]
+pub fn native_system_daemon_history_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(program_data) = std::env::var("ProgramData") {
+            return PathBuf::from(program_data)
+                .join("TaskForest")
+                .join("history");
+        }
+        PathBuf::from(r"C:\ProgramData\TaskForest\history")
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        PathBuf::from("/Library/Application Support/TaskForest/history")
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        PathBuf::from("/var/lib/taskforest/history")
+    }
 }
 
 /// Discover validated local-time rules through the selected Linux adapter.
@@ -229,7 +295,7 @@ pub fn capture_current_window_png(
 }
 
 #[cfg(target_os = "windows")]
-struct WindowsNamedPipeListenerAdapter(NamedPipeListener);
+struct WindowsNamedPipeListenerAdapter(WindowsNamedPipeServer);
 
 #[cfg(target_os = "windows")]
 impl TransportListener for WindowsNamedPipeListenerAdapter {
@@ -248,8 +314,7 @@ pub fn bind_daemon_transport(
         IpcEndpoint::Unix(_) => bind_transport(endpoint),
         #[cfg(target_os = "windows")]
         IpcEndpoint::Windows(pipe_name) => {
-            let listener = NamedPipeListener::bind(pipe_name)
-                .map_err(|e| std::io::Error::other(format!("Named pipe bind failed: {e:?}")))?;
+            let listener = WindowsNamedPipeServer::bind(pipe_name)?;
             Ok(Box::new(WindowsNamedPipeListenerAdapter(listener)))
         }
         #[cfg(target_os = "windows")]

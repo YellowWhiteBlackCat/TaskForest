@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use taskmanager_ipc::IpcEndpoint;
+use taskmanager_platform_native::{native_history_dir, native_system_daemon_history_dir};
 
 /// Runtime configuration for the background daemon service.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +22,7 @@ impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
             endpoint: IpcEndpoint::default_platform(),
-            history_dir: default_daemon_history_dir(),
+            history_dir: default_daemon_history_dir(false),
             active_interval_ms: 1000,
             idle_interval_ms: 10_000,
         }
@@ -39,21 +40,12 @@ impl DaemonConfig {
     }
 }
 
-/// Platform-appropriate default storage location for system daemon history.
-fn default_daemon_history_dir() -> PathBuf {
-    #[cfg(windows)]
-    {
-        if let Ok(program_data) = std::env::var("ProgramData") {
-            return PathBuf::from(program_data)
-                .join("TaskForest")
-                .join("history");
-        }
-        PathBuf::from(r"C:\ProgramData\TaskForest\history")
-    }
-
-    #[cfg(not(windows))]
-    {
-        // System-level default on Linux/Unix
-        PathBuf::from("/var/lib/taskforest/history")
+/// Platform-appropriate default storage location for background daemon history.
+#[must_use]
+pub fn default_daemon_history_dir(is_user_mode: bool) -> PathBuf {
+    if is_user_mode {
+        native_history_dir()
+    } else {
+        native_system_daemon_history_dir()
     }
 }

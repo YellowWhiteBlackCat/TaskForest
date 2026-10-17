@@ -1,8 +1,6 @@
 //! Background telemetry persistence manager wrapping PersistentHistoryStore.
 
 use std::fs;
-#[cfg(target_os = "linux")]
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -12,6 +10,7 @@ use taskmanager_history_store::{
     RecordSampleOutcome, RetentionPolicy,
 };
 use taskmanager_ipc::{HistoryProvider, SubscriptionMask};
+use taskmanager_platform_native::history_lock_holder_is_gone;
 
 /// Daemon persistence manager owning the background rolling telemetry store.
 pub struct DaemonHistoryManager {
@@ -31,7 +30,7 @@ impl DaemonHistoryManager {
         })?;
 
         let policy = RetentionPolicy::default();
-        let store = PersistentHistoryStore::open(&root, policy, default_holder_is_gone)?;
+        let store = PersistentHistoryStore::open(&root, policy, history_lock_holder_is_gone)?;
 
         Ok(Self {
             store: Mutex::new(Some(store)),
@@ -132,24 +131,5 @@ impl Drop for DaemonHistoryManager {
 impl HistoryProvider for DaemonHistoryManager {
     fn query_history(&self, facet_mask: u32, start_ms: u64, end_ms: u64) -> (usize, String) {
         self.query_facet_range(facet_mask, start_ms, end_ms)
-    }
-}
-
-/// Safe platform-neutral PID liveness check.
-fn default_holder_is_gone(pid: u32) -> bool {
-    if pid == 0 || pid == std::process::id() {
-        return false;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        // On Linux, check whether /proc/<pid> exists
-        !Path::new("/proc").join(pid.to_string()).exists()
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        // In other environments, assume holder is gone if not current pid
-        true
     }
 }
