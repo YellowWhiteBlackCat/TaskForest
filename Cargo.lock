@@ -10948,6 +10948,7 @@ name = "taskmanager-ui"
 version = "0.3.0"
 dependencies = [
  "gpui-kit",
+ "taskmanager-assets",
  "taskmanager-icons",
  "taskmanager-theme",
  "taskmanager-ui-contract",

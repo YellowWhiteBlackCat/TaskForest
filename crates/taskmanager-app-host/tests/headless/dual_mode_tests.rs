@@ -1,8 +1,14 @@
 use super::*;
+use taskmanager_ipc::transport::IpcEndpoint;
+
+#[cfg(not(windows))]
 use std::thread;
+#[cfg(not(windows))]
 use std::time::Duration;
+#[cfg(not(windows))]
 use taskmanager_ipc::protocol::{DaemonMessage, Frame, Opcode, SubscriptionMask};
-use taskmanager_ipc::transport::{FramedReader, FramedWriter, IpcEndpoint};
+#[cfg(not(windows))]
+use taskmanager_ipc::transport::{FramedReader, FramedWriter};
 
 #[test]
 fn probe_host_mode_defaults_to_standalone_when_no_daemon_active() {

@@ -19,7 +19,8 @@ use gpui::{
     App, Image, ImageFormat, Img, IntoElement, Refineable, RenderOnce, StyleRefinement, Styled,
     Window, img, svg,
 };
-use taskmanager_icons::{path, product_logo_bytes};
+use taskmanager_assets::product_logo_bytes;
+use taskmanager_icons::path;
 use taskmanager_ui_contract::IconId;
 
 /// Toolkit-owned mirror of the shared icon wire format.

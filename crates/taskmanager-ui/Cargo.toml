@@ -22,6 +22,7 @@ test-support = []
 # theme crate.
 gpui = { workspace = true }
 taskmanager-theme = { path = "../taskmanager-theme" }
+taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 
