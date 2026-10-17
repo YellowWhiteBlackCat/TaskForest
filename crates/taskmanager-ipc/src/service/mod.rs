@@ -5,5 +5,5 @@ pub mod server;
 pub mod session;
 
 pub use client::IpcClient;
-pub use server::{IpcConnectionHandler, SubscriptionHub};
+pub use server::{HistoryProvider, IpcConnectionHandler, SubscriptionHub};
 pub use session::ClientSession;

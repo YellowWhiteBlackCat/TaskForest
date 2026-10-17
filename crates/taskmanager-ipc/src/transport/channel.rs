@@ -2,12 +2,45 @@
 
 use std::io::{self, Read, Write};
 
+#[cfg(windows)]
+use taskmanager_windows_api::NamedPipeListener;
+
 use super::endpoint::IpcEndpoint;
 
 /// Unified trait representing a bi-directional, thread-safe, and unbounded byte stream.
-pub trait TransportStream: Read + Write + Send + 'static {}
+pub trait TransportStream: Read + Write + Send + 'static {
+    /// Attempt to duplicate the stream handle for independent concurrent read and write operations.
+    fn try_clone(&self) -> io::Result<Box<dyn TransportStream>>;
+}
 
-impl<T: Read + Write + Send + 'static> TransportStream for T {}
+impl TransportStream for Box<dyn TransportStream> {
+    fn try_clone(&self) -> io::Result<Box<dyn TransportStream>> {
+        (**self).try_clone()
+    }
+}
+
+#[cfg(not(windows))]
+impl TransportStream for std::os::unix::net::UnixStream {
+    fn try_clone(&self) -> io::Result<Box<dyn TransportStream>> {
+        let cloned = self.try_clone()?;
+        Ok(Box::new(cloned))
+    }
+}
+
+#[cfg(windows)]
+impl TransportStream for std::fs::File {
+    fn try_clone(&self) -> io::Result<Box<dyn TransportStream>> {
+        let cloned = self.try_clone()?;
+        Ok(Box::new(cloned))
+    }
+}
+
+impl TransportStream for std::net::TcpStream {
+    fn try_clone(&self) -> io::Result<Box<dyn TransportStream>> {
+        let cloned = self.try_clone()?;
+        Ok(Box::new(cloned))
+    }
+}
 
 /// Unified trait representing an incoming connection listener for IPC servers.
 pub trait TransportListener: Send + 'static {
@@ -23,6 +56,17 @@ impl TransportListener for UnixListenerAdapter {
     fn accept(&self) -> io::Result<Box<dyn TransportStream>> {
         let (stream, _) = self.0.accept()?;
         Ok(Box::new(stream))
+    }
+}
+
+#[cfg(windows)]
+struct WindowsNamedPipeListenerAdapter(NamedPipeListener);
+
+#[cfg(windows)]
+impl TransportListener for WindowsNamedPipeListenerAdapter {
+    fn accept(&self) -> io::Result<Box<dyn TransportStream>> {
+        let file = self.0.accept()?;
+        Ok(Box::new(file))
     }
 }
 
@@ -68,10 +112,15 @@ pub fn bind_transport(endpoint: &IpcEndpoint) -> io::Result<Box<dyn TransportLis
             Ok(Box::new(UnixListenerAdapter(listener)))
         }
         #[cfg(windows)]
-        IpcEndpoint::Windows(_) => Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "Windows Named Pipe server listening requires SCM or dedicated overlapped pipe handle",
-        )),
+        IpcEndpoint::Windows(pipe_name) => {
+            let listener = NamedPipeListener::bind(pipe_name).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Named pipe bind failed: {e:?}"),
+                )
+            })?;
+            Ok(Box::new(WindowsNamedPipeListenerAdapter(listener)))
+        }
         #[cfg(windows)]
         IpcEndpoint::Unix(_) => Err(io::Error::new(
             io::ErrorKind::Unsupported,

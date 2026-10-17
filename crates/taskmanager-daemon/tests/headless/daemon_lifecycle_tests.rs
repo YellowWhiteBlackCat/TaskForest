@@ -6,13 +6,13 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
+use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey, unix_millis};
 use taskmanager_daemon::collector::DaemonCollector;
 use taskmanager_daemon::config::DaemonConfig;
 use taskmanager_daemon::persistence::DaemonHistoryManager;
 use taskmanager_daemon::service::DaemonService;
 use taskmanager_daemon::state::{DaemonCadenceMode, DaemonState};
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
+use taskmanager_ipc::protocol::{ClientMessage, DaemonMessage, SubscriptionMask};
 use taskmanager_ipc::service::{ClientSession, IpcClient};
 use taskmanager_ipc::transport::IpcEndpoint;
 
@@ -109,4 +109,114 @@ fn daemon_collector_real_sampling_test() {
         // On Linux host, memory total must be positive non-zero
         assert!(snapshot.memory_total_bytes.is_some_and(|tot| tot > 0));
     }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn e2e_daemon_telemetry_broadcast_to_subscribers() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let socket_path = temp_dir.path().join("broadcast_daemon.sock");
+    let history_dir = temp_dir.path().join("broadcast_history");
+
+    let mut config = DaemonConfig::new(IpcEndpoint::unix(&socket_path), &history_dir);
+    config.active_interval_ms = 100;
+    let history = DaemonHistoryManager::open(&history_dir).unwrap();
+    let service = Arc::new(DaemonService::new(config, history));
+
+    let join_handle = Arc::clone(&service).start_on_thread().unwrap();
+    thread::sleep(Duration::from_millis(50));
+
+    // Client connects
+    let mut client = IpcClient::connect_uds(&socket_path).unwrap();
+    let welcome = client.handshake("test-frontend", "0.3.0").unwrap();
+    assert!(matches!(welcome, DaemonMessage::Welcome { .. }));
+
+    // Subscribe to CPU & MEMORY
+    client
+        .subscribe(SubscriptionMask::CPU | SubscriptionMask::MEMORY, 100)
+        .unwrap();
+
+    // Verify subscriber registered in service
+    thread::sleep(Duration::from_millis(50));
+    assert!(service.subscriber_count() >= 1);
+
+    // Wait for at least one live TelemetryBatch broadcasted from the sampling loop
+    let mut received_batch = false;
+    for _ in 0..10 {
+        if let Ok(msg) = client.receive_daemon_message() {
+            if let DaemonMessage::TelemetryBatch {
+                timestamp_ms,
+                facet_mask,
+                payload_json,
+            } = msg
+            {
+                assert!(timestamp_ms > 0);
+                assert_eq!(facet_mask, SubscriptionMask::ALL.bits());
+                assert!(!payload_json.is_empty());
+                received_batch = true;
+                break;
+            }
+        }
+    }
+    assert!(
+        received_batch,
+        "Client must receive live TelemetryBatch broadcast"
+    );
+
+    service.stop();
+    let _ = join_handle.join();
+}
+
+#[cfg(not(windows))]
+#[test]
+fn e2e_daemon_real_history_query_and_response() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let socket_path = temp_dir.path().join("history_daemon.sock");
+    let history_dir = temp_dir.path().join("query_history");
+
+    let history = DaemonHistoryManager::open(&history_dir).unwrap();
+    // Record real sample at current wall clock to match TTL retention window
+    let now = unix_millis(std::time::SystemTime::now());
+    let key = HistorySeriesKey::system(HistoryMetric::CpuUsagePct);
+    let sample = HistoricalSample {
+        revision: 1,
+        completed_at_ms: now,
+        measured_at_ms: Some(now),
+        value: Some(33.3),
+    };
+    history.record_sample(key, sample).unwrap();
+    history.flush(now).unwrap();
+
+    let config = DaemonConfig::new(IpcEndpoint::unix(&socket_path), &history_dir);
+    let service = Arc::new(DaemonService::new(config, history));
+    let join_handle = Arc::clone(&service).start_on_thread().unwrap();
+    thread::sleep(Duration::from_millis(50));
+
+    let mut client = IpcClient::connect_uds(&socket_path).unwrap();
+    client.handshake("test-frontend", "0.3.0").unwrap();
+
+    // Query history for CPU in range around `now`
+    let query_msg = ClientMessage::QueryHistory {
+        facet_mask: SubscriptionMask::CPU.bits(),
+        range_start_ms: now.saturating_sub(5000),
+        range_end_ms: now.saturating_add(5000),
+    };
+    client.send_client_message(&query_msg).unwrap();
+
+    let resp = client.receive_daemon_message().unwrap();
+    if let DaemonMessage::HistoryResponse {
+        facet_mask,
+        points_count,
+        payload_json,
+    } = resp
+    {
+        assert_eq!(facet_mask, SubscriptionMask::CPU.bits());
+        assert_eq!(points_count, 1);
+        assert!(payload_json.contains("33.3"));
+    } else {
+        panic!("Expected HistoryResponse, got {resp:?}");
+    }
+
+    service.stop();
+    let _ = join_handle.join();
 }

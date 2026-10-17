@@ -19,5 +19,8 @@ serde_json = "1.0"
 crc32fast = "1.5"
 thiserror = "2.0"
 
+[target.'cfg(windows)'.dependencies]
+taskmanager-windows-api = { path = "../taskmanager-windows-api" }
+
 [dev-dependencies]
 tempfile = "3.27"

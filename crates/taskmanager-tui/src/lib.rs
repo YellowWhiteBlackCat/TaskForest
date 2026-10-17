@@ -106,7 +106,9 @@ pub fn run_cli(binary_name: &'static str) {
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_ipc::DaemonMessage;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_application::process_category_projection::category_expansion_key;
@@ -309,6 +311,9 @@ pub struct TuiApp {
     page_row_anchors: std::collections::HashMap<AppPage, selection::PageRowAnchor>,
     /// Whether the terminal session is attached to the taskforest-daemon service.
     pub is_daemon_connected: bool,
+    pub daemon_worker: Option<DaemonSubscriptionWorker>,
+    pub daemon_rx: Option<crossbeam_channel::Receiver<DaemonMessage>>,
+    pub last_daemon_telemetry_ms: u64,
 }
 
 impl TuiApp {
@@ -387,7 +392,56 @@ impl TuiApp {
             prefs: AppliedPrefs::default(),
             page_row_anchors: std::collections::HashMap::new(),
             is_daemon_connected: false,
+            daemon_worker: None,
+            daemon_rx: None,
+            last_daemon_telemetry_ms: 0,
         }
+    }
+
+    /// Attach active background daemon subscriber channel to stream live observations.
+    pub fn install_daemon_subscriber(
+        &mut self,
+        worker: DaemonSubscriptionWorker,
+        rx: crossbeam_channel::Receiver<DaemonMessage>,
+    ) {
+        self.daemon_worker = Some(worker);
+        self.daemon_rx = Some(rx);
+    }
+
+    /// Ingest a live telemetry observation batch pushed by the background daemon.
+    pub fn apply_daemon_telemetry_batch(
+        &mut self,
+        timestamp_ms: u64,
+        _facet_mask: u32,
+        _payload_json: &str,
+    ) {
+        self.last_daemon_telemetry_ms = timestamp_ms;
+        *self.visual_row_count_cache.borrow_mut() = None;
+    }
+
+    /// Drain ready incoming daemon messages and apply to the terminal application state.
+    pub fn drain_daemon_telemetry(&mut self) -> bool {
+        let mut had_messages = false;
+        if let Some(rx) = &self.daemon_rx {
+            let mut messages = Vec::new();
+            while let Ok(msg) = rx.try_recv() {
+                messages.push(msg);
+            }
+            if !messages.is_empty() {
+                had_messages = true;
+                for msg in messages {
+                    if let DaemonMessage::TelemetryBatch {
+                        timestamp_ms,
+                        facet_mask,
+                        payload_json,
+                    } = msg
+                    {
+                        self.apply_daemon_telemetry_batch(timestamp_ms, facet_mask, &payload_json);
+                    }
+                }
+            }
+        }
+        had_messages
     }
 
     /// Apply a platform batch through the shell state machine. The shell is

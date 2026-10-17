@@ -5,7 +5,9 @@
 use std::io::Cursor;
 
 use taskmanager_ipc::protocol::{Frame, FrameHeader, IpcError, Opcode};
-use taskmanager_ipc::transport::{FramedReader, FramedWriter, IpcEndpoint};
+use taskmanager_ipc::transport::{
+    FramedReader, FramedWriter, IpcEndpoint, bind_transport, connect_transport,
+};
 
 #[test]
 fn framed_read_write_roundtrip() {
@@ -67,4 +69,21 @@ fn endpoint_default_platform_resolution() {
     {
         assert!(matches!(endpoint, IpcEndpoint::Unix(_)));
     }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn transport_listener_accept_and_stream_clone() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let socket_path = temp_dir.path().join("transport_test.sock");
+    let endpoint = IpcEndpoint::Unix(socket_path);
+
+    let listener = bind_transport(&endpoint).unwrap();
+    let client_stream = connect_transport(&endpoint).unwrap();
+    let server_stream = listener.accept().unwrap();
+
+    let cloned_client = client_stream.try_clone().unwrap();
+    let cloned_server = server_stream.try_clone().unwrap();
+    assert!(cloned_client.try_clone().is_ok());
+    assert!(cloned_server.try_clone().is_ok());
 }

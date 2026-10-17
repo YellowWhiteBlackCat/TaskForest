@@ -13,6 +13,7 @@ use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_ipc::SubscriptionMask;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
@@ -172,6 +173,9 @@ fn run_interactive(demo: bool) -> io::Result<()> {
                 FeedbackLifecycle::UntilReplaced,
                 "Connected to TaskForest Daemon (7x24 background monitoring active)".to_string(),
             );
+            if let Some((worker, rx)) = host.subscribe_daemon_stream(SubscriptionMask::ALL, 1000) {
+                app.install_daemon_subscriber(worker, rx);
+            }
         }
         app.request_history_frontend(app.history_persistence_enabled());
         app.install_history_frontend_connector(host.history_frontend_connector());

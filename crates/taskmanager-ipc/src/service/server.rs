@@ -66,6 +66,12 @@ impl SubscriptionHub {
     }
 }
 
+/// Provider trait for resolving historical telemetry queries from persistent storage.
+pub trait HistoryProvider: Send + Sync + 'static {
+    /// Query historical points matching facet mask and millisecond range, returning (count, json).
+    fn query_history(&self, facet_mask: u32, start_ms: u64, end_ms: u64) -> (usize, String);
+}
+
 /// Server connection processor handling one connected client stream.
 pub struct IpcConnectionHandler<S> {
     stream: S,
@@ -75,6 +81,7 @@ pub struct IpcConnectionHandler<S> {
     session: Option<ClientSession>,
     hub: Arc<Mutex<SubscriptionHub>>,
     daemon_version: String,
+    history_provider: Option<Arc<dyn HistoryProvider>>,
 }
 
 impl<S: Read + Write> IpcConnectionHandler<S> {
@@ -92,7 +99,15 @@ impl<S: Read + Write> IpcConnectionHandler<S> {
             session: None,
             hub,
             daemon_version: daemon_version.into(),
+            history_provider: None,
         }
+    }
+
+    /// Attach a persistent history provider to serve historical range queries.
+    #[must_use]
+    pub fn with_history_provider(mut self, provider: Arc<dyn HistoryProvider>) -> Self {
+        self.history_provider = Some(provider);
+        self
     }
 
     /// Read and dispatch one incoming frame from this client.
@@ -161,12 +176,20 @@ impl<S: Read + Write> IpcConnectionHandler<S> {
                 };
                 self.send_daemon_message(&pong)
             }
-            ClientMessage::QueryHistory { .. } => {
-                // Return empty history acknowledgment in prototype phase
+            ClientMessage::QueryHistory {
+                facet_mask,
+                range_start_ms,
+                range_end_ms,
+            } => {
+                let (points_count, payload_json) = if let Some(provider) = &self.history_provider {
+                    provider.query_history(facet_mask, range_start_ms, range_end_ms)
+                } else {
+                    (0, "[]".to_string())
+                };
                 let resp = DaemonMessage::HistoryResponse {
-                    facet_mask: 0,
-                    points_count: 0,
-                    payload_json: "[]".to_string(),
+                    facet_mask,
+                    points_count,
+                    payload_json,
                 };
                 self.send_daemon_message(&resp)
             }

@@ -499,6 +499,10 @@ where
         cycle.ancillary_effect |= app.drain_snapshot_export_completions();
         cycle.ancillary_effect |= app.drain_diagnostic_bundle_completions();
         cycle.ancillary_effect |= app.drain_window_capture_completions();
+        if app.drain_daemon_telemetry() {
+            cycle.ancillary_effect = true;
+            pending_draw = true;
+        }
         if let Some(platform) = platform.as_deref_mut() {
             cycle.ancillary_effect |= app
                 .shell

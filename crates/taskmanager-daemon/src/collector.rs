@@ -2,12 +2,13 @@
 
 use std::io;
 
+use serde::{Deserialize, Serialize};
 use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
 
 use crate::persistence::DaemonHistoryManager;
 
 /// System metrics snapshot sampled by the daemon collector.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemTelemetrySnapshot {
     pub timestamp_ms: u64,
     pub cpu_usage_pct: Option<f64>,

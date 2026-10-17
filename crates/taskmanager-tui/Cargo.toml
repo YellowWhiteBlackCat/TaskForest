@@ -19,6 +19,8 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 taskmanager-assets = { path = "../taskmanager-assets" }
+taskmanager-ipc = { path = "../taskmanager-ipc" }
+crossbeam-channel = "0.5"
 # Shared CLI composition harness (ADR-051): the product bin hands this
 # frontend's capability set to `taskmanager_cli::run`.
 taskmanager-cli = { path = "../taskmanager-cli" }

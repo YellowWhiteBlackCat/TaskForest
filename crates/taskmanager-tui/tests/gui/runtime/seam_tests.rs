@@ -17,6 +17,7 @@ use crate::ui::TuiFramePlan;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
+use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
 
@@ -867,4 +868,27 @@ fn native_navigation_key_and_rail_click_share_the_painted_page_order_and_protect
     app.close_local_overlays();
     super::handle_key(&mut app, KeyEvent::new(KeyCode::F(7), KeyModifiers::NONE));
     assert_eq!(app.nav_orientation, NavOrientation::Horizontal);
+}
+
+#[test]
+fn daemon_telemetry_stream_injection_and_drain() {
+    let mut app = TuiApp::new();
+    assert_eq!(app.last_daemon_telemetry_ms, 0);
+
+    let (tx, rx) = crossbeam_channel::bounded(16);
+    app.daemon_rx = Some(rx);
+
+    let batch = DaemonMessage::TelemetryBatch {
+        timestamp_ms: 123456789,
+        facet_mask: SubscriptionMask::CPU.bits(),
+        payload_json: "{\"cpu_percent\":25.0}".to_string(),
+    };
+    tx.send(batch).unwrap();
+
+    let drained = app.drain_daemon_telemetry();
+    assert!(drained);
+    assert_eq!(app.last_daemon_telemetry_ms, 123456789);
+
+    // Second drain when channel is empty returns false
+    assert!(!app.drain_daemon_telemetry());
 }

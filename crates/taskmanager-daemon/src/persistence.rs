@@ -6,11 +6,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use taskmanager_core::{HistoricalSample, HistorySeriesKey};
+use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_history_store::{
     HistoryQuery, HistoryStoreError, HistoryStoreErrorKind, PersistentHistoryStore,
     RecordSampleOutcome, RetentionPolicy,
 };
+use taskmanager_ipc::{HistoryProvider, SubscriptionMask};
 
 /// Daemon persistence manager owning the background rolling telemetry store.
 pub struct DaemonHistoryManager {
@@ -72,6 +73,46 @@ impl DaemonHistoryManager {
         HistoryQuery::new(self.root_dir.clone())
     }
 
+    /// Query historical samples for a given facet within the specified time range.
+    pub fn query_facet_range(
+        &self,
+        facet_mask: u32,
+        start_ms: u64,
+        end_ms: u64,
+    ) -> (usize, String) {
+        let key = if facet_mask & SubscriptionMask::CPU.bits() != 0 {
+            HistorySeriesKey::system(HistoryMetric::CpuUsagePct)
+        } else if facet_mask & SubscriptionMask::MEMORY.bits() != 0 {
+            HistorySeriesKey::system(HistoryMetric::MemoryUsedPct)
+        } else {
+            return (0, "[]".to_string());
+        };
+
+        let duration = end_ms.saturating_sub(start_ms);
+        let window = if duration <= HistoryWindow::OneHour.duration_ms() {
+            HistoryWindow::OneHour
+        } else if duration <= HistoryWindow::TwentyFourHours.duration_ms() {
+            HistoryWindow::TwentyFourHours
+        } else {
+            HistoryWindow::SevenDays
+        };
+
+        let query = self.query();
+        if let Ok(Some(read)) = query.series(&key, window, end_ms) {
+            let filtered: Vec<HistoricalSample> = read
+                .series
+                .samples
+                .into_iter()
+                .filter(|s| s.completed_at_ms >= start_ms && s.completed_at_ms <= end_ms)
+                .collect();
+            let count = filtered.len();
+            let json = serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string());
+            (count, json)
+        } else {
+            (0, "[]".to_string())
+        }
+    }
+
     /// Gracefully drop and release writer lock.
     pub fn close(&self) {
         if let Ok(mut guard) = self.store.lock() {
@@ -85,6 +126,12 @@ impl DaemonHistoryManager {
 impl Drop for DaemonHistoryManager {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+impl HistoryProvider for DaemonHistoryManager {
+    fn query_history(&self, facet_mask: u32, start_ms: u64, end_ms: u64) -> (usize, String) {
+        self.query_facet_range(facet_mask, start_ms, end_ms)
     }
 }
 

@@ -10490,6 +10490,7 @@ dependencies = [
 name = "taskmanager-daemon"
 version = "0.3.0"
 dependencies = [
+ "crossbeam-channel",
  "ctrlc",
  "pico-args",
  "serde",
@@ -10639,6 +10640,7 @@ dependencies = [
  "serde",
  "serde_json",
  "taskmanager-core",
+ "taskmanager-windows-api",
  "tempfile",
  "thiserror 2.0.21",
 ]
@@ -10918,12 +10920,14 @@ dependencies = [
 name = "taskmanager-tui"
 version = "0.3.0"
 dependencies = [
+ "crossbeam-channel",
  "ratatui",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
  "taskmanager-cli",
  "taskmanager-core",
+ "taskmanager-ipc",
  "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",
