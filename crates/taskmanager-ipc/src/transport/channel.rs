@@ -2,9 +2,6 @@
 
 use std::io::{self, Read, Write};
 
-#[cfg(windows)]
-use taskmanager_windows_api::NamedPipeListener;
-
 use super::endpoint::IpcEndpoint;
 
 /// Unified trait representing a bi-directional, thread-safe, and unbounded byte stream.
@@ -59,17 +56,6 @@ impl TransportListener for UnixListenerAdapter {
     }
 }
 
-#[cfg(windows)]
-struct WindowsNamedPipeListenerAdapter(NamedPipeListener);
-
-#[cfg(windows)]
-impl TransportListener for WindowsNamedPipeListenerAdapter {
-    fn accept(&self) -> io::Result<Box<dyn TransportStream>> {
-        let file = self.0.accept()?;
-        Ok(Box::new(file))
-    }
-}
-
 /// Establish an active client connection to the designated IPC endpoint.
 pub fn connect_transport(endpoint: &IpcEndpoint) -> io::Result<Box<dyn TransportStream>> {
     match endpoint {
@@ -112,15 +98,10 @@ pub fn bind_transport(endpoint: &IpcEndpoint) -> io::Result<Box<dyn TransportLis
             Ok(Box::new(UnixListenerAdapter(listener)))
         }
         #[cfg(windows)]
-        IpcEndpoint::Windows(pipe_name) => {
-            let listener = NamedPipeListener::bind(pipe_name).map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Named pipe bind failed: {e:?}"),
-                )
-            })?;
-            Ok(Box::new(WindowsNamedPipeListenerAdapter(listener)))
-        }
+        IpcEndpoint::Windows(_) => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Windows Named Pipe server listening is provided by platform-native composition adapter",
+        )),
         #[cfg(windows)]
         IpcEndpoint::Unix(_) => Err(io::Error::new(
             io::ErrorKind::Unsupported,

@@ -2,12 +2,18 @@
 //!
 //! Integration behavior tests for taskmanager-ipc client and daemon server interaction.
 
+#[cfg(not(windows))]
 use std::sync::{Arc, Mutex};
+#[cfg(not(windows))]
 use std::thread;
+#[cfg(not(windows))]
 use std::time::Duration;
 
+#[cfg(not(windows))]
 use taskmanager_ipc::protocol::{DaemonMessage, Frame, Opcode, SubscriptionMask};
+#[cfg(not(windows))]
 use taskmanager_ipc::service::{IpcClient, IpcConnectionHandler, SubscriptionHub};
+#[cfg(not(windows))]
 use taskmanager_ipc::transport::{FramedReader, FramedWriter};
 
 #[cfg(not(windows))]

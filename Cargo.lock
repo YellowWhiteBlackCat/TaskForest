@@ -10646,7 +10646,6 @@ dependencies = [
  "serde",
  "serde_json",
  "taskmanager-core",
- "taskmanager-windows-api",
  "tempfile",
  "thiserror 2.0.21",
 ]
@@ -10758,6 +10757,7 @@ name = "taskmanager-platform-native"
 version = "0.3.0"
 dependencies = [
  "taskmanager-core",
+ "taskmanager-ipc",
  "taskmanager-platform-contract",
  "taskmanager-platform-linux",
  "taskmanager-platform-macos",

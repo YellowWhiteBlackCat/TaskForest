@@ -42,6 +42,8 @@ use taskmanager_platform_runtime::{
 mod bindings;
 mod command;
 mod config;
+
+pub use taskmanager_windows_api::NamedPipeListener;
 mod local_time;
 mod provider;
 pub mod tray;

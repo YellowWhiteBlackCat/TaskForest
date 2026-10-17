@@ -9,6 +9,14 @@
 
 use std::path::{Path, PathBuf};
 
+#[cfg(target_os = "windows")]
+use taskmanager_ipc::transport::TransportStream;
+#[cfg(not(target_os = "windows"))]
+use taskmanager_ipc::transport::bind_transport;
+use taskmanager_ipc::transport::{IpcEndpoint, TransportListener};
+#[cfg(target_os = "windows")]
+use taskmanager_platform_windows::NamedPipeListener;
+
 use taskmanager_platform_contract::{
     InProcessCaptureFn, NativeWindowCapture, PlatformCapabilitySurface, WindowCaptureBackend,
     WindowCaptureFailure, WindowCaptureReceipt,
@@ -218,6 +226,43 @@ pub fn capture_current_window_png(
     }
 
     native_window_capture().capture_active_window(output)
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsNamedPipeListenerAdapter(NamedPipeListener);
+
+#[cfg(target_os = "windows")]
+impl TransportListener for WindowsNamedPipeListenerAdapter {
+    fn accept(&self) -> std::io::Result<Box<dyn TransportStream>> {
+        let file = self.0.accept()?;
+        Ok(Box::new(file))
+    }
+}
+
+/// Bind the platform-native IPC listener for background daemon service.
+pub fn bind_daemon_transport(
+    endpoint: &IpcEndpoint,
+) -> std::io::Result<Box<dyn TransportListener>> {
+    match endpoint {
+        #[cfg(not(target_os = "windows"))]
+        IpcEndpoint::Unix(_) => bind_transport(endpoint),
+        #[cfg(target_os = "windows")]
+        IpcEndpoint::Windows(pipe_name) => {
+            let listener = NamedPipeListener::bind(pipe_name)
+                .map_err(|e| std::io::Error::other(format!("Named pipe bind failed: {e:?}")))?;
+            Ok(Box::new(WindowsNamedPipeListenerAdapter(listener)))
+        }
+        #[cfg(target_os = "windows")]
+        IpcEndpoint::Unix(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Unix Domain Sockets unsupported on Windows",
+        )),
+        #[cfg(not(target_os = "windows"))]
+        IpcEndpoint::Windows(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Windows Named Pipes unsupported on Unix targets",
+        )),
+    }
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]

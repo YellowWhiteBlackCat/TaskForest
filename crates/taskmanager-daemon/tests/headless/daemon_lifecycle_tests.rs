@@ -2,18 +2,29 @@
 //!
 //! Behavior tests for daemon service lifecycle, state machine, and persistence integration.
 
+#[cfg(not(windows))]
 use std::sync::Arc;
+#[cfg(not(windows))]
 use std::thread;
+#[cfg(not(windows))]
 use std::time::Duration;
-
-use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey, unix_millis};
+#[cfg(not(windows))]
+use taskmanager_core::unix_millis;
+use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
 use taskmanager_daemon::collector::DaemonCollector;
+#[cfg(not(windows))]
 use taskmanager_daemon::config::DaemonConfig;
 use taskmanager_daemon::persistence::DaemonHistoryManager;
+#[cfg(not(windows))]
 use taskmanager_daemon::service::DaemonService;
 use taskmanager_daemon::state::{DaemonCadenceMode, DaemonState};
-use taskmanager_ipc::protocol::{ClientMessage, DaemonMessage, SubscriptionMask};
-use taskmanager_ipc::service::{ClientSession, IpcClient};
+use taskmanager_ipc::protocol::SubscriptionMask;
+#[cfg(not(windows))]
+use taskmanager_ipc::protocol::{ClientMessage, DaemonMessage};
+use taskmanager_ipc::service::ClientSession;
+#[cfg(not(windows))]
+use taskmanager_ipc::service::IpcClient;
+#[cfg(not(windows))]
 use taskmanager_ipc::transport::IpcEndpoint;
 
 #[test]

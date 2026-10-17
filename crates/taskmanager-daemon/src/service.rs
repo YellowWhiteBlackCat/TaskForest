@@ -13,7 +13,8 @@ use taskmanager_core::unix_millis;
 use taskmanager_ipc::IpcEndpoint;
 use taskmanager_ipc::protocol::{ClientMessage, DaemonMessage, Frame, SubscriptionMask};
 use taskmanager_ipc::service::ClientSession;
-use taskmanager_ipc::transport::{FramedReader, FramedWriter, TransportStream, bind_transport};
+use taskmanager_ipc::transport::{FramedReader, FramedWriter, TransportStream};
+use taskmanager_platform_native::bind_daemon_transport;
 
 use crate::collector::DaemonCollector;
 use crate::config::DaemonConfig;
@@ -225,7 +226,7 @@ impl DaemonService {
         self.running.store(true, Ordering::Release);
         let service = Arc::clone(&self);
 
-        let listener = bind_transport(&self.config.endpoint)?;
+        let listener = bind_daemon_transport(&self.config.endpoint)?;
 
         // Dedicated accept thread listening for incoming client connections
         let service_accept = Arc::clone(&service);

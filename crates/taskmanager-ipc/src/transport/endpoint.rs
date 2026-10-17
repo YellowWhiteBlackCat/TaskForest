@@ -32,10 +32,10 @@ impl IpcEndpoint {
     pub fn default_platform() -> Self {
         #[cfg(windows)]
         {
-            if let Ok(custom) = env::var(Self::ENV_WINDOWS_PIPE) {
-                if !custom.trim().is_empty() {
-                    return Self::Windows(custom);
-                }
+            if let Ok(custom) = env::var(Self::ENV_WINDOWS_PIPE)
+                && !custom.trim().is_empty()
+            {
+                return Self::Windows(custom);
             }
             Self::Windows(Self::DEFAULT_WINDOWS_PIPE.to_string())
         }

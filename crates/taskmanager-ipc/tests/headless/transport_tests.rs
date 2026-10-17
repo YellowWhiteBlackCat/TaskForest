@@ -5,9 +5,10 @@
 use std::io::Cursor;
 
 use taskmanager_ipc::protocol::{Frame, FrameHeader, IpcError, Opcode};
-use taskmanager_ipc::transport::{
-    FramedReader, FramedWriter, IpcEndpoint, bind_transport, connect_transport,
-};
+use taskmanager_ipc::transport::{FramedReader, FramedWriter, IpcEndpoint};
+
+#[cfg(not(windows))]
+use taskmanager_ipc::transport::{bind_transport, connect_transport};
 
 #[test]
 fn framed_read_write_roundtrip() {
