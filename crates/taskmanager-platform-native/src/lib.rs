@@ -191,32 +191,8 @@ pub fn history_lock_holder_is_gone(pid: u32) -> bool {
 #[cfg(target_os = "macos")]
 pub use taskmanager_platform_macos::NativePlatformRuntime;
 
-#[cfg(target_os = "macos")]
-pub fn native_config_path() -> PathBuf {
-    use taskmanager_platform_macos::user_config_path;
-    user_config_path()
-}
-
-#[cfg(target_os = "macos")]
-pub fn native_history_dir() -> PathBuf {
-    use taskmanager_platform_macos::user_history_dir;
-    user_history_dir()
-}
-
 #[cfg(target_os = "windows")]
 pub use taskmanager_platform_windows::NativePlatformRuntime;
-
-#[cfg(target_os = "windows")]
-pub fn native_config_path() -> PathBuf {
-    use taskmanager_platform_windows::user_config_path;
-    user_config_path()
-}
-
-#[cfg(target_os = "windows")]
-pub fn native_history_dir() -> PathBuf {
-    use taskmanager_platform_windows::user_history_dir;
-    user_history_dir()
-}
 
 #[cfg(target_os = "windows")]
 pub fn native_locale_name() -> Option<String> {
