@@ -66,7 +66,7 @@ the lower document layers.
 
 - Preserve unrelated work. Cargo uses `.tmp/`, shared `target/`, and at most four jobs. Every non-doctest test must use `cargo nextest run ... -j 4`; only an explicit `cargo test --doc ... -j 4` is allowed for doctests. The quick gate mechanically rejects every other non-doctest form.
 - Routine work may proceed on `main` until the owner rescinds mainline mode.
-- Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
+- Before completion, run the quick gate, verify the Eight Closure Questions (STANDARDS.md § 8), and report pass/fail/skip with relevant evidence.
 - Every visible layout change must complete the elastic-layout playbook: derive slot budgets, admit
   lower content as whole groups, protect bottom/right edges, and run headless bounds plus real capture.
 - Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

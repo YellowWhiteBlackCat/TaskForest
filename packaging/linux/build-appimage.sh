@@ -44,6 +44,16 @@ install -m644 "$script_dir/io.github.YellowWhiteBlackCat.TaskForestG.desktop" \
     "$appdir/usr/share/applications/"
 install -m644 "$script_dir/io.github.YellowWhiteBlackCat.TaskForest.svg" \
     "$appdir/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
+install -m644 "$script_dir/io.github.YellowWhiteBlackCat.TaskForest.svg" \
+    "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.YellowWhiteBlackCat.TaskForest.svg"
+for size in 16 24 32 48 64 128 256 512; do
+    icon_png="$script_dir/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
+    if [[ -f "$icon_png" ]]; then
+        mkdir -p "$appdir/usr/share/icons/hicolor/${size}x${size}/apps"
+        install -m644 "$icon_png" "$appdir/usr/share/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
+        install -m644 "$icon_png" "$appdir/usr/share/icons/hicolor/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png"
+    fi
+done
 
 linuxdeploy_bin=${LINUXDEPLOY_BIN:-$work/linuxdeploy-x86_64.AppImage}
 if [[ ! -x "$linuxdeploy_bin" ]]; then
