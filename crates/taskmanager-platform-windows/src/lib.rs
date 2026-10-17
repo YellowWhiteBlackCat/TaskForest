@@ -38,10 +38,35 @@ use taskmanager_platform_runtime::{
     CompositionError, NativeProviderSet, RuntimeConfig, RuntimeExecutors, RuntimeProviderBindings,
     assemble_native_runtime,
 };
+use taskmanager_windows_api::NamedPipeListener;
 
 mod bindings;
 mod command;
 mod config;
+
+/// Native Windows Named Pipe server adapter for background daemon IPC.
+#[derive(Debug)]
+pub struct WindowsNamedPipeServer(NamedPipeListener);
+
+impl WindowsNamedPipeServer {
+    /// Bind a new named pipe server listener at the designated pipe name.
+    pub fn bind(pipe_name: impl Into<String>) -> std::io::Result<Self> {
+        NamedPipeListener::bind(pipe_name)
+            .map(Self)
+            .map_err(|e| std::io::Error::other(format!("Named pipe bind failed: {e:?}")))
+    }
+
+    /// Access the bound pipe path.
+    #[must_use]
+    pub fn pipe_name(&self) -> &str {
+        self.0.pipe_name()
+    }
+
+    /// Accept a client connection on the named pipe.
+    pub fn accept(&self) -> std::io::Result<std::fs::File> {
+        self.0.accept()
+    }
+}
 mod local_time;
 mod provider;
 pub mod tray;
@@ -51,7 +76,7 @@ pub use window_capture::WindowsWindowCapture;
 // from tauri-plugin-single-instance; ADR-032 follow-up).
 pub mod instance;
 
-pub use config::{user_config_path, user_history_dir, user_locale_name};
+pub use config::{system_daemon_history_dir, user_config_path, user_history_dir, user_locale_name};
 pub use local_time::local_time_rules;
 pub use provider::capability_surface;
 pub use provider::{WindowsProviderRegistry, WindowsProviderRegistryParams};

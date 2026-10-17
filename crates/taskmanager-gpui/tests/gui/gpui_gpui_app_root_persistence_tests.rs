@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use taskmanager_application::i18n::Language;
 use taskmanager_core::core::alerts::NotificationPolicy;
 use taskmanager_core::core::alerts::QuietHours;
+use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_shell::ProcessViewing;
 use taskmanager_shell::SortDir;
 
@@ -482,4 +483,34 @@ fn col_widths_save_is_deterministic_and_excludes_name() {
     let saved = col_widths_to_config(&with_name);
     assert!(saved.iter().all(|e| e.column != "Name"));
     assert_eq!(saved.len(), 3);
+}
+
+#[gpui::test]
+fn daemon_telemetry_stream_drain_in_root_view(cx: &mut TestAppContext) {
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    let (tx, rx) = crossbeam_channel::bounded(16);
+    root.update(cx, |view, _cx| {
+        view.daemon_rx = Some(rx);
+        assert_eq!(view.last_daemon_telemetry_ms, 0);
+    });
+
+    let batch = DaemonMessage::TelemetryBatch {
+        timestamp_ms: 987654321,
+        facet_mask: SubscriptionMask::CPU.bits(),
+        payload_json:
+            "{\"cpu_usage_pct\":42.0,\"memory_used_bytes\":5000000,\"memory_total_bytes\":10000000}"
+                .to_string(),
+    };
+    tx.send(batch).unwrap();
+
+    let drained = root.update(cx, |view, _cx| view.drain_daemon_telemetry());
+    assert!(drained);
+    root.update(cx, |view, _cx| {
+        assert_eq!(view.last_daemon_telemetry_ms, 987654321);
+        let snap = view.system_snapshot_rc();
+        assert_eq!(snap.timestamp_ms, 987654321);
+        assert_eq!(snap.cpu.current_global_usage_pct(), Some(42.0));
+        assert_eq!(snap.memory.current_used_bytes(), Some(5000000));
+        assert_eq!(snap.memory.current_total_bytes(), Some(10000000));
+    });
 }

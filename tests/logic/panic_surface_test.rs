@@ -32,7 +32,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const SCAN_ROOTS: [&str; 44] = [
+const SCAN_ROOTS: [&str; 46] = [
     "src",
     "crates/taskmanager-accessibility-linux/src",
     "crates/taskmanager-afpacket/src",
@@ -42,12 +42,14 @@ const SCAN_ROOTS: [&str; 44] = [
     "crates/taskmanager-bevy-ui/src",
     "crates/taskmanager-cli/src",
     "crates/taskmanager-core/src",
+    "crates/taskmanager-daemon/src",
     "crates/taskmanager-escalation/src",
     "crates/taskmanager-fd-bridge/src",
     "crates/taskmanager-gpui/src",
     "crates/taskmanager-history-store/src",
     "crates/taskmanager-iced/src",
     "crates/taskmanager-icons/src",
+    "crates/taskmanager-ipc/src",
     "crates/taskmanager-msr-helper/src",
     "crates/taskmanager-net-launcher/src",
     "crates/taskmanager-perf-ioctl/src",

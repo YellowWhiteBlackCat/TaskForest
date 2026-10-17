@@ -48,7 +48,7 @@ pub mod tray;
 // tauri-plugin-single-instance; ADR-032 follow-up).
 pub mod instance;
 
-pub use config::{user_config_path, user_history_dir};
+pub use config::{system_daemon_history_dir, user_config_path, user_history_dir};
 pub use provider::capability_surface;
 pub use provider::{MacOsProviderRegistry, MacOsProviderRegistryParams};
 use taskmanager_core::core::time::unix_millis;

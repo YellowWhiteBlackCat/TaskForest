@@ -4,7 +4,7 @@ Section: admin
 Priority: optional
 Architecture: __ARCH__
 Depends: taskforest-common, fontconfig, libfreetype6, libxkbcommon0, libwayland-client0, libvulkan1
-Recommends: polkitd
+Recommends: polkitd, taskforest-daemon
 Suggests: smartmontools, nvme-cli, xfsprogs, iw, mesa-vulkan-drivers, nvidia-vulkan-icd
 Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
 Installed-Size: __INSTALLED_SIZE__

@@ -15,7 +15,6 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
-use taskmanager_assets::product;
 use taskmanager_shell::{PageHelp, page_help};
 use taskmanager_ui_contract::IconId;
 
@@ -23,9 +22,9 @@ use crate::{TuiApp, TuiTheme};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let brand = if area.width < 68 || area.height <= 2 {
-        " TF "
+        " 🌲 TF "
     } else {
-        product::NAME
+        " 🌲 TaskForest "
     };
     let mut spans = vec![Span::styled(
         brand,
@@ -34,6 +33,14 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             .bg(theme.accent)
             .add_modifier(Modifier::BOLD),
     )];
+    if app.is_daemon_connected {
+        spans.push(Span::styled(
+            " [Daemon] ",
+            Style::new()
+                .fg(theme.color(Color::Green))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
     if app.nav_orientation == NavOrientation::Vertical {
         spans.push(Span::styled(
             format!(

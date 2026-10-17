@@ -57,6 +57,7 @@ impl IcedApp {
     /// platform borrow and folded after it ends (the fold mutates
     /// renderer-local surface state).
     pub(super) fn tick(&mut self) {
+        self.drain_daemon_telemetry();
         let plan = self.prepare_tick_system();
         let (service_updates, first_run_events) = self.platform_tick_system(plan);
         self.apply_first_run_completion(first_run_events);

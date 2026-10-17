@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-gpui"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -24,6 +24,7 @@ taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-ipc = { path = "../taskmanager-ipc" }
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-theme = { path = "../taskmanager-theme" }

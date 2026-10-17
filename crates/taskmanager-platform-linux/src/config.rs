@@ -45,6 +45,12 @@ pub fn user_history_dir() -> PathBuf {
     )
 }
 
+/// Resolve the persistent system-wide background daemon history directory.
+#[must_use]
+pub fn system_daemon_history_dir() -> PathBuf {
+    PathBuf::from("/var/lib/taskforest/history")
+}
+
 /// Number of collector ticks between full `/proc/<pid>/fd` directory scans.
 ///
 /// fd count is a low-frequency-drift column — a process rarely opens or closes

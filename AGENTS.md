@@ -41,23 +41,15 @@ the lower document layers.
 
 ## Non-negotiable invariants
 
-- Business crates are safe Rust. `unsafe` exists only in the four audited boundary
-  crates and crosses their APIs only as typed, owned values.
-- The application is unprivileged by default. Escalation is per feature, OS-native,
-  typed, and observable; unavailable data is never fabricated as zero or success.
-- Frontends never read OS sources directly. Blocking collection stays off the UI thread;
-  rendering and keyboard paths consume the same cached projection.
-- Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is
-  an independent product crate with its own binary over the shared `taskmanager-cli`
-  harness; the workspace carries no `ui-*` features, and shared layers never gate code
-  on a frontend identity.
-- Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens,
-  and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
+- Business crates are safe Rust. `unsafe` exists only in the four audited boundary crates and crosses their APIs only as typed, owned values.
+- Tri-platform parity & crates.io rule: Published libraries must be platform-neutral or fully tri-platform (Linux/Windows/macOS parity); only platform-suffixed crates specialize; publish namespaces reserve `taskforest-*`.
+- The application is unprivileged by default. Escalation is per feature, OS-native, typed, and observable; unavailable data is never fabricated as zero or success.
+- Frontends never read OS sources directly. Blocking collection stays off the UI thread; rendering and keyboard paths consume the same cached projection.
+- Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is an independent product crate with its own binary over the shared `taskmanager-cli` harness; the workspace carries no `ui-*` features, and shared layers never gate code on a frontend identity.
+- Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens, and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
 - Windows telemetry, tests, and helpers never use PowerShell or another command interpreter.
-- Production code is panic-free by gate. Tests prove behavior and side effects, not source
-  text, vacuous assertions, or host-specific values.
-- Public-repository checks reject private paths, live captures, personal email addresses,
-  credentials, and host-specific absolute paths.
+- Production code is panic-free by gate. Tests prove behavior and side effects, not source text, vacuous assertions, or host-specific values.
+- Public-repository checks reject private paths, live captures, personal email addresses, credentials, and host-specific absolute paths.
 
 ## Authority route
 
@@ -74,7 +66,7 @@ the lower document layers.
 
 - Preserve unrelated work. Cargo uses `.tmp/`, shared `target/`, and at most four jobs. Every non-doctest test must use `cargo nextest run ... -j 4`; only an explicit `cargo test --doc ... -j 4` is allowed for doctests. The quick gate mechanically rejects every other non-doctest form.
 - Routine work may proceed on `main` until the owner rescinds mainline mode.
-- Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
+- Before completion, run the quick gate, verify the Eight Closure Questions (STANDARDS.md § 8), and report pass/fail/skip with relevant evidence.
 - Every visible layout change must complete the elastic-layout playbook: derive slot budgets, admit
   lower content as whole groups, protect bottom/right edges, and run headless bounds plus real capture.
 - Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

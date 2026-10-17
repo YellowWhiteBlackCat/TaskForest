@@ -37,9 +37,14 @@ done
 printf '%s\n' '==> rasterizing the freedesktop hicolor size ladder'
 for size in 16 24 32 48 64 128 256 512; do
     destination="$LINUX_ICON_DIR/${size}x${size}/apps/taskforest-taskboard.png"
+    destination_canonical="$LINUX_ICON_DIR/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png"
     mkdir -p "$(dirname "$destination")"
     rsvg-convert -w "$size" -h "$size" "$SOURCE" -o "$destination"
+    cp -f "$destination" "$destination_canonical"
 done
+mkdir -p "$LINUX_ICON_DIR/scalable/apps"
+cp -f "$SOURCE" "$LINUX_ICON_DIR/scalable/apps/taskforest-taskboard.svg"
+cp -f "$SOURCE" "$LINUX_ICON_DIR/scalable/apps/io.github.YellowWhiteBlackCat.TaskForest.svg"
 
 printf '%s\n' '==> assembling macOS ICNS with the checked-in Rust tool'
 cargo run --locked -j 4 --manifest-path "$MACOS_DIR/build-icns/Cargo.toml"

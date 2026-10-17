@@ -24,6 +24,8 @@ mod job_control;
 mod known_folders;
 mod memory_info;
 mod msg_pump;
+pub mod named_pipe;
+pub use named_pipe::NamedPipeListener;
 mod network;
 mod npu;
 mod open_files;

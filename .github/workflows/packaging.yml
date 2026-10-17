@@ -159,6 +159,7 @@ jobs:
             -p taskmanager-gpui \
             -p taskmanager-iced \
             -p taskmanager-bevy-ui \
+            -p taskmanager-daemon \
             -p taskmanager-setup-helper \
             -p taskmanager-privilege-helper \
             -p taskmanager-net-launcher \
@@ -200,6 +201,11 @@ jobs:
             "${{ steps.version.outputs.version }}" \
             "TaskForest-Common-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
             "$DEB_ARCH"
+          # System daemon package
+          packaging/debian/build-deb-daemon.sh \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-Daemon-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
+            "$DEB_ARCH"
       - name: Build RPM
         run: |
           for ui in G I T B; do
@@ -214,10 +220,15 @@ jobs:
             "${{ steps.version.outputs.version }}" \
             "TaskForest-Common-${{ steps.version.outputs.version }}-${{ matrix.arch }}.rpm" \
             C
+          # System daemon package
+          packaging/rpm/build-rpm.sh staging \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-Daemon-${{ steps.version.outputs.version }}-${{ matrix.arch }}.rpm" \
+            Daemon
       - name: Validate DEB package
         run: |
           set -euo pipefail
-          for ui in G I T B Common; do
+          for ui in G I T B Common Daemon; do
             deb=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.deb" -print -quit)
             test -n "$deb"
             test -f "$deb"
@@ -230,7 +241,7 @@ jobs:
       - name: Validate RPM package
         run: |
           set -euo pipefail
-          for ui in G I T B Common; do
+          for ui in G I T B Common Daemon; do
             rpm_file=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.rpm" -print -quit)
             test -n "$rpm_file"
             test "$(rpm -qp --queryformat '%{ARCH}\n' "$rpm_file")" = "$RPM_ARCH"

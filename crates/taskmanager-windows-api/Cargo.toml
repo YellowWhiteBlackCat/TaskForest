@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-windows-api"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -38,6 +38,7 @@ windows = { version = "0.62.2", default-features = false, features = [
     "Win32_System_Memory",
     "Win32_System_Ole",
     "Win32_System_Performance",
+    "Win32_System_Pipes",
     "Win32_System_Power",
     "Win32_System_ProcessStatus",
     "Win32_System_Registry",

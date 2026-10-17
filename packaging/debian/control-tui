@@ -3,6 +3,7 @@ Version: __VERSION__
 Section: admin
 Priority: optional
 Architecture: __ARCH__
+Recommends: polkitd, taskforest-daemon
 Suggests: smartmontools, nvme-cli, xfsprogs, iw
 Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
 Installed-Size: __INSTALLED_SIZE__

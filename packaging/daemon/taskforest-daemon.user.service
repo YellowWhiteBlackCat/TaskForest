@@ -1,0 +1,12 @@
+[Unit]
+Description=TaskForest User Session Background Daemon
+Documentation=https://github.com/YellowWhiteBlackCat/TaskForest
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/taskforest-daemon --user
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

@@ -19,6 +19,7 @@ use gpui::{
     App, Image, ImageFormat, Img, IntoElement, Refineable, RenderOnce, StyleRefinement, Styled,
     Window, img, svg,
 };
+use taskmanager_assets::product_logo_bytes;
 use taskmanager_icons::path;
 use taskmanager_ui_contract::IconId;
 
@@ -101,4 +102,10 @@ impl RenderOnce for Icon {
 #[must_use]
 pub fn icon(icon: IconId) -> Icon {
     Icon::new(icon)
+}
+
+/// Build a GPUI element rendering the canonical TaskForest brand logo.
+#[must_use]
+pub fn brand_logo_image() -> Img {
+    application_image(ApplicationImageFormat::Svg, product_logo_bytes())
 }

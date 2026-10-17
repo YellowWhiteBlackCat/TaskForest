@@ -13,12 +13,15 @@
 //! `settings` (settings application + theme rebuild), `refresh` (the tick
 //! loop), `focus_state` (the focus command policy).
 
+use crossbeam_channel::Receiver;
 use std::time::{Duration, Instant};
+use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_ipc::DaemonMessage;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::saved_views::{SavedViewPreset, SavedViewTransferFeedback};
 use taskmanager_ui_contract::navigation::NavOrientation;
@@ -630,11 +633,69 @@ pub struct IcedApp {
     pub(crate) a11y_bridge: crate::a11y::AppAccessibilityBridge,
     pub(crate) a11y_revision: u64,
     pub(crate) a11y_snapshot: Option<SemanticSnapshot>,
+    /// Whether this Iced window is connected to taskforest-daemon.
+    pub is_daemon_connected: bool,
+    /// Background daemon subscription worker.
+    pub daemon_worker: Option<DaemonSubscriptionWorker>,
+    /// Live telemetry streaming channel from daemon.
+    pub daemon_rx: Option<Receiver<DaemonMessage>>,
+    /// Timestamp of the last received telemetry batch from daemon.
+    pub last_daemon_telemetry_ms: u64,
 }
 
 impl IcedApp {
     pub(crate) fn publish_accessibility_snapshot(&mut self) {
         crate::a11y::publish_accessibility_snapshot(self);
+    }
+
+    /// Ingest ready incoming daemon messages and apply to the Iced application state.
+    pub fn drain_daemon_telemetry(&mut self) -> bool {
+        let mut had_messages = false;
+        if let Some(rx) = &self.daemon_rx {
+            let mut messages = Vec::new();
+            while let Ok(msg) = rx.try_recv() {
+                messages.push(msg);
+            }
+            if !messages.is_empty() {
+                had_messages = true;
+                for msg in messages {
+                    if let DaemonMessage::TelemetryBatch {
+                        timestamp_ms,
+                        payload_json,
+                        ..
+                    } = msg
+                    {
+                        self.last_daemon_telemetry_ms = timestamp_ms;
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+                            let cpu = val
+                                .get("cpu_usage_pct")
+                                .and_then(|v| v.as_f64())
+                                .map(|v| v as f32);
+                            let mem_used = val.get("memory_used_bytes").and_then(|v| v.as_u64());
+                            let mem_total = val.get("memory_total_bytes").and_then(|v| v.as_u64());
+                            self.shell.apply_daemon_telemetry_snapshot(
+                                timestamp_ms,
+                                cpu,
+                                mem_used,
+                                mem_total,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        had_messages
+    }
+
+    /// Install the active background daemon subscription worker and streaming channel.
+    pub fn install_daemon_subscriber(
+        &mut self,
+        worker: DaemonSubscriptionWorker,
+        rx: Receiver<DaemonMessage>,
+    ) {
+        self.is_daemon_connected = true;
+        self.daemon_worker = Some(worker);
+        self.daemon_rx = Some(rx);
     }
 }
 

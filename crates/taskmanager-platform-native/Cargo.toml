@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-platform-native"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Compile-time native OS adapter selection for TaskForest frontends"
@@ -22,6 +22,7 @@ nvidia = ["taskmanager-platform-linux/nvidia"]
 [dependencies]
 taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-ipc = { path = "../taskmanager-ipc" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 taskmanager-platform-linux = { path = "../taskmanager-platform-linux", default-features = false }

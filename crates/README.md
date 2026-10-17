@@ -45,10 +45,12 @@ Cargo metadata 决定，下表是按层归组的阅读地图：
 - [taskmanager-ui-contract](taskmanager-ui-contract/README.md) — 前端必须提供的 UI 语义契约
 - [taskmanager-platform-contract](taskmanager-platform-contract/README.md) — 平台能力、请求、事件与端口契约
 - [taskmanager-platform-provider](taskmanager-platform-provider/README.md) — provider SPI 与注册
+- [taskmanager-ipc](taskmanager-ipc/README.md) — 守护进程跨进程二进制通信协议与传输通道
 
 **执行运行时**
 
 - [taskmanager-platform-runtime](taskmanager-platform-runtime/README.md) — 有界执行、公平投递与 ECS 调度内核
+- [taskmanager-daemon](taskmanager-daemon/README.md) — 后台系统守护进程服务与时序持久化单写者
 
 **平台适配器与 OS 边界**
 

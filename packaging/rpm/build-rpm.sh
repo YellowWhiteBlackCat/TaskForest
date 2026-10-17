@@ -45,7 +45,11 @@ case "$ui" in
         spec_file="$script_dir/taskforest-common.spec"
         ui_tag="C"
         ;;
-    *) echo "build-rpm: unknown UI target '$ui' (expected G, I, T, B, or C)" >&2; exit 1 ;;
+    D|d|daemon|Daemon)
+        spec_file="$script_dir/taskforest-daemon.spec"
+        ui_tag="Daemon"
+        ;;
+    *) echo "build-rpm: unknown UI target '$ui' (expected G, I, T, B, C, or Daemon)" >&2; exit 1 ;;
 esac
 
 # RPM's Version field forbids dashes; a Cargo prerelease like 0.1.0-rc5
@@ -114,6 +118,11 @@ case "$ui_tag" in
         mkdir -p "$work/stage-common"
         "$repo/packaging/debian/build-deb-common.sh" --stage-only "$work/stage-common" >/dev/null
         target_staged="$work/stage-common"
+        ;;
+    Daemon)
+        mkdir -p "$work/stage-daemon"
+        "$repo/packaging/debian/build-deb-daemon.sh" --stage-only "$work/stage-daemon" >/dev/null
+        target_staged="$work/stage-daemon"
         ;;
 esac
 

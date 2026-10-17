@@ -1,0 +1,20 @@
+[Unit]
+Description=TaskForest Background Telemetry & System Monitoring Daemon
+Documentation=https://github.com/YellowWhiteBlackCat/TaskForest
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/taskforest-daemon
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening and filesystem boundaries
+RuntimeDirectory=taskforest
+StateDirectory=taskforest
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/taskforest /var/lib/taskforest
+
+[Install]
+WantedBy=multi-user.target

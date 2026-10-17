@@ -47,6 +47,7 @@ use bevy::ui::prelude::{BackgroundColor, EmSize, Node, RemSize};
 use bevy::ui::widget::Text;
 use bevy::window::{Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
+use taskmanager_ipc::SubscriptionMask;
 
 mod capture_marker;
 mod capture_state;
@@ -240,8 +241,26 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
 
         let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
         app.insert_resource(crate::tray::TrayResource::new(tray_controller, tray_rx));
+
+        let host = NativeAppHost::production();
+        let is_connected = host.is_daemon_connected();
+        let (worker, rx) = if is_connected {
+            match host.subscribe_daemon_stream(SubscriptionMask::ALL, 1000) {
+                Some((w, r)) => (Some(w), Some(r)),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
+        app.insert_resource(crate::drain::DaemonStreamResource {
+            _worker: worker,
+            rx,
+            is_connected,
+            last_telemetry_ms: 0,
+        });
     } else {
         app.insert_resource(crate::tray::TrayResource::empty());
+        app.insert_resource(crate::drain::DaemonStreamResource::default());
     }
     if let Some(page) = capture_page() {
         app.insert_resource(Route { page });

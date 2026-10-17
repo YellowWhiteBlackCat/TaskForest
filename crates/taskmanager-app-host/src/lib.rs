@@ -16,6 +16,7 @@ use taskmanager_application::{
     ConfigClient, ConfigCoordinator, ConfigRuntimeStartError, PlatformClient,
 };
 use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_platform_contract::{
     InProcessCaptureFn, InstanceEvent, InstanceFailure, InstanceRole, PlatformCapabilitySurface,
     TrayController, TrayFailure,
@@ -30,6 +31,7 @@ mod diagnostic_bundle_runtime;
 mod history_frontend;
 mod history_persistence_runtime;
 mod history_replay_runtime;
+mod mode;
 mod presentation;
 mod process_termination;
 mod snapshot_export_runtime;
@@ -55,6 +57,9 @@ pub use history_persistence_runtime::{
 };
 use history_replay_runtime::HistoryReplayCoordinator;
 pub use history_replay_runtime::{HistoryReplayClient, HistoryReplayRuntimeStartError};
+pub use mode::{
+    AppHostMode, DaemonSubscriptionWorker, ENV_FORCE_STANDALONE, probe_endpoint, probe_host_mode,
+};
 pub use presentation::{
     LayerShellAnchor, LayerShellFallbackPolicy, LayerShellKeyboardInteractivity, LayerShellLayer,
     LayerShellMargins, LayerShellOutput, LayerShellSize, LayerShellSpec, LayerShellSpecError,
@@ -152,6 +157,7 @@ pub struct NativeAppHost {
         Arc<OnceLock<Result<WindowCaptureCoordinator, WindowCaptureRuntimeStartError>>>,
     diagnostic_bundle_runtime:
         Arc<OnceLock<Result<DiagnosticBundleCoordinator, DiagnosticBundleRuntimeStartError>>>,
+    host_mode: Arc<OnceLock<AppHostMode>>,
 }
 
 /// The host's single persistence-writer generation: one bounded start attempt,
@@ -257,6 +263,38 @@ impl NativeAppHost {
             snapshot_export_runtime: Arc::new(OnceLock::new()),
             window_capture_runtime: Arc::new(OnceLock::new()),
             diagnostic_bundle_runtime: Arc::new(OnceLock::new()),
+            host_mode: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// Return the discovered dual-mode execution topology (ADR-055).
+    #[must_use]
+    pub fn host_mode(&self) -> &AppHostMode {
+        self.host_mode.get_or_init(probe_host_mode)
+    }
+
+    /// Whether this host instance is connected to an active background daemon.
+    #[must_use]
+    pub fn is_daemon_connected(&self) -> bool {
+        self.host_mode().is_daemon()
+    }
+
+    /// Subscribe to live daemon metrics if currently connected to taskforest-daemon under ADR-055.
+    ///
+    /// Returns `None` if running in Standalone mode or if connection fails.
+    pub fn subscribe_daemon_stream(
+        &self,
+        facets: SubscriptionMask,
+        interval_ms: u32,
+    ) -> Option<(
+        DaemonSubscriptionWorker,
+        crossbeam_channel::Receiver<DaemonMessage>,
+    )> {
+        match self.host_mode() {
+            AppHostMode::Daemon { endpoint, .. } => {
+                DaemonSubscriptionWorker::start(endpoint, facets, interval_ms)
+            }
+            AppHostMode::Standalone => None,
         }
     }
 

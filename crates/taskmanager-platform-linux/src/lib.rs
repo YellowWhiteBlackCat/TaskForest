@@ -32,7 +32,7 @@ pub use backend::{
     StorageProviders, SystemAuxiliaryProviders, SystemAuxiliaryProvidersParams,
     SystemObservationProviders, SystemProviders,
 };
-pub use config::{user_config_path, user_history_dir};
+pub use config::{system_daemon_history_dir, user_config_path, user_history_dir};
 pub use local_time::local_time_rules;
 
 /// Return whether a process that previously owned a persistent-history lock

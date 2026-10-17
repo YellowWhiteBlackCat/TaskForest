@@ -46,6 +46,7 @@ use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowControls, WindowCorner};
+use taskmanager_ui::brand_logo_image;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
 /// The CSD titlebar: drag handle + centered window title + per-platform window
@@ -119,9 +120,17 @@ pub fn top_bar(
         })
         .child(
             div()
-                .text_size(font_size(tokens::FONT_13))
-                .text_color(hsla(t.fg_dim))
-                .child(title),
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(6.0))
+                .child(brand_logo_image().w(px(16.0)).h(px(16.0)))
+                .child(
+                    div()
+                        .text_size(font_size(tokens::FONT_13))
+                        .text_color(hsla(t.fg_dim))
+                        .child(title),
+                ),
         );
 
     match t.window_controls {

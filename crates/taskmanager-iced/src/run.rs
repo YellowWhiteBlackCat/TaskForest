@@ -16,6 +16,7 @@ use taskmanager_assets::product;
 use crate::{IcedApp, Message, ui};
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_assets::embedded_fonts;
+use taskmanager_ipc::SubscriptionMask;
 use taskmanager_platform_contract::InstanceEvent;
 use taskmanager_platform_contract::InstanceGuard;
 use taskmanager_platform_contract::InstanceRole;
@@ -188,6 +189,12 @@ pub fn run(demo: bool) -> iced::Result {
                     initial_instance_guard.borrow_mut().take(),
                     initial_instance_rx.borrow_mut().take(),
                 );
+                if host.is_daemon_connected()
+                    && let Some((worker, rx)) =
+                        host.subscribe_daemon_stream(SubscriptionMask::ALL, 1000)
+                {
+                    app.install_daemon_subscriber(worker, rx);
+                }
                 // Spawn after language/config restoration so tray labels and
                 // the first rendered frame use the same locale. A typed native
                 // failure leaves a normal window-only Iced app.

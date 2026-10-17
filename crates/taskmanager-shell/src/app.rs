@@ -468,6 +468,31 @@ impl ShellApp {
         self.data.refresh_count = self.data.refresh_count.saturating_add(1);
     }
 
+    /// Ingest a telemetry snapshot from the background daemon into the shared projection store.
+    pub fn apply_daemon_telemetry_snapshot(
+        &mut self,
+        timestamp_ms: u64,
+        cpu_usage_pct: Option<f32>,
+        memory_used_bytes: Option<u64>,
+        memory_total_bytes: Option<u64>,
+    ) {
+        let snapshot = self
+            .data
+            .snapshot
+            .get_or_insert_with(SystemSnapshot::default);
+        snapshot.timestamp_ms = timestamp_ms;
+        if let Some(cpu) = cpu_usage_pct {
+            snapshot.cpu.set_global_usage(cpu, timestamp_ms);
+        }
+        if let (Some(used), Some(total)) = (memory_used_bytes, memory_total_bytes) {
+            snapshot
+                .memory
+                .set_used_and_total(used, total, timestamp_ms);
+        }
+        self.data.system_revision = self.data.system_revision.saturating_add(1);
+        self.data.refresh_count = self.data.refresh_count.saturating_add(1);
+    }
+
     pub(crate) fn edit_fixture_processes(
         &mut self,
         edit: impl FnOnce(&mut Option<Vec<ProcessItem>>),

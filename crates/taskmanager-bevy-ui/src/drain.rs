@@ -15,8 +15,11 @@ use crate::window_surface::{
     WindowSurface, WindowSurfaceChanged, WindowSurfaceCommand, WindowSurfaceKind,
     WindowSurfaceState,
 };
+use crossbeam_channel::Receiver;
 use std::time::{SystemTime, UNIX_EPOCH};
+use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
+use taskmanager_ipc::DaemonMessage;
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
@@ -234,6 +237,69 @@ pub(crate) struct AppearanceTargets<'w> {
     clear: Option<ResMut<'w, bevy::camera::ClearColor>>,
 }
 
+/// Telemetry scalar point extracted from background daemon streaming frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DaemonTelemetryPoint {
+    pub timestamp_ms: u64,
+    pub cpu_usage_pct: Option<f32>,
+    pub memory_used_bytes: Option<u64>,
+    pub memory_total_bytes: Option<u64>,
+}
+
+/// Shared daemon subscription stream resource managed by the Bevy UI runtime.
+#[derive(Resource, Default)]
+pub(crate) struct DaemonStreamResource {
+    pub(crate) _worker: Option<DaemonSubscriptionWorker>,
+    pub(crate) rx: Option<Receiver<DaemonMessage>>,
+    pub(crate) is_connected: bool,
+    pub(crate) last_telemetry_ms: u64,
+}
+
+impl DaemonStreamResource {
+    /// Ingest ready incoming daemon messages and update the stream state.
+    pub fn drain_messages(&mut self) -> Vec<DaemonTelemetryPoint> {
+        let mut updates = Vec::new();
+        if let Some(rx) = &self.rx {
+            let mut messages = Vec::new();
+            while let Ok(msg) = rx.try_recv() {
+                messages.push(msg);
+            }
+            for msg in messages {
+                if let DaemonMessage::TelemetryBatch {
+                    timestamp_ms,
+                    payload_json,
+                    ..
+                } = msg
+                {
+                    self.last_telemetry_ms = timestamp_ms;
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+                        let cpu = val
+                            .get("cpu_usage_pct")
+                            .and_then(|v| v.as_f64())
+                            .map(|v| v as f32);
+                        let mem_used = val.get("memory_used_bytes").and_then(|v| v.as_u64());
+                        let mem_total = val.get("memory_total_bytes").and_then(|v| v.as_u64());
+                        updates.push(DaemonTelemetryPoint {
+                            timestamp_ms,
+                            cpu_usage_pct: cpu,
+                            memory_used_bytes: mem_used,
+                            memory_total_bytes: mem_total,
+                        });
+                    }
+                }
+            }
+        }
+        updates
+    }
+}
+
+/// Peripheral background streaming and tray integration resources.
+#[derive(SystemParam)]
+pub(crate) struct PeripheralTargets<'w> {
+    tray: Option<ResMut<'w, crate::tray::TrayResource>>,
+    daemon_stream: Option<ResMut<'w, DaemonStreamResource>>,
+}
+
 /// The `PreUpdate` system: one drain cycle against the shared runtime.
 ///
 /// The very first frame also submits the initial full refresh through the
@@ -246,11 +312,23 @@ pub(crate) fn drain_system(
     mut track: NonSendMut<FrontendTrack>,
     mut pending: ResMut<crate::input::PendingEffects>,
     mut feedback_cache: ResMut<FeedbackCache>,
-    mut tray: Option<ResMut<crate::tray::TrayResource>>,
+    mut peripherals: PeripheralTargets,
     mut appearance_targets: AppearanceTargets,
     mut commands: Commands,
 ) {
-    if let Some(tray_res) = tray.as_mut() {
+    if let Some(stream_res) = peripherals.daemon_stream.as_deref_mut()
+        && stream_res.is_connected
+    {
+        for point in stream_res.drain_messages() {
+            track.shell.apply_daemon_telemetry_snapshot(
+                point.timestamp_ms,
+                point.cpu_usage_pct,
+                point.memory_used_bytes,
+                point.memory_total_bytes,
+            );
+        }
+    }
+    if let Some(tray_res) = peripherals.tray.as_mut() {
         tray_res.sync_pause_checkmark(track.shell.paused());
         for event in tray_res.drain_events() {
             if let TrayEvent::MenuActivated { id } = event
