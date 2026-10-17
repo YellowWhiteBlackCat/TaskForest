@@ -11,7 +11,7 @@ homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 documentation = "https://docs.rs/taskmanager-core"
 keywords = ["system-monitor", "process-tree", "telemetry", "metrics", "smart"]
 categories = ["os", "development-tools::profiling", "data-structures"]
-include = ["src/**/*", "examples/**/*", "README.md", "Cargo.toml", "LICENSE"]
+include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "Cargo.toml", "LICENSE"]
 autotests = false
 
 [[test]]
