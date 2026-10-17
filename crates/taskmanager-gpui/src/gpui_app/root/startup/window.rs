@@ -10,18 +10,21 @@ use super::{
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::root::{RootView, responsive};
 use crate::window_presentation::GpuiSurfaceRole;
+use crossbeam_channel::Receiver;
 use gpui::{
     App, AppContext, Bounds, Entity, TitlebarOptions, Window, WindowBounds, WindowOptions, point,
     px, size,
 };
 use taskmanager_app_host::{
-    DiagnosticBundleClient, SnapshotExportClient, WindowCaptureClient, WindowPresentation,
+    DaemonSubscriptionWorker, DiagnosticBundleClient, SnapshotExportClient, WindowCaptureClient,
+    WindowPresentation,
 };
 use taskmanager_application::{
     ConfigClient, ConfigRevision, PlatformClient, TelemetryRefreshPolicy,
 };
 use taskmanager_assets::product;
 use taskmanager_core::core::config::Config;
+use taskmanager_ipc::DaemonMessage;
 use taskmanager_platform_contract::{InstanceEvent, InstanceGuard};
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
 use taskmanager_theme::Theme;
@@ -50,6 +53,8 @@ pub(super) struct RootWindowInputs {
     pub applied_config_revision: Option<ConfigRevision>,
     pub capture_mode: bool,
     pub surface_role: GpuiSurfaceRole,
+    pub daemon_worker: Option<DaemonSubscriptionWorker>,
+    pub daemon_rx: Option<Receiver<DaemonMessage>>,
 }
 
 pub(super) fn make_root_builder(inputs: RootWindowInputs) -> RootBuilder {
@@ -73,6 +78,8 @@ pub(super) fn make_root_builder(inputs: RootWindowInputs) -> RootBuilder {
         applied_config_revision,
         capture_mode,
         surface_role,
+        daemon_worker,
+        daemon_rx,
     } = inputs;
 
     Box::new(move |window, cx| {
@@ -108,6 +115,9 @@ pub(super) fn make_root_builder(inputs: RootWindowInputs) -> RootBuilder {
                 view.instance_guard = Some(guard);
             }
             view.instance_rx = Some(instance_rx);
+            if let (Some(worker), Some(rx)) = (daemon_worker, daemon_rx) {
+                view.install_daemon_subscriber(worker, rx);
+            }
         });
         if let Some(notice) = config_bootstrap_notice {
             entity.update(cx, |view, cx| view.show_local_feedback(notice, cx));

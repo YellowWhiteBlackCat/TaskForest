@@ -1,6 +1,7 @@
 //! Root gpui view: holds live telemetry + process data, renders the Mission Center shell
 //! (top tab bar + Devices sidebar + active page), and polls the collector on a timer.
 
+use crossbeam_channel::Receiver;
 use gpui::{
     AnyWindowHandle, Context, Entity, Pixels, ScrollHandle, Subscription, UniformListScrollHandle,
 };
@@ -9,7 +10,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::ProcessInsightFacet;
+use taskmanager_ipc::DaemonMessage;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_ui_contract::navigation::NavOrientation;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
@@ -95,6 +98,7 @@ pub mod batch_process;
 pub mod capture;
 pub mod chrome;
 mod clipboard;
+pub(crate) mod daemon_stream;
 mod device_selection;
 pub mod diagnostic_bundle;
 mod dialog_scroll_state;
@@ -296,6 +300,14 @@ pub struct RootView {
     /// Next-start preference plus this process's typed, boot-fixed history
     /// capabilities, replay lifecycle and boot baseline projection.
     pub(in crate::gpui_app) history_runtime: history_runtime::HistoryRuntimeState,
+    /// Whether this window is attached to taskforest-daemon.
+    pub is_daemon_connected: bool,
+    /// Background daemon subscription worker.
+    pub daemon_worker: Option<DaemonSubscriptionWorker>,
+    /// Live telemetry streaming channel from daemon.
+    pub daemon_rx: Option<Receiver<DaemonMessage>>,
+    /// Timestamp of the last received telemetry batch from daemon.
+    pub last_daemon_telemetry_ms: u64,
     /// The motion-preference token loaded this run. GPUI does not consume the
     /// preference (no switch is fabricated); the value is retained only so
     /// `config_from_view` echoes it instead of clobbering a recorded choice.
@@ -843,6 +855,10 @@ impl RootView {
             a11y_bridge: AppAccessibilityBridge::default(),
             a11y_revision: 0,
             a11y_snapshot: None,
+            is_daemon_connected: false,
+            daemon_worker: None,
+            daemon_rx: None,
+            last_daemon_telemetry_ms: 0,
         }
     }
 

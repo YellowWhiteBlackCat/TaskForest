@@ -14,6 +14,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
+use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, EventSequence, RequestId,
@@ -335,4 +336,28 @@ fn advance_feedback_time_clears_timed_notices_in_drain_cycle() {
         shell.feedback_text(),
         "Screenshot saved to /tmp/screenshot.png"
     );
+}
+
+#[test]
+fn daemon_stream_resource_drain_test() {
+    let mut res = super::DaemonStreamResource::default();
+    assert_eq!(res.last_telemetry_ms, 0);
+
+    let (tx, rx) = crossbeam_channel::bounded(16);
+    res.rx = Some(rx);
+    res.is_connected = true;
+
+    let batch = DaemonMessage::TelemetryBatch {
+        timestamp_ms: 5544332211,
+        facet_mask: SubscriptionMask::CPU.bits(),
+        payload_json: "{\"cpu_percent\":12.3}".to_string(),
+    };
+    tx.send(batch).unwrap();
+
+    let drained = res.drain_messages();
+    assert!(drained);
+    assert_eq!(res.last_telemetry_ms, 5544332211);
+
+    // Empty queue drain returns false
+    assert!(!res.drain_messages());
 }

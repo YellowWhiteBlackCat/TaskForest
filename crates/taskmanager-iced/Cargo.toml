@@ -66,6 +66,8 @@ taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-ipc = { path = "../taskmanager-ipc" }
+crossbeam-channel = "0.5"
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
 taskmanager-theme = { path = "../taskmanager-theme" }

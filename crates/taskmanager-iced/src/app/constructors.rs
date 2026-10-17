@@ -136,6 +136,10 @@ impl IcedApp {
             a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
             a11y_revision: 0,
             a11y_snapshot: None,
+            is_daemon_connected: false,
+            daemon_worker: None,
+            daemon_rx: None,
+            last_daemon_telemetry_ms: 0,
         };
         // Optional setup observes quietly; an explicit Settings entry owns visibility.
         app.begin_first_run_observation();
@@ -218,6 +222,10 @@ impl IcedApp {
             a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
             a11y_revision: 0,
             a11y_snapshot: None,
+            is_daemon_connected: false,
+            daemon_worker: None,
+            daemon_rx: None,
+            last_daemon_telemetry_ms: 0,
         }
         // The demo keeps the shared shell fixture's single recorded snapshot
         // (G-02): the Performance chart renders the honest "collecting"

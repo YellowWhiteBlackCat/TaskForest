@@ -10,6 +10,7 @@ use gpui::{AnyWindowHandle, App, AsyncApp, SharedString, WeakEntity, WindowDecor
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_app_host::HistoryFrontendConnector;
 use taskmanager_app_host::HistoryFrontendConnectorStartError;
+use taskmanager_app_host::NativeAppHost;
 use taskmanager_app_host::SnapshotExportClient;
 use taskmanager_app_host::WindowCaptureClient;
 use taskmanager_app_host::WindowPresentation;
@@ -23,6 +24,7 @@ use taskmanager_application::TelemetryRefreshPolicy;
 use taskmanager_assets::product;
 use taskmanager_core::core::config::Config;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_ipc::SubscriptionMask;
 use taskmanager_platform_contract::InstanceEvent;
 use taskmanager_platform_contract::InstanceGuard;
 use taskmanager_platform_contract::InstanceRole;
@@ -278,6 +280,9 @@ fn spawn_update_loop(
                 if view.drain_window_capture_completions() {
                     cx.notify();
                 }
+                if view.drain_daemon_telemetry() {
+                    cx.notify();
+                }
                 let notice_before = view.shell.feedback_notice().is_some();
                 view.shell.advance_feedback_time(Duration::from_millis(200));
                 if notice_before && view.shell.feedback_notice().is_none() {
@@ -490,6 +495,16 @@ pub fn init<E>(
     };
     let _ = platform.request_refresh(RefreshRequest::Dashboard, platform_submission_time_ms());
     let surface_role = crate::window_presentation::surface_role(&presentation);
+    let host = NativeAppHost::production();
+    let is_daemon_connected = host.is_daemon_connected();
+    let (daemon_worker, daemon_rx) = if !capture_mode && is_daemon_connected {
+        match host.subscribe_daemon_stream(SubscriptionMask::ALL, 1000) {
+            Some((w, r)) => (Some(w), Some(r)),
+            None => (None, None),
+        }
+    } else {
+        (None, None)
+    };
     let root_builder = make_root_builder(RootWindowInputs {
         theme,
         telemetry,
@@ -510,6 +525,8 @@ pub fn init<E>(
         applied_config_revision,
         capture_mode,
         surface_role,
+        daemon_worker,
+        daemon_rx,
     });
     open_main_window(
         cx,
