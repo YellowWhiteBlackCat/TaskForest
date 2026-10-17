@@ -521,6 +521,12 @@ fi
 if maybe msi-payload-self; then
     run_stage msi-payload-self quick run_py scripts/quality/validate_msi_payload.py --self-test
 fi
+if maybe flatpak-manifest-self; then
+    run_stage flatpak-manifest-self quick run_py scripts/quality/test_flatpak_manifest.py --self-test
+fi
+if maybe flatpak-manifest; then
+    run_stage flatpak-manifest quick run_py scripts/quality/test_flatpak_manifest.py
+fi
 if maybe capture-isolation-self; then
     run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"
 fi
