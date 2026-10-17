@@ -126,13 +126,9 @@ pub fn user_history_dir() -> PathBuf {
 pub fn system_daemon_history_dir() -> PathBuf {
     #[cfg(windows)]
     {
-        let base = known_folder_path(KnownFolder::CommonAppData)
-            .ok()
-            .or_else(|| {
-                std::env::var_os("ProgramData")
-                    .map(PathBuf::from)
-                    .and_then(absolute_directory)
-            })
+        let base = std::env::var_os("ProgramData")
+            .map(PathBuf::from)
+            .and_then(absolute_directory)
             .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"));
         base.join("TaskForest").join("history")
     }
