@@ -487,6 +487,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-platform-native",
             &[
                 "taskmanager-core",
+                "taskmanager-ipc",
                 "taskmanager-platform-contract",
                 "taskmanager-platform-linux",
                 "taskmanager-platform-macos",
@@ -545,6 +546,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-application",
                 "taskmanager-assets",
                 "taskmanager-core",
+                "taskmanager-ipc",
                 "taskmanager-platform-contract",
                 "taskmanager-shell",
                 // The neutral design system (ADR-026): the TUI takes the theme
@@ -566,6 +568,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 // into iced's font database — the same pure leaf GPUI embeds.
                 "taskmanager-assets",
                 "taskmanager-core",
+                "taskmanager-ipc",
                 "taskmanager-platform-contract",
                 // ADR-051: taskmanager-icons is neutral on every target; the
                 // iced frontend resolves its own bytes for rendering.
@@ -587,6 +590,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-assets",
                 "taskmanager-core",
                 "taskmanager-icons",
+                "taskmanager-ipc",
                 "taskmanager-platform-contract",
                 "taskmanager-shell",
                 "taskmanager-telemetry-store",
@@ -606,6 +610,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-assets",
                 "taskmanager-core",
                 "taskmanager-icons",
+                "taskmanager-ipc",
                 "taskmanager-platform-contract",
                 "taskmanager-shell",
                 "taskmanager-theme",
@@ -639,6 +644,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-ui",
             &[
+                "taskmanager-assets",
                 "taskmanager-icons",
                 "taskmanager-theme",
                 "taskmanager-ui-contract",

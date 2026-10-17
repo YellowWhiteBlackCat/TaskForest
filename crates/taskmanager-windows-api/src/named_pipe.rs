@@ -89,7 +89,7 @@ impl NamedPipeListener {
 
         // SAFETY: The handle is valid, connected, and exclusively owned.
         // File::from_raw_handle takes ownership of the handle and closes it on drop.
-        let file = unsafe { File::from_raw_handle(handle.0 as *mut _) };
+        let file = unsafe { File::from_raw_handle(handle.0) };
         Ok(file)
     }
 
