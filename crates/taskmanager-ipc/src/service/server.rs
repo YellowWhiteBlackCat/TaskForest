@@ -206,10 +206,10 @@ impl<S: Read + Write> IpcConnectionHandler<S> {
 
 impl<S> IpcConnectionHandler<S> {
     fn cleanup(&mut self) {
-        if let Some(session) = self.session.take() {
-            if let Ok(mut hub) = self.hub.lock() {
-                hub.unregister_session(session.session_id);
-            }
+        if let Some(session) = self.session.take()
+            && let Ok(mut hub) = self.hub.lock()
+        {
+            hub.unregister_session(session.session_id);
         }
     }
 }

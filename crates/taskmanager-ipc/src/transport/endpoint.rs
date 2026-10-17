@@ -16,16 +16,16 @@ pub enum IpcEndpoint {
 
 impl IpcEndpoint {
     /// Default socket path on Unix-like operating systems.
-    pub const DEFAULT_UNIX_PATH: &'static str = "/run/taskforest/daemon.sock";
+    pub const DEFAULT_UNIX_PATH: &str = "/run/taskforest/daemon.sock";
 
     /// Default named pipe identifier on Windows operating systems.
-    pub const DEFAULT_WINDOWS_PIPE: &'static str = r"\\.\pipe\taskforest-daemon";
+    pub const DEFAULT_WINDOWS_PIPE: &str = r"\\.\pipe\taskforest-daemon";
 
     /// Environment variable overriding the daemon socket on Unix.
-    pub const ENV_UNIX_SOCKET: &'static str = "TASKFOREST_DAEMON_SOCKET";
+    pub const ENV_UNIX_SOCKET: &str = "TASKFOREST_DAEMON_SOCKET";
 
     /// Environment variable overriding the daemon named pipe on Windows.
-    pub const ENV_WINDOWS_PIPE: &'static str = "TASKFOREST_DAEMON_PIPE";
+    pub const ENV_WINDOWS_PIPE: &str = "TASKFOREST_DAEMON_PIPE";
 
     /// Resolve the default platform-native IPC endpoint for the current session.
     #[must_use]
@@ -42,17 +42,17 @@ impl IpcEndpoint {
 
         #[cfg(not(windows))]
         {
-            if let Ok(custom) = env::var(Self::ENV_UNIX_SOCKET) {
-                if !custom.trim().is_empty() {
-                    return Self::Unix(PathBuf::from(custom));
-                }
+            if let Ok(custom) = env::var(Self::ENV_UNIX_SOCKET)
+                && !custom.trim().is_empty()
+            {
+                return Self::Unix(PathBuf::from(custom));
             }
 
             // Honor XDG_RUNTIME_DIR for unprivileged/user-session daemons
-            if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
-                if !xdg.trim().is_empty() {
-                    return Self::Unix(Path::new(&xdg).join("taskforest").join("daemon.sock"));
-                }
+            if let Ok(xdg) = env::var("XDG_RUNTIME_DIR")
+                && !xdg.trim().is_empty()
+            {
+                return Self::Unix(Path::new(&xdg).join("taskforest").join("daemon.sock"));
             }
 
             Self::Unix(PathBuf::from(Self::DEFAULT_UNIX_PATH))

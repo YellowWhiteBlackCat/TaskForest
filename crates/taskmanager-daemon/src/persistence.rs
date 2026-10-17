@@ -45,10 +45,10 @@ impl DaemonHistoryManager {
         key: HistorySeriesKey,
         sample: HistoricalSample,
     ) -> Result<RecordSampleOutcome, HistoryStoreError> {
-        if let Ok(guard) = self.store.lock() {
-            if let Some(store) = guard.as_ref() {
-                return Ok(store.try_record_sample(key, sample));
-            }
+        if let Ok(guard) = self.store.lock()
+            && let Some(store) = guard.as_ref()
+        {
+            return Ok(store.try_record_sample(key, sample));
         }
         Err(HistoryStoreError::new(
             HistoryStoreErrorKind::Write,
@@ -58,11 +58,11 @@ impl DaemonHistoryManager {
 
     /// Flush in-memory buffered samples to disk files.
     pub fn flush(&self, now_ms: u64) -> Result<(), HistoryStoreError> {
-        if let Ok(guard) = self.store.lock() {
-            if let Some(store) = guard.as_ref() {
-                let _report = store.flush(now_ms)?;
-                return Ok(());
-            }
+        if let Ok(guard) = self.store.lock()
+            && let Some(store) = guard.as_ref()
+        {
+            let _report = store.flush(now_ms)?;
+            return Ok(());
         }
         Ok(())
     }
@@ -115,10 +115,10 @@ impl DaemonHistoryManager {
 
     /// Gracefully drop and release writer lock.
     pub fn close(&self) {
-        if let Ok(mut guard) = self.store.lock() {
-            if let Some(store) = guard.take() {
-                let _ = store.flush(0);
-            }
+        if let Ok(mut guard) = self.store.lock()
+            && let Some(store) = guard.take()
+        {
+            let _ = store.flush(0);
         }
     }
 }

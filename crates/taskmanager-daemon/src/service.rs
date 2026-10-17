@@ -209,10 +209,10 @@ impl DaemonService {
             }
 
             // Cleanup session on client disconnect
-            if let Some(s) = session {
-                if let Ok(mut hub) = service.state.hub.lock() {
-                    hub.unregister_session(s.session_id);
-                }
+            if let Some(s) = session
+                && let Ok(mut hub) = service.state.hub.lock()
+            {
+                hub.unregister_session(s.session_id);
             }
             drop(tx);
         });

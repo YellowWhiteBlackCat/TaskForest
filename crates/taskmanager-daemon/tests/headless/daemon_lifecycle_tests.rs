@@ -143,19 +143,17 @@ fn e2e_daemon_telemetry_broadcast_to_subscribers() {
     // Wait for at least one live TelemetryBatch broadcasted from the sampling loop
     let mut received_batch = false;
     for _ in 0..10 {
-        if let Ok(msg) = client.receive_daemon_message() {
-            if let DaemonMessage::TelemetryBatch {
-                timestamp_ms,
-                facet_mask,
-                payload_json,
-            } = msg
-            {
-                assert!(timestamp_ms > 0);
-                assert_eq!(facet_mask, SubscriptionMask::ALL.bits());
-                assert!(!payload_json.is_empty());
-                received_batch = true;
-                break;
-            }
+        if let Ok(DaemonMessage::TelemetryBatch {
+            timestamp_ms,
+            facet_mask,
+            payload_json,
+        }) = client.receive_daemon_message()
+        {
+            assert!(timestamp_ms > 0);
+            assert_eq!(facet_mask, SubscriptionMask::ALL.bits());
+            assert!(!payload_json.is_empty());
+            received_batch = true;
+            break;
         }
     }
     assert!(

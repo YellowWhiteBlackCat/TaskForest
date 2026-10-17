@@ -11,7 +11,7 @@ use taskmanager_ipc::service::IpcClient;
 use taskmanager_ipc::transport::{IpcEndpoint, connect_transport};
 
 /// Environment variable that forces the frontend to run in standalone in-process mode.
-pub const ENV_FORCE_STANDALONE: &'static str = "TASKFOREST_FORCE_STANDALONE";
+pub const ENV_FORCE_STANDALONE: &str = "TASKFOREST_FORCE_STANDALONE";
 
 /// Execution topology of the application host.
 #[derive(Clone, Debug, PartialEq, Eq)]

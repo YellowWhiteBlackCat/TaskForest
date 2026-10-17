@@ -57,8 +57,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let endpoint = if let Some(path) = custom_socket {
         IpcEndpoint::unix(path)
-    } else if is_user_mode {
-        IpcEndpoint::default_platform()
     } else {
         IpcEndpoint::default_platform()
     };

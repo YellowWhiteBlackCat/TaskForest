@@ -113,18 +113,17 @@ impl DaemonCollector {
 
         // 2. Record Memory usage history
         if let (Some(used), Some(total)) = (snapshot.memory_used_bytes, snapshot.memory_total_bytes)
+            && total > 0
         {
-            if total > 0 {
-                let mem_pct = (used as f64 / total as f64) * 100.0;
-                let mem_key = HistorySeriesKey::system(HistoryMetric::MemoryUsedPct);
-                let sample = HistoricalSample {
-                    revision: self.revision,
-                    completed_at_ms: now_ms,
-                    measured_at_ms: Some(now_ms),
-                    value: Some(mem_pct),
-                };
-                let _ = history.record_sample(mem_key, sample);
-            }
+            let mem_pct = (used as f64 / total as f64) * 100.0;
+            let mem_key = HistorySeriesKey::system(HistoryMetric::MemoryUsedPct);
+            let sample = HistoricalSample {
+                revision: self.revision,
+                completed_at_ms: now_ms,
+                measured_at_ms: Some(now_ms),
+                value: Some(mem_pct),
+            };
+            let _ = history.record_sample(mem_key, sample);
         }
 
         Ok(snapshot)
