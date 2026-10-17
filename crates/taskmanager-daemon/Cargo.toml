@@ -18,13 +18,17 @@ taskmanager-ipc = { path = "../taskmanager-ipc" }
 taskmanager-history-store = { path = "../taskmanager-history-store" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
-taskmanager-platform-native = { path = "../taskmanager-platform-native", default-features = false }
+taskmanager-platform-native = { path = "../taskmanager-platform-native" }
 pico-args = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 ctrlc = { version = "3.5", features = ["termination"] }
 crossbeam-channel = "0.5"
+
+[features]
+default = ["hardware-all"]
+hardware-all = ["taskmanager-platform-native/hardware-all"]
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }

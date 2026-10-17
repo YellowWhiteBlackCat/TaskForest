@@ -9,6 +9,7 @@ Release:    1%{?dist}
 Summary:    Background telemetry and persistence daemon for TaskForest
 License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
+Source0:    taskforest-tree.tar.gz
 
 Requires:   polkit
 
@@ -17,7 +18,16 @@ TaskForest daemon runs as a continuous system service (systemd) providing
 7x24 background telemetry persistence and IPC metric streaming for TaskForest
 frontends (GPUI, Iced, TUI, Bevy).
 
+%prep
+
+%build
+
+%install
+mkdir -p %{buildroot}
+tar -xf %{SOURCE0} -C %{buildroot}
+
 %files
 %defattr(-,root,root,-)
+/usr/bin/taskforest-daemon
 /usr/lib/systemd/system/taskforest-daemon.service
 /usr/lib/systemd/user/taskforest-daemon.service

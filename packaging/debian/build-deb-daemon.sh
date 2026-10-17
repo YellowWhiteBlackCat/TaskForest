@@ -62,9 +62,16 @@ work=$(mktemp -d "$repo/.tmp/build-deb-daemon.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 # Directories
+mkdir -p "$work/usr/bin"
 mkdir -p "$work/usr/lib/systemd/system"
 mkdir -p "$work/usr/lib/systemd/user"
 mkdir -p "$work/DEBIAN"
+
+# Install daemon binary if present
+if [[ -f "$repo/target/release/taskforest-daemon" ]]; then
+    cp "$repo/target/release/taskforest-daemon" "$work/usr/bin/taskforest-daemon"
+    chmod 755 "$work/usr/bin/taskforest-daemon"
+fi
 
 # Install service files
 cp "$repo/packaging/daemon/taskforest-daemon.service" "$work/usr/lib/systemd/system/taskforest-daemon.service"
