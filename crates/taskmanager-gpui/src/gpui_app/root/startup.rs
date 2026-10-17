@@ -495,16 +495,15 @@ pub fn init<E>(
     };
     let _ = platform.request_refresh(RefreshRequest::Dashboard, platform_submission_time_ms());
     let surface_role = crate::window_presentation::surface_role(&presentation);
-    let host = NativeAppHost::production();
-    let is_daemon_connected = host.is_daemon_connected();
-    let (daemon_worker, daemon_rx) = if !capture_mode && is_daemon_connected {
-        match host.subscribe_daemon_stream(SubscriptionMask::ALL, 1000) {
-            Some((w, r)) => (Some(w), Some(r)),
-            None => (None, None),
-        }
-    } else {
-        (None, None)
-    };
+    let (daemon_worker, daemon_rx) =
+        if !capture_mode && NativeAppHost::production().is_daemon_connected() {
+            match NativeAppHost::production().subscribe_daemon_stream(SubscriptionMask::ALL, 1000) {
+                Some((w, r)) => (Some(w), Some(r)),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
     let root_builder = make_root_builder(RootWindowInputs {
         theme,
         telemetry,

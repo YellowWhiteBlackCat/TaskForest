@@ -10446,6 +10446,7 @@ dependencies = [
  "accesskit_consumer",
  "bevy",
  "crossbeam-channel",
+ "serde_json",
  "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
@@ -10927,6 +10928,7 @@ version = "0.3.0"
 dependencies = [
  "crossbeam-channel",
  "ratatui",
+ "serde_json",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",

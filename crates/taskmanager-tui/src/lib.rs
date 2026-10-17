@@ -413,9 +413,19 @@ impl TuiApp {
         &mut self,
         timestamp_ms: u64,
         _facet_mask: u32,
-        _payload_json: &str,
+        payload_json: &str,
     ) {
         self.last_daemon_telemetry_ms = timestamp_ms;
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(payload_json) {
+            let cpu = val
+                .get("cpu_usage_pct")
+                .and_then(|v| v.as_f64())
+                .map(|v| v as f32);
+            let mem_used = val.get("memory_used_bytes").and_then(|v| v.as_u64());
+            let mem_total = val.get("memory_total_bytes").and_then(|v| v.as_u64());
+            self.shell
+                .apply_daemon_telemetry_snapshot(timestamp_ms, cpu, mem_used, mem_total);
+        }
         *self.visual_row_count_cache.borrow_mut() = None;
     }
 

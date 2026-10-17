@@ -350,14 +350,21 @@ fn daemon_stream_resource_drain_test() {
     let batch = DaemonMessage::TelemetryBatch {
         timestamp_ms: 5544332211,
         facet_mask: SubscriptionMask::CPU.bits(),
-        payload_json: "{\"cpu_percent\":12.3}".to_string(),
+        payload_json:
+            "{\"cpu_usage_pct\":12.3,\"memory_used_bytes\":2000000,\"memory_total_bytes\":4000000}"
+                .to_string(),
     };
     tx.send(batch).unwrap();
 
-    let drained = res.drain_messages();
-    assert!(drained);
+    let updates = res.drain_messages();
+    assert_eq!(updates.len(), 1);
+    let point = updates[0];
+    assert_eq!(point.timestamp_ms, 5544332211);
+    assert_eq!(point.cpu_usage_pct, Some(12.3));
+    assert_eq!(point.memory_used_bytes, Some(2000000));
+    assert_eq!(point.memory_total_bytes, Some(4000000));
     assert_eq!(res.last_telemetry_ms, 5544332211);
 
-    // Empty queue drain returns false
-    assert!(!res.drain_messages());
+    // Empty queue drain returns empty vec
+    assert!(res.drain_messages().is_empty());
 }

@@ -237,6 +237,15 @@ pub(crate) struct AppearanceTargets<'w> {
     clear: Option<ResMut<'w, bevy::camera::ClearColor>>,
 }
 
+/// Telemetry scalar point extracted from background daemon streaming frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DaemonTelemetryPoint {
+    pub timestamp_ms: u64,
+    pub cpu_usage_pct: Option<f32>,
+    pub memory_used_bytes: Option<u64>,
+    pub memory_total_bytes: Option<u64>,
+}
+
 /// Shared daemon subscription stream resource managed by the Bevy UI runtime.
 #[derive(Resource, Default)]
 pub(crate) struct DaemonStreamResource {
@@ -248,23 +257,39 @@ pub(crate) struct DaemonStreamResource {
 
 impl DaemonStreamResource {
     /// Ingest ready incoming daemon messages and update the stream state.
-    pub fn drain_messages(&mut self) -> bool {
-        let mut had_messages = false;
+    pub fn drain_messages(&mut self) -> Vec<DaemonTelemetryPoint> {
+        let mut updates = Vec::new();
         if let Some(rx) = &self.rx {
             let mut messages = Vec::new();
             while let Ok(msg) = rx.try_recv() {
                 messages.push(msg);
             }
-            if !messages.is_empty() {
-                had_messages = true;
-                for msg in messages {
-                    if let DaemonMessage::TelemetryBatch { timestamp_ms, .. } = msg {
-                        self.last_telemetry_ms = timestamp_ms;
+            for msg in messages {
+                if let DaemonMessage::TelemetryBatch {
+                    timestamp_ms,
+                    payload_json,
+                    ..
+                } = msg
+                {
+                    self.last_telemetry_ms = timestamp_ms;
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+                        let cpu = val
+                            .get("cpu_usage_pct")
+                            .and_then(|v| v.as_f64())
+                            .map(|v| v as f32);
+                        let mem_used = val.get("memory_used_bytes").and_then(|v| v.as_u64());
+                        let mem_total = val.get("memory_total_bytes").and_then(|v| v.as_u64());
+                        updates.push(DaemonTelemetryPoint {
+                            timestamp_ms,
+                            cpu_usage_pct: cpu,
+                            memory_used_bytes: mem_used,
+                            memory_total_bytes: mem_total,
+                        });
                     }
                 }
             }
         }
-        had_messages
+        updates
     }
 }
 
@@ -294,7 +319,14 @@ pub(crate) fn drain_system(
     if let Some(stream_res) = peripherals.daemon_stream.as_deref_mut()
         && stream_res.is_connected
     {
-        stream_res.drain_messages();
+        for point in stream_res.drain_messages() {
+            track.shell.apply_daemon_telemetry_snapshot(
+                point.timestamp_ms,
+                point.cpu_usage_pct,
+                point.memory_used_bytes,
+                point.memory_total_bytes,
+            );
+        }
     }
     if let Some(tray_res) = peripherals.tray.as_mut() {
         tray_res.sync_pause_checkmark(track.shell.paused());

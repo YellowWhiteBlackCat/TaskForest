@@ -420,6 +420,16 @@ impl MemoryMetrics {
             .copied()
     }
 
+    /// Update live memory used and total byte observations.
+    pub fn set_used_and_total(&mut self, used_bytes: u64, total_bytes: u64, observed_at_ms: u64) {
+        self.scalar_observations.total_bytes =
+            ScalarObservation::available(total_bytes, observed_at_ms);
+        self.scalar_observations.used_bytes =
+            ScalarObservation::available(used_bytes, observed_at_ms);
+        self.scalar_observations.available_bytes =
+            ScalarObservation::available(total_bytes.saturating_sub(used_bytes), observed_at_ms);
+    }
+
     #[must_use]
     pub const fn current_swap_total_bytes(&self) -> Option<u64> {
         self.scalar_observations

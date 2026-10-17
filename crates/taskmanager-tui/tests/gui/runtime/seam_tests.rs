@@ -881,13 +881,21 @@ fn daemon_telemetry_stream_injection_and_drain() {
     let batch = DaemonMessage::TelemetryBatch {
         timestamp_ms: 123456789,
         facet_mask: SubscriptionMask::CPU.bits(),
-        payload_json: "{\"cpu_percent\":25.0}".to_string(),
+        payload_json:
+            "{\"cpu_usage_pct\":25.0,\"memory_used_bytes\":4000000,\"memory_total_bytes\":8000000}"
+                .to_string(),
     };
     tx.send(batch).unwrap();
 
     let drained = app.drain_daemon_telemetry();
     assert!(drained);
     assert_eq!(app.last_daemon_telemetry_ms, 123456789);
+
+    let snap = app.shell.projection().snapshot.as_ref().unwrap();
+    assert_eq!(snap.timestamp_ms, 123456789);
+    assert_eq!(snap.cpu.current_global_usage_pct(), Some(25.0));
+    assert_eq!(snap.memory.current_used_bytes(), Some(4000000));
+    assert_eq!(snap.memory.current_total_bytes(), Some(8000000));
 
     // Second drain when channel is empty returns false
     assert!(!app.drain_daemon_telemetry());

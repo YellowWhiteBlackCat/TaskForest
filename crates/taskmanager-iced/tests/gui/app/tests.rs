@@ -725,13 +725,21 @@ fn daemon_telemetry_stream_drain_in_iced_app() {
     let batch = DaemonMessage::TelemetryBatch {
         timestamp_ms: 1122334455,
         facet_mask: SubscriptionMask::CPU.bits(),
-        payload_json: "{\"cpu_percent\":18.0}".to_string(),
+        payload_json:
+            "{\"cpu_usage_pct\":18.0,\"memory_used_bytes\":3000000,\"memory_total_bytes\":6000000}"
+                .to_string(),
     };
     tx.send(batch).unwrap();
 
     let drained = app.drain_daemon_telemetry();
     assert!(drained);
     assert_eq!(app.last_daemon_telemetry_ms, 1122334455);
+
+    let snap = app.shell.projection().snapshot.as_ref().unwrap();
+    assert_eq!(snap.timestamp_ms, 1122334455);
+    assert_eq!(snap.cpu.current_global_usage_pct(), Some(18.0));
+    assert_eq!(snap.memory.current_used_bytes(), Some(3000000));
+    assert_eq!(snap.memory.current_total_bytes(), Some(6000000));
 }
 #[path = "tests/settings_and_service_control_tests.rs"]
 mod settings_and_service_control_tests;

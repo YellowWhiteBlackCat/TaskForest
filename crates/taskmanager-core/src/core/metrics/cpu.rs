@@ -747,6 +747,12 @@ impl CpuMetrics {
             .copied()
     }
 
+    /// Update the live global CPU usage percentage observation.
+    pub fn set_global_usage(&mut self, usage_pct: f32, observed_at_ms: u64) {
+        self.scalar_observations.global_usage_pct =
+            ScalarObservation::available(usage_pct, observed_at_ms);
+    }
+
     #[must_use]
     pub fn current_core_usage_pct(&self, index: usize) -> Option<f32> {
         self.scalar_observations

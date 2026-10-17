@@ -497,7 +497,9 @@ fn daemon_telemetry_stream_drain_in_root_view(cx: &mut TestAppContext) {
     let batch = DaemonMessage::TelemetryBatch {
         timestamp_ms: 987654321,
         facet_mask: SubscriptionMask::CPU.bits(),
-        payload_json: "{\"cpu_percent\":42.0}".to_string(),
+        payload_json:
+            "{\"cpu_usage_pct\":42.0,\"memory_used_bytes\":5000000,\"memory_total_bytes\":10000000}"
+                .to_string(),
     };
     tx.send(batch).unwrap();
 
@@ -505,5 +507,10 @@ fn daemon_telemetry_stream_drain_in_root_view(cx: &mut TestAppContext) {
     assert!(drained);
     root.update(cx, |view, _cx| {
         assert_eq!(view.last_daemon_telemetry_ms, 987654321);
+        let snap = view.system_snapshot_rc();
+        assert_eq!(snap.timestamp_ms, 987654321);
+        assert_eq!(snap.cpu.current_global_usage_pct(), Some(42.0));
+        assert_eq!(snap.memory.current_used_bytes(), Some(5000000));
+        assert_eq!(snap.memory.current_total_bytes(), Some(10000000));
     });
 }
