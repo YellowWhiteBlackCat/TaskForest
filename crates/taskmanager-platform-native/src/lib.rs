@@ -118,27 +118,31 @@ pub fn native_history_dir() -> PathBuf {
 }
 
 /// Resolve the platform-native storage directory for background daemon continuous history.
+#[cfg(target_os = "linux")]
 #[must_use]
 pub fn native_system_daemon_history_dir() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(program_data) = std::env::var("ProgramData") {
-            return PathBuf::from(program_data)
-                .join("TaskForest")
-                .join("history");
-        }
-        PathBuf::from(r"C:\ProgramData\TaskForest\history")
-    }
+    use taskmanager_platform_linux::system_daemon_history_dir;
+    system_daemon_history_dir()
+}
 
-    #[cfg(target_os = "macos")]
-    {
-        PathBuf::from("/Library/Application Support/TaskForest/history")
-    }
+#[cfg(target_os = "windows")]
+#[must_use]
+pub fn native_system_daemon_history_dir() -> PathBuf {
+    use taskmanager_platform_windows::system_daemon_history_dir;
+    system_daemon_history_dir()
+}
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        PathBuf::from("/var/lib/taskforest/history")
-    }
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn native_system_daemon_history_dir() -> PathBuf {
+    use taskmanager_platform_macos::system_daemon_history_dir;
+    system_daemon_history_dir()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[must_use]
+pub fn native_system_daemon_history_dir() -> PathBuf {
+    PathBuf::from("/var/lib/taskforest/history")
 }
 
 /// Discover validated local-time rules through the selected Linux adapter.

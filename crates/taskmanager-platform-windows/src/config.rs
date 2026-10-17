@@ -121,6 +121,34 @@ pub fn user_history_dir() -> PathBuf {
     }
 }
 
+/// Resolve the persistent system-wide background daemon history directory.
+#[must_use]
+pub fn system_daemon_history_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        let base = known_folder_path(KnownFolder::CommonAppData)
+            .ok()
+            .or_else(|| {
+                std::env::var_os("ProgramData")
+                    .map(PathBuf::from)
+                    .and_then(absolute_directory)
+            })
+            .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"));
+        base.join("TaskForest").join("history")
+    }
+
+    #[cfg(not(windows))]
+    {
+        let base = std::env::var_os("ProgramData")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from);
+        base.map_or_else(
+            || PathBuf::from(r"C:\ProgramData\TaskForest\history"),
+            |directory| directory.join("TaskForest").join("history"),
+        )
+    }
+}
+
 /// Resolve the user's Windows locale through the native safe API boundary.
 ///
 /// This is a hint for frontend default-language selection only. A persisted

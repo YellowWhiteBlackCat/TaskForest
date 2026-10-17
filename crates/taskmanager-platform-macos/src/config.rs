@@ -35,6 +35,12 @@ pub fn user_history_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("taskmanager-history"))
 }
 
+/// Resolve the persistent system-wide background daemon history directory.
+#[must_use]
+pub fn system_daemon_history_dir() -> PathBuf {
+    PathBuf::from("/Library/Application Support/TaskForest/history")
+}
+
 #[cfg(test)]
 #[path = "../tests/headless/macos_config.rs"]
 mod tests;
