@@ -55,6 +55,12 @@ pub fn product_logo_bytes() -> &'static [u8] {
     include_bytes!("../assets/product/taskforest-logo.svg")
 }
 
+/// Pixel-aligned optical reduction of the brand for 16px titlebars and icons.
+#[must_use]
+pub fn product_small_logo_bytes() -> &'static [u8] {
+    include_bytes!("../assets/product/taskforest-logo-small.svg")
+}
+
 #[derive(Clone, Copy)]
 struct EmbeddedAsset {
     path: &'static str,

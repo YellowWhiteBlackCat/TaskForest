@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="TaskForest forest monitor small icon">
+  <!-- 16px optical master: integer-aligned edges and a full pixel between shapes. -->
+  <rect width="16" height="16" rx="4" fill="#104d3d"/>
+  <rect x="1" y="2" width="14" height="11" rx="2" fill="#f0f7ed"/>
+  <rect x="3" y="4" width="10" height="7" rx="1" fill="#082e28"/>
+  <path d="M7 13h2v1h3v1H4v-1h3z" fill="#f0f7ed"/>
+  <path d="m8 4 2 3H9l2 2H9v1H7V9H5l2-2H6z" fill="#c5ed9b"/>
+  <path d="M3 8h1v2H3zM12 7h1v3h-1z" fill="#b7dfa4"/>
+</svg>

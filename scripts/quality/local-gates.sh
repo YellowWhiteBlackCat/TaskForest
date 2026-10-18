@@ -527,6 +527,12 @@ fi
 if maybe flatpak-manifest; then
     run_stage flatpak-manifest quick run_py scripts/quality/test_flatpak_manifest.py
 fi
+if maybe soak-stability-self; then
+    run_stage soak-stability-self quick run_py scripts/quality/soak_stability_guard.py --self-test
+fi
+if maybe soak-stability; then
+    run_stage soak-stability quick run_py scripts/quality/soak_stability_guard.py
+fi
 if maybe capture-isolation-self; then
     run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"
 fi

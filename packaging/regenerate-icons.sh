@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Rebuild every shipped TaskForest application and tray icon from the two
-# surface-owned SVG sources.
+# Rebuild every shipped TaskForest application and tray icon from the
+# surface-owned SVG masters, including the pixel-aligned 16px reduction.
 #
 # The application SVG remains at the historical Linux packaging path so
 # installed desktop identities stay upgrade-compatible. The tray SVG is an
@@ -15,6 +15,8 @@ export CARGO_BUILD_JOBS=4
 export RUSTC_WRAPPER=
 
 SOURCE="$REPO_ROOT/packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg"
+SMALL_SOURCE="$REPO_ROOT/crates/taskmanager-assets/assets/product/taskforest-logo-small.svg"
+EMBEDDED_SOURCE="$REPO_ROOT/crates/taskmanager-assets/assets/product/taskforest-logo.svg"
 TRAY_SOURCE="$REPO_ROOT/packaging/tray/taskforest-tray.svg"
 MACOS_DIR="$REPO_ROOT/packaging/macos"
 LINUX_ICON_DIR="$REPO_ROOT/packaging/linux/icons/hicolor"
@@ -29,9 +31,14 @@ for command in cargo magick rsvg-convert; do
     }
 done
 
+printf '%s\n' '==> synchronizing the embedded product SVG'
+cp -f "$SOURCE" "$EMBEDDED_SOURCE"
+
 printf '%s\n' '==> rasterizing TaskForest SVG to the macOS size ladder'
 for size in 16 32 64 128 256 512 1024; do
-    rsvg-convert -w "$size" -h "$size" "$SOURCE" -o "$MACOS_DIR/icon_${size}.png"
+    optical_source="$SOURCE"
+    if [[ "$size" -eq 16 ]]; then optical_source="$SMALL_SOURCE"; fi
+    rsvg-convert -w "$size" -h "$size" "$optical_source" -o "$MACOS_DIR/icon_${size}.png"
 done
 
 printf '%s\n' '==> rasterizing the freedesktop hicolor size ladder'
@@ -39,7 +46,9 @@ for size in 16 24 32 48 64 128 256 512; do
     destination="$LINUX_ICON_DIR/${size}x${size}/apps/taskforest-taskboard.png"
     destination_canonical="$LINUX_ICON_DIR/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png"
     mkdir -p "$(dirname "$destination")"
-    rsvg-convert -w "$size" -h "$size" "$SOURCE" -o "$destination"
+    optical_source="$SOURCE"
+    if [[ "$size" -eq 16 ]]; then optical_source="$SMALL_SOURCE"; fi
+    rsvg-convert -w "$size" -h "$size" "$optical_source" -o "$destination"
     cp -f "$destination" "$destination_canonical"
 done
 mkdir -p "$LINUX_ICON_DIR/scalable/apps"
@@ -50,8 +59,14 @@ printf '%s\n' '==> assembling macOS ICNS with the checked-in Rust tool'
 cargo run --locked -j 4 --manifest-path "$MACOS_DIR/build-icns/Cargo.toml"
 
 printf '%s\n' '==> assembling the Windows multi-resolution ICO'
-magick "$MACOS_DIR/icon_1024.png" \
-    -define icon:auto-resize=16,24,32,48,64,128,256 \
+magick \
+    "$MACOS_DIR/icon_16.png" \
+    "$LINUX_ICON_DIR/24x24/apps/taskforest-taskboard.png" \
+    "$MACOS_DIR/icon_32.png" \
+    "$LINUX_ICON_DIR/48x48/apps/taskforest-taskboard.png" \
+    "$MACOS_DIR/icon_64.png" \
+    "$MACOS_DIR/icon_128.png" \
+    "$MACOS_DIR/icon_256.png" \
     "$WINDOWS_ICON"
 
 printf '%s\n' '==> rasterizing the shared 22px native tray icon'
