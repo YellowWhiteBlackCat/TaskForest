@@ -73,6 +73,7 @@ fn typed_unavailability_never_falls_back_to_legacy_metadata() {
     item.apply_metadata_observations(ProcessMetadataObservations {
         owner: ProcessMetadataObservation::unavailable(ProcessMetadataFailure::PermissionDenied),
         executable_path: ProcessMetadataObservation::unavailable(ProcessMetadataFailure::PidRace),
+        ..Default::default()
     });
     let mut wire = serde_json::to_value(item).expect("serialize typed metadata");
     wire["user"] = serde_json::json!("stale-user");
@@ -110,6 +111,7 @@ fn confirmed_absent_and_stale_metadata_win_over_legacy_strings() {
     absent.apply_metadata_observations(ProcessMetadataObservations {
         owner: ProcessMetadataObservation::absent(10),
         executable_path: ProcessMetadataObservation::absent(10),
+        ..Default::default()
     });
     let mut stale = ProcessItem::new(43, "worker");
     stale.apply_metadata_observations(ProcessMetadataObservations {
@@ -120,6 +122,7 @@ fn confirmed_absent_and_stale_metadata_win_over_legacy_strings() {
             10,
         )
         .transition_failure(ProcessMetadataFailure::PidRace),
+        ..Default::default()
     });
 
     for (mut wire, expected_availability) in [
@@ -158,6 +161,7 @@ fn legacy_projections_are_derived_from_current_typed_metadata_only() {
             ProcessMetadataFailure::NotFound,
         ),
         executable_path: ProcessMetadataObservation::absent(50),
+        ..Default::default()
     });
 
     assert_eq!(item.current_user().as_deref(), Some("4242"));

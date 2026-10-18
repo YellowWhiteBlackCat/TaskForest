@@ -5,6 +5,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
+use taskmanager_core::core::process::{ContainerMetadata, parse_cgroup_container_metadata};
 use taskmanager_core::{
     FailureKind, ProcessMetadataFailure, ProcessMetadataObservation, ProcessMetadataObservations,
     ProcessOwner, ProcessOwnerIdentity, SourceOutcome,
@@ -50,7 +51,7 @@ pub(super) fn observe_process_metadata<P: PreviousProcessView + ?Sized>(
         owner_label: label_outcome(&uid, passwd),
         executable_path: observation_outcome(&executable_path),
     };
-    let current = observations_from_results(uid, passwd, executable_path, observed_at_ms);
+    let current = observations_from_results(pid, uid, passwd, executable_path, observed_at_ms);
     (
         retain_for_same_identity(current, Some(current_start_token), previous),
         evidence,
@@ -66,6 +67,7 @@ fn unavailable_for_identity_failure(
         ProcessMetadataObservations {
             owner: ProcessMetadataObservation::unavailable(metadata_failure),
             executable_path: ProcessMetadataObservation::unavailable(metadata_failure),
+            container: ProcessMetadataObservation::unavailable(metadata_failure),
         },
         ProcessMetadataEvidence {
             owner_identity: unavailable,
@@ -92,18 +94,40 @@ fn retain_for_same_identity<P: PreviousProcessView + ?Sized>(
         executable_path: current
             .executable_path
             .retain_previous(previous.metadata_observations().executable_path.clone()),
+        container: current
+            .container
+            .retain_previous(previous.metadata_observations().container.clone()),
     }
 }
 
 fn observations_from_results(
+    pid: u32,
     uid: Result<u32, ProcessMetadataFailure>,
     passwd: &PasswdLabels,
     executable_path: ProcessMetadataObservation<PathBuf>,
     observed_at_ms: u64,
 ) -> ProcessMetadataObservations {
+    let container = read_cgroup_container(pid, observed_at_ms);
     ProcessMetadataObservations {
         owner: owner_observation(uid, passwd, observed_at_ms),
         executable_path,
+        container,
+    }
+}
+
+fn read_cgroup_container(
+    pid: u32,
+    observed_at_ms: u64,
+) -> ProcessMetadataObservation<ContainerMetadata> {
+    match fs::read_to_string(format!("/proc/{pid}/cgroup")) {
+        Ok(content) => {
+            if let Some(meta) = parse_cgroup_container_metadata(&content) {
+                ProcessMetadataObservation::available(meta, observed_at_ms)
+            } else {
+                ProcessMetadataObservation::absent(observed_at_ms)
+            }
+        }
+        Err(_) => ProcessMetadataObservation::absent(observed_at_ms),
     }
 }
 

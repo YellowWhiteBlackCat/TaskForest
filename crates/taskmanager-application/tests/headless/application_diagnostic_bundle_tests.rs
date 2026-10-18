@@ -42,6 +42,7 @@ fn sample_process(pid: u32, name: &str, user: &str, cmdline: &str) -> ProcessIte
             100,
         ),
         executable_path: ProcessMetadataObservation::available(PathBuf::from(cmdline), 100),
+        ..Default::default()
     });
     item.apply_scalar_observations(ProcessScalarObservations {
         cpu_percentage: ScalarObservation::available(18.5, 100),

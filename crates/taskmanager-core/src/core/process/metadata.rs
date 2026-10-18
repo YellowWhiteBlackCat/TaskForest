@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use super::container::ContainerMetadata;
 use crate::core::{FailureKind, ObservationWireError};
 
 /// A platform-neutral process-owner identity token.
@@ -290,6 +291,7 @@ fn validate_metadata_wire<T>(
 pub struct ProcessMetadataObservations {
     pub owner: ProcessMetadataObservation<ProcessOwner>,
     pub executable_path: ProcessMetadataObservation<PathBuf>,
+    pub container: ProcessMetadataObservation<ContainerMetadata>,
 }
 
 impl ProcessMetadataObservations {
@@ -305,6 +307,27 @@ impl ProcessMetadataObservations {
                 || ProcessMetadataObservation::absent(observed_at_ms),
                 |path| ProcessMetadataObservation::available(path, observed_at_ms),
             ),
+            container: ProcessMetadataObservation::absent(observed_at_ms),
+        }
+    }
+
+    #[must_use]
+    pub fn current_with_container(
+        owner: ProcessOwner,
+        executable_path: Option<PathBuf>,
+        container: Option<ContainerMetadata>,
+        observed_at_ms: u64,
+    ) -> Self {
+        Self {
+            owner: ProcessMetadataObservation::available(owner, observed_at_ms),
+            executable_path: executable_path.map_or_else(
+                || ProcessMetadataObservation::absent(observed_at_ms),
+                |path| ProcessMetadataObservation::available(path, observed_at_ms),
+            ),
+            container: container.map_or_else(
+                || ProcessMetadataObservation::absent(observed_at_ms),
+                |c| ProcessMetadataObservation::available(c, observed_at_ms),
+            ),
         }
     }
 
@@ -313,6 +336,7 @@ impl ProcessMetadataObservations {
         Self {
             owner: self.owner.transition_failure(failure),
             executable_path: self.executable_path.transition_failure(failure),
+            container: self.container.transition_failure(failure),
         }
     }
 }

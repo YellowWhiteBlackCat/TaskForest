@@ -435,6 +435,7 @@ fn html_contains_document_structure_and_snapshot_stats() {
             1,
         ),
         executable_path: ProcessMetadataObservation::absent(1),
+        ..Default::default()
     });
     let html = processes_to_html(&snapshot, &[process]);
 

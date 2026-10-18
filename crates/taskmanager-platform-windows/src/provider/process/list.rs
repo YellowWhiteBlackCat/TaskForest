@@ -298,6 +298,7 @@ impl ProcessListProvider for WinProcessListProvider {
             item.apply_metadata_observations(ProcessMetadataObservations {
                 owner,
                 executable_path,
+                ..Default::default()
             });
             item.apply_scalar_observations(observations);
 

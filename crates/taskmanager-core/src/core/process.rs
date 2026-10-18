@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub mod aggregate;
 mod anomaly;
 mod application;
+pub mod container;
 mod control;
 pub mod group_aggregate;
 mod history;
@@ -31,6 +32,7 @@ pub use application::{
     ApplicationIconAsset, ApplicationIconFormat, MAX_APPLICATION_ICON_BYTES,
     ProcessApplicationIdentity, ProcessCategory, process_category,
 };
+pub use container::{ContainerMetadata, ContainerRuntime, parse_cgroup_container_metadata};
 pub(crate) use control::process_batch_failure_wire_code;
 pub use control::{
     FrozenProcessIdentity, PriorityTier, ProcessBatchAction, ProcessBatchIntent,
@@ -186,6 +188,12 @@ impl ProcessItem {
     #[must_use]
     pub const fn metadata_observations(&self) -> &ProcessMetadataObservations {
         &self.metadata_observations
+    }
+
+    /// Access currently observed container or sandbox metadata if running inside a container.
+    #[must_use]
+    pub fn current_container_metadata(&self) -> Option<&ContainerMetadata> {
+        self.metadata_observations.container.current_value()
     }
 
     pub fn apply_application_identity(

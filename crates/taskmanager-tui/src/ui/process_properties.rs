@@ -249,6 +249,7 @@ fn overview_pairs(
             t("proc.ancestor_lineage"),
             text(ProcessDetailsField::AncestorLineage),
         ),
+        ("Container", text(ProcessDetailsField::Container)),
         (t("common.user"), text(ProcessDetailsField::User)),
         (t("common.status"), text(ProcessDetailsField::Status)),
         (t("common.threads"), text(ProcessDetailsField::Threads)),

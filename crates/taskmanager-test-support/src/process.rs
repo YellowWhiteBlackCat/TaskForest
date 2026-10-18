@@ -395,6 +395,7 @@ pub fn sort_fixture_row(
             FIXTURE_OBSERVED_AT,
         ),
         executable_path: ProcessMetadataObservation::absent(FIXTURE_OBSERVED_AT),
+        ..Default::default()
     });
     process.apply_scalar_observations(ProcessScalarObservations {
         cpu_percentage: fixture_observation(metrics.cpu),

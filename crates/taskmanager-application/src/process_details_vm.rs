@@ -129,6 +129,8 @@ pub enum ProcessDetailsField {
     ParentPid,
     /// Ancestor process lineage up to root (`systemd (1) > sway (800)`). All ends.
     AncestorLineage,
+    /// Container or sandbox identity ([Docker: 123456], [Flatpak: app.id], etc.).
+    Container,
     /// Owner label. All ends.
     User,
     /// Process state string. All ends.
@@ -188,11 +190,12 @@ pub enum ProcessDetailsField {
 impl ProcessDetailsField {
     /// Every field in the canonical row order — the single variant list
     /// ([`process_details_rows`] emits exactly this sequence).
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 30] = [
         Self::Name,
         Self::Pid,
         Self::ParentPid,
         Self::AncestorLineage,
+        Self::Container,
         Self::User,
         Self::Status,
         Self::Cpu,
@@ -229,6 +232,7 @@ impl ProcessDetailsField {
             Self::Pid => "pid",
             Self::ParentPid => "parent_pid",
             Self::AncestorLineage => "ancestor_lineage",
+            Self::Container => "container",
             Self::User => "user",
             Self::Status => "status",
             Self::Cpu => "cpu",
@@ -352,6 +356,10 @@ pub fn process_details_rows_with_local_time(
         ProcessDetailsRowVm {
             field: ProcessDetailsField::AncestorLineage,
             value: text(item.current_ancestor_lineage_formatted()),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::Container,
+            value: text(item.current_container_metadata().map(|m| m.display_badge())),
         },
         ProcessDetailsRowVm {
             field: ProcessDetailsField::User,

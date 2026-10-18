@@ -79,12 +79,13 @@ fn overview_rows_mirror_the_neutral_vm() {
         &fixture(),
         &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     );
-    assert_eq!(pairs.len(), 19);
+    assert_eq!(pairs.len(), 20);
     let fields = [
         ProcessDetailsField::Name,
         ProcessDetailsField::Pid,
         ProcessDetailsField::ParentPid,
         ProcessDetailsField::AncestorLineage,
+        ProcessDetailsField::Container,
         ProcessDetailsField::User,
         ProcessDetailsField::Status,
         ProcessDetailsField::Threads,
