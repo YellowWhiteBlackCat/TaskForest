@@ -6,6 +6,22 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.3.1] — 2026-10-18
+
+### 新增
+
+- **Linux 现代沙箱 Flatpak 分发清单与构建自动化**：
+  - 编写官方 Flatpak 构建清单（`packaging/flatpak/io.github.YellowWhiteBlackCat.TaskForest.json`），配置 Wayland、`/proc:ro`、`/sys:ro` 只读硬件挂载及 IPC 运行时通信通道；
+  - 提供单文件 bundle 构建脚本（`build-flatpak.sh`）及质量门禁守卫（`test_flatpak_manifest.py`）。
+- **Linux 容器与虚拟化进程树折叠与标签视图**：
+  - 支持 cgroups v1 / v2 容器签名解析，精准识别 Docker、Podman、CRI-O、containerd、Flatpak、Snap 容器沙箱内进程；
+  - 在四端前端（GPUI、Iced、TUI、Bevy）进程详情页完整渲染醒目的容器专属 Badge（如 `[Docker: a1b2c3d4e5f6]`、`[Flatpak: app.id]`）。
+- **长效运行内存防泄漏与句柄稳定性浸泡压测线束**：
+  - 增加长驻留浸泡稳定性检测守卫（`soak_stability_guard.py`），验证连续高频数据采样与文件轮转下物理驻留内存（RSS）收敛及文件描述符（FD）零泄漏；
+  - 快速质量门禁阶段扩展至 56 stages 全部打通。
+- **Crates.io 独立底层库发布预备态达成**：
+  - 补全 `taskmanager-core`、`taskmanager-ipc`、`taskmanager-daemon`、`taskmanager-platform-contract` 的发布级元数据、文档与独立 LICENSE 副本，独立沙箱打包与校验通过。
+
 ## [0.3.0] — 2026-10-17
 
 ### 新增
