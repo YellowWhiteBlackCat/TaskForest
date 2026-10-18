@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-platform-contract"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ categories = ["os", "development-tools::profiling"]
 include = ["src/**/*", "README.md", "Cargo.toml", "LICENSE"]
 
 [dependencies]
-taskmanager-core = { path = "../taskmanager-core", version = "0.3.0" }
+taskmanager-core = { path = "../taskmanager-core", version = "0.3.1" }
 
 [lib]
 name = "taskmanager_platform_contract"
