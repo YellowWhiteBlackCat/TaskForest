@@ -54,6 +54,7 @@ fn attach_capture_metadata(process: &mut ProcessItem, user: &str, executable: Op
             || ProcessMetadataObservation::absent(1),
             |path| ProcessMetadataObservation::available(path.into(), 1),
         ),
+        ..Default::default()
     });
 }
 

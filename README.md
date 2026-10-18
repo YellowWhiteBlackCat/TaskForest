@@ -1,5 +1,10 @@
 # TaskForest · 任务森林
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="crates/taskmanager-assets/assets/product/taskforest-cover-dark.png">
+  <img alt="TaskForest — Eye-friendly native system monitor" src="crates/taskmanager-assets/assets/product/taskforest-cover.png" width="2172" height="724">
+</picture>
+
 > **护眼原生系统监视器** —— 面向进程、服务、设备与系统健康。
 
 TaskForest 是一个用 **Rust 2024** 构建的跨平台系统监视器，运行在 **Linux、Windows 和

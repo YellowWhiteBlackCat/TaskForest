@@ -8,8 +8,8 @@
 //! seam.
 
 use gpui::{App, ClipboardItem, Div, Entity, ParentElement, Styled, Window, div, px};
-use taskmanager_assets::product;
-use taskmanager_ui::icons_binding::icon;
+use taskmanager_assets::{product, product_logo_bytes};
+use taskmanager_ui::icons_binding::{ApplicationImageFormat, application_image};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -22,7 +22,6 @@ use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_shell::presentation::about::metadata;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_ui_contract::IconId;
 
 /// Build version compiled into this frontend binary.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -70,9 +69,9 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                 .items_center()
                 .gap(definite_length(tokens::SPACE_12))
                 .child(
-                    icon(IconId::System)
-                        .size(px(38.0))
-                        .text_color(hsla(theme.accent)),
+                    application_image(ApplicationImageFormat::Svg, product_logo_bytes())
+                        .w(px(38.0))
+                        .h(px(38.0)),
                 )
                 .child(
                     div()

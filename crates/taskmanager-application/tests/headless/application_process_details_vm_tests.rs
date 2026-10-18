@@ -4,8 +4,9 @@ use taskmanager_core::DeviceState;
 use taskmanager_core::ProcessSchedulingPolicy;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
-    ProcessAncestorNode, ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations,
-    ProcessOwner, ProcessOwnerIdentity, ProcessScalarObservations,
+    ContainerMetadata, ContainerRuntime, ProcessAncestorNode, ProcessItem,
+    ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
+    ProcessScalarObservations,
 };
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_core::core::units::UnitPreferences;
@@ -45,6 +46,10 @@ fn fully_observed_item() -> ProcessItem {
             PathBuf::from("/usr/bin/sample"),
             42,
         ),
+        container: ProcessMetadataObservation::available(
+            ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6"),
+            42,
+        ),
     });
     item.apply_scalar_observations(ProcessScalarObservations {
         start_token: ScalarObservation::available(600, 42),
@@ -77,119 +82,125 @@ fn value(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) -> &DetailVal
 /// default (Mission-Center-parity, base-2 bytes) preferences.
 #[test]
 fn fully_observed_row_folds_every_field_to_text() {
-    let rows = process_details_rows(&fully_observed_item(), &UnitPreferences::default());
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Name),
-        &DetailValue::Text("sample".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Pid),
-        &DetailValue::Text("4242".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::ParentPid),
-        &DetailValue::Text("1".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::AncestorLineage),
-        &DetailValue::Text("systemd (1)".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::User),
-        &DetailValue::Text("root".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Status),
-        &DetailValue::Text("S".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Cpu),
-        &DetailValue::Text("12.5%".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Memory),
-        &DetailValue::Text("100.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Pss),
-        &DetailValue::Text("50.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Uss),
-        &DetailValue::Text("40.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Shared),
-        &DetailValue::Text("60.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::AnonHugePages),
-        &DetailValue::Text("8.0 MiB (8.0% RSS)".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Swap),
-        &DetailValue::Text("2.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Threads),
-        &DetailValue::Text("8".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Fds),
-        &DetailValue::Text("42".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Nice),
-        &DetailValue::Text("+10".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::SchedPolicy),
-        &DetailValue::Text("Normal (SCHED_OTHER)".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::OomScore),
-        &DetailValue::Text("250".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::PageFaults),
-        &DetailValue::Text("15000 (I/O: 3)".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::StartTime),
-        &DetailValue::Text("2020-09-13 12:26:40".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::CpuTime),
-        &DetailValue::Text("01h 01m".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::DiskReadRate),
-        &DetailValue::Text("1.5 KiB/s".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::DiskWriteRate),
-        &DetailValue::Text("1.0 MiB/s".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::NetworkRate),
-        &DetailValue::Text("2.9 KiB/s".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::DiskReadTotal),
-        &DetailValue::Text("10.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::DiskWriteTotal),
-        &DetailValue::Text("20.0 MiB".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Exe),
-        &DetailValue::Text("/usr/bin/sample".to_owned())
-    );
-    assert_eq!(
-        value(&rows, ProcessDetailsField::Cmdline),
-        &DetailValue::Text("sample --flag value".to_owned())
-    );
+    crate::i18n::with_language(crate::i18n::Language::En, || {
+        let rows = process_details_rows(&fully_observed_item(), &UnitPreferences::default());
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Name),
+            &DetailValue::Text("sample".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Pid),
+            &DetailValue::Text("4242".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::ParentPid),
+            &DetailValue::Text("1".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::AncestorLineage),
+            &DetailValue::Text("systemd (1)".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Container),
+            &DetailValue::Text("[Docker: a1b2c3d4e5f6]".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::User),
+            &DetailValue::Text("root".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Status),
+            &DetailValue::Text("S".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Cpu),
+            &DetailValue::Text("12.5%".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Memory),
+            &DetailValue::Text("100.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Pss),
+            &DetailValue::Text("50.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Uss),
+            &DetailValue::Text("40.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Shared),
+            &DetailValue::Text("60.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::AnonHugePages),
+            &DetailValue::Text("8.0 MiB (8.0% RSS)".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Swap),
+            &DetailValue::Text("2.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Threads),
+            &DetailValue::Text("8".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Fds),
+            &DetailValue::Text("42".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Nice),
+            &DetailValue::Text("+10".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::SchedPolicy),
+            &DetailValue::Text("Normal (SCHED_OTHER)".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::OomScore),
+            &DetailValue::Text("250".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::PageFaults),
+            &DetailValue::Text("15000 (I/O: 3)".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::StartTime),
+            &DetailValue::Text("2020-09-13 12:26:40".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::CpuTime),
+            &DetailValue::Text("01h 01m".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::DiskReadRate),
+            &DetailValue::Text("1.5 KiB/s".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::DiskWriteRate),
+            &DetailValue::Text("1.0 MiB/s".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::NetworkRate),
+            &DetailValue::Text("2.9 KiB/s".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::DiskReadTotal),
+            &DetailValue::Text("10.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::DiskWriteTotal),
+            &DetailValue::Text("20.0 MiB".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Exe),
+            &DetailValue::Text("/usr/bin/sample".to_owned())
+        );
+        assert_eq!(
+            value(&rows, ProcessDetailsField::Cmdline),
+            &DetailValue::Text("sample --flag value".to_owned())
+        );
+    });
 }
 
 /// The derived-shared facet is the core authority's `RSS - USS` difference:

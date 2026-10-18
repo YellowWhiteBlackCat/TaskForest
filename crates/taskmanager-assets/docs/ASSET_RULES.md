@@ -21,6 +21,10 @@ UI glyph artwork is monochrome and uses `currentColor`; renderers choose how
 to apply those bytes and colors. Product branding preserves its authored
 colors. See [ASSET-LICENSE.md](../ASSET-LICENSE.md) for provenance.
 
+The compact window-chrome mark uses `product_small_logo_bytes()`, the same
+pixel-aligned 16px optical master used by desktop icon regeneration. Larger
+brand placements use `product_logo_bytes()`; neither is a tinted UI glyph.
+
 ## Verification
 
 Keep asset provenance and `currentColor` behavior stable when changing the

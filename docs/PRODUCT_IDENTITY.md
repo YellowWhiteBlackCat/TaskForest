@@ -65,13 +65,17 @@ polkit action id 与桌面 app id 共用同一 reverse-DNS 命名空间：
 
 ## 图标权威
 
-- 应用矢量 SVG：`crates/taskmanager-assets/assets/product/taskforest-logo.svg`（代码内嵌）与 `packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg`（安装源）
+- 应用矢量母版：`packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg`；内嵌的 `crates/taskmanager-assets/assets/product/taskforest-logo.svg` 由再生脚本同步。
 - 托盘 SVG：`packaging/tray/taskforest-tray.svg`
+- 16px 光学母版：`crates/taskmanager-assets/assets/product/taskforest-logo-small.svg`，供标题栏及三平台最小尺寸使用。
+- 品牌封面：`crates/taskmanager-assets/assets/product/taskforest-cover.png` 与 `taskforest-cover-dark.png`，使用相同标识，README 按明暗主题选择。
 - freedesktop 图标 token：`io.github.YellowWhiteBlackCat.TaskForest`（现代 reverse-DNS 规范）与 `taskforest-taskboard`（兼容映射）
 - 平台派生资产由 `bash packaging/regenerate-icons.sh` 统一生成。
 
 PNG、ICNS、ICO 和内嵌 RGBA 都是派生产物，不允许手工维护平台分叉。Windows EXE、MSI
 快捷方式和卸载列表必须使用同一 ICO；macOS bundle 必须包含对应 ICNS。
+应用标识采用显示器、松树和两根监测柱；托盘使用同构的 22px 光学母版。每个 ICO 层直接
+取对应尺寸的 SVG 栅格化结果，避免从大图反复缩放；封面是独立的品牌插画，不作为桌面图标源。
 
 ## 平台消费契约
 

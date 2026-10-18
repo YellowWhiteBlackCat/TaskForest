@@ -135,6 +135,7 @@ pub(super) fn processes() -> Vec<ProcessItem> {
                 1,
             ),
             executable_path: ProcessMetadataObservation::absent(1),
+            ..Default::default()
         });
         process.apply_scalar_observations(ProcessScalarObservations {
             start_token: ScalarObservation::available(

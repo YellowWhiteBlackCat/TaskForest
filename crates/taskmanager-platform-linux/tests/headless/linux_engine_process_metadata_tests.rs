@@ -126,6 +126,7 @@ fn metadata_failure_recovery_retains_only_the_same_identity() {
             Path::new("/usr/bin/worker").to_path_buf(),
             10,
         ),
+        ..Default::default()
     };
     let previous_item = ProcessItemFixtureBuilder::new()
         .metadata_observations(previous)
@@ -136,6 +137,7 @@ fn metadata_failure_recovery_retains_only_the_same_identity() {
         })
         .build();
     let failed = observations_from_results(
+        1,
         Err(ProcessMetadataFailure::PermissionDenied),
         &Ok(HashMap::new()),
         ProcessMetadataObservation::unavailable(ProcessMetadataFailure::PermissionDenied),
@@ -157,6 +159,7 @@ fn metadata_failure_recovery_retains_only_the_same_identity() {
     assert_eq!(reused_pid.owner.last_success_ms(), None);
 
     let recovered = observations_from_results(
+        1,
         Ok(1000),
         &Ok(HashMap::from([(1000, "alice".to_owned())])),
         ProcessMetadataObservation::available(Path::new("/usr/bin/worker-v2").to_path_buf(), 30),

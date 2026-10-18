@@ -17,6 +17,7 @@ pub(super) fn field_label(field: ProcessDetailsField) -> &'static str {
         ProcessDetailsField::Pid => "PID",
         ProcessDetailsField::ParentPid => t("prop.parent_pid"),
         ProcessDetailsField::AncestorLineage => t("proc.ancestor_lineage"),
+        ProcessDetailsField::Container => "Container",
         ProcessDetailsField::User => t("common.user"),
         ProcessDetailsField::Status => t("common.status"),
         ProcessDetailsField::Cpu => t("common.cpu"),

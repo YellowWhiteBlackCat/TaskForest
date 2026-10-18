@@ -121,6 +121,7 @@ fn observations_container_transition_failure_maps_every_field() {
             10,
         ),
         executable_path: ProcessMetadataObservation::available(PathBuf::from("/usr/bin/alice"), 10),
+        ..Default::default()
     };
     let failed = observations.transition_failure(ProcessMetadataFailure::PidRace);
     assert!(matches!(
