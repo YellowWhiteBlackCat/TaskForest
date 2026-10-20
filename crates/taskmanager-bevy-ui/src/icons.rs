@@ -34,12 +34,14 @@ use bevy::picking::Pickable;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::scene::{EntityCommandsSceneExt, Scene, bsn};
 use bevy::text::{InlineBox, InlineBoxKind};
-use bevy::ui::prelude::{Node, px};
+use bevy::ui::prelude::{Node, rem};
 use bevy::ui::widget::{ImageNode, InlineImage};
 use taskmanager_assets::UI_ICON_RGBA_SIZE;
 use taskmanager_assets::ui_icon_rgba;
 use taskmanager_icons::path;
 use taskmanager_ui_contract::IconId;
+
+use crate::palette::UiPalette;
 
 /// The semantic ids this frontend draws. The list is exhaustive for the
 /// product surface: navigation tabs, the trailing settings/alert affordances,
@@ -201,15 +203,19 @@ pub(crate) fn build_icon_plates(images: Option<ResMut<Assets<Image>>>, mut comma
     commands.insert_resource(IconPlates::build(&mut images));
 }
 
-/// The icon scene: a fixed square carrying the plate + ink markers; the stamp
+/// The icon scene: a square carrying the plate + ink markers; the stamp
 /// observer turns it into a tinted bitmap. Plate resolution is deferred to
 /// that observer, so a missing bitmap is an invisible square — not a panic
 /// and not a glyph.
-pub(crate) fn icon_scene(icon: IconId, size: f32, ink: Color) -> Box<dyn Scene> {
+///
+/// The extent comes from the palette's icon step, never from a literal: the
+/// node rides the rem axis, so the user's UI-size choice re-scales every
+/// semantic icon with the reading size.
+pub(crate) fn icon_scene(icon: IconId, palette: &UiPalette, ink: Color) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node {
-            width: px(size),
-            height: px(size),
+            width: rem(palette.icon_rem),
+            height: rem(palette.icon_rem),
             flex_shrink: 0.0,
         }
         IconPlate({ icon })
@@ -236,9 +242,13 @@ impl Default for InlineIcon {
 /// tinted [`InlineImage`]; a missing bitmap is zero reserved space — not a
 /// panic and not a glyph. `Pickable::IGNORE` keeps the flow box from
 /// intercepting clicks aimed at the button the text belongs to.
-pub(crate) fn inline_icon_scene(icon: IconId, size: f32, ink: Color) -> Box<dyn Scene> {
+///
+/// The flow box is the one engine-px seam: `bevy_text` measures an inline box
+/// in logical pixels, so the extent is the palette's icon step resolved
+/// against the live rem size — it still re-scales with the UI-size choice.
+pub(crate) fn inline_icon_scene(icon: IconId, palette: &UiPalette, ink: Color) -> Box<dyn Scene> {
     Box::new(bsn! {
-        InlineBox { kind: InlineBoxKind::InFlow, size: Vec2::splat(size) }
+        InlineBox { kind: InlineBoxKind::InFlow, size: Vec2::splat(palette.icon_size_px()) }
         InlineIcon({ icon })
         IconInk({ ink })
         Pickable::IGNORE

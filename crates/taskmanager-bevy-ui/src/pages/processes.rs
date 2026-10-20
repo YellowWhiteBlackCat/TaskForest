@@ -15,7 +15,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Val,
-    percent, px,
+    percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -465,7 +465,6 @@ fn row_fill(selected: bool, palette: &UiPalette) -> bevy::color::Color {
 fn row_wrapper_scene(
     row: &ProcessRowView,
     columns: &[&ProcessColumnSpec],
-    row_height: f32,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let fill = row_fill(row.selected, palette);
@@ -479,7 +478,7 @@ fn row_wrapper_scene(
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: px(row_height),
+            height: rem(palette.control_height_rem),
         }
         BackgroundColor({ fill })
         ProcessRowLink({ index })
@@ -522,11 +521,10 @@ fn window_scenes(
         return vec![empty_state_scene(empty_state_text(query))];
     }
     let columns = visible_columns(hidden_cols);
-    let row_height = palette.control_height_px();
     projection
         .rows
         .iter()
-        .map(|row| row_wrapper_scene(row, &columns, row_height, palette))
+        .map(|row| row_wrapper_scene(row, &columns, palette))
         .collect()
 }
 
@@ -595,12 +593,11 @@ fn rebuild_table(
 fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
     let text = query.to_owned();
     let width = space_24() * 12.0;
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {
             width: px(width),
-            height: px(height),
+            height: rem(palette.control_height_rem),
             align_items: AlignItems::Center,
             padding: Val::Px(space_8()),
             border_radius: BorderRadius::all(Val::Px(radius)),

@@ -22,7 +22,7 @@ use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 
@@ -157,7 +157,6 @@ fn menu_row_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let label = item.label.clone();
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let fill = menu_row_background(highlighted, palette);
     // Dim ink for the honest unavailable state; body ink otherwise. The role
@@ -171,7 +170,7 @@ fn menu_row_scene(
         Box::new(bsn! {
             Node {
                 width: percent(100),
-                height: px(height),
+                height: rem(palette.control_height_rem),
                 align_items: AlignItems::Center,
                 padding: UiRect::left(Val::Px(space_8())),
                 border_radius: BorderRadius::all(Val::Px(radius)),
@@ -187,7 +186,7 @@ fn menu_row_scene(
         Box::new(bsn! {
             Node {
                 width: percent(100),
-                height: px(height),
+                height: rem(palette.control_height_rem),
                 align_items: AlignItems::Center,
                 padding: UiRect::left(Val::Px(space_8())),
                 border_radius: BorderRadius::all(Val::Px(radius)),

@@ -8,6 +8,7 @@
 //! reinterprets the token scale fails here without any window.
 
 use bevy::color::Srgba;
+use bevy::scene::WorldSceneExt;
 use bevy::text::{FontSize, RemSize};
 use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
@@ -178,4 +179,107 @@ fn high_contrast_theme_strengthens_bevy_palette_and_flags_hc() {
     assert!(hc.high_contrast);
     assert_ne!(standard.border_color.to_srgba(), hc.border_color.to_srgba());
     assert_eq!(hc.border_color.to_srgba().alpha, 1.0);
+}
+
+/// The rem axis is a behavior, not a source convention: a control's height is
+/// declared as a rem ratio and resolves against the live `RemSize`, so every
+/// UI-size step re-scales the type ladder without a scene rebuild.
+#[test]
+fn control_rows_ride_the_rem_axis_across_every_ui_size_step() {
+    for size in UiSize::ALL {
+        let palette = ui_palette(&Theme::dark(), size);
+        let mut app = scene_app();
+        let world = app.world_mut();
+        let root = world
+            .spawn_scene(crate::widgets::controls::stat_row_scene(
+                "CPU".to_owned(),
+                Box::new(crate::icons::icon_scene(
+                    crate::icons::PLATE_ICONS[0],
+                    &palette,
+                    palette.dim_color,
+                )),
+                &palette,
+            ))
+            .expect("the stat row scene resolves without assets")
+            .id();
+        let node = world
+            .get::<bevy::ui::Node>(root)
+            .expect("the stat row mounts a layout node");
+        assert_eq!(
+            node.min_height,
+            bevy::ui::Val::Rem(palette.control_height_rem),
+            "the row height is declared on the rem axis, not in px"
+        );
+        assert_eq!(
+            resolve_px(node.min_height, palette.rem_px),
+            palette.control_height_px(),
+            "the declared ratio resolves to the {size:?} control height"
+        );
+    }
+}
+
+/// The icon extent rides the same axis: the node declares the palette's icon
+/// ratio, so the semantic icon re-scales with the reading size.
+#[test]
+fn icon_extents_ride_the_palette_icon_step() {
+    for size in UiSize::ALL {
+        let palette = ui_palette(&Theme::dark(), size);
+        let mut app = scene_app();
+        let world = app.world_mut();
+        let root = world
+            .spawn_scene(crate::icons::icon_scene(
+                crate::icons::PLATE_ICONS[0],
+                &palette,
+                palette.dim_color,
+            ))
+            .expect("the icon scene resolves without assets")
+            .id();
+        let node = world
+            .get::<bevy::ui::Node>(root)
+            .expect("the icon mounts a layout node");
+        assert_eq!(node.width, bevy::ui::Val::Rem(palette.icon_rem));
+        assert_eq!(node.height, bevy::ui::Val::Rem(palette.icon_rem));
+        assert_eq!(
+            resolve_px(node.width, palette.rem_px),
+            palette.icon_size_px(),
+            "the icon extent resolves to the {size:?} icon step"
+        );
+    }
+}
+
+/// The rem axis is live: one declared ratio follows the `RemSize` resource, so
+/// a UI-size choice re-scales the surface without touching a scene.
+#[test]
+fn a_declared_rem_ratio_follows_the_live_rem_size() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let declared = bevy::ui::Val::Rem(palette.control_height_rem);
+    assert_eq!(resolve_px(declared, palette.rem_px), 38.0);
+    assert_eq!(resolve_px(declared, 14.0), 33.25);
+    assert_eq!(resolve_px(declared, 18.0), 42.75);
+}
+
+/// A headless scene host: the scene plugin plus the font store the text
+/// component needs. No window, no compositor, no asset reads.
+fn scene_app() -> bevy::app::App {
+    let mut app = bevy::app::App::new();
+    app.add_plugins(bevy::MinimalPlugins);
+    app.add_plugins((
+        bevy::asset::AssetPlugin::default(),
+        bevy::scene::ScenePlugin,
+    ));
+    app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
+    app
+}
+
+/// Resolve a length against a rem size the way the layout pass does.
+fn resolve_px(value: bevy::ui::Val, rem_px: f32) -> f32 {
+    value
+        .resolve(
+            1.0,
+            0.0,
+            bevy::math::Vec2::ZERO,
+            bevy::text::EmSize(rem_px),
+            bevy::text::RemSize(rem_px),
+        )
+        .expect("a rem length resolves against the rem size")
 }

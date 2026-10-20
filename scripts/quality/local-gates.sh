@@ -7,9 +7,9 @@
 #
 #   quick      seconds-minutes: toolchain/platform preflight, fmt, dependency-floor,
 #              python policy gates, test-runner policy, install-manager
-#              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
-#              side-effect guards, per-crate coverage gate self-test, the
-#              CI/local command-parity and gate-wiring guards, and the
+#              smoke, line/doc/test-layout/source-inspection/bevy-bsn/bevy-rem/
+#              headless side-effect guards, per-crate coverage gate self-test,
+#              the CI/local command-parity and gate-wiring guards, and the
 #              private A/B capture-isolation check when a host Wayland/KWin
 #              session and writable user cgroup are available (or
 #              TM_CAPTURE_ISOLATION_GATE=1 forces it).
@@ -473,6 +473,22 @@ if maybe bevy-bsn-guard-self; then
 fi
 if maybe bevy-bsn-guard; then
     run_stage bevy-bsn-guard quick run_py scripts/quality/bevy_bsn_guard.py --mode enforce
+fi
+if maybe bevy-scene-gate; then
+    # Bevy 场景律法（BSN 唯一构造 + rem 唯一 authored 长度）的执行器随共享包
+    # zhuge-ui-kit 一起发布；此处是同一份文件的拷贝，台账记录其摘要，改动必须同步。
+    run_stage bevy-scene-gate quick run_py scripts/quality/bevy_scene_gate.py \
+        --root crates/taskmanager-bevy-ui/src \
+        --baseline scripts/quality/bevy_scene_ratchet.json
+fi
+if maybe bevy-rem-guard-self; then
+    run_stage bevy-rem-guard-self quick run_py scripts/quality/bevy_rem_guard.py --self-test
+fi
+if maybe bevy-rem-guard; then
+    run_stage bevy-rem-guard quick run_py scripts/quality/bevy_rem_guard.py --mode enforce
+fi
+if maybe bevy-scene-gate-test; then
+    run_stage bevy-scene-gate-test quick run_py scripts/quality/test_bevy_scene_gate.py
 fi
 if maybe bevy-world-access-self; then
     run_stage bevy-world-access-self quick run_py scripts/quality/bevy_world_access_guard.py --self-test

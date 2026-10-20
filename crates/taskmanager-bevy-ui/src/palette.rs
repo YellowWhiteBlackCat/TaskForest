@@ -126,10 +126,18 @@ impl UiPalette {
     }
 
     /// The live inline icon extent in logical px, derived from the rem ratio
-    /// and the current rem size.
+    /// and the current rem size. The inline text-flow box is the one engine-px
+    /// seam; the node-based icon rides `icon_rem` directly.
     #[must_use]
     pub(crate) fn icon_size_px(&self) -> f32 {
         self.icon_rem * self.rem_px
+    }
+
+    /// A px length expressed in the live rem ratio, for the rare length that
+    /// mixes a type-ladder step with a fixed spacing token.
+    #[must_use]
+    pub(crate) fn rem_ratio(&self, px: f32) -> f32 {
+        px / self.rem_px
     }
 }
 

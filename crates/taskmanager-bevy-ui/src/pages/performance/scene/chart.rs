@@ -19,7 +19,11 @@ pub(crate) fn curve_card_scene(
 ) -> impl Scene + use<> {
     let title = curve.title();
     let caption = curve_caption(shell, curve);
-    let strip_height = palette.control_height_px() * 3.0;
+    // The strip budget rides the rem axis: the scene declares the rem ratio
+    // and the polyline math resolves the same budget in px against the live
+    // rem size, so the chart and its segments can never disagree.
+    let strip_height_rem = palette.control_height_rem * 3.0;
+    let strip_height_px = strip_height_rem * palette.rem_px;
     let samples = curve_samples(shell, curve);
     // The polyline is the only curve render path (M2): the bounded,
     // gap-aware projection feeds rotated 2px segments — the same visual
@@ -28,7 +32,7 @@ pub(crate) fn curve_card_scene(
         crate::widgets::chart::line_segments_scaled(
             &window(&shell.history, curve.series()),
             CHART_STRIP_WIDTH_PX,
-            strip_height,
+            strip_height_px,
             MAX_CHART_POINTS,
             100.0,
         )
@@ -64,12 +68,12 @@ pub(crate) fn curve_card_scene(
 
                 Node {
                     width: percent(100),
-                    height: px(strip_height),
+                    height: rem(strip_height_rem),
                     position_type: PositionType::Relative,
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                     @chart_grid_scene(strip_height, palette) --
+                     @chart_grid_scene(strip_height_px, palette) --
 
                         Node {
                             width: px(CHART_STRIP_WIDTH_PX),

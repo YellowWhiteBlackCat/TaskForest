@@ -177,30 +177,38 @@ fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
 /// gap-aware polyline adapter (one visual grammar across the whole page), and
 /// an empty window remains visually empty. The strip is static per sidebar
 /// rebuild — the page refresh recreates it with the folded window.
+/// The smallest graph budget, in rem: one pixel at the 16px baseline. The
+/// graph never collapses to a zero-height strip.
+const MIN_GRAPH_HEIGHT_REM: f32 = 0.0625;
+
 fn activity_graph_scene(
     samples: &[f32],
     color: bevy::color::Color,
-    height: f32,
+    height_rem: f32,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
-    let height = height.max(1.0);
-    let width = palette.control_height_px() * 2.0;
-    let segments = line_segments(samples, width, height, MAX_CHART_POINTS);
+    // The graph budget rides the rem axis: the node declares the rem ratio
+    // and the polyline math resolves the same budget in px against the live
+    // rem size, so the graph and its segments can never disagree.
+    let height_rem = height_rem.max(MIN_GRAPH_HEIGHT_REM);
+    let height_px = height_rem * palette.rem_px;
+    let width_px = palette.control_height_px() * 2.0;
+    let segments = line_segments(samples, width_px, height_px, MAX_CHART_POINTS);
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: px(height),
+            height: rem(height_rem),
             position_type: PositionType::Relative,
         }
         Children [
 
                 Node {
                     width: percent(100),
-                    height: px(height),
+                    height: rem(height_rem),
                     position_type: PositionType::Relative,
                 }
                 Children [
-                     @chart_grid_scene(height, palette) --
+                     @chart_grid_scene(height_px, palette) --
 
                         Node {
                             width: percent(100),
@@ -226,22 +234,22 @@ fn sidebar_activity_scene(
     color: bevy::color::Color,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
-    let height = palette.control_height_px() * 1.35;
-    let graph = activity_graph_scene(samples, color, height, palette);
+    let height_rem = palette.control_height_rem * 1.35;
+    let graph = activity_graph_scene(samples, color, height_rem, palette);
     Box::new(bsn! {
         Node {
             width: rem(palette.control_height_rem * 3.0),
-            height: px(height),
+            height: rem(height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_2()),
         }
         Children [
-             @{ crate::icons::icon_scene(icon, 16.0, palette.dim_color) } --
+             @{ crate::icons::icon_scene(icon, palette, palette.dim_color) } --
 
                 Node {
                     width: rem(palette.control_height_rem * 2.0),
-                    height: px(height),
+                    height: rem(height_rem),
                 }
                 Children [
                      @{ graph }

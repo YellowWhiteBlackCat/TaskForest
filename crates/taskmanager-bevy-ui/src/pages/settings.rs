@@ -45,7 +45,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, Node, Overflow, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, FlexDirection, Node, Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ScrollArea, ValueChange};
@@ -623,7 +623,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            Node { min_height: px(context.palette.control_height_px() + space_8()), flex_shrink: 0.0 }
+            Node { min_height: rem(context.palette.control_height_rem + context.palette.rem_ratio(space_8())), flex_shrink: 0.0 }
             SettingsHeading
             Children [ Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ] --
             Node {
@@ -635,7 +635,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             SettingsBody
             Children [ { rows } ] --
 
-                Node { min_height: px(context.palette.control_height_px() + space_8()), flex_shrink: 0.0 }
+                Node { min_height: rem(context.palette.control_height_rem + context.palette.rem_ratio(space_8())), flex_shrink: 0.0 }
                 SettingsFooter
                 Children [
                     Text("Choices apply live through the shared shell seams and persist across sessions through the shared config coordinator")

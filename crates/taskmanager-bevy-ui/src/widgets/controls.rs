@@ -46,7 +46,7 @@ pub(crate) fn sort_indicator_scene(
     };
     vec![crate::icons::inline_icon_scene(
         icon,
-        palette.icon_size_px(),
+        palette,
         palette.dim_color,
     )]
 }

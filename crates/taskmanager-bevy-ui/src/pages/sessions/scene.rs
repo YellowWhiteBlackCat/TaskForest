@@ -190,7 +190,6 @@ pub(super) fn session_row_scene(
     } else {
         Color::NONE
     };
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let session_width = widths[0].width_px;
     let user_width = widths[1].width_px;
@@ -201,7 +200,7 @@ pub(super) fn session_row_scene(
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: px(height),
+            height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),

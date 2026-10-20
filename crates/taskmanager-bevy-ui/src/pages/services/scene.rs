@@ -28,12 +28,11 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         palette.nav_active_ink
     };
     let width = space_24() * 10.0;
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {
             width: px(width),
-            height: px(height),
+            height: rem(palette.control_height_rem),
             align_items: AlignItems::Center,
             padding: Val::Px(space_8()),
             border_radius: BorderRadius::all(Val::Px(radius)),
@@ -342,7 +341,6 @@ pub(super) fn service_row_scene(
     };
     let chip = chip_fill(service_chip(row.status), palette);
     let target = row.target.clone();
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let name_width = widths[0].width_px;
     let status_width = widths[1].width_px;
@@ -350,7 +348,7 @@ pub(super) fn service_row_scene(
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: px(height),
+            height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),
@@ -379,7 +377,7 @@ pub(super) fn service_name_cell_scene(
     let alert = if cycle {
         vec![crate::icons::icon_scene(
             IconId::Alert,
-            12.0,
+            palette,
             palette.warning_color,
         )]
     } else {

@@ -6,6 +6,21 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.3.2] — 2026-10-20
+
+### 修复
+
+- **Bevy 前端（B）的「界面尺寸」档位现在完整缩放类型阶梯**：控件/行高、图标尺寸与字号
+  全部走 rem 轴，改 Small/Standard/Large 时表面按档位整体重算（此前图标尺寸写死为
+  像素值，不随档位变化）；rem 尺寸轴同时由 `bevy_rem_guard.py` 门禁机械强制。
+
+### 变更
+
+- **Bevy 场景律法升级为机械门禁**：`bevy_bsn_guard.py`（唯一 `bsn!` 构造路线）、
+  `bevy_rem_guard.py`（rem 尺寸轴：零 `FontSize::Px`、px 派生值不作布局长度、图标
+  适配器不收裸数字尺寸）与 `bevy_scene_gate.py`（共享包 `zhuge-ui-kit` 随 crate 发布的
+  唯一执行器，禁硬编码非零 px 字面量，存量走棘轮台账）注册进 quick 门禁与 CI。
+
 ## [0.3.1] — 2026-10-18
 
 ### 新增
