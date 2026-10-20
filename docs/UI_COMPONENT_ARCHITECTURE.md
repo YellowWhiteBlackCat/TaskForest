@@ -163,8 +163,8 @@ TaskForest 践行“求同存异”端际契约治理：四端（GPUI、Iced、T
 
 ## 视觉不变量
 
-- 颜色只能来自 `taskmanager_theme` token；禁止在组件中新增产品色 literal。
-- 间距、字体、行高、圆角和动画使用 token；`px(...)` 只用于明确的几何合同。
+- 颜色只能来自 `taskmanager_theme` token；禁止在组件中新增产品色 literal。间距、字体、行高、
+  圆角和动画使用 token；`px(...)` 只用于明确的几何合同（Bevy 前端升格为 rem 尺寸轴并机械强制）。
 - 可选择的应用汇总行使用 `ProcessRowId::Application(root_identity)`；root identity 仅是实时树查找键，
   不是代表 PID。分类标题是结构行，真实进程行才使用 `ProcessRowId::Process(identity)`。
 - 渲染入口先完成数据 fold；同一 projection 同时服务鼠标、键盘和辅助技术。

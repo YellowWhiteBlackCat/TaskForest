@@ -68,6 +68,20 @@
     `insert`；反向封死即正向保证。`scripts/quality/bevy_bsn_guard.py`
     机械强制（001 UI 构造出景 / 002 手动挂子 / 003 直接 spawn / 004 括号
     失衡 / 005 template_value 硬零 / 006 创建链 insert）。
+- **rem 尺寸轴铁律（2026-10-20 起）**：类型阶梯（控件/行高、图标尺寸、
+  字号、行高）只走 rem 轴——`rem(palette.control_height_rem …)`、
+  `rem(palette.icon_rem)`、`FontSize::Rem`。palette 的 px 派生值
+  （`control_height_px` / `icon_size_px`）是**纯算术专用**（行计数、虚拟窗口、
+  折线段几何），永不作布局长度来源；图标适配器自持尺寸，调用点不得传裸数字。
+  px 只属于真实几何合同（发丝线、边框、半径、固定窗口几何）与引擎 px 缝
+  （行内 `InlineBox` 流框，由 palette 图标档位换算）。
+  机械强制：`scripts/quality/bevy_rem_guard.py`（BEVY-REM-001 字号零
+  `FontSize::Px` / BEVY-REM-002 px 派生值不作布局长度，含直接写入、`let`
+  绑定与跨函数传参三条路径 / BEVY-REM-003 图标适配器不得收裸数字尺寸）；
+  `scripts/quality/bevy_scene_gate.py`（共享包 `zhuge-ui-kit` 随 crate 发布的
+  唯一执行器）禁硬编码非零 px 字面量，存量 85 处记在
+  `scripts/quality/bevy_scene_ratchet.json` 棘轮台账，台账外新增立即失败。
+  两者均注册进 `scripts/quality/local-gates.sh` 与 CI。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
 - Linux 窗口仅支持 Wayland；X11 已被全面废弃，非 Wayland 或纯终端环境由 TaskForest-T 承载。
@@ -78,6 +92,9 @@
   （Small/Standard/Large，正文 14/16/18px）驱动；类型阶梯长度一律 `rem(...)`/
   `FontSize::Rem`，文本无关节点的 `EmSize` 由 `sync_node_em_size` 钉住。设置页
   「界面尺寸」行写共享 config 的 `ui_size` 权威，捕获经 `TM_UI_SIZE` 选档。
+  控件/行高是 `rem(palette.control_height_rem)`，图标是
+  `rem(palette.icon_rem)`（节点式）或 `palette.icon_size_px()`（行内流框），
+  两者同源同档位：改档位即整条类型阶梯重算，场景不必重建。
 - **headless `TabList`**：导航 strip 与属性弹窗页签是 `TabList`+`Tab`（共享
   tablist/tab 无障碍角色与漫游箭头焦点）；`Route`/呈现 section 是唯一选择权威，
   条带经 `SelectedTab` 单向镜像，点选走 typed `ValueChange`。
@@ -87,7 +104,9 @@
 - **`FixedNode` 浮层**：确认面、tooltip、菜单浮窗的根节点视口锚定
   （不继承 shell 布局、裁剪与变换），替代 `PositionType::Absolute` 惯用法。
 - **`InlineBox`/`InlineImage` 行内图文**：排序方向板等语义图标以 `InlineIcon`
-  流入文字布局（与标签同线裁切对齐），位图句柄由观察者 typed 补全。
+  流入文字布局（与标签同线裁切对齐），位图句柄由观察者 typed 补全；流框几何是
+  唯一的引擎 px 缝（bevy_text 以逻辑像素量 inline box），尺寸仍由 palette
+  图标档位换算。
 
 ## 数据接缝
 

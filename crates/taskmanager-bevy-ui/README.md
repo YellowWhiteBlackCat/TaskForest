@@ -54,7 +54,8 @@ area; a successful SMBIOS or NPU lane remains visible while static hardware is
 unavailable.
 
 The 100% `bsn!` authoring law lives in
-[`docs/BSN_AUTHORING.md`](docs/BSN_AUTHORING.md); the dependency whitelist,
+[`docs/BSN_AUTHORING.md`](docs/BSN_AUTHORING.md); the rem sizing axis (the
+type ladder rides rem, never px), the dependency whitelist,
 locked Bevy version and two-Worlds rule are charter law in
 [`docs/BEVY_UI_FRONTEND.md`](docs/BEVY_UI_FRONTEND.md). Bevy types never cross
 this crate's public API; Linux windowing is Wayland-only.
@@ -74,8 +75,11 @@ Performance scene module (`src/pages/performance/scene.rs`) is the default
 composition reference for new Bevy UI work.
 
 Verify with `cargo check --locked -p taskmanager-bevy-ui --tests`,
-`bash scripts/accept-bevy-interactions.sh`, and
-`cargo clippy --locked -p taskmanager-bevy-ui --tests`; guard details,
+`bash scripts/accept-bevy-interactions.sh`,
+`cargo clippy --locked -p taskmanager-bevy-ui --tests`,
+`python3 scripts/quality/bevy_bsn_guard.py --mode enforce` (100% `bsn!` law)
+and `python3 scripts/quality/bevy_rem_guard.py --mode enforce` (rem sizing
+axis); guard details,
 headless suite and capture flow live in
 [`docs/VERIFICATION.md`](docs/VERIFICATION.md) and
 [`docs/QUALITY_GATES.md`](../../docs/QUALITY_GATES.md).

@@ -80,11 +80,10 @@ pub(crate) struct ProcessColumnToggleId(pub(crate) &'static str);
 /// Scene for the "Choose columns" button mounted in the processes toolbar.
 pub(crate) fn choose_columns_button_scene(palette: &UiPalette) -> impl Scene + use<> {
     let label = t("proc.choose_columns");
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     bsn! {
         Node {
-            height: px(height),
+            height: rem(palette.control_height_rem),
             padding: UiRect::axes(Val::Px(space_16()), Val::Px(space_4())),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,

@@ -25,6 +25,10 @@ scripts/capture-bevy.sh
 scripts/capture_bevy_scenarios.tsv
 scripts/quality/local-gates.sh
 scripts/quality/bevy_bsn_guard.py
+scripts/quality/bevy_rem_guard.py
+scripts/quality/bevy_scene_gate.py
+scripts/quality/bevy_scene_ratchet.json
+scripts/quality/test_bevy_scene_gate.py
 scripts/validate_bevy_matrix.py
 docs/BEVY_UI_FRONTEND.md
 locales/en.json

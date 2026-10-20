@@ -57,7 +57,7 @@ use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px,
+    UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{
@@ -805,7 +805,6 @@ pub(crate) fn tab_icon(page: Page) -> IconId {
 /// ellipses labels instead of pushing the trailing buttons out of the strip.
 fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
     let label = page.nav_label().to_owned();
-    let height = palette.control_height_px() * 1.4;
     let radius = palette.control_radius_px;
     let fill = nav_item_background(active, palette);
     let ink = if active {
@@ -817,7 +816,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         Node {
             flex_grow: 1.0,
             min_width: px(0.0),
-            height: px(height),
+            height: rem(palette.control_height_rem * 1.4),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -830,7 +829,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         ControlVisual(ControlTone::Nav, active)
         Tab
         Children [
-             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE --
+             @{ crate::icons::icon_scene(tab_icon(page), palette, ink) } NavItemLabel Pickable::IGNORE --
 
                 Node {
                     min_width: px(0.0),
@@ -851,7 +850,6 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
 /// Trailing strip affordance for the two frontend-owned routes: a compact
 /// square icon button (Alerts bell, Settings gear) — GPUI's gear slot.
 fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
-    let height = palette.control_height_px() * 1.4;
     let fill = nav_item_background(active, palette);
     let ink = if active {
         palette.nav_active_ink
@@ -860,8 +858,8 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
     };
     bsn! {
         Node {
-            width: px(height),
-            height: px(height),
+            width: rem(palette.control_height_rem * 1.4),
+            height: rem(palette.control_height_rem * 1.4),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
@@ -872,7 +870,7 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
         Button
         on(nav_button_activated)
         Children [
-             @{ crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE
+             @{ crate::icons::icon_scene(tab_icon(page), palette, ink) } NavItemLabel Pickable::IGNORE
         ]
     }
 }

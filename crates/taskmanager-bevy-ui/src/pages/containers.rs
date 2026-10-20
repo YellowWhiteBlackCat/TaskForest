@@ -15,7 +15,7 @@ use bevy::scene::{Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent,
-    px,
+    px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
@@ -247,7 +247,6 @@ fn header_scene(palette: &UiPalette) -> impl Scene + use<> {
 }
 
 fn container_row_scene(model: &ContainerRowModel, palette: &UiPalette) -> impl Scene + use<> {
-    let height = palette.control_height_px();
     let radius = palette.control_radius_px;
     let id = model.id.clone();
     let name = model.name.clone();
@@ -257,7 +256,7 @@ fn container_row_scene(model: &ContainerRowModel, palette: &UiPalette) -> impl S
     bsn! {
         Node {
             width: percent(100),
-            height: px(height),
+            height: rem(palette.control_height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),

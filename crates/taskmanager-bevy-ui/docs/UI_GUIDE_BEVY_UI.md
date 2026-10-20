@@ -84,6 +84,23 @@ Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单�
   `rem(...)`/`FontSize::Rem`，禁止为它们新增 `px(...)` 字面量或硬编码比例；
   px 只属于真实几何合同（边框、半径、固定窗口几何）。`RemSize` 由 palette 的
   UI-size 档位驱动，文本无关节点的 `EmSize` 由 `sync_node_em_size` 兜底。
+  **机械强制（2026-10-20 起）**：`scripts/quality/bevy_rem_guard.py`（BEVY-REM-001
+  字号零 `FontSize::Px`、BEVY-REM-002 px 派生值不得作布局长度、BEVY-REM-003 图标
+  适配器不得收裸数字尺寸）与 `scripts/quality/bevy_scene_gate.py`（共享包
+  `zhuge-ui-kit` 随 crate 发布的唯一执行器，UIK-REM-001 禁硬编码非零 px 字面量、
+  UIK-REM-002 字号必须 rem）都已注册进 `scripts/quality/local-gates.sh` 与 CI；
+  存量 85 处硬编码 px 字面量记在 `scripts/quality/bevy_scene_ratchet.json` 棘轮台账，
+  台账外新增立即失败。
+- **rem 轴写法（新增控件照此写）**：
+  - 控件/行高写 `rem(palette.control_height_rem)`（需要比例时
+    `rem(palette.control_height_rem * 2.8)`，比例必须挂在 palette 档位上）；
+  - 需要把固定间距并入 rem 长度时用 `palette.rem_ratio(space_8())` 把 px 间距
+    折成 rem 比例（`Val` 没有加法，`rem(a) + px(b)` 不存在）；
+  - 图标调用 `crate::icons::icon_scene(id, palette, ink)` /
+    `inline_icon_scene(id, palette, ink)`，尺寸由适配器按 palette 档位持有，
+    调用点不传尺寸；
+  - `palette.control_height_px()` / `icon_size_px()` 只出现在纯算术里
+    （行计数、虚拟窗口、折线段几何），绝不作为场景长度来源。
 - **headless `TabList`**：页签面（导航 strip、弹窗页签）用 `TabList`+`Tab`，
   点选经 typed `ValueChange<Option<Entity>>`；选择权威（`Route`/呈现 state）
   永远只有一个，条带经 `SelectedTab` 单向镜像，镜像挂在 `Ready` 上（场景声明期
@@ -94,4 +111,4 @@ Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单�
 - **`InlineIcon` 行内图文**：与文字同线的语义图标（表头排序板）用
   `crate::icons::inline_icon_scene`——`InlineBox`（几何权威）+ 标记组件在场景
   声明，位图句柄由观察者 typed 补全；图标随 ui_size 阶梯缩放
-  （`palette.icon_size_px()`）。
+  （`palette.icon_size_px()`，流框是唯一的引擎 px 缝）。

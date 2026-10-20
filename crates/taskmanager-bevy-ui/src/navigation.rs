@@ -60,7 +60,7 @@ fn toggle(
 pub(crate) fn button(palette: &UiPalette) -> impl Scene + use<> {
     bsn! {Node {width:rem(palette.control_height_rem*1.4),height:rem(palette.control_height_rem*1.4),align_items:AlignItems::Center,justify_content:JustifyContent::Center} Button NavigationToggle on(activate)
     crate::tooltip::TooltipText({t("navigation.toggle").to_owned()})
-    Children [@{crate::icons::icon_scene(IconId::Sidebar,18.0,palette.dim_color)} Pickable::IGNORE]}
+    Children [@{crate::icons::icon_scene(IconId::Sidebar,palette,palette.dim_color)} Pickable::IGNORE]}
 }
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<NavigationState>().add_observer(toggle);

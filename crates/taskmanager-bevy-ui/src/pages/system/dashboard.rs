@@ -31,7 +31,7 @@ use bevy::{
         UiSystems,
         prelude::{
             BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Overflow,
-            ScrollPosition, UiRect, percent, px,
+            ScrollPosition, UiRect, percent, px, rem,
         },
     },
     ui_widgets::{Activate, Button},
@@ -133,9 +133,8 @@ pub(crate) fn button(
     active: bool,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let height = palette.control_height_px();
     bsn! {
-        Node { min_height: px(height), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 }
+        Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 }
         Button DashboardControlButton(action) ControlVisual(ControlTone::Surface, active) on(activate)
         Children [ Text(label) TextRole(Role::Caption) ]
     }
@@ -156,9 +155,8 @@ pub(crate) fn toolbar(state: &SystemDashboardState, palette: &UiPalette) -> impl
             (IconId::NavigateUp, DashboardControl::Previous),
             (IconId::NavigateDown, DashboardControl::Next),
         ] {
-            let image = icon_scene(icon, 16.0, palette.body_color);
-            let height = palette.control_height_px();
-            controls.push(Box::new(bsn! { Node { width: px(height), min_height: px(height), flex_shrink: 0.0, padding: UiRect::all(px(space_8())) } Button DashboardControlButton(action) ControlVisual(ControlTone::Surface, false) on(activate) Children [ @{image} ] }));
+            let image = icon_scene(icon, palette, palette.body_color);
+            controls.push(Box::new(bsn! { Node { width: rem(palette.control_height_rem), min_height: rem(palette.control_height_rem), flex_shrink: 0.0, padding: UiRect::all(px(space_8())) } Button DashboardControlButton(action) ControlVisual(ControlTone::Surface, false) on(activate) Children [ @{image} ] }));
         }
         controls.push(Box::new(button(
             t("dashboard.hardware").into(),

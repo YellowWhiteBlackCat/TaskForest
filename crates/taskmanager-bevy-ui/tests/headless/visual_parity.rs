@@ -116,7 +116,8 @@ fn icon_plates_build_and_stamp_onto_spawned_scenes() {
     app.insert_resource(plates);
     app.add_observer(crate::icons::stamp_icon_plate);
     let ink = bevy::color::Color::srgb(0.2, 0.4, 0.6);
-    let scene = icon_scene(IconId::Cpu, 16.0, ink);
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let scene = icon_scene(IconId::Cpu, &palette, ink);
     let entity = app
         .world_mut()
         .spawn_scene(scene)

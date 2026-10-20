@@ -23,4 +23,8 @@ run_gate() {
 }
 
 run_gate "bsn-guard" timeout --kill-after=10s 120s python3 scripts/quality/bevy_bsn_guard.py --mode enforce
+run_gate "rem-guard" timeout --kill-after=10s 120s python3 scripts/quality/bevy_rem_guard.py --mode enforce
+run_gate "scene-gate" timeout --kill-after=10s 120s python3 scripts/quality/bevy_scene_gate.py \
+    --root crates/taskmanager-bevy-ui/src \
+    --baseline scripts/quality/bevy_scene_ratchet.json
 run_gate "interactions" bash scripts/accept-bevy-interactions.sh

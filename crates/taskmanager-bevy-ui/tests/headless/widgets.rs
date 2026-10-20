@@ -144,6 +144,7 @@ fn sorted_header_flows_the_direction_plate_inside_the_label_text() {
 
 #[test]
 fn inline_icon_stamps_a_typed_bitmap_payload_on_the_declared_flow_box() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let mut app = headless_scene_app();
     app.add_observer(stamp_inline_icon);
     app.init_asset::<Image>();
@@ -160,7 +161,7 @@ fn inline_icon_stamps_a_typed_bitmap_payload_on_the_declared_flow_box() {
     let root = world
         .spawn_scene(inline_icon_scene(
             IconId::Cpu,
-            16.0,
+            &palette,
             bevy::color::Color::WHITE,
         ))
         .expect("the inline icon scene resolves")
@@ -176,10 +177,10 @@ fn inline_icon_stamps_a_typed_bitmap_payload_on_the_declared_flow_box() {
     assert_eq!(image.image, handle, "the semantic plate handle is stamped");
     assert_eq!(
         image.width,
-        Some(16.0),
-        "the extent follows the declared box"
+        Some(palette.icon_size_px()),
+        "the extent follows the palette icon step"
     );
-    assert_eq!(image.height, Some(16.0));
+    assert_eq!(image.height, Some(palette.icon_size_px()));
     assert!(pickable, "the flow box never intercepts button clicks");
 }
 
