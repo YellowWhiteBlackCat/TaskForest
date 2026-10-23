@@ -5,6 +5,7 @@ use crate::{
     app::{FocusTarget, Message},
     focus,
     i18n::{self, Key},
+    theme,
 };
 use iced::Element;
 use iced::widget::{column, row, scrollable};
@@ -111,8 +112,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if app.compact_layout() {
         scrollable(row(toolbar_items).spacing(4))
             .direction(iced::widget::scrollable::Direction::Horizontal(
-                iced::widget::scrollable::Scrollbar::default(),
+                theme::scrollbar(),
             ))
+            .style(theme::scrollbar_style)
             .height(iced::Length::Fixed(36.0))
             .width(iced::Length::Fill)
             .into()
@@ -123,8 +125,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
         // action without changing the page's vertical budget.
         scrollable(row(toolbar_items).spacing(4))
             .direction(iced::widget::scrollable::Direction::Horizontal(
-                iced::widget::scrollable::Scrollbar::default(),
+                theme::scrollbar(),
             ))
+            .style(theme::scrollbar_style)
             .height(iced::Length::Fixed(36.0))
             .width(iced::Length::Fill)
             .into()
@@ -138,6 +141,10 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // had disappeared behind the right edge even though they were reachable.
     if app.nav_orientation == NavOrientation::Vertical {
         let rail = scrollable(column(page_tabs).spacing(6))
+            .direction(iced::widget::scrollable::Direction::Vertical(
+                theme::scrollbar(),
+            ))
+            .style(theme::scrollbar_style)
             .width(iced::Length::Fixed(app.navigation_rail_width()))
             .height(iced::Length::Fill)
             .into();
@@ -150,8 +157,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
                 .padding([f32::from(tokens::SPACE_2), f32::from(tokens::SPACE_4)]),
         )
         .direction(iced::widget::scrollable::Direction::Horizontal(
-            iced::widget::scrollable::Scrollbar::default(),
+            theme::scrollbar(),
         ))
+        .style(theme::scrollbar_style)
         .height(iced::Length::Fixed(44.0))
         .width(iced::Length::Fill);
         column![page_nav, toolbar]

@@ -91,8 +91,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (ColumnDragResize, Ported),
         (VirtualList, Ported),
         (Tree, Ported),
-        // Scrolling trusts iced's own scrollable: viewport tracking and
-        // wheel semantics belong to the toolkit here.
+        // Scrolling rides iced's own scrollable with the product's capsule thumb
+        // and translucent floating rail (styled_scrollable + theme::scrollbar_style).
         (
             Scrollbar,
             Native {

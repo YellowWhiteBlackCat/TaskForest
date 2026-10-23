@@ -1,9 +1,9 @@
 //! Health cards consume cached canonical filesystem, sensor and SMART groups.
 use crate::app::{FocusTarget, Message};
-use crate::ui::components::{key_value_rows, titled_card};
+use crate::ui::components::{key_value_rows, styled_scrollable, titled_card};
 use crate::ui::system_dashboard::SystemDashboardMessage;
 use crate::{IcedApp, focus};
-use iced::widget::{column, row, scrollable};
+use iced::widget::{column, row};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::smart::SmartSelfTestKind;
@@ -89,7 +89,7 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
     .wrap();
     column![
         tabs,
-        scrollable(body)
+        styled_scrollable(body)
             .id("system-health-scroll")
             .height(Length::Fill)
     ]

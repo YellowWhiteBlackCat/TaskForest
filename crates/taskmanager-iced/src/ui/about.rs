@@ -1,11 +1,11 @@
 //! Independent application About over shared build metadata.
 
-use super::components::IcedElement;
+use super::components::{IcedElement, styled_scrollable};
 use super::overlays::bounded_modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use iced::Length;
-use iced::widget::{column, scrollable, text};
+use iced::widget::{column, text};
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
 use taskmanager_shell::presentation::about::metadata;
@@ -16,7 +16,7 @@ pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
         product::LICENSE_SPDX,
         product::REPOSITORY_URL,
     );
-    let body = scrollable(
+    let body = styled_scrollable(
         column![
             text(metadata.name).size(22),
             text(metadata.description),

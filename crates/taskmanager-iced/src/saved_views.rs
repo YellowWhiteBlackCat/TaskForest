@@ -104,8 +104,9 @@ pub fn presets_ribbon<'a>(
         let strip =
             iced::widget::scrollable(row(items).spacing(6).align_y(iced::Alignment::Center))
                 .direction(iced::widget::scrollable::Direction::Horizontal(
-                    iced::widget::scrollable::Scrollbar::default(),
+                    crate::theme::scrollbar(),
                 ))
+                .style(crate::theme::scrollbar_style)
                 .height(Length::Fixed(32.0))
                 .width(Length::Fill);
         crate::ui::saved_views::wheel_guard(strip.into())

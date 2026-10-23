@@ -19,7 +19,7 @@
 //! row that crossed a DECLARED ceiling wears the warning ink.
 
 use iced::widget::canvas::{self, Geometry, Path, Stroke};
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length, Point, Rectangle, Size};
 use taskmanager_application::container_row_window;
 use taskmanager_core::core::device_state::DeviceStatus;
@@ -36,7 +36,7 @@ use crate::i18n::{self, Key};
 use crate::theme;
 use taskmanager_theme::tokens;
 
-use super::components::message_panel;
+use super::components::{message_panel, styled_scrollable};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_theme::Theme;
@@ -621,7 +621,7 @@ fn container_table<'a>(
 
     // The page body owns the full remaining height (the old modal capped the
     // scroll at a fixed 360px card).
-    scrollable(
+    styled_scrollable(
         column(Some(header.into()).into_iter().chain(rows))
             .spacing(1)
             .width(Length::Fill),

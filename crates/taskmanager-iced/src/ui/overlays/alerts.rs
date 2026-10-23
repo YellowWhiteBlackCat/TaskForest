@@ -2,7 +2,7 @@
 //!
 //! Renders active alert rules, threshold settings, and recent alert event history.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::{
@@ -13,6 +13,7 @@ use taskmanager_theme::tokens;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use crate::ui::components::styled_compact_scrollable;
 use taskmanager_theme::Theme;
 
 pub fn alert_center_overlay<'a>(
@@ -95,7 +96,7 @@ pub fn alert_center_overlay<'a>(
             .spacing(8);
             col = col.push(item_row);
         }
-        scrollable(col)
+        styled_compact_scrollable(col)
             .height(Length::Fixed(200.0))
             .width(Length::Fill)
             .into()

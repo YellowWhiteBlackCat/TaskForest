@@ -4,7 +4,7 @@
 //! and the shared typed dependency lifecycle, while retry and log actions
 //! publish ordinary `Message` values back through the application edge.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -17,7 +17,9 @@ use taskmanager_theme::{Theme, tokens};
 
 use super::overlays::modal_overlay;
 use crate::app::{FocusTarget, Message};
-use crate::ui::components::{key_value_rows, titled_card};
+use crate::ui::components::{
+    key_value_rows, styled_compact_scrollable, styled_scrollable, titled_card,
+};
 use crate::{IcedApp, focus, theme};
 use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_shell::presentation::service_diagnostics_rows;
@@ -119,7 +121,7 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
 
     let body = column![
         header,
-        scrollable(
+        styled_scrollable(
             column![
                 titled_card(app.theme(), t("svc.lifecycle"), lifecycle_content),
                 titled_card(
@@ -372,7 +374,7 @@ fn logs_panel<'a>(
             let owner = app.text_selection_owner();
             let value_id = iced::advanced::widget::Id::from("svc-details-log-block");
             let is_owner = owner.as_ref() == Some(&value_id);
-            scrollable(
+            styled_compact_scrollable(
                 crate::ui::components::SelectableText::new(
                     value_id,
                     service_log_block(lines),

@@ -6,7 +6,7 @@
 //! layer so page input cannot leak through the modal.
 
 use crate::ui::smart_self_test_confirmation::confirmation;
-use iced::widget::{column, container, opaque, row, scrollable, text};
+use iced::widget::{column, container, opaque, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::{
@@ -20,7 +20,7 @@ use taskmanager_theme::{Theme, tokens};
 use crate::app::Message;
 use crate::focus;
 use crate::theme;
-use crate::ui::components::key_value_rows;
+use crate::ui::components::{key_value_rows, styled_scrollable};
 use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_core::core::SmartSelfTestPhase;
 use taskmanager_core::core::metrics::DiskMetrics;
@@ -249,7 +249,7 @@ fn suggestions_overlay<'a>(
         theme_snapshot,
         t("alerts.threshold_suggestions"),
         t("alerts.observed_hint"),
-        scrollable(column(rows).spacing(4))
+        styled_scrollable(column(rows).spacing(4))
             .height(Length::Fixed(260.0))
             .width(Length::Fill)
             .into(),

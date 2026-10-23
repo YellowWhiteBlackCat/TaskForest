@@ -239,9 +239,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                 header.into(),
                 table_body.into(),
                 Length::Fill,
-                iced::widget::scrollable::Direction::Vertical(
-                    iced::widget::scrollable::Scrollbar::default(),
-                ),
+                iced::widget::scrollable::Direction::Vertical(crate::theme::scrollbar()),
                 Message::StartupScrolled,
             );
             if let Some(banner) = source_notice_banner(

@@ -3,7 +3,7 @@
 //! Native typed actions never interpret the displayed command strings.
 
 use iced::Length;
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, row, text};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptInfo};
 use taskmanager_shell::presentation::first_run::first_run_failure_key;
@@ -13,7 +13,7 @@ use crate::focus;
 use crate::theme;
 use taskmanager_theme::tokens;
 
-use super::components::IcedElement;
+use super::components::{IcedElement, styled_scrollable};
 use super::overlays::bounded_modal_overlay;
 use taskmanager_theme::Theme;
 
@@ -43,7 +43,7 @@ pub(crate) fn render_first_run(app: &crate::IcedApp) -> IcedElement<'_> {
         None => discovering_body(theme, state),
         Some(info) => info_body(theme, state, info),
     };
-    let body = scrollable(
+    let body = styled_scrollable(
         column![text(t("first_run.description")), body].spacing(f32::from(tokens::SPACE_12)),
     )
     .height(Length::Fill)

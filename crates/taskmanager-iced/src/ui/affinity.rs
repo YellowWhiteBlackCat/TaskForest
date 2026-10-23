@@ -4,13 +4,14 @@
 //! owns its own geometry: a bounded wrapped chip grid, Iced focus IDs, and the
 //! modal's local loading/failure projection.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::ProcessAffinityState;
 use taskmanager_application::i18n::t;
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message};
+use crate::ui::components::styled_scrollable;
 use crate::{IcedApp, focus, theme};
 use taskmanager_shell::presentation::missing_value;
 
@@ -177,7 +178,7 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
                 .spacing(16)
                 .align_y(iced::Alignment::Center),
             preset_bar,
-            scrollable(grid).height(Length::Fixed(320.0)),
+            styled_scrollable(grid).height(Length::Fixed(320.0)),
             row![apply].width(Length::Fill),
         ]
         .spacing(8)

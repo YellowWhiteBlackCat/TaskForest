@@ -213,7 +213,7 @@ pub fn render_history_replay<'a>(
     }
 
     panel = panel.push(
-        iced::widget::scrollable(body)
+        crate::ui::components::styled_scrollable(body)
             .width(Length::Fill)
             .height(Length::Fill),
     );

@@ -305,11 +305,9 @@ fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
             .width(content_width)
             .height(Length::Fill)
             .direction(iced::widget::scrollable::Direction::Vertical(
-                iced::widget::scrollable::Scrollbar::new()
-                    .width(4)
-                    .scroller_width(4)
-                    .spacing(4),
-            )),
+                theme::compact_scrollbar(),
+            ))
+            .style(theme::compact_scrollbar_style),
     )
     .width(content_width)
     .height(Length::Fill)

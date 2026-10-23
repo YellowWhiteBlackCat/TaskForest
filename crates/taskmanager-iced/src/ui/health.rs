@@ -3,7 +3,7 @@
 //! rolling history (`suggest_threshold` — the same source as the TUI's
 //! alerts overlay, presented with iced widgets).
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_core::core::alerts::AlertMetric;
 use taskmanager_core::core::metrics::SystemSnapshot;
@@ -13,6 +13,7 @@ use taskmanager_theme::tokens;
 use crate::app::Message;
 use crate::i18n::{self, Key, Language};
 use crate::theme;
+use crate::ui::components::styled_scrollable;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
 use taskmanager_shell::ShellApp;
@@ -117,7 +118,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         theme_snapshot,
         i18n::t(language, Key::Health),
         i18n::t(language, Key::HealthObservedHint),
-        scrollable(column(modal_panels).spacing(12))
+        styled_scrollable(column(modal_panels).spacing(12))
             .id(BODY_SCROLL_ID)
             .height(Length::Fixed(430.0))
             .width(Length::Fill)

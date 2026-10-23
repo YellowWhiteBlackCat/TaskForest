@@ -226,9 +226,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                 header.into(),
                 table_body,
                 Length::Fill,
-                iced::widget::scrollable::Direction::Vertical(
-                    iced::widget::scrollable::Scrollbar::default(),
-                ),
+                iced::widget::scrollable::Direction::Vertical(crate::theme::scrollbar()),
                 Message::UsersScrolled,
             );
             if let Some(banner) = source_notice_banner(

@@ -33,7 +33,7 @@ unused_must_use = "deny"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"

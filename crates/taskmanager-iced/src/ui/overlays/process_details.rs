@@ -1,6 +1,6 @@
 //! Process properties and details modal projection for Iced.
 
-use iced::widget::{column, container, row, scrollable, text, text_input};
+use iced::widget::{column, container, row, text, text_input};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{
@@ -19,7 +19,7 @@ use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::focus;
-use crate::ui::components::key_value_rows;
+use crate::ui::components::{key_value_rows, styled_scrollable};
 mod performance;
 use performance::performance_tab;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
@@ -141,7 +141,9 @@ pub(crate) fn details_overlay<'a>(
             header,
             row(tabs).spacing(4).wrap(),
             row(facets).spacing(4).wrap(),
-            scrollable(body).height(Length::Fill).width(Length::Fill)
+            styled_scrollable(body)
+                .height(Length::Fill)
+                .width(Length::Fill)
         ]
         .spacing(8)
         .height(Length::Fill)

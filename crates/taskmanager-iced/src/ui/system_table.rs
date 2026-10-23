@@ -2,7 +2,7 @@
 
 use iced::advanced::widget::Id;
 use iced::widget::operation::{AbsoluteOffset, scroll_to};
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, row, text};
 use iced::{Element, Length, Task};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
@@ -13,7 +13,7 @@ use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::{duration, missing_value};
 use taskmanager_theme::tokens;
 
-use super::components::{key_value_rows, message_panel, titled_card};
+use super::components::{key_value_rows, message_panel, styled_scrollable, titled_card};
 use super::system_dashboard::{SystemDashboardMessage, window_controls};
 use super::tables::ListState;
 use crate::IcedApp;
@@ -132,7 +132,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         page.push(health::render(app)).into()
     } else {
         page.push(
-            scrollable(column(content).spacing(12))
+            styled_scrollable(column(content).spacing(12))
                 .id("system-facts-scroll")
                 .height(Length::Fill),
         )

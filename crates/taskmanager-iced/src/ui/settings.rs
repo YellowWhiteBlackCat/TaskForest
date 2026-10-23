@@ -14,7 +14,7 @@
 //! text-raster mode — is an explicit unavailable state, never a dead
 //! selector.
 
-use iced::widget::{column, scrollable, text};
+use iced::widget::{column, text};
 use iced::{Element, Length};
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontRole, Theme, tokens,
@@ -22,6 +22,7 @@ use taskmanager_theme::{
 
 use crate::app::{DeviceKind, FocusTarget, Message, PresentationPreferences, SettingsChange};
 use crate::i18n::{self, Key, Language};
+use crate::ui::components::styled_scrollable;
 
 use super::components::IcedElement;
 use super::components::{segmented, select, slider, switch};
@@ -99,7 +100,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         theme_snapshot,
         i18n::t(language, Key::Settings),
         t("settings.persist_hint"),
-        scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
+        styled_scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
             .height(Length::Fill)
             .width(Length::Fill)
             .into(),
