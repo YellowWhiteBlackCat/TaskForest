@@ -42,7 +42,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 120
     env:
-      RUSTFLAGS: -D warnings -C link-arg=-Wl,-no_compact_unwind
+      RUSTFLAGS: -D warnings -A linker_messages
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.99.0
