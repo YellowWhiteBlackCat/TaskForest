@@ -18,6 +18,7 @@
 mod control;
 pub mod evidence;
 mod init_source;
+pub mod phases;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;

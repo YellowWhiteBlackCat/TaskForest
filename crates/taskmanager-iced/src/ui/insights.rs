@@ -12,15 +12,14 @@
 //! Extracted from [`super::overlays`] so the overlays module stays under the
 //! repository's source-size budget.
 use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ConnectionAddressFamily;
-use taskmanager_core::core::process_telemetry::ConnectionTransport;
 use taskmanager_core::core::process_telemetry::ProcessConnection;
-use taskmanager_shell::presentation::capabilities_summary;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;
+mod chips;
 mod helpers;
 pub(crate) use helpers::*;
+mod pills;
 
 use iced::Element;
 use iced::widget::{column, text};
@@ -132,7 +131,11 @@ fn network_section<'a>(
                 ));
             } else {
                 for connection in network.connections.iter() {
-                    rows.push(muted_text(theme_snapshot, format_connection(connection)));
+                    rows.push(pills::connection_row(
+                        theme_snapshot,
+                        connection,
+                        t("net.rtt"),
+                    ));
                 }
             }
             (heading, rows)
@@ -169,18 +172,14 @@ fn escalation_pill<'a>(
 /// One connection readout line: `{transport}  {local} → {remote}` with
 /// family-aware transport naming (TCP6/UDP6), mirroring gpui's
 /// `format_connection` so the local/remote endpoints are never dropped.
+///
+/// The plain-text parity seam: the facet renders the semantic capsules of
+/// [`pills::connection_row`], and this line keeps the single-string readout
+/// the reference shell prints.
+#[cfg_attr(not(test), allow(dead_code))]
 #[must_use]
 fn format_connection(connection: &ProcessConnection) -> String {
-    let transport = match (&connection.transport, &connection.family) {
-        (ConnectionTransport::Tcp, ConnectionAddressFamily::Ipv6) => "TCP6".to_string(),
-        (ConnectionTransport::Udp, ConnectionAddressFamily::Ipv6) => "UDP6".to_string(),
-        _ => connection.transport.to_string(),
-    };
-    let scope = if connection.is_loopback() {
-        "LOOPBACK"
-    } else {
-        "EXTERNAL"
-    };
+    let readout = pills::connection_readout(connection);
     let rtt = connection
         .rtt_ms
         .filter(|value| value.is_finite() && *value >= 0.0)
@@ -188,8 +187,8 @@ fn format_connection(connection: &ProcessConnection) -> String {
             format!(" · {} {value:.1} ms", t("net.rtt"))
         });
     format!(
-        "{transport} [{} · {scope}]  {} → {}{rtt}",
-        connection.state, connection.local, connection.remote
+        "{} [{} · {}]  {}{rtt}",
+        readout.transport, connection.state, readout.scope, readout.endpoints
     )
 }
 
@@ -415,13 +414,15 @@ pub(crate) fn isolation_section<'a>(
                     .as_deref()
                     .map_or_else(|| t("proc_insights.unknown").to_owned(), str::to_owned),
             ));
-            rows.push(kv_row(
+            // The seccomp mode is a code token: it wears the monospace tag
+            // background instead of reading as prose.
+            rows.push(kv_row_element(
                 theme_snapshot,
                 t("proc_insights.seccomp").to_string(),
-                isolation.seccomp_mode.map_or_else(
-                    || t("proc_insights.unknown").to_owned(),
-                    |mode| mode.to_string(),
-                ),
+                match isolation.seccomp_mode {
+                    Some(mode) => chips::mono_chip(theme_snapshot, mode.to_string()),
+                    None => muted_text(theme_snapshot, t("proc_insights.unknown")),
+                },
             ));
             rows.push(kv_row(
                 theme_snapshot,
@@ -439,14 +440,16 @@ pub(crate) fn isolation_section<'a>(
                     |scope| scope.to_string(),
                 ),
             ));
-            rows.push(kv_row(
+            // The capability bits are code tokens: each effective bit wears
+            // the monospace tag background, so a permission set reads as a
+            // list of named capabilities rather than a run-on sentence.
+            rows.push(kv_row_element(
                 theme_snapshot,
                 t("proc_insights.capabilities").to_string(),
-                isolation
-                    .capabilities
-                    .as_ref()
-                    .map(capabilities_summary)
-                    .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
+                match isolation.capabilities.as_ref() {
+                    Some(capabilities) => chips::capability_chips(theme_snapshot, capabilities),
+                    None => muted_text(theme_snapshot, t("proc_insights.unknown")),
+                },
             ));
             rows.push(kv_row(
                 theme_snapshot,
@@ -681,3 +684,7 @@ fn gpu_engines_section<'a>(
 #[cfg(test)]
 #[path = "../../tests/gui/ui/insights/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/insights/pills_tests.rs"]
+mod pills_tests;

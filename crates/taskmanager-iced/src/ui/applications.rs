@@ -24,9 +24,11 @@ use taskmanager_theme::tokens::FONT_CAPTION;
 use taskmanager_theme::tokens::SPACE_8;
 use taskmanager_ui_contract::find;
 
+mod emphasis;
 mod priority_choice;
 use priority_choice::{PriorityChoice, selection_hint};
 mod process_menu;
+mod sort_tint;
 
 pub(crate) mod aggregate_projection;
 pub(crate) mod page;
@@ -426,6 +428,12 @@ pub(crate) fn trend_header_index_for(columns: &[(SortCol, f32)]) -> usize {
 /// ordinary header clicks keep sorting.
 const PROCESS_HEADER_RESIZE_EDGE_PX: f32 = 6.0;
 
+/// The horizontal inset of a header cell's caption inside its cell: the
+/// clickable button's own padding. The caption therefore never touches the
+/// cell's edge, and the body cell under it (which paints flush against its
+/// cell edge) keeps the same column boundary.
+pub(crate) const HEADER_CELL_INSET_X: f32 = 4.0;
+
 /// Build one clickable header cell: the column label plus the ▲/▼ marker on the
 /// active sort column, with the whole column-width surface a click target that
 /// emits [`Message::SortBy`]. Inactive columns are still clickable so a click
@@ -467,7 +475,7 @@ fn header_cell(
     )
     .on_press(sort_action.clone())
     .style(move |_theme, status| theme::header_button_style(theme_snapshot, status, active))
-    .padding([2.0, 4.0])
+    .padding([2.0, HEADER_CELL_INSET_X])
     .width(Length::Fixed(width));
     let sort_button = focus::focusable_control(
         theme_snapshot,
@@ -476,7 +484,7 @@ fn header_cell(
         sort_action,
     );
     if !column_resizable(column) {
-        return sort_button;
+        return tinted_header_cell(theme_snapshot, active_sort.0, column, sort_button);
     }
     // Resize edge: a `mouse_area` strip over the cell's trailing edge. The
     // strip's press is captured before the sort button underneath sees the
@@ -494,7 +502,7 @@ fn header_cell(
         start_width: width,
     })
     .interaction(iced::mouse::Interaction::ResizingColumn);
-    Stack::new()
+    let stacked: Element<'_, Message, iced::Theme, iced::Renderer> = Stack::new()
         .push(sort_button)
         .push(
             container(edge)
@@ -503,7 +511,60 @@ fn header_cell(
                 .align_x(Horizontal::Right),
         )
         .width(Length::Fixed(width))
-        .into()
+        .into();
+    tinted_header_cell(theme_snapshot, active_sort.0, column, stacked)
+}
+
+/// Wash one header cell with the sorted-column tint when it belongs to the
+/// active sort column. The wash is translucent, so the table surface reads
+/// through it and the accent label of the active column keeps its contrast.
+fn tinted_header_cell<'a>(
+    theme_snapshot: &'a Theme,
+    active_sort: SortCol,
+    column: SortCol,
+    cell: Element<'a, Message, iced::Theme, iced::Renderer>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    match sort_tint::sort_tint_style(theme_snapshot, active_sort, column) {
+        Some(style) => container(cell).style(move |_| style).into(),
+        None => cell,
+    }
+}
+
+/// The Applications table's sticky header row: one header cell per visible
+/// column plus the non-sortable Trend cell, laid out over the SHARED row
+/// geometry — the same row padding and the same column gutter the body rows
+/// use. The header therefore cannot drift off its columns: a header cell and
+/// the body cells under it share one left inset and one column pitch.
+///
+/// The non-sortable Trend header sits immediately after the CPU column
+/// (Pid, Name, Cpu → Trend) so it lines up with the per-row sparkline cell
+/// below. It is NOT part of `apps_columns` (no `SortCol` — a per-row visual
+/// has no underlying scalar to rank), mirroring the gpui processes_view
+/// chrome (`i18n::t("proc.trend")`, width 56, left-aligned, muted).
+#[must_use]
+pub(crate) fn applications_header_row<'a>(
+    theme_snapshot: &'a Theme,
+    visible_columns: &[(SortCol, f32)],
+    active_sort: (SortCol, SortDir),
+    compact: bool,
+    table_extent: f32,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let mut header_cells: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = visible_columns
+        .iter()
+        .map(|(column, width)| header_cell(theme_snapshot, *column, *width, active_sort))
+        .collect();
+    header_cells.insert(
+        trend_header_index_for(visible_columns),
+        trend_header_cell(theme_snapshot),
+    );
+    container(
+        row(header_cells)
+            .padding(theme::row_padding(compact))
+            .spacing(theme::table_column_spacing()),
+    )
+    .height(Length::Fixed(APPLICATION_HEADER_HEIGHT))
+    .width(Length::Fixed(table_extent))
+    .into()
 }
 
 /// Localized Applications header labels. The shell owns sort identity and
@@ -534,6 +595,18 @@ pub(crate) fn localized_sort_column_label(column: SortCol) -> &'static str {
 #[cfg(test)]
 #[path = "../../tests/gui/ui/applications_header_tests.rs"]
 mod applications_header_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/applications_sort_tint_tests.rs"]
+mod applications_sort_tint_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/applications_emphasis_tests.rs"]
+mod applications_emphasis_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/applications_column_alignment_tests.rs"]
+mod applications_column_alignment_tests;
 
 /// Intrinsic width of the Applications table content. Iced's scrollable
 /// defaults to a shrink-to-fit content strategy; without an explicit width a

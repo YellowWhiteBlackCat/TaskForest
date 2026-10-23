@@ -270,6 +270,14 @@ const fn ascii_glyph(icon: IconId) -> &'static str {
         IconId::CircleCheck => "+",
         IconId::TriangleAlert => "!",
         IconId::History => "H",
+        // The session / runtime / lock semantics. The TUI draws an ASCII
+        // fallback for every semantic id, so the new ones need one too.
+        IconId::Terminal => "T",
+        IconId::Display => "D",
+        IconId::Docker => "K",
+        IconId::Podman => "M",
+        IconId::Lock => "L",
+        IconId::Remote => "N",
     }
 }
 

@@ -12,13 +12,14 @@ use crate::pages::settings::ThemePreferences;
 use crate::pages::startup::menu::StartupMenuCtx;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{UiPalette, space_8, space_24};
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -37,6 +38,11 @@ use std::marker::PhantomData;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
+
+/// The modal surface's maximum width, in rem: the widest a shell surface
+/// (the sidebar editor, the event center, the about box) may grow before it
+/// starts scrolling its own body.
+const WINDOW_SURFACE_MAX_WIDTH_REM: f32 = 42.5;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum WindowSurfaceKind {
@@ -335,10 +341,7 @@ fn paint_surface(mut render: SurfaceRender) {
     }
     if let Some(scene) = scene {
         let overlay = render.commands.spawn_scene(scene).id();
-        render
-            .commands
-            .entity(root)
-            .add_one_related::<ChildOf>(overlay);
+        attach_child(&mut render.commands, root, overlay);
     }
     render.paint.dirty = false;
 }
@@ -357,7 +360,7 @@ pub(crate) fn modal_scene(
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
         BackgroundColor({ palette.scrim }) WindowSurfaceOverlay({ kind })
         Children [
-            Node { width: percent(90), max_width: px(680.0), height: percent(90), max_height: percent(90), min_height: px(0.0), min_width: px(0.0),
+            Node { width: percent(90), max_width: rem(WINDOW_SURFACE_MAX_WIDTH_REM), height: percent(90), max_height: percent(90), min_height: px(0.0), min_width: px(0.0),
                 flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()), padding: UiRect::all(Val::Px(space_24())), border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)) }
             BackgroundColor({ palette.panel_fill })
             Children [

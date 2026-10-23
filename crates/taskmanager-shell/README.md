@@ -59,6 +59,8 @@ src/presentation.rs                 renderer-neutral presentation helpers
 src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
 ├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs  smart.rs
+├── smart_tool.rs        the shared SMART remediation projection (probe + install hint)
+├── storage_health.rs    the partition ↔ filesystem health projection
 src/viewmodel.rs                    product-first view-model projections
 src/history.rs                      correlated outcomes → telemetry store mapping
 src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions

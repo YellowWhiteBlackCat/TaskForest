@@ -2,7 +2,6 @@
 
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
-use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 // Shared locale catalog for the shared-page body chrome (System / Services /
 // Startup column headers, action labels, confirm/cancel) that was previously
@@ -19,7 +18,7 @@ use taskmanager_theme::tokens;
 pub(super) use super::components::{
     message_panel, search_input, source_notice_banner, source_state_panel,
 };
-use super::virtual_list::{ColumnWidth, TableColumn};
+use super::virtual_list::{ColumnWidth, TableColumn, resolve_table_window};
 use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
@@ -179,13 +178,16 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
 
             let (scroll_y, viewport_height) = app.services_virtual_scroll();
             // Sticky header: the header row sits outside the body scrollable,
-            // so the body window carries no header prefix.
-            let window = VirtualWindow::for_sticky_rows(
+            // so the body window carries no header prefix. The body
+            // materializes the visible rows plus the product's pre-render
+            // band, so a fast wheel flick never exposes an unbuilt row.
+            let window = resolve_table_window(
                 filtered_indices.len(),
                 scroll_y,
                 viewport_height,
                 service_row_height(compact),
-            );
+            )
+            .materialized();
             // The compact two-cell identity block derives from the same
             // specs: name + status + the shared column gutter.
             let compact_cell_width = columns.name.width.fixed_px()

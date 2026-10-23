@@ -30,6 +30,10 @@ use super::tables::{
 use super::tables::{ListState, message_panel, source_notice_banner, source_state_panel};
 use super::virtual_list::{ColumnWidth, TableColumn};
 use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
+// The neutral vector empty-state illustration is shared with the Containers
+// page: one drawing program, one palette, so both empty states read as one
+// family instead of two unrelated decorations.
+use super::containers::{EmptyStateMotif, empty_state_illustration, empty_state_illustration_size};
 use taskmanager_application::AppPage;
 use taskmanager_shell::InfoSortCol;
 use taskmanager_shell::InfoTable;
@@ -65,6 +69,20 @@ pub(super) fn users_columns() -> UsersColumns {
     }
 }
 
+/// Whether the Users page's empty state wears the neutral vector
+/// empty-state illustration (ICED-047).
+///
+/// Only a genuinely empty session inventory does. A typed source state
+/// (permission denied, stale, unsupported) explains itself in words, and
+/// the waiting / ready branches are not empty states at all — so the
+/// illustration never covers a failure or a live inventory.
+pub(crate) fn users_empty_state_wears_illustration(
+    state: ListState,
+    has_source_state: bool,
+) -> bool {
+    state == ListState::Empty && !has_source_state
+}
+
 /// Render the Users page from the shared session inventory.
 pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let shell = &app.shell;
@@ -77,12 +95,32 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
     let body: Element<'_, Message, iced::Theme, iced::Renderer> = match list_state {
         ListState::Loading => message_panel(theme_snapshot, t("users.inventory_waiting")),
-        ListState::Empty => source_state_panel(
-            theme_snapshot,
-            shell.projection().sessions_source.as_deref(),
-            RefreshRequest::Sessions,
-        )
-        .unwrap_or_else(|| message_panel(theme_snapshot, t("users.no_sessions"))),
+        ListState::Empty => {
+            let source_panel = source_state_panel(
+                theme_snapshot,
+                shell.projection().sessions_source.as_deref(),
+                RefreshRequest::Sessions,
+            );
+            if users_empty_state_wears_illustration(list_state, source_panel.is_some()) {
+                column![
+                    empty_state_illustration(
+                        theme_snapshot,
+                        EmptyStateMotif::EmptySession,
+                        empty_state_illustration_size(compact),
+                    ),
+                    message_panel(theme_snapshot, t("users.no_sessions")),
+                ]
+                .spacing(f32::from(tokens::SPACE_8))
+                .align_x(iced::Alignment::Center)
+                .into()
+            } else {
+                // A typed source state (permission denied / stale) explains
+                // itself; only the genuinely empty session inventory wears
+                // the neutral vector empty-state illustration.
+                source_panel
+                    .unwrap_or_else(|| message_panel(theme_snapshot, t("users.no_sessions")))
+            }
+        }
         ListState::Ready => {
             // Clickable sort headers: the active column wears ▲/▼, clicks
             // route to the shell's shared per-table sort slot. Widths come

@@ -128,6 +128,9 @@ pub(crate) struct ProcessRowView {
     pub(crate) name: String,
     pub(crate) cells: Vec<String>,
     pub(crate) selected: bool,
+    /// Whether the process carries a resolved application identity — the
+    /// precondition for the inline app icon in the name cell.
+    pub(crate) app_icon: bool,
 }
 
 /// Full window projection: the total behind the filter plus the visible slice.
@@ -161,6 +164,7 @@ pub(crate) fn rows_projection_with_hidden(
                 name: process.name.clone(),
                 cells: row_cells(process, &columns, is_selected),
                 selected: is_selected,
+                app_icon: process.current_application_identity().is_some(),
             }
         })
         .collect();

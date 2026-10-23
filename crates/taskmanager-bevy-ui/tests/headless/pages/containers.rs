@@ -14,19 +14,29 @@
 //! 3. Scene assembly:
 //!    - Each of the 5 honest branch states renders its expected content.
 
+use bevy::app::App;
+use bevy::asset::AssetPlugin;
+use bevy::scene::{ScenePlugin, WorldSceneExt};
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary};
+use taskmanager_core::core::process_telemetry::{
+    ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
+};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
-use super::{ContainersPageBranch, container_row_model, page_branch, scene};
+use super::{
+    ContainerRuntime, ContainerRuntimeBadge, ContainersPageBranch, container_row_model,
+    page_branch, scene,
+};
 use crate::app::PageContext;
 use crate::palette::ui_palette;
+use crate::window::WindowPalette;
+use taskmanager_shell::demo_app;
 
 fn dummy_summary(
     id: &str,
@@ -49,6 +59,8 @@ fn dummy_summary(
             |v| ScalarObservation::available(v, 1),
         ),
         member_pids: pids,
+        // The fixture declares no cgroup ceiling.
+        quota: ContainerQuota::not_declared(),
     }
 }
 
@@ -239,4 +251,121 @@ fn containers_scene_assembles_for_all_five_branches() {
         };
         let _ = scene(&ctx);
     }
+}
+
+// ---- the sandbox runtime badge (BEVY-151) ----
+
+const GIB: u64 = 1024 * 1024 * 1024;
+
+/// A container summary with a recognized runtime family.
+fn runtime_summary(
+    id: &str,
+    name: &str,
+    runtime: Option<IsolationKind>,
+    memory: u64,
+) -> ContainerSummary {
+    let mut summary = dummy_summary(id, name, Some(3.0), Some(memory), vec![42]);
+    summary.runtime = runtime;
+    summary
+}
+
+#[test]
+fn container_rows_name_the_sandbox_family_the_provider_recognized() {
+    let docker = runtime_summary("d1", "web", Some(IsolationKind::Docker), GIB);
+    let podman = runtime_summary("p1", "cache", Some(IsolationKind::Podman), GIB);
+    let unknown = runtime_summary("u1", "mystery", None, GIB);
+
+    let docker_model = container_row_model(&docker);
+    assert_eq!(
+        docker_model.runtime,
+        Some(ContainerRuntime::Docker),
+        "the row keeps the provider's runtime family"
+    );
+    let podman_model = container_row_model(&podman);
+    assert_eq!(
+        podman_model.runtime,
+        Some(ContainerRuntime::Podman),
+        "every family reaches its own row"
+    );
+    assert_eq!(
+        ContainerRuntime::Docker.label(),
+        "Docker",
+        "the badge label is the friendly runtime name"
+    );
+    assert_eq!(
+        ContainerRuntime::Podman.label(),
+        "Podman",
+        "each family carries its own brand word"
+    );
+    assert_ne!(
+        ContainerRuntime::Docker.icon(),
+        ContainerRuntime::Podman.icon(),
+        "the brand marks are distinct per runtime family"
+    );
+    assert_eq!(
+        container_row_model(&unknown).runtime,
+        None,
+        "an unrecognized runtime stays unknown, never a guess"
+    );
+}
+
+#[test]
+fn the_mounted_container_rows_carry_their_runtime_badge() {
+    let mut shell = demo_app();
+    fixture::edit_containers(&mut shell, |c| {
+        *c = Some(ContainerRollup {
+            state: DeviceState::healthy(100),
+            containers: vec![
+                runtime_summary("d1", "web", Some(IsolationKind::Docker), GIB),
+                runtime_summary("p1", "cache", Some(IsolationKind::Podman), GIB),
+            ],
+        });
+    });
+    let mut app = mount_containers_page(&shell);
+
+    let badges: Vec<Option<ContainerRuntime>> = app
+        .world_mut()
+        .query_filtered::<&ContainerRuntimeBadge, ()>()
+        .iter(app.world())
+        .map(|badge| badge.0)
+        .collect();
+    assert_eq!(
+        badges.len(),
+        2,
+        "every container row carries a runtime badge"
+    );
+    assert!(
+        badges.contains(&Some(ContainerRuntime::Docker))
+            && badges.contains(&Some(ContainerRuntime::Podman)),
+        "the badges name the observed families: {badges:?}"
+    );
+}
+
+// The declared-quota contract (the warning halo and the quota column) is
+// covered by its own file: `container_quota_parity.rs`.
+
+/// Mount the containers page scene in a headless app so the rendered rows
+/// can be inspected.
+fn mount_containers_page(shell: &ShellApp) -> App {
+    let mut app = App::new();
+    app.add_plugins(bevy::MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<bevy::asset::Assets<bevy::text::Font>>();
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    app.insert_resource(WindowPalette {
+        inner: palette.clone(),
+    });
+    let history = crate::pages::history::HistoryProjectionResource::default();
+    let context = PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
+        shell,
+        palette: &palette,
+        history: &history.0,
+    };
+    app.world_mut()
+        .spawn_scene(scene(&context))
+        .expect("the containers scene resolves without assets");
+    app.update();
+    app
 }

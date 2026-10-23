@@ -1,5 +1,6 @@
 use std::thread;
 use std::time::Duration;
+use taskmanager_core::core::process_telemetry::ContainerQuota;
 
 use taskmanager_application::{
     ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleEvent,
@@ -244,6 +245,8 @@ fn container_lane_emits_snapshot_event_carrying_the_provider_rollup() {
             cpu_percentage: ScalarObservation::available(42.0, 17),
             memory_bytes: ScalarObservation::available(1_048_576, 17),
             member_pids: vec![1111, 2222],
+            // The stub declares no cgroup ceiling.
+            quota: ContainerQuota::not_declared(),
         });
         rollup
     };

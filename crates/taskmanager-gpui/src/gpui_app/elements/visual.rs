@@ -148,8 +148,9 @@ pub fn status_bar(theme: &Theme, left: &[String], right: &[String]) -> Div {
 /// accent family) — ASCII case-insensitive, non-overlapping, via the SINGLE
 /// shared match engine `taskmanager_core::core::text::match_ranges_ascii_ci`
 /// (ADR-020: GPUI, TUI and iced all render these ranges and never recompute
-/// matches themselves; the `taskmanager-ui` highlighter component remains for
-/// other consumers but is no longer the GPUI search-match source).
+/// matches themselves; the shared engine in `taskmanager_core::core::text` is
+/// the only match owner, so no second implementation survives in a frontend
+/// component).
 /// Falls back to a plain text element when the query is empty.
 pub fn highlighted_text(text: &str, query: &str, theme: &Theme) -> impl IntoElement {
     let query = query.trim();

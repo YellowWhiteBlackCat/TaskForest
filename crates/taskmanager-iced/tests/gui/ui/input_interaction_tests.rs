@@ -548,10 +548,13 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
         "the IcedApp consumer restores CPU after Space activation"
     );
 
-    let mut disabled: TestElement<'_> =
-        crate::ui::components::switch(app.theme(), FocusTarget::StartupControl, true, true, |_| {
-            Message::Tick
-        });
+    let mut disabled: TestElement<'_> = crate::ui::components::switch(
+        *app.theme(),
+        FocusTarget::StartupControl,
+        true,
+        true,
+        |_| Message::Tick,
+    );
     let mut tree = Tree::new(&disabled);
     let node = layout(&mut disabled, &mut tree, &renderer, viewport);
     assert!(

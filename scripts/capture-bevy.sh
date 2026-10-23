@@ -373,11 +373,19 @@ capture_one() {
         if NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
             --id "$window_id" --write-to-disk true --path "$image" >>"$action" 2>&1; then
             # Niri acknowledges the action before the PNG writer has flushed
-            # the file. Wait for a parseable PNG, otherwise the receipt can
-            # race the writer and record a false 0x0 image.
+            # the file. Wait for a parseable PNG whose size has STOPPED
+            # growing: a half-written PNG already carries the header, so
+            # "is a PNG" alone can still race the writer and record a
+            # truncated image (the receipt then contradicts the bytes on
+            # disk and the evidence validator rejects the run).
+            stable_bytes=""
             for _ in $(seq 1 50); do
                 if [ -s "$image" ] && file "$image" | grep -q 'PNG image data'; then
-                    break
+                    current_bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
+                    if [ "$current_bytes" = "$stable_bytes" ]; then
+                        break
+                    fi
+                    stable_bytes="$current_bytes"
                 fi
                 sleep 0.1
             done

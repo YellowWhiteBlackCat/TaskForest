@@ -227,6 +227,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::StartupScrolled(_)
         | Message::UsersScrolled(_)
         | Message::WindowResized(_)
+        | Message::WindowScaleFactorChanged(_)
         | Message::WindowCloseRequested
         | Message::WindowUnfocused) => MessageDomain::Window(message),
     }

@@ -15,11 +15,19 @@ use taskmanager_ipc::protocol::{DaemonMessage, Frame, Opcode, SubscriptionMask};
 use taskmanager_ipc::service::{IpcClient, IpcConnectionHandler, SubscriptionHub};
 #[cfg(not(windows))]
 use taskmanager_ipc::transport::{FramedReader, FramedWriter};
+#[cfg(not(windows))]
+use taskmanager_test_support::unix_socket::socket_temp_root;
 
 #[cfg(not(windows))]
 #[test]
 fn e2e_uds_handshake_subscribe_and_telem_stream() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("test_daemon.sock");
 
     let listener = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();

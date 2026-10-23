@@ -20,7 +20,10 @@
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
-#              matrix + release/package smoke + the diff-scoped P4
+#              matrix + release/package smoke + the public-API semver gate
+#              (scripts/quality/semver-api-gate.sh; skipped when
+#              cargo-semver-checks is not installed, blocking when it is) +
+#              the diff-scoped P4
 #              `parity-evidence` anchor resolver (facet manifest + unified
 #              interaction matrix + feature evidence) + (with
 #              --with-gui) the GPUI/Bevy headless interaction acceptance
@@ -59,6 +62,9 @@
 #   JOBS=<n>                cargo/test parallelism (default 4)
 #   STAGE_TIMEOUT=<sec>     per-stage deadline (default 3600)
 #   QUICK_TIMEOUT=<sec>     quick-stage deadline (default 300)
+#   SEMVER_TIMEOUT=<sec>    public-API semver gate deadline (default 1800); the
+#                           gate rebuilds the workspace twice (current tree and
+#                           baseline tree), so it cannot fit the quick budget
 #   TM_SCRATCH_ROOT=<dir>   scratch root (default: .agent-scratch beside the
 #                           repo; it must be outside the repository)
 #   SKIP_INSTALL_MANAGER_SMOKE=1  defer that smoke until the release build
@@ -103,6 +109,10 @@ export RUSTFLAGS="$rustflags"
 
 stage_timeout="${STAGE_TIMEOUT:-3600}"
 quick_timeout="${QUICK_TIMEOUT:-300}"
+# The public-API semver gate builds the workspace twice (the current tree and
+# the baseline tree) and emits rustdoc JSON for every publishable crate, so
+# it gets its own deadline instead of the quick tier's seconds-minutes one.
+semver_timeout="${SEMVER_TIMEOUT:-1800}"
 skip_install_manager_smoke="${SKIP_INSTALL_MANAGER_SMOKE:-0}"
 case "$skip_install_manager_smoke" in
     0|1) ;;
@@ -674,16 +684,39 @@ if maybe ui-route-table; then
     # and an unlisted ui-contract path stays fail-closed at all four.
     run_stage ui-route-table quick run_py scripts/quality/ui_evidence_route_guard.py
 fi
-if maybe semver-checks; then
-    if ! command -v cargo-semver-checks >/dev/null 2>&1; then
-        echo "SKIP semver-checks (cargo-semver-checks not installed; install with 'cargo install cargo-semver-checks')"
-        record semver-checks quick SKIP 0
-    else
-        run_stage semver-checks quick cargo semver-checks check-release -p taskmanager-core
-    fi
-fi
-
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
+
+# ---- standard --------------------------------------------------------
+if maybe semver-checks; then
+    # The public-API semver gate (scripts/quality/semver-api-gate.sh) is the
+    # one stage that separates "not available" from "failed": exit 2 means the
+    # tool or the baseline is missing (a skippable local condition), every
+    # other non-zero exit is a broken public API and must block. It runs in the
+    # standard tier because it is part of the blocking CI surface and because
+    # it rebuilds the workspace twice — the current tree and the baseline tree
+    # — which cannot fit the quick tier's per-stage budget. Its own deadline
+    # (SEMVER_TIMEOUT) bounds it.
+    semver_started="$(date +%s)"
+    semver_rc=0
+    timeout --kill-after=30s "$semver_timeout" bash scripts/quality/semver-api-gate.sh || semver_rc=$?
+    semver_elapsed="$(( $(date +%s) - semver_started ))"
+    if [[ "$semver_rc" -eq 0 ]]; then
+        record semver-checks standard PASS "$semver_elapsed"
+        echo "PASS semver-checks"
+    elif [[ "$semver_rc" -eq 2 ]]; then
+        record semver-checks standard SKIP 0
+        echo "SKIP semver-checks"
+    else
+        record semver-checks standard FAIL "$semver_elapsed"
+        echo "FAIL semver-checks"
+        failures=$((failures + 1))
+        if [[ "$fail_fast" == "1" ]]; then
+            echo "local-gates: fail-fast after semver-checks (rc=$semver_rc); use --keep-going for a diagnostic batch" >&2
+            exit "$semver_rc"
+        fi
+    fi
+    stages_run=$((stages_run + 1))
+fi
 
 # ---- standard --------------------------------------------------------
 if maybe module-map-self; then

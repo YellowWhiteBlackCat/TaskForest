@@ -63,8 +63,7 @@ pub use columns::{
 };
 pub use model::{TableEvent, TableSelection, TableVisibleRange};
 pub use resize::{
-    COLUMN_RESIZE_HANDLE_SIZE, COLUMN_RESIZE_KEYBOARD_STEP, COLUMN_RESIZE_MAX_WIDTH,
-    COLUMN_RESIZE_MIN_WIDTH, ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
+    COLUMN_RESIZE_HANDLE_SIZE, ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
     clamp_column_width, column_resize_handle, column_resize_handle_with_keyboard, width_from_drag,
 };
 pub use widget::Table;

@@ -24,7 +24,7 @@ use crate::system_information_modal::SystemInformationCommand;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
@@ -32,7 +32,7 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::ComputedNode;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FixedNode, FlexDirection, JustifyContent, Node,
-    UiRect, Val, percent, px,
+    Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -46,9 +46,11 @@ use taskmanager_shell::presentation::process_batch_action_label;
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8, space_16, space_24};
+use crate::scene_attach::attach_child;
 use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::widgets::layout::MODAL_PANEL_WIDTH_REM;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::ShellApp;
@@ -68,6 +70,42 @@ pub(crate) struct PendingConfirmationView {
     /// Stable identity of the frozen target set, for tests and semantic
     /// surfaces; never re-derived from live rows after arming.
     pub(crate) target_key: String,
+    /// The FROZEN collateral set of a tree action: the affected root and
+    /// every descendant below it, with the depth that draws the indentation.
+    ///
+    /// The rows are frozen with the intent. A later refresh of the live
+    /// process table cannot change them, and the surface never re-reads the
+    /// live rows to build them.
+    pub(crate) collateral: Vec<FrozenCollateralRow>,
+}
+
+/// One row of the frozen collateral list: an affected process and its depth
+/// below the frozen root.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FrozenCollateralRow {
+    /// The process name frozen at capture time.
+    pub(crate) name: String,
+    /// The process id.
+    pub(crate) pid: u32,
+    /// The nesting depth below the frozen root (`0` is the root itself).
+    pub(crate) depth: u32,
+}
+
+/// The frozen collateral rows of an armed tree intent.
+///
+/// The rows come from the intent the shell froze at arming time; a batch
+/// that was not frozen from a tree root (a plain selection) has no
+/// hierarchy and carries no rows.
+fn frozen_collateral_rows(intent: &ProcessBatchIntent) -> Vec<FrozenCollateralRow> {
+    intent
+        .collateral_rows()
+        .iter()
+        .map(|member| FrozenCollateralRow {
+            name: member.name().to_owned(),
+            pid: member.pid(),
+            depth: member.depth(),
+        })
+        .collect()
 }
 
 impl PendingConfirmationView {
@@ -91,6 +129,7 @@ impl PendingConfirmationView {
                         || format!("process:pid:{}:unknown", target.pid),
                         |identity| format!("process:{}", identity.stable_key()),
                     ),
+                    collateral: Vec::new(),
                 })
             }
             PendingConfirmation::ProcessBatch(intent) => {
@@ -115,6 +154,7 @@ impl PendingConfirmationView {
                     confirm_label: t("common.confirm").to_owned(),
                     cancel_label: t("common.cancel").to_owned(),
                     target_key: format!("batch:{}", frozen_process_key(targets.iter())),
+                    collateral: frozen_collateral_rows(intent),
                 })
             }
             PendingConfirmation::ServiceControl(target) => {
@@ -132,6 +172,7 @@ impl PendingConfirmationView {
                         target.service_id.as_str(),
                         service_action_token(target.action)
                     ),
+                    collateral: Vec::new(),
                 })
             }
             PendingConfirmation::StartupControl(request) => {
@@ -154,6 +195,7 @@ impl PendingConfirmationView {
                         request.entry.name,
                         if request.enabled { "enable" } else { "disable" }
                     ),
+                    collateral: Vec::new(),
                 })
             }
             PendingConfirmation::SessionControl(pending) => {
@@ -176,6 +218,7 @@ impl PendingConfirmationView {
                         pending.session.id,
                         service_action_token_session(pending.action)
                     ),
+                    collateral: Vec::new(),
                 })
             }
             PendingConfirmation::SmartSelfTest(intent) => {
@@ -194,6 +237,7 @@ impl PendingConfirmationView {
                         intent.device_id.as_str(),
                         intent.kind
                     ),
+                    collateral: Vec::new(),
                 })
             }
         }
@@ -303,6 +347,29 @@ pub(crate) struct ConfirmChoice;
 #[derive(Component, Clone, Default)]
 pub(crate) struct DismissChoice;
 
+/// Marker on the frozen collateral list of a tree confirmation.
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct ConfirmationCollateral;
+
+/// Marker on one row of the frozen collateral list: the nesting depth below
+/// the frozen root and the affected process id.
+///
+/// The fields are positional for the scene's component syntax: the depth,
+/// then the process id.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ConfirmationCollateralRow {
+    /// The nesting depth below the frozen root (`0` is the root itself).
+    pub(crate) depth: usize,
+    /// The affected process id.
+    pub(crate) pid: u32,
+}
+
+/// The height of a collateral row, relative to the standard control height.
+///
+/// The collateral list is a compact list: its rows are denser than the
+/// process table's rows so a whole subtree stays readable in one glance.
+const COLLATERAL_ROW_SCALE: f32 = 0.8;
+
 /// A capture must show the frozen gate and both usable choices after layout.
 #[derive(SystemParam)]
 pub(crate) struct ConfirmationCapture<'w, 's> {
@@ -358,7 +425,7 @@ fn on_confirmation_changed(
     let overlay = commands
         .spawn_scene(overlay_scene(view, &palette.inner))
         .id();
-    commands.entity(root).add_one_related::<ChildOf>(overlay);
+    attach_child(&mut commands, root, overlay);
 }
 
 /// Confirm button: route the frozen request through the shell's typed path.
@@ -433,9 +500,15 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
     let confirm = view.confirm_label.clone();
     let cancel = view.cancel_label.clone();
     let radius = palette.panel_radius_px;
+    // The frozen collateral list rides under the echoed body: the danger
+    // confirmation shows WHICH processes the action reaches, in the
+    // hierarchy that was frozen at arming time. A plain selection batch has
+    // no hierarchy, so the list is absent and the flat echo stays.
+    let collateral: Option<Box<dyn Scene>> =
+        (!view.collateral.is_empty()).then(|| collateral_list_scene(&view.collateral, palette));
     bsn! {
         Node {
-            width: px(460.0),
+            width: rem(MODAL_PANEL_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
@@ -446,6 +519,7 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
         Children [
              Text(title) TextRole(Role::Heading) --
              Text(body) TextRole(Role::Body) --
+             @{ collateral } --
 
                 Node {
                     width: percent(100),
@@ -476,6 +550,53 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
 
         ]
     }
+}
+
+/// The frozen collateral list: the dense, indented rows of the processes an
+/// action on the frozen tree would reach.
+///
+/// The rows carry the depth the intent froze, so the list reads as the tree
+/// it is. The list is ONE whole group: it is admitted with its rows, never
+/// half of them.
+fn collateral_list_scene(rows: &[FrozenCollateralRow], palette: &UiPalette) -> Box<dyn Scene> {
+    let children: Vec<Box<dyn Scene>> = rows
+        .iter()
+        .map(|row| collateral_row_scene(row, palette))
+        .collect();
+    Box::new(bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(0.0),
+            overflow: Overflow::clip_x(),
+        }
+        ConfirmationCollateral
+        Children [{ children }]
+    })
+}
+
+/// One dense row of the frozen collateral list.
+fn collateral_row_scene(row: &FrozenCollateralRow, palette: &UiPalette) -> Box<dyn Scene> {
+    // The indentation rides the depth the intent froze: one spacing step
+    // per level below the root.
+    let indent = space_8() * (row.depth as f32 + 1.0);
+    let label = format!("{} · {}", row.name, row.pid);
+    let depth = row.depth as usize;
+    let pid = row.pid;
+    Box::new(bsn! {
+        Node {
+            height: rem(palette.control_height_rem * COLLATERAL_ROW_SCALE),
+            padding: UiRect::left(Val::Px(indent)),
+            align_items: AlignItems::Center,
+            flex_shrink: 0.0,
+            overflow: Overflow::clip_x(),
+        }
+        ConfirmationCollateralRow { depth: { depth }, pid: { pid } }
+        Children [
+            Text({ label }) TextRole(Role::Caption)
+        ]
+    })
 }
 
 /// Register the confirmation observers on the app composition. Called by the
@@ -519,3 +640,7 @@ pub(crate) fn init_capture_confirmation(
 #[cfg(test)]
 #[path = "../tests/headless/confirmation.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/pages/contract_fed_parity.rs"]
+mod contract_fed_parity_tests;

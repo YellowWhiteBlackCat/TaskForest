@@ -8,7 +8,8 @@ fn every_declared_path_is_loadable_through_gpui() {
     let assets = TaskManagerAssets;
     let paths: Vec<_> = all_asset_paths().collect();
 
-    assert_eq!(paths.len(), 101);
+    // The session / runtime / lock semantics joined the icon set.
+    assert_eq!(paths.len(), 105);
     for path in paths {
         assert!(assets.load(path).unwrap().is_some());
     }
@@ -26,6 +27,6 @@ fn directory_listing_exposes_the_embedded_asset_tree() {
         .collect();
 
     assert_eq!(root, ["domain", "icons"]);
-    assert_eq!(assets.list("icons").unwrap().len(), 86);
+    assert_eq!(assets.list("icons").unwrap().len(), 90);
     assert_eq!(assets.list("domain/").unwrap().len(), 15);
 }

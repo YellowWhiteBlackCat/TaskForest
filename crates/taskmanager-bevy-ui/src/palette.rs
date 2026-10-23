@@ -14,6 +14,7 @@
 use bevy::text::{FontSize, FontWeight, TextFont};
 use taskmanager_theme::Theme;
 use taskmanager_theme::Weight;
+use taskmanager_theme::palette::SeverityPalette;
 use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{Color, LightDark};
 
@@ -84,10 +85,23 @@ pub(crate) struct UiPalette {
     pub(crate) body_color: bevy::color::Color,
     /// Dimmed ink (captions, summary lines, idle nav labels).
     pub(crate) dim_color: bevy::color::Color,
+    /// The query-match ink: the text a search hit wears. Kept separate from
+    /// the accent so an accent change cannot repaint every highlight.
+    pub(crate) highlight_fg: bevy::color::Color,
     /// Destructive/error ink.
     pub(crate) danger_color: bevy::color::Color,
     /// Warning ink.
     pub(crate) warning_color: bevy::color::Color,
+    /// Success/positive ink (a running service, a healthy device, a
+    /// confirmed action). The theme's own success token — a frontend never
+    /// borrows the accent to paint a positive state.
+    pub(crate) success_color: bevy::color::Color,
+    /// The card/panel drop-shadow ink (the theme's two-layer soft shadow).
+    pub(crate) card_shadow: bevy::color::Color,
+    /// The theme's own event-severity palette, carried verbatim. A frontend
+    /// resolves the severity ink from the owner instead of rebuilding a
+    /// severity table out of converted channel values.
+    pub(crate) severity: SeverityPalette,
     /// Page-title type metrics (size + weight; handle stamped later).
     pub(crate) heading: TextFont,
     /// Body type metrics.
@@ -177,8 +191,12 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
         heading_color: theme_color(theme.fg),
         body_color: theme_color(theme.fg),
         dim_color: theme_color(theme.fg_dim),
+        highlight_fg: theme_color(theme.highlight_fg()),
         danger_color: theme_color(theme.danger),
         warning_color: theme_color(theme.warning),
+        success_color: theme_color(theme.success),
+        card_shadow: theme_color(theme.card_shadow()),
+        severity: theme.severity_palette(),
         high_contrast: theme.hc,
         border_color: theme_color(theme.border),
         focus_ring: theme_color(theme.with_focus_visible(true).palette().ring),
@@ -207,11 +225,52 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
     }
 }
 
+/// The same color at a scaled alpha — the translucent surfaces the product
+/// floats over another surface (the scrollbar rail, the focus halo).
+///
+/// The alpha is a *factor* on the token's own alpha, so a token that is
+/// already translucent stays proportional instead of being flattened.
+pub(crate) fn with_alpha(color: bevy::color::Color, factor: f32) -> bevy::color::Color {
+    let mut srgba = color.to_srgba();
+    srgba.alpha = (srgba.alpha * factor).clamp(0.0, 1.0);
+    bevy::color::Color::srgba(srgba.red, srgba.green, srgba.blue, srgba.alpha)
+}
+
+/// Composite a translucent overlay over an opaque backdrop in the theme's
+/// own sRGB space.
+///
+/// The reference frontends blend their translucent surfaces in the theme's
+/// sRGB space. A render target that blends in linear space lifts a dark
+/// surface's tint visibly (the "washed out, grayish" cast); pre-composing
+/// the overlay in sRGB space makes the painted result identical in every
+/// blend space, and keeps the frontend's own color math in the space the
+/// theme's tokens live in.
+#[must_use]
+pub(crate) fn composite_over(
+    backdrop: bevy::color::Color,
+    overlay: bevy::color::Color,
+) -> bevy::color::Color {
+    let back = backdrop.to_srgba();
+    let over = overlay.to_srgba();
+    let alpha = over.alpha.clamp(0.0, 1.0);
+    let mix = |back: f32, over: f32| back + (over - back) * alpha;
+    bevy::color::Color::srgba(
+        mix(back.red, over.red),
+        mix(back.green, over.green),
+        mix(back.blue, over.blue),
+        back.alpha.max(over.alpha),
+    )
+}
+
 /// Theme spacing accessors for bsn! field expressions. Thin named wrappers:
 /// a bare token path inside a `bsn!` field (`Val::Px(tokens::SPACE_8.0)`)
 /// re-parses as a nested scene patch and fails; a plain lowercase function
 /// call is the macro's dynamic-expression form. The theme stays the only
 /// source — no literal ever appears at a scene call site.
+pub(crate) fn space_1() -> f32 {
+    tokens::SPACE_1.0
+}
+
 pub(crate) fn space_2() -> f32 {
     tokens::SPACE_2.0
 }

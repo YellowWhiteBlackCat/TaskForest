@@ -103,12 +103,11 @@ impl ShellApp {
     /// control calls [`Self::confirm_startup_control`] to actually emit.
     #[must_use]
     pub fn request_startup_control(&mut self, enabled: bool) -> Option<PlatformEffect> {
-        let entry = self
-            .data
-            .startup_entries
-            .as_deref()?
-            .get(self.selected)?
-            .clone();
+        // The selected row is a VISUAL index: resolve it through the same
+        // canonical sort the table renders, so a sorted Startup table acts on
+        // the entry the user actually sees (the provider-order list would
+        // pick a different unit).
+        let entry = self.sorted_startup_entry_at(self.selected)?.clone();
         self.request_startup_control_for(entry, enabled)
     }
 

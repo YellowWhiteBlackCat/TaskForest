@@ -198,6 +198,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 && let Some(target) = FrozenProcessIdentity::from_process(&process)
             {
                 let intent = ProcessBatchIntent {
+                    collateral: Default::default(),
                     action: ProcessBatchAction::Kill,
                     scope: ProcessGroupScope::PidAdjacency,
                     targets: vec![target],
@@ -229,6 +230,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 .unwrap_or_default();
             if !targets.is_empty() {
                 let intent = ProcessBatchIntent {
+                    collateral: Default::default(),
                     action: ProcessBatchAction::Kill,
                     scope: ProcessGroupScope::PidAdjacency,
                     targets,

@@ -6,6 +6,7 @@ use crate::core::process::{FrozenProcessIdentity, ProcessBatchAction, ProcessBat
 
 fn intent() -> ProcessBatchIntent {
     ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::End,
         scope: Default::default(),
         targets: vec![

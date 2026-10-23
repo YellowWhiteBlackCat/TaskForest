@@ -45,3 +45,30 @@ The System timeline adapter implements the application read port over the
 authoritative telemetry rings. Window, gap and summary rules stay in
 application; frontends receive immutable projections and hold only native
 rendering caches.
+
+## Timestamped trend samples
+
+`presentation::trend::timestamped_window` is the rendering-neutral read of a
+live graph: it returns the accepted samples as `core::metrics::MetricSample`
+values, each carrying the instant the observation was MEASURED. The
+value-only `trend::window` is the line-drawing projection of the SAME
+accepted samples and stays index-aligned with it.
+
+A sample without a measurement instant is a gap: the surface shows the shared
+dash, never a `-N` sample offset, and the acceptance time is never relabelled
+as the sampling time. `sample_timestamp_text` renders the instant with the
+live local-time rules.
+
+## SMART remediation
+
+`presentation::smart_tool::smart_tool_guidance` projects a missing SMART
+tool's remediation: the platform-neutral probe command from the contract plus
+the platform's install command when the platform actually knows one. A
+frontend copies the command; it composes none.
+
+## Partition health
+
+`presentation::storage_health::partition_health_facts` pairs each partition
+with its filesystem health fact, using the contract's own link. A partition
+with no observation has no fact (not a healthy one), and no frontend matches
+mount-point strings.

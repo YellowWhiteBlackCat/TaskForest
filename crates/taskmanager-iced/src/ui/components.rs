@@ -41,7 +41,10 @@ pub(crate) fn page_scaffold<'a>(
     footer: IcedElement<'a>,
 ) -> IcedElement<'a> {
     column![navigation, body, footer]
-        .spacing(8)
+        // The gap between the page content and the bottom bar IS the bottom
+        // safety band: the last row keeps that distance from the edge in
+        // every viewport (ICED-053).
+        .spacing(crate::ui::responsive::BOTTOM_SAFETY_BAND)
         .padding(10)
         .width(Length::Fill)
         .height(Length::Fill)
@@ -67,7 +70,9 @@ pub(crate) fn page_scaffold_with_rail<'a>(
         .height(Length::Fill),
         footer
     ]
-    .spacing(8)
+    // The gap between the page content and the bottom bar IS the bottom
+    // safety band (ICED-053).
+    .spacing(crate::ui::responsive::BOTTOM_SAFETY_BAND)
     .padding(10)
     .width(Length::Fill)
     .height(Length::Fill)

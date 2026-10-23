@@ -1,5 +1,6 @@
 //! Coalesced panel publication using the shell projection and owned slots.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::hierarchy::Children;
@@ -18,6 +19,7 @@ pub(super) fn register(app: &mut App) {
 struct PaintAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     palette: Res<'w, WindowPalette>,
+    expansion: Res<'w, crate::pages::services::deps_tree::ServiceDepsExpansion>,
     rendered: ResMut<'w, ServicesDependenciesRenderState>,
     dirty: ResMut<'w, PaintState>,
     slots: Query<'w, 's, (Entity, Option<&'static Children>), With<ServicesDependenciesPanelSlot>>,
@@ -41,15 +43,13 @@ fn paint(mut access: PaintAccess) {
     if shell.service_dependencies.target().is_some() {
         let fresh = access
             .commands
-            .spawn_scene(service_dependencies_panel_scene(
+            .spawn_scene(service_dependencies_panel_scene_expanded(
                 shell,
                 &access.palette.inner,
+                &access.expansion,
             ))
             .id();
-        access
-            .commands
-            .entity(slot)
-            .add_one_related::<ChildOf>(fresh);
+        attach_child(&mut access.commands, slot, fresh);
     }
     access.rendered.rendered = fingerprint;
 }

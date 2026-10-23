@@ -287,21 +287,15 @@ fn input_controls_build_across_skins_modes_and_degenerate_states() {
         for mode in [LightDark::Light, LightDark::Dark, LightDark::EyeForest] {
             let theme = theme_for(skin, mode);
 
+            let _ = switch(theme, target(), true, false, Message::RequestStartupControl);
             let _ = switch(
-                &theme,
-                target(),
-                true,
-                false,
-                Message::RequestStartupControl,
-            );
-            let _ = switch(
-                &theme,
+                theme,
                 target(),
                 false,
                 false,
                 Message::RequestStartupControl,
             );
-            let _ = switch(&theme, target(), true, true, Message::RequestStartupControl);
+            let _ = switch(theme, target(), true, true, Message::RequestStartupControl);
 
             let _ = slider(
                 &theme,

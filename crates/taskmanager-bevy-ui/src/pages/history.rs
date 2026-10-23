@@ -11,13 +11,14 @@
 //! The page still keeps the distinction between a mounted route and continuous
 //! real in-process persistence evidence explicit.
 
+use bevy::ecs::hierarchy::Children;
 use std::sync::Arc;
 
 use crate::app::{FrontendTrack, Route, RouteChanged, SharedRuntimeHandle};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;

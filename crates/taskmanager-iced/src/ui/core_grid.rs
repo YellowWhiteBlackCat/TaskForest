@@ -29,8 +29,8 @@ use std::rc::Rc;
 
 use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry};
-use iced::widget::{column, container, row, scrollable, text};
-use iced::{Color, Length, Rectangle};
+use iced::widget::{Space, column, container, row, scrollable, stack, text};
+use iced::{Color, Length, Point, Rectangle, Size};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_theme::{Theme, tokens};
@@ -56,7 +56,54 @@ const CELL_STROKE_WIDTH: f32 = 1.4;
 /// Alpha multiplier applied to the tier color for the area fill (matches the
 /// Cpu chart's legibility wash).
 const CELL_AREA_ALPHA: f32 = 0.18;
+/// The gap between two cells of one row (the grid's own row spacing).
+const ROW_SPACING: f32 = 8.0;
+/// The gap between the label, the sparkline slot and the readout inside one
+/// cell.
+const CELL_SPACING: f32 = 2.0;
+/// The height of a cell's label line. The label is pinned to this height so
+/// the batched canvas and the text cells agree on where the sparkline band
+/// starts without measuring anything at draw time: it is the label's font
+/// size under the toolkit's default relative line height.
+fn label_height() -> f32 {
+    f32::from(tokens::FONT_10) * 1.2
+}
 pub(crate) const CORE_GRID_SCROLL_ID: &str = "performance-cpu-core-grid";
+
+/// The number of grid rows a core count occupies.
+///
+/// The grid draws one batched canvas per row, so the per-frame canvas
+/// submission count follows the row count, not the core count: a 128-core
+/// host submits 22 batched canvases instead of 128 per-core ones.
+#[must_use]
+pub(crate) fn grid_row_count(core_count: usize) -> usize {
+    core_count.div_ceil(CELLS_PER_ROW)
+}
+
+/// The sparkline band of one cell inside a row box.
+///
+/// The row's cells are `FillPortion(1)` children separated by [`ROW_SPACING`],
+/// so the band of cell `index` is the same slice of the row the text cell
+/// occupies — the canvas and the widget tree resolve the same geometry from
+/// the same rule instead of two independent guesses.
+#[must_use]
+pub(crate) fn cell_chart_rect(row_width: f32, count: usize, index: usize) -> Rectangle {
+    if count == 0 {
+        return Rectangle {
+            x: 0.0,
+            y: label_height() + CELL_SPACING,
+            width: 0.0,
+            height: CELL_CHART_HEIGHT,
+        };
+    }
+    let cell_width = ((row_width - ROW_SPACING * (count as f32 - 1.0)) / count as f32).max(0.0);
+    Rectangle {
+        x: index as f32 * (cell_width + ROW_SPACING),
+        y: label_height() + CELL_SPACING,
+        width: cell_width,
+        height: CELL_CHART_HEIGHT,
+    }
+}
 
 type Elem<'a> = iced::Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -108,7 +155,8 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
     // The app cache owns one contiguous snapshot per core for this history
     // revision. Group the shared handles directly so idle frames allocate no
     // fresh VecDeque copies (and no per-cell sample buffers).
-    let mut grouped: Vec<Vec<(usize, Rc<[f32]>)>> = Vec::new();
+    let mut grouped: Vec<Vec<(usize, Rc<[f32]>)>> =
+        Vec::with_capacity(grid_row_count(series.len()));
     for (index, samples) in series.iter().cloned().enumerate() {
         if grouped
             .last()
@@ -123,24 +171,35 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
     let rows: Vec<Elem<'static>> = grouped
         .into_iter()
         .map(|chunk| {
-            let cells: Vec<Elem<'static>> = chunk
-                .into_iter()
-                .map(|(index, samples)| {
-                    let core_type = cpu_types.and_then(|types| types.get(index)).copied();
-                    let core_usage = cpu_metrics.and_then(|cpu| cpu.current_core_usage_pct(index));
-                    let core_freq =
-                        cpu_metrics.and_then(|cpu| cpu.current_core_frequency_mhz(index));
-                    core_grid_cell(
-                        index,
-                        samples,
-                        theme_snapshot,
-                        core_type,
-                        core_usage,
-                        core_freq,
-                    )
-                })
-                .collect();
-            row(cells).spacing(8).width(Length::Fill).into()
+            let mut cells: Vec<Elem<'static>> = Vec::with_capacity(chunk.len());
+            let mut charts: Vec<CoreCellChart> = Vec::with_capacity(chunk.len());
+            for (index, samples) in chunk {
+                let core_type = cpu_types.and_then(|types| types.get(index)).copied();
+                let core_usage = cpu_metrics.and_then(|cpu| cpu.current_core_usage_pct(index));
+                let core_freq = cpu_metrics.and_then(|cpu| cpu.current_core_frequency_mhz(index));
+                let (cell, chart) = core_grid_cell(
+                    index,
+                    samples,
+                    theme_snapshot,
+                    core_type,
+                    core_usage,
+                    core_freq,
+                );
+                cells.push(cell);
+                if let Some(chart) = chart {
+                    charts.push(chart);
+                }
+            }
+            // One canvas per row: the text cells are the base layer, the
+            // batched sparklines ride above them in the same box.
+            let text_row = row(cells).spacing(ROW_SPACING).width(Length::Fill);
+            if charts.is_empty() {
+                return text_row.into();
+            }
+            let batch = canvas::Canvas::new(CoreRowBatch::new(charts))
+                .width(Length::Fill)
+                .height(Length::Fill);
+            stack![text_row, batch].into()
         })
         .collect();
 
@@ -212,6 +271,11 @@ pub(crate) fn format_core_readout(usage_pct: Option<f32>, freq_mhz: Option<u64>)
 /// single sample draws no polyline yet (the readout carries the value) until a
 /// second snapshot arrives. The theme borrow is consumed up front (resolved into
 /// `Copy` colors + an owned sample `Vec`), so the returned element is `'static`.
+///
+/// The cell owns the TEXT half of the sparkline surface: the label, a fixed
+/// height slot the row's batched canvas draws into, and the readout. The
+/// sparkline itself is handed back to the row so one canvas can paint every
+/// cell of the row in a single pass.
 fn core_grid_cell(
     index: usize,
     samples: Rc<[f32]>,
@@ -219,7 +283,7 @@ fn core_grid_cell(
     core_type: Option<CpuType>,
     usage_pct: Option<f32>,
     freq_mhz: Option<u64>,
-) -> Elem<'static> {
+) -> (Elem<'static>, Option<CoreCellChart>) {
     let type_suffix = match core_type {
         Some(CpuType::Performance) => " (P)",
         Some(CpuType::Efficient) => " (E)",
@@ -230,7 +294,7 @@ fn core_grid_cell(
 
     let readout = format_core_readout(usage_pct, freq_mhz);
     let has_finite_history = samples.iter().any(|value| value.is_finite());
-    let body: Elem<'static> = if has_finite_history {
+    let (body, chart) = if has_finite_history {
         // Historical samples can still draw a trend while the current typed
         // observation is unavailable. Dim that stale trend and keep the
         // readout missing instead of treating the history gap (NaN) as a
@@ -239,25 +303,30 @@ fn core_grid_cell(
             .filter(|value| value.is_finite())
             .map(|value| tier_color(theme_snapshot, value.clamp(0.0, 100.0)))
             .unwrap_or_else(|| crate::theme_binding::color(theme_snapshot.fg_dim));
-        let chart = canvas::Canvas::new(CoreCellChart::new(samples, stroke_color))
-            .width(Length::Fill)
-            .height(Length::Fixed(CELL_CHART_HEIGHT));
-        column(vec![
-            chart.into(),
+        let chart = CoreCellChart::new(samples, stroke_color);
+        // The slot reserves the band the batched canvas draws into; the row's
+        // band is the same band the cell reserves.
+        let slot = Space::new().height(Length::Fixed(CELL_CHART_HEIGHT));
+        let body: Elem<'static> = column(vec![
+            slot.into(),
             text(readout).size(f32::from(tokens::FONT_10)).into(),
         ])
-        .spacing(2)
-        .into()
+        .spacing(CELL_SPACING)
+        .into();
+        (body, Some(chart))
     } else {
-        text(readout).size(f32::from(tokens::FONT_12)).into()
+        (text(readout).size(f32::from(tokens::FONT_12)).into(), None)
     };
-    column(vec![
-        text(label).size(f32::from(tokens::FONT_10)).into(),
+    let cell: Elem<'static> = column(vec![
+        container(text(label).size(f32::from(tokens::FONT_10)))
+            .height(Length::Fixed(label_height()))
+            .into(),
         body,
     ])
-    .spacing(2)
+    .spacing(CELL_SPACING)
     .width(Length::FillPortion(1))
-    .into()
+    .into();
+    (cell, chart)
 }
 
 /// One logical core's rolling utilization window as a mini line+area sparkline,
@@ -287,6 +356,34 @@ impl CoreCellChart {
     }
 }
 
+/// One row's worth of per-core sparklines, drawn in a single canvas pass.
+///
+/// The grid used to mount one canvas per logical core: a 128-core host paid
+/// 128 caches, 128 geometry rebuilds and 128 draw submissions per frame. A
+/// row now owns ONE canvas that draws every cell of that row into one
+/// [`Cache`] and one [`Geometry`], so the submission count falls with the
+/// row count instead of the core count. The cell bands come from
+/// [`cell_chart_rect`], the same rule the text cells are laid out by, so the
+/// batched charts and the labels cannot drift apart.
+struct CoreRowBatch {
+    cells: Vec<CoreCellChart>,
+}
+
+impl CoreRowBatch {
+    fn new(cells: Vec<CoreCellChart>) -> Self {
+        Self { cells }
+    }
+
+    /// The fingerprint of the whole row: it changes when any cell's window
+    /// changes, which is exactly when the batched geometry must be rebuilt.
+    #[must_use]
+    fn fingerprint(&self) -> CoreRowFingerprint {
+        CoreRowFingerprint {
+            cells: self.cells.iter().map(|cell| cell.fingerprint()).collect(),
+        }
+    }
+}
+
 /// The cached identity of one immutable per-core snapshot generation. The tier
 /// color derives from the same snapshot. Color theme tokens are NOT part of
 /// the fingerprint (a theme switch
@@ -307,6 +404,12 @@ impl CoreCellFingerprint {
     }
 }
 
+/// The cached identity of a whole row: one entry per cell, in cell order.
+#[derive(Clone, Default, PartialEq, Debug)]
+struct CoreRowFingerprint {
+    cells: Vec<CoreCellFingerprint>,
+}
+
 /// The persistent per-canvas state: the geometry [`Cache`] plus the last
 /// fingerprint drawn into it. `Default`-derivable so iced can seed one when the
 /// canvas node first appears; the `Cache` and the `Cell` both reuse interior
@@ -315,10 +418,10 @@ impl CoreCellFingerprint {
 #[derive(Default)]
 struct CoreCellState {
     cache: Cache,
-    fingerprint: RefCell<CoreCellFingerprint>,
+    fingerprint: RefCell<CoreRowFingerprint>,
 }
 
-impl canvas::Program<Message> for CoreCellChart {
+impl canvas::Program<Message> for CoreRowBatch {
     type State = CoreCellState;
 
     fn draw(
@@ -341,27 +444,37 @@ impl canvas::Program<Message> for CoreCellChart {
         }
         // `Cache::draw` invokes the closure synchronously. Avoid copying each
         // core's history window when the geometry cache is already warm.
-        let samples = &self.samples;
-        let color = self.color;
+        let cells = &self.cells;
         let geometry = state.cache.draw(renderer, bounds.size(), |frame| {
-            let size = frame.size();
-            // Reuse the Performance chart's `[0,100]`→frame projection so a
-            // per-core sparkline and the full chart read the same sample
-            // identically.
-            for points in series_point_runs(samples, size) {
-                if points.len() < 2 {
+            for (index, cell) in cells.iter().enumerate() {
+                let band = cell_chart_rect(bounds.width, cells.len(), index);
+                if band.width <= 0.0 {
                     continue;
                 }
-                if let Some(area) = area_path(&points, size.height) {
-                    frame.fill(&area, color.scale_alpha(CELL_AREA_ALPHA));
-                }
-                if let Some(line) = line_path(&points) {
-                    frame.stroke(
-                        &line,
-                        canvas::Stroke::default()
-                            .with_width(CELL_STROKE_WIDTH)
-                            .with_color(color),
-                    );
+                let size = Size::new(band.width, band.height);
+                let color = cell.color;
+                // Reuse the Performance chart's `[0,100]`→frame projection so a
+                // per-core sparkline and the full chart read the same sample
+                // identically.
+                for points in series_point_runs(&cell.samples, size) {
+                    if points.len() < 2 {
+                        continue;
+                    }
+                    let shifted: Vec<Point> = points
+                        .iter()
+                        .map(|point| Point::new(point.x + band.x, point.y + band.y))
+                        .collect();
+                    if let Some(area) = area_path(&shifted, band.y + band.height) {
+                        frame.fill(&area, color.scale_alpha(CELL_AREA_ALPHA));
+                    }
+                    if let Some(line) = line_path(&shifted) {
+                        frame.stroke(
+                            &line,
+                            canvas::Stroke::default()
+                                .with_width(CELL_STROKE_WIDTH)
+                                .with_color(color),
+                        );
+                    }
                 }
             }
         });

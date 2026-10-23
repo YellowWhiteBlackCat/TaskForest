@@ -4,7 +4,7 @@
 
 mod accessibility;
 mod capabilities;
-mod columns;
+pub mod columns;
 mod command;
 mod conformance;
 mod feature_coverage;
@@ -31,7 +31,10 @@ pub use capabilities::{
     CapabilitySemanticSpec, CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration,
     capability_drift, capability_findings, capability_report,
 };
-pub use columns::{PROCESS_COLUMNS, ProcessColumnSpec, find};
+pub use columns::{
+    COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN, PROCESS_COLUMNS,
+    ProcessColumnSpec, find,
+};
 pub use command::{CommandDescriptor, descriptor};
 pub use conformance::ContractTag;
 pub use feature_coverage::{

@@ -12,17 +12,17 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::text::{LineBreak, TextColor, TextLayout};
+use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, px, rem,
+    Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -37,10 +37,16 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, She
 use crate::app::FrontendTrack;
 use crate::drain::{ShellProjectionFolded, unix_now_ms};
 use crate::input::PendingEffects;
+use crate::pages::services::{log_follow, log_text};
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
 use taskmanager_core::core::services::ServiceLogLevel;
+
+/// The log list's viewport height, in rem: the visible budget of the log
+/// entries before the list starts scrolling. The bound rides the rem axis
+/// with the panel around it.
+const LOG_LIST_VIEWPORT_HEIGHT_REM: f32 = 17.5;
 
 // ---- pure view model -------------------------------------------------------
 
@@ -180,32 +186,29 @@ fn time_caption(time: ServiceLogTimeFilter) -> String {
     }
 }
 
-/// UTC wall clock from the provider's realtime stamp; entries without one
-/// render an honest dash prefix — never a fabricated time.
+/// The timestamp column of one entry: the provider's realtime stamp rendered
+/// as RFC3339 UTC. An entry without one renders an honest dash — never a
+/// fabricated time.
 fn entry_stamp(entry: &ServiceLogEntry) -> String {
-    entry.realtime_timestamp_micros.map_or_else(
-        || "--:--:--".to_owned(),
-        |micros| {
-            let secs = micros / 1_000_000;
-            format!(
-                "{:02}:{:02}:{:02}",
-                (secs / 3600) % 24,
-                (secs / 60) % 60,
-                secs % 60
-            )
-        },
-    )
+    log_text::log_stamp_text(entry.realtime_timestamp_micros)
+}
+
+/// The ink the entry's own level wears. The message body keeps it, while a
+/// keyword inside the message always lights up by its own kind.
+fn entry_level_ink(level: ServiceLogLevel) -> log_text::LogInk {
+    match level {
+        ServiceLogLevel::Error => log_text::LogInk::Error,
+        ServiceLogLevel::Warning => log_text::LogInk::Warning,
+        ServiceLogLevel::Info => log_text::LogInk::Base,
+        ServiceLogLevel::Debug | ServiceLogLevel::Unknown => log_text::LogInk::Dim,
+    }
 }
 
 // ---- scenes ----------------------------------------------------------------
 
-fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene + use<> {
-    let ink = match entry.level {
-        ServiceLogLevel::Error => palette.danger_color,
-        ServiceLogLevel::Warning => palette.warning_color,
-        ServiceLogLevel::Info => palette.body_color,
-        ServiceLogLevel::Debug | ServiceLogLevel::Unknown => palette.dim_color,
-    };
+fn entry_row_scene(entry: &ServiceLogEntry) -> impl Scene + use<> {
+    let stamp = log_text::log_stamp_scene(entry_stamp(entry));
+    let message = log_text::log_message_scene(&entry.message, entry_level_ink(entry.level));
     bsn! {
         Node {
             width: percent(100.0),
@@ -216,27 +219,8 @@ fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene +
             overflow: Overflow::clip_x(),
         }
         Children [
-
-                Node {
-                    width: px(64.0),
-                    flex_shrink: 0.0,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [
-
-                        Text(entry_stamp(entry))
-                        TextColor(ink)
-                        TextRole(Role::Mono)
-                        TextLayout { linebreak: LineBreak::NoWrap }
-
-                ]
-            --
-
-                Text({ entry.message.clone() })
-                TextColor(ink)
-                TextRole(Role::Mono)
-                TextLayout { linebreak: LineBreak::NoWrap }
-
+             @{ stamp } --
+             @{ message }
         ]
     }
 }
@@ -273,6 +257,10 @@ fn chip_button(
 /// The panel scene: header (service word + close), the four control chips,
 /// the honest status line, and the bounded filtered entries. Rendered fresh
 /// by [`paint_log_panel`]; nothing here mutates the world.
+///
+/// The "return to latest" capsule floats over the bounded list whenever the
+/// stream is not following the newest entry — the shell's follow flag is the
+/// one authority for that state.
 pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
     let Some(open) = shell.service_log.as_ref() else {
         return Box::new(bsn! {
@@ -280,6 +268,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         });
     };
     let feed = &open.feed;
+    let pinned = feed.follow;
     // The header names the service the way the inventory rows do (the
     // provider-issued display name); an id absent from the inventory degrades
     // honestly to the raw authority target instead of a fabricated name.
@@ -300,7 +289,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         .unwrap_or_default();
     let rows: Vec<Box<dyn Scene>> = visible
         .iter()
-        .map(|entry| Box::new(entry_row_scene(entry, palette)) as Box<dyn Scene>)
+        .map(|entry| Box::new(entry_row_scene(entry)) as Box<dyn Scene>)
         .collect();
     let status = log_status_caption(&feed.provider);
     let status_row: Vec<Box<dyn Scene>> = if status.is_empty() {
@@ -326,18 +315,42 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
             ]
         })
     } else {
+        let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+        let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
         Box::new(bsn! {
+            // The viewport wrapper owns the scroll area AND the floating
+            // rail: the rail is a sibling of the scroll area, so it never
+            // scrolls with the content and never takes layout space away
+            // from it.
             Node {
                 width: percent(100.0),
-                height: px(280.0),
+                height: rem(LOG_LIST_VIEWPORT_HEIGHT_REM),
                 flex_direction: FlexDirection::Column,
-                overflow: Overflow::scroll_y(),
             }
-            ScrollArea
             Children [
-                { rows }
+                Node {
+                    width: percent(100.0),
+                    height: rem(LOG_LIST_VIEWPORT_HEIGHT_REM),
+                    flex_direction: FlexDirection::Column,
+                    overflow: Overflow::scroll_y(),
+                    padding: { lane },
+                }
+                ScrollArea
+                LogEntriesViewport
+                Children [
+                    { rows }
+                ]
+                --
+                @{ rail }
             ]
         })
+    };
+    // The "return to latest" capsule floats over the bounded list, and only
+    // while the view is not pinned to the newest entry.
+    let capsule: Vec<Box<dyn Scene>> = if pinned {
+        Vec::new()
+    } else {
+        vec![log_follow::return_latest_capsule_scene(palette)]
     };
     Box::new(bsn! {
         Node {
@@ -391,7 +404,8 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                 LogEntriesBox
                 Children [
                     { status_row }--
-                     @{ list }
+                     @{ list }--
+                     { capsule }
                 ]
 
         ]
@@ -438,6 +452,11 @@ pub(crate) struct ServicesLogStatusLine;
 /// Marker for the bounded entries list (tests + future scroll tail).
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct LogEntriesBox;
+
+/// Marker for the scrollable viewport of the bounded entries list — the
+/// element whose scroll offset the follow lock reads.
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct LogEntriesViewport;
 
 /// Marker on the page-root container that hosts the panel scene.
 #[derive(Component, Clone, Copy, Default)]

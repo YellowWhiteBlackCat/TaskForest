@@ -18,24 +18,43 @@
 //! frontend (row-summary copy), and a widget-local binding would shadow it
 //! everywhere.
 //!
-//! The widget is single-line by contract (values, addresses, identifiers);
-//! wrapping is off so a selection rectangle is one horizontal span. Selection
-//! offsets are byte ranges (the reference shape); caret lookup converts bytes
-//! to grapheme indices because cosmic-text's hit test and caret query speak
-//! different units.
+//! The widget is single-line by default (values, addresses, identifiers);
+//! wrapping is off so a selection rectangle is one horizontal span. A caller
+//! that owns a *block* of text opts into word-wrapped lines through
+//! [`SelectableText::wrapped`], and the same selection then spans the lines
+//! it actually covers.
+//!
+//! Every caret and every selection rectangle comes from the measured line
+//! geometry of the shaped paragraph (see [`crate::text_metrics`]): the line
+//! under the pointer, the byte offset inside that line and the caret x of
+//! each grapheme boundary are read from the shaped buffer, never estimated
+//! from character counts and never pinned to a hard-coded line index.
+//! Selection offsets are byte ranges (the reference shape); caret lookup
+//! converts bytes to grapheme indices because cosmic-text's hit test and
+//! caret query speak different units.
 
 use iced::advanced::mouse::click::Kind;
-use iced::advanced::text::paragraph::Plain;
-use iced::advanced::text::{self, Hit, Paragraph, Wrapping};
+use iced::advanced::text::{self, Hit, Paragraph};
 use iced::advanced::widget::{self, Id, Tree};
 use iced::advanced::{Clipboard, Layout, Renderer, Shell, Widget, layout};
 use iced::{Color, Element, Event, Length, Point, Rectangle, Size};
 use std::ops::Range;
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::app::Message;
+use crate::text_metrics::{MeasuredParagraph, line_at_y};
 
-type StateParagraph = Plain<<iced::Renderer as text::Renderer>::Paragraph>;
+/// The wrapping of a value.
+///
+/// A value is one line unless it carries line breaks of its own: a block of
+/// text is a block of text, and a selection that spans it must span the
+/// lines it covers.
+fn wrapping_for(content: &str) -> text::Wrapping {
+    if content.contains('\n') {
+        text::Wrapping::Word
+    } else {
+        text::Wrapping::None
+    }
+}
 
 /// One selectable read-only value. `id` must be stable per call site — it
 /// names the selection owner across frames.
@@ -70,7 +89,7 @@ impl SelectableText {
 
 #[derive(Default)]
 struct State {
-    paragraph: StateParagraph,
+    measured: MeasuredParagraph,
     content: String,
     last_click: Option<iced::advanced::mouse::Click>,
     /// The reference `SelectableTextState` shape: an anchor plus a byte-range
@@ -91,14 +110,34 @@ impl State {
         (!self.selection.is_empty()).then(|| self.content[self.selection.clone()].to_owned())
     }
 
-    /// The byte caret for one pointer position: the hit-tested offset,
-    /// clamped onto a char boundary and into the content. A miss past the
-    /// text means "caret at the end" — dragging beyond the last glyph must
-    /// not silently stop.
+    /// The byte caret for one pointer position: the offset of the character
+    /// the pointer landed on, resolved inside the line that owns that
+    /// pointer position, clamped onto a char boundary and into the content. A
+    /// miss past the text means "caret at the end" — dragging beyond the last
+    /// glyph must not silently stop.
     fn caret_at(&self, position: Point, bounds: Rectangle) -> usize {
         let relative = Point::new(position.x - bounds.x, position.y - bounds.y);
-        match self.paragraph.raw().hit_test(relative).map(Hit::cursor) {
-            Some(index) => char_boundary_at_or_before(&self.content, index),
+        let lines = self.measured.lines();
+        let Some(index) = line_at_y(lines, relative.y) else {
+            return 0;
+        };
+        let line = &lines[index];
+        // Hit-test inside the owning line's own band, so the cursor belongs
+        // to that line instead of the nearest one.
+        let y = relative
+            .y
+            .clamp(line.top, line.top + line.height.max(1.0) - 0.01);
+        match self
+            .measured
+            .paragraph()
+            .raw()
+            .hit_test(Point::new(relative.x, y))
+            .map(Hit::cursor)
+        {
+            Some(offset) => {
+                let local = offset.min(line.end_byte.saturating_sub(line.start_byte));
+                char_boundary_at_or_before(&self.content, line.start_byte + local)
+            }
             None if relative.x > 0.0 && relative.y >= 0.0 => self.content.len(),
             None => 0,
         }
@@ -181,14 +220,6 @@ fn word_range(text: &str, index: usize) -> Range<usize> {
     start..end
 }
 
-/// Byte caret → grapheme index: the units `hit_test` and
-/// `grapheme_position` speak.
-fn grapheme_index_at(text: &str, byte: usize) -> usize {
-    text.get(..byte)
-        .map(|prefix| prefix.graphemes(true).count())
-        .unwrap_or(0)
-}
-
 impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
     fn tag(&self) -> widget::tree::Tag {
         widget::tree::Tag::of::<State>()
@@ -223,18 +254,13 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
     ) -> layout::Node {
         let state = tree.state.downcast_mut::<State>();
         layout::sized(limits, self.width, Length::Shrink, |limits| {
-            let _ = state.paragraph.update(text::Text {
-                content: &state.content,
-                bounds: limits.max(),
-                size: self.size.into(),
-                line_height: text::LineHeight::default(),
-                font: iced::Font::default(),
-                align_x: text::Alignment::Default,
-                align_y: iced::alignment::Vertical::Top,
-                shaping: text::Shaping::Auto,
-                wrapping: Wrapping::None,
-            });
-            state.paragraph.min_bounds()
+            state.measured.update(
+                &state.content,
+                self.size,
+                limits.max(),
+                wrapping_for(&state.content),
+            );
+            state.measured.paragraph().min_bounds()
         })
     }
 
@@ -317,24 +343,32 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
     ) {
         let state = tree.state.downcast_ref::<State>();
         let bounds = layout.bounds();
-        let raw = state.paragraph.raw();
+        let raw = state.measured.paragraph().raw();
 
         if !state.selection.is_empty() {
-            let start_x = raw
-                .grapheme_position(0, grapheme_index_at(&state.content, state.selection.start))
-                .map(|point| point.x);
-            let end_x = if state.selection.end >= state.content.len() {
-                Some(raw.min_bounds().width)
-            } else {
-                raw.grapheme_position(0, grapheme_index_at(&state.content, state.selection.end))
-                    .map(|point| point.x)
-            };
-            if let (Some(start_x), Some(end_x)) = (start_x, end_x) {
+            for line in state.measured.lines() {
+                // The part of the selection that falls inside this line.
+                let from = state.selection.start.max(line.start_byte);
+                let to = state.selection.end.min(line.end_byte);
+                if to <= from {
+                    continue;
+                }
+                let from_x = line
+                    .carets
+                    .get(line.grapheme_index_at(&state.content, from))
+                    .copied();
+                let to_x = line
+                    .carets
+                    .get(line.grapheme_index_at(&state.content, to))
+                    .copied();
+                let (Some(from_x), Some(to_x)) = (from_x, to_x) else {
+                    continue;
+                };
                 renderer.fill_quad(
                     iced::advanced::renderer::Quad {
                         bounds: Rectangle::new(
-                            Point::new(bounds.x + start_x, bounds.y),
-                            Size::new((end_x - start_x).max(1.0), bounds.height),
+                            Point::new(bounds.x + from_x, bounds.y + line.top),
+                            Size::new((to_x - from_x).max(1.0), line.height),
                         ),
                         ..iced::advanced::renderer::Quad::default()
                     },

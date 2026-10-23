@@ -161,6 +161,19 @@ fn merge_observation(
     incoming.critical_chain_state = previous
         .critical_chain_state
         .merge_observation(incoming.critical_chain_state, observed_at_ms);
+    // The boot phase split is a SOURCE like the other two: its state merges
+    // with the previous one, and a split nobody published this round keeps
+    // the previous split only while the source is not healthy. A source that
+    // reads clean publishes no split, and that is an ABSENCE, not a stale
+    // value to keep.
+    incoming.phase_timeline_state = previous
+        .phase_timeline_state
+        .merge_observation(incoming.phase_timeline_state, observed_at_ms);
+    if incoming.phase_timeline_state.status != DeviceStatus::Healthy
+        && incoming.phase_timeline.is_none()
+    {
+        incoming.phase_timeline.clone_from(&previous.phase_timeline);
+    }
     if incoming.failed_units_state.status != DeviceStatus::Healthy
         && incoming.failed_units.is_empty()
     {
@@ -183,9 +196,14 @@ fn mark_unavailable(
     snapshot.state = degraded(snapshot.state, status);
     snapshot.failed_units_state = degraded(snapshot.failed_units_state, status);
     snapshot.critical_chain_state = degraded(snapshot.critical_chain_state, status);
+    // The phase split is a SOURCE too: a whole-request failure degrades its
+    // state and marks its failure, so a previous split can never keep
+    // looking current after the request failed.
+    snapshot.phase_timeline_state = degraded(snapshot.phase_timeline_state, status);
     let evidence_failure = evidence_failure(failure);
     snapshot.failed_units_failure = Some(evidence_failure);
     snapshot.critical_chain_failure = Some(evidence_failure);
+    snapshot.phase_timeline_failure = Some(evidence_failure);
     snapshot
 }
 

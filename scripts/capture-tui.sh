@@ -524,9 +524,20 @@ if ! NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
   printf 'TUI screenshot-window action failed\n' >&2
   exit 1
 fi
+# Niri acknowledges the screenshot action BEFORE the PNG writer has flushed
+# the file: a half-written PNG already carries the header, so waiting for
+# "it is a PNG" can still race the writer and leave a TRUNCATED image whose
+# byte count contradicts the receipt. Wait for a parseable PNG whose size has
+# STOPPED growing, so the recorded size and hash describe the same settled
+# file.
+stable_bytes=""
 for _ in $(seq 1 50); do
   if [ -s "$IMAGE" ] && file "$IMAGE" | grep -q 'PNG image data'; then
-    break
+    current_bytes="$(stat -c%s "$IMAGE" 2>/dev/null || echo 0)"
+    if [ "$current_bytes" = "$stable_bytes" ]; then
+      break
+    fi
+    stable_bytes="$current_bytes"
   fi
   sleep 0.1
 done

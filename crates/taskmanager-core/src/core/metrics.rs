@@ -13,6 +13,7 @@ mod msr_readout;
 mod network;
 mod psi;
 mod rapl_power;
+mod sample;
 mod smbios_memory;
 mod system;
 
@@ -32,7 +33,7 @@ pub use cpu_throttle::{
 };
 pub use disk::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,
-    SmartAvailability,
+    SMART_TOOL_PROBE_COMMAND, SmartAvailability, SmartToolGuidance, SmartToolRemediation,
 };
 pub use gpu::{
     GpuEngine, GpuEngineKind, GpuEngineMetric, GpuEngineMetricPoint, GpuGraphicsApi,
@@ -53,6 +54,7 @@ pub use network::{
 };
 pub use psi::{PressureWindow, ResourcePressure, SystemPressureSnapshot};
 pub use rapl_power::{RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot};
+pub use sample::MetricSample;
 pub use smbios_memory::{
     DmiIdentityFacts, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,
 };

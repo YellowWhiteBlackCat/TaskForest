@@ -9,6 +9,13 @@
 //! containers renders "no containers running", and per-container readings
 //! that are unavailable render as `—`, never a fabricated zero.
 //!
+//! Declared quota (the `quota` submodule): the row's limit column states what
+//! the container DECLARED — the observed share against the declared soft
+//! memory ceiling, the declared CPU budget, or the typed absence of a
+//! declaration. The page never invents a cap: a container that declares
+//! nothing is never compared against a limit of the page's own making, and a
+//! row that crossed a DECLARED ceiling wears the warning ink.
+//!
 //! This module also hosts shared presentation contracts. [`Panel`] owns the
 //! common bordered title frame, while [`StatePanel`] provides passive empty
 //! and collecting content inside it. [`Modal`] owns the `Clear` + overlay
@@ -37,6 +44,10 @@ use taskmanager_ui_contract::IconId;
 
 use super::frame_plan::TablePanelProjection;
 use crate::TuiApp;
+
+mod quota;
+
+use quota::{container_quota_view, quota_readout};
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/containers_support.rs"]
@@ -473,8 +484,26 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
     let mut rows: Vec<Row<'_>> = rollup.containers[..shown]
         .iter()
         .map(|container| {
+            let quota = container_quota_view(container);
+            let breach = quota.breach();
+            // The over-limit state rides the row: only a row that crossed a
+            // DECLARED ceiling wears the warning ink.
+            let name = if breach.is_some() {
+                Span::styled(container.name.as_str(), Style::new().fg(theme.warn))
+            } else {
+                Span::raw(container.name.as_str())
+            };
+            // A run that went twice past the declared ceiling takes the
+            // heavier mark; the percentage itself stays unclamped.
+            let quota_style = match breach {
+                Some(breach) if breach.is_deep_overrun() => {
+                    Style::new().fg(theme.warn).add_modifier(Modifier::BOLD)
+                }
+                Some(_) => Style::new().fg(theme.warn),
+                None => Style::default(),
+            };
             Row::new([
-                Cell::from(container.name.as_str()),
+                Cell::from(name),
                 Cell::from(runtime_label(container.runtime.as_ref(), theme)),
                 Cell::from(
                     container
@@ -495,6 +524,7 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
                     &container.member_pids.len().to_string(),
                     1,
                 )),
+                Cell::from(Span::styled(quota_readout(&quota), quota_style)),
             ])
         })
         .collect();
@@ -505,16 +535,18 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
             Cell::from(""),
             Cell::from(""),
             Cell::from(""),
+            Cell::from(""),
         ]));
     }
     let table = Table::new(
         rows,
         [
-            Constraint::Percentage(28),
-            Constraint::Length(18),
-            Constraint::Length(10),
+            Constraint::Percentage(19),
+            Constraint::Length(13),
+            Constraint::Length(8),
             Constraint::Length(12),
-            Constraint::Length(10),
+            Constraint::Length(7),
+            Constraint::Length(16),
         ],
     )
     // Same two-blank gutter as the process/services tables — column
@@ -527,6 +559,7 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
             t("containers.cpu"),
             t("containers.memory"),
             t("containers.members"),
+            t("proc_insights.resource_limits"),
         ])
         .style(Style::new().fg(theme.accent).add_modifier(Modifier::BOLD))
         .bottom_margin(1),

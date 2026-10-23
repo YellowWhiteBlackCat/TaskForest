@@ -172,7 +172,7 @@ fn table_column_width_distribution_shrinks_gracefully_when_constrained() {
     let total_dist: f32 = distributed.iter().sum();
     assert!((total_dist - 800.0).abs() < 1.0);
     for w in &distributed {
-        assert!(*w >= super::MIN_COLUMN_WIDTH_PX);
+        assert!(*w >= super::LAYOUT_MIN_COLUMN_WIDTH_PX);
     }
 }
 

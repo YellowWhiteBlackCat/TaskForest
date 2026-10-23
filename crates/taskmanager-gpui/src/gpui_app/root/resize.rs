@@ -5,9 +5,8 @@
 
 use gpui::{Context, Pixels, px};
 use taskmanager_shell::SortCol;
-use taskmanager_ui::data::table::COLUMN_RESIZE_MAX_WIDTH;
-use taskmanager_ui::data::table::COLUMN_RESIZE_MIN_WIDTH;
 use taskmanager_ui::data::table::clamp_column_width;
+use taskmanager_ui_contract::{COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
 
 use crate::gpui_app::processes_view::rows::default_width;
 
@@ -66,7 +65,7 @@ impl RootView {
 /// resize.rs`). Shared between the drag clamp ([`clamp_proc_col_width`]) and the
 /// config-load clamp ([`crate::gpui_app::root::persistence`]) so a hand-edited
 /// config file cannot smuggle in an unusable column sliver.
-pub(crate) const PROC_COL_MIN_WIDTH: f32 = COLUMN_RESIZE_MIN_WIDTH;
+pub(crate) const PROC_COL_MIN_WIDTH: f32 = COLUMN_WIDTH_MIN;
 /// Floor for the devices-sidebar width (device pixels): the narrowest the user
 /// can drag it before the device rows lose their icon + label. Shared between
 /// the drag clamp and the config-load clamp.
@@ -78,7 +77,7 @@ pub(crate) const SIDEBAR_MAX_WIDTH: f32 = 460.0;
 /// table crate's `resize_cols` ceiling). Shared between the drag clamp and the
 /// config-load clamp so an absurd hand-edited width clamps down rather than
 /// blowing out the table layout.
-pub(crate) const PROC_COL_MAX_WIDTH: f32 = COLUMN_RESIZE_MAX_WIDTH;
+pub(crate) const PROC_COL_MAX_WIDTH: f32 = COLUMN_WIDTH_MAX;
 
 /// Clamp a candidate processes-column width with the exact bounds + jitter rule
 /// the shared table crate's `TableState::resize_cols` uses

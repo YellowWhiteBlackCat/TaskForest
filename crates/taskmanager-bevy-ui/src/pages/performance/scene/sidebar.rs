@@ -7,6 +7,7 @@ use crate::pages::performance::metrics::{
 use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
+pub(crate) mod cores;
 pub(super) mod cpu;
 
 use super::blocks::gpu_block_title;
@@ -16,6 +17,15 @@ use bevy::ui_widgets::ScrollArea;
 use cpu::device_button_scene;
 use taskmanager_ui_contract::IconId;
 
+/// The fact row's floor width, in rem: the narrowest the label/value pair
+/// may take before the row would clip its own value. The row lives in the
+/// device sidebar, so the floor rides the rem axis with the sidebar.
+const FACT_ROW_MIN_WIDTH_REM: f32 = 13.75;
+
+/// The CPU metric label slot's width, in rem: the widest caption the metric
+/// rows carry, so every metric's label starts at the same column.
+const CPU_METRIC_LABEL_SLOT_WIDTH_REM: f32 = 6.0;
+
 /// One label→value line; the value is the rewritable fact. Both columns are
 /// strictly single-line: a long value clips at the rail edge instead of
 /// wrapping the row into an unreadable stack.
@@ -23,7 +33,7 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
     bsn! {
         Node {
             width: percent(100),
-            min_width: px(220.0),
+            min_width: rem(FACT_ROW_MIN_WIDTH_REM),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceBetween,
@@ -120,7 +130,7 @@ fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> i
         Children [
 
                 Node {
-                    width: px(96.0),
+                    width: rem(CPU_METRIC_LABEL_SLOT_WIDTH_REM),
                     flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
@@ -234,6 +244,25 @@ fn sidebar_activity_scene(
     color: bevy::color::Color,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
+    sidebar_activity_with_icon_scene(
+        crate::icons::icon_scene(icon, palette, palette.dim_color),
+        samples,
+        color,
+        palette,
+    )
+}
+
+/// The device row's accessory: the row's own mark beside its activity
+/// graph.
+///
+/// The mark is a scene, not an icon id, so a device whose mark carries its
+/// own state — the battery's charge flow — can wear it.
+fn sidebar_activity_with_icon_scene(
+    icon: Box<dyn Scene>,
+    samples: &[f32],
+    color: bevy::color::Color,
+    palette: &UiPalette,
+) -> Box<dyn Scene> {
     let height_rem = palette.control_height_rem * 1.35;
     let graph = activity_graph_scene(samples, color, height_rem, palette);
     Box::new(bsn! {
@@ -245,7 +274,7 @@ fn sidebar_activity_scene(
             column_gap: Val::Px(space_2()),
         }
         Children [
-             @{ crate::icons::icon_scene(icon, palette, palette.dim_color) } --
+             @{ icon } --
 
                 Node {
                     width: rem(palette.control_height_rem * 2.0),
@@ -414,7 +443,19 @@ pub(super) fn device_sidebar_scene(
                     PerformanceDeviceTarget::Battery(key.clone()),
                     Box::new(device_row_with_accessory_scene(
                         title,
-                        sidebar_activity_scene(IconId::Performance, &[], palette.accent, palette),
+                        // The battery wears its OWN mark: the pack's body, its
+                        // charge fill, and — while the provider reports the
+                        // pack as charging — the travelling charge flow.
+                        sidebar_activity_with_icon_scene(
+                            super::battery::battery_icon_scene(
+                                battery,
+                                crate::pages::performance::metrics::battery_charge_pct(battery),
+                                palette,
+                            ),
+                            &[],
+                            palette.accent,
+                            palette,
+                        ),
                         marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
                         false,
                         palette,
@@ -470,18 +511,34 @@ pub(super) fn device_sidebar_scene(
         }
     }
     let panel = surface_scene(SurfaceTone::Content, panel_children, palette);
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
     bsn! {
+        // The viewport wrapper owns the scroll area AND the floating rail:
+        // the rail is a sibling of the scroll area, so it never scrolls with
+        // the content and never takes layout space away from it.
         Node {
             width: px(WIDE_DEVICE_SIDEBAR_WIDTH_PX),
             min_width: px(WIDE_DEVICE_SIDEBAR_WIDTH_PX),
             height: percent(100),
             flex_shrink: 0.0,
-            overflow: Overflow::scroll_y(),
+            flex_direction: FlexDirection::Column,
         }
         PerformanceDeviceSidebar
-        ScrollArea
         Children [
-             @{ panel }
+            Node {
+                width: percent(100),
+                height: percent(100),
+                flex_shrink: 0.0,
+                overflow: Overflow::scroll_y(),
+                padding: { lane },
+            }
+            ScrollArea
+            Children [
+                 @{ panel }
+            ]
+            --
+            @{ rail }
         ]
     }
 }

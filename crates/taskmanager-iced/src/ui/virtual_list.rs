@@ -6,6 +6,9 @@ use zhuge_ui_core::virtual_list::VirtualWindow;
 mod columns;
 pub(crate) use columns::{ColumnWidth, TableColumn};
 
+mod window;
+pub(crate) use window::resolve_table_window;
+
 /// Inventory header remains product-owned.
 pub(crate) const VIRTUAL_TABLE_HEADER_HEIGHT: f32 = 32.0;
 
@@ -27,3 +30,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/ui/table_columns_tests.rs"]
 mod table_columns_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/virtual_list_overscan_tests.rs"]
+mod virtual_list_overscan_tests;

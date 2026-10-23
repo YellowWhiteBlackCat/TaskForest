@@ -3,266 +3,124 @@
 //! Bevy UI 0.20 lays out the surface; this module keeps the measurement math
 //! toolkit-neutral and makes the render seam a small `bsn!` scene. Non-finite
 //! observations create gaps rather than joining across missing data.
+//!
+//! The curve itself is a continuous canvas: one raster per chart, stroked as
+//! a single path, so a direction change keeps a round join instead of opening
+//! a seam between two rotated rectangles.
 
+pub(crate) mod canvas;
+pub(crate) mod geometry;
+pub(crate) mod hover;
+pub(crate) mod painter;
+
+pub(crate) use geometry::ChartSegment;
+pub(crate) use geometry::{MAX_CHART_POINTS, line_segments};
+pub(crate) use hover::{ChartHoverLabel, ChartPointer};
+pub(crate) use painter::{
+    ChartCanvas, ChartContent, ChartPaintState, ChartStyle, chart_canvas_scene,
+};
+
+use crate::scene_attach::insert_into;
+use crate::widgets::chart::geometry::{points_extent, segment_vertices};
+use crate::widgets::chart::painter::{ChartTextures, paint_chart_canvases};
+use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
+use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, SystemParam};
-use bevy::math::{Rot2, Vec2};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
-use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
+use bevy::math::Vec2;
+use bevy::scene::Scene;
 
-/// Hard upper bound used by the performance chart surface.
-pub(crate) const MAX_CHART_POINTS: usize = 600;
-
-/// Visual thickness of one polyline segment in px.
-pub(crate) const CHART_LINE_THICKNESS_PX: f32 = 2.0;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ChartVertex {
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ChartSegment {
-    pub(crate) start: ChartVertex,
-    pub(crate) end: ChartVertex,
-}
-
-/// Project the newest bounded sample window into line segments.
-///
-/// A segment is emitted only between adjacent finite observations. A gap,
-/// including a leading or trailing unavailable sample, is therefore visible
-/// to the eventual renderer and is never converted into a zero.
-#[must_use]
-pub(crate) fn line_segments(
-    samples: &[f32],
-    width: f32,
-    height: f32,
-    max_points: usize,
-) -> Vec<ChartSegment> {
-    if samples.is_empty() || max_points == 0 {
-        return Vec::new();
-    }
-    let window = &samples[samples.len().saturating_sub(max_points)..];
-    let (min, max) = window
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite())
-        .fold(None, |range: Option<(f32, f32)>, value| {
-            Some(match range {
-                Some((min, max)) => (min.min(value), max.max(value)),
-                None => (value, value),
-            })
-        })
-        .unwrap_or((0.0, 0.0));
-    let value_range = max - min;
-    let position = |index: usize, value: f32| -> ChartVertex {
-        let x = if window.len() <= 1 {
-            width
-        } else {
-            width * index as f32 / (window.len() - 1) as f32
-        };
-        let y = if !value.is_finite() || value_range <= 0.0 {
-            height / 2.0
-        } else {
-            height * (1.0 - ((value - min) / value_range).clamp(0.0, 1.0))
-        };
-        ChartVertex { x, y }
-    };
-
-    let mut segments = Vec::new();
-    let mut previous = None;
-    for (index, value) in window.iter().copied().enumerate() {
-        if !value.is_finite() {
-            previous = None;
-            continue;
-        }
-        let current = position(index, value);
-        if let Some(start) = previous {
-            segments.push(ChartSegment {
-                start,
-                end: current,
-            });
-        }
-        previous = Some(current);
-    }
-    segments
-}
-
-/// Project sample window into line segments anchored to a fixed ceiling (0.0..ceiling)
-/// rather than normalizing across local extrema.
-#[must_use]
-pub(crate) fn line_segments_scaled(
-    samples: &[f32],
-    width: f32,
-    height: f32,
-    max_points: usize,
-    ceiling: f32,
-) -> Vec<ChartSegment> {
-    if samples.is_empty() || max_points == 0 {
-        return Vec::new();
-    }
-    let window = &samples[samples.len().saturating_sub(max_points)..];
-    let safe_ceiling = if ceiling.is_finite() && ceiling > 0.0 {
-        ceiling
-    } else {
-        100.0
-    };
-    let position = |index: usize, value: f32| -> ChartVertex {
-        let x = if window.len() <= 1 {
-            width
-        } else {
-            width * index as f32 / (window.len() - 1) as f32
-        };
-        let y = if !value.is_finite() {
-            height / 2.0
-        } else {
-            height * (1.0 - (value / safe_ceiling).clamp(0.0, 1.0))
-        };
-        ChartVertex { x, y }
-    };
-
-    let mut segments = Vec::new();
-    let mut previous = None;
-    for (index, value) in window.iter().copied().enumerate() {
-        if !value.is_finite() {
-            previous = None;
-            continue;
-        }
-        let current = position(index, value);
-        if let Some(start) = previous {
-            segments.push(ChartSegment {
-                start,
-                end: current,
-            });
-        }
-        previous = Some(current);
-    }
-    segments
-}
-
-/// The layout/render anchor for a chart surface. `segment_count` is metadata
-/// only until the vector renderer is integrated; retaining it makes the scene
-/// truthful and headlessly inspectable.
+/// The layout/render anchor for a chart surface. The count is the number of
+/// plotted points — metadata the surface publishes so the render path and
+/// the tests read the same truth.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ChartSurface(pub(crate) usize);
-
-/// Layout of one segment as an absolutely-positioned rotated rectangle: the
-/// untransformed top-left, the rectangle length along x, and the clockwise
-/// rotation that aims it from `start` to `end`. A zero-length segment (two
-/// coincident points) degrades to 1px instead of disappearing — a real
-/// observation is never rendered as nothing.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct SegmentLayout {
-    pub(crate) left: f32,
-    pub(crate) top: f32,
-    pub(crate) length: f32,
-    pub(crate) rotation: f32,
-}
-
-#[must_use]
-pub(crate) fn segment_layout(segment: ChartSegment) -> SegmentLayout {
-    let dx = segment.end.x - segment.start.x;
-    let dy = segment.end.y - segment.start.y;
-    let length = dx.hypot(dy).max(1.0);
-    let center_x = (segment.start.x + segment.end.x) / 2.0;
-    let center_y = (segment.start.y + segment.end.y) / 2.0;
-    SegmentLayout {
-        left: center_x - length / 2.0,
-        top: center_y - CHART_LINE_THICKNESS_PX / 2.0,
-        length,
-        rotation: dy.atan2(dx),
-    }
-}
-
-/// One polyline segment as a rotated 2px rectangle. The transform rotates
-/// around the node center, so the untransformed top-left is placed such that
-/// the CENTER lands on the segment midpoint — the pure [`segment_layout`]
-/// math is the authority and headless tests pin it.
-pub(crate) fn segment_scene(
-    segment: ChartSegment,
-    color: bevy::color::Color,
-) -> impl Scene + use<> {
-    let layout = segment_layout(segment);
-    bsn! {
-        Node {
-            width: px(layout.length),
-            height: px(CHART_LINE_THICKNESS_PX),
-            position_type: PositionType::Absolute,
-            left: px(layout.left),
-            top: px(layout.top),
-        }
-        BackgroundColor(color)
-        UiTransform { rotation: Rot2::radians(layout.rotation) }
-    }
-}
-
-/// The polyline render adapter: one clipped absolute layer of segment
-/// rectangles inside the chart strip. Bounded by [`MAX_CHART_POINTS`] at the
-/// projection layer; gaps are simply absent segments (never zero-joined).
-pub(crate) fn polyline_scene(
-    segments: &[ChartSegment],
-    color: bevy::color::Color,
-) -> impl Scene + use<> {
-    let parts: Vec<Box<dyn Scene>> = segments
-        .iter()
-        .copied()
-        .map(|segment| Box::new(segment_scene(segment, color)) as Box<dyn Scene>)
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            height: percent(100),
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            overflow: bevy::ui::Overflow::clip(),
-        }
-        Children [
-            { parts }
-        ]
-    }
-}
-
-#[cfg(test)]
-#[path = "../../tests/headless/chart.rs"]
-mod tests;
 
 /// Last successfully painted logical chart size, shared by inspection surfaces.
 #[derive(Component, Clone, Default)]
 pub(crate) struct CurveMeasurement(pub(crate) Option<(f32, f32)>);
 
-/// Replace a measured curve through the owned scene adapter. Failed scene
-/// publication cannot certify a rendered curve for capture readiness.
+/// The polyline render adapter: one continuous canvas carrying the curve.
+///
+/// The segments are a derived view of the projection; the canvas strokes
+/// their points as a single path, so the rendered curve has no per-segment
+/// seams.
+pub(crate) fn polyline_scene(segments: &[ChartSegment], color: Color) -> impl Scene + use<> {
+    let vertices = segment_vertices(segments);
+    let extent = points_extent(&vertices);
+    chart_canvas_scene(
+        ChartCanvas {
+            content: ChartContent::Points {
+                vertices,
+                source: Vec2::new(extent.0, extent.1),
+            },
+            style: ChartStyle {
+                line: color,
+                ..ChartStyle::default()
+            },
+        },
+        Vec::new(),
+    )
+}
+
+/// The render seam's access: the host's children, the canvases they carry,
+/// and the command queue.
 #[derive(SystemParam)]
 pub(crate) struct CurvePaintAccess<'w, 's> {
-    children: Query<'w, 's, &'static Children>,
+    pub(crate) children: Query<'w, 's, &'static Children>,
+    pub(crate) canvases: Query<'w, 's, &'static mut painter::ChartCanvas>,
     commands: Commands<'w, 's>,
 }
 
+/// Publish a curve onto a surface through the owned scene adapter.
+///
+/// The surface owns the canvas content: the samples travel with the surface's
+/// own component, so the painter measures the slot and projects against that
+/// measurement instead of a fixed design width. Failed scene publication
+/// cannot certify a rendered curve for capture readiness.
 pub(crate) fn paint_curve_at_size(
     access: &mut CurvePaintAccess,
     entity: Entity,
     size: Vec2,
     samples: &[f32],
     ceiling: f32,
-    color: bevy::color::Color,
+    color: Color,
 ) -> bool {
-    if let Ok(children) = access.children.get(entity) {
-        for child in children.iter() {
-            access.commands.entity(*child).despawn();
-        }
+    if !size.x.is_finite() || !size.y.is_finite() || size.x <= 0.0 || size.y <= 0.0 {
+        return false;
     }
-    let segments = line_segments_scaled(samples, size.x, size.y, samples.len(), ceiling);
-    let child = access
-        .commands
-        .spawn_scene(polyline_scene(&segments, color))
-        .id();
-    access
-        .commands
-        .entity(entity)
-        .add_one_related::<ChildOf>(child);
+    let canvas = ChartCanvas {
+        content: ChartContent::Samples {
+            values: samples.to_vec(),
+            ceiling,
+        },
+        style: ChartStyle {
+            line: color,
+            ..ChartStyle::default()
+        },
+    };
+    insert_into(
+        &mut access.commands,
+        entity,
+        (canvas, ChartPaintState::default()),
+    );
     true
 }
+
+/// Register the chart painter: the canvas textures, the pointer seam, and
+/// the per-frame raster.
+pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<ChartTextures>();
+    app.add_observer(hover::on_chart_pointer_move);
+    app.add_observer(hover::on_chart_pointer_out);
+    app.add_systems(
+        bevy::app::PostUpdate,
+        paint_chart_canvases.after(bevy::ui::UiSystems::PostLayout),
+    );
+}
+
+#[cfg(test)]
+#[path = "../../tests/headless/chart.rs"]
+mod tests;

@@ -16,7 +16,7 @@
 
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
@@ -47,6 +47,15 @@ use crate::drain::ShellProjectionFolded;
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
+
+/// The detail row's label column width, in rem: the widest caption the
+/// detail rows carry, so every label starts at the same column and every
+/// value at the same one.
+const DETAIL_LABEL_COLUMN_WIDTH_REM: f32 = 8.125;
+
+/// The insight card's title slot width, in rem: the facet title's own
+/// bounded column, so the card's body starts at one place for every facet.
+const INSIGHT_TITLE_SLOT_WIDTH_REM: f32 = 6.5;
 
 const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
     (ProcessDetailsField::Pid, "proc.pid"),
@@ -305,6 +314,7 @@ pub(super) fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
 
 mod effects;
 mod formatting;
+use crate::scene_attach::attach_child;
 use bevy::text::{LineBreak, TextLayout};
 use effects::{
     on_network_escalate_activated, on_refresh_activated, queue_selected_process_insights,
@@ -327,12 +337,8 @@ fn bootstrap_details_page(
     let selection_observer = commands
         .spawn(Observer::new(on_details_selection_changed))
         .id();
-    commands
-        .entity(root)
-        .add_one_related::<ChildOf>(fold_observer);
-    commands
-        .entity(root)
-        .add_one_related::<ChildOf>(selection_observer);
+    attach_child(&mut commands, root, fold_observer);
+    attach_child(&mut commands, root, selection_observer);
 
     if let (Some(mut track), Some(pending)) = (track.take(), pending.as_deref_mut()) {
         queue_selected_process_insights(&mut track, pending, false);
@@ -398,7 +404,7 @@ fn rebuild(
     let child = commands
         .spawn_scene(details_content_scene(&projection(shell), palette))
         .id();
-    commands.entity(root).add_one_related::<ChildOf>(child);
+    attach_child(commands, root, child);
 }
 
 // ---- bsn render adapter -------------------------------------------------
@@ -408,24 +414,39 @@ fn rebuild(
 /// capture sizes.
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::all(Val::Px(space_8())));
     bsn! {
+        // The viewport wrapper owns the scroll area AND the floating rail:
+        // the rail is a sibling of the scroll area, so it never scrolls with
+        // the content and never takes layout space away from it.
         Node {
             width: percent(32),
             min_width: px(0.0),
             height: percent(100),
-            overflow: Overflow::scroll_y(),
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
         }
-        BackgroundColor({ palette.panel_fill })
-        ScrollArea
-        on(bootstrap_details_page)
-        ProcessDetailsRoot
-        super::ProcessDetailsContainer
         Children [
-             @{ details_content_scene(&projection(context.shell), palette) }
+            Node {
+                width: percent(100),
+                min_width: px(0.0),
+                height: percent(100),
+                overflow: Overflow::scroll_y(),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(space_8()),
+                padding: { lane },
+                border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            }
+            BackgroundColor({ palette.panel_fill })
+            ScrollArea
+            on(bootstrap_details_page)
+            ProcessDetailsRoot
+            super::ProcessDetailsContainer
+            Children [
+                 @{ details_content_scene(&projection(context.shell), palette) }
+            ]
+            --
+            @{ rail }
         ]
     }
 }
@@ -514,8 +535,8 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
         Children [
 
                 Node {
-                    width: px(130.0),
-                    min_width: px(130.0),
+                    width: rem(DETAIL_LABEL_COLUMN_WIDTH_REM),
+                    min_width: rem(DETAIL_LABEL_COLUMN_WIDTH_REM),
                     overflow: Overflow::clip_x(),
                 }
                 Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
@@ -550,7 +571,7 @@ fn insight_card_scene(card: &InsightCard, palette: &UiPalette) -> impl Scene + u
         }
         BackgroundColor({ palette.content_bg })
         Children [
-             Node { width: px(104.0), flex_shrink: 0.0 } Children [  Text(title) TextRole(Role::Caption)  ] --
+             Node { width: rem(INSIGHT_TITLE_SLOT_WIDTH_REM), flex_shrink: 0.0 } Children [  Text(title) TextRole(Role::Caption)  ] --
 
                 Node {
                     flex_grow: 1.0,

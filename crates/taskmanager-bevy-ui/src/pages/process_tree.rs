@@ -4,21 +4,25 @@
 //! keeps row identity typed, and stores expansion by locale-neutral keys. The
 //! render adapter is a small `bsn!` scene mounted in the formal Applications
 //! route; the flat table below it remains the search/sort reducer surface.
+//!
+//! The tree's own modules own one concern each: the owned row plan, the
+//! hierarchy guide, the disclosure chevron, the row badges, the hover group
+//! hint, the progressive mount, and the collateral tree of an affected root.
 
 use bevy::picking::Pickable;
 use std::collections::HashSet;
 
+use bevy::app::{Last, PostUpdate, Update};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::With;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::ui::prelude::{FlexDirection, Node, UiRect, percent, px, rem};
+use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
+use bevy::scene::{Scene, bsn, on};
+use bevy::ui::prelude::{AlignSelf, FlexDirection, Node, Overflow, UiRect, Val, percent, px, rem};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Button;
+use bevy::ui_widgets::{Button, ScrollArea};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
@@ -29,14 +33,25 @@ use taskmanager_shell::{
     process_semantic_key, project_process_tree_rows,
 };
 
-use crate::app::{FrontendTrack, ShellTrack};
+use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_8};
-use crate::window::{Role, TextRole, WindowPalette};
+use crate::window::{Role, TextRole};
 use taskmanager_shell::ShellApp;
 
 mod aggregate;
+mod badge;
+mod chevron;
+mod collateral;
+mod guide;
+mod hover;
+mod mount;
+mod plan;
+
 use aggregate::row_scene;
+use chevron::ChevronAnimations;
+use mount::TreeRowsState;
+use plan::{GuideColumn, guide_columns};
 
 /// Stable expansion state for the Applications tree.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -116,13 +131,15 @@ pub(crate) struct ProcessTreeRowView<'a> {
     pub(crate) has_children: bool,
     pub(crate) expanded: bool,
     pub(crate) item: Option<&'a ProcessItem>,
+    /// The hierarchy guide columns of this row (BEVY-125).
+    pub(crate) guide: Vec<GuideColumn>,
 }
 
 /// Typed local action emitted by a tree row. It changes only Bevy's
 /// expansion state; process controls continue to use the shell's atomic
 /// frozen-identity requests.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum ProcessTreeToggle {
+pub(crate) enum ProcessTreeToggle {
     Category(ProcessCategory),
     Application(ProcessLiveKey),
     Process(ProcessLiveKey),
@@ -140,7 +157,7 @@ pub(crate) fn project_items<'a>(
 ) -> Vec<ProcessTreeRowView<'a>> {
     let refs: Vec<&ProcessItem> = items.iter().collect();
     let expanded_groups = expansion.shared_expanded_groups();
-    project_process_tree_rows(
+    let mut rows: Vec<ProcessTreeRowView<'a>> = project_process_tree_rows(
         &refs,
         &expanded_groups,
         expansion.collapsed_set(),
@@ -168,6 +185,7 @@ pub(crate) fn project_items<'a>(
             has_children: true,
             expanded,
             item: None,
+            guide: Vec::new(),
         }),
         ProcessTreeRow::Application {
             visible_index,
@@ -199,6 +217,7 @@ pub(crate) fn project_items<'a>(
                 has_children,
                 expanded,
                 item: None,
+                guide: Vec::new(),
             })
         }
         ProcessTreeRow::Process {
@@ -224,10 +243,18 @@ pub(crate) fn project_items<'a>(
                 has_children,
                 expanded: !collapsed,
                 item: Some(process),
+                guide: Vec::new(),
             })
         }
     })
-    .collect()
+    .collect();
+    // The guide needs the whole ordered projection: a vertical connector
+    // belongs to the rows that share one ancestor.
+    let columns = guide_columns(&rows);
+    for (row, guide) in rows.iter_mut().zip(columns) {
+        row.guide = guide;
+    }
+    rows
 }
 
 fn category_label(category: ProcessCategory) -> String {
@@ -297,9 +324,56 @@ pub(crate) fn scene(
         .iter()
         .map(|row| Box::new(row_scene(row, palette)) as Box<dyn Scene>)
         .collect();
-    let body = Box::new(
+    let mut sections: Vec<Box<dyn Scene>> = vec![Box::new(
         bsn! {Node {width:percent(100),flex_direction:FlexDirection::Column} ProcessTreeRows Children [{row_scenes}]},
-    );
+    )];
+    // The collateral subtree of the selected process: the dense, indented
+    // list of the processes an action on the selection would reach.
+    let collateral = collateral_preview(shell, &items);
+    if !collateral.is_empty() {
+        sections.push(collateral::collateral_scene(&collateral, palette));
+    }
+    // The tree's own bounded viewport: the hierarchy is a high-density
+    // inspection surface, so it declares its OWN scroll owner and the
+    // visible rail instead of letting the shared modal body clip it. The
+    // body stretches to the modal body's inner height, so exactly one
+    // viewport scrolls — there is no nested scrollbar.
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(px(space_8())));
+    let body = Box::new(bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            align_self: AlignSelf::Stretch,
+            flex_direction: FlexDirection::Column,
+            row_gap: px(space_8()),
+        }
+        Children [
+            // The viewport wrapper owns the scroll area AND the floating
+            // rail: the rail is a sibling of the scroll area, so it never
+            // scrolls with the content and never takes layout space away
+            // from it.
+            Node {
+                width: percent(100),
+                min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                flex_direction: FlexDirection::Column,
+            }
+            Children [
+                Node {
+                    width: percent(100),
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(space_8()),
+                    overflow: Overflow::scroll_y(),
+                    padding: { lane },
+                }
+                ScrollArea ProcessTreeViewport
+                Children [{sections}]
+                --
+                @{ rail }
+            ]
+        ]
+    });
     let actions: Vec<Box<dyn Scene>> = vec![
         Box::new(tree_expansion_button(
             t("proc.expand_all"),
@@ -321,8 +395,21 @@ pub(crate) fn scene(
         palette,
     )
 }
+/// The collateral subtree of the shell's selected process.
+///
+/// The frozen closure is the shared core authority: the list names every
+/// process below the selection that an action would reach.
+fn collateral_preview(shell: &ShellApp, items: &[ProcessItem]) -> Vec<collateral::CollateralRow> {
+    shell
+        .selected_row
+        .and_then(ProcessRowId::live_key)
+        .map(|root| collateral::collateral_rows(items, root))
+        .unwrap_or_default()
+}
+
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct TreeWindowControl(pub(crate) bool);
+
 pub(crate) fn open_button(palette: &UiPalette) -> impl Scene + use<> {
     window_button("Process tree", true, palette)
 }
@@ -351,10 +438,27 @@ fn on_window_activated(
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ProcessTreeRows;
 
+/// The tree's own scroll owner: the bounded viewport the hierarchy scrolls
+/// inside, with the visible rail beside it.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessTreeViewport;
+
 pub(crate) fn register(app: &mut bevy::app::App) {
+    app.init_resource::<TreeRowsState>();
+    app.init_resource::<ChevronAnimations>();
     app.add_observer(on_tree_expansion_command);
     app.add_observer(refresh_tree_on_fold);
     app.add_observer(refresh_tree_on_expansion);
+    app.add_systems(Update, mount::sync_tree_rows);
+    app.add_systems(
+        PostUpdate,
+        (
+            chevron::animate_chevrons,
+            badge::emphasize_aggregate_values,
+            hover::paint_hover_group,
+        ),
+    );
+    app.add_systems(Last, mount::flush_hidden_rows);
 }
 
 #[derive(Event)]
@@ -366,7 +470,8 @@ fn on_tree_row_activated(
     mut track: NonSendMut<FrontendTrack>,
     mut commands: Commands,
 ) {
-    let Ok(marker) = markers.get(activate.event().entity) else {
+    let entity: Entity = activate.event().entity;
+    let Ok(marker) = markers.get(entity) else {
         return;
     };
     let Some(toggle) = marker.0.clone() else {
@@ -389,58 +494,17 @@ fn on_tree_row_activated(
     commands.trigger(ProcessTreeExpansionChanged);
 }
 
-fn refresh_tree_on_fold(
-    _fold: On<ShellProjectionFolded>,
-    track: ShellTrack,
-    palette: Res<WindowPalette>,
-    roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    mut commands: Commands,
-) {
-    let items: Vec<_> = track
-        .shell()
-        .visible_processes()
-        .into_iter()
-        .cloned()
-        .collect();
-    let observed_at_ms = track.shell().projection().processes_observed_at_ms;
-    let rows = project_items(&items, track.process_tree_expansion(), observed_at_ms);
-    refresh_tree_rows(&palette, roots, &mut commands, rows);
+/// The projection folded: the tree's rows have to be recomputed.
+fn refresh_tree_on_fold(_fold: On<ShellProjectionFolded>, mut state: ResMut<TreeRowsState>) {
+    state.dirty = true;
 }
 
+/// The expansion changed: the tree's rows have to be recomputed.
 fn refresh_tree_on_expansion(
     _changed: On<ProcessTreeExpansionChanged>,
-    track: ShellTrack,
-    palette: Res<WindowPalette>,
-    roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    mut commands: Commands,
+    mut state: ResMut<TreeRowsState>,
 ) {
-    let items: Vec<_> = track
-        .shell()
-        .visible_processes()
-        .into_iter()
-        .cloned()
-        .collect();
-    let observed_at_ms = track.shell().projection().processes_observed_at_ms;
-    let rows = project_items(&items, track.process_tree_expansion(), observed_at_ms);
-    refresh_tree_rows(&palette, roots, &mut commands, rows);
-}
-
-fn refresh_tree_rows(
-    palette: &WindowPalette,
-    roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    commands: &mut Commands,
-    rows: Vec<ProcessTreeRowView<'_>>,
-) {
-    for (root, children) in roots.iter() {
-        let stale: Vec<Entity> = children.iter().copied().collect();
-        for entity in stale {
-            commands.entity(entity).despawn();
-        }
-        for row in &rows {
-            let child = commands.spawn_scene(row_scene(row, &palette.inner)).id();
-            commands.entity(root).add_one_related::<ChildOf>(child);
-        }
-    }
+    state.dirty = true;
 }
 
 /// Identity marker for later pointer/keyboard observers.
@@ -458,3 +522,7 @@ impl Default for ProcessTreeRowMarker {
 #[cfg(test)]
 #[path = "../../tests/headless/pages/process_tree.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/process_tree_parity.rs"]
+mod parity;

@@ -8,7 +8,7 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -16,7 +16,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    PositionType, UiRect, Val, percent, px, rem,
+    PositionType, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -30,9 +30,18 @@ use crate::drain::ShellProjectionFolded;
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::widgets::layout::MODAL_PANEL_WIDTH_REM;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_application::ProcessAffinityRequest;
+
+/// The CPU button's width, in rem: the widest button label ("CPU 63") plus
+/// its air, so every core in the grid is the same size.
+const AFFINITY_CPU_BUTTON_WIDTH_REM: f32 = 5.5;
+
+/// The CPU grid's height, in rem: the visible budget of the wrapping core
+/// grid before it starts scrolling.
+const AFFINITY_CPU_GRID_HEIGHT_REM: f32 = 12.5;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AffinitySession {
@@ -144,7 +153,7 @@ pub(crate) fn affinity_modal_scene(
         cpu_buttons.push(Box::new(bsn! {
 
                 Node {
-                    width: px(88.0),
+                    width: rem(AFFINITY_CPU_BUTTON_WIDTH_REM),
                     height: rem(palette.control_height_rem),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -162,25 +171,40 @@ pub(crate) fn affinity_modal_scene(
         }) as Box<dyn Scene>);
     }
 
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
     let grid = Box::new(bsn! {
+        // The viewport wrapper owns the scroll area AND the floating rail:
+        // the rail is a sibling of the scroll area, so it never scrolls with
+        // the content and never takes layout space away from it.
         Node {
             width: percent(100.0),
-            height: px(200.0),
-            flex_direction: FlexDirection::Row,
-            flex_wrap: bevy::ui::FlexWrap::Wrap,
-            column_gap: Val::Px(space_8()),
-            row_gap: Val::Px(space_8()),
-            overflow: Overflow::scroll_y(),
+            height: rem(AFFINITY_CPU_GRID_HEIGHT_REM),
+            flex_direction: FlexDirection::Column,
         }
-        ScrollArea
         Children [
-            { cpu_buttons }
+            Node {
+                width: percent(100.0),
+                height: rem(AFFINITY_CPU_GRID_HEIGHT_REM),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: bevy::ui::FlexWrap::Wrap,
+                column_gap: Val::Px(space_8()),
+                row_gap: Val::Px(space_8()),
+                overflow: Overflow::scroll_y(),
+                padding: { lane },
+            }
+            ScrollArea
+            Children [
+                { cpu_buttons }
+            ]
+            --
+            @{ rail }
         ]
     }) as Box<dyn Scene>;
 
     let panel = Box::new(bsn! {
         Node {
-            width: px(460.0),
+            width: rem(MODAL_PANEL_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),

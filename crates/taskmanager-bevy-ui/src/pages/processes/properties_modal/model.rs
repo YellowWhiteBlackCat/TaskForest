@@ -62,6 +62,9 @@ pub(crate) fn view_model(
     let mut curves: Vec<PerformanceCurve> = Vec::new();
     let mut rows = Vec::new();
     let mut authorize_network = false;
+    let mut memory = None;
+    let mut gpu_bars = Vec::new();
+    let mut quotas = Vec::new();
     if let Some(process) = process {
         let mut current = process.clone();
         current.populate_ancestor_lineage(shell.projection().processes_slice());
@@ -112,6 +115,12 @@ pub(crate) fn view_model(
         if section == ProcessPropertiesSection::Performance {
             curves = performance_curves(&current, &vm);
         }
+        if section == ProcessPropertiesSection::Overview {
+            let segments = super::memory::memory_segments(&current);
+            if segments.is_measured() {
+                memory = Some(segments);
+            }
+        }
         if section == ProcessPropertiesSection::Insights {
             let projection = shell
                 .projection()
@@ -119,6 +128,12 @@ pub(crate) fn view_model(
                 .as_ref()
                 .filter(|projection| projection.target == *target);
             (rows, authorize_network) = insight_rows(projection, facet);
+            if facet == ProcessInsightFacet::Gpu {
+                gpu_bars = super::gpu::gpu_bars(projection);
+            }
+            if facet == ProcessInsightFacet::Resources {
+                quotas = super::quota::quota_facts(projection);
+            }
         }
     } else {
         rows = vec![
@@ -138,5 +153,8 @@ pub(crate) fn view_model(
         curves,
         authorize_network,
         live: process.is_some(),
+        memory,
+        gpu_bars,
+        quotas,
     })
 }

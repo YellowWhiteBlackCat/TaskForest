@@ -469,3 +469,7 @@ impl SystemProjectionStore {
 #[cfg(test)]
 #[path = "../../tests/headless/shell_app_process_control.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/shell_app_process_collateral.rs"]
+mod collateral_tests;

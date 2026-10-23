@@ -60,6 +60,9 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [053](053-product-expected-capability-surface.md) | Product-expected capability surface | The product declares the expected capability identities and the runtime catalog seeds a typed `Unsupported` absence for every unregistered expected capability; "no entry" is never a product answer. | Capability, Observation |
 | [054](054-terminal-semantics-and-gui-accessibility-receipts.md) | Terminal semantics and GUI accessibility receipts | Shared semantic row inputs belong to `ui-contract`; TUI relies on its terminal emulator's native tree, while GUI native receipts require a real target-platform assistive-technology consumer. | Frontend, Accessibility |
 | [055](055-daemon-architecture-and-ipc-trust-boundary.md) | Daemon architecture, IPC trust boundary, and persistence lifecycle | Dual-mode engine: daemon owns background persistence, privilege helpers and IPC stream; frontends run unprivileged and fall back to standalone in-process collection. | Runtime, History, Privilege |
+| [056](056-workspace-lint-single-source.md) | Single lint source of truth (workspace.lints) and the four unsafe trust roots | The root `[workspace.lints]` is the only lint source; business crates inherit it, the four audited unsafe trust roots declare their exception explicitly, and test-time unsafe must be registered. | Safety, Build |
+| [057](057-resolver-v3-msrv-aware-resolution.md) | Resolver v3, MSRV-aware dependency resolution | Resolver v3 makes dependency resolution honor the `rust-version` floor; feature unification semantics are unchanged. | Build |
+| [058](058-cargo-build-warnings-gate.md) | Warning threshold moves to Cargo build.warnings | The warning threshold is `build.warnings = "deny"`; CI keeps the mold-carrying `RUSTFLAGS`, so both hosts stay equally strict. | Build |
 
 ## Decision chains
 
@@ -89,6 +92,10 @@ existing ADRs: cross-references and history depend on stable numbers.
 - ADR-054 distinguishes shared semantic inputs from native accessibility
   evidence: TUI does not own its terminal emulator's tree, and GUI receipt
   claims require a real platform-matched assistive-technology consumer.
+- ADR-056 makes the lint policy a workspace-level single source: it keeps the
+  four audited unsafe trust roots of ADR-022/024/025/031 as the only lint
+  exceptions and registers the one test-time `unsafe` site. ADR-057 and ADR-058
+  pin dependency resolution and the warning threshold at the workspace level.
 
 ## Find by topic
 
@@ -99,9 +106,10 @@ existing ADRs: cross-references and history depend on stable numbers.
 | Observation & availability semantics | 007, 015, 016, 053 |
 | History & refresh | 014, 036 |
 | Privilege & escalation | 023, 035, 048 |
-| Audited unsafe boundaries | 022, 024, 025, 031 |
+| Audited unsafe boundaries | 022, 024, 025, 031, 056 |
 | Frontend & UI | 017, 020, 026, 027, 028, 029, 032, 037, 038, 039, 040, 041, 042, 046, 050, 051, 052 |
 | Accessibility & semantic output | 054 |
+| Build & dependency policy | 056, 057, 058 |
 | Runtime scheduling | 008, 033 |
 | Storage & persistence | 010, 036 |
 | Release & packaging | 006, 028, 029, 044, 045, 051 |

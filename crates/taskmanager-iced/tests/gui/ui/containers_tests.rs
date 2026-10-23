@@ -1,7 +1,7 @@
 use super::*;
 use taskmanager_application::MAX_CONTAINER_ROWS;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process_telemetry::ContainerSummary;
+use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 
 fn healthy_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);
@@ -13,6 +13,8 @@ fn healthy_rollup() -> ContainerRollup {
         cpu_percentage: ScalarObservation::available(120.5, 1_000),
         memory_bytes: ScalarObservation::available(3 * 1024 * 1024, 1_000),
         member_pids: vec![100, 101, 102],
+        // The fixture declares no cgroup ceiling.
+        quota: ContainerQuota::not_declared(),
     });
     rollup
 }

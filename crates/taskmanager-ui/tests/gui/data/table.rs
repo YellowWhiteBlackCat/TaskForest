@@ -15,6 +15,7 @@ use gpui::{
 };
 
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::{COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
 
 use crate::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 
@@ -739,13 +740,13 @@ async fn focused_resize_handle_steps_width_and_obeys_declared_bounds(cx: &mut Te
     }
     assert_eq!(
         table.read_with(&visual, |table, _| table.col_groups[1].width),
-        px(super::COLUMN_RESIZE_MIN_WIDTH),
+        px(COLUMN_WIDTH_MIN),
         "repeated Left steps must stop at the declared minimum"
     );
     visual.simulate_keystrokes("left");
     assert_eq!(
         table.read_with(&visual, |table, _| table.col_groups[1].width),
-        px(super::COLUMN_RESIZE_MIN_WIDTH),
+        px(COLUMN_WIDTH_MIN),
         "Left at the minimum must not move below the declared bound"
     );
 
@@ -754,13 +755,13 @@ async fn focused_resize_handle_steps_width_and_obeys_declared_bounds(cx: &mut Te
     }
     assert_eq!(
         table.read_with(&visual, |table, _| table.col_groups[1].width),
-        px(super::COLUMN_RESIZE_MAX_WIDTH),
+        px(COLUMN_WIDTH_MAX),
         "repeated Right steps must stop at the declared maximum"
     );
     visual.simulate_keystrokes("right");
     assert_eq!(
         table.read_with(&visual, |table, _| table.col_groups[1].width),
-        px(super::COLUMN_RESIZE_MAX_WIDTH),
+        px(COLUMN_WIDTH_MAX),
         "Right at the maximum must not move beyond the declared bound"
     );
     assert_eq!(

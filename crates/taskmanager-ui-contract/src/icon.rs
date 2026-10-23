@@ -41,6 +41,18 @@ pub enum IconId {
     TriangleAlert,
     /// Per-application usage history (App history page).
     History,
+    /// A console terminal (a terminal window carrying a prompt).
+    Terminal,
+    /// A graphical display server (a monitor).
+    Display,
+    /// The Docker container runtime (a corrugated container mark).
+    Docker,
+    /// The Podman container runtime (a pod of container marks).
+    Podman,
+    /// A read-only resource (a padlock).
+    Lock,
+    /// A remote session (a session reached over the network).
+    Remote,
 }
 
 impl IconId {
@@ -48,7 +60,7 @@ impl IconId {
     ///
     /// Frontend registries and tests iterate this source of truth instead of
     /// carrying drifting hand-written variant lists.
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 39] = [
         Self::Cpu,
         Self::Memory,
         Self::Disk,
@@ -82,5 +94,15 @@ impl IconId {
         Self::CircleX,
         Self::TriangleAlert,
         Self::History,
+        Self::Terminal,
+        Self::Display,
+        Self::Docker,
+        Self::Podman,
+        Self::Lock,
+        Self::Remote,
     ];
 }
+
+#[cfg(test)]
+#[path = "../tests/headless/ui_icon.rs"]
+mod tests;

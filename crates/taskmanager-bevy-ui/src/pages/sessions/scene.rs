@@ -69,6 +69,7 @@ pub(super) fn sessions_body_scene(
     shell: &ShellApp,
     palette: &UiPalette,
     selection: &SessionSelection,
+    bubble: Option<&SessionBubbleTarget>,
 ) -> impl Scene + use<> {
     let rows = session_rows(shell);
     let selected = selected_row(&rows, selection);
@@ -83,6 +84,10 @@ pub(super) fn sessions_body_scene(
     let children = body_children(&rows, selected, notice, feedback, empty, palette);
     let header = header_scene(shell.sessions_sort, palette);
     let toolbar = sessions_toolbar_scene(selection.target.is_some(), palette);
+    let bubble_children: Vec<Box<dyn Scene>> = bubble
+        .map(|target| Box::new(bubble::bubble_scene(target, palette)) as Box<dyn Scene>)
+        .into_iter()
+        .collect();
     bsn! {
         Node {
             width: percent(100),
@@ -92,6 +97,7 @@ pub(super) fn sessions_body_scene(
         }
         Children [
              @toolbar --
+             { bubble_children } --
              @header --
             { children }
         ]
@@ -183,7 +189,7 @@ pub(super) fn session_row_scene(
     let user = row.user.clone();
     let seat = row.seat.clone();
     let tty = row.tty.clone();
-    let kind = row.kind.to_owned();
+    let remote = row.remote.to_owned();
     let since = row.since.clone();
     let fill = if selected {
         palette.nav_active_bg
@@ -195,7 +201,7 @@ pub(super) fn session_row_scene(
     let user_width = widths[1].width_px;
     let seat_width = widths[2].width_px;
     let tty_width = widths[3].width_px;
-    let kind_width = widths[4].width_px;
+    let remote_width = widths[4].width_px;
     let since_width = widths[5].width_px;
     Box::new(bsn! {
         Node {
@@ -215,11 +221,38 @@ pub(super) fn session_row_scene(
              @text_cell_scene(session, session_width, Role::Body) --
              @text_cell_scene(user, user_width, Role::Body) --
              @text_cell_scene(seat, seat_width, Role::Body) --
-             @text_cell_scene(tty, tty_width, Role::Body) --
-             @text_cell_scene(kind, kind_width, Role::Body) --
+             @terminal_cell_scene(tty, tty_width, row.kind, palette) --
+             @text_cell_scene(remote, remote_width, Role::Body) --
              @text_cell_scene(since, since_width, Role::Body)
         ]
     })
+}
+
+/// The TTY cell: the observed terminal line preceded by the session family's
+/// vector mark, so the row says WHICH kind of session it is without a second
+/// column. The mark is a semantic icon plate (never a font codepoint) and the
+/// text stays on one clipped line.
+pub(super) fn terminal_cell_scene(
+    text: String,
+    width: f32,
+    kind: SessionKind,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let mark = crate::icons::icon_scene(kind.icon(), palette, palette.dim_color);
+    bsn! {
+        Node {
+            width: px(width),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_4()),
+            overflow: Overflow::clip_x(),
+        }
+        SessionKindMarker(kind)
+        Children [
+             @{ mark } Pickable::IGNORE --
+             Text(text) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }
+        ]
+    }
 }
 
 pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scene + use<> {

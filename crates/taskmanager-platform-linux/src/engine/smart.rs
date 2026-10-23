@@ -48,6 +48,7 @@ use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 pub(crate) mod provider;
 pub mod self_test;
+pub(crate) mod tool;
 mod transport;
 
 pub(crate) use provider::SmartProviderRegistry;

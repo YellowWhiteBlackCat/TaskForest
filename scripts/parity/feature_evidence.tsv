@@ -278,7 +278,7 @@ storage.swap-throughput	bevy	pages::performance::tests::memory_summary_renders_t
 storage.iops-queue-latency	iced	ui::tests::devices::disk_summary_renders_observed_iops_latency_and_queue_depth	anchored	-	-
 storage.iops-queue-latency	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_iops_latency_and_queue_depth	anchored	-	-
 storage.smart-health	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_smart_evidence_rows	anchored	-	-
-storage.device-topology	bevy	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	anchored	-	-
+storage.device-topology	bevy	pages::performance::device_rows_tests::the_partition_capacity_appears_once_in_the_disk_card	anchored	-	-
 gpu.adapter-enumeration	iced	ui::tests::devices::gpu_selector_enumerates_every_projected_adapter	anchored	-	-
 gpu.adapter-enumeration	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-	-
 gpu.engine-utilization	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-	-

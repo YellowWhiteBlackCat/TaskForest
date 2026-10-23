@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::process_telemetry::quota::ContainerQuota;
 use crate::core::{DeviceStatus, FailureKind};
 
 #[test]
@@ -27,6 +28,7 @@ fn has_current_reading_distinguishes_present_from_unavailable_fields() {
         cgroup_path: "/docker/abc".into(),
         cpu_percentage: ScalarObservation::unavailable(FailureKind::PermissionDenied),
         memory_bytes: ScalarObservation::unavailable(FailureKind::PermissionDenied),
+        quota: ContainerQuota::not_declared(),
         member_pids: Vec::new(),
     });
     assert!(!rollup.has_current_reading());

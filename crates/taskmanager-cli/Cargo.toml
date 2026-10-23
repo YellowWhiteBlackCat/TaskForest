@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-cli"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -28,3 +28,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # instead of naming an OS crate.
 taskmanager-platform-native = { path = "../taskmanager-platform-native" }
 taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+# Lint 事实源：根 `Cargo.toml` 的 `[workspace.lints]`（见 ADR-056）。
+[lints]
+workspace = true

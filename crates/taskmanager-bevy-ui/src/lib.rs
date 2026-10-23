@@ -77,6 +77,7 @@ pub mod pages;
 pub mod palette;
 pub mod runtime;
 pub(crate) mod saved_views;
+pub(crate) mod scene_attach;
 pub mod semantic;
 pub mod snapshot_export;
 pub(crate) mod system_information_modal;

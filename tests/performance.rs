@@ -16,6 +16,17 @@
 //!   memory (counting global allocator). Bounded histories allocate at
 //!   construction, so steady-state retained bytes must not grow.
 
+// ADR-056: the workspace lint table denies `unsafe_code` for every package, and
+// a process-global `#[global_allocator]` cannot be expressed without
+// `unsafe impl GlobalAlloc`. The exception is scoped to this file, and to the
+// platform that actually installs the allocator (`CountingAllocator` is
+// Linux-gated), so the gate host's library and every non-Linux target stay
+// under the plain `deny`. This is a standalone integration-test binary: it is
+// never part of `taskmanager-gates`' library and it never ships. The exemption
+// uses the scoped `cfg_attr` form, the only shape
+// `scripts/quality/allow_ceiling_guard.py` accepts.
+#![cfg_attr(all(test, target_os = "linux"), allow(unsafe_code))]
+
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 #[cfg(target_os = "linux")]

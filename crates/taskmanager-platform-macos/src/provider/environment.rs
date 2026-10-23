@@ -18,6 +18,7 @@ use taskmanager_application::{
     SessionControlRequest, SessionInventoryRequest, StartupControlRequest, StartupEvidenceRequest,
     StartupInventoryRequest,
 };
+use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceState, FailureKind, ProviderId, SessionControlAction, SessionIdentity, SessionItem,
@@ -299,6 +300,12 @@ impl StartupEvidenceProvider for MacStartupEvidenceProvider {
             critical_chain_state: DeviceState::healthy(observed_at_ms),
             failed_units_failure: failure,
             critical_chain_failure: failure,
+            // macOS has no systemd boot analyzer: the phase split is a typed
+            // absence, never a borrowed zero.
+            phase_timeline_state: DeviceState::default()
+                .transition(DeviceStatus::Unsupported, observed_at_ms),
+            phase_timeline_failure: Some(StartupEvidenceFailure::Unsupported),
+            phase_timeline: None,
             failed_units: Vec::new(),
             critical_chain: Vec::new(),
         })

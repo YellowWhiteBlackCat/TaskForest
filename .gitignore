@@ -33,6 +33,8 @@ __pycache__/
 *.pyc
 
 # Local agent runtime configurations and scratch — private, never commit.
+.agents/
+.aws/
 .claude/
 .claude.json
 claude.json

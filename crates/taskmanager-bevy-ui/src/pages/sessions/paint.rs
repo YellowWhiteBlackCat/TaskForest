@@ -1,5 +1,6 @@
 //! Coalesced sessions painting over explicit resource and entity access.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::schedule::IntoScheduleConfigs;
@@ -30,6 +31,7 @@ struct PaintAccess<'w, 's> {
     state: ResMut<'w, PaintState>,
     bodies: Query<'w, 's, (Entity, Option<&'static Children>), With<SessionsBody>>,
     status: Query<'w, 's, &'static mut Text, With<SessionsStatusLine>>,
+    overlays: Query<'w, 's, (), With<crate::confirmation::ConfirmationOverlay>>,
     commands: Commands<'w, 's>,
 }
 fn paint(mut access: PaintAccess) {
@@ -47,7 +49,22 @@ fn paint(mut access: PaintAccess) {
     {
         access.selection.target = None;
     }
-    let scene = sessions_body_scene(shell, &access.palette.inner, &access.selection);
+    // The page's bubble card and the shared confirmation modal are two views
+    // of the SAME armed gate: exactly one of them is on screen. The shared
+    // modal wins whenever it is mounted (it is the shell's own surface); the
+    // bubble carries the frozen target when the page armed the gate itself.
+    let shared_modal_mounted = !access.overlays.is_empty();
+    let bubble = if shared_modal_mounted {
+        None
+    } else {
+        bubble::bubble_target(shell)
+    };
+    let scene = sessions_body_scene(
+        shell,
+        &access.palette.inner,
+        &access.selection,
+        bubble.as_ref(),
+    );
     let line = status_line_text(shell, rows.len());
     access.rendered.rendered_revision = Some(shell.projection().sessions_revision);
     if let Some(children) = children {
@@ -56,10 +73,7 @@ fn paint(mut access: PaintAccess) {
         }
     }
     let fresh = access.commands.spawn_scene(scene).id();
-    access
-        .commands
-        .entity(body)
-        .add_one_related::<ChildOf>(fresh);
+    attach_child(&mut access.commands, body, fresh);
     for mut text in &mut access.status {
         text.0 = line.clone();
     }

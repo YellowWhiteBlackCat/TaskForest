@@ -8,7 +8,7 @@
 //! badge, divider, spinner, progress, tooltip, scrollbar, pill),
 //! `inputs` (switch, slider, checkbox, text_input, search_input),
 //! `overlays` (layer_stack, dialog, popup, context_menu, dropdown_menu,
-//! toast), and `data` (table, virtual_list, tree, highlighter).
+//! toast), and `data` (table, virtual_list, tree).
 //!
 //! Architecture (docs/UI_COMPONENT_ARCHITECTURE.md §2.3, M2):
 //! every interactive component is a `XxxState` entity (owning its
@@ -71,7 +71,7 @@ pub mod theme_binding;
 use overlays::layer_stack::LayerBackfill;
 use overlays::popup::PopupMenuState;
 
-pub use data::{highlighter, key_value_row, row, table, tree, virtual_list};
+pub use data::{key_value_row, row, table, tree, virtual_list};
 pub use focus::{
     ModalEscTarget, begin_modal, esc_chain_target, modal_context_focused, restore_modal, trap_modal,
 };

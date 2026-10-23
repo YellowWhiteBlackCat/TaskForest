@@ -55,8 +55,15 @@ impl IcedApp {
                 self.dismiss_context_menu_kind(ContextMenuKind::Startup);
                 self.shell.request_startup_control(enabled)
             }
-            Message::RequestStartupControlFor { index: _, enabled } => {
-                self.apply_startup_menu_action(enabled)
+            Message::RequestStartupControlFor { index, enabled } => {
+                // A row switch addresses the row it sits on; a row-menu action
+                // addresses the entry the menu captured. The open menu wins
+                // when there is one.
+                if self.startup_menu_entry().is_some() {
+                    self.apply_startup_menu_action(enabled)
+                } else {
+                    self.apply_startup_row_switch(index, enabled)
+                }
             }
             Message::ConfirmStartupControl => self.shell.confirm_startup_control(),
             Message::RequestSmartSelfTest(intent) => {

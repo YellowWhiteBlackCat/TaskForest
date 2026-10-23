@@ -251,6 +251,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             app.shell.application.active_page = AppPage::Applications;
             if let Some(target) = seed_capture_process_target(app) {
                 let intent = ProcessBatchIntent {
+                    collateral: Default::default(),
                     action: ProcessBatchAction::Kill,
                     scope: ProcessGroupScope::PidAdjacency,
                     targets: vec![target],
@@ -275,6 +276,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
             let targets = seed_capture_multiple_process_targets(app);
             if !targets.is_empty() {
                 let intent = ProcessBatchIntent {
+                    collateral: Default::default(),
                     action: ProcessBatchAction::Kill,
                     scope: ProcessGroupScope::PidAdjacency,
                     targets,

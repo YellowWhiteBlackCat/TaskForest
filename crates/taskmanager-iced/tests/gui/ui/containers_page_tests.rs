@@ -8,7 +8,7 @@ use super::*;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{ContainerSummary, IsolationKind};
+use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary, IsolationKind};
 
 fn populated_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);
@@ -20,6 +20,8 @@ fn populated_rollup() -> ContainerRollup {
         cpu_percentage: ScalarObservation::available(120.5, 1_000),
         memory_bytes: ScalarObservation::available(3 * 1024 * 1024, 1_000),
         member_pids: vec![100, 101, 102],
+        // The fixture declares no cgroup ceiling.
+        quota: ContainerQuota::not_declared(),
     });
     rollup
 }

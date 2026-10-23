@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,
-    SmartAvailability,
+    SmartAvailability, SmartToolRemediation,
 };
 use crate::core::device_state::DeviceState;
 use crate::core::smart::SmartProviderFailureKind;
@@ -215,6 +215,8 @@ struct DiskMetricsWire {
     hotplug_capable: Option<bool>,
     #[serde(default)]
     smart_availability: SmartAvailability,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    smart_tool_remediation: Option<SmartToolRemediation>,
     #[serde(default)]
     smart_state: DeviceState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -330,6 +332,7 @@ impl Serialize for DiskMetrics {
             media_removable: self.media_removable,
             hotplug_capable: self.hotplug_capable,
             smart_availability: self.smart_availability,
+            smart_tool_remediation: self.smart_tool_remediation.clone(),
             smart_state: self.smart_state,
             smart_provider: self.smart_provider.clone(),
             smart_failure: self.smart_failure,
@@ -431,6 +434,7 @@ impl<'de> Deserialize<'de> for DiskMetrics {
             media_removable,
             hotplug_capable: wire.hotplug_capable,
             smart_availability: wire.smart_availability,
+            smart_tool_remediation: wire.smart_tool_remediation,
             smart_state: wire.smart_state,
             smart_provider: wire.smart_provider,
             smart_failure: wire.smart_failure,

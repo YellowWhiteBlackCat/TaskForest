@@ -112,6 +112,7 @@ and the Linux polkit helpers are not part of it.
 | MSR readout optional capability | `taskforest-msr-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy` | Package transaction or the same manager's `msr` transaction |
 | SMART self-test control | `taskforest-smart-self-test-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.smart-self-test.policy` | Package transaction or the same manager's `smart-self-test` transaction |
 | Developer user integration | User-local TaskForestG/TaskForestI `.desktop` entries, shared SVG, conditional `index.theme`, and one ownership receipt | [`scripts/dev-install-frontends.sh`](../scripts/dev-install-frontends.sh); user-owned and separate from root package files |
+| Daemon service | `/usr/bin/taskforest-daemon`, `/usr/lib/systemd/system/taskforest-daemon.service`, `/usr/lib/systemd/user/taskforest-daemon.service` | Package transaction for `taskforest-daemon` (`packaging/debian/build-deb-daemon.sh` or `packaging/rpm/taskforest-daemon.spec`) |
 | Windows MSI products | Per-UI `taskforest-<ui>.exe` and Start Menu shortcut, plus the shared process-control helper, license notices, and `HKLM\Software\TaskForest` markers | Windows Installer — one MSI per UI target; remove with `msiexec /x TaskForest-<UI>.msi` |
 
 The full path, artifact, permission, conflict, and removal fields are kept in

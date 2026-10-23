@@ -6,12 +6,27 @@
 //! enums (GPUI `SortCol`, the Iced/TUI column models) map their variants onto
 //! these tokens and delegate the shared semantics here instead of carrying
 //! private copies that drift.
-//! Resize limits remain with each table shape's resize policy; they are not
-//! per-column facts in this shared vocabulary.
+//! The table's column-width RESIZE policy (minimum / maximum / keyboard step)
+//! lives here as well: it is one policy every frontend reads, not a per-column
+//! fact. A frontend's own layout floor stays with that frontend.
 //!
 //! The `id` tokens are spelled exactly like the persisted process-view
 //! sort/hidden-columns config tokens, so persisted settings, the contract,
 //! and every frontend enum agree on one string per column.
+
+/// The process table's column-width POLICY — the single authority.
+///
+/// These are the RESIZE limits: how far a user may drag a column's edge, and
+/// how far one keyboard step moves it. Every frontend reads these constants,
+/// so the same drag behaves the same everywhere. A frontend's own LAYOUT
+/// floor — how narrow a column may become when the table distributes the
+/// available width — stays with that frontend: it is a layout decision, not
+/// a shared policy.
+pub const COLUMN_WIDTH_MIN: f32 = 10.0;
+/// The widest a column may become when resizing.
+pub const COLUMN_WIDTH_MAX: f32 = 1200.0;
+/// The width change one keyboard resize step applies.
+pub const COLUMN_WIDTH_KEYBOARD_STEP: f32 = 10.0;
 
 /// One process-table column, described toolkit-neutrally.
 #[derive(Clone, Copy, Debug, PartialEq)]

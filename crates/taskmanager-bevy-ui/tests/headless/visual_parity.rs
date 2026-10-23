@@ -24,6 +24,7 @@ use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::scene::{Scene, ScenePlugin, WorldSceneExt, bsn};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use taskmanager_theme::tokens::UiSize;
 
@@ -55,6 +56,38 @@ fn every_drawn_icon_resolves_to_a_correctly_sized_bitmap() {
             rgba.len()
         );
     }
+}
+
+/// The semantic ids the icon owner chain added must be stampable by THIS
+/// frontend: a registered id whose bitmap never resolves would draw as an
+/// honest absence — an invisible mark, not a glyph.
+#[test]
+fn the_owner_chain_icons_are_registered_and_stampable_here() {
+    let added = [
+        IconId::Terminal,
+        IconId::Display,
+        IconId::Docker,
+        IconId::Podman,
+        IconId::Lock,
+    ];
+    for icon in added {
+        assert!(
+            PLATE_ICONS.contains(&icon),
+            "{icon:?} is not registered in PLATE_ICONS"
+        );
+        let rgba = icon_rgba(icon)
+            .unwrap_or_else(|| panic!("{icon:?} has no bitmap plate; regenerate UI icons"));
+        assert_eq!(
+            rgba.len(),
+            PLATE_BYTES,
+            "{icon:?} plate is {} bytes, expected {PLATE_BYTES}",
+            rgba.len()
+        );
+    }
+    // Each of them owns its own glyph: two ids sharing one path would let
+    // two frontends draw different marks for the same meaning.
+    let paths: HashSet<_> = added.iter().map(|icon| path(*icon)).collect();
+    assert_eq!(paths.len(), added.len(), "two ids share one glyph path");
 }
 
 #[test]

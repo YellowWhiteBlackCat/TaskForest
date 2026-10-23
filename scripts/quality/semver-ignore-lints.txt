@@ -1,0 +1,17 @@
+# semver-ignore-lints.txt — semver lints this repository accepts as breaking.
+#
+# One lint name per line. A `#` starts a comment, blank lines are ignored,
+# and an empty file means: ignore nothing — every deny-level semver finding
+# fails the public-API gate.
+#
+# A lint name listed here is only honoured when the installed
+# cargo-semver-checks accepts an `--ignore` flag; the gate fails closed
+# (instead of silently dropping the lint) when it does not. The
+# tool-independent way to downgrade one lint is the manifest configuration:
+#
+#   [package.metadata.cargo-semver-checks.lints]
+#   <lint_name> = "allow"
+#
+# Names are the snake_case ids cargo-semver-checks reports, for example
+# `function_missing` or `type_changed`. Keep this list empty unless a
+# reviewed breaking change is accepted on purpose.

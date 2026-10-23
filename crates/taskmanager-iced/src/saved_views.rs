@@ -96,13 +96,19 @@ pub fn presets_ribbon<'a>(
     if state.compact {
         // Keep the preset ribbon to a single bounded horizontal scrollable strip
         // so it never wraps into multiple vertical rows that consume the table viewport.
-        iced::widget::scrollable(row(items).spacing(6).align_y(iced::Alignment::Center))
-            .direction(iced::widget::scrollable::Direction::Horizontal(
-                iced::widget::scrollable::Scrollbar::default(),
-            ))
-            .height(Length::Fixed(32.0))
-            .width(Length::Fill)
-            .into()
+        //
+        // The strip also keeps the wheel: the guard forwards the gesture to the
+        // ribbon first and only then captures it, so the horizontal ribbon
+        // still scrolls while the table underneath never sees the wheel
+        // (ICED-051).
+        let strip =
+            iced::widget::scrollable(row(items).spacing(6).align_y(iced::Alignment::Center))
+                .direction(iced::widget::scrollable::Direction::Horizontal(
+                    iced::widget::scrollable::Scrollbar::default(),
+                ))
+                .height(Length::Fixed(32.0))
+                .width(Length::Fill);
+        crate::ui::saved_views::wheel_guard(strip.into())
     } else {
         container(row(items).spacing(6).align_y(iced::Alignment::Center))
             .padding([4, 8])

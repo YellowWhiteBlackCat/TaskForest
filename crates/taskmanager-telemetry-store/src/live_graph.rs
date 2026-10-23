@@ -19,7 +19,7 @@ use crate::HistoryRetention;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use taskmanager_core::{DeviceId, GpuEngineMetricPoint};
+use taskmanager_core::{DeviceId, GpuEngineMetricPoint, MetricSample};
 
 use crate::{
     CorrelatedMetricHistory, CorrelatedMetricSample, CorrelatedSystemTelemetryIngestor,
@@ -285,6 +285,30 @@ impl LiveGraphHistory {
         &self,
         query: ChartSeriesQuery<'_>,
     ) -> Result<Vec<f32>, ChartSeriesError> {
+        Self::validate(query)?;
+        Ok(self.window_for(query))
+    }
+
+    /// Resolve one chart series as timestamped samples.
+    ///
+    /// Each sample carries the instant its value was measured at, taken from
+    /// the accepted correlated observation. A consumer that shows when a
+    /// value was sampled reads that instant — never a sample offset such as
+    /// `-3`, and never a clock read in this layer.
+    ///
+    /// The scope discipline is the value-only read's: a wrong-domain query
+    /// returns the same typed [`ChartSeriesError`], and both reads resolve
+    /// the same accepted samples from the same rings.
+    pub fn resolve_series_samples(
+        &self,
+        query: ChartSeriesQuery<'_>,
+    ) -> Result<Vec<MetricSample>, ChartSeriesError> {
+        Self::validate(query)?;
+        Ok(self.samples_for(query))
+    }
+
+    /// The scope rule both series reads enforce before touching a ring.
+    fn validate(query: ChartSeriesQuery<'_>) -> Result<(), ChartSeriesError> {
         match (query.series.scope(), query.device) {
             (SeriesScope::Host, Some(_)) => Err(ChartSeriesError::DeviceIdentityOnHostSeries {
                 series: query.series,
@@ -293,37 +317,52 @@ impl LiveGraphHistory {
                 series: query.series,
                 domain,
             }),
-            _ => Ok(self.window_for(query)),
+            _ => Ok(()),
         }
     }
 
-    /// Window lookup for an already scope-validated query. The trailing arm
-    /// covers pairs [`Self::resolve_series`] rejects first and the legacy
-    /// accessors never build; it keeps this dispatch total and panic-free.
+    /// The value-only window of an already scope-validated query.
+    ///
+    /// This is a projection of the same accepted samples the timestamped
+    /// read exposes: the value list and the sample list are index-aligned,
+    /// and a missing measurement is a `NaN` gap in both.
     fn window_for(&self, query: ChartSeriesQuery<'_>) -> Vec<f32> {
+        values(&self.samples_for(query))
+    }
+
+    /// The timestamped samples of an already scope-validated query.
+    ///
+    /// This is the single dispatch every chart series resolves through: the
+    /// value-only window and the timestamped window are two projections of
+    /// the same accepted samples, so they can never disagree.
+    ///
+    /// The trailing arm covers pairs [`Self::resolve_series`] rejects first
+    /// and the legacy accessors never build; it keeps this dispatch total
+    /// and panic-free.
+    fn samples_for(&self, query: ChartSeriesQuery<'_>) -> Vec<MetricSample> {
         let history = &self.store.system_history;
         match (query.series, query.device) {
-            (MetricSeries::CpuUsagePercent, None) => self.f32_history(history.cpu_usage()),
-            (MetricSeries::MemoryUsagePercent, None) => self.f32_history(history.memory_usage()),
-            (MetricSeries::DiskBytesPerSec, None) => self.u64_history(history.storage_rate_total()),
+            (MetricSeries::CpuUsagePercent, None) => self.f32_samples(history.cpu_usage()),
+            (MetricSeries::MemoryUsagePercent, None) => self.f32_samples(history.memory_usage()),
+            (MetricSeries::DiskBytesPerSec, None) => self.u64_samples(history.storage_rate_total()),
             (MetricSeries::DiskBytesPerSec, Some(device)) => {
-                self.u64_device(history.storage_rate(device), query.generation)
+                self.u64_device_samples(history.storage_rate(device), query.generation)
             }
             (MetricSeries::NetworkBytesPerSec, None) => {
-                self.u64_history(history.network_rate_total())
+                self.u64_samples(history.network_rate_total())
             }
             (MetricSeries::NetworkBytesPerSec, Some(device)) => {
-                self.u64_device(history.network_rate(device), query.generation)
+                self.u64_device_samples(history.network_rate(device), query.generation)
             }
-            (MetricSeries::GpuUsagePercent, None) => self.f32_history(history.gpu_usage_mean()),
+            (MetricSeries::GpuUsagePercent, None) => self.f32_samples(history.gpu_usage_mean()),
             (MetricSeries::GpuUsagePercent, Some(device)) => {
-                self.f32_device(history.gpu_usage(device), query.generation)
+                self.f32_device_samples(history.gpu_usage(device), query.generation)
             }
-            (MetricSeries::CpuTemperatureC, None) => self.f32_history(history.cpu_temperature()),
-            (MetricSeries::CpuFrequencyMhz, None) => self.u64_history(history.cpu_frequency_mhz()),
-            (MetricSeries::CpuPowerW, None) => self.f32_history(history.cpu_power_w()),
+            (MetricSeries::CpuTemperatureC, None) => self.f32_samples(history.cpu_temperature()),
+            (MetricSeries::CpuFrequencyMhz, None) => self.u64_samples(history.cpu_frequency_mhz()),
+            (MetricSeries::CpuPowerW, None) => self.f32_samples(history.cpu_power_w()),
             (MetricSeries::DiskActiveTimePct, Some(device)) => {
-                self.f32_device(history.storage_activity(device), query.generation)
+                self.f32_device_samples(history.storage_activity(device), query.generation)
             }
             (
                 MetricSeries::CpuUsagePercent
@@ -366,7 +405,7 @@ impl LiveGraphHistory {
             .system_history
             .cpu_core_usage()
             .into_iter()
-            .map(|history| self.f32_history(history))
+            .map(|history| values(&self.f32_samples(history)))
             .collect()
     }
 
@@ -376,7 +415,7 @@ impl LiveGraphHistory {
     /// instead of growing a second store handle just for the Memory page.
     #[must_use]
     pub fn swap_usage_pct(&self) -> Vec<f32> {
-        self.f32_history(self.store.system_history.swap_usage())
+        values(&self.f32_samples(self.store.system_history.swap_usage()))
     }
 
     /// The disk's read+write throughput window in bytes/sec — the device leg
@@ -400,11 +439,13 @@ impl LiveGraphHistory {
     /// and the same read-time generation scope.
     #[must_use]
     pub fn disk_read_bytes_per_sec_for(&self, device_id: &str, generation: u64) -> Vec<f32> {
-        self.u64_device(
-            self.store
-                .system_history
-                .storage_read_rate(&device(device_id)),
-            generation,
+        values(
+            &self.u64_device_samples(
+                self.store
+                    .system_history
+                    .storage_read_rate(&device(device_id)),
+                generation,
+            ),
         )
     }
 
@@ -412,11 +453,13 @@ impl LiveGraphHistory {
     /// [`Self::disk_read_bytes_per_sec_for`].
     #[must_use]
     pub fn disk_write_bytes_per_sec_for(&self, device_id: &str, generation: u64) -> Vec<f32> {
-        self.u64_device(
-            self.store
-                .system_history
-                .storage_write_rate(&device(device_id)),
-            generation,
+        values(
+            &self.u64_device_samples(
+                self.store
+                    .system_history
+                    .storage_write_rate(&device(device_id)),
+                generation,
+            ),
         )
     }
 
@@ -425,11 +468,13 @@ impl LiveGraphHistory {
     /// detail-page trend.
     #[must_use]
     pub fn disk_temperature_c_for(&self, device_id: &str, generation: u64) -> Vec<f32> {
-        self.f32_device(
-            self.store
-                .system_history
-                .storage_temperature_c(&device(device_id)),
-            generation,
+        values(
+            &self.f32_device_samples(
+                self.store
+                    .system_history
+                    .storage_temperature_c(&device(device_id)),
+                generation,
+            ),
         )
     }
 
@@ -467,11 +512,13 @@ impl LiveGraphHistory {
     /// a fabricated 0) and the same read-time generation scope.
     #[must_use]
     pub fn network_rx_bytes_per_sec_for(&self, device_id: &str, generation: u64) -> Vec<f32> {
-        self.u64_device(
-            self.store
-                .system_history
-                .network_rx_rate(&device(device_id)),
-            generation,
+        values(
+            &self.u64_device_samples(
+                self.store
+                    .system_history
+                    .network_rx_rate(&device(device_id)),
+                generation,
+            ),
         )
     }
 
@@ -479,11 +526,13 @@ impl LiveGraphHistory {
     /// [`Self::network_rx_bytes_per_sec_for`].
     #[must_use]
     pub fn network_tx_bytes_per_sec_for(&self, device_id: &str, generation: u64) -> Vec<f32> {
-        self.u64_device(
-            self.store
-                .system_history
-                .network_tx_rate(&device(device_id)),
-            generation,
+        values(
+            &self.u64_device_samples(
+                self.store
+                    .system_history
+                    .network_tx_rate(&device(device_id)),
+                generation,
+            ),
         )
     }
 
@@ -560,68 +609,86 @@ impl LiveGraphHistory {
 
     #[must_use]
     pub fn fan_rpm_for(&self, channel_id: &str) -> Vec<f32> {
-        self.f32_dynamic_device(self.store.dynamic_history.fan_rpm(&device(channel_id)))
+        values(
+            &self.f32_dynamic_device_samples(
+                self.store.dynamic_history.fan_rpm(&device(channel_id)),
+            ),
+        )
     }
 
     #[must_use]
     pub fn fan_temperature_c_for(&self, channel_id: &str) -> Vec<f32> {
-        self.f32_dynamic_device(
-            self.store
-                .dynamic_history
-                .fan_temperature_c(&device(channel_id)),
+        values(
+            &self.f32_dynamic_device_samples(
+                self.store
+                    .dynamic_history
+                    .fan_temperature_c(&device(channel_id)),
+            ),
         )
     }
 
     #[must_use]
     pub fn battery_capacity_pct_for(&self, device_id: &str) -> Vec<f32> {
-        self.f32_dynamic_device(
-            self.store
-                .dynamic_history
-                .battery_capacity_pct(&device(device_id)),
+        values(
+            &self.f32_dynamic_device_samples(
+                self.store
+                    .dynamic_history
+                    .battery_capacity_pct(&device(device_id)),
+            ),
         )
     }
 
     #[must_use]
     pub fn battery_power_w_for(&self, device_id: &str) -> Vec<f32> {
-        self.f32_dynamic_device(
-            self.store
-                .dynamic_history
-                .battery_power_w(&device(device_id)),
+        values(
+            &self.f32_dynamic_device_samples(
+                self.store
+                    .dynamic_history
+                    .battery_power_w(&device(device_id)),
+            ),
         )
     }
 
-    fn f32_history(&self, history: CorrelatedMetricHistory<f32>) -> Vec<f32> {
+    fn f32_samples(&self, history: CorrelatedMetricHistory<f32>) -> Vec<MetricSample> {
         history
             .tail_samples(self.capacity())
             .iter()
-            .map(f32_value)
+            .map(f32_sample)
             .collect()
     }
 
-    fn u64_history(&self, history: CorrelatedMetricHistory<u64>) -> Vec<f32> {
+    fn u64_samples(&self, history: CorrelatedMetricHistory<u64>) -> Vec<MetricSample> {
         history
             .tail_samples(self.capacity())
             .iter()
-            .map(u64_value)
+            .map(u64_sample)
             .collect()
     }
 
-    fn f32_device(&self, history: Option<DeviceMetricHistory<f32>>, generation: u64) -> Vec<f32> {
+    fn f32_device_samples(
+        &self,
+        history: Option<DeviceMetricHistory<f32>>,
+        generation: u64,
+    ) -> Vec<MetricSample> {
         self.tail(
             generation_scoped(history, generation)
                 .map_or_else(Vec::new, |history| history.samples())
                 .iter()
-                .map(f32_value)
+                .map(f32_sample)
                 .collect(),
         )
     }
 
-    fn u64_device(&self, history: Option<DeviceMetricHistory<u64>>, generation: u64) -> Vec<f32> {
+    fn u64_device_samples(
+        &self,
+        history: Option<DeviceMetricHistory<u64>>,
+        generation: u64,
+    ) -> Vec<MetricSample> {
         self.tail(
             generation_scoped(history, generation)
                 .map_or_else(Vec::new, |history| history.samples())
                 .iter()
-                .map(u64_value)
+                .map(u64_sample)
                 .collect(),
         )
     }
@@ -630,17 +697,20 @@ impl LiveGraphHistory {
     /// by identity alone on this legacy leg; the generation discipline is the
     /// system-domain contract and the forward rule for any new per-device
     /// read edge.
-    fn f32_dynamic_device(&self, history: Option<DeviceMetricHistory<f32>>) -> Vec<f32> {
+    fn f32_dynamic_device_samples(
+        &self,
+        history: Option<DeviceMetricHistory<f32>>,
+    ) -> Vec<MetricSample> {
         self.tail(
             history
                 .map_or_else(Vec::new, |history| history.samples())
                 .iter()
-                .map(f32_value)
+                .map(f32_sample)
                 .collect(),
         )
     }
 
-    fn tail(&self, samples: Vec<f32>) -> Vec<f32> {
+    fn tail<T>(&self, samples: Vec<T>) -> Vec<T> {
         let keep = self.capacity();
         let skip = samples.len().saturating_sub(keep);
         samples.into_iter().skip(skip).collect()
@@ -670,17 +740,37 @@ fn generation_scoped<T>(
     history.filter(|history| ring_generation_matches(history.generation(), requested))
 }
 
-fn f32_value(sample: &CorrelatedMetricSample<f32>) -> f32 {
+/// The value-only projection of a sample list: a missing measurement stays a
+/// `NaN` gap, exactly as the live-graph windows have always published it.
+fn values(samples: &[MetricSample]) -> Vec<f32> {
+    samples
+        .iter()
+        .map(|sample| sample.value().unwrap_or(f32::NAN))
+        .collect()
+}
+
+/// One accepted scalar sample with its measurement instant.
+///
+/// A sample whose observation carried no measurement time is a gap: the
+/// window never invents an instant for a value it cannot place in time.
+fn f32_sample(sample: &CorrelatedMetricSample<f32>) -> MetricSample {
     match (sample.measured_at_ms, sample.value) {
-        (Some(_), Some(value)) if value.is_finite() => value,
-        _ => f32::NAN,
+        (Some(measured_at_ms), Some(value)) if value.is_finite() => {
+            MetricSample::measured(value, measured_at_ms, sample.stamp.completed_at_ms())
+        }
+        _ => MetricSample::gap(sample.stamp.completed_at_ms()),
     }
 }
 
-fn u64_value(sample: &CorrelatedMetricSample<u64>) -> f32 {
+/// One accepted counter sample with its measurement instant.
+fn u64_sample(sample: &CorrelatedMetricSample<u64>) -> MetricSample {
     match (sample.measured_at_ms, sample.value) {
-        (Some(_), Some(value)) => u64_as_f32(value),
-        _ => f32::NAN,
+        (Some(measured_at_ms), Some(value)) => MetricSample::measured(
+            u64_as_f32(value),
+            measured_at_ms,
+            sample.stamp.completed_at_ms(),
+        ),
+        _ => MetricSample::gap(sample.stamp.completed_at_ms()),
     }
 }
 
@@ -726,3 +816,7 @@ fn bounded_graph_f32(value: f64) -> f32 {
 #[cfg(test)]
 #[path = "../tests/headless/live_graph.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/live_graph_samples.rs"]
+mod samples_tests;

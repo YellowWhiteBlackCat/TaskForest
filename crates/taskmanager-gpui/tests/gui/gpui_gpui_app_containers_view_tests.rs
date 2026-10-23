@@ -7,6 +7,7 @@ use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_core::core::process_telemetry::ContainerQuota;
 use taskmanager_core::core::units::QuantityFamily;
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_core::core::{DeviceState, FailureKind, ScalarObservation};
@@ -26,6 +27,8 @@ fn sample_container(cpu: Option<f32>, mem: Option<u64>) -> ContainerSummary {
             None => ScalarObservation::unavailable(FailureKind::IdentityChanged),
         },
         member_pids: vec![10, 11],
+        // The fixture declares no cgroup ceiling.
+        quota: ContainerQuota::not_declared(),
     }
 }
 

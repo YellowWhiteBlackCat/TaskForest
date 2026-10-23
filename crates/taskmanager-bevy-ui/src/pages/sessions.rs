@@ -25,7 +25,7 @@ use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
@@ -39,7 +39,7 @@ use bevy::ui::prelude::{
     UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
@@ -55,10 +55,14 @@ use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene};
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod bubble;
+mod kind;
 pub(crate) mod menu;
 mod paint;
 mod scene;
 
+use bubble::SessionBubbleTarget;
+use kind::{SessionKind, SessionKindMarker};
 use scene::sessions_body_scene;
 
 // ---- pure core: row view model, seat/tty summary, copy ----
@@ -72,7 +76,8 @@ pub(crate) struct SessionRowModel {
     pub(crate) user: String,
     pub(crate) seat: String,
     pub(crate) tty: String,
-    pub(crate) kind: &'static str,
+    pub(crate) kind: SessionKind,
+    pub(crate) remote: &'static str,
     pub(crate) since: String,
 }
 
@@ -88,7 +93,8 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
             user: session.user.clone(),
             seat: session_seat_text(session),
             tty: session_tty_text(session),
-            kind: if session.remote {
+            kind: kind::classify(session),
+            remote: if session.remote {
                 t("common.yes")
             } else {
                 t("common.no")
@@ -332,9 +338,17 @@ pub(crate) struct SessionSelectionMoved(pub(crate) isize);
 
 /// Content-region scene for the Sessions page. The body's dynamic content is
 /// painted by the typed paint system — the single render authority for the rows.
-pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
+///
+/// **The scroll owner.** The users inventory is unbounded — a provider may
+/// report any number of sessions — so the page declares the official
+/// `ScrollArea` and gives it the visible rail. The bubble card is admitted as
+/// a whole group inside that viewport, and the last row keeps a bottom
+/// safety band instead of sitting flush against the viewport edge.
+pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Sessions.title();
     let waiting = t("common.waiting_inventory").to_owned();
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(context.palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(Val::Px(space_12())));
     bsn! {
         Node {
             width: percent(100),
@@ -352,13 +366,31 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                 TextRole(Role::Caption)
             --
 
+                // The viewport wrapper owns the scroll area AND the floating
+                // rail: the rail is a sibling of the scroll area, so it never
+                // scrolls with the content and never takes layout space away
+                // from it.
                 Node {
                     width: percent(100),
-                    height: Val::Auto,
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
                     flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(space_2()),
                 }
-                SessionsBody
+                Children [
+                    Node {
+                        width: percent(100),
+                        min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(space_2()),
+                        overflow: Overflow::scroll_y(),
+                        // The bottom inset is the safety band: the last row
+                        // never sits flush against the viewport edge. The
+                        // right inset is the rail's lane.
+                        padding: { lane },
+                    }
+                    ScrollArea SessionsBody
+                    --
+                    @{ rail }
+                ]
 
         ]
     }
@@ -389,7 +421,8 @@ fn on_session_disconnect_button_activated(
             .shell
             .select_session_control(&session, SessionControlAction::Disconnect)
     {
-        crate::confirmation::republish(&track.shell, &mut commands);
+        // The shared gate owns the frozen target; the page's bubble card is
+        // the surface that echoes it (see `sessions::bubble`).
         commands.trigger(crate::input::ShellInteractionApplied);
         commands.trigger(paint::RepaintRequested);
     }
@@ -414,7 +447,6 @@ fn on_session_lock_button_activated(
             .shell
             .select_session_control(&session, SessionControlAction::Lock)
     {
-        crate::confirmation::republish(&track.shell, &mut commands);
         commands.trigger(crate::input::ShellInteractionApplied);
         commands.trigger(paint::RepaintRequested);
     }
@@ -437,6 +469,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_session_disconnect_button_activated);
     app.add_observer(on_session_lock_button_activated);
     app.add_observer(on_sessions_body_added);
+    bubble::register(app);
     paint::register(app);
 }
 
@@ -501,6 +534,22 @@ fn on_sessions_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/sessions.rs"]
 mod tests;
+
+/// The scroll assembly and the owned micro-motions, asserted against the
+/// mounted surfaces: the visible rail on every scroll area, the scroll
+/// owners of the sessions / startup / process-tree surfaces, the hot-plug
+/// slide, and the battery's charge flow.
+#[cfg(test)]
+#[path = "../../tests/headless/pages/scroll_and_motion_parity.rs"]
+mod scroll_and_motion_parity_tests;
+
+/// The three semantic-icon surfaces this frontend owns — the session family
+/// glyph, the container runtime brand and the read-only mount lock — are
+/// asserted together because they read ONE icon chain: the shared semantic
+/// registry through the crate's icon layer.
+#[cfg(test)]
+#[path = "../../tests/headless/pages/icon_surfaces_parity.rs"]
+mod icon_surfaces_parity;
 
 fn on_sessions_row_activated(
     activate: On<Activate>,

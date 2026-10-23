@@ -20,9 +20,9 @@ use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    CorrelatedSessionEvent, HostTelemetryRequest, LatestControlRequest, PlatformClient,
-    PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle, SessionControlOutcome,
-    SessionEvent, SystemFacets,
+    CorrelatedSessionEvent, EnvironmentFacets, HostTelemetryRequest, LatestControlRequest,
+    PlatformClient, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
+    SessionControlOutcome, SessionControlRequest, SessionEvent, SystemFacets,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
@@ -42,9 +42,10 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;
 
 use super::{
-    SessionRowClicked, SessionSelection, SessionSelectionMoved, SessionSortClicked,
-    SessionsRowMarker, SessionsStatusLine, empty_state_text, feedback_line_text, moved_row,
-    selected_row, session_rows, session_seat_text, session_tty_text,
+    SessionKind, SessionKindMarker, SessionRowClicked, SessionSelection, SessionSelectionMoved,
+    SessionSortClicked, SessionsRowMarker, SessionsStatusLine, bubble, empty_state_text,
+    feedback_line_text, kind, moved_row, selected_row, session_rows, session_seat_text,
+    session_tty_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
 use crate::palette::ui_palette;
@@ -134,7 +135,33 @@ fn descriptor(id: CapabilityId, status: CapabilityStatus) -> CapabilityDescripto
     }
 }
 
+/// Records every session-control request the frontend submits to the
+/// platform: the observable half of "the bubble confirmed the frozen target".
+#[derive(Default)]
+struct RecordedSessionControls(Mutex<Vec<SessionControlRequest>>);
+
+impl RequestPort for RecordedSessionControls {
+    type Request = SessionControlRequest;
+
+    fn try_submit(&self, request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
+        self.0
+            .lock()
+            .expect("session control recorder lock")
+            .push(request.payload);
+        Ok(())
+    }
+}
+
 fn headless_sessions_app() -> (App, Arc<ScriptedEvents>) {
+    headless_sessions_app_with_controls(Arc::new(RecordedSessionControls::default()))
+}
+
+/// The same composition, with a recorder on the session-control port so a
+/// test can observe the submitted request instead of the queue it passed
+/// through.
+fn headless_sessions_app_with_controls(
+    controls: Arc<RecordedSessionControls>,
+) -> (App, Arc<ScriptedEvents>) {
     let events = Arc::new(ScriptedEvents::default());
     let snapshot = CapabilitySnapshot::from_descriptors([descriptor(
         CapabilityId::SESSIONS,
@@ -145,7 +172,8 @@ fn headless_sessions_app() -> (App, Arc<ScriptedEvents>) {
         Arc::new(FixedCapabilities(snapshot)),
         port,
         PlatformFacets::default()
-            .with_system(SystemFacets::default().with_host(Arc::new(QuietRequests))),
+            .with_system(SystemFacets::default().with_host(Arc::new(QuietRequests)))
+            .with_environment(EnvironmentFacets::default().with_session_control(controls.clone())),
     ));
     let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
     let runtime: &'static SharedRuntime = cache
@@ -626,5 +654,237 @@ fn sessions_toolbar_buttons_arm_confirmation_for_selected_session() {
             .pending_confirmation()
             .is_some(),
         "activating lock button arms confirmation"
+    );
+}
+
+// ---- terminal family marks (BEVY-150) ----
+
+#[test]
+fn session_kind_classifies_the_observed_terminal_family() {
+    let graphical = session_item("3", "ada", Some("seat0"), Some("wayland-0"));
+    assert_eq!(
+        kind::classify(&graphical),
+        SessionKind::Graphical,
+        "a Wayland compositor terminal owns a display session"
+    );
+    let x11 = session_item("4", "bo", Some("seat0"), Some(":0"));
+    assert_eq!(kind::classify(&x11), SessionKind::Graphical);
+    let console = session_item("5", "cy", Some("seat0"), Some("tty2"));
+    assert_eq!(
+        kind::classify(&console),
+        SessionKind::Console,
+        "a physical console line owns a terminal session"
+    );
+    let pseudo = session_item("6", "di", None, Some("pts/3"));
+    assert_eq!(kind::classify(&pseudo), SessionKind::Console);
+    let mut remote = session_item("7", "ed", Some("seat0"), Some("tty1"));
+    remote.remote = true;
+    assert_eq!(
+        kind::classify(&remote),
+        SessionKind::Remote,
+        "the transport outranks the terminal that carries it"
+    );
+    let bare = session_item("8", "fi", None, None);
+    assert_eq!(
+        kind::classify(&bare),
+        SessionKind::Unknown,
+        "an unobserved family is unknown, never a guess"
+    );
+}
+
+#[test]
+fn session_rows_carry_their_terminal_family_mark() {
+    let (mut app, events) = headless_sessions_app();
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![
+            session_item("2", "ada", Some("seat0"), Some("wayland-0")),
+            session_item("3", "bo", None, Some("tty1")),
+        ],
+    );
+    app.update();
+    app.update();
+
+    let marks: Vec<SessionKind> = app
+        .world_mut()
+        .query_filtered::<&SessionKindMarker, ()>()
+        .iter(app.world())
+        .map(|marker| marker.0)
+        .collect();
+    assert_eq!(marks.len(), 2, "every session row carries one family mark");
+    assert!(
+        marks.contains(&SessionKind::Graphical) && marks.contains(&SessionKind::Console),
+        "the marks name the two observed families: {marks:?}"
+    );
+}
+
+// ---- the bubble confirmation card (BEVY-149) ----
+
+/// Every text under one entity, in tree order.
+fn texts_under(app: &mut App, root: Entity) -> Vec<String> {
+    let world = app.world_mut();
+    let mut found = Vec::new();
+    let mut stack = vec![root];
+    while let Some(entity) = stack.pop() {
+        if let Some(text) = world.get::<bevy::ui::widget::Text>(entity) {
+            found.push(text.0.clone());
+        }
+        if let Some(children) = world.get::<bevy::ecs::hierarchy::Children>(entity) {
+            stack.extend(children.iter().copied());
+        }
+    }
+    found
+}
+
+/// Select the only session, then arm the logout verb.
+fn arm_logout(app: &mut App) {
+    app.world_mut().trigger(SessionRowClicked(0));
+    app.update();
+    let disconnect = app
+        .world_mut()
+        .query_filtered::<Entity, With<super::SessionDisconnectButton>>()
+        .iter(app.world())
+        .next()
+        .expect("the sessions toolbar mounts a disconnect button");
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate { entity: disconnect });
+    app.update();
+    app.update();
+}
+
+#[test]
+fn the_logout_verb_mounts_a_bubble_naming_the_frozen_session() {
+    let (mut app, events) = headless_sessions_app();
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![session_item("2", "ada", Some("seat0"), Some("tty1"))],
+    );
+    app.update();
+    app.update();
+    arm_logout(&mut app);
+
+    let target = {
+        let track = app.world().non_send::<FrontendTrack>();
+        bubble::bubble_target(&track.shell).expect("the bubble echoes the armed gate")
+    };
+    assert_eq!(
+        target.session_id, "2",
+        "the frozen target is the session id"
+    );
+    assert_eq!(target.user, "ada", "the frozen target names its owner");
+    assert_eq!(
+        target.action,
+        SessionControlAction::Disconnect,
+        "the frozen target keeps the verb"
+    );
+
+    let bubbles: Vec<Entity> = app
+        .world_mut()
+        .query_filtered::<Entity, With<bubble::SessionBubble>>()
+        .iter(app.world())
+        .collect();
+    assert_eq!(bubbles.len(), 1, "exactly one bubble card is mounted");
+    let copy = texts_under(&mut app, bubbles[0]);
+    assert!(
+        copy.iter()
+            .any(|line| line.contains("2") && line.contains("ada")),
+        "the bubble names the session it would log out: {copy:?}"
+    );
+}
+
+#[test]
+fn the_bubble_confirm_routes_through_the_shared_typed_gate() {
+    let controls = Arc::new(RecordedSessionControls::default());
+    let (mut app, events) = headless_sessions_app_with_controls(controls.clone());
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![session_item("2", "ada", Some("seat0"), Some("tty1"))],
+    );
+    app.update();
+    app.update();
+    arm_logout(&mut app);
+
+    let confirm = app
+        .world_mut()
+        .query_filtered::<Entity, With<bubble::SessionBubbleConfirm>>()
+        .iter(app.world())
+        .next()
+        .expect("the bubble carries a confirm choice");
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate { entity: confirm });
+    app.update();
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_confirmation()
+            .is_none(),
+        "the shared gate is cleared once the bubble confirms"
+    );
+    let submitted = controls.0.lock().expect("session control recorder lock");
+    assert_eq!(
+        submitted.len(),
+        1,
+        "the shared typed confirm path submitted exactly one request"
+    );
+    assert_eq!(
+        submitted[0].identity.session_id.as_str(),
+        "2",
+        "the submitted request carries the frozen session target"
+    );
+    assert_eq!(
+        submitted[0].action,
+        SessionControlAction::Disconnect,
+        "the submitted request carries the frozen verb"
+    );
+}
+
+#[test]
+fn the_bubble_dismiss_clears_the_gate_without_an_effect() {
+    let controls = Arc::new(RecordedSessionControls::default());
+    let (mut app, events) = headless_sessions_app_with_controls(controls.clone());
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![session_item("2", "ada", Some("seat0"), Some("tty1"))],
+    );
+    app.update();
+    app.update();
+    arm_logout(&mut app);
+
+    let dismiss = app
+        .world_mut()
+        .query_filtered::<Entity, With<bubble::SessionBubbleDismiss>>()
+        .iter(app.world())
+        .next()
+        .expect("the bubble carries a dismiss choice");
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate { entity: dismiss });
+    app.update();
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_confirmation()
+            .is_none(),
+        "dismissing the bubble clears the shared gate"
+    );
+    assert!(
+        controls
+            .0
+            .lock()
+            .expect("session control recorder lock")
+            .is_empty(),
+        "a dismissed bubble submits nothing"
     );
 }

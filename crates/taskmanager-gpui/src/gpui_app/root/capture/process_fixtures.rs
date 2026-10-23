@@ -422,6 +422,10 @@ pub(super) fn prepare_startup_boot_markers(
         critical_chain_state: DeviceState::healthy(10),
         failed_units_failure: None,
         critical_chain_failure: None,
+        // The capture fixture carries no boot phase split.
+        phase_timeline_state: DeviceState::healthy(10),
+        phase_timeline_failure: None,
+        phase_timeline: None,
         failed_units: Vec::new(),
         critical_chain: current_chain.to_vec(),
     });

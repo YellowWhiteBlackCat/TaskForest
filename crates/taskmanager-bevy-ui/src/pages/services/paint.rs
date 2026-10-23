@@ -1,5 +1,6 @@
 //! Coalesced services painting over explicit resource and entity access.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::schedule::IntoScheduleConfigs;
@@ -26,6 +27,7 @@ struct PaintAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     palette: Res<'w, WindowPalette>,
     selection: ResMut<'w, ServiceSelection>,
+    filter: Res<'w, crate::pages::services::unit_filter::ServiceUnitFilter>,
     rendered: ResMut<'w, ServicesRenderState>,
     state: ResMut<'w, PaintState>,
     bodies: Query<'w, 's, (Entity, Option<&'static Children>), With<ServicesBody>>,
@@ -50,13 +52,13 @@ fn paint(mut access: PaintAccess) {
     };
     access.state.dirty = false;
     let shell = &access.track.shell;
-    let rows = service_rows(shell);
+    let rows = service_rows_for(shell, *access.filter);
     if let Some(target) = &access.selection.target
         && !rows.iter().any(|row| &row.target == target)
     {
         access.selection.target = None;
     }
-    let scene = services_body_scene(shell, &access.palette.inner, &access.selection);
+    let scene = services_body_scene(shell, &access.palette.inner, &access.selection, &rows);
     let line = status_line_text(shell, rows.len());
     access.rendered.rendered_revision = Some(shell.projection().services_revision);
     if let Some(children) = children {
@@ -65,10 +67,7 @@ fn paint(mut access: PaintAccess) {
         }
     }
     let fresh = access.commands.spawn_scene(scene).id();
-    access
-        .commands
-        .entity(body)
-        .add_one_related::<ChildOf>(fresh);
+    attach_child(&mut access.commands, body, fresh);
     for mut text in &mut access.status {
         text.0 = line.clone();
     }

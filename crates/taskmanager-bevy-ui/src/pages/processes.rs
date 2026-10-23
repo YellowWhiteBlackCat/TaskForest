@@ -6,7 +6,7 @@ use bevy::a11y::AccessibilityNode;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::{EntityEvent, Event};
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
@@ -30,7 +30,8 @@ use crate::drain::ShellProjectionFolded;
 use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
-use crate::widgets::table::{header_scene, row_scene, visible_columns};
+use crate::widgets::table::resize::{ColumnResizeSession, ColumnWidthOverrides};
+use crate::widgets::table::{header_scene_with_widths, row_scene_with_widths, visible_columns};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod affinity;
@@ -49,6 +50,7 @@ pub(crate) struct ProcessPageRoot;
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct ProcessOptionalChrome;
 
+use crate::scene_attach::attach_child;
 use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene};
 
 // ---- pure view model ----------------------------------------------------
@@ -194,32 +196,6 @@ pub(crate) struct ProcessCountLine;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessSearchInput;
 
-/// Table column width configuration on the Processes page.
-#[derive(Resource, Clone, Debug, Default)]
-pub(crate) struct ProcessColumnWidthConfig {
-    pub(crate) overrides: std::collections::HashMap<String, f32>,
-}
-
-/// Event to resize a table column by ID.
-#[derive(Clone, Debug, PartialEq, EntityEvent)]
-pub(crate) struct ProcessColumnResize {
-    pub(crate) entity: Entity,
-    pub(crate) column_id: String,
-    pub(crate) width: f32,
-}
-
-pub(crate) fn on_process_column_resize(
-    trigger: On<ProcessColumnResize>,
-    mut config: Option<ResMut<ProcessColumnWidthConfig>>,
-    mut commands: Commands,
-) {
-    let event = trigger.event();
-    if let Some(ref mut cfg) = config {
-        cfg.overrides.insert(event.column_id.clone(), event.width);
-        commands.trigger(crate::input::ShellInteractionApplied);
-    }
-}
-
 pub(crate) fn on_search_input_activated(
     _activate: On<Activate>,
     mut track: NonSendMut<FrontendTrack>,
@@ -253,6 +229,8 @@ pub(crate) struct TableSurface<'w, 's> {
     headers: Query<'w, 's, Entity, With<ProcessTableHeaderArtifact>>,
     count: Query<'w, 's, &'static mut Text, With<ProcessCountLine>>,
     hidden_cols: Option<Res<'w, ProcessHiddenColumns>>,
+    widths: Option<Res<'w, ColumnWidthOverrides>>,
+    resize: Option<Res<'w, ColumnResizeSession>>,
 }
 
 // ---- observers -----------------------------------------------------------
@@ -289,7 +267,8 @@ fn bootstrap_processes_page(
     mut commands: Commands,
 ) {
     let root = trigger.event().entity;
-    commands.init_resource::<ProcessColumnWidthConfig>();
+    commands.init_resource::<ColumnWidthOverrides>();
+    commands.init_resource::<ColumnResizeSession>();
     commands.init_resource::<crate::input::TextInputState>();
     commands.init_resource::<ProcessHiddenColumns>();
     commands.init_resource::<ProcessColumnsModalState>();
@@ -303,9 +282,7 @@ fn bootstrap_processes_page(
     });
     input::bootstrap(root, &mut commands);
     let fold_observer = commands.spawn(Observer::new(on_projection_folded)).id();
-    commands
-        .entity(root)
-        .add_one_related::<ChildOf>(fold_observer);
+    attach_child(&mut commands, root, fold_observer);
 }
 
 /// Data-refresh observer: one non-empty drain fold re-reads the shell
@@ -465,16 +442,19 @@ fn row_fill(selected: bool, palette: &UiPalette) -> bevy::color::Color {
 fn row_wrapper_scene(
     row: &ProcessRowView,
     columns: &[&ProcessColumnSpec],
+    widths: &[f32],
+    query: &str,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let fill = row_fill(row.selected, palette);
     let index = row.index;
     let cells = row.cells.clone();
+    let app_icon = row.app_icon;
     let accessibility_node = crate::semantic::process_row_node(&row.name, &row.semantic_id);
     let semantic = crate::input_contract::SemanticAddress(
         crate::input_contract::stable_semantic_address("process-row", &row.semantic_id),
     );
-    let inner = row_scene(&cells, columns);
+    let inner = row_scene_with_widths(&cells, columns, widths, query, app_icon, Some(palette));
     Box::new(bsn! {
         Node {
             width: percent(100),
@@ -486,6 +466,7 @@ fn row_wrapper_scene(
         ControlVisual(ControlTone::Surface, { row.selected })
         Button
         on(input::on_row_activated)
+        on(input::on_row_secondary_pressed)
         SemanticAddress({ semantic.0.clone() })
         AccessibilityNode({ accessibility_node })
         Children [
@@ -513,24 +494,29 @@ fn empty_state_scene(message: String) -> Box<dyn Scene> {
 /// observer rebuild.
 fn window_scenes(
     projection: &ProcessRowsProjection,
+    columns: &[&ProcessColumnSpec],
+    widths: &[f32],
     palette: &UiPalette,
     query: &str,
-    hidden_cols: &[&str],
 ) -> Vec<Box<dyn Scene>> {
     if projection.total == 0 {
         return vec![empty_state_scene(empty_state_text(query))];
     }
-    let columns = visible_columns(hidden_cols);
     projection
         .rows
         .iter()
-        .map(|row| row_wrapper_scene(row, &columns, palette))
+        .map(|row| row_wrapper_scene(row, columns, widths, query, palette))
         .collect()
 }
 
 /// Despawn the previous window's artifacts, spawn the new one under the rows
 /// root, rewrite the count line, and normalize the stored scroll intent to
 /// the clamped window start. Shared by every observer.
+///
+/// The header is NOT rebuilt while a column drag is live: the drag's gutter
+/// lives in the header, and rebuilding it under the pointer would cancel the
+/// drag mid-gesture. The dragged widths are written into the live cells
+/// instead, and the header picks them up when the drag ends.
 fn rebuild_table(
     commands: &mut Commands,
     root: Entity,
@@ -548,29 +534,38 @@ fn rebuild_table(
         &hidden_ids,
     );
     surface.scroll.top = projection.window.first;
+    let columns = visible_columns(&hidden_ids);
+    let widths = live_widths(&columns, surface.widths.as_deref());
     for artifact in surface.artifacts.iter() {
         commands.entity(artifact).despawn();
     }
     for scene in window_scenes(
         &projection,
+        &columns,
+        &widths,
         &surface.palette.inner,
         &shell.query,
-        &hidden_ids,
     ) {
         let child = commands.spawn_scene(scene).id();
-        commands.entity(root).add_one_related::<ChildOf>(child);
+        attach_child(commands, root, child);
     }
     if let Ok(mut line) = surface.count.single_mut() {
         line.0 = count_line_text_for_shell(shell, projection.total, &shell.query);
     }
 
+    let dragging = surface
+        .resize
+        .as_ref()
+        .is_some_and(|session| session.column.is_some());
+    if dragging {
+        return;
+    }
     for header in surface.headers.iter() {
         commands.entity(header).despawn();
     }
     if let Ok(slot) = surface.header_slots.single() {
-        let columns = visible_columns(&hidden_ids);
         let sort_proj = sort_projection(shell.process_sort);
-        let header = header_scene(&columns, sort_proj, &surface.palette.inner);
+        let header = header_scene_with_widths(&columns, &widths, sort_proj, &surface.palette.inner);
         let header_node = bsn! {
             Node {
                 width: percent(100),
@@ -581,7 +576,19 @@ fn rebuild_table(
             ]
         };
         let child = commands.spawn_scene(header_node).id();
-        commands.entity(slot).add_one_related::<ChildOf>(child);
+        attach_child(commands, slot, child);
+    }
+}
+
+/// The live widths of the visible columns: the user's drag overrides over the
+/// contract defaults.
+fn live_widths(
+    columns: &[&ProcessColumnSpec],
+    overrides: Option<&ColumnWidthOverrides>,
+) -> Vec<f32> {
+    match overrides {
+        Some(overrides) => crate::widgets::table::resize::live_column_widths(columns, overrides),
+        None => crate::widgets::table::distribute_column_widths(columns, None),
     }
 }
 
@@ -617,11 +624,12 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
 /// `Add` trigger dispatches), and the mount-time static window inside.
 fn rows_root_scene(
     projection: &ProcessRowsProjection,
+    columns: &[&ProcessColumnSpec],
+    widths: &[f32],
     palette: &UiPalette,
     query: &str,
-    hidden_cols: &[&str],
 ) -> impl Scene + use<> {
-    let rows = window_scenes(projection, palette, query, hidden_cols);
+    let rows = window_scenes(projection, columns, widths, palette, query);
     bsn! {
         Node {
             width: percent(100),
@@ -634,7 +642,6 @@ fn rows_root_scene(
         on(on_toggle_row_selection)
         on(on_scroll_intent)
         on(on_query_commit)
-        on(on_process_column_resize)
         ProcessRowsRoot
         Children [
             { rows }
@@ -649,8 +656,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let projection = rows_projection(context.shell, 1, 0);
     let count = count_line_text_for_shell(context.shell, projection.total, &context.shell.query);
     let columns = visible_columns(&[]);
-    let header = header_scene(
+    let widths = live_widths(&columns, None);
+    let header = header_scene_with_widths(
         &columns,
+        &widths,
         sort_projection(context.shell.process_sort),
         palette,
     );
@@ -671,7 +680,13 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
 
         ]
     };
-    let rows_root = rows_root_scene(&projection, palette, &context.shell.query, &[]);
+    let rows_root = rows_root_scene(
+        &projection,
+        &columns,
+        &widths,
+        palette,
+        &context.shell.query,
+    );
     let search = search_input_scene(palette, &context.shell.query);
     let choose_columns_btn = choose_columns_button_scene(palette);
     let saved_views = crate::saved_views::button(
@@ -742,6 +757,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
 #[cfg(test)]
 #[path = "../../tests/headless/pages/processes.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/processes_table_parity.rs"]
+mod table_parity_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/process_affinity.rs"]

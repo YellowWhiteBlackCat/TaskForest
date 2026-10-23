@@ -7,6 +7,7 @@
 
 use super::aggregate_projection::{AggregateCellProjection, project_group_aggregate_cells};
 use super::process_projection::{ProcessRowFacts, ProjectedRow, RowCells};
+use super::sort_tint;
 use super::*;
 use iced::widget::canvas;
 use iced::widget::text::Wrapping;
@@ -29,11 +30,11 @@ pub(super) fn project_row_element(
 ) -> Option<Element<'static, Message, iced::Theme, iced::Renderer>> {
     let zebra = theme::zebra_index(row_index);
     match row {
-        ProjectedRow::GroupHeader { .. } => Some(group_header_row(ctx, row, row_index)),
+        ProjectedRow::GroupHeader { .. } => Some(group_header_row(ctx, projection, row, row_index)),
         ProjectedRow::Tree { flat_index, .. } => {
             let process = projection.process_facts(*flat_index)?;
             let cells = projection.row_cells(*flat_index)?;
-            Some(tree_node_row(ctx, row, process, cells, zebra))
+            Some(tree_node_row(ctx, projection, row, process, cells, zebra))
         }
     }
 }
@@ -47,6 +48,7 @@ pub(super) fn project_row_element(
 /// row renders).
 fn tree_node_row(
     ctx: &RowRender,
+    projection: &ProcessProjection,
     row: &ProjectedRow,
     process: &ProcessRowFacts,
     cells: &RowCells,
@@ -121,10 +123,7 @@ fn tree_node_row(
     }
 
     let mut elements: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
-        iced::widget::container(name_row)
-            .width(Length::Fixed(ctx.resolved_column_width(SortCol::Name)))
-            .clip(true)
-            .into(),
+        identity_cell(ctx, name_row.into()),
         text_cell(ctx, cells.user.clone(), SortCol::User),
         text_cell(ctx, cells.pid.clone(), SortCol::Pid),
         zero_tinted_text(
@@ -205,7 +204,14 @@ fn tree_node_row(
         process.nice_zero,
         SortCol::Nice,
     ));
-    let elements = visible_column_elements(elements, ctx.swap_visible, &ctx.hidden_columns, false);
+    let elements = visible_column_elements_with_sort(
+        elements,
+        ctx.swap_visible,
+        &ctx.hidden_columns,
+        false,
+        projection.sort_column(),
+        Some(&ctx.theme),
+    );
     let row_content = container(
         iced::widget::row(elements)
             .padding(row_padding)
@@ -255,7 +261,12 @@ fn tree_node_row(
             // The open menu floats on its own row: anchored by the popover
             // primitive, dismissible by an outside press, and never clipped
             // by the table viewport the way the old inline panel was.
-            let panel = super::process_menu::panel(theme_snapshot, process.name.clone(), *pid);
+            let panel = super::process_menu::panel(
+                theme_snapshot,
+                process.name.clone(),
+                *pid,
+                process.not_responding,
+            );
             crate::ui::components::Popover::new(row_element, panel, Message::CloseProcessRowMenu)
                 .into()
         } else {
@@ -375,6 +386,19 @@ fn text_cell(
     column_cell(ctx, text(label), column)
 }
 
+/// The identity cell of a tree row or an aggregate header: the name content
+/// bounded to the Name column's width and clipped, so a long name can never
+/// push the metric columns out of alignment.
+fn identity_cell(
+    ctx: &RowRender,
+    content: Element<'static, Message, iced::Theme, iced::Renderer>,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    iced::widget::container(content)
+        .width(Length::Fixed(ctx.resolved_column_width(SortCol::Name)))
+        .clip(true)
+        .into()
+}
+
 /// Bound one cell element to its column's resolved width and align it
 /// (numeric columns right-align so digits stack; text columns stay left).
 fn column_cell(
@@ -421,19 +445,48 @@ fn visible_column_tags(swap_visible: bool, _grouped: bool) -> Vec<Option<SortCol
     columns
 }
 
+/// The visible cells of one row, without the sorted-column tint.
+///
+/// Test seam for the column contract: the render path resolves the cells
+/// through [`visible_column_elements_with_sort`], and the headless column
+/// tests assert the untinted projection.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn visible_column_elements(
     elements: Vec<Element<'static, Message, iced::Theme, iced::Renderer>>,
     swap_visible: bool,
     hidden: &std::collections::HashSet<SortCol>,
     grouped: bool,
 ) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
+    visible_column_elements_with_sort(elements, swap_visible, hidden, grouped, None, None)
+}
+
+/// [`visible_column_elements`] with the sorted-column tint: every cell of the
+/// active sort column wears the faint accent wash, so the whole column reads
+/// as the sort axis. The wash is translucent and sits over the row's own
+/// surface, so the selection tint and the zebra stripe still read through it.
+pub(crate) fn visible_column_elements_with_sort(
+    elements: Vec<Element<'static, Message, iced::Theme, iced::Renderer>>,
+    swap_visible: bool,
+    hidden: &std::collections::HashSet<SortCol>,
+    grouped: bool,
+    sort_column: Option<SortCol>,
+    theme_snapshot: Option<&Theme>,
+) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
     elements
         .into_iter()
         .zip(visible_column_tags(swap_visible, grouped))
         .filter_map(|(element, column)| {
-            column
-                .is_none_or(|column| column == SortCol::Name || !hidden.contains(&column))
-                .then_some(element)
+            if !column.is_none_or(|column| column == SortCol::Name || !hidden.contains(&column)) {
+                return None;
+            }
+            let style = column.and_then(|column| {
+                sort_column
+                    .and_then(|active| sort_tint::sort_tint_style(theme_snapshot?, active, column))
+            });
+            Some(match style {
+                Some(style) => container(element).style(move |_| style).into(),
+                None => element,
+            })
         })
         .collect()
 }
@@ -455,6 +508,7 @@ pub(crate) fn visible_column_elements(
 /// toggle expansion; structural category/type headers only toggle expansion.
 fn group_header_row(
     ctx: &RowRender,
+    projection: &ProcessProjection,
     row: &ProjectedRow,
     row_index: usize,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
@@ -488,9 +542,9 @@ fn group_header_row(
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.
-    let identity_width = ctx.resolved_column_width(SortCol::Name);
     let mut cells: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
-        iced::widget::container(
+        identity_cell(
+            ctx,
             iced::widget::row![
                 text(marker).size(f32::from(tokens::FONT_12)),
                 container(
@@ -503,11 +557,9 @@ fn group_header_row(
                 text(format!("x{member_count}")).size(f32::from(tokens::FONT_12)),
             ]
             .spacing(6)
-            .align_y(iced::Alignment::Center),
-        )
-        .width(Length::Fixed(identity_width))
-        .clip(true)
-        .into(),
+            .align_y(iced::Alignment::Center)
+            .into(),
+        ),
         text_cell(ctx, user.clone(), SortCol::User),
         text_cell(ctx, "—".to_string(), SortCol::Pid),
         aggregate_tinted_text(ctx, aggregate.threads, SortCol::Threads),
@@ -559,7 +611,14 @@ fn group_header_row(
         *nice == Some(0),
         SortCol::Nice,
     ));
-    let cells = visible_column_elements(cells, ctx.swap_visible, &ctx.hidden_columns, true);
+    let cells = visible_column_elements_with_sort(
+        cells,
+        ctx.swap_visible,
+        &ctx.hidden_columns,
+        true,
+        projection.sort_column(),
+        Some(&ctx.theme),
+    );
     let action = Message::ToggleGroupExpansion {
         name: expansion_key.clone(),
         row_key: *row_key,

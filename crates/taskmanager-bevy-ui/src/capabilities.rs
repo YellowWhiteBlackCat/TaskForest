@@ -62,22 +62,20 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (
             TextSelection,
             Divergent {
-                reason: "pointer press selects a whole readout for Ctrl/Cmd+C; range and word gestures, Ctrl/Cmd+A, and visible selection highlighting are not implemented",
+                reason: "pointer press selects a whole readout for Ctrl/Cmd+C; the process table adds a visible double-click cell selection and a secondary-click row copy, while range/word gestures and Ctrl/Cmd+A stay unimplemented",
             },
         ),
-        // Boolean rows use the official `bevy_ui_widgets::Checkbox`; no
-        // switch-specific control is authored.
-        (
-            Switch,
-            Divergent {
-                reason: "boolean rows use the official bevy_ui_widgets Checkbox; no switch-specific control is authored",
-            },
-        ),
-        // Bounded settings are discrete radio choices.
+        // The settings rows own a real sliding switch: the official
+        // `bevy_ui_widgets::Checkbox` behavior primitive drives the toggle
+        // and the platform tree publishes the `Switch` role.
+        (Switch, Ported),
+        // The alert rule editor mounts the official `bevy_ui_widgets` Slider
+        // for its threshold values; the bounded settings rows still render as
+        // discrete radio choices.
         (
             Slider,
             Divergent {
-                reason: "bounded settings render as discrete radio choices",
+                reason: "the alert rule editor mounts the official bevy_ui_widgets Slider for threshold values; bounded settings rows still render as discrete radio choices",
             },
         ),
         // These are semantic-contract capabilities. Bevy composes the
@@ -97,11 +95,13 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (VirtualList, Ported),
         (Tree, Ported),
         // Scrolling rides the official `bevy_ui_widgets::ScrollArea`
-        // (wheel/trackpad + ScrollIntoView).
+        // (wheel/trackpad + ScrollIntoView); the visible rail is the
+        // official `bevy_ui_widgets::Scrollbar` wearing the product's
+        // translucent track and capsule thumb.
         (
             Scrollbar,
             Divergent {
-                reason: "page scrolling rides the official bevy_ui_widgets ScrollArea",
+                reason: "the scroll areas mount the official bevy_ui_widgets Scrollbar: a translucent floating rail with a capsule thumb, press-and-drag included",
             },
         ),
         // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).

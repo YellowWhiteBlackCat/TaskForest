@@ -13,6 +13,7 @@ mod gpu_engines;
 mod isolation;
 mod namespaces;
 mod open_files;
+mod quota;
 mod resources;
 mod snapshot;
 mod threads;
@@ -37,6 +38,7 @@ pub use namespaces::{
     parse_namespace_inode,
 };
 pub use open_files::{OpenFileEntry, OpenFileItem, OpenFileKind, ProcessOpenFiles};
+pub use quota::{ContainerCpuQuota, ContainerQuota};
 pub use resources::{
     LimitValue, ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupCpuLimit,
     ResourceGroupLimitRequest, ResourceGroupMembership, ResourceLastObservation, ResourceLimit,

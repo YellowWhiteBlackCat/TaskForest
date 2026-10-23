@@ -154,11 +154,16 @@ fn render_events(
                 .child(i18n::t("events.empty")),
         );
     }
+    // The severity palette is the single authority for severity ink (BEVY-174
+    // convergence): a frontend resolves it instead of assembling its own
+    // severity table. The warning level reads the theme's warning token — it
+    // never borrowed the GPU accent, which painted a warning green.
+    let severity = theme.severity_palette();
     for event in visible {
         let color = match event.alert.severity {
-            AlertSeverity::Info => theme.accent,
-            AlertSeverity::Warning => theme.gpu,
-            AlertSeverity::Critical => theme.danger,
+            AlertSeverity::Info => severity.notice(),
+            AlertSeverity::Warning => severity.warning(),
+            AlertSeverity::Critical => severity.critical(),
         };
         events = events.child(
             CardSurface::new(theme.palette())

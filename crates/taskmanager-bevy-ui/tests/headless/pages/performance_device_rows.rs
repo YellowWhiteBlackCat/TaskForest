@@ -13,14 +13,18 @@ use bevy::text::Font;
 use bevy::ui::prelude::{Display, Node};
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
+use taskmanager_core::core::SystemSnapshot;
+use taskmanager_core::core::metrics::{
+    DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
+};
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
 use super::replay::{PerformanceHistoryEntry, PerformanceLiveBody, PerformanceReplayRoot};
 use super::scene::content;
-use super::tests::{block_keys, dyn_text_value};
+use super::tests::{block_keys, dyn_text_value, headless_perf_app, route_to_performance};
 use super::{DynField, Section, section_keys};
 use crate::app::PageContext;
 use crate::palette::ui_palette;
@@ -275,81 +279,6 @@ fn gpu_section_enumerates_every_projected_adapter() {
 }
 
 #[test]
-fn disk_block_renders_the_projected_partition_rows() {
-    use taskmanager_core::core::metrics::{
-        DiskPartition, DiskPartitionScalarObservations, SystemSnapshot,
-    };
-    use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
-
-    const GIB: u64 = 1024 * 1024 * 1024;
-    let partition = |name: &str, mount: &str, used: u64, capacity: u64| {
-        let mut part = DiskPartition::new(name);
-        part.mount_point = mount.to_owned();
-        part.fs_type = "ext4".to_owned();
-        part.apply_scalar_observations(DiskPartitionScalarObservations {
-            capacity_bytes: ScalarObservation::available(capacity, 1),
-            used_bytes: ScalarObservation::available(used, 1),
-            ..DiskPartitionScalarObservations::default()
-        });
-        part
-    };
-    let mut disk = DiskMetrics::new("nvme0n1");
-    disk.device_id = "disk:test:nvme0".to_owned();
-    disk.model = "TiPro9000".to_owned();
-    disk.partitions = vec![
-        partition("nvme0n1p1", "/", 70 * GIB, 100 * GIB),
-        partition("nvme0n1p2", "/home", 30 * GIB, 50 * GIB),
-    ];
-
-    let mut shell = ShellApp::new();
-    let snapshot = SystemSnapshot {
-        disks: vec![disk],
-        ..SystemSnapshot::default()
-    };
-    seed_projection_fact(
-        &mut shell,
-        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
-    );
-    assert_eq!(section_keys(&shell, Section::Disk).len(), 1);
-
-    // The mounted disk block paints one row per projected partition: its
-    // identity and its own usage math.
-    let mut app = headless_scene_app();
-    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
-    let history = crate::pages::history::HistoryProjectionResource::default();
-    let context = PageContext {
-        sidebar: &Default::default(),
-        gray_zero_values: false,
-        shell: &shell,
-
-        palette: &palette,
-        history: &history.0,
-    };
-    let world = app.world_mut();
-    let root = world
-        .spawn_scene(content(&context))
-        .expect("the seeded performance page resolves")
-        .id();
-    let texts: Vec<String> = world
-        .query::<&Text>()
-        .iter(world)
-        .map(|text| text.0.clone())
-        .collect();
-    for expected in [
-        "/ (ext4)",
-        "/home (ext4)",
-        "70.0 GiB / 100.0 GiB (70%)",
-        "30.0 GiB / 50.0 GiB (60%)",
-    ] {
-        assert!(
-            texts.iter().any(|text| text == expected),
-            "the partition row must paint {expected:?}: {texts:?}"
-        );
-    }
-    assert!(world.despawn(root), "the seeded page despawns cleanly");
-}
-
-#[test]
 fn battery_block_renders_voltage_health_and_cycles() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::power::{
@@ -495,3 +424,50 @@ fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
 }
 
 // ---- SMART self-test request ----------------------------------------------
+
+// ---- the partition proportion appears once -------------------------------
+
+/// The disk block and the storage surface are the SAME card: the storage
+/// surface is the disk block's child. The partition's capacity therefore
+/// appears exactly ONCE — the ring's readout. A second copy (the old
+/// partition bar row) showed the same partition and the same numbers twice
+/// in one card.
+#[test]
+fn the_partition_capacity_appears_once_in_the_disk_card() {
+    let mut app = headless_perf_app();
+    let mut shell = ShellApp::new();
+    let mut disk = DiskMetrics::default();
+    disk.device_id = "disk-0".to_owned();
+    disk.name = "nvme0n1".to_owned();
+    disk.model = "Example Disk".to_owned();
+    let mut partition = DiskPartition::new("disk-0-part-1");
+    partition.mount_point = "/".to_owned();
+    partition.fs_type = "ext4".to_owned();
+    partition.apply_scalar_observations(DiskPartitionScalarObservations {
+        capacity_bytes: ScalarObservation::available(100, 1),
+        used_bytes: ScalarObservation::available(62, 1),
+        free_bytes: ScalarObservation::available(38, 1),
+    });
+    disk.partitions = vec![partition];
+    let snapshot = SystemSnapshot {
+        disks: vec![disk],
+        ..Default::default()
+    };
+    edit_snapshot(&mut shell, |s| *s = Some(snapshot));
+    route_to_performance(&mut app);
+    for _ in 0..4 {
+        app.update();
+    }
+
+    let world = app.world_mut();
+    let readouts: Vec<String> = world
+        .query::<&Text>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .filter(|text| text.contains("(62%)"))
+        .collect();
+    assert!(
+        readouts.is_empty(),
+        "the disk block no longer repeats the partition the storage surface already states: {readouts:?}"
+    );
+}

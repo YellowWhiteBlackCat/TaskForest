@@ -162,6 +162,13 @@ fn diskstats_io_failure(error: &std::io::Error) -> FailureKind {
 /// the collector loop body free of field-by-field plumbing.
 pub(super) fn apply_smart(d: &mut DiskMetrics, s: &DiskSmart) {
     d.smart_availability = s.availability;
+    // The remediation for a missing tool is a platform fact: the contract owns
+    // the probe command and the guidance paragraph, this platform adds the
+    // install command of the package manager it can actually see.
+    d.smart_tool_remediation = crate::engine::smart::tool::remediation(
+        s.availability,
+        crate::engine::smart::tool::host_install_command(),
+    );
     d.smart_state = s.state;
     d.smart_provider.clone_from(&s.provider);
     d.smart_failure = s.failure;

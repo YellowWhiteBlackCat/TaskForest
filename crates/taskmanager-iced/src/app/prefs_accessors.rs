@@ -59,6 +59,17 @@ impl IcedApp {
         UiSize::from_config_token(&self.preferences().ui_size)
     }
 
+    /// The device-pixel scale the chart aligns against.
+    ///
+    /// iced multiplies the window's DPI scale factor with the application's
+    /// render scale at the toolkit boundary, so the exact product is the
+    /// window scale TIMES the app render scale. Aligning against only one of
+    /// them is off by a factor on every HiDPI display (ICED-032 / ICED-054).
+    #[must_use]
+    pub fn device_pixel_scale(&self) -> f32 {
+        self.ui_size().renderer_scale() * self.window_scale_factor
+    }
+
     /// Resolved memory-unit preference for the view layer.
     #[must_use]
     pub fn memory_use_bytes(&self) -> bool {

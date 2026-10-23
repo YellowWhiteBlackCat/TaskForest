@@ -7,7 +7,9 @@
 use crate::TuiApp;
 use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
+use taskmanager_core::core::process_telemetry::{
+    ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
+};
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -45,6 +47,8 @@ impl TuiApp {
                             1_785_292_800_000,
                         ),
                         member_pids: vec![4201, 4202],
+                        // The demo data declares no cgroup ceiling.
+                        quota: ContainerQuota::not_declared(),
                     },
                     ContainerSummary {
                         id: "/docker/def456".into(),
@@ -57,6 +61,8 @@ impl TuiApp {
                             1_785_292_800_000,
                         ),
                         member_pids: vec![4301],
+                        // The demo data declares no cgroup ceiling.
+                        quota: ContainerQuota::not_declared(),
                     },
                 ],
             })),

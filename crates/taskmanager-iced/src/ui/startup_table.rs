@@ -4,7 +4,7 @@
 //! data comes from the shared shell inventory; the enable/disable actions
 //! route through the shared startup-control gate.
 
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use std::rc::Rc;
 use taskmanager_application::i18n::t;
@@ -176,7 +176,20 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                 ),
                                 text(startup_impact_text(startup)).width(columns.impact.length()),
                                 text(startup_source_text(startup)).width(columns.source.length()),
-                                text(startup_control_text(startup)).width(columns.control.length()),
+                                // Every row carries its OWN switch: it is bound to
+                                // that row's enabled state and addresses that
+                                // row, so a sorted table never retargets the
+                                // action onto a different entry.
+                                crate::ui::components::switch(
+                                    table_theme,
+                                    FocusTarget::StartupRowSwitch { index },
+                                    startup.enabled,
+                                    !startup_control_actionable(startup),
+                                    move |enabled| Message::RequestStartupControlFor {
+                                        index,
+                                        enabled,
+                                    },
+                                ),
                                 text(startup.exec.clone()).width(columns.command.length()),
                             ]
                             .spacing(8)
@@ -319,13 +332,12 @@ fn startup_confirm_bar<'a>(
     .into()
 }
 
-/// The Startup-page enable/disable action bar. A contextual toggle — Disable
-/// when the selected entry is enabled, Enable when not — plus the selected
-/// entry's name and control policy as a quiet status line. Disable is
-/// destructive, so it wears the danger styling; no-selection or an
-/// `Unsupported` control policy renders a quiet disabled affordance. The
-/// toggle submits through the shell's shared startup-control request
-/// (latest-wins). Mirrors the Users session action bar.
+/// The Startup-page enable/disable action bar. The selected entry's
+/// enabled state wears the shared Switch control (a real sliding knob, not
+/// a checkbox and not a text button), plus the selected entry's name and
+/// control policy as a quiet status line. The switch publishes through the
+/// shell's shared startup-control request (latest-wins), which the
+/// confirmation bar gates. Mirrors the Users session action bar.
 fn startup_action_bar<'a>(
     theme_snapshot: &'a Theme,
     shell: &ShellApp,
@@ -333,29 +345,26 @@ fn startup_action_bar<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let selected = rows.get(shell.selected);
     // GPUI parity: an Unsupported-policy entry never carries a live toggle —
-    // the underlying control request can never succeed for it, so the button
+    // the underlying control request can never succeed for it, so the switch
     // renders as the same inert affordance the no-selection branch uses.
-    let actionable = selected.is_some_and(startup_control_actionable);
-    // Contextual toggle: Disable when currently enabled, Enable when not.
-    let (label, next_enabled) = match selected.map(|row| row.enabled) {
-        Some(true) => (t("startup.disable"), false),
-        _ => (t("startup.enable"), true),
-    };
+    let switch_state = startup_switch_state(selected);
     let status = selected.map_or_else(String::new, |row| {
         format!("{} · {}", row.name, startup_control_text(row))
     });
+    let caption = selected.map_or_else(String::new, |row| startup_status_text(row).to_owned());
     let mut elements: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = vec![
-        if actionable {
-            focus::button(
-                theme_snapshot,
-                FocusTarget::StartupControl,
-                label,
-                Message::RequestStartupControl(next_enabled),
-                !next_enabled,
-            )
-        } else {
-            button(text(label)).into()
-        },
+        // The shared Switch: the knob slides between the track's ends, the
+        // track wears the accent while the entry is enabled. An entry the
+        // provider cannot mutate keeps the dimmed geometry but loses its
+        // click path and its focus stop.
+        crate::ui::components::switch(
+            *theme_snapshot,
+            FocusTarget::StartupControl,
+            switch_state.on,
+            !switch_state.actionable,
+            Message::RequestStartupControl,
+        ),
+        text(caption).size(f32::from(tokens::FONT_12)).into(),
         text(status).size(f32::from(tokens::FONT_12)).into(),
     ];
     if let Some(row) = selected.filter(|r| !r.exec.is_empty()) {
@@ -371,6 +380,33 @@ fn startup_action_bar<'a>(
         ));
     }
     row(elements).spacing(8).padding(4).into()
+}
+
+/// The Startup switch's projection for the selected entry: whether the
+/// switch is ON (the entry's real enabled state) and whether it may act
+/// at all. An `Unsupported` control policy means the native provider
+/// cannot safely mutate the entry, so the switch is inert for it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct StartupSwitchState {
+    /// The switch's ON state — the entry's real enabled state.
+    pub on: bool,
+    /// Whether the switch may publish a startup-control request.
+    pub actionable: bool,
+}
+
+/// The switch state for the selected entry (or for no selection at all).
+#[must_use]
+pub(crate) fn startup_switch_state(row: Option<&StartupRow>) -> StartupSwitchState {
+    let Some(row) = row else {
+        return StartupSwitchState {
+            on: false,
+            actionable: false,
+        };
+    };
+    StartupSwitchState {
+        on: row.enabled,
+        actionable: startup_control_actionable(row),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -613,3 +649,7 @@ fn boot_evidence_strip<'a>(
 #[cfg(test)]
 #[path = "../../tests/gui/ui/startup_table_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/startup_switch_tests.rs"]
+mod switch_tests;

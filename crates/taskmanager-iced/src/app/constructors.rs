@@ -105,6 +105,7 @@ impl IcedApp {
                 crate::font_catalog::system(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
+            window_scale_factor: 1.0,
             nav_orientation: NavOrientation::default(),
             saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
@@ -188,6 +189,7 @@ impl IcedApp {
                 crate::font_catalog::bundled_only(),
             ),
             run_task: crate::ui::overlays::run_task::RunTaskState::default(),
+            window_scale_factor: 1.0,
             nav_orientation: NavOrientation::default(),
             saved_views: default_built_in_presets(),
             next_saved_view_id: 10,
@@ -622,6 +624,10 @@ fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
         critical_chain_state: healthy,
         failed_units_failure: None,
         critical_chain_failure: None,
+        // The demo fixture carries no boot phase split.
+        phase_timeline_state: healthy,
+        phase_timeline_failure: None,
+        phase_timeline: None,
         failed_units: Vec::new(),
         critical_chain: vec![
             StartupCriticalChainNode {

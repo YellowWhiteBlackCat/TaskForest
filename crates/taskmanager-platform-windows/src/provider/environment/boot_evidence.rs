@@ -38,6 +38,11 @@ impl StartupEvidenceProvider for WinStartupEvidenceProvider {
                 critical_chain_state: state,
                 failed_units_failure: Some(StartupEvidenceFailure::Unsupported),
                 critical_chain_failure: Some(StartupEvidenceFailure::Unsupported),
+                // Windows has no systemd boot analyzer: the phase split is a
+                // typed absence, never a borrowed zero.
+                phase_timeline_state: state,
+                phase_timeline_failure: Some(StartupEvidenceFailure::Unsupported),
+                phase_timeline: None,
                 failed_units: Vec::new(),
                 critical_chain: Vec::new(),
             })
@@ -74,6 +79,10 @@ fn collect_boot_evidence_windows(now_ms: u64) -> StartupBootEvidenceSnapshot {
                 critical_chain_state: healthy,
                 failed_units_failure: None,
                 critical_chain_failure: None,
+                // No phase analyzer on Windows: the split stays absent.
+                phase_timeline_state: healthy,
+                phase_timeline_failure: Some(StartupEvidenceFailure::Unsupported),
+                phase_timeline: None,
                 failed_units: Vec::new(),
                 critical_chain,
             }
@@ -104,6 +113,10 @@ fn boot_evidence_degraded(
         critical_chain_state: state,
         failed_units_failure: Some(failure),
         critical_chain_failure: Some(failure),
+        // The degraded source published no phase split either.
+        phase_timeline_state: state,
+        phase_timeline_failure: Some(StartupEvidenceFailure::Unsupported),
+        phase_timeline: None,
         failed_units: Vec::new(),
         critical_chain: Vec::new(),
     }

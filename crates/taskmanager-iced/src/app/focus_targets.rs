@@ -199,6 +199,13 @@ pub enum FocusTarget {
     CancelServiceControl,
     /// The startup-entry enable/disable toggle on the Startup page.
     StartupControl,
+    /// One Startup-row enable/disable switch, addressed by its row index.
+    ///
+    /// The action bar carries the SELECTED entry's toggle; this variant lets
+    /// every row own its own switch.
+    StartupRowSwitch {
+        index: usize,
+    },
     /// One Startup-row context-menu enable/disable action.
     StartupMenuAction {
         index: usize,

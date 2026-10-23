@@ -129,7 +129,7 @@ interaction	bev-input-semantic	bevy	P0-MC-03	lib	input_contract::tests::semantic
 interaction	bev-tree-projection	bevy	P0-MC-03	lib	pages::process_tree::tests::projection_keeps_category_aggregate_and_process_identities_distinct	projection|identity|success	-	projection	
 interaction	bev-tree-collapse	bevy	P0-MC-03	lib	pages::process_tree::tests::process_collapse_hides_only_descendants	keyboard|lifecycle|success	-	keyboard	
 interaction	bev-chart-gaps	bevy	-	lib	widgets::chart::tests::unavailable_samples_break_the_line_instead_of_becoming_zero	projection|failure|success	-	projection	
-interaction	bev-chart-segments	bevy	-	lib	widgets::chart::tests::segment_layout_aims_each_rectangle_from_start_to_end	projection|render|success	-	projection	
+interaction	bev-chart-segments	bevy	-	lib	pages::performance::scene::chart::parity_tests::the_stroke_joins_at_the_corner_where_per_segment_rectangles_leave_a_notch	projection|render|success	-	projection	
 interaction	bev-history-once	bevy	-	lib	pages::history::tests::the_disabled_page_states_itself_exactly_once	projection|failure|lifecycle	-	projection	
 interaction	bev-system-chord	bevy	P0-MC-00	lib	app::tests::every_shared_page_chord_routes_and_system_is_formal	keyboard|route|success	-	keyboard	
 interaction	bev-system-mount	bevy	-	lib	pages::system::tests::the_mounted_page_paints_the_host_once_and_survives_refolds	projection|identity|lifecycle	-	projection	
@@ -172,7 +172,7 @@ interaction	bev-log-status-typed	bevy	-	lib	pages::services::service_logs_tests:
 interaction	bev-log-chord-map	bevy	-	lib	pages::services::service_logs_tests::the_chord_mapping_is_total_and_exclusive	keyboard|render|success	-	keyboard	
 interaction	bev-log-controls-move-state	bevy	-	lib	pages::services::service_logs_tests::panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet	keyboard|lifecycle|success	-	keyboard	
 interaction	bev-log-repaint-gate	bevy	-	lib	pages::services::service_logs_tests::the_repaint_gate_fires_only_when_a_rendered_fact_moves	render|lifecycle|success	-	render	
-interaction	bev-partition-rows	bevy	P0-MC-02	lib	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	projection|render|success	-	projection	
+interaction	bev-partition-rows	bevy	P0-MC-02	lib	pages::performance::device_rows_tests::the_partition_capacity_appears_once_in_the_disk_card	projection|render|success	-	projection	
 interaction	bev-settings-preferences	bevy	P0-MC-05	lib	pages::settings::tests::settings_page_projects_the_live_authorities_into_rows	success	-	success	
 interaction	bev-battery-fan-history	bevy	P0-MC-01	lib	pages::performance::device_history_tests::battery_and_fan_blocks_paint_their_own_history_curve	projection|render|success	-	projection	
 interaction	bev-gpu-metric-selector	bevy	P0-MC-04	lib	pages::performance::device_history_tests::gpu_curve_metric_selection_drives_the_shared_graph	selection|success	-	selection	

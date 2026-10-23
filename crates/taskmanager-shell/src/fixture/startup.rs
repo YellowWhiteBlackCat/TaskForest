@@ -14,6 +14,9 @@ pub fn startup_failure_evidence(timestamp_ms: u64) -> StartupBootEvidenceSnapsho
         critical_chain_state: healthy,
         failed_units_failure: None,
         critical_chain_failure: None,
+        phase_timeline_state: healthy,
+        phase_timeline_failure: None,
+        phase_timeline: None,
         failed_units: [
             "taskforest-g.service",
             "taskforest-i.service",

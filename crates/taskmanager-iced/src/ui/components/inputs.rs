@@ -47,7 +47,7 @@ const SWITCH_KNOB_SIZE: f32 = 16.0;
 /// stop nor a click target while its dimmed geometry stays legible.
 #[must_use]
 pub(crate) fn switch<'a>(
-    theme_snapshot: &'a Theme,
+    theme_snapshot: Theme,
     focus_target: FocusTarget,
     enabled: bool,
     disabled: bool,
@@ -68,7 +68,7 @@ pub(crate) fn switch<'a>(
         container(Space::new())
             .width(Length::Fixed(SWITCH_KNOB_SIZE))
             .height(Length::Fixed(SWITCH_KNOB_SIZE))
-            .style(move |_theme| switch_knob_style(theme_snapshot, disabled))
+            .style(move |_theme| switch_knob_style(&theme_snapshot, disabled))
             .into(),
     );
     let track = row(track_children)
@@ -82,7 +82,7 @@ pub(crate) fn switch<'a>(
         .padding(0.0)
         .width(Length::Fixed(SWITCH_TRACK_WIDTH))
         .height(Length::Fixed(SWITCH_TRACK_HEIGHT))
-        .style(move |_theme, status| switch_track_style(theme_snapshot, enabled, status));
+        .style(move |_theme, status| switch_track_style(&theme_snapshot, enabled, status));
     if disabled {
         // Without `on_press` the iced button never fires and its style never
         // leaves `Status::Disabled`; no focus wrapper means no Tab stop.

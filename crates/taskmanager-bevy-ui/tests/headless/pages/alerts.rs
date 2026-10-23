@@ -48,7 +48,7 @@ use taskmanager_theme::tokens::UiSize;
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
-use super::{AlertRuleToggleTarget, active_alert_line, alerts_summary, managed_rule_line};
+use super::{AlertRuleToggleTarget, active_alert_banner_rows, alerts_summary, managed_rule_line};
 use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
@@ -65,7 +65,7 @@ use taskmanager_ui_contract::ProductIntent;
 use taskmanager_ui_contract::SurfaceDecision;
 
 /// Export the managed alert rules through the canonical core transfer codec.
-fn export_alert_rules(shell: &ShellApp) -> Result<String, AlertRuleTransferError> {
+pub(crate) fn export_alert_rules(shell: &ShellApp) -> Result<String, AlertRuleTransferError> {
     let entries: Vec<AlertRuleTransferEntry> = shell
         .projection()
         .alert_center
@@ -117,7 +117,7 @@ impl RequestPort for QuietRequests {
     }
 }
 
-fn scripted_runtime() -> &'static crate::runtime::SharedRuntime {
+pub(crate) fn scripted_runtime() -> &'static crate::runtime::SharedRuntime {
     let snapshot = CapabilitySnapshot::from_descriptors([CapabilityDescriptor {
         id: CapabilityId::TELEMETRY_HOST,
         status: CapabilityStatus::Available,
@@ -138,7 +138,7 @@ fn scripted_runtime() -> &'static crate::runtime::SharedRuntime {
         .expect("the scripted runtime always starts")
 }
 
-fn headless_shell_app() -> App {
+pub(crate) fn headless_shell_app() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(HeadlessFrontendPlugins);
@@ -152,7 +152,7 @@ fn headless_shell_app() -> App {
 
 /// Mount the Alerts page through the programmatic route seam (the resource
 /// move + `RouteChanged` trigger pair the app module documents).
-fn mount_alerts(app: &mut App) {
+pub(crate) fn mount_alerts(app: &mut App) {
     // Set the route BEFORE the first update so the page mounts directly —
     // no intermediate page ever mounts in this fixture.
     app.world_mut().resource_mut::<Route>().page = Page::Alerts;
@@ -168,14 +168,14 @@ fn mount_alerts(app: &mut App) {
     );
 }
 
-fn mounted_page_entity(world: &mut World) -> Entity {
+pub(crate) fn mounted_page_entity(world: &mut World) -> Entity {
     world
         .query_filtered::<Entity, With<PageContent>>()
         .single(world)
         .expect("exactly one page content mounts")
 }
 
-fn rule_target_entity(world: &mut World, rule_id: &str) -> Entity {
+pub(crate) fn rule_target_entity(world: &mut World, rule_id: &str) -> Entity {
     let mut targets = world.query_filtered::<(Entity, &AlertRuleToggleTarget), ()>();
     targets
         .iter(world)
@@ -217,26 +217,30 @@ fn alert(metric: AlertMetric, rule_id: &str, target: &str, value: f32, threshold
 // ---- pure row projections ----
 
 #[test]
-fn active_alert_line_joins_the_clear_band_from_the_canonical_rule() {
+fn active_alert_banner_rows_join_the_clear_band_from_the_canonical_rule() {
     let shell = ShellApp::new();
     let rules = shell.projection().alert_center.managed_rules();
     // The default "cpu-high" rule is threshold 90 with hysteresis 10.
-    let line = active_alert_line(
+    let (headline, detail) = active_alert_banner_rows(
         &alert(AlertMetric::CpuUsagePercent, "cpu-high", "CPU", 96.0, 90.0),
         rules,
     );
     assert_eq!(
-        line, "Warning · CPU — 96.0% ≥ 90.0% (clears ≤ 80.0%)",
-        "the row states the firing comparison and the hysteresis clear band"
+        headline, "Warning · CPU",
+        "the headline states the severity and the target"
+    );
+    assert_eq!(
+        detail, "96.0% ≥ 90.0% (clears ≤ 80.0%)",
+        "the detail states the firing comparison and the hysteresis clear band"
     );
 }
 
 #[test]
-fn active_alert_line_uses_the_metric_unit_and_target() {
+fn active_alert_banner_rows_use_the_metric_unit_and_target() {
     let shell = ShellApp::new();
     let rules = shell.projection().alert_center.managed_rules();
     // The default "disk-temperature" rule is threshold 70 with hysteresis 5.
-    let line = active_alert_line(
+    let (headline, detail) = active_alert_banner_rows(
         &alert(
             AlertMetric::DiskTemperatureC,
             "disk-temperature",
@@ -247,14 +251,18 @@ fn active_alert_line_uses_the_metric_unit_and_target() {
         rules,
     );
     assert_eq!(
-        line, "Warning · nvme0n1 — 75.0°C ≥ 70.0°C (clears ≤ 65.0°C)",
-        "temperature rows carry °C and the disk target, not a fabricated %"
+        headline, "Warning · nvme0n1",
+        "the headline carries the disk target"
+    );
+    assert_eq!(
+        detail, "75.0°C ≥ 70.0°C (clears ≤ 65.0°C)",
+        "temperature rows carry °C, not a fabricated %"
     );
 }
 
 #[test]
-fn active_alert_line_omits_the_clear_band_when_the_rule_left_the_set() {
-    let line = active_alert_line(
+fn active_alert_banner_rows_omit_the_clear_band_when_the_rule_left_the_set() {
+    let (_, detail) = active_alert_banner_rows(
         &alert(
             AlertMetric::CpuUsagePercent,
             "removed-rule",
@@ -265,11 +273,11 @@ fn active_alert_line_omits_the_clear_band_when_the_rule_left_the_set() {
         &[],
     );
     assert!(
-        line.contains("rule not in set"),
-        "a missing rule is stated, not smoothed over: {line}"
+        detail.contains("rule not in set"),
+        "a missing rule is stated, not smoothed over: {detail}"
     );
     assert!(
-        !line.contains("clears ≤"),
+        !detail.contains("clears ≤"),
         "no clear band is invented without the rule's hysteresis"
     );
 }
@@ -573,7 +581,7 @@ fn alert_rule_export_and_import_round_trip() {
     assert_eq!(shell.projection().alert_center.managed_rules().len(), 1);
 }
 
-fn click_rule_control(app: &mut App, action: super::editor::RuleControl) {
+pub(crate) fn click_rule_control(app: &mut App, action: super::editor::RuleControl) {
     use super::editor::RuleButton;
     let entity = app
         .world_mut()

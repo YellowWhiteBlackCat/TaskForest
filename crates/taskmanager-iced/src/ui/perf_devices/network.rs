@@ -310,6 +310,20 @@ fn network_block<'a>(
     // each direction keeps its own gap evidence. The canvas takes the
     // remaining column height on a wide card and the fixed primary height
     // inside a compact scrollable.
+    let mut graph = graph;
+    if app.network_dynamic_scaling() {
+        // 120 ms damped transition: the axis and the curve move together
+        // instead of snapping to a new scale when a traffic spike lands.
+        // The disk page reads the same shared ceiling, so one product never
+        // shows two different spike behaviors.
+        let traffic_peak = crate::trend_strip::finite_peak(&rx_samples)
+            .max(crate::trend_strip::finite_peak(&tx_samples));
+        graph.max_override = Some(super::range::damped_ceiling(
+            &nic.device_id,
+            traffic_peak,
+            std::time::Instant::now(),
+        ));
+    }
     let mut graphs = vec![device_chart::multi::device_multi_graph_fill(
         device_chart::multi::DeviceMultiGraphSpec {
             primary: network_split_series(t("net.receive").to_string(), rx_samples),

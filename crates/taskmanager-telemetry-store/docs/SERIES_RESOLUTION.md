@@ -21,3 +21,16 @@ Disk active time is a device-only series: the persisted
 `storage-activity-pct` per-device ring is the authority, and no host mean is
 fabricated (the interim host mean ring was removed when the scope model made
 the per-device resolution the single path).
+
+## Timestamped reads
+
+`LiveGraphHistory::resolve_series_samples` is the read edge that answers a
+query with the accepted samples, each carrying the instant the observation was
+MEASURED (`core::metrics::MetricSample`). The value-only window is the
+projection of the same accepted list and stays index-aligned with it.
+
+A sample whose observation carries no measurement time is a GAP: it has no
+value and no instant, and the surface shows the shared dash rather than an
+offset. The acceptance time is a separate field and is never relabelled as
+the sampling time. A query for the wrong domain is rejected by the
+timestamped read exactly as it is by the value read.

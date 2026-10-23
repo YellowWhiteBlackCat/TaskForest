@@ -5,6 +5,7 @@ use crate::pages::history::control::{
     PerformancePresentation,
 };
 use crate::palette::{UiPalette, space_8};
+use crate::scene_attach::attach_child;
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 use crate::widgets::history_controls::{action_scene, toolbar_scene};
 use crate::widgets::scene_paint::ScenePaint;
@@ -13,7 +14,7 @@ use bevy::app::{App, PostUpdate};
 use bevy::ecs::{
     component::Component,
     entity::Entity,
-    hierarchy::{ChildOf, Children},
+    hierarchy::Children,
     lifecycle::Add,
     observer::On,
     query::With,
@@ -28,6 +29,7 @@ use bevy::ui::{
     UiSystems,
     prelude::{
         BackgroundColor, ComputedNode, Display, FlexDirection, Node, Overflow, UiRect, percent, px,
+        rem,
     },
 };
 use bevy::ui_widgets::ScrollArea;
@@ -37,6 +39,14 @@ use taskmanager_application::{
     history_decimation::gap_preserving_envelope, i18n::t,
 };
 use taskmanager_shell::presentation::{history_replay::row_heading, missing_value};
+
+/// The replay chart's slot height, in rem.
+///
+/// The replay surface is a review list, so its chart slot is taller than the
+/// live performance chart's: the reviewed series needs the vertical room. The
+/// slot rides the rem axis, so a UI-size choice re-scales it with the rest
+/// of the surface (the Standard step still measures 96 logical px).
+const REPLAY_CHART_SLOT_HEIGHT_REM: f32 = 6.0;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct PerformanceLiveBody;
@@ -124,9 +134,11 @@ fn review_scene(model: &PerformanceHistoryProjection, palette: &UiPalette) -> im
         );
         let samples: Arc<[f32]> =
             gap_preserving_envelope(&row.gap_aware_samples(), MAX_CHART_POINTS).into();
-        rows.push(Box::new(bsn! { Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } BackgroundColor({ palette.panel_fill }) Children [ Text(heading) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } -- Text(summary) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::AnyCharacter } -- Node { width: percent(100), height: px(96.0), flex_shrink: 0.0, overflow: Overflow::clip() } ReplayChart(samples) ChartSize(None) ] }));
+        rows.push(Box::new(bsn! { Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } BackgroundColor({ palette.panel_fill }) Children [ Text(heading) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } -- Text(summary) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::AnyCharacter } -- Node { width: percent(100), height: rem(REPLAY_CHART_SLOT_HEIGHT_REM), flex_shrink: 0.0, overflow: Overflow::clip() } ReplayChart(samples) ChartSize(None) ] }));
     }
-    bsn! { Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } Children [ Text(t("perf.replay.title")) TextRole(Role::Heading) -- @{ controls } -- Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), row_gap: px(space_8()) } ScrollArea PerformanceReplayBody Children [ { rows } ] ] }
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
+    bsn! { Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } Children [ Text(t("perf.replay.title")) TextRole(Role::Heading) -- @{ controls } -- Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column } Children [ Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), row_gap: px(space_8()), padding: { lane } } ScrollArea PerformanceReplayBody Children [ { rows } ] -- @{ rail } ] ] }
 }
 type ReplayVisibilityQuery<'w, 's> = Query<
     'w,
@@ -182,7 +194,7 @@ fn paint(
         let entity = commands
             .spawn_scene(review_scene(&model.0, &palette.inner))
             .id();
-        commands.entity(root).add_one_related::<ChildOf>(entity);
+        attach_child(&mut commands, root, entity);
     }
 }
 pub(crate) fn paint_charts(
@@ -210,7 +222,7 @@ pub(crate) fn paint_charts(
         let child = commands
             .spawn_scene(polyline_scene(&segments, palette.inner.accent))
             .id();
-        commands.entity(entity).add_one_related::<ChildOf>(child);
+        attach_child(&mut commands, entity, child);
         last.0 = Some((size.x, size.y));
     }
 }

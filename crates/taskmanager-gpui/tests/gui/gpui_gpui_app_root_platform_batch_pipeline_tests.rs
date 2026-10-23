@@ -9,6 +9,7 @@ use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::process::ProcessMetadataObservations;
 use taskmanager_core::core::process::ProcessOwner;
 use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::process_telemetry::ContainerQuota;
 use taskmanager_core::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
@@ -199,6 +200,8 @@ fn populated_rollup() -> ContainerRollup {
             cpu_percentage: ScalarObservation::available(42.0, 1_000),
             memory_bytes: ScalarObservation::available(256 * 1024 * 1024, 1_000),
             member_pids: vec![100, 101],
+            // The fixture declares no cgroup ceiling.
+            quota: ContainerQuota::not_declared(),
         }],
     }
 }

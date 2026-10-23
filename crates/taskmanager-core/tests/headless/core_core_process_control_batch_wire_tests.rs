@@ -100,6 +100,7 @@ fn freeze_keeps_only_live_selected_pids_in_sorted_order() {
 #[test]
 fn applied_count_counts_only_applied_targets() {
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Kill,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![

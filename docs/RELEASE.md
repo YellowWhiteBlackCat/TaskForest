@@ -6,35 +6,30 @@
 
 ## 发布面
 
-当前官方发布矩阵已实现四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、
-TaskForest-B）四端发行物与前端语义同权（即「四端平权」）：Linux 同时提供四端的 amd64/arm64 DEB
-与 x86_64/aarch64 RPM 发布物，另有共享数据包 `taskforest-common` 的同架构 DEB/RPM；
-Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名
-和公证暂缓。该平权仅指四端发行物与前端语义同权，不含「跨平台功能对等」；平台能力边界见下方说明。
+当前官方发布矩阵已实现四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、TaskForest-B）四端发行物与
+前端语义同权（即「四端平权」）：Linux 同时提供四端的 amd64/arm64 DEB 与 x86_64/aarch64 RPM 发布物，另有共享数据包
+`taskforest-common` 的同架构 DEB/RPM；Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名和公证暂缓。
+该平权仅指四端发行物与前端语义同权，不含「跨平台功能对等」；平台能力边界见下方说明。
 
-### 0.2.0 发行面与平价矩阵
+### 发行面与平价矩阵
 
-正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
-Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。
-三大图形前端（GPUI、Iced、Bevy）严格保持 Wayland-only，彻底不含 X11 依赖；TUI 为零图形栈
-终端渲染，不依赖任何显示服务器（X11 同样不受支持）。
+正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、Iced、TUI、Bevy）全量 DEB 与
+RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。三大图形前端（GPUI、Iced、Bevy）严格保持 Wayland-only，
+彻底不含 X11 依赖；TUI 为零图形栈终端渲染，不依赖任何显示服务器（X11 同样不受支持）。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
-四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台
-的系统级能力按来源分别判定。发行面内没有合格数据源、授权或原生实现的能力，必须继续以
-typed 能力状态作答（五种 `CapabilityStatus` 不可用变体与两轴规则见
-[GLOSSARY](GLOSSARY.md)），不得用空值、静态占位或未接线按钮把它写成正式版功能。能力身份
-承诺面（`CapabilityId::EXPECTED_SURFACE`）的作答机制见
-[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 与
+四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台的系统级能力按来源分别判定。
+发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed 能力状态作答（五种 `CapabilityStatus` 不可用变体与
+两轴规则见 [GLOSSARY](GLOSSARY.md)），不得用空值、静态占位或未接线按钮把它写成正式版功能。能力身份承诺面
+（`CapabilityId::EXPECTED_SURFACE`）的作答机制见 [TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 与
 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 
-只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应
-Release（预发布 tag 自动标记为 GitHub prerelease）并生成 28 项构建产物（四端各 4 个
-DEB/RPM 与 2 架构 MSI、`taskforest-common` 两架构 DEB/RPM）加 4 份 sha256 校验清单，共 32 个发布附件。
-所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为 `G`、`I`、`T`、`B`，
-共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
-包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
-`x86_64`/`aarch64`，与文件名中的 `x64`/`arm64` 是固定映射。
+只有推送与根 `Cargo.toml` 版本逐字一致的 `vX.Y.Z` 或 `vX.Y.Z-rcN` tag，才会创建对应 Release（预发布 tag 自动标记为
+GitHub prerelease）并生成 28 项构建产物（四端各 4 个 DEB/RPM 与 2 架构 MSI、`taskforest-common` 两架构 DEB/RPM）加
+4 份 sha256 校验清单，共 32 个发布附件。所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为
+`G`、`I`、`T`、`B`，共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
+包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为 `x86_64`/`aarch64`，与文件名中的
+`x64`/`arm64` 是固定映射。
 
 | 平台 | 架构 | 产物 | 包内 arch | 构建入口 |
 |---|---|---|---|---|
@@ -81,45 +76,38 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 2. DEB 和 RPM 构建器只叠加格式元数据；共享图标资产由数据包 `taskforest-common`
    独占，四端包从自身文件清单移除这些路径并声明对该包的依赖；
 3. `packaging/arch/stage-package-sim.sh` 检查 manifest、权限和 polkit `exec.path`；
-4. 发布包只包含 DEB/RPM 的系统安装树；正式发布面不包含便携包或后台服务。
+4. 桌面安装包包含对应前端与系统安装树；后台持久化服务 `taskforest-daemon` 作为可选独立服务包分发，便携单文件暂不进发行面。
 
 ## 跨代升级
 
-共享图标资产自首个携带拆分的发行（本线为预发布 `0.2.0-rc1`）起由 `taskforest-common`
-独占。接管下界是历史常量（首个拆包版本），不是当前版本：它以 Cargo 形式唯一存放在
-`packaging/split-version`，DEB 与 RPM 各用与包版本相同的 `-`→`~` 变换渲染
-（DEB `<<`、RPM `<`），不得各写一份。`~` 在两种排序中均低于正式版，故预发布边界须按
-格式自身排序命名（`0.2.0-rc1` → `0.2.0~rc1`），只接管更旧的旧前端，不会让同一预发布
-版本的 `taskforest-common` 与自己的前端相互 `Breaks`/`Conflicts`；边界不随 tag 或
-`Cargo.toml` 版本浮动，否则最终会错误接管更晚的兼容前端。
+共享图标资产自首个携带拆分的发行（本线为预发布 `0.2.0-rc1`）起由 `taskforest-common` 独占。接管下界是历史常量
+（首个拆包版本），不是当前版本：它以 Cargo 形式唯一存放在 `packaging/split-version`，DEB 与 RPM 各用与包版本相同的
+`-`→`~` 变换渲染（DEB `<<`、RPM `<`），不得各写一份。`~` 在两种排序中均低于正式版，故预发布边界须按格式自身排序
+命名（`0.2.0-rc1` → `0.2.0~rc1`），只接管更旧的旧前端，不会让同一预发布版本的 `taskforest-common` 与自己的前端相互
+`Breaks`/`Conflicts`；边界不随 tag 或 `Cargo.toml` 版本浮动，否则最终会错误接管更晚的兼容前端。
 
-- DEB：≤0.1.3 曾发布自带该路径的 `taskforest`、`taskforest-i`、`taskforest-b`；
-  `taskforest-common` 声明 `Replaces` 与 `Breaks`（均约束 `<< 0.2.0~rc1`）接管，
-  符合 Debian Policy 7.6.1 的拆包规则；
-- RPM：≤0.1.3 只发布过 `taskforest`（GPUI）一个 RPM（其 `%files` 自带该路径），
-  故 `taskforest-common` 的版本化 `Conflicts`（`< 0.2.0~rc1`）只列 `taskforest`，
-  让 dnf 在同一事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting
-  Packages」）；`taskforest-i`/`taskforest-b` 的 RPM spec 首见于未发布的 0.1.4
-  树、从未发布过 RPM，拆分起其 RPM 又移除公共路径，所以不列；也不使用
-  `Obsoletes`，因为它会删除前端产品而非升级；
-- MSI：不涉及拆包；`MajorUpgrade` 配合 `AllowSameVersionUpgrades` 与固定的
-  `UpgradeCode`/组件 GUID 已覆盖代际替换，四端各持独立 `UpgradeCode` 以并存。
+- DEB：≤0.1.3 曾发布自带该路径的 `taskforest`、`taskforest-i`、`taskforest-b`；`taskforest-common` 声明 `Replaces` 与
+  `Breaks`（均约束 `<< 0.2.0~rc1`）接管，符合 Debian Policy 7.6.1 的拆包规则；
+- RPM：≤0.1.3 只发布过 `taskforest`（GPUI）一个 RPM（其 `%files` 自带该路径），故 `taskforest-common` 的版本化
+  `Conflicts`（`< 0.2.0~rc1`）只列 `taskforest`，让 dnf 在同一事务内升级旧归属包（Fedora Packaging:Conflicts「Splitting
+  Packages」）；`taskforest-i`/`taskforest-b` 的 RPM spec 首见于未发布的 0.1.4 树、从未发布过 RPM，拆分起其 RPM 又移除
+  公共路径，所以不列；也不使用 `Obsoletes`，因为它会删除前端产品而非升级；
+- MSI：不涉及拆包；`MajorUpgrade` 配合 `AllowSameVersionUpgrades` 与固定的 `UpgradeCode`/组件 GUID 已覆盖代际替换，
+  四端各持独立 `UpgradeCode` 以并存。
 
 `taskforest-t` 从未承载共享路径，不列入；Arch 为单体包，自带图标，无拆包。
 
 ## Windows MSI
 
-WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。该文件对四端参数化，
-每个 `TaskForest-<UI>` MSI 安装所选前端的可执行文件（`G`/`I`/`T`/`B`）、同目录的身份校验
-UAC process-control helper、LICENSE、THIRD-PARTY-NOTICES 和开始菜单入口，不安装后台历史
-服务或 autostart。Linux 专用 helper 和 polkit policy 不进入 MSI。共享的 helper、LICENSE、
-notices 与安装标记使用四端一致的组件 GUID，由 Windows Installer 引用计数，只在最后一个
-产品卸载时移除；不设单独的 common MSI。
+WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。该文件对四端参数化，每个 `TaskForest-<UI>` MSI
+安装所选前端的可执行文件（`G`/`I`/`T`/`B`）、同目录的身份校验 UAC process-control helper、LICENSE、
+THIRD-PARTY-NOTICES 和开始菜单入口，不安装后台历史服务或 autostart。Linux 专用 helper 和 polkit policy 不进入 MSI。
+共享的 helper、LICENSE、notices 与安装标记使用四端一致的组件 GUID，由 Windows Installer 引用计数，只在最后一个产品
+卸载时移除；不设单独的 common MSI。
 
-MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字段 `X.Y.Z`；完整版本
-（含 `rcN`）出现在文件名、MSI 摘要 Description、ARP comments 以及安装后的
-`Software\TaskForest\Version` 注册表值中，CI 会在反编译校验里断言完整版本确实入包。
-rc 与正式版共享数字 `ProductVersion`，覆盖升级由 `AllowSameVersionUpgrades` 保证。
+MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字段 `X.Y.Z`；完整版本（含 `rcN`）出现在文件名、MSI
+摘要 Description、ARP comments 以及安装后的 `Software\TaskForest\Version` 注册表值中，CI 会在反编译校验里断言完整
+版本确实入包。rc 与正式版共享数字 `ProductVersion`，覆盖升级由 `AllowSameVersionUpgrades` 保证。
 
 CI 构建后通过 WiX 反编译实际 MSI、提取载荷，校验版本、安装文件名、PE 架构及 staged 输入哈希。配置
 `WINDOWS_CERT_B64` 与 `WINDOWS_CERT_PASSWORD` 时执行 Authenticode 签名；没有证书时
@@ -127,22 +115,35 @@ CI 构建后通过 WiX 反编译实际 MSI、提取载荷，校验版本、安�
 
 ## 版本与 tag
 
-- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-rcN`（本线为 `v0.2.0-rc1`）；预发布后缀统一连写不带点
-  （如 `v0.1.0-rc5`），与 Cargo 版本、产物文件名逐字一致；semver 按字典序比较预发布
-  标识（`rc10` 排在 `rc5` 前），故 `rcN` 仅用于个位数编号，更多轮次应直接发正式版；
+- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-rcN`（例如 `v0.3.2`）；预发布后缀统一连写不带点（如 `v0.1.0-rc5`），与 Cargo
+  版本、产物文件名逐字一致；semver 按字典序比较预发布标识（`rc10` 排在 `rc5` 前），故 `rcN` 仅用于个位数编号，
+  更多轮次应直接发正式版；
 - 默认要求 tag 版本与根 `Cargo.toml` 完全一致；
 - `Cargo.lock` 必须提交且 `cargo metadata --locked` 通过；
 - prerelease tag 自动创建 GitHub prerelease；
-- DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc5` 落盘为 `0.1.0~rc5`
-  （~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
-- `packaging/split-version` 是 `taskforest-common` 接管下界的单一来源（Cargo 形式），
-  与 tag 和 `Cargo.toml` 版本独立：固定为首个拆包版本 `0.2.0-rc1`，渲染为 `0.2.0~rc1`；
-- MSI 文件名使用完整 Cargo 版本（含 `rcN` 预发布后缀），与其他产物一致；
-  MSI `ProductVersion` 属性只使用数字段 `X.Y.Z`（WiX 要求），由 CI 从完整版本剥离；
+- DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc5` 落盘为 `0.1.0~rc5`（~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
+- `packaging/split-version` 是 `taskforest-common` 接管下界的单一来源（Cargo 形式），与 tag 和 `Cargo.toml` 版本独立：
+  固定为首个拆包版本 `0.2.0-rc1`，渲染为 `0.2.0~rc1`；
+- MSI 文件名使用完整 Cargo 版本（含 `rcN` 预发布后缀），与其他产物一致；MSI `ProductVersion` 属性只使用数字段 `X.Y.Z`
+  （WiX 要求），由 CI 从完整版本剥离；
 - 每个平台输出独立 SHA-256 清单；
 - tag 一经推送不可移动、重打或删除重发；
-- prerelease 编号连续递增，作废编号不回收，缺失原因在根
-  [CHANGELOG.md](../CHANGELOG.md) 中说明。
+- prerelease 编号连续递增，作废编号不回收，缺失原因在根 [CHANGELOG.md](../CHANGELOG.md) 中说明。
+
+## 可复现发布记录
+
+每次发布必须固定并记录下列事实，缺一不得发布：
+
+1. workspace `Cargo.lock`（依赖版本与补丁解析结果）；
+2. `rust-toolchain.toml` 声明的 1.99.0 工具链；
+3. 根 `Cargo.toml` 的 `rust-version` 下限；
+4. `[patch.crates-io]` 中的 GPUI Kit（`gpui-kit` 0.7.3）、`bevy_clipboard` 0.20.0 与
+   `cryoglyph` 0.1.0 补丁版本；
+5. 目标平台 SDK 与系统库版本；
+6. 打包与签名工具版本。
+
+`Cargo.lock` 只能固定 Rust 依赖版本，不能固定原生编译器、系统库与移动 SDK，因此发布记录
+必须单列这些事实。
 
 ## 分支与发布线生命周期
 

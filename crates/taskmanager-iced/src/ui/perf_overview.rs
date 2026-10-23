@@ -289,18 +289,21 @@ fn memory_detail(
                 .color(theme::muted_text_color(theme_snapshot))
         ]
         .spacing(8);
-        let swap_chart = canvas::Canvas::new(PerfChart::new(
-            Rc::clone(&swap_samples),
-            Rc::from([]),
-            crate::theme_binding::color(theme_snapshot.memory).scale_alpha(0.75),
-            crate::theme_binding::color(theme_snapshot.palette().border),
-            crate::theme_binding::color(theme_snapshot.palette().border),
-            crate::perf_chart::ReadoutColors {
-                bg: crate::theme_binding::color(theme_snapshot.palette().surface),
-                fg: crate::theme_binding::color(theme_snapshot.palette().fg),
-            },
-            false,
-        ))
+        let swap_chart = canvas::Canvas::new(
+            PerfChart::new(
+                Rc::clone(&swap_samples),
+                Rc::from([]),
+                crate::theme_binding::color(theme_snapshot.memory).scale_alpha(0.75),
+                crate::theme_binding::color(theme_snapshot.palette().border),
+                crate::theme_binding::color(theme_snapshot.palette().border),
+                crate::perf_chart::ReadoutColors {
+                    bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+                    fg: crate::theme_binding::color(theme_snapshot.palette().fg),
+                },
+                false,
+            )
+            .with_scale_factor(app.device_pixel_scale()),
+        )
         .width(Length::Fill)
         .height(chart_height);
         swap_content = swap_content.push(swap_chart);
@@ -627,18 +630,21 @@ fn cpu_performance_chart(
     }
     let palette = theme_snapshot.palette();
     let cpu_color = crate::theme_binding::color(palette.accent);
-    canvas::Canvas::new(PerfChart::new(
-        cpu,
-        Rc::from([]),
-        cpu_color,
-        cpu_color,
-        crate::theme_binding::color(theme_snapshot.palette().border),
-        crate::perf_chart::ReadoutColors {
-            bg: crate::theme_binding::color(palette.surface),
-            fg: crate::theme_binding::color(palette.fg),
-        },
-        true,
-    ))
+    canvas::Canvas::new(
+        PerfChart::new(
+            cpu,
+            Rc::from([]),
+            cpu_color,
+            cpu_color,
+            crate::theme_binding::color(theme_snapshot.palette().border),
+            crate::perf_chart::ReadoutColors {
+                bg: crate::theme_binding::color(palette.surface),
+                fg: crate::theme_binding::color(palette.fg),
+            },
+            true,
+        )
+        .with_scale_factor(app.device_pixel_scale()),
+    )
     .width(Length::Fill)
     .height(height)
     .into()
@@ -657,18 +663,21 @@ fn memory_performance_chart(
     }
     let palette = theme_snapshot.palette();
     let memory_color = crate::theme_binding::color(palette.success);
-    canvas::Canvas::new(PerfChart::new(
-        memory,
-        Rc::from([]),
-        memory_color,
-        memory_color,
-        crate::theme_binding::color(theme_snapshot.palette().border),
-        crate::perf_chart::ReadoutColors {
-            bg: crate::theme_binding::color(palette.surface),
-            fg: crate::theme_binding::color(palette.fg),
-        },
-        true,
-    ))
+    canvas::Canvas::new(
+        PerfChart::new(
+            memory,
+            Rc::from([]),
+            memory_color,
+            memory_color,
+            crate::theme_binding::color(theme_snapshot.palette().border),
+            crate::perf_chart::ReadoutColors {
+                bg: crate::theme_binding::color(palette.surface),
+                fg: crate::theme_binding::color(palette.fg),
+            },
+            true,
+        )
+        .with_scale_factor(app.device_pixel_scale()),
+    )
     .width(Length::Fill)
     .height(height)
     .into()

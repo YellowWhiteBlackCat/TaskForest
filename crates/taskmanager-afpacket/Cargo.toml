@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-afpacket"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -18,3 +18,12 @@ libc = "0.2"
 [lib]
 name = "taskmanager_afpacket"
 path = "src/lib.rs"
+
+# ADR-056：这四个 crate 是工作区仅有的 unsafe 信任根
+# （ADR-022 perf-ioctl / ADR-024 afpacket / ADR-025 fd-bridge / ADR-031 windows-api）。
+# `forbid`/`deny` 无法被更低作用域的 `allow` 放松，而 Cargo 不允许
+# `workspace = true` 与其它 lint 键共存，因此这里显式声明，不继承 workspace 表。
+[lints.rust]
+unsafe_code = "allow"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"

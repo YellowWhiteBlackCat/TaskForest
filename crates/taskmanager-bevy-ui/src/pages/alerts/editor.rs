@@ -18,8 +18,14 @@ use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
-use bevy::ui::{Checked, FlexDirection, FlexWrap, Node, UiRect, percent, px, rem};
-use bevy::ui_widgets::{Activate, Button, Checkbox};
+use bevy::ui::{
+    AlignItems, BackgroundColor, BorderRadius, Checked, FlexDirection, FlexWrap, Node,
+    PositionType, UiRect, Val, percent, px, rem,
+};
+use bevy::ui_widgets::{
+    Activate, Button, Checkbox, Slider, SliderOrientation, SliderPrecision, SliderRange,
+    SliderStep, SliderThumb, SliderValue, TrackClick, ValueChange,
+};
 use std::time::Duration;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
@@ -49,9 +55,84 @@ pub(crate) struct PendingImport(pub(crate) Option<(ClipboardRead, AlertRuleImpor
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<PendingImport>()
         .add_systems(PreUpdate, poll_import);
+    // The alerts page module owns the rest of this page's systems (the
+    // banner spring, the export toast, the pause overlay); the window
+    // composition reaches them through this entry point.
+    super::register(app);
 }
 #[derive(Component, Clone, Default)]
 pub(crate) struct RuleButton(pub(crate) RuleControl);
+
+/// The rule a threshold slider owns. The slider's typed value change is
+/// resolved back to the rule through this marker.
+#[derive(Component, Clone, Debug, Default)]
+pub(crate) struct ThresholdSlider(pub(crate) Option<AlertRuleId>);
+
+/// The row's threshold value text. The slider's observer rewrites it in
+/// place so a drag reads its own value without a page remount.
+#[derive(Component, Clone, Debug, Default)]
+pub(crate) struct ThresholdValue(pub(crate) Option<AlertRuleId>);
+
+/// Which part of the threshold slider a node is.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ThresholdKind {
+    /// The filled portion of the track — its width is the live fraction.
+    Fill,
+    /// The thumb — its offset is the live fraction.
+    Thumb,
+}
+
+/// One movable part of the threshold slider: the rule it belongs to and
+/// which part it is. Both parts write the `Node` component, so they share
+/// one exclusive query instead of two conflicting ones.
+#[derive(Component, Clone, Debug)]
+pub(crate) struct ThresholdPart(pub(crate) Option<AlertRuleId>, pub(crate) ThresholdKind);
+
+impl Default for ThresholdPart {
+    /// The bsn! template seed only: a spawned part always carries its rule.
+    fn default() -> Self {
+        Self(None, ThresholdKind::Fill)
+    }
+}
+
+/// The continuous range one metric's threshold may take: the minimum, the
+/// maximum and the step. The binary SMART warning bit has no continuous
+/// range — it keeps the step buttons alone.
+fn threshold_range(metric: AlertMetric) -> Option<(f32, f32, f32)> {
+    match metric {
+        AlertMetric::CpuUsagePercent
+        | AlertMetric::MemoryUsagePercent
+        | AlertMetric::SmartPercentUsed => Some((0.0, 100.0, 1.0)),
+        AlertMetric::DiskTemperatureC => Some((0.0, 200.0, 1.0)),
+        AlertMetric::SmartCriticalWarning => None,
+    }
+}
+
+/// The metric's threshold ceiling. A rule may never ask for more than the
+/// metric can express.
+fn threshold_ceiling(metric: AlertMetric) -> f32 {
+    threshold_range(metric).map_or(1.0, |(_, max, _)| max)
+}
+
+/// The canonical edit that moves one rule's threshold to `value`.
+fn threshold_edit(
+    shell: &ShellApp,
+    rule_id: &AlertRuleId,
+    value: f32,
+) -> Option<ManagedAlertRuleEdit> {
+    let rules = shell.projection().alert_center.managed_rules();
+    let mut managed = rules
+        .iter()
+        .find(|managed| &managed.rule.id == rule_id)?
+        .clone();
+    let ceiling = threshold_ceiling(managed.rule.metric);
+    managed.rule.threshold = value.clamp(0.0, ceiling);
+    managed.rule.hysteresis = managed.rule.hysteresis.min(managed.rule.threshold);
+    Some(ManagedAlertRuleEdit::Update {
+        target_id: rule_id.clone(),
+        managed,
+    })
+}
 
 #[derive(SystemParam)]
 struct RuleAccess<'w, 's> {
@@ -59,6 +140,7 @@ struct RuleAccess<'w, 's> {
     track: NonSendMut<'w, FrontendTrack>,
     clipboard: Option<ResMut<'w, Clipboard>>,
     output: Option<ResMut<'w, ClipboardPort>>,
+    toast: Option<ResMut<'w, super::toast::ExportToast>>,
     pending: ResMut<'w, PendingImport>,
     commands: Commands<'w, 's>,
 }
@@ -89,7 +171,13 @@ fn activate(event: On<Activate>, mut access: RuleAccess) {
             match export_alert_rules_json(&entries) {
                 Ok(json) => {
                     if let Some(output) = &mut access.output {
-                        output.request_text(json, t("alerts.manage"));
+                        let label = t("alerts.manage");
+                        output.request_text(json, label);
+                        // The confirmation toast is raised by the shell's
+                        // clipboard success notice, never by the request.
+                        if let Some(toast) = access.toast.as_mut() {
+                            toast.requested(label);
+                        }
                     } else {
                         report(&mut access.track.shell, "clipboard unavailable");
                     }
@@ -178,7 +266,9 @@ fn edit(shell: &ShellApp, action: &RuleControl) -> Option<ManagedAlertRuleEdit> 
             }
         }
         RuleControl::Threshold(_, delta) => {
-            managed.rule.threshold = (managed.rule.threshold + f32::from(*delta)).max(0.0)
+            managed.rule.threshold = (managed.rule.threshold + f32::from(*delta))
+                .clamp(0.0, threshold_ceiling(managed.rule.metric));
+            managed.rule.hysteresis = managed.rule.hysteresis.min(managed.rule.threshold);
         }
         RuleControl::Duration(_, delta) => {
             managed.rule.for_duration = if *delta < 0 {
@@ -264,6 +354,71 @@ fn poll_import(
     }
     commands.trigger(RouteChanged);
 }
+/// The threshold slider's applier: a typed value change from the widget
+/// becomes a canonical rule edit, and the row's live value, filled track and
+/// thumb follow the value the shell actually accepted. The remount happens
+/// only when the interaction ends, so a drag is never interrupted by the
+/// page rebuilding under the pointer.
+pub(super) fn threshold_slider_observer(
+    change: On<ValueChange<f32>>,
+    sliders: Query<&ThresholdSlider>,
+    mut values: Query<(&ThresholdValue, &mut Text)>,
+    mut parts: Query<(&ThresholdPart, &mut Node)>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut commands: Commands,
+) {
+    let Ok(target) = sliders.get(change.event().source) else {
+        return;
+    };
+    let Some(rule_id) = target.0.clone() else {
+        return;
+    };
+    let Some(edit) = threshold_edit(&track.shell, &rule_id, change.event().value) else {
+        return;
+    };
+    if let Err(error) = track.shell.edit_alert_rules(edit) {
+        report(&mut track.shell, error);
+    }
+    let Some((threshold, metric)) = track
+        .shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .iter()
+        .find(|managed| managed.rule.id == rule_id)
+        .map(|managed| (managed.rule.threshold, managed.rule.metric))
+    else {
+        return;
+    };
+    let text = format!("{:.1}{}", threshold, metric_unit(metric));
+    for (target, mut value) in &mut values {
+        if target.0.as_ref() == Some(&rule_id) {
+            value.0 = text.clone();
+        }
+    }
+    let Some((min, max, _)) = threshold_range(metric) else {
+        return;
+    };
+    let span = max - min;
+    let ratio = if span > 0.0 {
+        ((threshold - min) / span).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    for (target, mut node) in &mut parts {
+        if target.0.as_ref() != Some(&rule_id) {
+            continue;
+        }
+        match target.1 {
+            ThresholdKind::Fill => node.width = Val::Percent(ratio * 100.0),
+            ThresholdKind::Thumb => node.left = Val::Percent(ratio * 100.0),
+        }
+    }
+    if change.event().is_final {
+        commands.trigger(RouteChanged);
+    }
+}
+
 fn button(label: String, action: RuleControl, palette: &UiPalette) -> impl Scene + use<> {
     bsn! {
         Node { min_height: rem(palette.control_height_rem), max_width: percent(100), min_width: px(0.0), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 }
@@ -304,6 +459,102 @@ fn numeric(
     let plus = button("+".into(), up, palette);
     bsn! { Node { flex_direction: FlexDirection::Row, column_gap: px(space_4()), flex_shrink: 0.0 } Children [ Text(label) TextRole(Role::Caption) -- @{ minus } -- @{ plus } ] }
 }
+
+/// The continuous threshold slider.
+///
+/// The widget is the real `bevy_ui_widgets` slider: the track reports the
+/// pointer position, the thumb is the widget's own marker, and the value
+/// arrives as a typed `ValueChange<f32>` — the same event a drag emits. The
+/// scene only dresses the widget: the track, the filled portion and the
+/// thumb all ride the rem axis.
+fn threshold_slider(managed: &ManagedAlertRule, palette: &UiPalette) -> Box<dyn Scene> {
+    let Some((min, max, step)) = threshold_range(managed.rule.metric) else {
+        return Box::new(bsn! { Node { width: rem(0.0), height: rem(0.0) } });
+    };
+    let id = managed.rule.id.clone();
+    let value = managed.rule.threshold.clamp(min, max);
+    let span = max - min;
+    let ratio = if span > 0.0 {
+        ((value - min) / span).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let filled = ratio * 100.0;
+    let track_rem = palette.control_height_rem * 4.0;
+    let thumb_rem = palette.icon_rem * 0.6;
+    let range = SliderRange::new(min, max);
+    Box::new(bsn! {
+        Node {
+            width: rem(track_rem),
+            height: rem(thumb_rem),
+            position_type: PositionType::Relative,
+            margin: UiRect::horizontal(rem(thumb_rem / 2.0)),
+            flex_shrink: 0.0,
+        }
+        SliderValue({ value })
+        SliderRange { ..range }
+        SliderStep({ step })
+        SliderPrecision(1)
+        Slider { track_click: TrackClick::Snap, orientation: SliderOrientation::Horizontal }
+        ThresholdSlider(Option::Some({ id.clone() }))
+        Children [
+             Node { width: percent(100), height: percent(100), border_radius: BorderRadius::all(Val::Percent(50.0)) }
+             BackgroundColor({ palette.panel_fill }) --
+             Node {
+                position_type: PositionType::Absolute,
+                left: px(0.0),
+                top: px(0.0),
+                bottom: px(0.0),
+                width: percent(filled),
+                height: percent(100),
+                border_radius: BorderRadius::all(Val::Percent(50.0)),
+             }
+             BackgroundColor({ palette.accent })
+             ThresholdPart(Option::Some({ id.clone() }), ThresholdKind::Fill) --
+             Node {
+                position_type: PositionType::Absolute,
+                left: percent(filled),
+                top: percent(50.0),
+                width: rem(thumb_rem),
+                height: rem(thumb_rem),
+                margin: UiRect::left(rem(-thumb_rem / 2.0)),
+                border_radius: BorderRadius::all(Val::Percent(50.0)),
+             }
+             BackgroundColor({ palette.accent })
+             SliderThumb
+             ThresholdPart(Option::Some({ id.clone() }), ThresholdKind::Thumb)
+        ]
+    })
+}
+
+/// The threshold control: the label, the live value, the continuous slider
+/// and the step buttons. The slider is the affordance the step buttons
+/// cannot give — a held drag walks the threshold continuously.
+fn threshold_control(managed: &ManagedAlertRule, palette: &UiPalette) -> Box<dyn Scene> {
+    let id = managed.rule.id.clone();
+    let value = format!(
+        "{:.1}{}",
+        managed.rule.threshold,
+        metric_unit(managed.rule.metric)
+    );
+    let minus = button("−".into(), RuleControl::Threshold(id.clone(), -1), palette);
+    let plus = button("+".into(), RuleControl::Threshold(id.clone(), 1), palette);
+    let slider = threshold_slider(managed, palette);
+    Box::new(bsn! {
+        Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: px(space_4()),
+            flex_shrink: 0.0,
+        }
+        Children [
+             Text({ t("alerts.threshold").to_owned() }) TextRole(Role::Caption) --
+             Text(value) TextRole(Role::Mono) ThresholdValue(Option::Some({ id.clone() })) --
+             @{ slider } --
+             @{ minus } -- @{ plus }
+        ]
+    })
+}
 pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene + use<> {
     let id = managed.rule.id.clone();
     let title = format!(
@@ -312,17 +563,7 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
         metric_label(managed.rule.metric),
         super::managed_rule_line(managed)
     );
-    let threshold = numeric(
-        t("alerts.threshold"),
-        format!(
-            "{:.1}{}",
-            managed.rule.threshold,
-            metric_unit(managed.rule.metric)
-        ),
-        RuleControl::Threshold(id.clone(), -1),
-        RuleControl::Threshold(id.clone(), 1),
-        palette,
-    );
+    let threshold = threshold_control(managed, palette);
     let duration = numeric(
         t("alerts.duration"),
         format!("{}s", managed.rule.for_duration.as_secs()),

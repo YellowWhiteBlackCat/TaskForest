@@ -73,6 +73,13 @@ fn sync_rows(
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<ProcessScrollState>().add_systems(
         PostUpdate,
-        (sync_chrome, sync_rows).after(UiSystems::Layout),
+        (
+            (sync_chrome, sync_rows).after(UiSystems::Layout),
+            // The cell ellipsis runs on the laid-out frame: it needs the
+            // measured slot and the shaped paragraph of every cell.
+            crate::widgets::table::ellipsis::ellipsize_overflowing_cells.after(UiSystems::Layout),
+            crate::widgets::table::figures::apply_tabular_figures,
+            crate::widgets::table::selection::paint_cell_selection,
+        ),
     );
 }

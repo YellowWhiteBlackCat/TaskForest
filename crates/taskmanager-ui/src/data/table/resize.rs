@@ -13,22 +13,15 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, actions, div, px,
 };
 use taskmanager_theme::Palette;
+// The resize policy is the contract's (see `taskmanager_ui_contract::columns`):
+// every frontend reads the same minimum, maximum and keyboard step, so the
+// same drag behaves the same everywhere.
+use taskmanager_ui_contract::{COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
 
 /// The reference resize gutter width. The visual surface may choose a larger
 /// acquisition area in another frontend; GPUI's reference table uses this
 /// two-pixel gutter and paints a one-pixel divider inside it.
 pub const COLUMN_RESIZE_HANDLE_SIZE: Pixels = px(2.0);
-
-/// Reference lower bound for a resizable column. Frontend-specific geometry
-/// may choose a stricter floor when its text/layout system needs one; this is
-/// the GPUI table policy and is kept in one place for all GPUI consumers.
-pub const COLUMN_RESIZE_MIN_WIDTH: f32 = 10.0;
-
-/// Reference upper bound for a resizable column.
-pub const COLUMN_RESIZE_MAX_WIDTH: f32 = 1200.0;
-
-/// Keyboard width change per resize-handle step.
-pub const COLUMN_RESIZE_KEYBOARD_STEP: f32 = 10.0;
 
 /// Key context for a focused resize handle.
 pub const COLUMN_RESIZE_CONTEXT: &str = "TaskManagerColumnResize";
@@ -72,14 +65,14 @@ impl Render for ColumnResizeDrag {
 #[must_use]
 pub fn clamp_column_width(new: Pixels, old: Pixels) -> Option<Pixels> {
     let new = new.floor();
-    if new < px(COLUMN_RESIZE_MIN_WIDTH) {
+    if new < px(COLUMN_WIDTH_MIN) {
         return None;
     }
     let changed = new - old;
     if changed > px(-1.0) && changed < px(1.0) {
         return None;
     }
-    Some(new.min(px(COLUMN_RESIZE_MAX_WIDTH)))
+    Some(new.min(px(COLUMN_WIDTH_MAX)))
 }
 
 /// Resolve the next width in a drag session. The first pointer sample becomes
@@ -205,9 +198,9 @@ where
 /// Direction of one keyboard resize step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColumnResizeStep {
-    /// Reduce the current width by [`COLUMN_RESIZE_KEYBOARD_STEP`].
+    /// Reduce the current width by [`COLUMN_WIDTH_KEYBOARD_STEP`].
     Narrower,
-    /// Increase the current width by [`COLUMN_RESIZE_KEYBOARD_STEP`].
+    /// Increase the current width by [`COLUMN_WIDTH_KEYBOARD_STEP`].
     Wider,
 }
 
@@ -329,8 +322,8 @@ impl<D: super::TableDelegate> super::TableState<D> {
                         return;
                     };
                     let delta = match step {
-                        ColumnResizeStep::Narrower => -COLUMN_RESIZE_KEYBOARD_STEP,
-                        ColumnResizeStep::Wider => COLUMN_RESIZE_KEYBOARD_STEP,
+                        ColumnResizeStep::Narrower => -COLUMN_WIDTH_KEYBOARD_STEP,
+                        ColumnResizeStep::Wider => COLUMN_WIDTH_KEYBOARD_STEP,
                     };
                     table.resize_cols(ix, width + px(delta), cx);
                     if table

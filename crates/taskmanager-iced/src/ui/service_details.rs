@@ -362,35 +362,28 @@ fn logs_panel<'a>(
 
     let lines_body: Element<'_, Message, iced::Theme, iced::Renderer> = match &details.logs {
         ServiceLogState::Ready(lines) => {
-            // Each log line is an independently selectable value (GPUI
-            // SelectableText parity for the line-level copy workflow): drag a
-            // line into the primary clipboard, Ctrl/Cmd-C to the standard
-            // clipboard. Whole-block export stays on the copy/export actions
-            // by design — the paragraph layer exposes no line metrics, so a
-            // block-wide highlight could only be approximate.
+            // ONE multi-line block, not one widget per line: the shared
+            // selectable widget measures the shaped paragraph, so the caret
+            // resolves inside the line the pointer lands on (a single click
+            // still selects within one row) while a drag spans every line it
+            // covers. The selection then reaches the standard clipboard
+            // through the shared Ctrl/Cmd-C path, so the whole log can be
+            // copied as one range instead of row by row.
             let owner = app.text_selection_owner();
-            let rows = lines
-                .as_slice()
-                .iter()
-                .enumerate()
-                .map(|(line_index, line)| {
-                    let value_id =
-                        iced::advanced::widget::Id::from(format!("svc-details-log-{line_index}"));
-                    let is_owner = owner.as_ref() == Some(&value_id);
-                    crate::ui::components::SelectableText::new(
-                        value_id,
-                        line.clone(),
-                        f32::from(tokens::FONT_11),
-                        crate::theme_binding::color(theme_snapshot.palette().fg),
-                    )
-                    .selection_owner(is_owner)
-                    .into()
-                })
-                .collect::<Vec<Element<'_, Message, iced::Theme, iced::Renderer>>>();
-            scrollable(column(rows).spacing(2))
-                .height(Length::Fixed(140.0))
-                .width(Length::Fill)
-                .into()
+            let value_id = iced::advanced::widget::Id::from("svc-details-log-block");
+            let is_owner = owner.as_ref() == Some(&value_id);
+            scrollable(
+                crate::ui::components::SelectableText::new(
+                    value_id,
+                    service_log_block(lines),
+                    f32::from(tokens::FONT_11),
+                    crate::theme_binding::color(theme_snapshot.palette().fg),
+                )
+                .selection_owner(is_owner),
+            )
+            .height(Length::Fixed(140.0))
+            .width(Length::Fill)
+            .into()
         }
         state => container(text(log_state_caption(state)).size(f32::from(tokens::FONT_11)))
             .padding(8)
@@ -399,6 +392,19 @@ fn logs_panel<'a>(
     };
 
     column![controls, lines_body].spacing(6).into()
+}
+
+/// The service log's whole-block text: the visible lines joined by REAL line
+/// breaks.
+///
+/// The shared selectable widget treats a value carrying line breaks as one
+/// multi-line block, measures it through the paragraph layer, and resolves a
+/// drag selection to a byte range that can span the lines it covers. Joining
+/// the lines here is what turns the row-level list into a cross-line
+/// selection — no estimated geometry, no second selection path.
+#[must_use]
+pub(crate) fn service_log_block(lines: &[String]) -> String {
+    lines.join("\n")
 }
 
 /// The merged panel's level-filter caption — the same shared-catalog keys the
@@ -446,3 +452,7 @@ fn warning_panel_style(theme_snapshot: &Theme) -> iced::widget::container::Style
     style.border.color = crate::theme_binding::color(theme_snapshot.palette().warning);
     style
 }
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/service_details_block_tests.rs"]
+mod block_tests;

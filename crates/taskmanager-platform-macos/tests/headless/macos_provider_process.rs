@@ -217,6 +217,7 @@ fn batch_preserves_the_exact_unsupported_failure_for_every_action_and_target() {
     ] {
         let mut provider = MacProcessControlProvider::new();
         let intent = ProcessBatchIntent {
+            collateral: Default::default(),
             action,
             scope: Default::default(),
             targets: targets.clone(),

@@ -2,8 +2,8 @@
 
 use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px, size};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
-use taskmanager_ui::data::table::{
-    COLUMN_RESIZE_KEYBOARD_STEP, COLUMN_RESIZE_MAX_WIDTH, COLUMN_RESIZE_MIN_WIDTH,
+use taskmanager_ui_contract::columns::{
+    COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN,
 };
 use taskmanager_ui_contract::navigation::NavOrientation;
 
@@ -169,7 +169,7 @@ async fn apps_column_resize_handle_steps_width_within_declared_bounds(cx: &mut T
         );
         view.resize_proc_col(
             SortCol::Cpu,
-            px(COLUMN_RESIZE_MIN_WIDTH + COLUMN_RESIZE_KEYBOARD_STEP),
+            px(COLUMN_WIDTH_MIN + COLUMN_WIDTH_KEYBOARD_STEP),
             cx,
         );
         cx.notify();
@@ -197,26 +197,26 @@ async fn apps_column_resize_handle_steps_width_within_declared_bounds(cx: &mut T
     visual.simulate_keystrokes("left");
     assert_eq!(
         view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
-        px(COLUMN_RESIZE_MIN_WIDTH),
+        px(COLUMN_WIDTH_MIN),
         "Left must shrink the process CPU column to its declared minimum"
     );
     visual.simulate_keystrokes("left");
     assert_eq!(
         view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
-        px(COLUMN_RESIZE_MIN_WIDTH),
+        px(COLUMN_WIDTH_MIN),
         "Left at the minimum must not move the process column below its bound"
     );
     visual.simulate_keystrokes("right");
     assert_eq!(
         view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
-        px(COLUMN_RESIZE_MIN_WIDTH + COLUMN_RESIZE_KEYBOARD_STEP),
+        px(COLUMN_WIDTH_MIN + COLUMN_WIDTH_KEYBOARD_STEP),
         "Right must expand the same live process column by one shared step"
     );
 
     view.update(cx, |view, cx| {
         view.resize_proc_col(
             SortCol::Cpu,
-            px(COLUMN_RESIZE_MAX_WIDTH - COLUMN_RESIZE_KEYBOARD_STEP),
+            px(COLUMN_WIDTH_MAX - COLUMN_WIDTH_KEYBOARD_STEP),
             cx,
         );
     });
@@ -224,13 +224,13 @@ async fn apps_column_resize_handle_steps_width_within_declared_bounds(cx: &mut T
     visual.simulate_keystrokes("right");
     assert_eq!(
         view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
-        px(COLUMN_RESIZE_MAX_WIDTH),
+        px(COLUMN_WIDTH_MAX),
         "Right must saturate at the declared process-column maximum"
     );
     visual.simulate_keystrokes("right");
     assert_eq!(
         view.read_with(cx, |view, _| view.proc_col_width(SortCol::Cpu)),
-        px(COLUMN_RESIZE_MAX_WIDTH),
+        px(COLUMN_WIDTH_MAX),
         "Right at the maximum must not move the process column beyond its bound"
     );
 }

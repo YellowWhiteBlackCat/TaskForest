@@ -14,6 +14,32 @@ inventory tables (services/startup/sessions), settings, and the alert center.
 - `src/pages/alerts/editor.rs` mounts canonical rule creation, field edits,
   enabled state, removal and clipboard import/export. Rules and events scroll
   beneath fixed page actions; edits always reduce through the shared shell.
+  The threshold value rides a real `bevy_ui_widgets` slider whose typed value
+  change reduces through the canonical rule edit, and a successful export
+  raises one clipboard-success toast.
+- The alert center paints severity through the theme's own severity palette
+  (the frontend resolves the owner's palette, it never assembles a severity
+  table), and the firing rule's banner opens through a spring reveal. A paused
+  telemetry stream freezes the content slot behind a PAUSED watermark while
+  the nav rail stays live.
+- The services page paints a breathing status dot per unit (only the running
+  state breathes), splits the log level keywords out of the message body, and
+  releases the follow lock when the reader leaves the newest entry — the
+  shell's `feed.follow` stays the single authority. The unit-type filter bar
+  slides sideways instead of wrapping, and the dependency panel renders the
+  relation tree with typed disclosure state.
+- The containers page states each container's DECLARED quota in its own
+  column: the observed share of the declared soft memory ceiling, the
+  declared CPU budget, or the typed absence of a declaration ("not declared"
+  / "unknown"). A row that crossed a declared ceiling wears a pulsing amber
+  halo whose opacity follows the shared projection revision; the page never
+  compares a container against a ceiling the container did not declare, and
+  the seven column slots are percentage shares of the row's content box, so
+  the header and every data row keep ONE basis at any window width.
+- The startup page pins the failed-unit forensics panel above the inventory
+  (each unit an accordion over the provider's own load/active/sub state) and
+  lays the boot critical chain out as a gantt over the shared timeline rows.
+  The three-phase proportion rows mark an unmeasured phase as unavailable.
 - System Health selects shared storage and sensor groups inside the measured
   System body. SMART controls freeze disk generation before activation and arm
   the shared confirmation; replaced targets cannot redirect a stale control.

@@ -8,12 +8,26 @@ use bevy::scene::CommandsSceneExt;
 use bevy::ui::UiSystems;
 
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::history_controls::toolbar_scene;
 use crate::window::WindowPalette;
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{Display, FlexWrap, Overflow};
 use bevy::ui_widgets::ScrollArea;
 use taskmanager_application::history_decimation::gap_preserving_envelope;
+
+/// The trend strip's height, in logical px — a documented pixel contract.
+///
+/// One bar's height is the sample's share of THIS strip, so the strip and
+/// its bars have to agree in one unit: a rem strip would clip the bars at
+/// the smaller reading sizes, and a bar scale that ignored the strip would
+/// draw outside it. The strip therefore stays px, and the shared constant
+/// keeps the container and the bar math on the same scale.
+const TREND_STRIP_HEIGHT_PX: f32 = 20.0;
+
+/// The hairline a gap draws: the space between two bars, and the slot a
+/// missing sample leaves behind.
+const TREND_BAR_GAP_PX: f32 = 1.0;
 
 #[derive(Component, Clone, Default)]
 struct HistoryToolbar;
@@ -33,11 +47,13 @@ struct HistoryPaint {
 /// into a doubled surface, so the container starts empty by contract.
 pub(crate) fn content(
     projection: &ApplicationHistoryProjection,
-    _palette: &UiPalette,
+    palette: &UiPalette,
 ) -> impl Scene + use<> {
     let model = HistoryPageModel::from_projection(projection);
     let title = t("history.application.title").to_owned();
     let line = summary_text(&model);
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
     bsn! {
         Node {
             width: percent(100),
@@ -61,15 +77,29 @@ pub(crate) fn content(
              Text(line) HistoryStatusLine TextRole(Role::Caption) --
              Node { width: percent(100), flex_shrink: 0.0 } HistoryToolbar Children [] --
 
+                // The viewport wrapper owns the scroll area AND the floating
+                // rail: the rail is a sibling of the scroll area, so it never
+                // scrolls with the content and never takes layout space away
+                // from it.
                 Node {
                     width: percent(100),
                     min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
-                    overflow: Overflow::scroll_y(),
                     flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(space_2()),
                 }
-                ScrollArea HistoryBody
-                Children []
+                Children [
+                    Node {
+                        width: percent(100),
+                        min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                        overflow: Overflow::scroll_y(),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(space_2()),
+                        padding: { lane },
+                    }
+                    ScrollArea HistoryBody
+                    Children []
+                    --
+                    @{ rail }
+                ]
 
         ]
     }
@@ -180,14 +210,14 @@ fn history_row_scene(row: &HistoryRowModel, palette: &UiPalette) -> Box<dyn Scen
             Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } Children [
                 Text(cpu) TextRole(Role::Caption) -- Text(memory) TextRole(Role::Caption) -- Text(count) TextRole(Role::Caption)
             ] --
-            Node { width: percent(100), height: px(20.0), min_width: px(0.0) } Children [ @{ chart } ]
+            Node { width: percent(100), height: px(TREND_STRIP_HEIGHT_PX), min_width: px(0.0) } Children [ @{ chart } ]
         ]
     })
 }
 
 fn empty_trend_scene() -> Box<dyn Scene> {
     Box::new(bsn! {
-        Node { width: percent(100), height: px(20.0) }
+        Node { width: percent(100), height: px(TREND_STRIP_HEIGHT_PX) }
         Children [ Text({ missing_value() }) TextRole(Role::Caption) ]
     })
 }
@@ -214,11 +244,11 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
         .copied()
         .map(|sample| {
             let height = if !sample.is_finite() {
-                1.0
+                TREND_BAR_GAP_PX
             } else if range > 0.0 {
-                (((sample - min) / range).clamp(0.0, 1.0) * 20.0).max(1.0)
+                (((sample - min) / range).clamp(0.0, 1.0) * TREND_STRIP_HEIGHT_PX).max(TREND_BAR_GAP_PX)
             } else {
-                10.0
+                TREND_STRIP_HEIGHT_PX / 2.0
             };
             if sample.is_finite() {
                 Box::new(bsn! {
@@ -227,7 +257,7 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
                 }) as Box<dyn Scene>
             } else {
                 Box::new(bsn! {
-                    Node { flex_grow: 1.0, min_width: px(0.0), flex_basis: px(0.0), height: px(1.0) }
+                    Node { flex_grow: 1.0, min_width: px(0.0), flex_basis: px(0.0), height: px(TREND_BAR_GAP_PX) }
                 }) as Box<dyn Scene>
             }
         })
@@ -235,10 +265,10 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: px(20.0),
+            height: px(TREND_STRIP_HEIGHT_PX),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::FlexEnd,
-            column_gap: px(1.0),
+            column_gap: px(TREND_BAR_GAP_PX),
         }
         Children [{ bars }]
     })
@@ -291,10 +321,7 @@ fn paint_history(mut render: HistoryRender) {
         .commands
         .spawn_scene(history_body_scene(&model, palette))
         .id();
-    render
-        .commands
-        .entity(body)
-        .add_one_related::<ChildOf>(fresh);
+    attach_child(&mut render.commands, body, fresh);
     for (toolbar, mut node, children) in &mut render.toolbars {
         if let Some(children) = children {
             for child in children.iter() {
@@ -314,10 +341,7 @@ fn paint_history(mut render: HistoryRender) {
             .commands
             .spawn_scene(toolbar_scene(model.selected_window, false, palette))
             .id();
-        render
-            .commands
-            .entity(toolbar)
-            .add_one_related::<ChildOf>(fresh);
+        attach_child(&mut render.commands, toolbar, fresh);
     }
     for mut line in &mut render.lines {
         line.0 = summary_text(&model);

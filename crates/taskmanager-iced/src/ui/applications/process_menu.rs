@@ -22,10 +22,16 @@ use taskmanager_shell::presentation::priority_tier_label;
 /// The floating action panel for one open process menu. Self-owned (the
 /// panel must outlive the frame that built it inside the row's lazy body),
 /// so it takes the resolved theme and the process name by value.
+///
+/// `not_responding` is the platform's typed "not responding" state of THIS
+/// process (the core's uninterruptible wait). The "End task" action wears
+/// the destructive accent only for such a process: a stuck process is the
+/// case where the user has to reach for the destructive path.
 pub(super) fn panel(
     theme_snapshot: Theme,
     process_name: String,
     pid: u32,
+    not_responding: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let process_name = if process_name.trim().is_empty() {
         t("proc.unknown_process").to_owned()
@@ -47,7 +53,7 @@ pub(super) fn panel(
             FocusTarget::ProcessMenuEndTask,
             t("proc.end_task"),
             ProcessMenuAction::EndTask,
-            true,
+            not_responding,
         ),
         action_button(
             theme_snapshot,

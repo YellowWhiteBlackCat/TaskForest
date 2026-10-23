@@ -3,6 +3,7 @@
 use crate::input::PendingEffects;
 use crate::pages::settings::SettingsBody;
 use crate::palette::{UiPalette, space_8};
+use crate::scene_attach::attach_child;
 use crate::text_selection::ClipboardPort;
 use crate::window::{Role, TextRole, WindowPalette};
 use crate::window_surface::{
@@ -13,7 +14,7 @@ use bevy::app::{App, Update};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -79,7 +80,7 @@ fn sync_setup_entry(
     );
     let entry = commands.spawn_scene(bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()) } SetupEntry
         Children [ Text(t("settings.additional_setup")) TextRole(Role::Heading) -- Text(t("settings.additional_setup_detail")) TextRole(Role::Caption) -- @{ button } ] }).id();
-    commands.entity(root).add_one_related::<ChildOf>(entry);
+    attach_child(&mut commands, root, entry);
 }
 
 #[derive(SystemParam)]

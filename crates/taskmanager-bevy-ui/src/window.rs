@@ -41,11 +41,13 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, bsn};
-use bevy::text::{Font, FontSource, TextColor, TextFont};
+use bevy::text::{
+    Font, FontFeatureTag, FontFeatures, FontSmoothing, FontSource, TextColor, TextFont,
+};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{BackgroundColor, EmSize, Node, RemSize};
 use bevy::ui::widget::Text;
-use bevy::window::{Window, WindowPlugin};
+use bevy::window::{PrimaryWindow, Window, WindowPlugin};
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_ipc::SubscriptionMask;
 
@@ -62,6 +64,7 @@ pub(crate) mod chrome;
 use chrome::app_shell_scene;
 mod appearance;
 use appearance::{demo_theme_from_env, demo_ui_size_from_env};
+pub(crate) mod edge;
 
 use crate::app::{AppShellPlugin, Route};
 use crate::capture::{capture_page, capture_scenario_target, capture_window_resolution};
@@ -101,6 +104,20 @@ struct PlaceholderFonts {
 /// spawned value always carries an explicit role.
 #[derive(Clone, Copy, Component, Debug, Default, PartialEq, Eq)]
 pub(crate) struct TextRole(pub(crate) Role);
+
+/// A text node whose INK belongs to the scene, not to its typographic role.
+///
+/// The role observer owns the ink of every ordinary text node: it stamps the
+/// role's palette ink when the node lands. A scene that needs a SEMANTIC ink
+/// — the theme's query-highlight ink, a status tier's ink — declares that
+/// ink beside this marker, and the observer keeps the role's FONT metrics
+/// while leaving the declared ink alone.
+///
+/// Without this marker the scene's `TextColor` was overwritten the moment
+/// the node landed, so a declared ink was a lie: the pixels showed the role
+/// ink while the scene claimed otherwise.
+#[derive(Clone, Copy, Component, Debug, Default, PartialEq, Eq)]
+pub(crate) struct CustomTextInk;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Role {
@@ -332,6 +349,7 @@ impl Plugin for FrontendWindowPlugin {
         // headless compositions remain honestly Disabled.
         app.init_resource::<HistoryProjectionResource>();
         app.init_resource::<RemSize>();
+        app.init_resource::<crate::widgets::switch::SwitchMemory>();
         app.init_resource::<PerformanceLayoutState>().add_systems(
             PostUpdate,
             (
@@ -342,6 +360,22 @@ impl Plugin for FrontendWindowPlugin {
                 crate::widgets::table::paint_zero_values,
             )
                 .chain(),
+        );
+        // The product-owned interaction layer: the switch thumb's slide, the
+        // scrollbar rail's target binding, and the focus ring's outer halo.
+        // The halo and the rail resolve before the UI layout, so their boxes
+        // are measured in the same frame they move.
+        app.add_systems(
+            PostUpdate,
+            (
+                crate::widgets::focus_ring::sync_focus_ring_halo,
+                crate::widgets::scrollbar::bind_scrollbar_targets,
+            )
+                .before(bevy::ui::UiSystems::Layout),
+        );
+        app.add_systems(
+            PostUpdate,
+            crate::widgets::switch::sync_switch_thumbs.after(bevy::ui::UiSystems::PostLayout),
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
@@ -447,11 +481,16 @@ fn role_font_source(fonts: &PlaceholderFonts, role: Role) -> FontSource {
 /// widget insert — the single place typography becomes bevy values.
 fn style_text_role(
     trigger: On<Add<TextRole>>,
-    mut texts: Query<(&TextRole, &mut TextFont, &mut TextColor)>,
+    mut texts: Query<(
+        &TextRole,
+        &mut TextFont,
+        &mut TextColor,
+        Option<&CustomTextInk>,
+    )>,
     palette: Res<WindowPalette>,
     fonts: Res<PlaceholderFonts>,
 ) {
-    let Ok((role, mut metrics, mut ink)) = texts.get_mut(trigger.event().entity) else {
+    let Ok((role, mut metrics, mut ink, custom)) = texts.get_mut(trigger.event().entity) else {
         return;
     };
     let (font, color) = match role.0 {
@@ -462,9 +501,29 @@ fn style_text_role(
     };
     *metrics = TextFont {
         font: role_font_source(&fonts, role.0),
+        // The OpenType `kern` feature: the font's own kerning pairs are
+        // applied, so small text keeps its rhythm instead of drifting apart
+        // glyph by glyph (BEVY-184).
+        font_features: kerned_features(),
+        // The antialiasing mode is stated, not inherited: the upstream
+        // subpixel variant does not exist in Bevy 0.20, so the frontend
+        // pins the grayscale mode and lets the hinting (which the `Text`
+        // component requires) do the small-size work.
+        font_smoothing: FontSmoothing::AntiAliased,
         ..font
     };
-    ink.0 = color;
+    // A scene that owns its ink keeps it: the role still owns the font
+    // metrics, but the declared ink is the truth.
+    if custom.is_none() {
+        ink.0 = color;
+    }
+}
+
+/// The OpenType features every text node carries: the font's own kerning.
+fn kerned_features() -> FontFeatures {
+    FontFeatures::builder()
+        .enable(FontFeatureTag::new(b"kern"))
+        .build()
 }
 
 /// Keep the window's `RemSize` resource on the live palette's UI-size step.
@@ -568,10 +627,16 @@ fn rewrite_feedback_line(
 /// Startup spawn: one camera for the ui render node to target, then the
 /// shell scene. The initial route comes from the (default) route resource —
 /// no window-local page state exists.
+///
+/// The window's own frame decides the edge highlight: a window the
+/// compositor decorates already has a visible frame, while an undecorated
+/// window touches the screen edge with nothing between it and the
+/// wallpaper — that is where the app draws its own hairline (BEVY-180).
 fn spawn_app_shell(
     palette: Res<WindowPalette>,
     route: Res<Route>,
     demo: Option<Res<DemoMode>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
     mut commands: Commands,
 ) {
     commands.spawn_scene(bsn! { Camera2d });
@@ -580,7 +645,16 @@ fn spawn_app_shell(
     } else {
         t("status.waiting_for_snapshot").to_owned()
     };
-    commands.spawn_scene(app_shell_scene(&palette.inner, route.page, summary));
+    let decorated = windows
+        .iter()
+        .next()
+        .is_some_and(|window| window.decorations);
+    commands.spawn_scene(app_shell_scene(
+        &palette.inner,
+        route.page,
+        summary,
+        !decorated,
+    ));
 }
 
 #[cfg(test)]

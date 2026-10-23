@@ -28,9 +28,24 @@ use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_test_support::pin_english;
 use taskmanager_theme::tokens::UiSize;
 
-use super::dependencies_panel::{dependencies_fingerprint, service_dependencies_panel_scene};
+use super::dependencies_panel::{
+    dependencies_fingerprint, service_dependencies_panel_scene_expanded,
+};
 use super::tests::{headless_services_app, push_services, route_to_services};
+use crate::palette::UiPalette;
+use bevy::scene::Scene;
 use taskmanager_theme::Theme;
+
+/// The panel scene with a default accordion state. The production painter
+/// carries the reader's expansion state; the scene-level fixtures ask for the
+/// default one.
+fn service_dependencies_panel_scene(shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
+    service_dependencies_panel_scene_expanded(
+        shell,
+        palette,
+        &super::deps_tree::ServiceDepsExpansion::default(),
+    )
+}
 
 fn service_item(id: &str, name: &str, status: ServiceStatus) -> ServiceItem {
     ServiceItem::from_inventory(

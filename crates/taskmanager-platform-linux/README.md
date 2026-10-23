@@ -42,7 +42,9 @@ src/engine.rs                          collection engine root
 ├── sensors/                           thermal/fan sensor collection
 ├── services/                          systemd service collection
 ├── smart/                             SMART disk health collection
+│   └── tool.rs                        the missing-tool remediation (the real package manager)
 ├── startup/                           startup-item collection
+│   └── phases.rs                      the per-phase boot split (systemd-analyze summary)
 ├── runtime_evidence/                  runtime evidence capture
 ├── desktop_appearance.rs              desktop theme detection
 ├── session.rs  storage_health.rs  storage_target.rs
