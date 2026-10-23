@@ -509,6 +509,15 @@ impl PageLayoutBudget {
     }
 }
 
+/// The minimum band between the last page row and the bottom bar.
+///
+/// The elastic-layout playbook makes the bottom safety band a BUDGET fact, not
+/// a rendering accident: the last row must keep this distance from the
+/// bottom edge in every viewport, so it is never clipped or read as cut off.
+/// The scaffold owns the gap that provides it, and the page profiles never
+/// shrink it below this value.
+pub const BOTTOM_SAFETY_BAND: f32 = 8.0;
+
 /// The one rail-width decision per root navigation presentation (GPUI
 /// parity).
 #[must_use]
@@ -522,3 +531,7 @@ pub const fn nav_rail_width(presentation: NavigationPresentation) -> f32 {
 #[cfg(test)]
 #[path = "../../tests/gui/ui/responsive_tests.rs"]
 mod responsive_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/bottom_safety_band_tests.rs"]
+mod bottom_safety_band_tests;

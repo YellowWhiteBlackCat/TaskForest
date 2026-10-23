@@ -134,6 +134,27 @@ pub fn card_style(theme: &Theme) -> container::Style {
     }
 }
 
+/// The recessed inset-panel surface: a well cut INTO the page surface, used
+/// for content that belongs to an enclosing scope (the container's own
+/// process block). The fill is the theme's window backdrop blended toward
+/// the shadow side, so the panel reads as recessed on light and dark skins
+/// alike; the border keeps the skin's hairline. Token-derived (ADR-017: no
+/// color literals).
+#[must_use]
+pub fn inset_panel_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    container::Style {
+        background: Some(color(mix(palette.window_backdrop, Color::BLACK, 0.22)).into()),
+        text_color: Some(color(palette.fg)),
+        border: iced::Border {
+            color: color(palette.border),
+            width: 1.0,
+            radius: f32::from(palette.small_radius).into(),
+        },
+        ..container::Style::default()
+    }
+}
+
 /// Solid-fill container style — the composition-bar segments, the legend
 /// swatches, and the bar tracks. The color is pre-resolved (an iced `Color`)
 /// so the caller owns it and the style closure stays `'static`.

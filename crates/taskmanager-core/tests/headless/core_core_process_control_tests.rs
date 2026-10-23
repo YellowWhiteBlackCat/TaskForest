@@ -241,6 +241,7 @@ fn group_scope_wire_tags_are_snake_case_and_round_trip() {
 #[test]
 fn intent_scope_is_wire_compatible_with_payloads_missing_the_field() {
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::End,
         scope: ProcessGroupScope::NativeGroup {
             family: "job_object".to_owned(),
@@ -274,6 +275,7 @@ fn schema_v1_payload_reads_but_never_authorizes_control() {
     assert_eq!(legacy.authoritative_start_token(), None);
 
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Kill,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![legacy.clone()],

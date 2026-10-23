@@ -45,11 +45,20 @@ use taskmanager_application::i18n::t;
 use crate::app::Message;
 
 mod geometry;
+mod motion;
 mod program;
+mod raster;
 pub(crate) use geometry::{
     area_path, line_path, scaled_y, scaled_y_in_range, series_point_runs, series_point_runs_for,
     series_point_runs_in_range, series_point_runs_windowed, smooth_area_path, smooth_line_path,
 };
+pub(crate) use motion::{DampedRangeLedger, series_runs};
+pub(crate) use raster::{
+    data_point_badge_bounds, draw_y_axis_ticks, y_axis_scale_ticks, y_axis_tick_values,
+};
+
+use motion::{SeriesSlide, SlidePhase};
+use raster::snap_to_device_grid;
 
 /// Stroke width for each series polyline.
 const SERIES_STROKE_WIDTH: f32 = 1.6;
@@ -115,6 +124,12 @@ pub(crate) struct PerfChart {
     pub grid_color: Color,
     pub readout: ReadoutColors,
     pub smooth: bool,
+    /// The render scale the drawn polyline is aligned to: the device grid
+    /// the toolkit renders at. The caller supplies the scale it can resolve
+    /// (the app's render zoom), so the curve keeps a constant sub-pixel
+    /// phase on HiDPI and fractional-scale windows instead of an occasional
+    /// blur.
+    pub scale_factor: f32,
 }
 
 impl PerfChart {
@@ -141,7 +156,23 @@ impl PerfChart {
             grid_color,
             readout,
             smooth,
+            scale_factor: 1.0,
         }
+    }
+
+    /// The chart's render scale: the device grid the drawn polyline is
+    /// aligned to. The caller supplies the scale the toolkit renders at, so
+    /// the alignment is exact on HiDPI and fractional-scale windows instead
+    /// of being guessed here. A non-positive or non-finite scale falls back
+    /// to the 1:1 device grid.
+    #[must_use]
+    pub(crate) fn with_scale_factor(mut self, scale_factor: f32) -> Self {
+        self.scale_factor = if scale_factor.is_finite() && scale_factor > 0.0 {
+            scale_factor
+        } else {
+            1.0
+        };
+        self
     }
 
     /// The data fingerprint identifying the grid + two-series geometry this
@@ -150,7 +181,12 @@ impl PerfChart {
     /// [`PerfChartDataFingerprint`]).
     #[must_use]
     pub(crate) fn fingerprint(&self) -> PerfChartDataFingerprint {
-        PerfChartDataFingerprint::from_series(&self.cpu, &self.memory, self.smooth)
+        let mut fingerprint =
+            PerfChartDataFingerprint::from_series(&self.cpu, &self.memory, self.smooth);
+        // The render scale selects the device grid the polyline is aligned
+        // to, so a scale change must rebuild the cached geometry.
+        fingerprint.scale_bits = self.scale_factor.to_bits();
+        fingerprint
     }
 }
 
@@ -165,6 +201,8 @@ pub(crate) struct PerfChartDataFingerprint {
     cpu: SeriesGeneration,
     memory: SeriesGeneration,
     smooth: bool,
+    /// The render scale the cached geometry was aligned to.
+    scale_bits: u32,
 }
 
 impl PerfChartDataFingerprint {
@@ -175,6 +213,7 @@ impl PerfChartDataFingerprint {
             cpu: SeriesGeneration::new(cpu),
             memory: SeriesGeneration::new(memory),
             smooth,
+            scale_bits: 0,
         }
     }
 }
@@ -200,10 +239,25 @@ struct PerfChartOverlayFingerprint {
 pub(crate) struct PerfChartState {
     /// The hovered sample index, updated through `update` on cursor motion.
     pub(crate) hover: HoverState,
+    /// The per-series slide transitions: the curve eases from the outgoing
+    /// frame into the incoming one instead of jumping once per sample.
+    pub(crate) slide: RefCell<ChartSlide>,
+    /// The slide phase the cached geometry was drawn with: the curve moves
+    /// on every frame of a slide, so a phase change rebuilds the data
+    /// cache.
+    pub(crate) slide_fingerprint: RefCell<(u32, u32)>,
     data_cache: Cache,
     overlay_cache: Cache,
     data_fingerprint: RefCell<PerfChartDataFingerprint>,
     overlay_fingerprint: RefCell<PerfChartOverlayFingerprint>,
+}
+
+/// The chart's per-series slide transitions: the CPU and the memory series
+/// advance independently (one of them may be empty while the other is not).
+#[derive(Default)]
+pub(crate) struct ChartSlide {
+    pub(crate) cpu: SeriesSlide,
+    pub(crate) memory: SeriesSlide,
 }
 
 /// Hover state for the chart canvas, stored in the widget-tree `Program::State`
@@ -507,49 +561,6 @@ pub(crate) fn grid_rules(opts: ChartOpts) -> Vec<GridRule> {
     rules
 }
 
-/// The y-axis tick ladder: `[max, max / 2, 0]` — the three labels that make a
-/// magnitude graph readable without crowding a mini-chart. Empty for a
-/// non-positive or non-finite `max` (the honest idle window carries no scale
-/// to read). Pure so the ladder is unit-tested headlessly.
-#[must_use]
-pub(crate) fn y_axis_tick_values(max: f32) -> Vec<f32> {
-    if !max.is_finite() || max <= 0.0 {
-        return Vec::new();
-    }
-    vec![max, max / 2.0, 0.0]
-}
-
-/// Draw the y-axis tick labels for one ladder (see [`y_axis_tick_values`]):
-/// each value's text (formatted by the caller's injected unit formatter — the
-/// MB/s spelling belongs to the call site, never the chart) sits at the
-/// height its value maps to under [`scaled_y`], in a token-derived muted
-/// color. Labels are clamped inside the frame so the 0 and max ticks never
-/// half-clip past the edges.
-pub(crate) fn draw_y_axis_ticks(
-    frame: &mut canvas::Frame<iced::Renderer>,
-    size: Size,
-    ticks: &[f32],
-    max: f32,
-    format_value: impl Fn(f32) -> String,
-    color: Color,
-) {
-    if !max.is_finite() || max <= 0.0 {
-        return;
-    }
-    for &value in ticks {
-        let fraction = (value / max).clamp(0.0, 1.0);
-        let y = (size.height * (1.0 - fraction)).clamp(5.0, (size.height - 5.0).max(5.0));
-        frame.fill_text(canvas::Text {
-            content: format_value(value),
-            position: Point::new(3.0, y),
-            color,
-            size: Pixels(9.0),
-            align_y: iced::alignment::Vertical::Center,
-            ..canvas::Text::default()
-        });
-    }
-}
-
 /// The GPUI-parity hover sample mark: one horizontal reference rule through
 /// the hovered sample's y plus a small snap dot at `(x, y)` in the series'
 /// own color. Paired with the vertical rule the readout pill already draws,
@@ -582,23 +593,30 @@ pub(crate) fn draw_hover_sample_mark(
 /// fabricated single-segment line. The area fill is the vertical
 /// Mission-Center gradient ([`vertical_area_gradient`]); when `smooth` is set
 /// the stroke and the fill's top edge run through a Catmull-Rom spline (GPUI
-/// parity).
+/// parity). Every vertex is aligned to the device grid of `scale_factor`
+/// first, so the stroke keeps a constant sub-pixel phase on HiDPI and
+/// fractional-scale windows.
 fn draw_series(
     frame: &mut canvas::Frame<iced::Renderer>,
-    samples: &[f32],
+    runs: &mut [Vec<Point>],
     size: Size,
     color: Color,
     smooth: bool,
+    scale_factor: f32,
 ) {
-    for points in series_point_runs(samples, size) {
+    for points in runs.iter_mut() {
+        for point in points.iter_mut() {
+            point.x = snap_to_device_grid(point.x, scale_factor);
+            point.y = snap_to_device_grid(point.y, scale_factor);
+        }
         if points.len() < 2 {
             continue;
         }
         if smooth && points.len() >= 3 {
-            if let Some(area) = smooth_area_path(&points, size.height) {
+            if let Some(area) = smooth_area_path(points, size.height) {
                 frame.fill(&area, vertical_area_gradient(color, size.height));
             }
-            if let Some(line) = smooth_line_path(&points) {
+            if let Some(line) = smooth_line_path(points) {
                 frame.stroke(
                     &line,
                     Stroke::default()
@@ -608,10 +626,10 @@ fn draw_series(
             }
             continue;
         }
-        if let Some(area) = area_path(&points, size.height) {
+        if let Some(area) = area_path(points, size.height) {
             frame.fill(&area, vertical_area_gradient(color, size.height));
         }
-        if let Some(line) = line_path(&points) {
+        if let Some(line) = line_path(points) {
             frame.stroke(
                 &line,
                 Stroke::default()
@@ -662,39 +680,14 @@ pub(crate) fn draw_readout_pill(
     );
 }
 
-/// Place a measured value pill beside a data point. It prefers the upper side
-/// of the point, flips below near the top edge, and clamps both axes so long
-/// labels stay inside short and narrow canvases.
-#[must_use]
-pub(crate) fn data_point_badge_bounds(size: Size, anchor: Point, text_width: f32) -> Rectangle {
-    let width = (text_width.max(0.0) + 12.0).min(size.width.max(0.0));
-    let height = 18.0_f32.min(size.height.max(0.0));
-    let max_x = (size.width - width).max(0.0);
-    let max_y = (size.height - height).max(0.0);
-    let x = (anchor.x - width / 2.0).clamp(0.0, max_x);
-    let above = anchor.y - height - 6.0;
-    let below = anchor.y + 6.0;
-    let y = if above >= 0.0 {
-        above.min(max_y)
-    } else if below <= max_y {
-        below
-    } else {
-        (anchor.y - height / 2.0).clamp(0.0, max_y)
-    };
-    Rectangle {
-        x,
-        y,
-        width,
-        height,
-    }
-}
-
 #[derive(Clone, Copy)]
 struct LatestBadgeStyle {
     cpu_color: Color,
     memory_color: Color,
     grid_color: Color,
     readout: ReadoutColors,
+    /// The render scale the badge's dot is aligned to.
+    scale_factor: f32,
 }
 
 fn draw_latest_badge(
@@ -710,8 +703,14 @@ fn draw_latest_badge(
     };
     let text_width = crate::text_metrics::measured_text_width(content, 11.0);
     let point = Point::new(
-        sample_x(anchor.index, sample_count, size.width),
-        scaled_y(anchor.value, 100.0, size.height),
+        snap_to_device_grid(
+            sample_x(anchor.index, sample_count, size.width),
+            style.scale_factor,
+        ),
+        snap_to_device_grid(
+            scaled_y(anchor.value, 100.0, size.height),
+            style.scale_factor,
+        ),
     );
     let point_color = match anchor.series {
         ReadoutSeries::Cpu => style.cpu_color,
@@ -759,6 +758,20 @@ fn draw_value_pill(
     });
 }
 
+/// The hover readout's drawing inputs: the token-derived colors plus the
+/// render scale the crosshair is aligned to and the position the slide
+/// moves it to. Bundled so the readout helper stays under clippy's
+/// argument budget.
+#[derive(Clone, Copy)]
+struct HoverReadoutStyle {
+    grid_color: Color,
+    readout: ReadoutColors,
+    scale_factor: f32,
+    /// The crosshair's position while a slide is in flight (`None` keeps it
+    /// on the settled slot grid).
+    slide_x: Option<f32>,
+}
+
 /// The CPU/memory chart's hover readout geometry: the shared
 /// [`draw_readout_pill`] at the hovered sample's x, plus a GPUI-parity
 /// [`draw_hover_sample_mark`] per series (horizontal rule + snap dot on the
@@ -770,21 +783,25 @@ fn draw_hover_readout(
     size: Size,
     index: usize,
     series: &[(&[f32], Color); 2],
-    grid_color: Color,
-    readout: ReadoutColors,
+    style: HoverReadoutStyle,
 ) {
     let [(cpu, cpu_color), (memory, memory_color)] = series;
     let sample_count = cpu.len().max(memory.len());
-    let x = sample_x(index, sample_count, size.width);
+    let x = snap_to_device_grid(
+        style
+            .slide_x
+            .unwrap_or_else(|| sample_x(index, sample_count, size.width)),
+        style.scale_factor,
+    );
     for (samples, color) in [(cpu, *cpu_color), (memory, *memory_color)] {
         if let Some(&value) = samples.get(index).filter(|value| value.is_finite()) {
             draw_hover_sample_mark(
                 frame,
                 size,
                 x,
-                scaled_y(value, 100.0, size.height),
+                snap_to_device_grid(scaled_y(value, 100.0, size.height), style.scale_factor),
                 color,
-                grid_color,
+                style.grid_color,
             );
         }
     }
@@ -792,15 +809,15 @@ fn draw_hover_readout(
         .get(index)
         .filter(|value| value.is_finite())
         .or_else(|| memory.get(index).filter(|value| value.is_finite()))
-        .map(|value| scaled_y(*value, 100.0, size.height));
+        .map(|value| snap_to_device_grid(scaled_y(*value, 100.0, size.height), style.scale_factor));
     draw_readout_pill(
         frame,
         size,
         x,
         anchor_y,
         readout_text(cpu, memory, index).as_deref(),
-        grid_color,
-        readout,
+        style.grid_color,
+        style.readout,
     );
 }
 
@@ -894,3 +911,7 @@ pub(crate) fn latest_readout_anchor(cpu: &[f32], memory: &[f32]) -> Option<Lates
 #[cfg(test)]
 #[path = "../tests/gui/perf_chart/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/gui/perf_chart/motion_tests.rs"]
+mod motion_tests;

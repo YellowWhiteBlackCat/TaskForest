@@ -22,12 +22,16 @@ use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, Node, ShadowStyle, UiRect,
+    Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
+
+/// The menu panel's width, in rem — the type ladder's own step.
+const MENU_WIDTH_REM: f32 = 13.75;
 
 /// One menu entry. `enabled == false` renders a dimmed, non-activatable row
 /// (honest unavailable state — never hidden, never faked as clickable).
@@ -109,6 +113,40 @@ pub(crate) fn menu_row_background(highlighted: bool, palette: &UiPalette) -> Col
     }
 }
 
+/// The shadow ink of one layer: the theme's dimming token, scaled to the
+/// layer's weight. The token is a neutral dark ink in every skin, so the
+/// shadow darkens the surface behind the menu in light AND dark mode.
+fn shadow_ink(base: Color, weight: f32) -> Color {
+    let mut ink = base.to_srgba();
+    ink.alpha = (ink.alpha * weight).clamp(0.0, 1.0);
+    Color::srgba(ink.red, ink.green, ink.blue, ink.alpha)
+}
+
+/// The menu's drop shadow: a wide ambient layer plus a tight contact layer.
+///
+/// A menu floats over a list, so it needs to read as a raised surface. One
+/// flat shadow looks like a border; two layers (a wide soft one and a small
+/// dark one) read as depth. The offsets ride the rem axis, so the depth
+/// scales with the user's reading size.
+pub(crate) fn menu_shadow(palette: &UiPalette) -> Vec<ShadowStyle> {
+    vec![
+        ShadowStyle {
+            color: shadow_ink(palette.card_shadow, 0.45),
+            x_offset: Val::Rem(0.0),
+            y_offset: Val::Rem(0.25),
+            spread_radius: Val::Rem(0.0),
+            blur_radius: Val::Rem(0.75),
+        },
+        ShadowStyle {
+            color: shadow_ink(palette.card_shadow, 0.8),
+            x_offset: Val::Rem(0.0),
+            y_offset: Val::Rem(0.05),
+            spread_radius: Val::Rem(0.0),
+            blur_radius: Val::Rem(0.15),
+        },
+    ]
+}
+
 /// Full render: panel + title + one row per entry, the cursor row filled by
 /// [`menu_row_background`], disabled rows caption-dim. Highlight is fill-only
 /// — no marker glyph text, so the text census stays title + one line per
@@ -121,9 +159,12 @@ pub(crate) fn menu_scene_at(
     let title = spec.title.clone();
     let radius = palette.control_radius_px;
     let rows = menu_rows(spec, state.selection, palette);
+    let shadow = menu_shadow(palette);
     bsn! {
         Node {
-            width: px(220.0),
+            // The menu's width rides the rem axis, so it re-scales with the
+            // user's reading size.
+            width: rem(MENU_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px({ space_8() / 4.0 }),
@@ -131,6 +172,7 @@ pub(crate) fn menu_scene_at(
             border_radius: BorderRadius::all(Val::Px(radius)),
         }
         BackgroundColor({ palette.panel_fill })
+        BoxShadow({ shadow })
         Children [
              Text(title) TextRole(Role::Caption) --
             { rows }

@@ -18,7 +18,7 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
-use bevy::scene::ScenePlugin;
+use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::ui::widget::Text;
 use taskmanager_application::{AppAction, AppPage, ConfirmationKind};
 use taskmanager_core::core::identity::DeviceId;
@@ -178,6 +178,7 @@ fn the_armed_view_echoes_the_frozen_target() {
     // for the armed one).
     let freeze = |pids: [u32; 2]| {
         let intent = ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Kill,
             scope: Default::default(),
             targets: pids
@@ -212,6 +213,7 @@ fn batch_confirmation_names_the_requested_action() {
         ProcessBatchAction::SetPriority(PriorityTier::High),
     ] {
         let intent = ProcessBatchIntent {
+            collateral: Default::default(),
             action,
             scope: Default::default(),
             targets: vec![frozen_identity(4242, "worker")],
@@ -537,4 +539,54 @@ fn smart_self_test_confirmation_view_and_confirm_armed() {
         )) if i.display_name == "TiPro9000 2TB"
     ));
     assert_eq!(shell.confirmation_kind(), None);
+}
+
+/// The panel's width rides the rem axis: at the Standard step the dialog
+/// still measures the logical pixel budget it was designed for, and the
+/// RATIO — not a hardcoded pixel — is what carries the panel to another
+/// reading size.
+#[test]
+fn the_confirmation_panel_measures_its_logical_pixel_budget_on_the_rem_axis() {
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
+    let pending = PendingConfirmation::EndTask(frozen_identity(4242, "cargo"));
+    let view =
+        PendingConfirmationView::from_pending(&pending).expect("EndTask renders a dialog view");
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    let panel = app
+        .world_mut()
+        .spawn_scene(super::panel_scene(&view, &palette))
+        .expect("the confirmation panel scene spawns")
+        .id();
+    app.world_mut().flush();
+    let width = app
+        .world()
+        .get::<bevy::ui::prelude::Node>(panel)
+        .expect("the panel node")
+        .width;
+    assert_eq!(
+        resolve_length(width, palette.rem_px),
+        460.0,
+        "the Standard step measures the panel's 460 logical pixel budget"
+    );
+    assert_eq!(
+        resolve_length(width, UiSize::Large.body_font_size().0),
+        460.0 * 18.0 / 16.0,
+        "the panel width rides the UI-size axis with the surface around it"
+    );
+}
+
+/// Resolve one declared length against a rem size the way the layout pass
+/// does.
+fn resolve_length(value: bevy::ui::Val, rem_px: f32) -> f32 {
+    value
+        .resolve(
+            1.0,
+            0.0,
+            bevy::math::Vec2::ZERO,
+            bevy::text::EmSize(rem_px),
+            bevy::text::RemSize(rem_px),
+        )
+        .expect("a rem length resolves against the rem size")
 }

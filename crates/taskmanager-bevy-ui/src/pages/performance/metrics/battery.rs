@@ -6,6 +6,15 @@ use taskmanager_shell::presentation::duration;
 
 use super::missing_value;
 
+/// The observed charge percentage of one battery.
+///
+/// The renderer never reads the observation itself (ARCH.md §8.1): this data
+/// layer owns the read and hands the folded share down to the icon scene, so
+/// the scene paints a fact instead of folding one.
+pub(crate) fn battery_charge_pct(battery: &BatteryInfo) -> Option<u8> {
+    battery.current_capacity_pct()
+}
+
 /// Joined fact line for one battery block: charge, power, voltage, cycles,
 /// degradation health, and runtime estimates (full / empty).
 pub(crate) fn battery_fact_line(battery: &BatteryInfo) -> String {

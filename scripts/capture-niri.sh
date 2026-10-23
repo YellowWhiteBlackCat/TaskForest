@@ -365,20 +365,29 @@ start_niri() {
   fi
 
   SOCK=""
-  for i in $(seq 1 40); do
+  IPC=""
+  # The private host session can pause a new nested client for tens of
+  # seconds after a burst of compositor start/stop cycles: a SLOW start is not
+  # a dead compositor. Wait for the Wayland socket AND the IPC endpoint, and
+  # stop waiting early only when the niri process itself is gone — the same
+  # tolerance the output probe below applies.
+  for i in $(seq 1 150); do
+    kill -0 "$NIRI_PID" 2>/dev/null || break
     SOCK="$(find "$NIRI_RUNTIME" -maxdepth 1 -type s -name 'wayland-[0-9]*' \
       -printf '%f\n' -quit 2>/dev/null || true)"
     if [ -z "$SOCK" ]; then
       SOCK="$(grep -oE 'wayland-[0-9]+' "$niri_log" | head -1 || true)"
     fi
-    [ -n "$SOCK" ] && [ -S "$NIRI_RUNTIME/$SOCK" ] && break
+    IPC="$(find "$NIRI_RUNTIME" -maxdepth 1 -type s -name 'niri.*.sock' \
+      -print -quit 2>/dev/null || true)"
+    if [ -z "$IPC" ]; then
+      IPC="$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$niri_log" | head -1 || true)"
+    fi
+    if [ -n "$SOCK" ] && [ -S "$NIRI_RUNTIME/$SOCK" ] && [ -n "$IPC" ]; then
+      break
+    fi
     sleep 0.2
   done
-  IPC="$(find "$NIRI_RUNTIME" -maxdepth 1 -type s -name 'niri.*.sock' \
-    -print -quit 2>/dev/null || true)"
-  if [ -z "$IPC" ]; then
-    IPC="$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$niri_log" | head -1 || true)"
-  fi
   if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
     printf 'niri did not start nested; tail of log:\n'
     tail -8 "$niri_log"
@@ -734,12 +743,26 @@ capture() {
   fi
   local f="$shot"
   if [ "$action" = ok ]; then
-    for i in $(seq 1 20); do
-      [ -s "$f" ] && break
+    # Niri acknowledges the screenshot action BEFORE the PNG writer has
+    # flushed the file: a half-written PNG already carries the header, so
+    # waiting for "the file exists" can still race the writer and record a
+    # TRUNCATED size — the receipt then contradicts the bytes on disk and the
+    # evidence validator rejects the run. Wait for a parseable PNG whose size
+    # has STOPPED growing before the image is staged, sized and hashed.
+    stable_bytes=""
+    for i in $(seq 1 50); do
+      if [ -s "$f" ] && file "$f" | grep -q 'PNG image data'; then
+        current_bytes="$(stat -c%s "$f" 2>/dev/null || echo 0)"
+        if [ "$current_bytes" = "$stable_bytes" ]; then
+          break
+        fi
+        stable_bytes="$current_bytes"
+      fi
       sleep 0.1
     done
   fi
   local status=failed width=0 height=0 bytes=0 hash=-
+  local stable_bytes="" current_bytes=0
   if [ "$markers" = ready ] && [ "$window_ready" = ready ] && [ "$action" = ok ] \
     && [ -s "$f" ] && [ "$(stat -c%s "$f")" -gt 5000 ]; then
     local dimensions

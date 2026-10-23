@@ -446,6 +446,10 @@ impl IcedApp {
                 }
                 None
             }
+            Message::WindowScaleFactorChanged(scale_factor) => {
+                self.window_scale_factor = scale_factor;
+                None
+            }
             Message::WindowCloseRequested => {
                 // Quit is an unconditional flush point for a deferred
                 // stepper commit: the final width must not die with the

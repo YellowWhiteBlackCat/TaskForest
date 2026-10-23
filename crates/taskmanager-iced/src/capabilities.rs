@@ -68,10 +68,14 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 // triple-click all, one active selection per window,
                 // drag-finish clipboard, and Ctrl/Cmd-C are ported. Keyboard
                 // select-all (Ctrl-A) remains the shared row-summary command
-                // in this product, and multi-line service logs select
-                // row-wise because the paragraph layer exposes no line
-                // metrics; block export stays on copy/export actions.
-                reason: "Iced ports pointer/word/block selection but keeps Ctrl-A on the shared row-summary command and uses row-wise selection for multi-line logs",
+                // in this product. Multi-line service logs still select
+                // row-wise while ICED-043 lifts that limit — the paragraph
+                // layer does expose line metrics (`grapheme_position(line,
+                // index)`, `span_bounds`), and the shared seam in
+                // `src/text_metrics.rs` now measures line geometry, so the
+                // row-wise limit is a product decision under work, not an
+                // upstream limit.
+                reason: "Iced ports pointer/word/block selection but keeps Ctrl-A on the shared row-summary command; multi-line service logs still select row-wise while ICED-043 lifts that limit on the measured line-geometry seam",
             },
         ),
         (Switch, Ported),

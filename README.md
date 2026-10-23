@@ -48,9 +48,9 @@ macOS** 上。它想回答一个很朴素的问题：当我们长时间盯着一
 
 - CPU、内存、磁盘、网络、GPU、电池、传感器和硬件信息；
 - 应用与进程树、搜索、排序、列配置、批量操作和详情检查；
-- 服务、启动项、登录会话和容器视图；
+- 服务、启动项、登录会话与 cgroups 容器沙箱识别（Docker/Podman/Flatpak/Snap）；
 - 亮色、暗色、EyeForest 护眼主题，键盘导航、英中双语和无障碍语义；
-- JSON 快照、类型化失败状态，以及按功能授权的可选高级采集。
+- 后台守护进程模式（`taskforest-daemon`）、JSON 快照、类型化失败状态与可选高级采集。
 
 不同系统和硬件上的可用字段并不完全相同。缺少数据源或权限时，界面会显示明确的不可用
 原因，而不是留白或归零。
@@ -93,6 +93,7 @@ cargo build --locked --release -p taskmanager-bevy-ui # target/release/taskfores
 并生成官方产物：
 
 - Linux `.deb`：`amd64`、`arm64`；`.rpm`：`x86_64`、`aarch64`；四端各一套；
+- Linux Flatpak 单文件沙箱包与可选 `taskforest-daemon` 系统守护进程包；
 - Windows `.msi`：`x64`、`arm64`；四端各一套；
 - 共享数据包 `taskforest-common` 与四端安装包配合分发。
 
@@ -102,7 +103,7 @@ Rust 版本、平台依赖、包内容和发布规则见[文档中心](docs/READ
 [发布说明](docs/RELEASE.md)。
 
 > [!WARNING]
-> TaskForest 仍处于实验阶段，尚无稳定版本。最新发布版本为 `0.2.3`，`main` 线正在开发 `0.3.0`。
+> TaskForest 仍处于实验阶段，尚无稳定版本。最新发布版本为 `0.3.2`。
 > 部分平台数据源、安装流程、签名和真实硬件验证仍在持续完善，请勿把它作为
 > 生产环境的唯一监控或管理工具。
 

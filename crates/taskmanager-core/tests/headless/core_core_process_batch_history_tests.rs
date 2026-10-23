@@ -29,6 +29,7 @@ fn result(
     let target = identity(completed_pid, &format!("process-{completed_pid}"));
     ProcessBatchResult {
         intent: ProcessBatchIntent {
+            collateral: Default::default(),
             action,
             scope: Default::default(),
             targets: vec![target.clone()],
@@ -95,6 +96,7 @@ fn partial_failure_export_keeps_v1_shape_and_uses_stable_failure_code() {
         1_700_000_000_123,
         ProcessBatchResult {
             intent: ProcessBatchIntent {
+                collateral: Default::default(),
                 action: ProcessBatchAction::SetPriority(PriorityTier::High),
                 scope: Default::default(),
                 targets: vec![first.clone(), second.clone(), third.clone()],
@@ -207,6 +209,7 @@ fn executor_preserves_every_shared_failure_kind_without_translation() {
     ] {
         let result = execute_process_batch_with(
             ProcessBatchIntent {
+                collateral: Default::default(),
                 action: ProcessBatchAction::End,
                 scope: Default::default(),
                 targets: vec![target.clone()],
@@ -233,6 +236,7 @@ fn pid_reuse_is_rejected_before_the_executor_runs() {
     )];
     let result = execute_process_batch_with(
         ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Kill,
             scope: Default::default(),
             targets: vec![frozen],
@@ -259,6 +263,7 @@ fn display_name_changes_do_not_change_the_live_process_identity() {
     let mut executed = false;
     let result = execute_process_batch_with(
         ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Suspend,
             scope: Default::default(),
             targets: vec![frozen],
@@ -293,6 +298,7 @@ fn execution_result_is_recorded_automatically_including_partial_failure() {
         })
         .collect::<Vec<_>>();
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Suspend,
         scope: Default::default(),
         targets,

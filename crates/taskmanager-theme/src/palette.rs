@@ -19,6 +19,94 @@
 use crate::color::{Color, Length};
 use crate::theme::{RadiusScale, Theme, with_alpha};
 
+/// The three event-severity levels the product paints.
+///
+/// Severity is a cross-frontend vocabulary: a frontend maps its own domain
+/// severity (an alert rule, a security event, a service state) onto one of
+/// these levels and reads the ink from the theme's [`SeverityPalette`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SeverityLevel {
+    /// Critical — the destructive red: the level demands immediate action.
+    Critical,
+    /// Warning — the cautionary amber: the level reports a degraded state.
+    Warning,
+    /// Notice — the informational accent: the level only informs.
+    Notice,
+}
+
+impl SeverityLevel {
+    /// Every level, in descending severity.
+    pub const ALL: [Self; 3] = [Self::Critical, Self::Warning, Self::Notice];
+
+    /// The ink this level paints inside the given palette.
+    #[must_use]
+    pub fn ink(self, palette: SeverityPalette) -> Color {
+        match self {
+            Self::Critical => palette.critical,
+            Self::Warning => palette.warning,
+            Self::Notice => palette.notice,
+        }
+    }
+}
+
+/// The resolved severity palette: one ink per severity level.
+///
+/// The palette is the single authority for severity color. A frontend never
+/// assembles its own severity table; it resolves this palette (through the
+/// theme snapshot or through the already-resolved status tokens its own
+/// toolkit adapter carries) and reads the ink per level.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct SeverityPalette {
+    critical: Color,
+    warning: Color,
+    notice: Color,
+}
+
+impl SeverityPalette {
+    /// Build the palette from the theme's three status tokens.
+    ///
+    /// [`severity_palette`] is the authority; this constructor exists for
+    /// frontend adapters that already carry the resolved status colors and
+    /// must not re-derive them.
+    #[must_use]
+    pub const fn from_status(critical: Color, warning: Color, notice: Color) -> Self {
+        Self {
+            critical,
+            warning,
+            notice,
+        }
+    }
+
+    /// The critical ink.
+    #[must_use]
+    pub const fn critical(self) -> Color {
+        self.critical
+    }
+
+    /// The warning ink.
+    #[must_use]
+    pub const fn warning(self) -> Color {
+        self.warning
+    }
+
+    /// The notice ink.
+    #[must_use]
+    pub const fn notice(self) -> Color {
+        self.notice
+    }
+}
+
+/// Resolve the severity palette for a theme snapshot.
+///
+/// Critical rides the destructive red, Warning the cautionary amber and Notice
+/// the informational accent — the three status hues every skin already
+/// defines, so the severity palette can never drift from the theme it
+/// belongs to.
+#[must_use]
+pub fn severity_palette(t: &Theme) -> SeverityPalette {
+    SeverityPalette::from_status(t.danger, t.warning, t.accent)
+}
+
 /// Resolved color contract handed to UI components. Every field is a concrete
 /// sRGB token; state-derived colors (hover/active/disabled) are derived by
 /// components from these, and focus rings always read [`Palette::ring`].
@@ -122,8 +210,19 @@ impl Theme {
             xsmall_radius: Length(self.radius(RadiusScale::XSmall)),
         }
     }
+
+    /// The event-severity palette for this theme snapshot. The single
+    /// authority for severity color across every frontend.
+    #[must_use]
+    pub fn severity_palette(self) -> SeverityPalette {
+        severity_palette(&self)
+    }
 }
 
 #[cfg(test)]
 #[path = "../tests/headless/theme_palette.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/theme_severity.rs"]
+mod severity_tests;

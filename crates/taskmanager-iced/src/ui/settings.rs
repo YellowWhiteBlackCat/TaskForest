@@ -227,7 +227,7 @@ fn appearance_group<'a>(
             ),
             setting_row(
                 i18n::t(language, Key::HighContrast),
-                switch(theme_snapshot, target("hc"), prefs.hc, false, |on| {
+                switch(*theme_snapshot, target("hc"), prefs.hc, false, |on| {
                     Message::SettingsChanged(SettingsChange::HighContrast(on))
                 }),
             ),
@@ -415,7 +415,7 @@ fn system_group<'a>(
         rows.push(setting_row(
             t(device_label_key(kind)),
             switch(
-                theme_snapshot,
+                *theme_snapshot,
                 target(kind.key()),
                 prefs.device_visible(kind),
                 false,
@@ -462,7 +462,7 @@ fn system_group<'a>(
     rows.push(setting_row(
         t("settings.network_dynamic_scaling"),
         switch(
-            theme_snapshot,
+            *theme_snapshot,
             target("net-scaling"),
             prefs.network_dynamic_scaling,
             false,
@@ -472,7 +472,7 @@ fn system_group<'a>(
     rows.push(setting_row(
         t("settings.zero_values"),
         switch(
-            theme_snapshot,
+            *theme_snapshot,
             target("zero-values"),
             prefs.gray_zero_values,
             false,
@@ -486,7 +486,7 @@ fn system_group<'a>(
     rows.push(setting_row(
         t("settings.history_persistence"),
         switch(
-            theme_snapshot,
+            *theme_snapshot,
             target("continuous-history"),
             prefs.history_persistence,
             false,
@@ -513,7 +513,7 @@ fn notifications_group<'a>(
             setting_row(
                 t("settings.desktop_notifications"),
                 switch(
-                    theme_snapshot,
+                    *theme_snapshot,
                     target("desktop-notifications"),
                     prefs.notify_enabled,
                     false,

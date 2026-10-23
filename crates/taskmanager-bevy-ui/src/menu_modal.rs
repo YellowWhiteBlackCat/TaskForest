@@ -1,19 +1,26 @@
-//! The generic frontend-local action-menu modal, shared by every inventory
-//! page that offers control verbs (Services, Startup, Sessions).
+//! The generic frontend-local action menu: an ANCHORED POPOVER shared by
+//! every inventory page that offers control verbs (Services, Startup,
+//! Sessions, Applications).
 //!
 //! **Architecture**: a page instantiates `MenuModal<Ctx>` with its own
 //! frozen-target type (`ActionMenuContext`). The engine owns the open
-//! session, the clamped keyboard state machine, and the overlay mount/
+//! session, the clamped keyboard state machine, and the popover mount /
 //! despawn; the page owns only the menu spec, how a verb freezes into the
-//! shell's shared confirmation gate (`ActionMenuContext::commit`), and how
-//! a closed menu's open-attempt resolves a page selection into a frozen
-//! target.
+//! shell's shared confirmation gate (`ActionMenuContext::commit`), and the
+//! control the menu floats against (`ActionMenuContext::register`).
 //!
-//! **Modal precedence** is enforced by [`crate::input`]: the shell's armed
-//! gate always wins; an open modal swallows every other key (TUI parity — a
-//! frontend-local modal owns the keyboard chord-for-chord); with the menu
-//! closed, the page's open-attempt (bare Enter over a selected row) runs
-//! before the shell's free bindings.
+//! **The surface is a popover, not a modal** (GPUI parity): the menu is a
+//! CHILD of its trigger and carries Bevy's own anchored-popup placement, so
+//! the inventory behind it stays visible and live while the user picks a
+//! verb. There is NO scrim and NO full-screen catcher: a press outside the
+//! menu simply reaches the background — the GPUI reference forwards that
+//! press to the background target — and the menu closes in the same frame.
+//!
+//! **Keyboard precedence** is enforced by [`crate::input`]: the shell's
+//! armed gate always wins; an open menu swallows every other key (TUI
+//! parity — a frontend-local menu owns the keyboard chord-for-chord); with
+//! the menu closed, the page's open-attempt (bare Enter over a selected row)
+//! runs before the shell's free bindings.
 //!
 //! Mount/despawn flows through `MenuModalChanged`, fired by the caller on
 //! session transitions.
@@ -26,19 +33,21 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::input::keyboard::KeyCode;
+use bevy::picking::events::PointerPress;
+use bevy::prelude::Visibility;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
-use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FixedNode, FlexDirection, JustifyContent, Node,
-    UiRect, Val, percent, px,
-};
+use bevy::ui::prelude::{FlexDirection, GlobalZIndex, Node, OverrideClip, PositionType, Val};
+use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
 
+use crate::app::ContentSlot;
+use crate::scene_attach::{attach_child, insert_into};
 use crate::widgets::menu::{MenuInput, MenuItemIndex, MenuSpec, MenuState, menu_scene_at};
 use crate::window::{AppShellRoot, WindowPalette};
 
-/// The per-page contract a modal menu instantiates: what the menu shows and
-/// how a picked verb freezes into the shell's shared confirmation gate.
+/// The per-page contract a menu instantiates: what the menu shows and how a
+/// picked verb freezes into the shell's shared confirmation gate.
 pub(crate) trait ActionMenuContext: Clone + Send + Sync + 'static {
     /// The menu entries (labels + enablement), in display order.
     fn spec(&self) -> MenuSpec;
@@ -50,29 +59,69 @@ pub(crate) trait ActionMenuContext: Clone + Send + Sync + 'static {
     /// verb that submits through the shell's batch track carries its own
     /// [`PlatformEffect`] (`ExecuteBatch`) when no confirmation is needed.
     fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect>;
+
+    /// Register the page's own menu wiring.
+    ///
+    /// The engine owns the popover; the page owns the CONTROL the menu
+    /// floats against — it publishes that control into the menu's own state
+    /// with [`MenuModal::set_trigger`] — plus any page-specific observer. A
+    /// page that publishes no trigger leaves the menu anchored to the
+    /// window's content region, which still floats and still never blocks.
+    ///
+    /// The trigger lives in the menu's STATE, not in a world query: during a
+    /// route change the outgoing and the incoming page roots coexist for one
+    /// frame, so "the first trigger in the world" could anchor the menu to
+    /// the page that is on its way out.
+    fn register(_app: &mut bevy::app::App) {}
 }
 
-/// One open modal: the frozen target context plus the keyboard cursor.
+/// One open menu: the frozen target context plus the keyboard cursor.
 pub(crate) struct MenuSession<Ctx> {
     pub(crate) frozen: Ctx,
     pub(crate) state: MenuState,
 }
 
-/// The per-page modal state: at most one open session. A `Resource` so each
+/// The per-page menu state: at most one open session. A `Resource` so each
 /// instantiation lives in the `World` and the input adapter can drive it.
 #[derive(bevy::ecs::resource::Resource)]
 pub(crate) struct MenuModal<Ctx> {
     pub(crate) session: Option<MenuSession<Ctx>>,
+    /// The surfaces hidden this frame; they are despawned at the END of it.
+    pending_despawn: Vec<Entity>,
+    /// The control the popover floats against, published by the page.
+    ///
+    /// The anchor is STATE, not a world scan: a route change keeps the
+    /// outgoing and the incoming page roots alive for one frame, and
+    /// "the first trigger in the world" would then anchor the menu to the
+    /// page that is leaving.
+    trigger: Option<Entity>,
 }
 
 impl<Ctx> Default for MenuModal<Ctx> {
     fn default() -> Self {
-        // No Ctx: Default bound — an empty modal has no frozen target.
-        Self { session: None }
+        // No Ctx: Default bound — an empty menu has no frozen target.
+        Self {
+            session: None,
+            pending_despawn: Vec::new(),
+            trigger: None,
+        }
     }
 }
 
 impl<Ctx: ActionMenuContext> MenuModal<Ctx> {
+    /// Publish the control the popover floats against.
+    ///
+    /// The page calls this when it mounts its surface, so the anchor always
+    /// names the page that is CURRENTLY on screen.
+    pub(crate) fn set_trigger(&mut self, entity: Entity) {
+        self.trigger = Some(entity);
+    }
+
+    /// The published anchor, if it is still alive.
+    pub(crate) fn trigger(&self) -> Option<Entity> {
+        self.trigger
+    }
+
     /// Open with a frozen target. Returns whether the state changed (callers
     /// fire the mount event on a transition).
     pub(crate) fn open(&mut self, frozen: Ctx) -> bool {
@@ -88,8 +137,8 @@ impl<Ctx: ActionMenuContext> MenuModal<Ctx> {
 
     /// Close without any shell effect. Returns whether the state changed.
     /// Drive an open menu with one key. Returns `true` when the key was
-    /// consumed — an open modal swallows EVERY key it does not use, so a
-    /// frontend-local modal can never leak a chord to navigation or the
+    /// consumed — an open menu swallows EVERY key it does not use, so a
+    /// frontend-local menu can never leak a chord to navigation or the
     /// shell. Confirm freezes the picked verb into the shell's gate; any
     /// platform effect the freeze produced is appended to `effects`.
     pub(crate) fn drive(
@@ -128,8 +177,8 @@ impl<Ctx: ActionMenuContext> MenuModal<Ctx> {
     }
 }
 
-/// Publishes modal transitions: `true` mounts the overlay, `false` despawns.
-/// One event type per context (Bevy observers are typed).
+/// Publishes menu transitions: `true` mounts the popover, `false` retires
+/// it. One event type per context (Bevy observers are typed).
 #[derive(Event)]
 pub(crate) struct MenuModalChanged<Ctx>(pub(crate) bool, pub(crate) std::marker::PhantomData<Ctx>);
 
@@ -140,8 +189,8 @@ impl<Ctx> Clone for MenuModalChanged<Ctx> {
 }
 impl<Ctx> Copy for MenuModalChanged<Ctx> {}
 
-/// Type-erased modal driver so the input seam can route keys through every
-/// instantiated menu without knowing the frozen-target types. An open modal
+/// Type-erased menu driver so the input seam can route keys through every
+/// instantiated menu without knowing the frozen-target types. An open menu
 /// swallows every key (TUI modal parity).
 pub(crate) trait ModalDriver {
     fn is_open(&self) -> bool;
@@ -183,28 +232,44 @@ impl<Ctx: ActionMenuContext> ModalDriver for bevy::ecs::system::ResMut<'_, MenuM
     }
 }
 
-/// Marker on the one mounted overlay. Deliberately non-generic: at most one
-/// modal is open at a time (opening one closes the others), so a single
-/// marker is unambiguous and every context's observer can despawn it.
+/// Marker on the one mounted popover. Deliberately non-generic: at most one
+/// menu is open at a time (opening one closes the others), so a single
+/// marker is unambiguous and every context's observer can retire it.
 #[derive(Component, Clone, Default)]
-pub(crate) struct MenuModalOverlay;
+pub(crate) struct MenuModalPopover;
 
-/// Marker on the scrim background button for dismissing an open menu.
+/// Marker on the control an action menu floats against. The page publishes
+/// it on the surface its menu belongs to (the inventory table block); the
+/// popover is mounted as that control's CHILD, so the menu travels with the
+/// page and never covers it.
 #[derive(Component, Clone, Copy, Default)]
-pub(crate) struct MenuModalScrim;
+pub(crate) struct MenuModalTrigger;
 
-/// Observer: mount/despawn the overlay under the app shell root. One
-/// registration per context (see [`register`]).
+/// The menu surface's shared reads: the window shell root, the window's
+/// content region, the page-published trigger and the mounted popover.
+/// Bundled so the mount observer stays inside the argument budget.
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct MenuSurface<'w, 's> {
+    pub(crate) roots: Query<'w, 's, Entity, With<AppShellRoot>>,
+    pub(crate) slots: Query<'w, 's, Entity, With<ContentSlot>>,
+    pub(crate) triggers: Query<'w, 's, Entity, With<MenuModalTrigger>>,
+    pub(crate) popovers: Query<'w, 's, Entity, With<MenuModalPopover>>,
+}
+
+/// Observer: mount the anchored popover under its trigger, or retire the
+/// previous one. One registration per context (see [`register`]).
 fn on_menu_modal_changed<Ctx: ActionMenuContext>(
     changed: On<MenuModalChanged<Ctx>>,
     palette: Option<Res<WindowPalette>>,
-    roots: Query<Entity, With<AppShellRoot>>,
-    overlays: Query<Entity, With<MenuModalOverlay>>,
-    modal: ResMut<MenuModal<Ctx>>,
+    surface: MenuSurface,
+    mut modal: ResMut<MenuModal<Ctx>>,
     mut commands: Commands,
 ) {
-    for entity in &overlays {
-        commands.entity(entity).despawn();
+    // The previous surface is HIDDEN now and despawned at the end of the
+    // frame: a rebuild never hands a vanished child to an observer.
+    for entity in &surface.popovers {
+        insert_into(&mut commands, entity, Visibility::Hidden);
+        modal.pending_despawn.push(entity);
     }
     if !changed.event().0 {
         return;
@@ -212,16 +277,29 @@ fn on_menu_modal_changed<Ctx: ActionMenuContext>(
     let Some(palette) = palette else {
         return;
     };
-    let Ok(root) = roots.single() else {
+    let Some(session) = modal.session.as_ref() else {
         return;
     };
-    if modal.session.is_none() {
+    let Ok(root) = surface.roots.single() else {
         return;
-    }
-    let overlay = commands
-        .spawn_scene(menu_overlay_scene(&modal, &palette.inner))
+    };
+    // The trigger: the control the page published into this menu's own
+    // state, else the window's content region, else the shell root. The
+    // menu floats in every case — it never blocks the page behind it.
+    //
+    // The published anchor must still be a live trigger surface: a route
+    // change despawns the outgoing page's surface, and a dead anchor would
+    // take the popover with it.
+    let published = modal
+        .trigger()
+        .filter(|entity| surface.triggers.contains(*entity));
+    let trigger = published
+        .or_else(|| surface.slots.iter().next())
+        .unwrap_or(root);
+    let popover = commands
+        .spawn_scene(menu_popover_scene(session, &palette.inner))
         .id();
-    commands.entity(root).add_one_related::<ChildOf>(overlay);
+    attach_child(&mut commands, trigger, popover);
 }
 
 /// Observer: handle click activation on a menu item.
@@ -256,17 +334,25 @@ fn on_menu_item_activated<Ctx: ActionMenuContext>(
     commands.trigger(crate::input::ShellInteractionApplied);
 }
 
-/// Observer: handle click activation on the scrim to dismiss the menu.
-fn on_menu_scrim_dismiss_activated<Ctx: ActionMenuContext>(
-    activate: On<bevy::ui_widgets::Activate>,
-    scrims: Query<&MenuModalScrim>,
+/// Observer: a press OUTSIDE the open menu dismisses it — and the press
+/// still reaches the background.
+///
+/// The GPUI reference forwards the outside press to the background target
+/// (the Iced `DropdownMenu` captures that press instead — the recorded
+/// difference between the two surfaces). The menu therefore needs NO scrim
+/// and NO full-screen catcher: the press lands on the page behind the menu,
+/// and the menu closes in the same frame.
+fn on_press_outside_the_menu<Ctx: ActionMenuContext>(
+    press: On<PointerPress>,
+    popovers: Query<&MenuModalPopover>,
+    parents: Query<&ChildOf>,
     mut modal: ResMut<MenuModal<Ctx>>,
     mut commands: Commands,
 ) {
-    if !scrims.contains(activate.event().entity) {
+    if modal.session.is_none() {
         return;
     }
-    if modal.session.is_none() {
+    if is_inside_the_popover(&popovers, &parents, press.entity) {
         return;
     }
     modal.session = None;
@@ -274,57 +360,86 @@ fn on_menu_scrim_dismiss_activated<Ctx: ActionMenuContext>(
     commands.trigger(crate::input::ShellInteractionApplied);
 }
 
-/// Register one modal's resource and observers on the app composition.
+/// Whether the pressed entity belongs to the open popover (a menu row is
+/// inside it; the page behind it is not).
+fn is_inside_the_popover(
+    popovers: &Query<&MenuModalPopover>,
+    parents: &Query<&ChildOf>,
+    entity: Entity,
+) -> bool {
+    let mut current = entity;
+    for _ in 0..16 {
+        if popovers.contains(current) {
+            return true;
+        }
+        let Ok(parent) = parents.get(current) else {
+            return false;
+        };
+        current = parent.parent();
+    }
+    false
+}
+
+/// The surfaces hidden this frame are despawned at the END of it, so every
+/// observer of this frame has already run against the live child and a
+/// rebuild can never hand one a vanished entity.
+fn flush_pending_despawns<Ctx: ActionMenuContext>(
+    mut modal: ResMut<MenuModal<Ctx>>,
+    mut commands: Commands,
+) {
+    for entity in modal.pending_despawn.drain(..) {
+        // `try_despawn` never panics on an entity that is already gone.
+        commands.entity(entity).try_despawn();
+    }
+}
+
+/// Register one menu's resource and observers on the app composition.
 pub(crate) fn register<Ctx: ActionMenuContext>(app: &mut bevy::app::App) {
     app.init_resource::<MenuModal<Ctx>>();
     app.add_observer(on_menu_modal_changed::<Ctx>);
     app.add_observer(on_menu_item_activated::<Ctx>);
-    app.add_observer(on_menu_scrim_dismiss_activated::<Ctx>);
+    app.add_observer(on_press_outside_the_menu::<Ctx>);
+    app.add_systems(bevy::app::Last, flush_pending_despawns::<Ctx>);
+    Ctx::register(app);
 }
 
-/// Centered modal card over a dim scrim — the same staging every
-/// destructive-adjacent surface uses, so ownership reads identically.
-fn menu_overlay_scene<Ctx: ActionMenuContext>(
-    modal: &MenuModal<Ctx>,
+/// The anchored popover: the menu card, positioned against its trigger by
+/// Bevy's own popover placement (the same shape the column chooser uses).
+/// No scrim, no full-screen catcher — the page behind stays live.
+///
+/// The menu hangs off the trigger's TRAILING edge: the inventory's control
+/// column is where the verbs belong, so the menu opens where the reference
+/// surface opens its row menus. The second placement flips the menu above
+/// the trigger when the window edge leaves no room below.
+fn menu_popover_scene<Ctx: ActionMenuContext>(
+    session: &MenuSession<Ctx>,
     palette: &crate::palette::UiPalette,
 ) -> Box<dyn Scene> {
-    let Some(session) = modal.session.as_ref() else {
-        // Unreachable through the mount observer; the empty body keeps the
-        // builder total without inventing menu content.
-        return Box::new(bsn! { Node { width: percent(100) } }) as Box<dyn Scene>;
-    };
     let spec = session.frozen.spec();
     let card = menu_scene_at(&spec, &session.state, palette);
-    let scrim = palette.scrim;
-    let radius = palette.panel_radius_px;
     Box::new(bsn! {
         Node {
-            width: percent(100),
-            height: percent(100),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
+            position_type: PositionType::Absolute,
+            width: Val::Auto,
+            height: Val::Auto,
+            flex_direction: FlexDirection::Column,
         }
-        // Viewport-anchored modal layer (see confirmation.rs): FixedNode
-        // detaches the scrim from shell layout, clipping and transforms.
-        FixedNode
-        BackgroundColor({ scrim })
-        bevy::ui_widgets::Button
-        MenuModalScrim
-        MenuModalOverlay
+        OverrideClip
+        GlobalZIndex({ 100 })
+        MenuModalPopover
+        Popover {
+            positions: { vec![
+                PopoverPlacement { side: PopoverSide::Bottom, align: PopoverAlign::End, gap: 4.0 },
+                PopoverPlacement { side: PopoverSide::Top, align: PopoverAlign::End, gap: 4.0 },
+            ] },
+            window_margin: { 8.0_f32 },
+        }
         Children [
-
-                Node {
-                    width: px(360.0),
-                    height: Val::Auto,
-                    flex_direction: FlexDirection::Column,
-                    padding: UiRect::all(Val::Px(crate::palette::space_16())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
-                }
-                BackgroundColor({ palette.panel_fill })
-                Children [
-                     @{ card }
-                ]
-
+             @{ card }
         ]
     }) as Box<dyn Scene>
 }
+
+#[cfg(test)]
+#[path = "../tests/headless/menu_popover_tests.rs"]
+mod tests;

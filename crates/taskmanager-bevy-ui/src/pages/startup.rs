@@ -11,11 +11,17 @@
 //!   `Enabled`/`Disabled` via the shared catalog);
 //! - the source column reads `source · scope` and the impact column carries
 //!   its evidence (`Low · 42 ms` measured, `Low · unmeasured` otherwise —
-//!   never a fabricated duration);
+//!   never a fabricated duration) behind the three-tier impact badge
+//!   (`impact`);
 //! - the boot-evidence projection renders as one honest caption line: the
 //!   typed unavailable marker when the provider could not instrument the
 //!   boot, a chain/failed-units summary when it could, nothing before the
-//!   first observation.
+//!   first observation;
+//! - the boot overview card carries the measured critical chain as a placed
+//!   gantt over the boot's own axis (`timeline`) with the boot-phase
+//!   proportion rows on the same scale (`phases`);
+//! - a boot that failed units pins a forensics panel to the top of the page
+//!   (`forensics`) with an error-detail accordion per failed unit.
 //!
 //! Action-menu seam: the enable/disable verbs read the current target
 //! from `StartupSelection`; the pointer and key adapters fire
@@ -27,7 +33,7 @@ use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
@@ -41,9 +47,10 @@ use bevy::ui::prelude::{
     UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
+use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupEntry, StartupEntryId, StartupImpactEvidence, StartupScope,
@@ -58,10 +65,16 @@ use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene};
 use crate::window::{Role, TextRole, WindowPalette};
 
+mod forensics;
+mod impact;
+mod inks;
 pub(crate) mod menu;
 mod paint;
+pub(crate) mod phases;
 mod scene;
+pub(crate) mod timeline;
 
+use impact::ImpactTier;
 use scene::startup_body_scene;
 
 // The inventory action-menu tests cover both the Startup and Sessions
@@ -78,7 +91,11 @@ pub(crate) struct StartupRowModel {
     pub(crate) name: String,
     pub(crate) enabled: bool,
     pub(crate) source: String,
+    /// The impact text: the tier word plus its evidence.
     pub(crate) impact: String,
+    /// The impact tier behind the badge: the shared classification, not a
+    /// frontend guess.
+    pub(crate) impact_tier: ImpactTier,
     pub(crate) exec: String,
 }
 
@@ -93,6 +110,7 @@ pub(crate) fn startup_rows(shell: &ShellApp) -> Vec<StartupRowModel> {
             enabled: entry.enabled,
             source: startup_source_text(entry),
             impact: startup_impact_text(entry),
+            impact_tier: ImpactTier::of(entry.impact),
             exec: entry.exec.clone(),
         })
         .collect()
@@ -336,6 +354,43 @@ pub(crate) struct StartupSortHeader(pub(crate) Option<InfoSortCol>);
 #[derive(Resource)]
 struct StartupRenderState {
     rendered_revision: Option<u64>,
+    rendered_evidence: Option<EvidenceFingerprint>,
+}
+
+/// A cheap fingerprint of the boot evidence projection.
+///
+/// The boot overview and the forensics panel read the EVIDENCE, not the
+/// inventory, so the page's idle gate must notice an evidence change on its
+/// own — otherwise a boot that failed units would never reach the screen.
+/// The fingerprint carries the facts the page renders: how many units
+/// failed, how many chain nodes exist, their measured total, and the
+/// provider's own state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct EvidenceFingerprint {
+    failed_units: usize,
+    chain_nodes: usize,
+    total_ms: u64,
+    status: DeviceStatus,
+    observed_ms: Option<u64>,
+}
+
+/// Fingerprint the boot evidence projection, or `None` when the provider
+/// never instrumented this boot.
+pub(crate) fn evidence_fingerprint(
+    evidence: Option<&StartupBootEvidenceSnapshot>,
+) -> Option<EvidenceFingerprint> {
+    let evidence = evidence?;
+    Some(EvidenceFingerprint {
+        failed_units: evidence.failed_units.len(),
+        chain_nodes: evidence.critical_chain.len(),
+        total_ms: evidence
+            .critical_chain
+            .iter()
+            .filter_map(|node| node.duration_ms)
+            .sum(),
+        status: evidence.state.status,
+        observed_ms: evidence.state.last_success_ms,
+    })
 }
 
 /// Pointer input: a header cell was clicked.
@@ -355,9 +410,16 @@ pub(crate) struct StartupSelectionMoved(pub(crate) isize);
 
 /// Content-region scene for the Startup page. The body's dynamic content is
 /// painted by the typed paint system — the single render authority for the rows.
-pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
+///
+/// **The scroll owner.** The startup inventory is unbounded — a host may
+/// register any number of startup entries — so the page declares the
+/// official `ScrollArea` and gives it the visible rail. The last row keeps a
+/// bottom safety band instead of sitting flush against the viewport edge.
+pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Startup.title();
     let waiting = t("common.waiting_inventory").to_owned();
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(context.palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(Val::Px(space_12())));
     bsn! {
         Node {
             width: percent(100),
@@ -375,13 +437,31 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                 TextRole(Role::Caption)
             --
 
+                // The viewport wrapper owns the scroll area AND the floating
+                // rail: the rail is a sibling of the scroll area, so it never
+                // scrolls with the content and never takes layout space away
+                // from it.
                 Node {
                     width: percent(100),
-                    height: Val::Auto,
+                    min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
                     flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(space_2()),
                 }
-                StartupBody
+                Children [
+                    Node {
+                        width: percent(100),
+                        min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(space_2()),
+                        overflow: Overflow::scroll_y(),
+                        // The bottom inset is the safety band: the last row
+                        // never sits flush against the viewport edge. The
+                        // right inset is the rail's lane.
+                        padding: { lane },
+                    }
+                    ScrollArea StartupBody
+                    --
+                    @{ rail }
+                ]
 
         ]
     }
@@ -392,8 +472,10 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
 /// The one authoritative repaint; see `paint::paint` in the template page.
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<StartupSelection>();
+    app.init_resource::<forensics::StartupForensicsExpanded>();
     app.insert_resource(StartupRenderState {
         rendered_revision: None,
+        rendered_evidence: None,
     });
     app.init_resource::<paint::PaintState>();
     app.add_observer(paint::on_repaint_requested);
@@ -405,6 +487,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_startup_disable_button_activated);
     app.add_observer(on_startup_selection_moved);
     app.add_observer(on_startup_body_added);
+    inks::register(app);
     paint::register(app);
 }
 
@@ -412,17 +495,42 @@ fn on_startup_body_added(_event: On<Add<StartupBody>>, mut commands: Commands) {
     commands.trigger(paint::RepaintRequested);
 }
 
-/// Fold repaint with the idle gate (startup-domain revision only).
+/// Fold repaint with the idle gate: the startup-domain revision AND the
+/// boot-evidence fingerprint. The evidence arrives on its own fold (it is
+/// not part of the inventory revision), and the boot overview plus the
+/// forensics panel read it.
 fn on_startup_projection_folded(
     _fold: On<ShellProjectionFolded>,
     track: ShellTrack,
     rendered: Res<StartupRenderState>,
     mut commands: Commands,
 ) {
-    let revision = track.shell().projection().startup_revision;
-    if rendered.rendered_revision == Some(revision) {
+    let projection = track.shell().projection();
+    let revision = projection.startup_revision;
+    let evidence = evidence_fingerprint(projection.startup_boot_evidence.as_ref());
+    if rendered.rendered_revision == Some(revision) && rendered.rendered_evidence == evidence {
         return;
     }
+    commands.trigger(paint::RepaintRequested);
+}
+
+/// The failed-unit accordion toggle: the page-owned expansion state flips
+/// and the page repaints. The provider's error detail is never rewritten —
+/// only the accordion's open set changes.
+///
+/// The observer is scene-local (the `on(...)` seam in the forensics panel):
+/// a global registration would run the toggle twice per activation and
+/// cancel itself out.
+pub(crate) fn on_startup_forensics_toggled(
+    activate: On<Activate>,
+    toggles: Query<&forensics::StartupForensicsToggle>,
+    mut expanded: ResMut<forensics::StartupForensicsExpanded>,
+    mut commands: Commands,
+) {
+    let Ok(toggle) = toggles.get(activate.event().entity) else {
+        return;
+    };
+    expanded.toggle(&toggle.0);
     commands.trigger(paint::RepaintRequested);
 }
 
@@ -475,6 +583,10 @@ fn on_startup_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/startup.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/startup_parity.rs"]
+mod parity_tests;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct StartupEnableButton;

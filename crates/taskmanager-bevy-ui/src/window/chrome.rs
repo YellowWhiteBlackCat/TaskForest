@@ -2,13 +2,20 @@
 use super::{AppShellRoot, FeedbackLine, Role, SummaryLine, TextRole};
 use crate::app::{ContentSlot, Page, nav_strip_scene};
 use crate::palette::{UiPalette, space_8, space_12};
+use crate::widgets::focus_ring::focus_ring_halo_scene;
+use crate::window::edge::edge_highlight_scene;
 use bevy::ecs::{component::Component, hierarchy::Children};
 use bevy::scene::{Scene, bsn};
 use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
 #[derive(Component, Clone, Default)]
 pub(crate) struct AppWorkspace;
-pub(super) fn app_shell_scene(palette: &UiPalette, route: Page, summary: String) -> Box<dyn Scene> {
+pub(super) fn app_shell_scene(
+    palette: &UiPalette,
+    route: Page,
+    summary: String,
+    edge_highlight: bool,
+) -> Box<dyn Scene> {
     let strip = nav_strip_scene(route, palette);
     let status: Vec<Box<dyn Scene>> = if route == Page::Performance {
         Vec::new()
@@ -18,9 +25,20 @@ pub(super) fn app_shell_scene(palette: &UiPalette, route: Page, summary: String)
             Children [Text(summary) SummaryLine TextRole(Role::Caption) -- Text("") FeedbackLine TextRole(Role::Caption)]},
         )]
     };
+    // The focus ring's outer halo: one overlay for the whole window, moved
+    // and resized by the focus layer onto whichever control holds the
+    // keyboard focus.
+    let halo = focus_ring_halo_scene(palette);
+    // The window's outer edge: a hairline the app draws when the
+    // compositor gives the window no frame of its own.
+    let edge = edge_highlight_scene(palette, edge_highlight);
     Box::new(bsn! {
         Node {width:percent(100),height:percent(100),min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column} BackgroundColor({palette.window_clear}) AppShellRoot
         Children [
+            @{ halo }
+            --
+            @{ edge }
+            --
             Node {width:percent(100),height:percent(100),min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column,flex_grow:1.0,flex_basis:px(0.0)} AppWorkspace
             Children [@{strip} --
                 Node {min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column,flex_grow:1.0,flex_basis:px(0.0)}

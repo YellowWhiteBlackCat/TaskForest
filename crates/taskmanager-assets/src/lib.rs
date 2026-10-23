@@ -109,6 +109,7 @@ asset_group!(
         "icons/copy.svg",
         "icons/dash.svg",
         "icons/delete.svg",
+        "icons/docker.svg",
         "icons/ellipsis.svg",
         "icons/ellipsis-vertical.svg",
         "icons/external-link.svg",
@@ -130,11 +131,13 @@ asset_group!(
         "icons/layout-dashboard.svg",
         "icons/loader.svg",
         "icons/loader-circle.svg",
+        "icons/lock.svg",
         "icons/map.svg",
         "icons/maximize.svg",
         "icons/menu.svg",
         "icons/minimize.svg",
         "icons/minus.svg",
+        "icons/monitor.svg",
         "icons/moon.svg",
         "icons/palette.svg",
         "icons/panel-bottom.svg",
@@ -146,6 +149,7 @@ asset_group!(
         "icons/panel-right-close.svg",
         "icons/panel-right-open.svg",
         "icons/plus.svg",
+        "icons/podman.svg",
         "icons/redo.svg",
         "icons/redo-2.svg",
         "icons/replace.svg",
@@ -210,6 +214,22 @@ pub mod icon_path {
     pub const REFRESH: &str = "domain/refresh.svg";
     pub const SEARCH: &str = "domain/search.svg";
     pub const SETTINGS: &str = "domain/settings.svg";
+    /// The confirmed-action glyph (a check inside a ring).
+    pub const CIRCLE_CHECK: &str = "icons/circle-check.svg";
+    /// The caution glyph (a warning triangle).
+    pub const TRIANGLE_ALERT: &str = "icons/triangle-alert.svg";
+    /// The console-terminal glyph (a terminal window carrying a prompt).
+    pub const TERMINAL: &str = "icons/square-terminal.svg";
+    /// The display glyph (a monitor with a stand).
+    pub const DISPLAY: &str = "icons/monitor.svg";
+    /// The Docker runtime mark (a corrugated container).
+    pub const DOCKER: &str = "icons/docker.svg";
+    /// The Podman runtime mark (a pod of containers).
+    pub const PODMAN: &str = "icons/podman.svg";
+    /// The read-only mark (a padlock).
+    pub const LOCK: &str = "icons/lock.svg";
+    /// A remote session (the globe glyph that already ships as a vector).
+    pub const REMOTE: &str = "icons/globe.svg";
 }
 
 // ── embedded fonts ─────────────────────────────────────────────────────────
@@ -321,6 +341,18 @@ const UI_ICON_RGBA: &[(&str, &[u8])] = &[
         include_bytes!("../assets/icons-rgba/domain-settings.rgba"),
     ),
     (
+        icon_path::CIRCLE_CHECK,
+        include_bytes!("../assets/icons-rgba/icons-circle-check.rgba"),
+    ),
+    (
+        icon_path::TRIANGLE_ALERT,
+        include_bytes!("../assets/icons-rgba/icons-triangle-alert.rgba"),
+    ),
+    (
+        icon_path::HEALTH,
+        include_bytes!("../assets/icons-rgba/domain-health.rgba"),
+    ),
+    (
         "icons/chart-pie.svg",
         include_bytes!("../assets/icons-rgba/icons-chart-pie.rgba"),
     ),
@@ -339,6 +371,30 @@ const UI_ICON_RGBA: &[(&str, &[u8])] = &[
     (
         "icons/arrow-down.svg",
         include_bytes!("../assets/icons-rgba/icons-arrow-down.rgba"),
+    ),
+    (
+        icon_path::TERMINAL,
+        include_bytes!("../assets/icons-rgba/icons-square-terminal.rgba"),
+    ),
+    (
+        icon_path::DISPLAY,
+        include_bytes!("../assets/icons-rgba/icons-monitor.rgba"),
+    ),
+    (
+        icon_path::DOCKER,
+        include_bytes!("../assets/icons-rgba/icons-docker.rgba"),
+    ),
+    (
+        icon_path::PODMAN,
+        include_bytes!("../assets/icons-rgba/icons-podman.rgba"),
+    ),
+    (
+        icon_path::LOCK,
+        include_bytes!("../assets/icons-rgba/icons-lock.rgba"),
+    ),
+    (
+        icon_path::REMOTE,
+        include_bytes!("../assets/icons-rgba/icons-globe.rgba"),
     ),
 ];
 
@@ -362,6 +418,15 @@ pub const UI_ICON_RGBA_PATHS: &[&str] = &[
     "icons/layout-dashboard.svg",
     "icons/arrow-up.svg",
     "icons/arrow-down.svg",
+    icon_path::CIRCLE_CHECK,
+    icon_path::TRIANGLE_ALERT,
+    icon_path::HEALTH,
+    icon_path::TERMINAL,
+    icon_path::DISPLAY,
+    icon_path::DOCKER,
+    icon_path::PODMAN,
+    icon_path::LOCK,
+    icon_path::REMOTE,
 ];
 
 /// Return the decoded RGBA bytes for a known icon asset path. Bitmaps are

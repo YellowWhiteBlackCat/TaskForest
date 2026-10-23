@@ -548,6 +548,7 @@ fn process_batch_freezes_the_selected_target_and_applies_outcome() {
     let target = intent.targets[0].clone();
     app.apply_batch_outcome(ProcessBatchResult {
         intent: ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Suspend,
             scope: Default::default(),
             targets: vec![target.clone()],

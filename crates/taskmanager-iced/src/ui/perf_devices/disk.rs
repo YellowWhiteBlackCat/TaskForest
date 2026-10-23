@@ -22,6 +22,8 @@ use taskmanager_theme::Theme;
 
 mod header;
 pub(crate) use header::{disk_subtitle, disk_title};
+mod mount;
+pub(crate) use mount::{MOUNT_SLOT_WIDTH, partition_label};
 
 /// The Performance-page per-disk panel readiness.
 #[must_use]
@@ -353,6 +355,17 @@ fn disk_graphs<'a>(
         app.cached_disk_split_series(&disk.device_id, disk.device_generation.get());
     let activity_samples =
         app.cached_disk_active_time_series(&disk.device_id, disk.device_generation.get());
+    // The throughput graph's Y ceiling tracks the traffic peak. Switching it
+    // in one step makes the curve jump, so the ceiling eases over the shared
+    // 120 ms damped transition: the axis and the curve move together.
+    let traffic_peak = crate::trend_strip::finite_peak(&read_samples)
+        .max(crate::trend_strip::finite_peak(&write_samples));
+    let mut throughput_graph = graph;
+    throughput_graph.max_override = Some(range::damped_ceiling(
+        &disk.device_id,
+        traffic_peak,
+        std::time::Instant::now(),
+    ));
     let mut graphs = vec![
         // Two-series read/write graph: the disk family token strokes read, the
         // same token lifted toward white strokes write, both resolved through
@@ -367,7 +380,7 @@ fn disk_graphs<'a>(
                 family_color: color,
                 capacity: app.graph_data_points(),
                 format_value: drive_throughput_formatter(app.drive_units()),
-                prefs: graph,
+                prefs: throughput_graph,
             },
             t("disk.throughput").to_string(),
             theme_snapshot,
@@ -552,7 +565,7 @@ fn partition_row<'a>(
     theme_snapshot: &'a Theme,
     units: UnitPrefs,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let label = partition_label(partition);
+    let label = partition_label(partition, MOUNT_SLOT_WIDTH);
     // Usage text: "used / total · free · pct"; unavailable facts name the
     // reason instead of an empty bar with numbers that do not exist.
     let usage = partition_usage_text(
@@ -623,39 +636,6 @@ fn partition_row<'a>(
     .into()
 }
 
-/// One partition's identity: `name · mount · fs` with `/dev/` handling and
-/// the unmounted qualifier (GPUI `partition_label` parity).
-fn partition_label(partition: &DiskPartition) -> String {
-    let raw_name = partition.name.trim();
-    let raw_mount = partition.mount_point.trim();
-    let is_windows_path = raw_name.contains(':')
-        || raw_name.starts_with('\\')
-        || raw_mount.contains(':')
-        || raw_mount.starts_with('\\')
-        || cfg!(target_os = "windows");
-    let name = raw_name.trim_start_matches("/dev/");
-    let mount = raw_mount.trim_start_matches("/dev/");
-    let prefix = if !is_windows_path && !name.starts_with('/') && !name.is_empty() {
-        "/dev/"
-    } else {
-        ""
-    };
-
-    if mount.is_empty() {
-        format!("{prefix}{name} · {}", t("disk.unmounted"))
-    } else if partition.fs_type.is_empty() {
-        if name.eq_ignore_ascii_case(mount) || name.is_empty() {
-            mount.to_string()
-        } else {
-            format!("{prefix}{name} · {mount}")
-        }
-    } else if name.eq_ignore_ascii_case(mount) || name.is_empty() {
-        format!("{mount} · {}", partition.fs_type)
-    } else {
-        format!("{prefix}{name} · {mount} · {}", partition.fs_type)
-    }
-}
-
 fn disk_block<'a>(
     ctx: DeviceBlockContext<'a>,
     disk: &'a DiskMetrics,
@@ -695,3 +675,7 @@ fn disk_block<'a>(
 #[cfg(test)]
 #[path = "../../../tests/gui/ui/perf_devices/disk_split_chart_tests.rs"]
 mod split_chart_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/perf_devices/disk_mount_tests.rs"]
+mod disk_mount_tests;

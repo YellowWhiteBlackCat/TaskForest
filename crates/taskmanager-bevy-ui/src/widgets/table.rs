@@ -10,6 +10,7 @@
 //! (which rows exist, their cell text) stays owned by the page + shell —
 //! this layer only renders what it is handed, bounded by the window math.
 
+use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
@@ -18,35 +19,56 @@ use bevy::ecs::system::{Commands, NonSendMut, Query};
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::TextColor;
-use bevy::text::{LineBreak, TextLayout};
+use bevy::text::{LineBreak, TextLayout, TextSpan};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px, rem,
+    TextBackgroundColor, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskmanager_core::core::text::match_ranges_ascii_ci;
 use taskmanager_shell::SortCol;
-use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
+use taskmanager_ui_contract::{IconId, PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::app::FrontendTrack;
 use crate::pages::settings::ThemePreferences;
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::WindowPalette;
-use crate::window::{Role, TextRole};
+use crate::window::{CustomTextInk, Role, TextRole};
+use taskmanager_ui_contract::{COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
+
+pub(crate) mod contrast;
+pub(crate) mod ellipsis;
+pub(crate) mod figures;
+pub(crate) mod resize;
+pub(crate) mod selection;
+
+use contrast::calibrate_muted_ink;
+use ellipsis::BoundedCellText;
+use figures::TabularFigures;
+use resize::ColumnWidthNode;
+use selection::CellSelection;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct ZeroValueCell(pub(crate) bool);
 
 /// Dimming follows the live preference; missing cells never become zeros.
+/// The muted ink is calibrated against the surfaces the value can sit on, so
+/// a dimmed zero stays readable instead of fading into the row.
 pub(crate) fn paint_zero_values(
     preferences: Res<ThemePreferences>,
     palette: Res<WindowPalette>,
     mut cells: Query<(&ZeroValueCell, &mut TextColor)>,
 ) {
+    let muted = calibrate_muted_ink(
+        palette.inner.dim_color,
+        palette.inner.body_color,
+        &[palette.inner.content_bg, palette.inner.nav_active_bg],
+    );
     for (zero, mut color) in &mut cells {
         let selected = if zero.0 && preferences.gray_zero_values {
-            palette.inner.dim_color
+            muted
         } else {
             palette.inner.body_color
         };
@@ -77,15 +99,19 @@ pub(crate) fn visible_columns(hidden: &[&str]) -> Vec<&'static ProcessColumnSpec
         .collect()
 }
 
-/// Minimum width in pixels for any rendered column to remain legible.
-pub(crate) const MIN_COLUMN_WIDTH_PX: f32 = 40.0;
-/// Maximum width in pixels for any column when resizing or distributing.
-pub(crate) const MAX_COLUMN_WIDTH_PX: f32 = 1200.0;
+/// The narrowest a column may become when the table DISTRIBUTES the
+/// available width, in pixels.
+///
+/// This is the frontend's LAYOUT floor, not the shared resize policy: a
+/// column squeezed by the layout keeps its text legible. The resize POLICY
+/// (what a user may drag a column to) is the contract's
+/// (`taskmanager_ui_contract::columns`), and every frontend reads it.
+pub(crate) const LAYOUT_MIN_COLUMN_WIDTH_PX: f32 = 40.0;
 
-/// Clamp a column width to the supported range.
+/// Clamp a column width to the contract's resize policy.
 #[must_use]
 pub(crate) fn clamp_column_width(width: f32) -> f32 {
-    width.clamp(MIN_COLUMN_WIDTH_PX, MAX_COLUMN_WIDTH_PX)
+    width.clamp(COLUMN_WIDTH_MIN, COLUMN_WIDTH_MAX)
 }
 
 /// Distribute available horizontal width across table columns.
@@ -96,7 +122,7 @@ pub(crate) fn clamp_column_width(width: f32) -> f32 {
 ///   Fixed/numeric columns keep their legible default widths; the primary identity column
 ///   (`Name`) flexes to absorb the surplus space.
 /// - If `w` is less than total default width:
-///   Columns are scaled proportionally down to `MIN_COLUMN_WIDTH_PX`.
+///   Columns are scaled proportionally down to the layout floor.
 #[must_use]
 pub(crate) fn distribute_column_widths(
     columns: &[&ProcessColumnSpec],
@@ -134,7 +160,7 @@ pub(crate) fn distribute_column_widths_with_overrides(
     }
 
     let total_base: f32 = base_widths.iter().sum();
-    let total_min = MIN_COLUMN_WIDTH_PX * (columns.len() as f32);
+    let total_min = LAYOUT_MIN_COLUMN_WIDTH_PX * (columns.len() as f32);
 
     if avail >= total_base {
         let surplus = avail - total_base;
@@ -150,13 +176,14 @@ pub(crate) fn distribute_column_widths_with_overrides(
         }
         result
     } else if avail <= total_min {
-        vec![MIN_COLUMN_WIDTH_PX; columns.len()]
+        vec![LAYOUT_MIN_COLUMN_WIDTH_PX; columns.len()]
     } else {
         let factor = (avail - total_min) / (total_base - total_min).max(1e-6);
         base_widths
             .iter()
             .map(|&base| {
-                let shrunk = MIN_COLUMN_WIDTH_PX + (base - MIN_COLUMN_WIDTH_PX) * factor;
+                let shrunk =
+                    LAYOUT_MIN_COLUMN_WIDTH_PX + (base - LAYOUT_MIN_COLUMN_WIDTH_PX) * factor;
                 clamp_column_width(shrunk)
             })
             .collect()
@@ -297,6 +324,7 @@ pub(crate) fn header_scene_with_widths(
 /// Render adapter: the header row. One text cell per column, widths from the
 /// contract's default-width tokens; numeric columns right-align; the sorted
 /// column carries the semantic direction icon.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn header_scene(
     columns: &[&ProcessColumnSpec],
     sort: Option<SortProjection>,
@@ -306,35 +334,170 @@ pub(crate) fn header_scene(
     header_scene_with_widths(columns, &widths, sort, palette)
 }
 
-/// A data cell: contract width, right-aligned when numeric, and strictly
-/// single-line — `NoWrap` + x-clip means a value wider than its column is
-/// clipped at the column edge, never wrapped into a second line and never
-/// allowed to stretch the row or shift sibling cells. Horizontal alignment
-/// is the MAIN axis (`justify_content`); the text is vertically centered
-/// (`align_items` is the cross axis), so numeric and text cells share one
-/// baseline inside the fixed-height row.
-fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> impl Scene + use<> {
-    let align = if numeric_column {
+/// One cell's render inputs: the value, its slot, and the two pieces of
+/// context the cell needs — the active search query (the highlight engine's
+/// input) and whether the row carries an application identity (the inline
+/// app icon).
+pub(crate) struct CellRender<'a> {
+    pub(crate) text: String,
+    pub(crate) width: f32,
+    pub(crate) numeric: bool,
+    pub(crate) label: bool,
+    pub(crate) column: &'static str,
+    pub(crate) query: &'a str,
+    pub(crate) app_icon: bool,
+}
+
+/// The search-match ranges of one cell value: the shared core match engine
+/// (the single source of search-match geometry, ADR-020) over the cell's own
+/// text. Only the identity column carries the highlight, exactly like the
+/// reference surfaces.
+fn highlight_ranges(column: &str, text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
+    if column != "Name" || query.trim().is_empty() {
+        return Vec::new();
+    }
+    match_ranges_ascii_ci(text, query.trim())
+}
+
+/// The value split into its plain and highlighted segments. The segments are
+/// contiguous and cover the whole value, so the cell renders exactly the text
+/// it was handed.
+fn highlight_segments(text: &str, ranges: &[std::ops::Range<usize>]) -> Vec<(String, bool)> {
+    if ranges.is_empty() {
+        return vec![(text.to_owned(), false)];
+    }
+    let mut segments: Vec<(String, bool)> = Vec::new();
+    let mut cursor = 0;
+    for range in ranges {
+        let start = range.start.min(text.len());
+        let end = range.end.min(text.len());
+        if start < cursor {
+            continue;
+        }
+        if start > cursor {
+            segments.push((text[cursor..start].to_owned(), false));
+        }
+        segments.push((text[start..end].to_owned(), true));
+        cursor = end;
+    }
+    if cursor < text.len() {
+        segments.push((text[cursor..].to_owned(), false));
+    }
+    segments
+}
+
+/// A data cell: the value in a bounded slot.
+///
+/// The value is a bounded slot: a wider value is cut at the column edge with
+/// an ellipsis (see `ellipsis`), never wrapped into a second line. The
+/// identity cell additionally carries the app icon as an INLINE flow box: the
+/// icon shares the text's layout, so it is aligned with the name's baseline
+/// instead of floating a pixel above it.
+///
+/// The palette is optional: a caller that renders a plain value (no search
+/// highlight, no application icon) needs no theme at all.
+fn cell_scene(cell: CellRender<'_>, palette: Option<&UiPalette>) -> impl Scene + use<> {
+    let align = if cell.numeric {
         JustifyContent::FlexEnd
     } else {
         JustifyContent::FlexStart
     };
-    let is_zero = cell == "0" || cell == "0.0%" || cell == "0 B" || cell == "0 B/s";
-    let role = if label { Role::Caption } else { Role::Body };
+    let is_zero = cell.numeric && !cell.label && is_zero_value(&cell.text);
+    let role = if cell.label {
+        Role::Caption
+    } else {
+        Role::Body
+    };
+    let ranges = highlight_ranges(cell.column, &cell.text, cell.query);
+    // The value lives in the root text unless a flow needs the paragraph: an
+    // inline icon has to come BEFORE the value, and the highlighted segments
+    // are spans of their own.
+    let segments = if ranges.is_empty() {
+        Vec::new()
+    } else {
+        highlight_segments(&cell.text, &ranges)
+    };
+    // The flow children: the app icon (a semantic plate, never a text glyph
+    // — the tofu law) followed by the value's segments.
+    let mut flow: Vec<Box<dyn Scene>> = Vec::new();
+    if cell.app_icon
+        && let Some(palette) = palette
+    {
+        flow.push(crate::icons::inline_icon_scene(
+            IconId::Applications,
+            palette,
+            palette.dim_color,
+        ));
+    }
+    for (segment, is_match) in &segments {
+        let background = if *is_match {
+            palette.map_or(Color::NONE, |palette| palette.selection_bg)
+        } else {
+            Color::NONE
+        };
+        // The theme's own query-highlight ink for a matched run.
+        let highlight = palette.map_or(Color::NONE, |palette| palette.highlight_fg);
+        if *is_match {
+            // The matched run owns its ink: the window layer's custom-ink
+            // seam keeps the declared highlight ink, the role observer would
+            // otherwise stamp the role ink over it.
+            flow.push(Box::new(bsn! {
+                TextSpan({ segment })
+                TextRole({ role })
+                TextBackgroundColor({ background })
+                TextColor({ highlight })
+                CustomTextInk
+            }) as Box<dyn Scene>);
+        } else {
+            flow.push(Box::new(bsn! {
+                TextSpan({ segment })
+                TextRole({ role })
+                TextBackgroundColor({ background })
+            }) as Box<dyn Scene>);
+        }
+    }
+    // With a flow (an inline icon or highlighted segments) the root text is
+    // empty and the value lives in the spans: the engine lays the root, the
+    // spans and the flow boxes out as ONE paragraph.
+    let root_text = if flow.is_empty() {
+        cell.text.clone()
+    } else {
+        String::new()
+    };
+
+    let selection_id = cell.column.to_owned();
+    let selection_content = cell.text.clone();
     bsn! {
         Node {
-            width: px(width),
+            width: px(cell.width),
             height: Val::Auto,
             flex_direction: FlexDirection::Row,
             justify_content: align,
             align_items: AlignItems::Center,
             overflow: Overflow::clip_x(),
         }
+        ColumnWidthNode({ cell.column })
+        CellSelection { id: { selection_id }, content: { selection_content } }
+        on(selection::on_cell_double_clicked)
         Children [
-             Text(cell) TextRole({ role }) TextLayout { linebreak: LineBreak::NoWrap }
-             ZeroValueCell({ is_zero && numeric_column && !label })
+             Text({ root_text })
+             TextRole({ role })
+             TextLayout { linebreak: LineBreak::NoWrap }
+             Node { flex_shrink: 0.0 }
+             BoundedCellText
+             ZeroValueCell({ is_zero })
+             TabularFigures({ cell.numeric })
+             Children [
+                  { flow }
+             ]
         ]
     }
+}
+
+/// Whether a value reads as a measured zero (the dimming policy's input).
+/// A missing value is a dash, never a zero.
+fn is_zero_value(text: &str) -> bool {
+    matches!(text, "0" | "0.0%" | "0 B" | "0 B/s" | "0.0 B/s")
 }
 
 fn header_cells(
@@ -357,6 +520,11 @@ fn header_cells(
 /// One header cell: the pure column label plus, when sorted, the semantic
 /// direction plate. Same bounded-line discipline as body cells — NoWrap +
 /// clip — and the same main-axis alignment contract.
+///
+/// The direction plate and the resize gutter are part of the LABEL's text
+/// flow: the plate is an inline flow box inside the label (so it shares the
+/// label's baseline and clips with it), and the gutter rides the cell's
+/// trailing edge as the drag affordance for the column width.
 fn header_cell_scene(
     label: String,
     column_id: &'static str,
@@ -372,6 +540,7 @@ fn header_cell_scene(
     };
     let is_sorted = direction.is_some();
     let indicator = crate::widgets::controls::sort_indicator_scene(direction, palette);
+    let handle = vec![resize::resize_handle_scene(column_id)];
     let bg = if is_sorted {
         palette.nav_active_bg
     } else {
@@ -391,13 +560,22 @@ fn header_cell_scene(
             overflow: Overflow::clip_x(),
         }
         BackgroundColor({ bg })
+        ColumnWidthNode({ column_id })
         ControlVisual(ControlTone::Surface, is_sorted)
         Button
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
         Children [
-             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
-             Children [ { indicator } ]
+             Text(label)
+             TextRole(Role::Caption)
+             TextLayout { linebreak: LineBreak::NoWrap }
+             Node { flex_shrink: 0.0 }
+             Pickable::IGNORE
+             Children [
+                  { indicator }
+             ]
+             --
+             { handle }
         ]
     }
 }
@@ -407,10 +585,12 @@ pub(crate) fn row_scene_with_widths(
     cells: &[String],
     columns: &[&ProcessColumnSpec],
     widths: &[f32],
+    query: &str,
+    app_icon: bool,
+    palette: Option<&UiPalette>,
 ) -> impl Scene + use<> {
     let owned: Vec<String> = cells.to_vec();
-    let numeric: Vec<bool> = columns.iter().map(|column| column.numeric).collect();
-    let cells = row_cells(&owned, widths, &numeric);
+    let cells = row_cells(&owned, columns, widths, query, app_icon, palette);
     bsn! {
         Node {
             width: percent(100),
@@ -427,18 +607,41 @@ pub(crate) fn row_scene_with_widths(
 /// Render adapter: one body row from pre-formatted cell strings. Cells pair
 /// with the same column slice the header used; row height/spacing come from
 /// the palette via the page (the row node here stays unstyled chrome).
+///
+/// This is the plain form: the contract's default widths, no search
+/// highlight and no application icon. A caller that wants the live table
+/// treatment uses [`row_scene_with_widths`].
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn row_scene(cells: &[String], columns: &[&ProcessColumnSpec]) -> impl Scene + use<> {
     let widths = distribute_column_widths(columns, None);
-    row_scene_with_widths(cells, columns, &widths)
+    row_scene_with_widths(cells, columns, &widths, "", false, None)
 }
 
-fn row_cells(cells: &[String], widths: &[f32], numeric: &[bool]) -> Vec<impl Scene + use<>> {
+fn row_cells(
+    cells: &[String],
+    columns: &[&ProcessColumnSpec],
+    widths: &[f32],
+    query: &str,
+    app_icon: bool,
+    palette: Option<&UiPalette>,
+) -> Vec<impl Scene + use<>> {
     cells
         .iter()
         .zip(widths.iter().copied())
-        .zip(numeric.iter().copied())
-        .map(|((cell, width), numeric_column)| {
-            cell_scene(cell.clone(), width, numeric_column, false)
+        .zip(columns.iter())
+        .map(|((cell, width), column)| {
+            cell_scene(
+                CellRender {
+                    text: cell.clone(),
+                    width,
+                    numeric: column.numeric,
+                    label: false,
+                    column: column.id,
+                    query,
+                    app_icon: app_icon && column.id == "Name",
+                },
+                palette,
+            )
         })
         .collect()
 }

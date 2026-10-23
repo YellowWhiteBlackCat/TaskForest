@@ -10,8 +10,9 @@ use taskmanager_assets::product::TAGLINE_EN;
 use taskmanager_assets::product::TAGLINE_ZH;
 use taskmanager_assets::product::ZH_NAME;
 use taskmanager_assets::{
-    EMBEDDED_FONT_FAMILIES, TASKMANAGER_ICON_PATHS, all_asset_paths, asset_bytes, embedded_fonts,
-    product_logo_bytes, product_logo_svg,
+    EMBEDDED_FONT_FAMILIES, TASKMANAGER_ICON_PATHS, UI_ICON_RGBA_PATHS, UI_ICON_RGBA_SIZE,
+    all_asset_paths, asset_bytes, embedded_fonts, product_logo_bytes, product_logo_svg,
+    ui_icon_rgba,
 };
 
 #[test]
@@ -31,7 +32,7 @@ fn every_declared_path_is_unique_and_loadable() {
     let paths: Vec<_> = all_asset_paths().collect();
     let unique: HashSet<_> = paths.iter().copied().collect();
 
-    assert_eq!(paths.len(), 101);
+    assert_eq!(paths.len(), 105);
     assert_eq!(unique.len(), paths.len());
     for path in paths {
         assert!(
@@ -40,6 +41,34 @@ fn every_declared_path_is_unique_and_loadable() {
         );
     }
     assert!(asset_bytes("icons/not-present.svg").is_none());
+}
+
+/// Every registered plate decodes to exactly one RGBA plate of the shared
+/// icon edge size. The raster frontend's image store rejects any other
+/// length, so a drifted bitmap must fail here instead of at draw time.
+#[test]
+fn every_registered_plate_is_exactly_one_rgba_plate() {
+    let expected = UI_ICON_RGBA_SIZE as usize * UI_ICON_RGBA_SIZE as usize * 4;
+    assert_eq!(
+        expected, 5184,
+        "the 36px plate edge carries 36*36*4 RGBA bytes"
+    );
+    let unique: HashSet<_> = UI_ICON_RGBA_PATHS.iter().copied().collect();
+    assert_eq!(
+        unique.len(),
+        UI_ICON_RGBA_PATHS.len(),
+        "a plate key is registered twice"
+    );
+    for path in UI_ICON_RGBA_PATHS {
+        let rgba =
+            ui_icon_rgba(path).unwrap_or_else(|| panic!("{path} is registered without a bitmap"));
+        assert_eq!(
+            rgba.len(),
+            expected,
+            "{path} plate is {} bytes, expected {expected}",
+            rgba.len()
+        );
+    }
 }
 
 #[test]

@@ -54,10 +54,7 @@ OS → platform adapter → runtime → application reducer → cached projectio
 前端不能直接读取 `/proc`、注册表、系统 API 或命令输出；平台 crate 不能拥有 UI 状态；
 `core` 不能执行 I/O。
 
-跨 crate 不建立 forwarding facade：领域事实从 `taskmanager-core` 的 owner module 导入，
-能力、请求、事件和 port 类型从 `taskmanager-platform-contract` 导入，application 只暴露
-application-owned command/reducer/projection。`taskmanager-app-host` 与
-`taskmanager-platform-native` 只承担组合和 adapter 选择；它们不复制或转发这些类型。
+跨 crate 不建立 forwarding facade：领域事实从 `taskmanager-core` 导入，能力与端口类型从 `taskmanager-platform-contract` 导入，application 只暴露自家命令与投影。`taskmanager-app-host` 与 `taskmanager-platform-native` 仅承担组合与选择；宿主拓扑支持双模态自适应（ADR-055）：前端通过 `taskmanager-ipc` 订阅 `taskforest-daemon` 后台流，守护进程缺席时透明降级为 Standalone 直采模式。
 
 ## 3. 层级职责
 
@@ -68,6 +65,7 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
 | `taskmanager-shell` | 前端中立投影、缓存和交互词汇 | 直接采集、toolkit widget |
 | `taskmanager-platform-*` | 平台数据源和控制适配器 | 重定义领域语义、制造默认成功 |
 | `taskmanager-platform-runtime` | 调度、并发、背压和事件传递 | UI 生命周期所有权 |
+| `taskmanager-daemon` / `ipc` | 7×24 后台时序采集、持久化单写锁与安全定长二进制 IPC | 在守护进程持 UI 类型、绕过 16MiB 帧上限 |
 | `taskmanager-app-host` | 选择适配器并组合应用运行时，发布工具包无关的 surface role 合同 | 新建第二套事实模型、持有 toolkit/native surface |
 | `taskmanager-cli` | 共享 CLI 组合边：解析、中性模式、help、tracing；以能力值接收产品差异 | 拥有 UI 生命周期、按前端身份 `cfg`、第二个事实模型 |
 | frontend crates | 渲染投影并提交命令；各自拥有 toolkit 适配（含 theme token → toolkit 类型的映射） | OS I/O、阻塞采集、业务规则分叉 |

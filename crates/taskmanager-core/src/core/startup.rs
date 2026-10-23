@@ -15,5 +15,6 @@ pub use inventory::{
 };
 pub use timeline::{
     BootSegmentDelta, BootTimeline, BootTimelineSegment, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS,
-    DEFAULT_BOOT_TIMELINE_MAX_UNTIMED, segment_deltas,
+    DEFAULT_BOOT_TIMELINE_MAX_UNTIMED, StartupPhase, StartupPhaseKind, StartupTimelineSnapshot,
+    segment_deltas,
 };

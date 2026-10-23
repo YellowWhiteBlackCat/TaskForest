@@ -33,10 +33,11 @@ use crate::navigation::{NavigationState, RAIL_WIDTH};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
+use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
@@ -58,7 +59,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 use taskmanager_shell::presentation::smart::self_test_intent;
-use taskmanager_shell::presentation::trend::{self, TrendSeries};
+use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::presentation::{
     bytes, gpu_display_identity, graph_summary, megahertz, missing_value, power_w, temperature_c,
 };
@@ -66,14 +67,12 @@ use taskmanager_shell::presentation::{
 use crate::app::{PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2};
-use crate::widgets::chart::{
-    CHART_LINE_THICKNESS_PX, ChartSurface, MAX_CHART_POINTS, line_segments, polyline_scene,
-    segment_layout,
-};
+use crate::widgets::chart::{ChartCanvas, ChartContent, ChartSurface};
 use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod device_curves;
+use device_curves::storage::{ExpandTarget, StorageExpand};
 mod gpu_metric;
 pub(crate) mod replay;
 pub(crate) mod scene;
@@ -84,12 +83,11 @@ mod metrics;
 
 use crate::pages::history::control::PerformancePresentation;
 
-use bevy::math::Rot2;
-use bevy::ui::UiTransform;
+use crate::scene_attach::attach_child;
 pub(crate) use metrics::cpu::{CpuField, cpu_field_text};
 use metrics::{
-    core_usage_count, core_usage_fill_pct, cpu_metrics, curve_caption, curve_samples, curve_wanted,
-    curve_warm, disk_spare_warning_for, dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics,
+    core_usage_fill_pct, cpu_metrics, curve_caption, curve_samples, curve_wanted, curve_warm,
+    disk_spare_warning_for, dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics,
     network_devices, nic_fact_line, section_keys, segment_key, segment_value, summary_value,
 };
 use scene::blocks::block_scene;
@@ -447,6 +445,38 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     selection::register(app);
     device_curves::register(app);
     sidebar_editor::register(app);
+    // The battery icon's charge flow: the band travels the fill while the
+    // observed charge state says the pack is charging.
+    scene::battery::register(app);
+    // The core grid's reveal is a PER-FRAME motion: the fold observer only
+    // flips the typed target, and the animator eases the height towards it.
+    // Without this system the reveal would ride the ~1 Hz telemetry cadence
+    // and read as a jump (BEVY-115).
+    app.add_systems(
+        bevy::app::PostUpdate,
+        animate_core_grid.after(bevy::ui::UiSystems::PostLayout),
+    );
+}
+
+/// The per-frame core-grid animator: the column policy follows the measured
+/// width, and the reveal eases towards its typed target.
+fn animate_core_grid(
+    time: Res<bevy::time::Time>,
+    palette: Res<WindowPalette>,
+    mut surface: crate::pages::performance::scene::sidebar::cores::CoreGridSurface,
+) {
+    crate::pages::performance::scene::sidebar::cores::apply_core_grid_columns(
+        &palette.inner,
+        &surface.rows,
+        &mut surface.cells,
+    );
+    crate::pages::performance::scene::sidebar::cores::advance_core_grid(
+        time.elapsed_secs(),
+        &palette.inner,
+        &surface.toggles,
+        &surface.contents,
+        &mut surface.bodies,
+    );
 }
 
 /// Bevy 0.20's official button widget emits `Activate` for pointer and
@@ -590,14 +620,13 @@ struct PerformanceRefreshQueries<'w, 's> {
     bars: Query<'w, 's, (&'static DynBar, &'static mut Node), Without<DynText>>,
     /// Marked disk-spare alerts.
     disk_alerts: Query<'w, 's, (&'static DynDiskSpareAlert, &'static mut Node), Without<DynBar>>,
-    /// Spark strips with their segment children and chart surface.
+    /// Curve strips with their canvas and chart surface.
     strips: Query<
         'w,
         's,
         (
-            Entity,
             &'static SparkStrip,
-            &'static Children,
+            &'static mut ChartCanvas,
             &'static mut ChartSurface,
         ),
     >,
@@ -607,10 +636,11 @@ struct PerformanceRefreshQueries<'w, 's> {
     sections: Query<'w, 's, (Entity, &'static DynSection)>,
     /// Device block markers.
     blocks: Query<'w, 's, (Entity, &'static DynBlock)>,
+    /// The expand motion of the device list items: a storage device slides
+    /// shut before it leaves the projection.
+    expands: Query<'w, 's, &'static mut StorageExpand, With<DynBlock>>,
     /// Bare node query shared by the strip and gate adapters.
     nodes: Query<'w, 's, &'static mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
-    /// UI transform query the strip adapter resizes through.
-    transforms: Query<'w, 's, &'static mut UiTransform>,
 }
 
 /// The pages' data-refresh trigger consumer (see [`crate::drain`]): re-read
@@ -630,14 +660,7 @@ fn refresh_on_fold(
     rewrite_texts(shell, &mut surface.texts);
     rewrite_core_bars(shell, &mut surface.bars);
     sync_disk_spare_alerts(shell, &mut surface.disk_alerts);
-    sync_strips(
-        shell,
-        &palette.inner,
-        &mut surface.strips,
-        &mut surface.nodes,
-        &mut surface.transforms,
-        &mut commands,
-    );
+    sync_strips(shell, &mut surface.strips);
     sync_card_gates(
         shell,
         focus.0,
@@ -650,6 +673,7 @@ fn refresh_on_fold(
         &palette.inner,
         &surface.sections,
         &surface.blocks,
+        &mut surface.expands,
         &mut commands,
     );
 }
@@ -697,51 +721,21 @@ fn rewrite_core_bars(shell: &ShellApp, bars: &mut Query<(&DynBar, &mut Node), Wi
     }
 }
 
-/// Resize each strip's polyline from the current window. A matching segment
-/// count rewrites each segment's geometry in place (the warm steady state
-/// re-spawns nothing); a changed count rebuilds the segment list once through
-/// the bsn! polyline adapter. Gaps are absent segments — never zero-joined.
+/// Publish the current window into each curve's canvas.
+///
+/// The strip's width is NOT a design constant: the canvas measures the slot
+/// the layout gave the chart and projects the window against that
+/// measurement, so the curve fills the card whatever the window does. Gaps
+/// stay gaps — a missing observation is never joined across.
 fn sync_strips(
     shell: &ShellApp,
-    palette: &UiPalette,
-    strips: &mut Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
-    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
-    transforms: &mut Query<&mut UiTransform>,
-    commands: &mut Commands,
+    strips: &mut Query<(&SparkStrip, &mut ChartCanvas, &mut ChartSurface)>,
 ) {
-    let strip_height = palette.control_height_px() * 3.0;
-    for (strip_entity, strip, children, mut chart) in strips.iter_mut() {
-        let segments = line_segments(
-            &trend::window(&shell.history, strip.0.series()),
-            scene::chart::CHART_STRIP_WIDTH_PX,
-            strip_height,
-            MAX_CHART_POINTS,
-        );
-        chart.0 = segments.len();
-        if children.len() == segments.len() {
-            for (child, segment) in children.iter().zip(segments.iter()) {
-                let layout = segment_layout(*segment);
-                if let Ok(mut node) = nodes.get_mut(*child) {
-                    node.width = Val::Px(layout.length);
-                    node.height = Val::Px(CHART_LINE_THICKNESS_PX);
-                    node.left = Val::Px(layout.left);
-                    node.top = Val::Px(layout.top);
-                }
-                if let Ok(mut transform) = transforms.get_mut(*child) {
-                    transform.rotation = Rot2::radians(layout.rotation);
-                }
-            }
-            continue;
-        }
-        for child in children.iter() {
-            commands.entity(*child).despawn();
-        }
-        let polyline = commands
-            .spawn_scene(polyline_scene(&segments, strip.0.color(palette)))
-            .id();
-        commands
-            .entity(strip_entity)
-            .add_one_related::<ChildOf>(polyline);
+    for (strip, mut canvas, mut chart) in strips.iter_mut() {
+        let values = curve_samples(shell, strip.0);
+        let ceiling = scene::chart::curve_ceiling(strip.0, &values);
+        chart.0 = values.len();
+        canvas.content = ChartContent::Samples { values, ceiling };
     }
 }
 
@@ -776,19 +770,44 @@ fn sync_card_gates(
 /// Reconcile each section's blocks with the projection's key list: despawn
 /// keys that left, spawn keys that arrived. The projection is the only
 /// memory of which devices exist — the page keeps no cache.
+///
+/// A storage device rides the SAME typed motion the storage surface owns:
+/// the list item slides shut before it leaves and slides open when it
+/// arrives, so a hot-plugged disk is never a jump.
 fn sync_blocks(
     shell: &ShellApp,
     palette: &UiPalette,
     sections: &Query<(Entity, &DynSection)>,
     blocks: &Query<(Entity, &DynBlock)>,
+    expands: &mut Query<&mut StorageExpand, With<DynBlock>>,
     commands: &mut Commands,
 ) {
     for (section_entity, section) in sections.iter() {
         let desired = section_keys(shell, section.0);
         for (block_entity, block) in blocks.iter() {
-            if block.0 == section.0 && !desired.iter().any(|key| key == &block.1) {
-                commands.entity(block_entity).despawn();
+            if block.0 != section.0 {
+                continue;
             }
+            let wanted = desired.iter().any(|key| key == &block.1);
+            if wanted {
+                // A device that came back while it was sliding shut slides
+                // open again.
+                if let Ok(mut expand) = expands.get_mut(block_entity)
+                    && expand.target == ExpandTarget::Collapsing
+                {
+                    expand.target = ExpandTarget::Expanding;
+                }
+                continue;
+            }
+            // The list item slides shut; the motion system retires it once
+            // the slide reaches its end.
+            if let Ok(mut expand) = expands.get_mut(block_entity) {
+                if expand.target != ExpandTarget::Collapsing {
+                    expand.target = ExpandTarget::Collapsing;
+                }
+                continue;
+            }
+            commands.entity(block_entity).despawn();
         }
         for key in desired {
             if blocks
@@ -799,9 +818,7 @@ fn sync_blocks(
             }
             if let Some(scene) = block_scene(section.0, &key, shell, palette) {
                 let child = commands.spawn_scene(scene).id();
-                commands
-                    .entity(section_entity)
-                    .add_one_related::<ChildOf>(child);
+                attach_child(commands, section_entity, child);
             }
         }
     }

@@ -321,7 +321,7 @@ fn multi_select_kill_arms_batch_gate_with_multiple_targets() {
 }
 
 #[test]
-fn test_process_menu_mouse_activation_and_scrim_dismiss() {
+fn test_process_menu_mouse_activation_retires_the_anchored_popover() {
     use bevy::MinimalPlugins;
     use bevy::app::App;
     use bevy::asset::{AssetPlugin, Assets};
@@ -335,7 +335,7 @@ fn test_process_menu_mouse_activation_and_scrim_dismiss() {
     use taskmanager_theme::Theme;
 
     use crate::app::FrontendTrack;
-    use crate::menu_modal::{MenuModalChanged, MenuModalOverlay, MenuModalScrim};
+    use crate::menu_modal::{MenuModalChanged, MenuModalPopover};
     use crate::palette::ui_palette;
     use crate::widgets::menu::MenuItemIndex;
     use crate::window::FrontendWindowPlugin;
@@ -390,11 +390,11 @@ fn test_process_menu_mouse_activation_and_scrim_dismiss() {
     let world = app.world_mut();
     assert_eq!(
         world
-            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .query_filtered::<Entity, With<MenuModalPopover>>()
             .iter(world)
             .count(),
         1,
-        "menu modal overlay is mounted"
+        "the anchored popover is mounted"
     );
 
     // 2. Click the Kill menu item (index 4)
@@ -414,7 +414,7 @@ fn test_process_menu_mouse_activation_and_scrim_dismiss() {
     let world = app.world_mut();
     assert_eq!(
         world
-            .query_filtered::<Entity, With<MenuModalOverlay>>()
+            .query_filtered::<Entity, With<MenuModalPopover>>()
             .iter(world)
             .count(),
         0,
@@ -434,54 +434,8 @@ fn test_process_menu_mouse_activation_and_scrim_dismiss() {
         .expect("dismiss confirmation");
     app.update();
 
-    // 3. Re-open menu and click scrim to cancel/dismiss
-    app.world_mut()
-        .run_system_once(
-            |mut modal: ResMut<ProcessMenuModal>,
-             track: NonSend<FrontendTrack>,
-             mut commands: Commands| {
-                assert!(open_for_selected(&mut modal, &track.shell));
-                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
-                    true,
-                    std::marker::PhantomData,
-                ));
-            },
-        )
-        .expect("reopen menu");
-    app.update();
-
-    let world = app.world_mut();
-    assert_eq!(
-        world
-            .query_filtered::<Entity, With<MenuModalOverlay>>()
-            .iter(world)
-            .count(),
-        1,
-        "menu modal is mounted again"
-    );
-
-    let scrim_entity = world
-        .query_filtered::<Entity, With<MenuModalScrim>>()
-        .iter(world)
-        .next()
-        .expect("scrim entity exists");
-
-    world.commands().trigger(bevy::ui_widgets::Activate {
-        entity: scrim_entity,
-    });
-    app.update();
-
-    let world = app.world_mut();
-    assert_eq!(
-        world
-            .query_filtered::<Entity, With<MenuModalOverlay>>()
-            .iter(world)
-            .count(),
-        0,
-        "menu modal is closed after clicking scrim"
-    );
     assert!(
-        world
+        app.world()
             .non_send::<FrontendTrack>()
             .shell
             .pending_confirmation()

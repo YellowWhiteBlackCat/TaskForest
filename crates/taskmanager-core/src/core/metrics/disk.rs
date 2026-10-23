@@ -2,16 +2,88 @@
 //! time, and response-time scalar observations with availability, plus the
 //! orthogonal connection model and per-device SMART availability/health fields.
 
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 use crate::core::device_state::DeviceState;
 use crate::core::smart::{SmartProviderFailureKind, SmartSelfTestCapabilities};
 use crate::core::storage::{StorageConnection, StorageIdentityStability};
+use crate::core::storage_health::{FilesystemHealth, FilesystemHealthSnapshot};
 use crate::core::{DeviceGeneration, FailureKind, ProviderId};
 
 use super::ScalarObservation;
 
 mod wire;
+
+/// The platform-neutral probe command for a missing SMART tool.
+///
+/// The smartmontools project ships the same `smartctl` binary on every
+/// platform, so this command belongs to the contract: a frontend copies it
+/// from the shared fact instead of composing a command of its own.
+pub const SMART_TOOL_PROBE_COMMAND: &str = "smartctl --scan";
+
+/// Which guidance paragraph a missing SMART tool needs.
+///
+/// The paragraph is a typed, localizable choice, not a free-form string: the
+/// localization key stays the contract's, and a frontend asks for the text
+/// through the shared i18n catalog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SmartToolGuidance {
+    /// Install the missing telemetry tool, then refresh the device list.
+    #[default]
+    InstallTool,
+}
+
+impl SmartToolGuidance {
+    /// The localization key of this guidance paragraph.
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::InstallTool => "device.action_missing_tool",
+        }
+    }
+}
+
+/// The remediation for a missing SMART tool.
+///
+/// The probe command and the guidance paragraph are platform-neutral; the
+/// install command belongs to the platform layer, which fills it only where
+/// it can name the real package-manager command. A platform without one
+/// leaves the install command absent rather than inventing a package
+/// manager.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SmartToolRemediation {
+    /// The command the user copies to verify the tool and list the
+    /// SMART-capable devices.
+    pub probe_command: String,
+    /// Which guidance paragraph explains the remediation.
+    pub guidance: SmartToolGuidance,
+    /// The platform's concrete install command, when the platform knows one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub install_command: Option<String>,
+}
+
+impl SmartToolRemediation {
+    /// The platform-neutral remediation: the smartmontools probe plus the
+    /// install guidance, without an install command.
+    #[must_use]
+    pub fn platform_neutral() -> Self {
+        Self {
+            probe_command: SMART_TOOL_PROBE_COMMAND.to_owned(),
+            guidance: SmartToolGuidance::InstallTool,
+            install_command: None,
+        }
+    }
+
+    /// The same remediation with the platform's concrete install command.
+    #[must_use]
+    pub fn with_install_command(mut self, command: impl Into<String>) -> Self {
+        self.install_command = Some(command.into());
+        self
+    }
+}
 
 /// Whether a disk SMART provider can currently supply health telemetry.
 /// Serialized as stable snake-case strings in exported snapshots.
@@ -215,6 +287,28 @@ impl DiskPartition {
         &self.scalar_observations
     }
 
+    /// The filesystem health fact observed for this partition's mount.
+    ///
+    /// The association is the canonical mount path both facts already carry,
+    /// and it is resolved here — in the contract layer — so no consumer
+    /// compares mount-point strings itself. `None` means the partition is not
+    /// mounted or the filesystem provider observed no such mount; it never
+    /// means a healthy filesystem.
+    #[must_use]
+    pub fn filesystem_health<'a>(
+        &self,
+        filesystems: &'a FilesystemHealthSnapshot,
+    ) -> Option<&'a FilesystemHealth> {
+        if self.mount_point.is_empty() {
+            return None;
+        }
+        let mount_point = Path::new(&self.mount_point);
+        filesystems
+            .filesystems
+            .iter()
+            .find(|filesystem| filesystem.mount_point.as_path() == mount_point)
+    }
+
     /// Replace the partition's canonical measurement group atomically.
     pub fn apply_scalar_observations(&mut self, observations: DiskPartitionScalarObservations) {
         self.scalar_observations = observations;
@@ -263,6 +357,12 @@ pub struct DiskMetrics {
     /// Platform-neutral availability of SMART telemetry. This remains explicit
     /// even when every individual optional health field is absent.
     pub smart_availability: SmartAvailability,
+    /// The platform's remediation for a missing SMART tool.
+    ///
+    /// `None` while the tool is present. A platform that knows its own
+    /// install command supplies it; the contract's platform-neutral
+    /// remediation applies otherwise.
+    pub smart_tool_remediation: Option<SmartToolRemediation>,
     pub smart_state: DeviceState,
     /// Runtime protocol provider selected for this SMART observation.
     pub smart_provider: Option<ProviderId>,
@@ -414,6 +514,24 @@ impl DiskMetrics {
         &self.scalar_observations
     }
 
+    /// The remediation guidance for this device's missing SMART tool.
+    ///
+    /// `None` while the tool is present. The contract's platform-neutral
+    /// remediation is the default, so a frontend never composes a command: it
+    /// copies the probe command from this fact and renders the guidance
+    /// paragraph named by [`SmartToolGuidance::i18n_key`].
+    #[must_use]
+    pub fn smart_tool_remediation_hint(&self) -> Option<SmartToolRemediation> {
+        if self.smart_availability != SmartAvailability::MissingTool {
+            return None;
+        }
+        Some(
+            self.smart_tool_remediation
+                .clone()
+                .unwrap_or_else(SmartToolRemediation::platform_neutral),
+        )
+    }
+
     /// Replace typed truth atomically. Compatibility scalars are projected
     /// only while serializing the private wire DTO.
     pub fn apply_scalar_observations(&mut self, observations: DiskScalarObservations) {
@@ -452,3 +570,7 @@ impl DiskMetrics {
 #[cfg(test)]
 #[path = "../../../tests/headless/core_core_metrics_disk_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/headless/core_core_metrics_disk_smart_tests.rs"]
+mod smart_tests;

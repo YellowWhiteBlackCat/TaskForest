@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-rapl-helper"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99.0"
 authors = ["TaskForest"]
@@ -22,3 +22,7 @@ publish = false
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# Lint 事实源：根 `Cargo.toml` 的 `[workspace.lints]`（见 ADR-056）。
+[lints]
+workspace = true

@@ -32,11 +32,14 @@
 //! imperative bulk spawn.
 
 use crate::pages::performance::sidebar_editor::SidebarState;
-use bevy::app::{App, Plugin, Update};
+use bevy::app::{App, Last, Plugin, Update};
 
 #[cfg(test)]
 #[path = "../tests/headless/app_support.rs"]
 pub(crate) mod app_support;
+
+mod deferred;
+use deferred::{DeferredPageDespawn, flush_page_despawns, hide_outgoing_contents};
 
 #[path = "pages/containers.rs"]
 pub(crate) mod containers;
@@ -76,6 +79,7 @@ use crate::navigation::NavigationStrip;
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::runtime::SharedRuntime;
+use crate::scene_attach::insert_into;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::picking::Pickable;
@@ -565,7 +569,7 @@ fn sync_selected_tab(
     if selected.is_some_and(|current| current.0 == next) {
         return;
     }
-    commands.entity(strip).insert(SelectedTab(next));
+    insert_into(&mut commands, strip, SelectedTab(next));
 }
 
 /// The strip mirrors every accepted route change, however it was reached
@@ -603,21 +607,20 @@ fn nav_strip_ready(
     if selected.is_some_and(|current| current.0 == next) {
         return;
     }
-    commands.entity(ready.entity).insert(SelectedTab(next));
+    insert_into(&mut commands, ready.entity, SelectedTab(next));
 }
 
-/// Observer: despawn the outgoing page content and request a remount. The
+/// Observer: hide the outgoing page content and request a remount. The
 /// respawn itself happens in [`mount_page_system`], which needs the
 /// non-send shell track this observer deliberately avoids.
 fn despawn_page_content(
     _changed: On<RouteChanged>,
     content: Query<Entity, With<PageContent>>,
     mut mount: ResMut<PageMount>,
+    mut deferred: ResMut<DeferredPageDespawn>,
     mut commands: Commands,
 ) {
-    for entity in &content {
-        commands.entity(entity).despawn();
-    }
+    hide_outgoing_contents(&content, &mut deferred, &mut commands);
     mount.requested = true;
 }
 
@@ -678,15 +681,32 @@ struct PagePresentation<'w> {
     palette: Res<'w, WindowPalette>,
 }
 
-fn mount_page_system(
-    track: ShellTrack,
-    presentation: PagePresentation,
-    history: Res<HistoryProjectionResource>,
-    route: Res<Route>,
-    mut mount: ResMut<PageMount>,
-    slot: Single<Entity, With<ContentSlot>>,
-    mut commands: Commands,
-) {
+/// The mount's own inputs: the ROUTE is the page authority, the mount
+/// bookkeeping says whether a remount is owed, and the content slot plus the
+/// mounted contents are the entities the mount writes.
+#[derive(SystemParam)]
+struct PageMountInputs<'w, 's> {
+    track: ShellTrack<'w>,
+    history: Res<'w, HistoryProjectionResource>,
+    route: Res<'w, Route>,
+    mount: ResMut<'w, PageMount>,
+    deferred: ResMut<'w, DeferredPageDespawn>,
+    slot: Single<'w, 's, Entity, With<ContentSlot>>,
+    content: Query<'w, 's, Entity, With<PageContent>>,
+    commands: Commands<'w, 's>,
+}
+
+fn mount_page_system(inputs: PageMountInputs, presentation: PagePresentation) {
+    let PageMountInputs {
+        track,
+        history,
+        route,
+        mut mount,
+        mut deferred,
+        slot,
+        content,
+        mut commands,
+    } = inputs;
     if mount.mounted == Some(route.page) && !mount.requested {
         return;
     }
@@ -697,6 +717,10 @@ fn mount_page_system(
         palette: &presentation.palette.inner,
         history: &history.0,
     };
+    // The mount owns the "exactly one page content" invariant: the ROUTE
+    // RESOURCE is the page authority, so every path that changes it leaves
+    // one content behind — even a path that never emitted the change event.
+    hide_outgoing_contents(&content, &mut deferred, &mut commands);
     commands.spawn_scene(bsn! {
         PageContent { page: {route.page} }
         ChildOf({*slot})
@@ -740,8 +764,10 @@ impl Plugin for AppShellPlugin {
             .init_resource::<crate::tooltip::TooltipState>()
             .init_resource::<crate::text_selection::TextSelectionState>()
             .init_resource::<crate::text_selection::ClipboardPort>()
+            .init_resource::<DeferredPageDespawn>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
+            .add_systems(Last, flush_page_despawns)
             .add_observer(on_nav_tab_change)
             .add_observer(sync_selected_tab_on_route)
             .add_observer(crate::widgets::table::on_process_sort_header_activated)

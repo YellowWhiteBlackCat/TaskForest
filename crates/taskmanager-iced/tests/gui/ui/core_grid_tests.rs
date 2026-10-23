@@ -128,3 +128,56 @@ fn format_core_readout_keeps_missing_and_non_finite_usage_honest() {
         "an unavailable utilization must not hide an independently observed clock"
     );
 }
+
+/// The batched canvas and the text cells must resolve the SAME cell slices:
+/// the bands tile the row with the row's own gap and no overlap, so a
+/// batched sparkline can never drift off its label.
+#[test]
+fn the_cell_bands_tile_the_row_without_gap_or_overlap() {
+    let row_width = 600.0;
+    let count = 6;
+
+    let mut cursor = 0.0;
+    for index in 0..count {
+        let band = cell_chart_rect(row_width, count, index);
+        assert!(
+            (band.x - cursor).abs() < 1e-3,
+            "cell {index} starts where the previous one ended: {band:?}"
+        );
+        cursor = band.x + band.width + ROW_SPACING;
+    }
+    let last = cell_chart_rect(row_width, count, count - 1);
+    assert!(
+        (last.x + last.width - row_width).abs() < 1e-3,
+        "the last cell ends at the row's right edge: {last:?}"
+    );
+}
+
+/// The band starts below the pinned label line: the label, the gap and the
+/// band are the same three numbers on both sides of the grid.
+#[test]
+fn the_batched_band_starts_below_the_pinned_label() {
+    let band = cell_chart_rect(600.0, 6, 0);
+
+    assert!(
+        (band.y - (label_height() + CELL_SPACING)).abs() < 1e-3,
+        "the band starts under the label: {band:?}"
+    );
+    assert!(
+        (band.height - CELL_CHART_HEIGHT).abs() < 1e-3,
+        "the band is the cell's fixed sparkline height: {band:?}"
+    );
+}
+
+/// A many-core host pays per ROW, not per core: the grid batches a row's
+/// sparklines into one canvas, so the submission count follows the row count.
+#[test]
+fn a_many_core_host_batches_its_canvases_per_row() {
+    assert_eq!(grid_row_count(6), 1);
+    assert_eq!(grid_row_count(7), 2);
+    assert_eq!(grid_row_count(128), 22);
+    assert!(
+        grid_row_count(128) < 128,
+        "the batched grid submits fewer canvases than it has cores"
+    );
+}

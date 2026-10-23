@@ -1,14 +1,18 @@
 //! One coalesced System paint through declared resources and entity queries.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::entity::Entity;
-use bevy::ecs::hierarchy::ChildOf;
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
 use bevy::scene::CommandsSceneExt;
 use bevy::ui::UiSystems;
+
+use super::overview::{OverviewInputs, OverviewLayout};
+use super::privacy::SerialDisclosure;
 
 #[derive(Resource, Default)]
 pub(crate) struct SystemPaint {
@@ -22,6 +26,9 @@ pub(crate) fn register(app: &mut App) {
             PostUpdate,
             paint_system.in_set(ScenePaint).before(UiSystems::Prepare),
         );
+    super::overview::register(app);
+    super::privacy::register(app);
+    super::thermal::register(app);
 }
 fn on_body_added(_event: On<Add<SystemBody>>, mut paint: ResMut<SystemPaint>) {
     paint.dirty = true;
@@ -35,6 +42,8 @@ struct SystemRender<'w, 's> {
     palette: Res<'w, WindowPalette>,
     dashboard: Option<Res<'w, SystemDashboardState>>,
     paint: ResMut<'w, SystemPaint>,
+    layout: Res<'w, OverviewLayout>,
+    disclosure: Option<Res<'w, SerialDisclosure>>,
     bodies:
         Query<'w, 's, (Entity, &'static ComputedNode, Option<&'static Children>), With<SystemBody>>,
     toolbars: Query<'w, 's, (Entity, Option<&'static Children>), With<SystemDashboardToolbar>>,
@@ -60,7 +69,9 @@ fn paint_system(mut render: SystemRender) {
     let npu = projection.npu_inventory.as_ref();
     let sensors = projection.sensors.as_ref();
     let summary = system_summary_model(projection);
-    let mut status = status_line_text(hardware, smbios, npu, sensors);
+    let disclosure = render.disclosure.map(|state| *state).unwrap_or_default();
+    let content_width = render.layout.content_width;
+    let mut status = status_line_text(hardware, smbios, npu, sensors, disclosure);
     let dashboard = render
         .dashboard
         .as_ref()
@@ -101,9 +112,18 @@ fn paint_system(mut render: SystemRender) {
             palette,
         ))
     } else {
-        Box::new(system_body_scene(
-            hardware, smbios, npu, sensors, &summary, palette,
-        ))
+        super::overview::system_body_scene(
+            &OverviewInputs {
+                hardware,
+                smbios,
+                npu,
+                sensors,
+                summary: &summary,
+                disclosure,
+                content_width,
+            },
+            palette,
+        )
     };
     if let Some(state) = render.dashboard.as_ref()
         && let Some((host, children)) = render.toolbars.iter().next()
@@ -117,10 +137,7 @@ fn paint_system(mut render: SystemRender) {
             .commands
             .spawn_scene(dashboard::toolbar(state, palette))
             .id();
-        render
-            .commands
-            .entity(host)
-            .add_one_related::<ChildOf>(child);
+        attach_child(&mut render.commands, host, child);
     }
     if let Some(children) = children {
         for child in children.iter() {
@@ -128,10 +145,7 @@ fn paint_system(mut render: SystemRender) {
         }
     }
     let fresh = render.commands.spawn_scene(scene).id();
-    render
-        .commands
-        .entity(body)
-        .add_one_related::<ChildOf>(fresh);
+    attach_child(&mut render.commands, body, fresh);
     if let Ok(mut line) = render.status.single_mut() {
         line.0 = status;
     }

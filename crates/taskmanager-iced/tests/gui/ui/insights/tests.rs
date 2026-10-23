@@ -257,18 +257,23 @@ fn engine_usage_keeps_a_cold_start_gap_honest() {
     );
     assert!(warm_line.contains("12.5%"));
     // The cumulative readout prefers busy-nanoseconds (i915) and falls
-    // back to the cycle counter (xe), never showing both.
+    // back to the cycle counter (xe), never showing both. The duration
+    // template and the cycle wording are locale-owned, so the test pins the
+    // language it renders and asserts against instead of inheriting the
+    // host's locale.
     let busy = ScalarObservation::available(3_600_000_000_000_u64, 1);
     let cycles = ScalarObservation::available(123_456_u64, 1);
-    let i915 = format_engine_usage("render", &warm, &busy, &no_time);
-    assert!(
-        i915.contains("01h 00m"),
-        "busy ns renders as duration: {i915}"
-    );
-    let xe = format_engine_usage("render", &warm, &no_time, &cycles);
-    assert!(xe.contains("cycles"), "xe cycle counter is shown: {xe}");
-    assert!(!i915.contains("cycles"));
-    assert!(!xe.contains("1h") && !xe.contains("h "));
+    with_language(Language::En, || {
+        let i915 = format_engine_usage("render", &warm, &busy, &no_time);
+        assert!(
+            i915.contains("01h 00m"),
+            "busy ns renders as duration: {i915}"
+        );
+        let xe = format_engine_usage("render", &warm, &no_time, &cycles);
+        assert!(xe.contains("cycles"), "xe cycle counter is shown: {xe}");
+        assert!(!i915.contains("cycles"));
+        assert!(!xe.contains("1h") && !xe.contains("h "));
+    });
 }
 
 /// The typed unavailable message maps reasons to the shared localized copy:

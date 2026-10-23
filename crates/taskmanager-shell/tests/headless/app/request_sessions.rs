@@ -43,6 +43,7 @@ fn context(request_id: RequestId, capability: CapabilityId, sequence: u64) -> Pl
 
 fn batch_intent(target: FrozenProcessIdentity, action: ProcessBatchAction) -> ProcessBatchIntent {
     ProcessBatchIntent {
+        collateral: Default::default(),
         action,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![target],

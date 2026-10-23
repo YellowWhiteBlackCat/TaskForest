@@ -294,6 +294,15 @@ impl Render for RootView {
                 if focus.is_focused(window) {
                     let _ = weak.update(cx, |view, cx| {
                         let viewport = view.dialog_scroll.settings.bounds();
+                        // The scroll-to-reveal in the shared switch scrolls the
+                        // focused control so its BOTTOM edge sits exactly on
+                        // the viewport's bottom edge — a fully visible control.
+                        // `Rect::contains` is strict on the far edge, so that
+                        // flush control would be judged invisible and the
+                        // evidence marker could never fire. Judge visibility
+                        // with inclusive edges: the control must be INSIDE the
+                        // viewport, and a control that touches the border is
+                        // still fully visible.
                         let visible = view
                             .settings_switches
                             .get(settings_focus_id)
@@ -301,8 +310,12 @@ impl Render for RootView {
                             .is_some_and(|bounds| {
                                 bounds.size.width > px(0.0)
                                     && bounds.size.height > px(0.0)
-                                    && viewport.contains(&bounds.origin)
-                                    && viewport.contains(&bounds.bottom_right())
+                                    && bounds.origin.x >= viewport.origin.x
+                                    && bounds.origin.y >= viewport.origin.y
+                                    && bounds.bottom_right().x
+                                        <= viewport.origin.x + viewport.size.width
+                                    && bounds.bottom_right().y
+                                        <= viewport.origin.y + viewport.size.height
                             });
                         if !visible {
                             cx.notify();

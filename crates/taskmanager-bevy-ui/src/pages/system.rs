@@ -21,7 +21,7 @@ use bevy::ecs::query::With;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent,
-    px,
+    px, rem,
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
@@ -38,6 +38,10 @@ use hardware::hardware_fact_rows;
 pub(crate) mod thermal;
 pub(crate) use thermal::thermal_zone_rows;
 
+pub(crate) mod overview;
+pub(crate) mod privacy;
+pub(crate) mod topology;
+
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
@@ -48,6 +52,7 @@ use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::ComputedNode;
 use bevy::ui_widgets::ScrollArea;
 use dashboard::{SystemDashboardState, SystemDashboardToolbar};
+use privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
@@ -55,6 +60,14 @@ use taskmanager_core::core::npu::NpuEngineKind;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
+
+/// The KPI tile's flex basis, in rem: the width one tile asks for before the
+/// row wraps the next one beside it.
+const KPI_TILE_FLEX_BASIS_REM: f32 = 12.5;
+
+/// The KPI tile's minimum width, in rem: the narrowest a tile may take
+/// before its own value would clip.
+const KPI_TILE_MIN_WIDTH_REM: f32 = 8.75;
 
 pub(crate) mod diagnostic_modal;
 
@@ -72,6 +85,10 @@ pub(crate) struct SystemActions;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct MemoryInventoryAnchor;
+
+/// The marker on one hardware fact card of the overview grid.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct SystemFactCard;
 
 /// The page's root: mounting it binds the paint observers.
 #[derive(Component, Clone, Default)]
@@ -250,15 +267,17 @@ fn status_line_text(
     smbios: Option<&SmbiosMemorySnapshot>,
     npu: Option<&NpuInventorySnapshot>,
     sensors: Option<&SensorCenterSnapshot>,
+    disclosure: SerialDisclosure,
 ) -> String {
     if hardware.is_none() && smbios.is_none() && npu.is_none() && sensors.is_none() {
-        t("common.waiting_inventory").to_owned()
-    } else {
-        let base_count = system_fact_rows(hardware, smbios, npu).len();
-        let thermal_count = sensors.map(|s| thermal_zone_rows(s).len()).unwrap_or(0);
-        let count = base_count + thermal_count;
-        t("system.facts_ready").replacen("{count}", &count.to_string(), 1)
+        return t("common.waiting_inventory").to_owned();
     }
+    let base_count = system_fact_rows(hardware, smbios, npu).len()
+        + identity_fact_rows(smbios, disclosure).len()
+        + module_serial_rows(smbios, disclosure).len();
+    let thermal_count = sensors.map(|s| thermal_zone_rows(s).len()).unwrap_or(0);
+    let count = base_count + thermal_count;
+    t("system.facts_ready").replacen("{count}", &count.to_string(), 1)
 }
 
 // ---- render adapters ------------------------------------------------------
@@ -278,7 +297,7 @@ pub(crate) fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl S
     detail_row_scene(row.label.clone(), value_scene, palette)
 }
 
-fn kpi_tile_scene(
+pub(crate) fn kpi_tile_scene(
     title: String,
     value: String,
     note: String,
@@ -287,8 +306,8 @@ fn kpi_tile_scene(
     bsn! {
         Node {
             flex_grow: 1.0,
-            flex_basis: px(200.0),
-            min_width: px(140.0),
+            flex_basis: rem(KPI_TILE_FLEX_BASIS_REM),
+            min_width: rem(KPI_TILE_MIN_WIDTH_REM),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_12())),
@@ -315,184 +334,36 @@ fn kpi_tile_scene(
     }
 }
 
+/// One fact card.
+///
+/// The card's width is the measured grid width: the overview resolves how
+/// many cards fit on one row from the content width it measured, so a small
+/// window folds the cards instead of letting them overflow.
 pub(crate) fn section_card_scene(
     title: String,
     rows: Vec<Box<dyn bevy::scene::Scene>>,
+    width: Option<f32>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let basis = width.map_or(Val::Auto, px);
     bsn! {
         Node {
             flex_grow: 1.0,
-            flex_basis: px(340.0),
-            min_width: px(300.0),
+            flex_basis: { basis },
+            min_width: px(0.0),
+            max_width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_12())),
             border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
         }
         BackgroundColor({ palette.panel_fill })
+        SystemFactCard
         Children [
              Text(title) TextRole(Role::Body) --
             { rows }
         ]
     }
-}
-
-fn system_body_scene(
-    hardware: Option<&HardwareInfo>,
-    smbios: Option<&SmbiosMemorySnapshot>,
-    npu: Option<&NpuInventorySnapshot>,
-    sensors: Option<&SensorCenterSnapshot>,
-    summary: &SystemSummaryModel,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let rows = system_fact_rows(hardware, smbios, npu);
-    let thermal_rows = sensors.map(thermal_zone_rows).unwrap_or_default();
-    if rows.is_empty() && thermal_rows.is_empty() {
-        return Box::new(bsn! {
-            Node {
-                width: percent(100),
-                padding: UiRect::all(Val::Px(space_12())),
-                border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-            }
-            BackgroundColor({ palette.panel_fill })
-            Children [
-                 Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body)
-            ]
-        }) as Box<dyn bevy::scene::Scene>;
-    }
-
-    let cpu_note = hardware
-        .and_then(|h| match (h.cpu_brand.as_deref(), h.cpu_cores) {
-            (Some(brand), Some(cores)) => Some(format!("{brand} · {cores} {}", t("common.cores"))),
-            (Some(brand), None) => Some(brand.to_owned()),
-            (None, Some(cores)) => Some(format!("{cores} {}", t("common.cores"))),
-            (None, None) => None,
-        })
-        .unwrap_or_else(|| t("common.utilization").to_owned());
-
-    let mem_total = hardware
-        .and_then(|h| h.total_memory_mb)
-        .map(clean_memory_size);
-    let mem_note = match mem_total {
-        Some(total) => format!("{total} {}", t("system.field.installed_memory")),
-        None => t("system.field.installed_memory").to_owned(),
-    };
-
-    let proc_val = summary
-        .processes
-        .map_or_else(missing_value, |count| count.to_string());
-    let proc_note = t("tab.apps").to_owned();
-
-    let alerts_val = summary.active_alerts.to_string();
-    let alerts_note = t("tab.alerts").to_owned();
-
-    let health_tile = summary.health.as_ref().map(|health| {
-        Box::new(kpi_tile_scene(
-            t("system.health_score").to_owned(),
-            health.clone(),
-            t("system.health_score").to_owned(),
-            palette,
-        )) as Box<dyn bevy::scene::Scene>
-    });
-
-    let mut tiles = vec![
-        Box::new(kpi_tile_scene(
-            t("common.cpu").to_owned(),
-            summary.cpu.clone(),
-            cpu_note,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(kpi_tile_scene(
-            t("common.memory").to_owned(),
-            summary.memory.clone(),
-            mem_note,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(kpi_tile_scene(
-            t("dashboard.processes").to_owned(),
-            proc_val,
-            proc_note,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-        Box::new(kpi_tile_scene(
-            t("dashboard.active_alerts").to_owned(),
-            alerts_val,
-            alerts_note,
-            palette,
-        )) as Box<dyn bevy::scene::Scene>,
-    ];
-    if let Some(tile) = health_tile {
-        tiles.push(tile);
-    }
-
-    let tiles_row = bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(space_8()),
-            row_gap: Val::Px(space_8()),
-        }
-        Children [
-            { tiles }
-        ]
-    };
-
-    let mut cards = [
-        (SystemFactGroup::OperatingSystem, "common.operating_system"),
-        (SystemFactGroup::Cpu, "system.field.cpu"),
-        (SystemFactGroup::Memory, "common.memory"),
-        (SystemFactGroup::Hardware, "common.hardware"),
-        (SystemFactGroup::Npu, "npu.title"),
-        (SystemFactGroup::MemoryInventory, "system.memory_inventory"),
-    ]
-    .into_iter()
-    .filter_map(|(group, title)| {
-        let group_rows = rows
-            .iter()
-            .filter(|row| row.group == group)
-            .map(|row| Box::new(fact_row_scene(row, palette)) as Box<dyn Scene>)
-            .collect::<Vec<_>>();
-        (!group_rows.is_empty()).then(|| {
-            let card = section_card_scene(t(title).to_owned(), group_rows, palette);
-            if group == SystemFactGroup::MemoryInventory {
-                Box::new(bsn! { MemoryInventoryAnchor @{card} }) as Box<dyn Scene>
-            } else {
-                Box::new(card) as Box<dyn Scene>
-            }
-        })
-    })
-    .collect::<Vec<_>>();
-
-    if let Some(thermal_card) = thermal::thermal_zone_card_scene(&thermal_rows, palette) {
-        cards.push(thermal_card);
-    }
-
-    let cards_grid = bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(space_8()),
-            row_gap: Val::Px(space_8()),
-        }
-        Children [
-            { cards }
-        ]
-    };
-
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_12()),
-        }
-        Children [
-             @{ tiles_row } --
-             @{ cards_grid }
-        ]
-    })
 }
 
 /// Content-region scene for the System page. The body container starts empty;
@@ -513,6 +384,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     );
     let waiting = t("common.waiting_inventory").to_owned();
     let diagnostic = diagnostic_modal::diagnostic_button_scene(_context.palette);
+    let mask = privacy::mask_button_scene(SerialDisclosure::default(), _context.palette);
     let about = crate::about_modal::action_scene(
         t("about.title"),
         crate::about_modal::AboutCommand::Open,
@@ -523,6 +395,8 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         crate::about_modal::AboutCommand::SystemInformation,
         _context.palette,
     );
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(_context.palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(px(space_8())));
     bsn! {
         Node {
             width: percent(100),
@@ -535,7 +409,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
              Text(title) TextRole(Role::Heading) --
              Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } SystemActions
-             Children [ @{ dashboard } -- @{ health } -- @{ diagnostic } -- @{ about } -- @{ system_information } ] --
+             Children [ @{ dashboard } -- @{ health } -- @{ diagnostic } -- @{ mask } -- @{ about } -- @{ system_information } ] --
 
                 Text(waiting)
                 SystemStatusLine
@@ -543,15 +417,31 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
             --
              Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column } SystemDashboardToolbar Children [] --
 
+                // The viewport wrapper owns the scroll area AND the floating
+                // rail: the rail is a sibling of the scroll area, so it never
+                // scrolls with the content and never takes layout space away
+                // from it.
                 Node {
                     width: percent(100),
                     min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
-                    overflow: Overflow::scroll_y(),
                     flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(space_2()),
-                    padding: UiRect::bottom(px(space_8())),
                 }
-                SystemBody ScrollArea
+                Children [
+                    Node {
+                        width: percent(100),
+                        min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                        overflow: Overflow::scroll_y(),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(space_2()),
+                        // The rail floats over the trailing edge: the content
+                        // keeps that lane clear, so no row's right edge ever
+                        // sits under the scrollbar.
+                        padding: { lane },
+                    }
+                    SystemBody ScrollArea
+                    --
+                    @{ rail }
+                ]
 
         ]
     }
@@ -560,3 +450,7 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
 #[cfg(test)]
 #[path = "../../tests/headless/pages/system.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/system_parity.rs"]
+mod parity_tests;

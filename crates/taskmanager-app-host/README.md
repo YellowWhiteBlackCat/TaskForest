@@ -43,6 +43,7 @@ target cfg paths and the native composition architecture tests.
 
 ```text
 src/lib.rs                       composition root: runtime + native client + surface roles
+src/mode.rs                      AppHostMode probe: daemon subscription vs standalone fallback (ADR-055)
 src/presentation.rs              toolkit-neutral WindowPresentation contract (ADR-037)
 src/history_frontend.rs          HistoryFrontendSession (replay client + writer ownership)
 src/history_persistence_runtime.rs (+ health.rs)   bounded persistence generation

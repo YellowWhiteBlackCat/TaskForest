@@ -22,6 +22,11 @@ pub(crate) fn diagnostic_bundle_overlay<'a>(
     let contents = match state {
         DiagnosticBundleUiState::Preview(plan) => diagnostic_preview_text(plan.preview()),
         DiagnosticBundleUiState::Writing(preview) => {
+            // The in-flight write wears the skeleton: the surface is honest
+            // about waiting instead of showing a stale preview (ICED-050).
+            if let Some(skeleton) = app.diagnostic_skeleton_view() {
+                body = body.push(skeleton);
+            }
             body = body.push(text(t("diagnostics.writing")));
             diagnostic_preview_text(preview)
         }

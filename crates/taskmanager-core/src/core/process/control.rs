@@ -1,10 +1,12 @@
 //! Platform-neutral process-control identity, intent, and result contracts.
 
-use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
 
+use super::collateral::{
+    FrozenProcessCollateral, FrozenProcessCollateralMember, ProcessTreeClosure,
+};
 use super::{ProcessItem, ProcessLiveKey};
 use crate::core::FailureKind;
 
@@ -169,9 +171,24 @@ pub struct ProcessBatchIntent {
     #[serde(default)]
     pub scope: ProcessGroupScope,
     pub targets: Vec<FrozenProcessIdentity>,
+    /// The frozen hierarchical view of `targets`: the tree root and every
+    /// affected descendant with its depth below the root.
+    ///
+    /// The view is captured from the SAME expansion the execution set uses
+    /// and at the same moment, so a confirmation surface can render the
+    /// indented closure without re-reading live rows (the frozen-gate
+    /// contract). It never names a process `targets` does not contain, and it
+    /// never drops one. A batch that was not frozen from a tree root has no
+    /// hierarchy and carries an empty view.
+    #[serde(default, skip_serializing_if = "FrozenProcessCollateral::is_empty")]
+    pub collateral: FrozenProcessCollateral,
 }
 
 impl ProcessBatchIntent {
+    /// Freeze the exact selected processes into one execution set.
+    ///
+    /// A selection is not a tree, so the frozen hierarchical view stays
+    /// empty: there is no root and no depth to draw.
     #[must_use]
     pub fn freeze(
         processes: &[ProcessItem],
@@ -193,6 +210,7 @@ impl ProcessBatchIntent {
                 })
                 .filter_map(FrozenProcessIdentity::from_process)
                 .collect(),
+            collateral: FrozenProcessCollateral::default(),
         }
     }
 
@@ -202,25 +220,44 @@ impl ProcessBatchIntent {
     /// while this contract owns identity capture and execution order. The
     /// frozen scope is [`ProcessGroupScope::PidAdjacency`] — the expansion is
     /// exactly the `parent_pid` closure known to the model today.
+    ///
+    /// The same expansion also freezes the hierarchical view: the root and
+    /// every affected descendant with its depth below the root, in root-first
+    /// depth-first order. The execution set and the view are two projections
+    /// of one walk, so the drawn closure can never disagree with what is
+    /// killed.
     #[must_use]
     pub fn freeze_tree(
         processes: &[ProcessItem],
         root: ProcessLiveKey,
         action: ProcessBatchAction,
     ) -> Self {
+        let closure = ProcessTreeClosure::freeze(processes, root);
         Self {
             action,
             scope: ProcessGroupScope::PidAdjacency,
-            targets: descendant_live_keys(processes, root)
-                .into_iter()
+            targets: closure
+                .execution()
+                .iter()
                 .filter_map(|identity| {
                     processes
                         .iter()
-                        .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
+                        .find(|process| ProcessLiveKey::from_process(process) == Some(*identity))
                 })
                 .filter_map(FrozenProcessIdentity::from_process)
                 .collect(),
+            collateral: FrozenProcessCollateral::from_closure(processes, &closure),
         }
+    }
+
+    /// The frozen collateral rows a confirmation surface renders: the root
+    /// first, then every affected descendant in depth-first order.
+    ///
+    /// The rows are frozen with the intent; a later refresh of the live rows
+    /// never changes them.
+    #[must_use]
+    pub fn collateral_rows(&self) -> &[FrozenProcessCollateralMember] {
+        self.collateral.members()
     }
 }
 
@@ -232,71 +269,18 @@ impl ProcessBatchIntent {
 /// The visited set makes the walk total on cyclic `parent_pid` chains. An
 /// unknown or identity-less root yields an EMPTY vector (fail closed — a
 /// control intent over a dead row has no honest targets).
+///
+/// The walk itself lives in `ProcessTreeClosure`, which also carries the
+/// root-first depth-first order of the same members; the execution order and
+/// the drawn hierarchy are two projections of ONE expansion.
 #[must_use]
 pub fn descendant_live_keys(
     processes: &[ProcessItem],
     root: ProcessLiveKey,
 ) -> Vec<ProcessLiveKey> {
-    let Some(root_process) = processes
-        .iter()
-        .find(|process| ProcessLiveKey::from_process(process) == Some(root))
-    else {
-        return Vec::new();
-    };
-    let mut by_pid = HashMap::with_capacity(processes.len());
-    for process in processes {
-        // Parent links are PID-based, so a provider snapshot containing two
-        // rows for one PID is ambiguous even when their start tokens differ.
-        // Refuse the whole tree rather than allowing the lookup map to pick a
-        // different incarnation than the root identity that was selected.
-        if by_pid.insert(process.pid, process).is_some() {
-            return Vec::new();
-        }
-    }
-    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
-    for process in processes {
-        if let Some(parent) = process.parent_pid
-            && process.pid != root.pid()
-        {
-            children.entry(parent).or_default().push(process.pid);
-        }
-    }
-    for child_pids in children.values_mut() {
-        child_pids.sort_unstable();
-    }
-
-    fn visit(
-        pid: u32,
-        children: &HashMap<u32, Vec<u32>>,
-        visited: &mut HashSet<u32>,
-        by_pid: &HashMap<u32, &ProcessItem>,
-        order: &mut Vec<ProcessLiveKey>,
-    ) {
-        if !visited.insert(pid) {
-            return;
-        }
-        if let Some(child_pids) = children.get(&pid) {
-            for child_pid in child_pids {
-                visit(*child_pid, children, visited, by_pid, order);
-            }
-        }
-        if let Some(identity) = by_pid
-            .get(&pid)
-            .and_then(|process| ProcessLiveKey::from_process(process))
-        {
-            order.push(identity);
-        }
-    }
-
-    let mut order = Vec::new();
-    visit(
-        root_process.pid,
-        &children,
-        &mut HashSet::new(),
-        &by_pid,
-        &mut order,
-    );
-    order
+    ProcessTreeClosure::freeze(processes, root)
+        .execution()
+        .to_vec()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

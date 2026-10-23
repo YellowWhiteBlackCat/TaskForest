@@ -35,8 +35,17 @@ pub const fn path(icon: IconId) -> &'static str {
         IconId::EndTask | IconId::Close | IconId::CircleX => "icons/circle-x.svg",
         IconId::Pause => "icons/dash.svg",
         IconId::Sidebar => "icons/panel-left.svg",
-        IconId::CircleCheck => "icons/circle-check.svg",
-        IconId::TriangleAlert => "icons/triangle-alert.svg",
+        IconId::CircleCheck => icon_path::CIRCLE_CHECK,
+        IconId::TriangleAlert => icon_path::TRIANGLE_ALERT,
+        // The session-family, container-runtime and read-only marks each own
+        // one glyph in the shared asset set — a frontend never invents a
+        // second drawing for the same semantic id.
+        IconId::Terminal => icon_path::TERMINAL,
+        IconId::Display => icon_path::DISPLAY,
+        IconId::Docker => icon_path::DOCKER,
+        IconId::Podman => icon_path::PODMAN,
+        IconId::Lock => icon_path::LOCK,
+        IconId::Remote => icon_path::REMOTE,
         // App-history: a dedicated glyph asset is not bundled, so the page
         // borrows the analytics-dashboard glyph — visually distinct from every
         // other nav-tab icon (chart-pie/process/service/startup/user/info) and

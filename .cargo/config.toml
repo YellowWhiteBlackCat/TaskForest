@@ -15,8 +15,16 @@
 
 [build]
 jobs = 4
-# Match the local gate's warning flags so ordinary builds reuse its artifacts.
-rustflags = ["-D", "warnings"]
+# Warning gate for local packages. `build.warnings` is Cargo's own knob for
+# exactly this scope and is stable since Cargo 1.97 (this repository pins
+# 1.99.0). It replaces `rustflags = ["-D", "warnings"]`, which applied the flag
+# to every compiler invocation and therefore invalidated the whole build cache
+# whenever the flag set changed. ADR-058.
+#
+# CI keeps `RUSTFLAGS` (it carries mold's `-C link-arg` and is hashed by the
+# rust-cache key), and the gate scripts export `-D warnings` into RUSTFLAGS
+# themselves, so local and CI strictness stay identical.
+warnings = "deny"
 
 # ADR-051: each frontend is its own product crate. Address a product by
 # package locally (`-p`) instead of re-selecting features — these aliases are

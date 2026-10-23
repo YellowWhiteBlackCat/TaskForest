@@ -7,6 +7,12 @@
 //! stable kernel interface report `Unavailable(Unsupported)` instead of a
 //! fabricated curve, and an empty device list with no failure is the honest
 //! "this host has no NPU" state, never an error.
+//!
+//! Power and energy are a separate, capability-gated fact
+//! ([`NpuPowerReport`]): the platform layer fills it only where the driver
+//! exposes a real power or energy counter, and an accelerator without that
+//! capability contributes no observation at all. The energy series is never
+//! derived from the utilization curve.
 
 use serde::{Deserialize, Serialize};
 
@@ -67,6 +73,41 @@ pub struct NpuMemoryReport {
     pub sram_total_bytes: ScalarObservation<u64>,
 }
 
+/// One accelerator's power and energy facts.
+///
+/// Both observations stay typed: a platform or driver that cannot read the
+/// capability reports `Unavailable(Unsupported)`. An accelerator's energy is
+/// never derived from its utilization curve — the absence of a counter stays
+/// the absence of a series.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub struct NpuPowerReport {
+    /// Instantaneous accelerator power draw, in watts.
+    pub power_w: ScalarObservation<f32>,
+    /// Cumulative energy the accelerator has consumed, in joules.
+    pub energy_j: ScalarObservation<u64>,
+}
+
+impl NpuPowerReport {
+    /// The honest "this platform cannot report it" report.
+    #[must_use]
+    pub const fn unsupported() -> Self {
+        Self {
+            power_w: ScalarObservation::unavailable(FailureKind::Unsupported),
+            energy_j: ScalarObservation::unavailable(FailureKind::Unsupported),
+        }
+    }
+}
+
+/// One accelerator's power/energy observation, filed under the accelerator's
+/// stable identity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NpuPowerObservation {
+    /// The accelerator this observation belongs to.
+    pub device_id: DeviceId,
+    /// The power and energy facts.
+    pub report: NpuPowerReport,
+}
+
 /// One discovered NPU accelerator device.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct NpuDevice {
@@ -103,10 +144,18 @@ pub struct NpuInventoryFailure {
 /// `devices` is non-empty only on a successful enumeration: an empty list with
 /// `failure: None` is the honest "enumeration ran, no NPU present" state,
 /// while any `failure` means no device row in this snapshot is real.
+///
+/// `power` carries the per-accelerator power/energy observations of the same
+/// enumeration. It is empty when no accelerator on this platform reports the
+/// capability — the energy series is then absent, never derived from
+/// utilization.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct NpuInventorySnapshot {
     pub observed_at_ms: u64,
     pub devices: Vec<NpuDevice>,
+    /// Power/energy observations, one per accelerator that reports the
+    /// capability.
+    pub power: Vec<NpuPowerObservation>,
     pub failure: Option<NpuInventoryFailure>,
 }
 
@@ -119,8 +168,21 @@ impl NpuInventorySnapshot {
         Self {
             observed_at_ms,
             devices,
+            power: Vec::new(),
             failure: None,
         }
+    }
+
+    /// Attach the per-accelerator power/energy observations to this
+    /// enumeration.
+    ///
+    /// The platform layer fills this by capability: an accelerator whose
+    /// driver exposes no power counter contributes no observation, so the
+    /// energy series stays absent for it.
+    #[must_use]
+    pub fn with_power(mut self, power: Vec<NpuPowerObservation>) -> Self {
+        self.power = power;
+        self
     }
 
     /// Failed enumeration: a typed reason, never a fabricated device.
@@ -129,6 +191,7 @@ impl NpuInventorySnapshot {
         Self {
             observed_at_ms,
             devices: Vec::new(),
+            power: Vec::new(),
             failure: Some(NpuInventoryFailure {
                 kind,
                 detail: detail.into(),
@@ -142,8 +205,22 @@ impl NpuInventorySnapshot {
     pub const fn is_success(&self) -> bool {
         self.failure.is_none()
     }
+
+    /// The power/energy observation of one accelerator, when the platform
+    /// reported the capability for it.
+    #[must_use]
+    pub fn power_for(&self, device_id: &DeviceId) -> Option<&NpuPowerReport> {
+        self.power
+            .iter()
+            .find(|observation| &observation.device_id == device_id)
+            .map(|observation| &observation.report)
+    }
 }
 
 #[cfg(test)]
 #[path = "../../tests/headless/core_core_npu_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/core_core_npu_power_tests.rs"]
+mod power_tests;

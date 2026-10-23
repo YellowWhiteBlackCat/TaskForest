@@ -12,12 +12,20 @@ use taskmanager_shell::presentation::trend::window;
 
 pub(super) mod battery;
 pub(super) mod cpu;
+pub(super) mod disk;
 mod fan;
 mod gpu;
+mod npu_power;
 mod smart;
-pub(super) use battery::battery_fact_line;
+pub(super) use battery::{battery_charge_pct, battery_fact_line};
+pub(super) use disk::{
+    MountAlert, NvmeGauge, PartitionDonut, SmartHealthBadge, SmartToolGuidance, WearBand,
+    mount_alerts, nvme_gauge_model, partition_donut_models, smart_health_badge, smart_health_label,
+    smart_tool_guidance,
+};
 pub(super) use fan::{fan_caption, fan_fact_line, fans};
 pub(super) use gpu::gpu_fact_line;
+pub(super) use npu_power::{npu_power_fact, npu_power_samples};
 pub(super) use smart::{smart_source_guidance, smart_source_status};
 
 /// Percent readout. There is no shared percent formatter in
@@ -191,40 +199,6 @@ pub(super) fn core_usage_fill_pct(shell: &ShellApp, index: usize) -> f32 {
     core_usage_pct(shell, index)
         .filter(|value| value.is_finite())
         .map_or(0.0, |value| value.clamp(0.0, 100.0))
-}
-
-/// A disk rail row's caption: activity percentage and the two transfer rates.
-/// Each fact keeps its own dash-on-missing semantics.
-pub(super) struct PartitionViewModel {
-    pub(super) name: String,
-    pub(super) usage_text: String,
-    pub(super) pct: f32,
-}
-
-pub(super) fn disk_partition_view_models(disk: &DiskMetrics) -> Vec<PartitionViewModel> {
-    disk.partitions
-        .iter()
-        .map(|part| {
-            let name = if !part.mount_point.is_empty() {
-                format!("{} ({})", part.mount_point, part.fs_type)
-            } else {
-                part.name.clone()
-            };
-            let (used_str, cap_str, pct) =
-                match (part.current_used_bytes(), part.current_capacity_bytes()) {
-                    (Some(used), Some(cap)) if cap > 0 => {
-                        let pct = (used as f32 / cap as f32 * 100.0).clamp(0.0, 100.0);
-                        (bytes(used), bytes(cap), pct)
-                    }
-                    _ => (missing_value(), missing_value(), 0.0),
-                };
-            PartitionViewModel {
-                name,
-                usage_text: format!("{used_str} / {cap_str} ({pct:.0}%)"),
-                pct,
-            }
-        })
-        .collect()
 }
 
 pub(super) struct GpuVramViewModel {

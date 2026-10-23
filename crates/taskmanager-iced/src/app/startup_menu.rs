@@ -36,6 +36,19 @@ impl IcedApp {
         entry.and_then(|entry| self.shell.request_startup_control_for(entry, enabled))
     }
 
+    /// The startup enable/disable request of ONE row switch.
+    ///
+    /// The row is resolved through the same canonical sort the table renders,
+    /// so the request targets the entry the user sees.
+    pub(super) fn apply_startup_row_switch(
+        &mut self,
+        visual_index: usize,
+        enabled: bool,
+    ) -> Option<PlatformEffect> {
+        let entry = self.shell.sorted_startup_entry_at(visual_index)?.clone();
+        self.shell.request_startup_control_for(entry, enabled)
+    }
+
     pub(super) fn startup_source_index(&self, visual_index: usize) -> Option<usize> {
         self.shell
             .sorted_startup_indices()

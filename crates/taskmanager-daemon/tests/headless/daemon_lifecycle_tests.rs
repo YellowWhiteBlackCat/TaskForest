@@ -26,6 +26,8 @@ use taskmanager_ipc::service::ClientSession;
 use taskmanager_ipc::service::IpcClient;
 #[cfg(not(windows))]
 use taskmanager_ipc::transport::IpcEndpoint;
+#[cfg(not(windows))]
+use taskmanager_test_support::unix_socket::socket_temp_root;
 
 #[test]
 fn daemon_configuration_and_cadence_switching() {
@@ -81,7 +83,13 @@ fn daemon_history_persistence_and_flush() {
 #[cfg(not(windows))]
 #[test]
 fn daemon_service_socket_lifecycle_and_graceful_shutdown() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("daemon_service.sock");
     let history_dir = temp_dir.path().join("daemon_svc_history");
 
@@ -125,7 +133,13 @@ fn daemon_collector_real_sampling_test() {
 #[cfg(not(windows))]
 #[test]
 fn e2e_daemon_telemetry_broadcast_to_subscribers() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("broadcast_daemon.sock");
     let history_dir = temp_dir.path().join("broadcast_history");
 
@@ -179,7 +193,13 @@ fn e2e_daemon_telemetry_broadcast_to_subscribers() {
 #[cfg(not(windows))]
 #[test]
 fn e2e_daemon_real_history_query_and_response() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("history_daemon.sock");
     let history_dir = temp_dir.path().join("query_history");
 

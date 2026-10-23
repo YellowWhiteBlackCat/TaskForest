@@ -13,6 +13,7 @@ fn worker_round_trips_a_rejected_target_result() {
         .expect("fixture identity");
     worker
         .submit(ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Resume,
             scope: Default::default(),
             targets: vec![ghost],
@@ -44,6 +45,7 @@ fn worker_accepts_one_intent_at_a_time() {
     let ghost = FrozenProcessIdentity::from_authoritative_parts(u32::MAX, "ghost-a", 1, 1)
         .expect("fixture identity");
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::End,
         scope: Default::default(),
         targets: vec![ghost],

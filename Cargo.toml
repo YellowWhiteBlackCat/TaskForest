@@ -3,7 +3,25 @@ exclude = [
     "crates/taskmanager-afpacket/fuzz",
 ]
 members = [".", "crates/*"]
-resolver = "2"
+# Resolver v3 (the edition-2024 default) keeps resolver v2 feature-unification
+# semantics and only flips `resolver.incompatible-rust-versions` from `allow`
+# to `fallback`, so dependency resolution prefers versions whose `rust-version`
+# does not exceed this workspace's floor. `rust-version` below is a published
+# compatibility promise, so the resolver must honour it. ADR-057.
+resolver = "3"
+
+# Single lint source of truth for the workspace (ADR-056). Members inherit it
+# through `[lints] workspace = true`; the four audited unsafe trust roots
+# (ADR-022 perf-ioctl, ADR-024 afpacket, ADR-025 fd-bridge, ADR-031 windows-api)
+# cannot inherit it — `forbid`/`deny` cannot be relaxed by a lower scope and
+# Cargo forbids mixing `workspace = true` with other lint keys — so they carry
+# an explicit table instead. `deny` here backs the crate-level
+# `#![forbid(unsafe_code)]` that business crates already carry; the manifest
+# entry is what stops a newly added crate from silently skipping the policy.
+[workspace.lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
 
 # The root package is `taskmanager-gates` (ADR-051): the cross-crate
 # conformance host. It ships no binary and no public API — the four frontend
@@ -15,7 +33,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -28,6 +46,11 @@ rust-version = "1.99.0"
 # The `tests/gui.rs` suite's product target is declared by
 # `taskmanager-gpui` (ADR-051); this host registers only its own suites.
 autotests = false
+
+# Lint fact source: the workspace table (ADR-056). The gate host is a business
+# crate and keeps its crate-level `#![forbid(unsafe_code)]`.
+[lints]
+workspace = true
 
 [[test]]
 name = "logic"

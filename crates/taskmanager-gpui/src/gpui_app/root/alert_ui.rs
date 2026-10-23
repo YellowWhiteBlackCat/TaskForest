@@ -72,10 +72,15 @@ pub fn render_banner(
     snapshot: &SystemSnapshot,
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
+    // The severity palette is the single authority for severity ink (BEVY-174
+    // convergence): a frontend resolves it instead of assembling its own
+    // severity table. The warning level reads the theme's warning token — it
+    // never borrowed the GPU accent, which painted a warning green.
+    let severity = theme.severity_palette();
     let color = match alert.severity {
-        AlertSeverity::Info => theme.accent,
-        AlertSeverity::Warning => theme.gpu,
-        AlertSeverity::Critical => theme.danger,
+        AlertSeverity::Info => severity.notice(),
+        AlertSeverity::Warning => severity.warning(),
+        AlertSeverity::Critical => severity.critical(),
     };
     let value = match alert.metric {
         AlertMetric::DiskTemperatureC => format!("{:.0} °C", alert.value),

@@ -118,6 +118,7 @@ fn single_process_work_tracks_pid_and_authoritative_start_token() {
 #[test]
 fn process_batch_keeps_one_transaction_lifecycle_even_for_one_target() {
     let request = ProcessControlRequest::ExecuteBatch(ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::End,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![process(41, "display", 100, 700)],

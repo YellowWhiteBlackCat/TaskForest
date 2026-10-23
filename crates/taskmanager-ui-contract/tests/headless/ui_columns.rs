@@ -51,3 +51,23 @@ fn name_is_not_hideable_and_every_width_is_positive() {
         }
     }
 }
+
+/// The column-width policy is ONE authority: the values are pinned here so
+/// a frontend cannot drift away from the contract, and the policy stays
+/// coherent (a minimum below the maximum, a positive step).
+#[test]
+fn the_column_width_policy_is_pinned_and_coherent() {
+    assert_eq!(COLUMN_WIDTH_MIN, 10.0, "the policy's minimum is pinned");
+    assert_eq!(COLUMN_WIDTH_MAX, 1200.0, "the policy's maximum is pinned");
+    assert_eq!(
+        COLUMN_WIDTH_KEYBOARD_STEP, 10.0,
+        "the policy's keyboard step is pinned"
+    );
+    // The policy's coherence is a COMPILE-TIME fact: these are constants, so
+    // a contradictory policy fails the build instead of a test run.
+    const {
+        assert!(COLUMN_WIDTH_MIN < COLUMN_WIDTH_MAX);
+        assert!(COLUMN_WIDTH_KEYBOARD_STEP > 0.0);
+        assert!(COLUMN_WIDTH_MIN + COLUMN_WIDTH_KEYBOARD_STEP <= COLUMN_WIDTH_MAX);
+    }
+}

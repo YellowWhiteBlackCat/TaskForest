@@ -143,6 +143,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ConfirmServiceControl => "iced-confirm-service-control".to_owned(),
         FocusTarget::CancelServiceControl => "iced-cancel-service-control".to_owned(),
         FocusTarget::StartupControl => "iced-startup-control".to_owned(),
+        FocusTarget::StartupRowSwitch { index } => format!("iced-startup-row-switch-{index}"),
         FocusTarget::StartupMenuAction { index, enabled } => {
             format!(
                 "iced-startup-menu-action-{index}-{}",

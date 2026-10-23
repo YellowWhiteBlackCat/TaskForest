@@ -265,6 +265,7 @@ fn foreign_control_mapping_preserves_rejection_and_helper_availability() {
 fn suspend_batch_reports_typed_results_per_target() {
     let mut provider = WinProcessControlProvider::new();
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Suspend,
         scope: Default::default(),
         targets: vec![frozen(1), frozen(2)],
@@ -331,6 +332,7 @@ fn execute_batch_end_action_echoes_intent_and_reports_per_target_failure() {
     let sentinel_a = u32::MAX;
     let sentinel_b = u32::MAX - 1;
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::End,
         scope: Default::default(),
         targets: vec![frozen(sentinel_a), frozen(sentinel_b)],

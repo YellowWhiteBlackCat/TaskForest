@@ -7,7 +7,7 @@
 use super::*;
 use crate::icons::{IconInk, IconPlate};
 use crate::pages::performance::metrics::disk_caption;
-use crate::palette::{UiPalette, space_4, space_8, space_12};
+use crate::palette::{UiPalette, space_1, space_4, space_8, space_12};
 use crate::widgets::controls::{
     ControlTone, ControlVisual, SurfaceTone, device_row_with_accessory_scene, graph_card_scene,
     pill_scene, stat_row_scene, surface_scene,
@@ -22,13 +22,23 @@ use bevy::ui::prelude::{BackgroundColor, BorderRadius, FlexWrap, PositionType};
 use bevy::ui_widgets::Button;
 use taskmanager_ui_contract::IconId;
 
+pub(crate) mod battery;
 pub(super) mod blocks;
-pub(super) mod chart;
+pub(crate) mod chart;
+pub(crate) mod hover;
+pub(crate) mod npu_power;
 pub(super) mod sidebar;
 
 use super::replay::{PerformanceLiveBody, PerformanceReplayRoot, entry_scene};
 use sidebar::cpu::cpu_main_scene;
 use sidebar::{device_sidebar_scene, stats_rail_scene};
+
+/// The vertical divider's rail width, in rem.
+///
+/// The rail is the lane the hairline divider is centered in: the line
+/// itself is one logical px, and the rail carries the air on both sides of
+/// it. The rail rides the rem axis with the rest of the page furniture.
+const DIVIDER_RAIL_WIDTH_REM: f32 = 0.375;
 
 /// The disk spare warning is a semantic plate sibling of the live caption.
 /// Keeping the icon outside the text node preserves both the tofu law and the
@@ -56,8 +66,8 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
         Children [
 
                 Node {
-                    width: px(14.0),
-                    height: px(14.0),
+                    width: rem(palette.icon_rem),
+                    height: rem(palette.icon_rem),
                     flex_shrink: 0.0,
                     display: { warning_display },
                 }
@@ -97,8 +107,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
              @{ devices } --
 
                 Node {
-                    width: px(6.0),
-                    min_width: px(6.0),
+                    width: rem(DIVIDER_RAIL_WIDTH_REM),
+                    min_width: rem(DIVIDER_RAIL_WIDTH_REM),
                     height: percent(100),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
@@ -106,7 +116,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 Children [
 
                         Node {
-                            width: px(1.0),
+                            width: px(space_1()),
                             height: percent(100),
                         }
                         BackgroundColor({ palette.border_color })

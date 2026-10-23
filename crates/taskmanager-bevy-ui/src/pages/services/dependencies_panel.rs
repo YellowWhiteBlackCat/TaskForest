@@ -8,7 +8,7 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -16,14 +16,13 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, px, rem,
+    Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::control_error_detail;
@@ -35,6 +34,11 @@ use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
+
+/// The dependency tree's viewport height, in rem: the visible budget of the
+/// dependency list before it starts scrolling. The bound rides the rem axis
+/// with the panel around it.
+const DEPENDENCY_TREE_VIEWPORT_HEIGHT_REM: f32 = 15.0;
 
 // ---- pure view model -------------------------------------------------------
 
@@ -98,69 +102,6 @@ pub(crate) struct ServicesDependenciesRenderState {
 
 // ---- scenes ----------------------------------------------------------------
 
-fn relation_section_scene(
-    header: &str,
-    deps: &ServiceDeps,
-    kind: &ServiceRelationKind,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let targets: Vec<String> = deps
-        .relation_targets(kind)
-        .map(|id| id.as_str().to_owned())
-        .collect();
-
-    let count_text = if targets.is_empty() {
-        format!("{header}: —")
-    } else {
-        format!("{header} ({}):", targets.len())
-    };
-
-    let target_chips: Vec<Box<dyn Scene>> = targets
-        .into_iter()
-        .map(|target_id| {
-            Box::new(bsn! {
-
-                    Node {
-                        height: rem(palette.control_height_rem),
-                        padding: UiRect::horizontal(Val::Px(space_8())),
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                    }
-                    BackgroundColor({ palette.content_bg })
-                    Children [
-                         Text(target_id) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap }
-                    ]
-
-            }) as Box<dyn Scene>
-        })
-        .collect();
-
-    bsn! {
-        Node {
-            width: percent(100.0),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_4()),
-            padding: UiRect::vertical(Val::Px(space_2())),
-        }
-        Children [
-             Text(count_text) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
-
-                Node {
-                    width: percent(100.0),
-                    flex_direction: FlexDirection::Row,
-                    flex_wrap: bevy::ui::FlexWrap::Wrap,
-                    column_gap: Val::Px(space_4()),
-                    row_gap: Val::Px(space_4()),
-                }
-                Children [
-                    { target_chips }
-                ]
-
-        ]
-    }
-}
-
 fn chip_button(
     action: ServiceDependenciesControlAction,
     label: String,
@@ -190,9 +131,11 @@ fn chip_button(
     })
 }
 
-pub(crate) fn service_dependencies_panel_scene(
+/// The panel scene: the dependency tree of the opened unit.
+pub(crate) fn service_dependencies_panel_scene_expanded(
     shell: &ShellApp,
     palette: &UiPalette,
+    expansion: &crate::pages::services::deps_tree::ServiceDepsExpansion,
 ) -> Box<dyn Scene> {
     let lifecycle = &shell.service_dependencies;
     let target_id = match lifecycle.target() {
@@ -226,44 +169,34 @@ pub(crate) fn service_dependencies_panel_scene(
             ]
         })
     } else if let Some(deps) = lifecycle.projected() {
-        let req = Box::new(relation_section_scene(
-            t("svc.requires"),
-            deps,
-            &ServiceRelationKind::Requires,
-            palette,
-        )) as Box<dyn Scene>;
-        let wants = Box::new(relation_section_scene(
-            t("svc.wants"),
-            deps,
-            &ServiceRelationKind::Wants,
-            palette,
-        )) as Box<dyn Scene>;
-        let wanted_by = Box::new(relation_section_scene(
-            t("svc.wanted_by"),
-            deps,
-            &ServiceRelationKind::WantedBy,
-            palette,
-        )) as Box<dyn Scene>;
-        let after = Box::new(relation_section_scene(
-            t("svc.after"),
-            deps,
-            &ServiceRelationKind::After,
-            palette,
-        )) as Box<dyn Scene>;
-
+        let target = lifecycle.target().cloned().unwrap_or_default();
+        let tree = crate::pages::services::deps_tree::dependency_tree(shell, &target, deps);
+        let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+        let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
         Box::new(bsn! {
+            // The viewport wrapper owns the scroll area AND the floating
+            // rail: the rail is a sibling of the scroll area, so it never
+            // scrolls with the content and never takes layout space away
+            // from it.
             Node {
                 width: percent(100.0),
-                height: px(240.0),
+                height: rem(DEPENDENCY_TREE_VIEWPORT_HEIGHT_REM),
                 flex_direction: FlexDirection::Column,
-                overflow: Overflow::scroll_y(),
             }
-            ScrollArea
             Children [
-                 @{ req } --
-                 @{ wants } --
-                 @{ wanted_by } --
-                 @{ after }
+                Node {
+                    width: percent(100.0),
+                    height: rem(DEPENDENCY_TREE_VIEWPORT_HEIGHT_REM),
+                    flex_direction: FlexDirection::Column,
+                    overflow: Overflow::scroll_y(),
+                    padding: { lane },
+                }
+                ScrollArea
+                Children [
+                     @{ crate::pages::services::deps_tree::dependency_tree_scene(&tree, expansion, palette) }
+                ]
+                --
+                @{ rail }
             ]
         })
     } else {

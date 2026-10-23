@@ -53,12 +53,12 @@ pub(super) fn services_body_scene(
     shell: &ShellApp,
     palette: &UiPalette,
     selection: &ServiceSelection,
+    rows: &[ServiceRowModel],
 ) -> impl Scene + use<> {
-    let rows = service_rows(shell);
-    let selected = selected_row(&rows, selection);
+    let selected = selected_row(rows, selection);
     let notice = source_notice_text(shell.projection().services_source.as_deref());
     let empty = empty_state_text(shell.projection().services_source.as_deref());
-    let children = body_children(&rows, selected, notice, empty, palette);
+    let children = body_children(rows, selected, notice, empty, palette);
     let header = header_scene(shell.services_sort, palette);
     let toolbar = services_toolbar_scene(selection.target.is_some(), palette);
     bsn! {
@@ -102,10 +102,55 @@ pub(super) fn body_children(
     children
 }
 
+/// The content of one action capsule: the semantic mark and the label, in
+/// the reference surface's `[mark][label]` order.
+fn capsule_content(
+    label: String,
+    glyph: Option<action_glyph::ServiceActionGlyph>,
+    enabled: bool,
+    palette: &UiPalette,
+) -> Box<dyn Scene> {
+    let mark: Vec<Box<dyn Scene>> = match glyph {
+        Some(glyph) => vec![action_glyph::action_glyph_scene(glyph, palette, enabled)],
+        None => Vec::new(),
+    };
+    Box::new(bsn! {
+        Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_4()),
+        }
+        Pickable::IGNORE
+        Children [
+             { mark }--
+             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
+        ]
+    })
+}
+
 /// Header row: one caption cell per column; every cell carries the
 /// [`ServicesSortHeader`] identity (`Some` on sortable columns) for the
 /// pointer adapter.
 pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
+    let enabled = has_selection;
+    let start = capsule_content(
+        t("svc.start").to_owned(),
+        Some(action_glyph::ServiceActionGlyph::Start),
+        enabled,
+        palette,
+    );
+    let stop = capsule_content(
+        t("svc.stop").to_owned(),
+        Some(action_glyph::ServiceActionGlyph::Stop),
+        enabled,
+        palette,
+    );
+    let restart = capsule_content(
+        t("svc.restart").to_owned(),
+        Some(action_glyph::ServiceActionGlyph::Restart),
+        enabled,
+        palette,
+    );
     Box::new(bsn! {
         Node {
             width: percent(100.0),
@@ -131,12 +176,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_start_button_activated)
                 ServiceStartButton
                 Children [
-
-                        Text({ t("svc.start").to_owned() })
-                        TextRole(Role::Caption)
-                        TextLayout { linebreak: LineBreak::NoWrap }
-                        Pickable::IGNORE
-
+                     @{ start }
                 ]
             --
 
@@ -155,12 +195,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_stop_button_activated)
                 ServiceStopButton
                 Children [
-
-                        Text({ t("svc.stop").to_owned() })
-                        TextRole(Role::Caption)
-                        TextLayout { linebreak: LineBreak::NoWrap }
-                        Pickable::IGNORE
-
+                     @{ stop }
                 ]
             --
 
@@ -179,12 +214,7 @@ pub(super) fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 on(on_service_restart_button_activated)
                 ServiceRestartButton
                 Children [
-
-                        Text({ t("svc.restart").to_owned() })
-                        TextRole(Role::Caption)
-                        TextLayout { linebreak: LineBreak::NoWrap }
-                        Pickable::IGNORE
-
+                     @{ restart }
                 ]
             --
 
@@ -333,7 +363,6 @@ pub(super) fn service_row_scene(
     let widths = columns();
     let name = row.name.clone();
     let description = row.description.clone();
-    let status = row.status.as_str().to_owned();
     let fill = if selected {
         palette.nav_active_bg
     } else {
@@ -362,7 +391,7 @@ pub(super) fn service_row_scene(
         on(on_services_row_activated)
         Children [
              @service_name_cell_scene(name, name_width, row.cycle, palette) --
-             @chip_cell_scene(status, status_width, chip, palette) --
+             @chip_cell_scene(row.status, status_width, chip, palette) --
              @text_cell_scene(description, description_width, Role::Body)
         ]
     })
@@ -414,17 +443,27 @@ pub(super) fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scen
     }
 }
 
+/// The status cell: the breathing status dot and the status word, in one
+/// bounded line.
 pub(super) fn chip_cell_scene(
-    word: String,
+    status: ServiceStatus,
     width: f32,
     fill: Color,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let radius = palette.control_radius_px;
+    let word = status.as_str().to_owned();
+    let dot = status_dot::status_dot_scene(service_chip(status), palette);
     bsn! {
-        Node { width: px(width), align_items: AlignItems::Center }
+        Node {
+            width: px(width),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_4()),
+        }
         Pickable::IGNORE
         Children [
+             @{ dot }--
 
                 Node {
                     height: Val::Auto,

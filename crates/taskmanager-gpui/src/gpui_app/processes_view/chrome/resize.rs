@@ -14,9 +14,10 @@ use crate::gpui_app::root::RootView;
 use taskmanager_shell::SortCol;
 use taskmanager_theme::Theme;
 use taskmanager_ui::data::table::{
-    COLUMN_RESIZE_KEYBOARD_STEP, ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
+    ColumnResizeDrag, ColumnResizeHandleProps, ColumnResizeStep,
     column_resize_handle_with_keyboard, width_from_drag,
 };
+use taskmanager_ui_contract::COLUMN_WIDTH_KEYBOARD_STEP;
 
 /// Resolve a column's live header width (user override else default) — the
 /// header counterpart of `cells::live_width`, keeping header + body pixel-aligned
@@ -85,8 +86,8 @@ fn proc_resize_handle(
     column_resize_handle_with_keyboard(props, focus_handle, move |step, cx| {
         ent_step.update(cx, |view, cx| {
             let delta = match step {
-                ColumnResizeStep::Narrower => -COLUMN_RESIZE_KEYBOARD_STEP,
-                ColumnResizeStep::Wider => COLUMN_RESIZE_KEYBOARD_STEP,
+                ColumnResizeStep::Narrower => -COLUMN_WIDTH_KEYBOARD_STEP,
+                ColumnResizeStep::Wider => COLUMN_WIDTH_KEYBOARD_STEP,
             };
             let width = view.proc_col_width(col);
             view.resize_proc_col(col, width + px(delta), cx);

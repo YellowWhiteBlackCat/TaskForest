@@ -392,6 +392,7 @@ fn fully_applied_batch_renders_success_marker_without_failure_item() {
         .selected_process_identity()
         .expect("selected row has a frozen identity");
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Suspend,
         scope: Default::default(),
         targets: vec![identity.clone()],

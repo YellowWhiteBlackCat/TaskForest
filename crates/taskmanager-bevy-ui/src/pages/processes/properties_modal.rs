@@ -6,18 +6,20 @@ use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, WindowPalette};
+use bevy::app::Last;
 use bevy::app::{App, PostUpdate, Startup};
 use bevy::ecs::{
     component::Component,
     entity::Entity,
     event::Event,
-    hierarchy::{ChildOf, Children},
+    hierarchy::Children,
     observer::On,
     query::With,
     resource::Resource,
     schedule::IntoScheduleConfigs,
     system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam},
 };
+use bevy::prelude::Visibility;
 use bevy::scene::{CommandsSceneExt, Ready};
 use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
 use bevy::ui_widgets::{Activate, SelectedTab, TabList, ValueChange};
@@ -26,12 +28,23 @@ use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ShellApp;
 use view::ProcessPropertiesCurve;
 
+mod backdrop;
+mod gpu;
 mod insights;
+mod memory;
 mod model;
 mod performance;
+mod quota;
+mod tabs;
 mod view;
+use crate::scene_attach::attach_child;
+use crate::scene_attach::insert_into;
+use gpu::GpuBar;
+use memory::MemorySegments;
 use model::view_model;
 use performance::PerformanceCurve;
+use quota::QuotaFact;
+use tabs::TabIndicatorMotion;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum ProcessPropertiesSection {
@@ -66,6 +79,12 @@ pub(crate) struct ProcessPropertiesView {
     pub(crate) curves: Vec<PerformanceCurve>,
     pub(crate) authorize_network: bool,
     pub(crate) live: bool,
+    /// The measured memory segments of the overview's comparison bar.
+    pub(crate) memory: Option<MemorySegments>,
+    /// The GPU device and engine micro bars of the insights facet.
+    pub(crate) gpu_bars: Vec<GpuBar>,
+    /// The observed resource quotas of the insights facet.
+    pub(crate) quotas: Vec<QuotaFact>,
 }
 impl ProcessPropertiesView {
     fn same_rendered(&self, other: &Self) -> bool {
@@ -75,6 +94,9 @@ impl ProcessPropertiesView {
             && self.rows == other.rows
             && self.authorize_network == other.authorize_network
             && self.live == other.live
+            && self.memory == other.memory
+            && self.gpu_bars == other.gpu_bars
+            && self.quotas == other.quotas
             && self.curves.len() == other.curves.len()
             && self
                 .curves
@@ -102,6 +124,16 @@ impl Default for ProcessPropertiesPresentation {
 struct PropertiesPaint {
     dirty: bool,
     shown: Option<ProcessPropertiesView>,
+    /// The previous surface, despawned on the NEXT frame: Bevy's official
+    /// `Tabs` widget inserts its `Selected` marker through a raw command in
+    /// the frame its surface is rebuilt in, and a vanished tab child would
+    /// turn that upstream race into a production panic.
+    pending_despawn: Vec<Entity>,
+    /// The overlay entity of the mounted surface.
+    ///
+    /// The sliding tab indicator reads it to tell the live surface from the
+    /// one that is still mounted for the rest of the rebuild frame.
+    current_surface: Option<Entity>,
 }
 #[derive(Event)]
 pub(crate) struct ProcessPropertiesChanged;
@@ -226,9 +258,7 @@ pub(super) fn sync_selected_tab(
     else {
         return;
     };
-    commands
-        .entity(ready.entity)
-        .insert(SelectedTab(Some(selected)));
+    insert_into(&mut commands, ready.entity, SelectedTab(Some(selected)));
 }
 pub(super) fn on_facet(
     event: On<Activate>,
@@ -284,11 +314,24 @@ struct PropertiesRender<'w, 's> {
     state: Res<'w, ProcessPropertiesPresentation>,
     paint: ResMut<'w, PropertiesPaint>,
     palette: Res<'w, WindowPalette>,
+    motion: Res<'w, TabIndicatorMotion>,
     bodies: Query<'w, 's, &'static ScrollPosition, With<ProcessPropertiesBody>>,
     overlays: Query<'w, 's, Entity, With<ProcessPropertiesOverlay>>,
     roots: Query<'w, 's, Entity, With<AppShellRoot>>,
     commands: Commands<'w, 's>,
 }
+/// Despawn the surface deferred by the rebuild.
+///
+/// The flush runs in `Last`: every widget observer of this frame has already
+/// run against the live child, so the official `Tabs` widget's raw
+/// `Selected` insert cannot hit a vanished entity.
+fn flush_pending_despawns(mut paint: ResMut<PropertiesPaint>, mut commands: Commands) {
+    for entity in paint.pending_despawn.drain(..) {
+        // `try_despawn` never panics on an entity that is already gone.
+        commands.entity(entity).try_despawn();
+    }
+}
+
 fn paint(mut render: PropertiesRender) {
     if !render.paint.dirty {
         return;
@@ -317,9 +360,16 @@ fn paint(mut render: PropertiesRender) {
     } else {
         ScrollPosition::default()
     };
-    for entity in &render.overlays {
-        render.commands.entity(entity).despawn();
+    // The previous surface is HIDDEN in this frame and despawned on the NEXT
+    // one: Bevy's official `Tabs` widget inserts its `Selected` marker through
+    // a raw command in the frame its surface is rebuilt in, and a vanished tab
+    // child would turn that upstream race into a production panic. Hiding it
+    // now keeps the frame free of a double-mounted surface.
+    for entity in render.overlays.iter() {
+        render.commands.entity(entity).insert(Visibility::Hidden);
+        render.paint.pending_despawn.push(entity);
     }
+    render.paint.current_surface = None;
     render.paint.shown = next.clone();
     let Some(view) = next else {
         return;
@@ -333,12 +383,11 @@ fn paint(mut render: PropertiesRender) {
             &view,
             &render.palette.inner,
             scroll,
+            render.motion.placement(),
         ))
         .id();
-    render
-        .commands
-        .entity(root)
-        .add_one_related::<ChildOf>(entity);
+    render.paint.current_surface = Some(entity);
+    attach_child(&mut render.commands, root, entity);
 }
 
 fn startup(
@@ -357,20 +406,29 @@ fn startup(
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<ProcessPropertiesPresentation>()
         .init_resource::<PropertiesPaint>()
+        .init_resource::<TabIndicatorMotion>()
         .add_systems(Startup, startup)
         .add_observer(on_changed)
         .add_observer(on_fold)
         .add_observer(on_applied)
         .add_observer(sync_selected_tab)
         .add_observer(on_tab)
+        .add_systems(Last, flush_pending_despawns)
         .add_systems(
             PostUpdate,
             (
                 paint.in_set(ScenePaint).before(UiSystems::Prepare),
                 view::paint_curves.after(UiSystems::Layout),
+                tabs::sync_tab_indicator.after(UiSystems::Layout),
+                quota::paint_quota_alerts
+                    .after(ScenePaint)
+                    .before(UiSystems::Layout),
             ),
         );
 }
+#[cfg(test)]
+#[path = "../../../tests/headless/pages/properties_parity.rs"]
+mod parity_tests;
 #[cfg(test)]
 #[path = "../../../tests/headless/pages/process_properties.rs"]
 mod tests;

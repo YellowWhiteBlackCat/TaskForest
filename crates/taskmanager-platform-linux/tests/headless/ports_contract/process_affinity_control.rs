@@ -19,6 +19,7 @@ fn slow_batch_control_cannot_block_affinity_mutation_lane() {
         &mut ids,
         CapabilityId::PROCESS_CONTROL,
         ProcessControlRequest::ExecuteBatch(ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::Suspend,
             scope: Default::default(),
             targets: vec![target.clone()],

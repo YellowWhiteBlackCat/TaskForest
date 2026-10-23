@@ -1,5 +1,6 @@
 //! Coalesced startup painting over explicit resource and entity access.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::schedule::IntoScheduleConfigs;
@@ -26,6 +27,7 @@ struct PaintAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     palette: Res<'w, WindowPalette>,
     selection: ResMut<'w, StartupSelection>,
+    forensics: Res<'w, forensics::StartupForensicsExpanded>,
     rendered: ResMut<'w, StartupRenderState>,
     state: ResMut<'w, PaintState>,
     bodies: Query<'w, 's, (Entity, Option<&'static Children>), With<StartupBody>>,
@@ -47,19 +49,23 @@ fn paint(mut access: PaintAccess) {
     {
         access.selection.target = None;
     }
-    let scene = startup_body_scene(shell, &access.palette.inner, &access.selection);
+    let scene = startup_body_scene(
+        shell,
+        &access.palette.inner,
+        &access.selection,
+        &access.forensics,
+    );
     let line = status_line_text(shell, rows.len());
     access.rendered.rendered_revision = Some(shell.projection().startup_revision);
+    access.rendered.rendered_evidence =
+        evidence_fingerprint(shell.projection().startup_boot_evidence.as_ref());
     if let Some(children) = children {
         for child in children.iter() {
             access.commands.entity(*child).despawn();
         }
     }
     let fresh = access.commands.spawn_scene(scene).id();
-    access
-        .commands
-        .entity(body)
-        .add_one_related::<ChildOf>(fresh);
+    attach_child(&mut access.commands, body, fresh);
     for mut text in &mut access.status {
         text.0 = line.clone();
     }

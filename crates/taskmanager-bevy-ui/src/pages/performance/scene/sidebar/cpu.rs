@@ -6,9 +6,7 @@ use super::*;
 use crate::pages::performance::metrics::battery_sidebar_title;
 use crate::pages::performance::sidebar_editor::{self, SidebarAction, SidebarState};
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
-use bevy::text::{LineBreak, TextLayout};
 use bevy::ui_widgets::ScrollArea;
-use taskmanager_core::core::hardware::CpuType;
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
     bsn! {
@@ -107,158 +105,38 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
     }
 }
 
+/// The per-core grid card: the shared graph card owns the card chrome, and
+/// the per-core body beside it owns the class groups, the socket envelopes,
+/// the responsive column policy, and the collapse/expand reveal.
+pub(super) fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
+    let body = super::cores::core_grid_body_scene(shell, palette);
+    let card = graph_card_scene(
+        t("common.cores").to_owned(),
+        super::cores::core_grid_subtitle(shell),
+        Box::new(body),
+        palette,
+    );
+    bsn! {
+        Node {
+            width: percent(100.0),
+            display: Display::Flex,
+        }
+        Children [
+            @{ card }
+        ]
+    }
+}
+
 /// One per-core bar row: identity label over a bounded track whose fill is
 /// the core's live utilization, with the numeric fact as the row's only
 /// mutable text. The bar and the number are two views of the same
 /// observation — the fill width is rewritten by the fold observer through
 /// [`DynBar`], the number through [`DynText`], so a fold repaints both or
 /// neither.
-fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl Scene + use<> {
-    let field = CpuField::Core(index);
-    let type_suffix = shell
-        .projection()
-        .hardware
-        .as_ref()
-        .and_then(|h| h.cpu_types.get(index).copied())
-        .map_or("", |t| match t {
-            CpuType::Performance => " (P)",
-            CpuType::Efficient => " (E)",
-            CpuType::LowPower => " (LP)",
-            _ => "",
-        });
-    let label = format!("Core {:02}{type_suffix}", index + 1);
-    // The fill's FIRST paint comes from the same folded observation the
-    // number renders — a page without a pending fold still shows bars that
-    // agree with their numeric facts (capture and cold start included).
-    let initial_pct = core_usage_fill_pct(shell, index);
-    bsn! {
-        Node {
-            width: percent(48.0),
-            min_width: rem(palette.control_height_rem * 5.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::vertical(Val::Px(space_2())),
-        }
-        Children [
-
-                Node {
-                    width: px(84.0),
-                    flex_shrink: 0.0,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [
-                     Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
-                ]
-            --
-
-                Node {
-                    flex_grow: 1.0,
-                    min_width: px(0.0),
-                    height: px(6.0),
-                    border_radius: BorderRadius::all(Val::Px(space_2())),
-                    overflow: Overflow::clip_x(),
-                }
-                BackgroundColor({ palette.nav_active_bg })
-                Children [
-
-                        Node {
-                            width: percent(initial_pct),
-                            height: percent(100.0),
-                            border_radius: BorderRadius::all(Val::Px(space_2())),
-                        }
-                        BackgroundColor({ palette.accent })
-                        DynBar(field)
-
-                ]
-            --
-
-                Node {
-                    width: px(120.0),
-                    flex_shrink: 0.0,
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::FlexEnd,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [
-
-                        Text(cpu_field_text(shell, field))
-                        TextRole(Role::Mono)
-                        DynText(DynField::Cpu(field))
-                        TextLayout { linebreak: LineBreak::NoWrap }
-
-                ]
-
-        ]
-    }
-}
-
-fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let core_count = core_usage_count(shell);
-    let rows: Vec<Box<dyn Scene>> = (0..core_count)
-        .map(|index| Box::new(core_bar_row_scene(shell, index, palette)) as Box<dyn Scene>)
-        .collect();
-    // No cores measured yet → one honest empty row, never a fabricated grid.
-    let rows = if rows.is_empty() {
-        vec![Box::new(bsn! {
-            Node { width: percent(100.0) }
-            Children [
-                 Text(missing_value()) TextRole(Role::Caption)
-            ]
-        }) as Box<dyn Scene>]
-    } else {
-        rows
-    };
-    let body = bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(space_8()),
-            row_gap: Val::Px(space_2()),
-        }
-        Children [
-            { rows }
-        ]
-    };
-    let hw = shell.projection().hardware.as_ref();
-    let breakdown_label = hw.and_then(|h| {
-        if h.core_breakdown.total() > 0 {
-            let mut parts = Vec::new();
-            if h.core_breakdown.p_cores > 0 {
-                parts.push(format!("{} P-Cores", h.core_breakdown.p_cores));
-            }
-            if h.core_breakdown.e_cores > 0 {
-                parts.push(format!("{} E-Cores", h.core_breakdown.e_cores));
-            }
-            if h.core_breakdown.lp_cores > 0 {
-                parts.push(format!("{} LP-Cores", h.core_breakdown.lp_cores));
-            }
-            Some(parts.join(" · "))
-        } else {
-            None
-        }
-    });
-    let subtitle = match breakdown_label {
-        Some(breakdown) => format!("{} · {breakdown}", t("cpu.utilization_by_core")),
-        None => t("cpu.utilization_by_core").to_owned(),
-    };
-    let graph = graph_card_scene(
-        t("common.cores").to_owned(),
-        subtitle,
-        Box::new(body),
-        palette,
-    );
-    bsn! {
-        Node {
-            width: percent(100),
-            display: Display::Flex,
-        }
-        PerformanceOptionalCoreGrid
-        Children [  @{ graph }  ]
-    }
-}
-
+///
+/// The grid itself — the heterogeneous class groups, the socket envelopes,
+/// the responsive column policy, and the collapse/expand reveal — lives in
+/// [`super::cores`]; this module keeps the CPU header and the metric strip.
 fn device_pill_scene(
     target: PerformanceDeviceTarget,
     label: String,
@@ -477,6 +355,8 @@ pub(crate) fn cpu_main_scene(
         ]
     };
 
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(Val::Px(space_8())));
     bsn! {
         Node {
             width: percent(100),
@@ -502,11 +382,24 @@ pub(crate) fn cpu_main_scene(
                     { cards }
                 ]
             --
-            Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: UiRect::bottom(px(8.0)) }
-            ScrollArea PerformanceDeviceBody Children [
-                @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
-                @{ network_container } -- @{ gpu_container } -- @{ battery_container } --
-                @{ fan_container }
+            // The viewport wrapper owns the scroll area AND the floating
+            // rail: the rail is a sibling of the scroll area, so it never
+            // scrolls with the content and never takes layout space away
+            // from it.
+            Node {
+                width: percent(100),
+                min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                flex_direction: FlexDirection::Column,
+            }
+            Children [
+                Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: { lane } }
+                ScrollArea PerformanceDeviceBody Children [
+                    @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
+                    @{ network_container } -- @{ gpu_container } -- @{ battery_container } --
+                    @{ fan_container }
+                ]
+                --
+                @{ rail }
             ]
         ]
     }

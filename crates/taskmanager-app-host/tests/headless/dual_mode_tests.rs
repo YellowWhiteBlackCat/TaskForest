@@ -9,6 +9,8 @@ use std::time::Duration;
 use taskmanager_ipc::protocol::{DaemonMessage, Frame, Opcode, SubscriptionMask};
 #[cfg(not(windows))]
 use taskmanager_ipc::transport::{FramedReader, FramedWriter};
+#[cfg(not(windows))]
+use taskmanager_test_support::unix_socket::socket_temp_root;
 
 #[test]
 fn probe_host_mode_defaults_to_standalone_when_no_daemon_active() {
@@ -29,7 +31,13 @@ fn probe_endpoint_non_existent_path_falls_back_to_standalone() {
 #[cfg(not(windows))]
 #[test]
 fn probe_endpoint_with_mock_daemon() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("probe_test.sock");
 
     let listener = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
@@ -70,7 +78,13 @@ fn probe_endpoint_with_mock_daemon() {
 #[cfg(not(windows))]
 #[test]
 fn daemon_subscription_worker_streaming_test() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("sub_worker_test.sock");
 
     let listener = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();

@@ -6,6 +6,79 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.4.0] — 2026-10-22
+
+> 本次为**破坏性次版本**：0.x 阶段的次版本号承载破坏性变更。本版本对已发布 crate 的
+> 公共 API 做了硬切换（`taskmanager-ui-contract` 的 `IconId` 新增语义变体并移除
+> `taskmanager-ui` 中重复的高亮匹配引擎、合同层新增带类型的容器配额 / 启动阶段 /
+> NPU 功耗 / 进程批量冻结等事实字段），下游 crate 需按新 API 更新。
+
+### 新增
+
+- **Core 遥测：NPU 功耗与能耗事实**：新增 `NpuPowerReport` / `NpuPowerObservation`
+  类型化功耗（瓦特）与累计能耗（焦耳）观测；平台层仅在驱动暴露真实功耗或能量计数器时
+  填充，无计数器的加速器不贡献观测值，能耗序列永远不从利用率曲线推导。
+- **Core 遥测：SMART 工具探测命令与修复引导**：新增 `SMART_TOOL_PROBE_COMMAND`、
+  `SmartToolGuidance`、`SmartToolRemediation` 类型，将磁盘健康工具的探测与修复建议
+  升级为结构化事实。
+- **Core 遥测：启动阶段时序快照**：新增 `StartupPhase`、`StartupPhaseKind`、
+  `StartupTimelineSnapshot` 类型，将启动过程从无差别的时间线段升级为有阶段语义的
+  结构化快照。
+- **Core 进程：批量确认冻结附带集**：新增 `FrozenProcessCollateral` /
+  `FrozenProcessCollateralMember`，进程树批量操作确认界面所画的层级列表与实际执行集
+  来自同一次展开，冻结后不再回读活表。
+- **Core 遥测：进程资源配额与通用采样点**：新增 `ProcessTelemetry::Quota` 资源配额
+  类型与 `MetricSample` 通用采样点。
+- **Bevy 前端（B）全页面模块深化**：Alerts 页（横幅弹簧、暂停覆盖层、严重性标签、
+  导出 Toast）、Performance 页（磁盘指标、NPU 功耗面板、悬停图表、侧边栏逐核列表）、
+  进程树页（徽章、折叠箭头、附带集层级、引导线、悬停、挂载点、规划）、进程属性弹窗
+  （背板、GPU 标签页、内存标签页、配额标签页、标签页骨架）、Services 页（动作字形、
+  依赖树、日志跟踪、日志文本、状态点、单元过滤）、Sessions 页（气泡、类型标签）、
+  Settings 页（行组件）、Startup 页（取证面板、影响评估、墨色方案、阶段轴、时间线）、
+  System 页（总览卡片、隐私面板、拓扑视图）全部落地为独立子模块。
+- **Bevy 前端（B）官方控件接入**：滑动开关（`Switch`）接入官方 `bevy_ui_widgets`
+  Checkbox 行为原件并发布 `Switch` 无障碍角色，能力状态由 Divergent 升格为 Ported；
+  告警规则编辑器接入官方 `bevy_ui_widgets` Slider 用于阈值滑杆；页面滚动条接入官方
+  `bevy_ui_widgets` Scrollbar，半透明浮动轨道配胶囊拇指。
+- **Bevy 前端（B）场景连接与缓动**：新增 `scene_attach` 场景挂载协议与 `easing`
+  缓动曲线控件。
+- **Iced 前端（I）性能图表动态与光栅化**：新增 `perf_chart/motion` 动画过渡与
+  `perf_chart/raster` 光栅化渲染路径。
+- **Iced 前端（I）磁盘吞吐量轴阻尼过渡**：磁盘吞吐量图的 Y 轴上限跟踪流量峰值，
+  切换时经 120 ms 阻尼过渡（轴与曲线同步移动），并新增挂载点标签槽位。
+- **Iced 前端（I）网络连接语义胶囊**：Insights 面板的网络连接行从纯文本升级为语义
+  胶囊（`pills::connection_row`），附带 `chips` 标签组件。
+- **Iced 前端（I）应用列表交互增强**：新增 `emphasis` 行高亮与 `sort_tint` 排序
+  色调标记。
+- **Iced 前端（I）虚拟列表窗口化**：新增 `virtual_list/window` 视口窗口化模块，
+  文本行几何量测接缝（`text_metrics` 行几何）就位。
+- **UI 合同：列宽常量公开**：`COLUMN_WIDTH_KEYBOARD_STEP`、`COLUMN_WIDTH_MAX`、
+  `COLUMN_WIDTH_MIN` 从 `columns` 模块导出，`columns` 升级为 `pub` 模块。
+- **图标资产扩充**：`taskmanager-assets` 新增 RGBA 图标集与矢量图标补充。
+
+### 变更
+
+- **文档同步更新**：ARCH、QUALITY_GATES、RELEASE、STANDARDS、STATE_OWNERSHIP、
+  SYSTEM_INSTALL_MANIFEST、UI_COMPONENT_ARCHITECTURE 同步至当前代码状态。
+- **质量门禁精简**：移除不再适用的 `nightly-quality.sh` 与
+  `perf-ioctl-privileged-coverage.sh`，更新 Bevy 场景棘轮台账。
+
+### 修复
+
+- **Bevy 前端（B）系统页总览网格换行**：总览网格此前按**边框盒**宽度解析列数，而卡片
+  实际只占**内容盒**宽度（右侧 8px 滚动条 lane 属于边框盒），第 4 张卡片因此被挤到
+  第二行；网格现在按内容盒宽度解析，2×2 与单行两种排布都成立。
+- **Bevy 前端（B）页面内容重复挂载**：路由资源变更后，旧页面内容与新内容可能同帧并存
+  （两套 `PageContent`）。页面生命周期改由**路由资源本身**裁定，挂载系统保证任意时刻
+  恰好一个页面内容，旧内容先隐藏、帧末再卸载，官方控件观察器不会拿到已消失的实体。
+- **Bevy 前端（B）存储热插拔滑动与电池充电流**：设备分类容器在窄布局下不可见时，列表项
+  测得 0 高，滑动动效永远等待测量；动效宿主改为按当前可见的磁盘分类推进，进度以类型化
+  数值逐帧前进。
+- **Bevy 前端（B）会话气泡卡被共享模态压掉**：气泡卡只在共享确认模态未挂载时显示，避免
+  两个确认面同时存在；会话页自身的控制按钮按产品路径武装会话控制门，气泡卡随之出现。
+- **搜索匹配引擎单一权威**：`taskmanager-ui` 的高亮匹配组件与 `taskmanager_core::core::text`
+  的匹配引擎重复实现同一语义，现已删除前端副本，匹配范围只由核心层产出。
+
 ## [0.3.2] — 2026-10-20
 
 ### 修复

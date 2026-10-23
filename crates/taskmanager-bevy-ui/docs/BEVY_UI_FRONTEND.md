@@ -79,8 +79,10 @@
   `FontSize::Px` / BEVY-REM-002 px 派生值不作布局长度，含直接写入、`let`
   绑定与跨函数传参三条路径 / BEVY-REM-003 图标适配器不得收裸数字尺寸）；
   `scripts/quality/bevy_scene_gate.py`（共享包 `zhuge-ui-kit` 随 crate 发布的
-  唯一执行器）禁硬编码非零 px 字面量，存量 85 处记在
-  `scripts/quality/bevy_scene_ratchet.json` 棘轮台账，台账外新增立即失败。
+  唯一执行器）禁硬编码非零 px 字面量；存量 85 处已于 2026-10-22 全部出清
+  （BEVY-178：布局长度归一为 rem / palette 间距 token，图表几何与发丝线保留
+  为具名 px 合同），`scripts/quality/bevy_scene_ratchet.json` 棘轮台账已重切为
+  **空账**，台账外新增立即失败。
   两者均注册进 `scripts/quality/local-gates.sh` 与 CI。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
@@ -101,8 +103,13 @@
 - **`Ready` 事件**：条带的初始选择镜像与弹窗每次重挂的镜像都挂在 `Ready`
   （子孙全部就绪的自底向上信号）上——场景声明期实体不存在，`Ready` 是类型化的
   挂载完成时刻，禁止再按组件 `Add` 逐个探测。
-- **`FixedNode` 浮层**：确认面、tooltip、菜单浮窗的根节点视口锚定
+- **`FixedNode` 浮层**：确认面、tooltip 的根节点视口锚定
   （不继承 shell 布局、裁剪与变换），替代 `PositionType::Absolute` 惯用法。
+- **锚定 `Popover` 浮层**（2026-10-22 起）：**本地选择**（动作菜单、列选择）一律是
+  `bevy_ui_widgets::popover::Popover`，**挂在触发器的子节点**上，带
+  `GlobalZIndex(100)` + `OverrideClip`，**无遮罩、无全屏拦截层**：浮层外的按下按
+  GPUI 参考面**转发**给背景目标。`FixedNode` 全屏浮层只留给**真正的模态**（确认面）。
+  动作菜单的遮罩形态已删除（ANTI-MODAL-006 归零）。
 - **`InlineBox`/`InlineImage` 行内图文**：排序方向板等语义图标以 `InlineIcon`
   流入文字布局（与标签同线裁切对齐），位图句柄由观察者 typed 补全；流框几何是
   唯一的引擎 px 缝（bevy_text 以逻辑像素量 inline box），尺寸仍由 palette
@@ -172,6 +179,14 @@ feature 让 winit 的 AccessKit 桥把组件树发布到 AT-SPI；无窗口的 h
 - **逐张目检闭环**：每轮收尾必须把本次 bevy 捕获与 GPUI 参考捕获逐页并排
   目检，差距逐条记账——修掉的进提交，暂缓的进 roadmap"存异"清单。绿色门禁
   只证明行为与来源，不证明观感；观感由本条的人类（或代理）评审环节负责。
+- **图表渲染契约（2026-10-22 起）**：一条折线是**一条连续路径**，按覆盖率
+  抗锯齿绘制（圆角连接），由逐帧 canvas 绘制器先**实测自己的槽位**再把窗口
+  投影上去。逐段旋转 2px 矩形拼出的"伪图表"形态**已删除且不留回退**：
+  段与段之间的缺口是缺陷，不是风格。参考线（25/50/75% 虚线）、渐变面积、
+  十字准星与浮标在同一层序里栅格化（面积 → 网格 → 曲线 → 引导）。
+  图层顺序与宽度来源都不得再出现写死的像素常量。
+  浮标的读数是**采样时刻**：共享 trend window 的带时间戳采样经共享格式化器渲染（本地时区规则由宿主发布），
+  不是采样偏移 `-N`；没有测量时刻的样本显示共享破折号。
 
 ## 门禁
 

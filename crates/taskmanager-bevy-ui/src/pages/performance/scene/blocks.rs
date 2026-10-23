@@ -1,15 +1,17 @@
 //! Dynamic GPU, network, memory, and section scene builders.
 
 use super::*;
+use crate::pages::performance::device_curves::storage::StorageExpand;
 use crate::pages::performance::device_curves::{
     self, DeviceCurve, DeviceCurveKind, DeviceCurveStatus,
 };
 use crate::pages::performance::metrics::{
-    batteries, battery_fact_line, disk_partition_view_models, disks, fan_fact_line, fans,
-    gpu_vram_view_model, smart_source_guidance, smart_source_status,
+    batteries, battery_fact_line, disks, fan_fact_line, fans, gpu_vram_view_model,
+    smart_source_guidance, smart_source_status,
 };
 use crate::palette::space_2;
 use crate::widgets::chart::CurveMeasurement;
+use crate::widgets::layout::PERFORMANCE_CHART_SLOT_HEIGHT_REM;
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::sensors::SensorReading;
@@ -17,6 +19,31 @@ use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricChoiceState;
 
 use super::super::gpu_metric::gpu_metric_button_activated;
+
+/// The GPU engine row's fixed column widths, in rem.
+///
+/// The row is three columns — the engine's name, its usage bar and the
+/// numeric readout — and every column is a bounded slot, so a long engine
+/// name clips instead of pushing the bar out of the card. The slots ride
+/// the rem axis with the card around them.
+const ENGINE_NAME_SLOT_WIDTH_REM: f32 = 5.0;
+const USAGE_BAR_FLOOR_WIDTH_REM: f32 = 3.75;
+const USAGE_READOUT_SLOT_WIDTH_REM: f32 = 3.125;
+
+/// The thickness of a usage bar, in rem.
+///
+/// A usage bar carries a proportion, not a label, so it stays a hairline
+/// track — but it still rides the rem axis, so a larger reading size gives
+/// it a proportionally thicker track.
+const USAGE_BAR_HEIGHT_REM: f32 = 0.375;
+
+/// The legend swatch's side, in rem: the square that names one memory
+/// segment's ink in the segment row.
+const LEGEND_SWATCH_SIZE_REM: f32 = 0.625;
+
+/// The stacked composition bar's height, in rem: the whole-bar strip that
+/// shows every memory segment's share of the physical memory.
+const SEGMENT_BAR_HEIGHT_REM: f32 = 0.875;
 
 pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
     let identity = gpu_display_identity(gpu);
@@ -94,10 +121,10 @@ fn gpu_metric_curve_scene(
         color: palette.accent,
     };
     bsn! {
-        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: Val::Px(space_4()) }
         Children [
             Text(label) TextRole(Role::Caption) DynText(DynField::GpuMetricLabel({ id.clone() })) --
-            Node { width: percent(100), height: px(64.0), flex_shrink: 0.0, overflow: Overflow::clip() }
+            Node { width: percent(100), height: rem(PERFORMANCE_CHART_SLOT_HEIGHT_REM), flex_shrink: 0.0, overflow: Overflow::clip() }
             DeviceCurve { kind: DeviceCurveKind::GpuMetric, id: { id.clone() }, generation: { generation }, color: { palette.accent } } CurveMeasurement(None) Children [] --
             Text(t("perf.collecting_samples")) TextRole(Role::Caption) DeviceCurveStatus({ status })
         ]
@@ -120,7 +147,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
 
                     Node {
                         width: percent(100),
-                        height: px(6.0),
+                        height: rem(USAGE_BAR_HEIGHT_REM),
                         border_radius: BorderRadius::all(Val::Px(space_2())),
                         overflow: Overflow::clip_x(),
                     }
@@ -156,7 +183,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
             Children [
 
                     Node {
-                        width: px(80.0),
+                        width: rem(ENGINE_NAME_SLOT_WIDTH_REM),
                         overflow: Overflow::clip_x(),
                     }
                     Children [  Text(name) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
@@ -164,8 +191,8 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
 
                     Node {
                         flex_grow: 1.0,
-                        min_width: px(60.0),
-                        height: px(6.0),
+                        min_width: rem(USAGE_BAR_FLOOR_WIDTH_REM),
+                        height: rem(USAGE_BAR_HEIGHT_REM),
                         border_radius: BorderRadius::all(Val::Px(space_2())),
                         overflow: Overflow::clip_x(),
                     }
@@ -183,7 +210,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
                 --
 
                     Node {
-                        width: px(50.0),
+                        width: rem(USAGE_READOUT_SLOT_WIDTH_REM),
                         flex_direction: FlexDirection::Row,
                         justify_content: JustifyContent::FlexEnd,
                     }
@@ -218,7 +245,11 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
     }
 }
 
-fn nic_block_scene(nic: &NetworkMetrics, palette: &UiPalette) -> impl Scene + use<> {
+fn nic_block_scene(
+    shell: &ShellApp,
+    nic: &NetworkMetrics,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
     let title = if nic.interface_name.is_empty() {
         (*nic.device_id).to_owned()
     } else {
@@ -262,12 +293,17 @@ fn nic_block_scene(nic: &NetworkMetrics, palette: &UiPalette) -> impl Scene + us
         Children [
              Text(title) TextRole(Role::Body) --
              Text(nic_fact_line(nic)) TextRole(Role::Mono) DynText(field) --
+             @device_curves::scene(DeviceCurveKind::NetworkThroughput, &nic.device_id, nic.device_generation, shell, palette) --
             { details }
         ]
     }
 }
 
-fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use<> {
+fn disk_block_scene(
+    shell: &ShellApp,
+    disk: &DiskMetrics,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
     let title = if !disk.model.is_empty() {
         disk.model.clone()
     } else if !disk.name.is_empty() {
@@ -275,51 +311,11 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
     } else {
         disk.device_id.clone()
     };
-    let mut partition_rows: Vec<Box<dyn Scene>> = Vec::new();
-    for part in disk_partition_view_models(disk) {
-        partition_rows.push(Box::new(bsn! {
-            Node {
-                width: percent(100),
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(space_2()),
-                padding: UiRect::vertical(Val::Px(space_2())),
-            }
-            Children [
-
-                    Node {
-                        width: percent(100),
-                        flex_direction: FlexDirection::Row,
-                        justify_content: JustifyContent::SpaceBetween,
-                        align_items: AlignItems::Center,
-                    }
-                    Children [
-                         Text({ part.name }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
-                         Text({ part.usage_text }) TextRole(Role::Mono) TextLayout { linebreak: LineBreak::NoWrap }
-                    ]
-                --
-
-                    Node {
-                        width: percent(100),
-                        height: px(6.0),
-                        border_radius: BorderRadius::all(Val::Px(space_2())),
-                        overflow: Overflow::clip_x(),
-                    }
-                    BackgroundColor({ palette.panel_fill })
-                    Children [
-
-                            Node {
-                                width: percent(part.pct),
-                                height: percent(100.0),
-                                border_radius: BorderRadius::all(Val::Px(space_2())),
-                            }
-                            BackgroundColor({ palette.accent })
-
-                    ]
-
-            ]
-        }) as Box<dyn Scene>);
-    }
-
+    // The list item rides the SAME typed motion the storage surface owns:
+    // a hot-plugged disk slides open, and a disk that leaves slides shut.
+    // The progress is a component field advanced by one per-frame system —
+    // never a sleep.
+    let expand_progress = 0.0_f32;
     bsn! {
         Node {
             width: percent(100),
@@ -327,9 +323,13 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_8())),
             border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            // The item clips its own content while it slides: a collapsing
+            // row never leaves its children hanging outside its frame.
+            overflow: Overflow::clip_y(),
         }
         BackgroundColor({ palette.content_bg })
         DynBlock(Section::Disk, { disk.device_id.clone() })
+        StorageExpand { progress: { expand_progress } }
         Children [
              Text(title) TextRole(Role::Body) --
              Text(smart_source_status(disk)) TextRole(Role::Caption)
@@ -339,10 +339,8 @@ fn disk_block_scene(disk: &DiskMetrics, palette: &UiPalette) -> impl Scene + use
              DynText(DynField::SmartGuidance({disk.device_id.clone()}))
              TextLayout { linebreak: LineBreak::WordBoundary } --
              @{ super::disk_caption_scene(disk, palette) } --
-             @device_curves::scene(DeviceCurveKind::DiskRead, &disk.device_id, disk.device_generation, palette) --
-             @device_curves::scene(DeviceCurveKind::DiskWrite, &disk.device_id, disk.device_generation, palette) --
-             @device_curves::scene(DeviceCurveKind::DiskActive, &disk.device_id, disk.device_generation, palette) --
-            { partition_rows }
+             @device_curves::scene(DeviceCurveKind::DiskThroughput, &disk.device_id, disk.device_generation, shell, palette) --
+             @device_curves::scene(DeviceCurveKind::DiskActive, &disk.device_id, disk.device_generation, shell, palette)
         ]
     }
 }
@@ -371,18 +369,23 @@ fn battery_block_scene(
         fact.push_str(&format!(" · {}: {rpm} RPM", t("fan.rpm")));
     }
     bsn! {
-        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: Val::Px(space_4()) }
         DynBlock(Section::Battery, { battery.id.clone() })
         Children [
             Text(title) TextRole(Role::Body) --
             Text(fact) TextRole(Role::Mono) DynText(DynField::Device { section: Section::Battery, device: { battery.id.clone() } }) --
-            @device_curves::scene(DeviceCurveKind::BatteryCharge, &battery.id, battery.device_generation, palette) --
-            @device_curves::scene(DeviceCurveKind::BatteryPower, &battery.id, battery.device_generation, palette)
+            @device_curves::scene(DeviceCurveKind::BatteryCharge, &battery.id, battery.device_generation, shell, palette) --
+            @device_curves::scene(DeviceCurveKind::BatteryPower, &battery.id, battery.device_generation, shell, palette)
         ]
     }
 }
 
-fn fan_block_scene(fan: &SensorReading, index: usize, palette: &UiPalette) -> impl Scene + use<> {
+fn fan_block_scene(
+    shell: &ShellApp,
+    fan: &SensorReading,
+    index: usize,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
     let title = if !fan.label().trim().is_empty() {
         fan.label().trim().to_string()
     } else {
@@ -392,12 +395,12 @@ fn fan_block_scene(fan: &SensorReading, index: usize, palette: &UiPalette) -> im
     let id = fan.id().to_owned();
     let generation = fan.device_generation();
     bsn! {
-        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(4.0) }
+        Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: Val::Px(space_4()) }
         DynBlock(Section::Fan, { id.clone() })
         Children [
             Text(title) TextRole(Role::Body) --
             Text(fact) TextRole(Role::Mono) DynText(DynField::Device { section: Section::Fan, device: { id.clone() } }) --
-            @device_curves::scene(DeviceCurveKind::FanRpm, &id, generation, palette)
+            @device_curves::scene(DeviceCurveKind::FanRpm, &id, generation, shell, palette)
         ]
     }
 }
@@ -423,8 +426,8 @@ fn segment_row_scene(
         Children [
 
                 Node {
-                    width: px(10.0),
-                    height: px(10.0),
+                    width: rem(LEGEND_SWATCH_SIZE_REM),
+                    height: rem(LEGEND_SWATCH_SIZE_REM),
                     border_radius: BorderRadius::all(Val::Px(space_2())),
                 }
                 BackgroundColor(color)
@@ -453,7 +456,7 @@ pub(crate) fn block_scene(
         Section::Network => network_devices(shell)?
             .iter()
             .find(|nic| &*nic.device_id == key)
-            .map(|nic| Box::new(nic_block_scene(nic, palette)) as Box<dyn Scene>),
+            .map(|nic| Box::new(nic_block_scene(shell, nic, palette)) as Box<dyn Scene>),
         Section::MemorySegments => memory_metrics(shell).and_then(|memory| {
             memory_segments(memory)
                 .iter()
@@ -465,7 +468,7 @@ pub(crate) fn block_scene(
         Section::Disk => disks(shell)?
             .iter()
             .find(|disk| disk.device_id == key)
-            .map(|disk| Box::new(disk_block_scene(disk, palette)) as Box<dyn Scene>),
+            .map(|disk| Box::new(disk_block_scene(shell, disk, palette)) as Box<dyn Scene>),
         Section::Battery => batteries(shell)?
             .iter()
             .enumerate()
@@ -477,7 +480,9 @@ pub(crate) fn block_scene(
             .into_iter()
             .enumerate()
             .find(|(_, fan)| fan.id() == key)
-            .map(|(idx, fan)| Box::new(fan_block_scene(fan, idx, palette)) as Box<dyn Scene>),
+            .map(|(idx, fan)| {
+                Box::new(fan_block_scene(shell, fan, idx, palette)) as Box<dyn Scene>
+            }),
     }
 }
 
@@ -583,7 +588,7 @@ pub(crate) fn segment_bar_scene(memory: &MemoryMetrics, palette: &UiPalette) -> 
     bsn! {
         Node {
             width: percent(100),
-            height: px(14.0),
+            height: rem(SEGMENT_BAR_HEIGHT_REM),
             flex_direction: FlexDirection::Row,
             column_gap: Val::Px(0.0),
             overflow: Overflow::clip_x(),

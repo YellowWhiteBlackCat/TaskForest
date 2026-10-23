@@ -1,7 +1,8 @@
 //! test-intent: behavior
 //!
-//! Behavior tests for the Bevy process columns visibility modal and hidden
-//! column projections.
+//! Behavior tests for the Bevy process column chooser: the ANCHORED
+//! POPOVER that replaces the former full-screen blocking modal, and the
+//! hidden-column projection it drives.
 
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -15,6 +16,7 @@ use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use bevy::text::Font;
+use bevy::ui::prelude::Node;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
@@ -23,8 +25,8 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
 use super::{
-    ProcessColumnToggleId, ProcessColumnsModalChanged, ProcessColumnsModalOverlay,
-    ProcessColumnsModalScrim, ProcessColumnsModalState, ProcessHiddenColumns,
+    ProcessColumnToggleId, ProcessColumnsModalChanged, ProcessColumnsModalState,
+    ProcessColumnsPopover, ProcessColumnsTrigger, ProcessHiddenColumns,
 };
 use crate::app::FrontendTrack;
 use crate::pages::processes::projection;
@@ -59,8 +61,10 @@ fn process_rows_projection_with_hidden_columns() {
     assert_eq!(cells_hidden_count, cells_all_count - 2);
 }
 
+/// The chooser is an anchored popover: it lives INSIDE the trigger, it never
+/// covers the page, and closing removes it again.
 #[test]
-fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_escape() {
+fn column_chooser_is_an_anchored_popover_inside_its_trigger() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins((
@@ -81,7 +85,6 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
         *shelved = Some(vec![target_proc]);
     });
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
-    assert!(shell.select_row(0));
 
     let mut track = app
         .world_mut()
@@ -89,11 +92,10 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
         .expect("the window plugin installed the track");
     track.shell = shell;
 
-    // Pump frames to initialize window chrome, AppShellRoot and page mount
     app.update();
     app.update();
 
-    // 1. Open the columns modal via resource / event
+    // Open the chooser through the shared key seam.
     app.world_mut()
         .run_system_once(
             |mut state: ResMut<ProcessColumnsModalState>, mut commands: Commands| {
@@ -101,34 +103,132 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
                 commands.trigger(ProcessColumnsModalChanged);
             },
         )
-        .expect("open columns modal");
+        .expect("open column chooser");
     app.update();
 
-    // Verify modal overlay is mounted
     let world = app.world_mut();
-    let overlay_count = world
-        .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
+    let popover = world
+        .query_filtered::<Entity, With<ProcessColumnsPopover>>()
         .iter(world)
-        .count();
-    assert_eq!(overlay_count, 1, "columns modal overlay is mounted");
-
-    // 2. Find a column toggle button and toggle it
-    let toggle_entity = world
-        .query_filtered::<(Entity, &ProcessColumnToggleId), ()>()
+        .next()
+        .expect("the anchored popover is mounted");
+    let trigger = world
+        .query_filtered::<Entity, With<ProcessColumnsTrigger>>()
         .iter(world)
-        .find(|(_, id)| id.0 == "PID")
-        .map(|(e, _)| e)
-        .expect("PID column toggle button exists");
+        .next()
+        .expect("the chooser trigger is mounted");
+    let parent = world
+        .get::<bevy::ecs::hierarchy::ChildOf>(popover)
+        .expect("the popover is parented")
+        .parent();
+    assert_eq!(
+        parent, trigger,
+        "the popover is anchored INSIDE the trigger, not over the page"
+    );
+    // The popover is a local surface: it is not a full-screen overlay.
+    let node = world.get::<Node>(popover).expect("the popover is a node");
+    assert_ne!(
+        node.width,
+        bevy::ui::prelude::Val::Percent(100.0),
+        "the chooser is a local menu, never a page-sized sheet"
+    );
 
-    world.commands().trigger(bevy::ui_widgets::Activate {
-        entity: toggle_entity,
-    });
+    // Close it again.
+    app.world_mut()
+        .run_system_once(
+            |mut state: ResMut<ProcessColumnsModalState>, mut commands: Commands| {
+                state.close();
+                commands.trigger(ProcessColumnsModalChanged);
+            },
+        )
+        .expect("close column chooser");
+    app.update();
     app.update();
 
-    // Verify PID is now in ProcessHiddenColumns
-    let hidden = app.world().resource::<ProcessHiddenColumns>();
-    assert!(hidden.0.contains("PID"), "PID is in hidden columns");
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+            .iter(world)
+            .count(),
+        0,
+        "closing the chooser removes the popover"
+    );
+}
 
+/// The chooser toggles a column, keeps the menu open, and resets to the
+/// default column set.
+#[test]
+fn column_chooser_toggles_columns_and_resets_without_blocking_the_page() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
+    });
+
+    let target_proc = test_proc(4242, "cargo");
+    let mut shell = ShellApp::new();
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![target_proc]);
+    });
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = shell;
+
+    app.update();
+    app.update();
+
+    app.world_mut()
+        .run_system_once(
+            |mut state: ResMut<ProcessColumnsModalState>, mut commands: Commands| {
+                state.open();
+                commands.trigger(ProcessColumnsModalChanged);
+            },
+        )
+        .expect("open column chooser");
+    app.update();
+
+    // Toggle PID off through the popover's own row.
+    let toggle_entity = {
+        let world = app.world_mut();
+        world
+            .query_filtered::<(Entity, &ProcessColumnToggleId), ()>()
+            .iter(world)
+            .find(|(_, id)| id.0 == "PID")
+            .map(|(entity, _)| entity)
+            .expect("PID column row exists")
+    };
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: toggle_entity,
+        });
+    app.update();
+
+    let hidden = app.world().resource::<ProcessHiddenColumns>();
+    assert!(hidden.0.contains("PID"), "PID is hidden");
+    assert_eq!(
+        app.world_mut()
+            .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+            .iter(app.world())
+            .count(),
+        1,
+        "the chooser stays open after a toggle"
+    );
+
+    // Toggle User off as well, then reset.
     let user_toggle = {
         let world = app.world_mut();
         world
@@ -136,7 +236,7 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
             .iter(world)
             .find(|(_, id)| id.0 == "User")
             .map(|(entity, _)| entity)
-            .expect("User column toggle button exists")
+            .expect("User column row exists")
     };
     app.world_mut()
         .commands()
@@ -147,19 +247,7 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
     let hidden = app.world().resource::<ProcessHiddenColumns>();
     assert!(hidden.0.contains("PID"));
     assert!(hidden.0.contains("User"));
-    let overlay_count = {
-        let world = app.world_mut();
-        world
-            .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
-            .iter(world)
-            .count()
-    };
-    assert_eq!(
-        overlay_count, 1,
-        "the multi-select column menu stays open after each toggle"
-    );
 
-    // 3. Reset columns
     app.world_mut()
         .run_system_once(
             |mut hidden: ResMut<ProcessHiddenColumns>, mut commands: Commands| {
@@ -170,33 +258,35 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
         )
         .expect("reset columns");
     app.update();
-
     let hidden = app.world().resource::<ProcessHiddenColumns>();
-    assert!(hidden.0.is_empty(), "hidden columns are cleared");
+    assert!(hidden.0.is_empty(), "the reset restores every column");
+}
 
-    // 4. Dismiss via scrim
-    let world = app.world_mut();
-    let scrim_entity = world
-        .query_filtered::<Entity, With<ProcessColumnsModalScrim>>()
-        .iter(world)
-        .next()
-        .expect("scrim exists");
-    world.commands().trigger(bevy::ui_widgets::Activate {
-        entity: scrim_entity,
+/// The keyboard seam opens the chooser over the page's own trigger.
+#[test]
+fn column_chooser_opens_from_the_c_key_and_closes_on_escape() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
     });
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = ShellApp::new();
+    app.update();
     app.update();
 
-    let world = app.world_mut();
-    assert_eq!(
-        world
-            .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
-            .iter(world)
-            .count(),
-        0,
-        "columns modal is despawned after scrim activation"
-    );
-
-    // 5. Open via 'c' key press and dismiss via Escape key
     let c_event = KeyboardInput {
         key_code: KeyCode::KeyC,
         logical_key: Key::Character("c".into()),
@@ -215,17 +305,15 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
         .expect("c key injection");
     app.update();
 
-    let world = app.world_mut();
     assert_eq!(
-        world
-            .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
-            .iter(world)
+        app.world_mut()
+            .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+            .iter(app.world())
             .count(),
         1,
-        "modal is mounted after pressing 'c'"
+        "the chooser opens from the 'c' chord"
     );
 
-    // Send Escape
     let esc_event = KeyboardInput {
         key_code: KeyCode::Escape,
         logical_key: Key::Escape,
@@ -243,14 +331,14 @@ fn process_columns_modal_toggles_columns_resets_and_dismisses_via_button_and_esc
         })
         .expect("esc key injection");
     app.update();
+    app.update();
 
-    let world = app.world_mut();
     assert_eq!(
-        world
-            .query_filtered::<Entity, With<ProcessColumnsModalOverlay>>()
-            .iter(world)
+        app.world_mut()
+            .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+            .iter(app.world())
             .count(),
         0,
-        "modal is despawned after Escape"
+        "Escape closes the chooser"
     );
 }

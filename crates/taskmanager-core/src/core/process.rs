@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub mod aggregate;
 mod anomaly;
 mod application;
+mod collateral;
 pub mod container;
 mod control;
 pub mod group_aggregate;
@@ -32,6 +33,7 @@ pub use application::{
     ApplicationIconAsset, ApplicationIconFormat, MAX_APPLICATION_ICON_BYTES,
     ProcessApplicationIdentity, ProcessCategory, process_category,
 };
+pub use collateral::{FrozenProcessCollateral, FrozenProcessCollateralMember};
 pub use container::{ContainerMetadata, ContainerRuntime, parse_cgroup_container_metadata};
 pub(crate) use control::process_batch_failure_wire_code;
 pub use control::{

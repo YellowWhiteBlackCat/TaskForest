@@ -632,6 +632,7 @@ capture_one() {
   local state_home="$RUNTIME_DIR/state-$name"
   local window_id="" window_ready=0 marker_ready=0 action_status=failed
   local width=0 height=0 bytes=0 hash=- rendered=unknown control=unknown
+  local stable_bytes="" current_bytes=0
   local page=performance
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
@@ -760,13 +761,25 @@ capture_one() {
     fi
 
     if [ "$action_status" = ok ]; then
-      for _ in $(seq 1 20); do
-        if [ -s "$image" ]; then
-          bytes="$(stat -c%s "$image")"
-          [ "$bytes" -gt 5000 ] && break
+      # Niri acknowledges the screenshot action BEFORE the PNG writer has
+      # flushed the file: a half-written PNG already carries the header, so
+      # "the file is bigger than 5000 bytes" can still race the writer and
+      # record a TRUNCATED size — the receipt then contradicts the bytes on
+      # disk and the evidence validator rejects the run. Wait for a parseable
+      # PNG whose size has STOPPED growing, then take the size and the hash
+      # from that same settled file.
+      stable_bytes=""
+      for _ in $(seq 1 50); do
+        if [ -s "$image" ] && file "$image" | grep -q 'PNG image data'; then
+          current_bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
+          if [ "$current_bytes" = "$stable_bytes" ]; then
+            break
+          fi
+          stable_bytes="$current_bytes"
         fi
         sleep 0.1
       done
+      bytes="$(stat -c%s "$image" 2>/dev/null || echo 0)"
       if [ "$bytes" -gt 5000 ]; then
         local dimensions
         dimensions="$(file "$image" | sed -nE 's/.*PNG image data, ([0-9]+) x ([0-9]+).*/\1 \2/p')"

@@ -10,6 +10,26 @@ Beyond the README module map, these ownership facts apply:
   identities; renderers and persistence writers never carry external spellings.
 - `src/core/process/`, `src/core/services/`, `src/core/startup/` and
   `src/core/export/` own typed product facts.
+- `src/core/process/collateral.rs` owns the ONE tree closure: the frozen
+  collateral view (root, members, depth) and the execution order are two
+  projections of that single walk, so a confirmation can never disagree
+  with what will be executed. A frontend renders the frozen rows and never
+  re-reads the live rows.
+- `src/core/metrics/sample.rs` owns the measured sample: a value, the instant
+  the observation was MEASURED, and the acceptance time. The acceptance time
+  is never relabelled as the sampling time, and a sample without a
+  measurement instant is a gap, not a zero.
+- `src/core/process_telemetry/quota.rs` owns the container's DECLARED
+  ceilings. Absent means undeclared (never zero); an unreadable declaration
+  is a typed failure with every dimension absent. A frontend never derives
+  a limit from an unrelated measurement.
+- `src/core/startup/timeline.rs` owns the per-phase boot split; a phase that
+  was not measured stays absent, and the measured total counts the measured
+  phases only.
+- `src/core/metrics/disk.rs` owns the partition ↔ filesystem link: the
+  association is made once in the contract, so no frontend matches
+  mount-point strings, and the SMART remediation hint travels with the
+  disk fact (the frontend composes no command).
 - `src/core/alerts/` owns alert rules, active-set transitions and the bounded,
   versioned event export; event history is session-local domain state, not a
   renderer cache.

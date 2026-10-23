@@ -1,4 +1,4 @@
-# TaskManager 代码标准与 Rust 2024 规范 (STANDARDS.md)
+# TaskForest 代码标准与 Rust 2024 规范 (STANDARDS.md)
 
 ## 1. Rust 2024 Edition 规范
 
@@ -7,12 +7,10 @@
    crate**——`taskmanager-perf-ioctl`（perf_event_open）、`taskmanager-afpacket`（AF_PACKET）、
    `taskmanager-fd-bridge`（SCM_RIGHTS）、`taskmanager-windows-api`（最小 Windows API 面，
    能力清单见 `docs/PERMISSION_MODEL.md` Boundary 1）。safe-Rust 门禁扫描生产 `src` 树；`tests/` 下的独立集成测试二进制不属于
-   产品 crate 的 safe-Rust 面，其中的 `unsafe` 必须自文档化（例：
-   `crates/taskmanager-tui/tests/headless/perf_budget_alloc_tests.rs` 的计数分配器，无法放进
-   `forbid(unsafe_code)` 的库）。每个边界 crate：根带 `#![deny(unsafe_op_in_unsafe_fn)]`（非 `forbid`）、
-   每个 `unsafe` 块带 `// SAFETY:` 注释、公开 API 不跨原始 OS handle/pointer（Unix 使用
-   `OwnedFd`/`impl AsFd`，Windows 只出 typed 值）、指针加宽只用 `.cast()`（禁
-   `as *const`/`as *mut`/`as RawFd`）、零 workspace 依赖。由
+   产品 crate 的 safe-Rust 面，其中的 `unsafe` 必须自文档化并登记（ADR-056）。每个边界 crate：根带
+   `#![deny(unsafe_op_in_unsafe_fn)]`（非 `forbid`）、每个 `unsafe` 块带 `// SAFETY:` 注释、
+   公开 API 不跨原始 OS handle/pointer（Unix 使用 `OwnedFd`/`impl AsFd`，Windows 只出 typed 值）、
+   指针加宽只用 `.cast()`（禁 `as *const`/`as *mut`/`as RawFd`）、零 workspace 依赖。由
    `tests/logic/workspace_architecture_test/dependency_firewall.rs` 逐构建强制（4-crate
    allowlist + 边界契约 + 四道反向防火墙）。
    - **遍历守卫与双执行面纪律**（裁决详版见 [PERMISSION_MODEL](PERMISSION_MODEL.md)
@@ -39,12 +37,23 @@
 1. **命名规范**：结构体/枚举/Trait `PascalCase`，函数/方法/变量 `snake_case`，常量 `SCREAMING_SNAKE_CASE`。
 2. **状态与并发**：
    - UI 线程与后台采集线程解耦，通过 `crossbeam-channel` 通信。
-   - 共享只读状态采用 `Arc<T>`；可变状态避免长时间持锁。系统图表统一读取
-     `CorrelatedSystemTelemetryHistory`，写能力仅由组合边界持有的独立 ingestor 暴露；
-     历史锁区必须保持短小，初始状态不得预填伪造零值。
+   - 共享只读状态采用 `Arc<T>`；可变状态避免长时间持锁。系统图表统一读取 `CorrelatedSystemTelemetryHistory`，
+     写能力仅由组合边界持有的独立 ingestor 暴露；历史锁区必须保持短小，初始状态不得预填伪造零值。
    - 多个 `bool` 如果共同编码互斥状态、合法组合或迁移关系，必须改为 typed enum/显式状态机
     （如 `Rejected`/`AcceptedPartial`/`Committed`）。独立 dirty flag、能力开关和事实属性
      可继续使用 `bool`，不得借其隐式表达生命周期。
+
+### 2.1 Lint 事实源与豁免纪律
+
+1. 根 `[workspace.lints]` 是唯一 lint 事实源（ADR-056）；每个业务 crate 必须
+   `[lints] workspace = true`，新增 crate 漏写继承即不合规。
+2. `unsafe` 只允许出现在四个信任根 crate：`taskmanager-perf-ioctl`（ADR-022）、
+   `taskmanager-afpacket`（ADR-024）、`taskmanager-fd-bridge`（ADR-025）、
+   `taskmanager-windows-api`（ADR-031）；它们显式声明 `unsafe_code = "allow"`。
+3. 测试期 `unsafe` 必须显式登记（当前两处：TUI 每帧分配预算与根包采集循环保留内存预算的
+   计数分配器），且只能用 `cfg_attr(...)` 作用域式豁免并写明理由——裸
+   `#[allow(...)]`/`#[expect(...)]` 一律违规（`scripts/quality/allow_ceiling_guard.py`
+   审计普查为零）。
 
 ---
 
@@ -67,8 +76,8 @@
      新增检测能力 / 确定性验证 / 低脆弱低维护 / 最低保证层级。
    - 八耻：证明代码存在 / 锁定实现细节 / 复制实现自证 / 源码文本代理语义 /
      重复覆盖刷率 / `sleep` 时序侥幸 / 正常重构即破坏 / 替代类型编译器 lint。
-   - 保证层级：类型系统→不写运行时测试；compiler→不写文本测试；lint→不写源码扫描；
-     结构检查→不写脆弱代理；只有真正行为→才进入行为测试。
+   - 保证层级：类型系统→不写运行时测试；compiler→不写文本测试；lint→不写源码扫描；结构检查→不写脆弱代理；
+     只有真正行为→才进入行为测试。
    - 五问准入：①保护哪个 regression？②什么 mutation 能让它 fail？③无行为重构会不会
      break？④已有覆盖？⑤更直接更稳定的保证方式？答不清①②不得新增；③为"会"时重写。
    - Agent 禁令：禁止为"有测试/提高覆盖率/证明修改存在"新增测试。低价值测试不如没有。
@@ -78,9 +87,8 @@
      删除旧路径/测试/fixture/demo 与文档。正向复读一律禁止。存量须迁移到可执行断言或声明合法类别。
 6. **空断言即灌水（禁止）**——`#[test]` 须对真实输出/状态/副作用做断言（`no_test_function_is_assertion_free` 拦截）。
    无效形态：仅 println 无 assert、断言恒真式、只断言 `is_ok()` 不验证副作用、读后丢弃 `let _ = value`。
-7. **可移植性红线**：禁止 `.expect("python3 must be available")`（先探测，缺失则 `eprintln!` +
-   return）；禁止硬编码宿主值；实时硬件读取须 `#[cfg(target_os)]` 守卫且只断言聚合性质；
-   优先纯函数表驱动测试。
+7. **可移植性红线**：禁止 `.expect("python3 must be available")`（先探测，缺失则 `eprintln!` + return）；
+   禁止硬编码宿主值；实时硬件读取须 `#[cfg(target_os)]` 守卫且只断言聚合性质；优先纯函数表驱动测试。
 8. **枚举变体单一事实源**：遍历枚举全部变体时引用 crate 的 `ALL`/迭代器，不得在测试重抄变体清单。
 
 ### 3.5 Rust/Python/Shell 反规避契约
@@ -89,8 +97,8 @@
 - Rust 测试通过 `ALL`/registry/trait/运行时输入自动发现范围，不逐个点名。
 - Python 门禁解析真实输入、构建关系或执行目标命令后判定；不把路径/名称逐项抄成"通过清单"。
 - Shell 脚本运行真实产物并检查退出码/状态/产物/收据；禁止只 `echo PASS` 或只 `grep` 文本。
-- "报菜名"/手工清单/恒真断言/空断言/吞错返回 0 均为灌水；不得以数量或覆盖率替代证据。
-- allowlist 只表达真实政策例外且须有原因和失败语义；验证器自身 fail-closed。
+- "报菜名"/手工清单/恒真断言/空断言/吞错返回 0 均为灌水；不得以数量或覆盖率替代证据；allowlist 只表达
+  真实政策例外且须有原因和失败语义，验证器自身 fail-closed。
 
 9. **平台契约套件**：`platform-conformance` 承载宿主无关断言（capability 表面、process 行、
    live drain 归属），不含 OS I/O 与 `cfg(target_os)` 分支。三平台 adapter 各以
@@ -112,10 +120,8 @@
 1. **无头行为测试**：覆盖成功/失败/取消路径，断言状态或输出（不能只证明"没有崩溃"）。
 2. **可观测埋点**：结构化 tracing marker/状态转储/等价探针；须可在 capture/test 模式开启，
    不记录隐私/机密/用户文件内容。
-3. **真实像素截图**：按前端 capture 脚本运行，须来自本次构建和真实渲染帧；旧图/mock 图/
-   仅构造 Scene 不能替代。
-4. **截图审查记录**：逐项检查信息层级/密度/间距/对齐/截断/对比度/空白利用/加载&空&错误状态；
-   按风险覆盖亮暗主题/最小窗口/缩放/键盘路径。
+3. **真实像素截图**：按前端 capture 脚本运行，须来自本次构建和真实渲染帧；旧图/mock 图/仅构造 Scene 不能替代。
+4. **截图审查记录**：逐项检查信息层级/密度/间距/对齐/截断/对比度/空白利用/加载&空&错误状态；按风险覆盖亮暗主题/最小窗口/缩放/键盘路径。
 
 回执新鲜度只属 capture/`--with-gui` 证据流程，默认 nextest 不得对已提交回执做哈希比对。
 每次截图运行应保存 git commit/工作树标识/Rust 版本/场景参数/埋点日志/PNG 尺寸哈希
@@ -138,9 +144,8 @@
 
 函数职责由 Clippy 全 workspace 收紧（`cognitive_complexity` 上限 48、单函数非注释行
 上限 650，`-D warnings`；阈值是存量棘轮，不是新代码目标）。新增交互/更新/渲染编排应拆成
-命名 system（单决策函数复杂度 ≤25），不得用 `#[allow]`/转发壳/换文件规避。
-`rust_surface_guard.py` 阻断 `*_open: bool`/`*_was_open: bool`，须改为 typed surface
-或穷尽 presence transition。
+命名 system（单决策函数复杂度 ≤25），不得用 `#[allow]`/转发壳/换文件规避；`rust_surface_guard.py`
+阻断 `*_open: bool`/`*_was_open: bool`，须改为 typed surface 或穷尽 presence transition。
 
 ---
 

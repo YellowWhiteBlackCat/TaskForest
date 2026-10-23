@@ -166,6 +166,10 @@ pub(crate) struct ProcessRowFacts {
     pub threads_zero: bool,
     pub fds_zero: bool,
     pub nice_zero: bool,
+    /// The platform's "not responding" state (the core's uninterruptible
+    /// wait). The row's process-control affordances wear the destructive
+    /// accent for such a process.
+    pub not_responding: bool,
 }
 
 impl ProcessRowFacts {
@@ -185,6 +189,7 @@ impl ProcessRowFacts {
             threads_zero: process.current_threads() == Some(0),
             fds_zero: process.current_fds() == Some(0),
             nice_zero: process.current_nice() == Some(0),
+            not_responding: process.status_kind().is_uninterruptible(),
         }
     }
 }
@@ -381,6 +386,11 @@ pub(crate) struct ProcessProjection {
     rows: Vec<ProjectedRow>,
     process_facts: Vec<ProcessRowFacts>,
     row_cells: Vec<RowCells>,
+    /// The column the projection was built for. The renderer wears it as the
+    /// sorted-column tint (the whole column gets a faint wash), so the
+    /// projection carries the sort axis it was sorted by instead of the
+    /// renderer re-deriving it.
+    sort_column: Option<SortCol>,
 }
 
 impl ProcessProjection {
@@ -426,7 +436,15 @@ impl ProcessProjection {
             rows,
             process_facts,
             row_cells,
+            sort_column: Some(sort.0),
         }
+    }
+
+    /// The column this projection is sorted by, when it was built from a
+    /// sort state. `None` for a default (unsorted) projection.
+    #[must_use]
+    pub(crate) fn sort_column(&self) -> Option<SortCol> {
+        self.sort_column
     }
 
     /// Every projected row in render order.

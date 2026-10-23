@@ -1,5 +1,6 @@
 //! Modal painting with an explicit access set.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::schedule::IntoScheduleConfigs;
@@ -38,9 +39,6 @@ fn paint(mut access: PaintAccess) {
             .commands
             .spawn_scene(service_details_modal_scene(value, &access.palette.inner))
             .id();
-        access
-            .commands
-            .entity(root)
-            .add_one_related::<ChildOf>(fresh);
+        attach_child(&mut access.commands, root, fresh);
     }
 }

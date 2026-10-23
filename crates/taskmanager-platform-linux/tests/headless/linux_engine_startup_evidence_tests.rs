@@ -73,3 +73,25 @@ fn init_probe_failures_remain_typed_in_evidence_state() {
         assert_eq!(snapshot.critical_chain_failure, Some(expected));
     }
 }
+
+#[test]
+fn a_non_systemd_init_reports_the_phase_source_as_typed_unavailable() {
+    // The per-phase split is an independent source: a host without systemd
+    // cannot answer it at all, and it must say so instead of publishing an
+    // empty split (which a renderer would read as "the boot took no time").
+    let snapshot = unavailable_for_init(Ok(InitSystem::Openrc), 42)
+        .expect("non-systemd init must stop before command construction");
+
+    assert_eq!(
+        snapshot.phase_timeline_state.status,
+        DeviceStatus::Unsupported
+    );
+    assert_eq!(
+        snapshot.phase_timeline_failure,
+        Some(StartupEvidenceFailure::Unsupported)
+    );
+    assert!(
+        snapshot.phase_timeline.is_none(),
+        "an unavailable phase source must publish no phase split"
+    );
+}

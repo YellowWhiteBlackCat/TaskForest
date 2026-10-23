@@ -86,6 +86,8 @@ FORBIDDEN_PUBLIC_FILES = {
     "scripts/multi_frontend_functional_score.py",
     "scripts/bonus_score.py",
     "scripts/dev-install-desktop.sh",
+    "scripts/quality/nightly-quality.sh",
+    "scripts/quality/perf-ioctl-privileged-coverage.sh",
     "tests/logic/mission_center_score_test.rs",
     "tests/logic/mission_center_parity_ledger_test.rs",
 }

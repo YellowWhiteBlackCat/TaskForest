@@ -37,6 +37,7 @@ fn opening_a_new_primary_surface_atomically_replaces_the_previous_branch() {
     );
 
     let batch = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Kill,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![frozen(8, "second")],
@@ -139,6 +140,7 @@ fn process_batch_preserves_leaf_first_scope_in_the_confirmed_effect() {
     let root = frozen(40, "root");
     let child = frozen(41, "child");
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::EndProcessTree,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![child.clone(), root.clone()],
@@ -153,6 +155,7 @@ fn process_batch_preserves_leaf_first_scope_in_the_confirmed_effect() {
     assert_eq!(
         confirmed.effect,
         Some(PlatformEffect::ExecuteBatch(ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::EndProcessTree,
             scope: ProcessGroupScope::PidAdjacency,
             targets: vec![child, root],

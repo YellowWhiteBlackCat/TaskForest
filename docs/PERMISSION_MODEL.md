@@ -13,6 +13,10 @@
 - `taskmanager-windows-api`：最小 Windows performance/locale/Known Folder/exact-process/WTS/SCM、
   topology/cache/NIC metadata API。
 
+这层约束由两处同时表达、缺一不可（[ADR-056](../adr/056-workspace-lint-single-source.md)）：根清单
+`[workspace.lints.rust]` 声明 `unsafe_code = "deny"`，业务 crate 一律 `[lints] workspace = true`；
+四个信任根显式声明 `unsafe_code = "allow"`，并保留 crate 级 `#![deny(unsafe_op_in_unsafe_fn)]`。
+
 边界内部拥有句柄、指针、缓冲和长度校验；公共 API 只返回 typed 值、owned fd 或 typed
 error，逐个 `unsafe` 块必须有 `SAFETY` 证明和 `unsafe_op_in_unsafe_fn` 约束。eBPF 不属于
 当前生产信任根。

@@ -39,7 +39,8 @@ use taskmanager_platform_contract::{
 };
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::{
-    CapabilitySupport, ComponentCapability, FrontendShape, capability_findings, capability_report,
+    CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration, FrontendShape,
+    capability_findings, capability_report,
 };
 
 use crate::app::{Page, PageContent, Route, RouteChanged};
@@ -261,8 +262,9 @@ fn capability_declaration_is_complete_and_pinned() {
         (SearchInput, Kind::Ported),
         // Read-only text selection and clipboard export surface.
         (TextSelection, Kind::Divergent),
-        // Boolean rows ride the official Checkbox.
-        (Switch, Kind::Divergent),
+        // Boolean rows ride the official Checkbox behavior behind the
+        // product's own sliding switch.
+        (Switch, Kind::Ported),
         // Bounded settings are discrete radio choices.
         (Slider, Kind::Divergent),
         // Both are semantic-contract capabilities, so Bevy's local
@@ -274,7 +276,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (ColumnDragResize, Kind::Unsupported),
         (VirtualList, Kind::Ported),
         (Tree, Kind::Ported),
-        // Scrolling rides the official ScrollArea.
+        // Scrolling rides the official ScrollArea and the official
+        // Scrollbar behind the product's rail.
         (Scrollbar, Kind::Divergent),
         // Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
         (FocusVisible, Kind::Ported),
@@ -303,6 +306,28 @@ fn capability_declaration_is_complete_and_pinned() {
     }
 }
 
+/// Whether the declaration for `capability` names any of the official
+/// mechanisms in `needles` in its driver text.
+///
+/// The delivered-surface gate binds the declaration to the mounted tree: a
+/// cell that claims an official mechanism shows it mounted, a cell that does
+/// not claim it shows it absent. Mounting an official slider, scrollbar or
+/// popover therefore fails here until the matching declaration edit lands in
+/// the same change — and a declaration that claims a mechanism nobody mounts
+/// fails just as hard.
+fn declares_official(
+    declaration: &FrontendCapabilityDeclaration,
+    capability: ComponentCapability,
+    needles: &[&str],
+) -> bool {
+    declaration
+        .entries
+        .iter()
+        .find(|entry| entry.capability == capability)
+        .and_then(|entry| entry.support.explanation())
+        .is_some_and(|reason| needles.iter().any(|needle| reason.contains(needle)))
+}
+
 /// Every declared delivered-surface cell matches the mounted page trees: the
 /// official mechanisms the `Divergent` cells name are really mounted, and the
 /// mechanisms that would replace an `Unsupported` cell are absent.
@@ -325,19 +350,35 @@ fn declared_cells_match_the_mounted_page_surface() {
             .expect("every route has a census")
     };
 
-    // Official mechanisms that would replace a declared cell: absent too.
+    // Official mechanisms that would replace a declared cell: the cell and
+    // the mounted surface must agree, in both directions.
+    let declaration = crate::capabilities::capability_declaration();
     assert_eq!(
-        totals.official_slider, 0,
-        "an official Slider mount must update the Slider declaration first"
+        totals.official_slider > 0,
+        declares_official(
+            &declaration,
+            ComponentCapability::Slider,
+            &["bevy_ui_widgets Slider"]
+        ),
+        "the Slider cell and the mounted slider surface must agree: {totals:?}"
     );
     assert_eq!(
-        totals.official_scrollbar, 0,
-        "an official Scrollbar mount must update the Scrollbar declaration first"
+        totals.official_scrollbar > 0,
+        declares_official(
+            &declaration,
+            ComponentCapability::Scrollbar,
+            &["bevy_ui_widgets Scrollbar"]
+        ),
+        "the Scrollbar cell and the mounted scrollbar surface must agree: {totals:?}"
     );
     assert_eq!(
-        totals.official_popover + totals.official_menu_popup,
-        0,
-        "an official Popover/MenuPopup mount must update the DropdownMenu declaration first"
+        totals.official_popover + totals.official_menu_popup > 0,
+        declares_official(
+            &declaration,
+            ComponentCapability::DropdownMenu,
+            &["bevy_ui_widgets Popover", "bevy_ui_widgets MenuPopup"]
+        ),
+        "the DropdownMenu cell and the mounted popover surface must agree: {totals:?}"
     );
 
     // The mechanisms the Divergent reasons name are really mounted.

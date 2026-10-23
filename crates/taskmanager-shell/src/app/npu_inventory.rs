@@ -75,9 +75,43 @@ impl SystemProjectionStore {
         while self.npu_usage_history.len() > MAX_NPU_HISTORY {
             let _ = self.npu_usage_history.pop_front();
         }
+        self.note_npu_power_history(&snapshot);
         self.npu_inventory = Some(snapshot);
         self.note_device_row_family_changed(DeviceRowFamily::Npu);
         true
+    }
+
+    /// Append the aggregate accelerator power draw to the bounded power
+    /// history.
+    ///
+    /// The aggregate is the sum of the accelerators that REPORT the
+    /// capability: an accelerator without a power counter contributes
+    /// nothing, and an inventory where no accelerator reports the capability
+    /// appends NOTHING at all — the buffer stays empty, so a chart drawn
+    /// from it has no series to draw. The energy counter is never derived
+    /// from the power draw or from the utilization curve.
+    fn note_npu_power_history(&mut self, snapshot: &NpuInventorySnapshot) {
+        let watts: Option<f32> = snapshot
+            .power
+            .iter()
+            .filter_map(|observation| {
+                observation
+                    .report
+                    .power_w
+                    .current_value()
+                    .copied()
+                    .filter(|value| value.is_finite())
+            })
+            .reduce(|left, right| left + right);
+        let Some(watts) = watts else {
+            return;
+        };
+        self.npu_power_history
+            .push_back((snapshot.observed_at_ms, watts));
+        const MAX_NPU_POWER_HISTORY: usize = 600;
+        while self.npu_power_history.len() > MAX_NPU_POWER_HISTORY {
+            let _ = self.npu_power_history.pop_front();
+        }
     }
 
     pub(crate) fn seed_npu_inventory_fixture(&mut self, snapshot: NpuInventorySnapshot) {
@@ -91,3 +125,7 @@ impl SystemProjectionStore {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/headless/shell_app_npu_power_history.rs"]
+mod tests;

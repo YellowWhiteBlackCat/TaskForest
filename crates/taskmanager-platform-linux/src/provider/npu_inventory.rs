@@ -13,7 +13,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use taskmanager_core::{
-    DeviceId, FailureKind, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, ScalarObservation,
+    DeviceId, FailureKind, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, NpuPowerObservation,
+    NpuPowerReport, ScalarObservation,
 };
 use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::NpuInventoryProvider;
@@ -52,6 +53,10 @@ impl NpuInventoryProvider for NativeNpuInventoryProvider {
 /// Enumerate one sysfs accelerator class root. A missing root is an honest
 /// empty host; unreadable roots stay typed failures; each accepted node uses
 /// its canonical physical sysfs path rather than the enumerated `accelN` name.
+///
+/// Power and energy are collected per node by capability: a node whose driver
+/// publishes no power counter contributes no observation, so the energy
+/// series stays absent for it.
 fn discover_accelerators(
     root: &Path,
     observed_at_ms: u64,
@@ -64,6 +69,7 @@ fn discover_accelerators(
         Err(error) => return Err(io_failure(error)),
     };
     let mut devices = Vec::new();
+    let mut power = Vec::new();
     for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
@@ -76,12 +82,20 @@ fn discover_accelerators(
         if !is_accel_node_name(name) {
             continue;
         }
-        devices.push(accel_device(entry.path(), name));
+        let node_root = entry.path();
+        let device = accel_device(node_root.clone(), name);
+        if let Some(report) = read_power_report(&node_root, observed_at_ms) {
+            power.push(NpuPowerObservation {
+                device_id: device.device_id.clone(),
+                report,
+            });
+        }
+        devices.push(device);
         if devices.len() >= MAX_ACCEL_NODES {
             break;
         }
     }
-    Ok(NpuInventorySnapshot::discovered(devices, observed_at_ms))
+    Ok(NpuInventorySnapshot::discovered(devices, observed_at_ms).with_power(power))
 }
 
 /// `accel<digits>` exactly: unrelated class members are skipped, not errors.
@@ -169,6 +183,47 @@ fn parse_size_bytes(value: &str) -> Option<u64> {
     number.checked_mul(multiplier)
 }
 
+/// Read the accelerator's own power and energy counters, when its driver
+/// registers a `hwmon` node for it.
+///
+/// The kernel publishes a device's power sensor under that device's own
+/// `hwmon` directory, so a counter read here belongs to this accelerator.
+/// `power1_input` is the instantaneous draw in microwatts and
+/// `energy1_input` is a cumulative microjoule counter.
+///
+/// `None` means the accelerator publishes no such counter at all: the
+/// capability is absent, so the energy series stays absent instead of being
+/// derived from the utilization curve.
+fn read_power_report(node_root: &Path, observed_at_ms: u64) -> Option<NpuPowerReport> {
+    let entries = fs::read_dir(node_root.join("device/hwmon")).ok()?;
+    let mut report = NpuPowerReport::unsupported();
+    let mut observed = false;
+    for entry in entries.flatten() {
+        let hwmon = entry.path();
+        if !hwmon.is_dir() {
+            continue;
+        }
+        if let Some(microwatts) = read_hwmon_counter(&hwmon.join("power1_input")) {
+            let watts = (microwatts as f64 / 1_000_000.0) as f32;
+            if watts.is_finite() && watts >= 0.0 {
+                report.power_w = ScalarObservation::available(watts, observed_at_ms);
+                observed = true;
+            }
+        }
+        if let Some(microjoules) = read_hwmon_counter(&hwmon.join("energy1_input")) {
+            report.energy_j = ScalarObservation::available(microjoules / 1_000_000, observed_at_ms);
+            observed = true;
+        }
+    }
+    observed.then_some(report)
+}
+
+/// One hwmon counter value in the unit the kernel publishes it in.
+fn read_hwmon_counter(path: &Path) -> Option<u64> {
+    let text = fs::read_to_string(path).ok()?;
+    text.trim().parse::<u64>().ok()
+}
+
 fn io_failure(error: io::Error) -> ProviderFailure {
     let kind = match error.kind() {
         io::ErrorKind::PermissionDenied => FailureKind::PermissionDenied,
@@ -180,3 +235,7 @@ fn io_failure(error: io::Error) -> ProviderFailure {
 #[cfg(test)]
 #[path = "../../tests/headless/linux_provider_npu_inventory_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/linux_provider_npu_power_tests.rs"]
+mod power_tests;

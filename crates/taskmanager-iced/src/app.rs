@@ -367,6 +367,12 @@ pub enum Message {
     /// The native window changed size; this drives the frontend-local
     /// responsive layout breakpoint and never crosses into the shell.
     WindowResized(iced::Size),
+    /// The native window changed its DPI scale factor.
+    ///
+    /// The chart's sub-pixel alignment is exact only against the PRODUCT of
+    /// the app's render scale and the window's scale factor: iced multiplies
+    /// the two at the toolkit boundary, so the app has to know both.
+    WindowScaleFactorChanged(f32),
     /// The native titlebar requested a close. With a live tray this is a
     /// minimize-to-tray action; without one it closes the only window.
     WindowCloseRequested,
@@ -573,6 +579,10 @@ pub struct IcedApp {
     configuration: configuration_state::IcedConfiguration,
     /// Run New Task state.
     pub(crate) run_task: crate::ui::overlays::run_task::RunTaskState,
+    /// The native window's DPI scale factor (ICED-054). Defaults to 1.0 until
+    /// the first scale event arrives; it multiplies the app's render scale
+    /// into the device-pixel product the chart aligns against.
+    pub(crate) window_scale_factor: f32,
     /// User process view presets.
     pub(crate) nav_orientation: NavOrientation,
     pub(crate) saved_views: Vec<SavedViewPreset>,
@@ -724,3 +734,7 @@ mod quit_tests;
 #[cfg(test)]
 #[path = "../tests/gui/app/window_capture_tests.rs"]
 mod window_capture_tests;
+
+#[cfg(test)]
+#[path = "../tests/gui/app/window_scale_tests.rs"]
+mod window_scale_tests;

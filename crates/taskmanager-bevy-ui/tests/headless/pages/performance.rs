@@ -67,7 +67,7 @@ use crate::app::{FrontendTrack, Page, PageContext, Route, RouteChanged};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
-use crate::widgets::chart::{MAX_CHART_POINTS, line_segments};
+use crate::widgets::chart::{ChartCanvas, ChartContent, MAX_CHART_POINTS, line_segments};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
 use taskmanager_application::ConfirmationKind;
@@ -86,15 +86,17 @@ use taskmanager_shell::presentation::trend::window;
 
 pub(super) const GIB: u64 = 1024 * 1024 * 1024;
 
-/// The strip's polyline projection over the shell's series — the same
-/// bounded, gap-aware call the render path makes (design strip geometry).
+/// The strip's projection over the shell's series — the same bounded,
+/// gap-aware call the render path makes. The width is the SLOT the layout
+/// measures, not a design constant: the assertions below read the segment
+/// COUNT (how many samples joined into a path), which no width changes.
 fn curve_segments(
     shell: &ShellApp,
     curve: SystemCurve,
 ) -> Vec<crate::widgets::chart::ChartSegment> {
     line_segments(
         &window(&shell.history, curve.series()),
-        super::scene::chart::CHART_STRIP_WIDTH_PX,
+        100.0,
         34.0 * 3.0,
         MAX_CHART_POINTS,
     )
@@ -623,26 +625,18 @@ fn content_spawns_from_a_cold_context_with_strip_markers() {
         .spawn_scene(content(&context))
         .expect("the cold page scene resolves without assets")
         .id();
-    let mut strips = world.query::<(&SparkStrip, &bevy::ecs::hierarchy::Children)>();
+    let mut strips = world.query::<(&SparkStrip, &ChartCanvas)>();
     for curve in SystemCurve::STRIP {
-        let strip = strips
+        let (_, canvas) = strips
             .iter(world)
             .find(|(marker, _)| marker.0 == curve)
             .unwrap_or_else(|| panic!("the {curve:?} strip is mounted with its marker"));
+        let ChartContent::Samples { values, .. } = &canvas.content else {
+            panic!("the {curve:?} strip carries its measured window");
+        };
         assert_eq!(
-            strip.1.len(),
-            1,
-            "a cold strip mounts exactly its polyline layer"
-        );
-        let segments = strip
-            .1
-            .iter()
-            .next()
-            .and_then(|polyline| world.get::<bevy::ecs::hierarchy::Children>(*polyline))
-            .map(|segments| segments.len())
-            .unwrap_or(usize::MAX);
-        assert_eq!(
-            segments, 0,
+            values.len(),
+            0,
             "a cold strip draws zero segments, never a fabricated line"
         );
     }
@@ -897,17 +891,19 @@ fn folded_projection_rewrites_the_mounted_page() {
     // the summary's projection: one fold left the strip still collecting.
     fn strip_segments(app: &mut App) -> usize {
         let world = app.world_mut();
-        let mut strips = world.query::<(&SparkStrip, &bevy::ecs::hierarchy::Children)>();
+        let mut strips = world.query::<(&SparkStrip, &ChartCanvas)>();
         strips
             .iter(world)
             .find(|(marker, _)| marker.0 == SystemCurve::Cpu)
-            .and_then(|(_, children)| {
-                children
-                    .iter()
-                    .next()
-                    .and_then(|polyline| world.get::<bevy::ecs::hierarchy::Children>(*polyline))
+            .and_then(|(_, canvas)| match &canvas.content {
+                ChartContent::Samples { values, .. } => Some(
+                    values
+                        .windows(2)
+                        .filter(|pair| pair[0].is_finite() && pair[1].is_finite())
+                        .count(),
+                ),
+                _ => None,
             })
-            .map(|segments| segments.len())
             .unwrap_or(0)
     }
     assert_eq!(

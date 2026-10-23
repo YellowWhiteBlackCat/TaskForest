@@ -27,7 +27,8 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use taskmanager_core::{
-    ContainerRollup, ContainerSummary, DeviceStatus, FailureKind, IsolationKind, ScalarObservation,
+    ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, DeviceStatus,
+    FailureKind, IsolationKind, ScalarObservation,
 };
 
 use super::isolation;
@@ -74,6 +75,57 @@ pub fn parse_cgroup_procs(text: &str) -> Vec<u32> {
     text.lines()
         .filter_map(|line| line.trim().parse().ok())
         .collect()
+}
+
+/// What a cgroup-v2 memory limit file declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryLimitDeclaration {
+    /// The cgroup declares a ceiling of this many bytes.
+    Ceiling(u64),
+    /// The cgroup declares no ceiling in that dimension (`max`).
+    NoCeiling,
+}
+
+/// Parse a cgroup-v2 memory limit payload (`memory.max` / `memory.high`).
+///
+/// The kernel writes `max` when the cgroup declares no ceiling in that
+/// dimension: that is "no ceiling declared", never a zero-byte ceiling. A
+/// payload that is neither `max` nor a byte count is malformed and stays
+/// unparsed.
+pub fn parse_memory_limit(text: &str) -> Option<MemoryLimitDeclaration> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed == "max" {
+        return Some(MemoryLimitDeclaration::NoCeiling);
+    }
+    trimmed.parse().ok().map(MemoryLimitDeclaration::Ceiling)
+}
+
+/// Parse a cgroup-v2 `cpu.max` payload.
+///
+/// The file holds `<quota> <period>` in microseconds. A `max` quota means the
+/// cgroup declares no CPU ceiling; the period is still reported because it is
+/// the window the quota would be measured over. A payload that is not a
+/// `<quota> <period>` pair stays unparsed.
+pub fn parse_cpu_max(text: &str) -> Option<ContainerCpuQuota> {
+    let mut fields = text.split_whitespace();
+    let quota = fields.next()?;
+    let period = fields.next()?;
+    if fields.next().is_some() {
+        return None;
+    }
+    let period_us = period.parse().ok()?;
+    let quota_us = if quota == "max" {
+        None
+    } else {
+        Some(quota.parse().ok()?)
+    };
+    Some(ContainerCpuQuota {
+        quota_us,
+        period_us,
+    })
 }
 
 /// Classify a cgroup relative path as a container runtime placement. Returns
@@ -162,6 +214,70 @@ fn field_io_failure(kind: ErrorKind) -> FailureKind {
         }
         _ => FailureKind::ProviderFault,
     }
+}
+
+/// The outcome of reading one cgroup-v2 limit file.
+enum LimitRead<T> {
+    /// The cgroup declares no ceiling in this dimension: the limit file does
+    /// not exist, or it declares `max`.
+    NotDeclared,
+    /// The cgroup declares this ceiling.
+    Declared(T),
+    /// The declaration exists but could not be read or parsed.
+    Failed(FailureKind),
+}
+
+fn read_memory_limit(path: &Path) -> LimitRead<u64> {
+    match fs::read_to_string(path) {
+        Ok(text) => match parse_memory_limit(&text) {
+            Some(MemoryLimitDeclaration::Ceiling(ceiling)) => LimitRead::Declared(ceiling),
+            Some(MemoryLimitDeclaration::NoCeiling) => LimitRead::NotDeclared,
+            None => LimitRead::Failed(FailureKind::ProviderFault),
+        },
+        Err(error) if error.kind() == ErrorKind::NotFound => LimitRead::NotDeclared,
+        Err(error) => LimitRead::Failed(field_io_failure(error.kind())),
+    }
+}
+
+fn read_cpu_quota(path: &Path) -> LimitRead<ContainerCpuQuota> {
+    match fs::read_to_string(path) {
+        Ok(text) => match parse_cpu_max(&text) {
+            Some(quota) => LimitRead::Declared(quota),
+            None => LimitRead::Failed(FailureKind::ProviderFault),
+        },
+        Err(error) if error.kind() == ErrorKind::NotFound => LimitRead::NotDeclared,
+        Err(error) => LimitRead::Failed(field_io_failure(error.kind())),
+    }
+}
+
+/// Read the ceilings one container cgroup declares for its workload.
+///
+/// The limit files are read from the cgroup itself: these are the ceilings
+/// the runtime declared FOR THIS workload, not the effective hierarchical
+/// minimum a parent cgroup may impose on top of them.
+///
+/// A limit file that does not exist (or declares `max`) means the cgroup
+/// declares no ceiling in that dimension. A file that exists but cannot be
+/// read or parsed makes the WHOLE quota unknown: a partially-known quota
+/// would let a frontend compare a container against a ceiling it never read.
+fn read_container_quota(dir: &Path) -> ContainerQuota {
+    let mut quota = ContainerQuota::not_declared();
+    match read_memory_limit(&dir.join("memory.max")) {
+        LimitRead::Declared(ceiling) => quota.memory_hard_limit_bytes = Some(ceiling),
+        LimitRead::NotDeclared => {}
+        LimitRead::Failed(failure) => return ContainerQuota::unavailable(failure),
+    }
+    match read_memory_limit(&dir.join("memory.high")) {
+        LimitRead::Declared(ceiling) => quota.memory_soft_limit_bytes = Some(ceiling),
+        LimitRead::NotDeclared => {}
+        LimitRead::Failed(failure) => return ContainerQuota::unavailable(failure),
+    }
+    match read_cpu_quota(&dir.join("cpu.max")) {
+        LimitRead::Declared(cpu) => quota.cpu = Some(cpu),
+        LimitRead::NotDeclared => {}
+        LimitRead::Failed(failure) => return ContainerQuota::unavailable(failure),
+    }
+    quota
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -388,6 +504,10 @@ fn build_summary(
         FieldRead::Value(bytes) => ScalarObservation::available(bytes, now_ms),
         FieldRead::Failed(failure) => ScalarObservation::unavailable(failure),
     };
+    // The declared ceilings come from the cgroup's own limit files. A limit
+    // that is not declared stays absent; a limit that could not be read makes
+    // the whole quota unknown (never a guessed cap).
+    let quota = read_container_quota(&abs);
     // Membership (`cgroup.procs`) read failure must never collapse into a silent
     // empty Vec that is indistinguishable from a genuine zero-member container:
     // keep the empty list (the model's documented "membership unavailable" form)
@@ -404,6 +524,7 @@ fn build_summary(
         cgroup_path: relative.to_owned(),
         cpu_percentage,
         memory_bytes,
+        quota,
         member_pids,
     };
     (summary, procs_read_failed)
@@ -518,3 +639,7 @@ fn is_strict_descendant(maybe_child: &str, maybe_parent: &str) -> bool {
 #[cfg(test)]
 #[path = "../../../../tests/headless/linux_engine_process_telemetry_containers_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/headless/linux_engine_process_telemetry_container_quota_tests.rs"]
+mod quota_tests;

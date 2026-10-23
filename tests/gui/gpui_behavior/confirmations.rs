@@ -146,6 +146,7 @@ async fn completed_process_batch_history_exports_to_clipboard(cx: &mut TestAppCo
             123_456,
             ProcessBatchResult {
                 intent: ProcessBatchIntent {
+                    collateral: Default::default(),
                     action: ProcessBatchAction::Suspend,
                     targets: vec![identity.clone()],
                     scope: Default::default(),

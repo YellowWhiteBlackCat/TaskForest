@@ -16,7 +16,7 @@ use taskmanager_core::core::process::{
     ProcessOwnerIdentity, ProcessScalarObservations,
 };
 use taskmanager_core::core::process_telemetry::{
-    ContainerSummary, IsolationKind, ProcessGpuEngineUsage, ProcessGpuEngines,
+    ContainerQuota, ContainerSummary, IsolationKind, ProcessGpuEngineUsage, ProcessGpuEngines,
 };
 use taskmanager_core::export::{
     ExportExtras, ProcessGpuEnginesEntry, processes_to_csv, processes_to_html, snapshot_to_json,
@@ -472,6 +472,7 @@ fn snapshot_to_json_with_extras_emits_containers_gpu_engines_and_thresholds() {
         cgroup_path: "/docker/abc".into(),
         cpu_percentage: ScalarObservation::available(12.5, 1_000),
         memory_bytes: ScalarObservation::available(1_048_576, 1_000),
+        quota: ContainerQuota::not_declared(),
         member_pids: vec![1234, 1235],
     };
     let engines = ProcessGpuEngines {

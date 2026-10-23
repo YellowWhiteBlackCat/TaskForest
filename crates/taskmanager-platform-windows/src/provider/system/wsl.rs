@@ -24,7 +24,9 @@ use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::{ContainerSummary, FailureKind, IsolationKind, ScalarObservation};
+use taskmanager_core::{
+    ContainerQuota, ContainerSummary, FailureKind, IsolationKind, ScalarObservation,
+};
 
 use crate::command::run_with_timeout;
 use taskmanager_windows_api::query_wsl_distributions;
@@ -362,6 +364,10 @@ impl WslRollupCollector {
                 cpu_percentage,
                 memory_bytes,
                 member_pids,
+                // A WSL distribution declares no cgroup ceiling: the source
+                // was read and it declares nothing (NOT DECLARED, not
+                // unavailable, and never a fabricated limit).
+                quota: ContainerQuota::not_declared(),
             });
         }
         // Descending CPU%: a distro with a current reading ranks above one

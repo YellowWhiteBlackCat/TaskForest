@@ -34,6 +34,7 @@ fn process(pid: u32, token: u64) -> FrozenProcessIdentity {
 
 fn batch(target: FrozenProcessIdentity, action: ProcessBatchAction) -> ProcessBatchIntent {
     ProcessBatchIntent {
+        collateral: Default::default(),
         action,
         scope: ProcessGroupScope::PidAdjacency,
         targets: vec![target],

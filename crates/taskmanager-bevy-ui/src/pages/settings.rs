@@ -43,12 +43,11 @@ use bevy::ecs::observer::On;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{EntityScene, Scene, bsn};
-use bevy::ui::Checked;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, Node, Overflow, UiRect, Val, percent, px, rem,
+    BackgroundColor, FlexDirection, Node, Overflow, RemSize, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ScrollArea, ValueChange};
+use bevy::ui_widgets::{ScrollArea, ValueChange};
 use taskmanager_application::i18n::{Language, current_language, set_language, t};
 use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInterval};
 use taskmanager_core::config::Config;
@@ -74,6 +73,9 @@ use choices::{
 
 mod privilege_center;
 use privilege_center::privileges_section_scene;
+
+mod rows;
+use rows::{ChoiceEntry, radio_row, toggle_row};
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct SettingsHeading;
@@ -191,14 +193,6 @@ pub(crate) fn palette_mode(palette: &UiPalette) -> Option<LightDark> {
     // another frontend's config) is never claimed: the row renders no
     // fabricated selection.
     matches!(palette.mode, LightDark::Light | LightDark::Dark).then_some(palette.mode)
-}
-
-/// One discrete choice on the page: display label, the typed choice it owns,
-/// and whether the live authority currently selects it.
-struct ChoiceEntry {
-    label: String,
-    choice: SettingsChoice,
-    selected: bool,
 }
 
 /// Identity of one interactive settings widget, carried by the widget entity
@@ -369,6 +363,8 @@ struct SettingsAppearanceTargets<'w> {
     palette: ResMut<'w, WindowPalette>,
     /// The camera clear color (absent headless).
     clear: Option<ResMut<'w, ClearColor>>,
+    /// The window's rem size — the rem axis every length resolves against.
+    rem: Option<ResMut<'w, RemSize>>,
 }
 
 fn settings_choice_observer(
@@ -488,6 +484,13 @@ fn settings_choice_observer(
                 let mode = palette_mode(&appearance.palette.inner).unwrap_or(LightDark::Dark);
                 appearance.palette.inner = ui_palette(&theme_for_mode(mode), size);
             }
+            // The rem axis moves **now**, in the same frame the choice was
+            // applied: the layout of this frame then measures the surface at
+            // the new reading size, so the switch re-scales the page without
+            // a single frame at the old scale (BEVY-181).
+            if let Some(rem) = appearance.rem.as_deref_mut() {
+                rem.0 = appearance.palette.inner.rem_px;
+            }
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
                 cfg.ui_size = size.config_token().to_string();
             });
@@ -547,6 +550,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 selected: context.gray_zero_values,
             },
             t("settings.gray_zero_values_hint"),
+            context.palette,
         ),
         radio_row(
             "Theme",
@@ -556,6 +560,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 Some(LightDark::Dark) => "Dark",
                 _ => "System",
             },
+            context.palette,
         ),
         toggle_row(
             "High contrast",
@@ -565,6 +570,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 selected: hc,
             },
             if hc { "enabled" } else { "disabled" },
+            context.palette,
         ),
         radio_row(
             "Language",
@@ -573,11 +579,13 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 Language::En => "en",
                 Language::Zh => "zh",
             },
+            context.palette,
         ),
         radio_row(
             "UI size",
             ui_size_entries(context.palette.ui_size),
             context.palette.ui_size.config_token(),
+            context.palette,
         ),
         radio_row(
             "Refresh interval",
@@ -586,11 +594,13 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 "{} ms",
                 u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX)
             ),
+            context.palette,
         ),
         radio_row(
             "History capacity",
             capacity_entries(capacity),
             &format!("{capacity} samples"),
+            context.palette,
         ),
         toggle_row(
             t("settings.history_persistence"),
@@ -600,6 +610,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 selected: persistence,
             },
             if persistence { "enabled" } else { "disabled" },
+            context.palette,
         ),
         toggle_row(
             "Telemetry updates",
@@ -609,10 +620,12 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 selected: paused,
             },
             if paused { "paused" } else { "live" },
+            context.palette,
         ),
     ];
     let mut rows = rows;
     rows.insert(0, privileges_section_scene(context.shell, context.palette));
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(context.palette);
     bsn! {
         Node {
             width: percent(100),
@@ -626,14 +639,30 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             Node { min_height: rem(context.palette.control_height_rem + context.palette.rem_ratio(space_8())), flex_shrink: 0.0 }
             SettingsHeading
             Children [ Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ] --
+
+            // The viewport wrapper owns the scroll area AND the floating
+            // scrollbar rail: the rail is a sibling of the scroll area, so
+            // it never scrolls with the content and never takes layout
+            // space away from it.
             Node {
                 width: percent(100), flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0),
                 flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()),
-                overflow: Overflow::scroll_y(),
             }
-            ScrollArea
-            SettingsBody
-            Children [ { rows } ] --
+            Children [
+                Node {
+                    width: percent(100), flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0),
+                    flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()),
+                    // The floating rail overlays the trailing edge: the
+                    // content keeps that lane clear, so no row's right edge
+                    // ever sits under the scrollbar.
+                    padding: UiRect::right(Val::Rem(crate::widgets::scrollbar::RAIL_WIDTH_REM)),
+                    overflow: Overflow::scroll_y(),
+                }
+                ScrollArea
+                SettingsBody
+                Children [ { rows } ] --
+                @{ rail }
+            ] --
 
                 Node { min_height: rem(context.palette.control_height_rem + context.palette.rem_ratio(space_8())), flex_shrink: 0.0 }
                 SettingsFooter
@@ -648,152 +677,6 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     }
 }
 
-/// A select-style row: caption label, the radio group, and the live value.
-fn radio_row(label: &str, entries: Vec<ChoiceEntry>, value: &str) -> Box<dyn Scene> {
-    let label = label.to_owned();
-    let value = value.to_owned();
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-             Node { width: px(160.0), height: Val::Auto } Children [
-                 Text(label) TextRole(Role::Caption)
-            ] --
-
-                Node {
-                    height: Val::Auto,
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_8()),
-                }
-                RadioGroup
-                Children [ { choice_widgets(entries) } ]
-            --
-             Text(value) TextRole(Role::Caption)
-        ]
-    })
-}
-
-/// A boolean row: caption label, one checkbox, and the live value.
-fn toggle_row(label: &str, entry: ChoiceEntry, value: &str) -> Box<dyn Scene> {
-    let label = label.to_owned();
-    let value = value.to_owned();
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-             Node { width: px(160.0), height: Val::Auto } Children [
-                 Text(label) TextRole(Role::Caption)
-            ] --
-            { choice_widgets(vec![entry]) }--
-             Text(value) TextRole(Role::Caption)
-        ]
-    })
-}
-
-/// One widget per choice. The shape pairs differ by the widget primitive
-/// (`Checkbox` for the boolean pause toggle, `RadioButton` for the discrete
-/// selects) and by the `Checked` marker, so the fan-out boxes the scenes
-/// (the documented dynamic-children seam). The primitives are the official
-/// unstyled ones; state is the `Checked` marker.
-fn choice_widgets(entries: Vec<ChoiceEntry>) -> Vec<Box<dyn Scene>> {
-    entries
-        .into_iter()
-        .map(|entry| {
-            let ChoiceEntry {
-                label,
-                choice,
-                selected,
-            } = entry;
-            let SettingsChoice(field) = choice;
-            let boolean = matches!(
-                field,
-                SettingsField::PauseTelemetry
-                    | SettingsField::HistoryPersistence(_)
-                    | SettingsField::GrayZeroValues(_)
-            );
-            match (boolean, selected) {
-                (true, true) => Box::new(checked_checkbox_shape(label, field)) as Box<dyn Scene>,
-                (true, false) => Box::new(unchecked_checkbox_shape(label, field)),
-                (false, true) => Box::new(checked_radio_shape(label, field)),
-                (false, false) => Box::new(unchecked_radio_shape(label, field)),
-            }
-        })
-        .collect()
-}
-
-fn checked_radio_shape(label: String, field: SettingsField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            height: px(28.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-        }
-        RadioButton
-        Checked
-        SettingsChoice(field)
-        Children [
-             Text(label) TextRole(Role::Body)
-        ]
-    }
-}
-
-fn unchecked_radio_shape(label: String, field: SettingsField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            height: px(28.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-        }
-        RadioButton
-        SettingsChoice(field)
-        Children [
-             Text(label) TextRole(Role::Body)
-        ]
-    }
-}
-
-fn checked_checkbox_shape(label: String, field: SettingsField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            height: px(28.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-        }
-        Checkbox
-        Checked
-        SettingsChoice(field)
-        Children [
-             Text(label) TextRole(Role::Body)
-        ]
-    }
-}
-
-fn unchecked_checkbox_shape(label: String, field: SettingsField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            height: px(28.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-        }
-        Checkbox
-        SettingsChoice(field)
-        Children [
-             Text(label) TextRole(Role::Body)
-        ]
-    }
-}
-
 #[cfg(test)]
 #[path = "../../tests/headless/pages/settings.rs"]
 mod tests;
@@ -801,3 +684,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/headless/config_sync.rs"]
 mod config_sync;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/settings_widgets_parity.rs"]
+mod widgets_parity;

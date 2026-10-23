@@ -47,6 +47,10 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 use taskmanager_ui_contract::IconId;
 
+/// The dashboard card's flex basis, in rem: the width one timeline card asks
+/// for before the row wraps the next one beside it.
+const DASHBOARD_CARD_FLEX_BASIS_REM: f32 = 16.25;
+
 #[derive(Resource)]
 pub(crate) struct SystemDashboardState {
     pub(crate) section: SystemPageSection,
@@ -201,7 +205,7 @@ pub(crate) fn body(
         }
         parts.push(Box::new(bsn! { Text({coverage(series, metric)}) TextRole(Role::Caption) }));
         Box::new(bsn! {
-            Node { flex_basis: px(260.0), flex_grow: 1.0, min_width: px(0.0), max_width: percent(100), height: px(budget.card_height), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(px(space_8())), border_radius: BorderRadius::all(px(palette.panel_radius_px)) }
+            Node { flex_basis: rem(DASHBOARD_CARD_FLEX_BASIS_REM), flex_grow: 1.0, min_width: px(0.0), max_width: percent(100), height: px(budget.card_height), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(px(space_8())), border_radius: BorderRadius::all(px(palette.panel_radius_px)) }
             BackgroundColor({palette.panel_fill})
             Children [{parts}]
         }) as Box<dyn Scene>

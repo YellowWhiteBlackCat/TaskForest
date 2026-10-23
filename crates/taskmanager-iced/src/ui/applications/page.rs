@@ -16,6 +16,8 @@ use taskmanager_shell::{ProcessControlScope, SortDir};
 use taskmanager_theme::tokens::FONT_13;
 use taskmanager_theme::tokens::FONT_CAPTION;
 
+use crate::ui::virtual_list::resolve_table_window;
+
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
 /// the renderer-local context owns the small selection/theme/query state. The
@@ -120,26 +122,16 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         &app.process_presentation.hidden_columns,
         column_widths.as_ref(),
     );
-    let trend_index = trend_header_index_for(&visible_columns);
-    let mut header_cells: Vec<Element<'_, Message, Theme, Renderer>> = visible_columns
-        .into_iter()
-        .map(|(column, width)| header_cell(theme_snapshot, column, width, active_sort))
-        .collect();
-    // The non-sortable Trend header sits immediately after the CPU column
-    // (Pid, Name, Cpu → Trend) so it lines up with the per-row sparkline cell
-    // below. It is NOT part of `apps_columns` (no `SortCol` — a per-row visual
-    // has no underlying scalar to rank), mirroring the gpui processes_view
-    // chrome (`i18n::t("proc.trend")`, width 56, left-aligned, muted).
-    header_cells.insert(trend_index, trend_header_cell(theme_snapshot));
-    // The same column gutter as the body rows (rows.rs) — header and body
-    // must agree or the headers drift off their columns.
-    let header_row = container(
-        row(header_cells)
-            .padding(4)
-            .spacing(theme::table_column_spacing()),
-    )
-    .height(Length::Fixed(APPLICATION_HEADER_HEIGHT))
-    .width(Length::Fixed(table_extent));
+    // The sticky header row shares the body rows' row padding and column
+    // gutter, so a header cell and the body cells under it share one left
+    // inset and one column pitch.
+    let header_row = applications_header_row(
+        theme_snapshot,
+        &visible_columns,
+        active_sort,
+        app.compact_density(),
+        table_extent,
+    );
 
     let (projection, projection_generation) = app.projected_table_model();
     // The cached projection is byte-identical to what a fresh
@@ -166,8 +158,11 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
     let (scroll_y, viewport_height) = app.applications_virtual_scroll();
     // Sticky header: the header row sits outside the body scrollable, so the
     // body window carries no header prefix — offsets are pure row extents.
-    let window =
-        VirtualWindow::for_sticky_rows(projection.len(), scroll_y, viewport_height, row_height);
+    // The body materializes the visible rows plus the product's pre-render
+    // band, so a fast wheel flick that outruns the one-frame scroll report
+    // still paints materialized rows instead of a blank block.
+    let window = resolve_table_window(projection.len(), scroll_y, viewport_height, row_height)
+        .materialized();
 
     let table_body: Element<'_, Message, Theme, Renderer> = if projection.is_empty() {
         // GPUI-parity empty state: a centered message instead of a blank
@@ -199,7 +194,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
     };
     let table = virtual_table(
         app.applications_scroll_id(),
-        header_row.into(),
+        header_row,
         table_body,
         Length::Fixed(table_extent),
         Direction::Both {
@@ -218,6 +213,11 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             let control = shell.process_control_availability();
             let tree_selected = matches!(control.scope(), Some(ProcessControlScope::Tree));
             let selected_target_count = control.target_count();
+            // The "End task" action wears the destructive accent only when the
+            // selection holds a process in the platform's "not responding"
+            // state (the core's uninterruptible wait): that is the case where
+            // the user has to reach for the destructive path.
+            let end_task_destructive = emphasis::selection_is_not_responding(shell);
             let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
             if !tree_selected {
                 actions.push(focus::button_enabled(
@@ -225,7 +225,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                     FocusTarget::EndTask,
                     t("proc.end_task"),
                     Message::RequestEndTask,
-                    true,
+                    end_task_destructive,
                     control.is_ready(),
                 ));
             }

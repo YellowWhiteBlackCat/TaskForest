@@ -273,6 +273,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {
             let intent = ProcessBatchIntent {
+                collateral: Default::default(),
                 action: ProcessBatchAction::Kill,
                 scope: ProcessGroupScope::PidAdjacency,
                 targets: vec![target_proc],
@@ -295,6 +296,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         let targets = seed_capture_multiple_process_targets(app);
         if !targets.is_empty() {
             let intent = ProcessBatchIntent {
+                collateral: Default::default(),
                 action: ProcessBatchAction::Kill,
                 scope: ProcessGroupScope::PidAdjacency,
                 targets,

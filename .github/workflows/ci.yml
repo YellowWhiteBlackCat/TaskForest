@@ -13,6 +13,14 @@
 #       Miri on the three audited unsafe crates, fuzz-target build/runs,
 #       release-bloat and bench trends.
 #
+# Kept in CI on purpose (not a local-only stage):
+#   - semver job         the public-API semver gate
+#                       (scripts/quality/semver-api-gate.sh): every publishable
+#                       crate is compared against the base revision, and a
+#                       breaking change blocks the merge. The publishable
+#                       crates are not on crates.io yet, so the baseline is a
+#                       git revision, not a published version.
+#
 # Removed from the PR path to save quota:
 #   - coverage job      -> local extended (same llvm-cov invocation)
 #   - ui-shapes matrix  -> local standard (shape-tui / shape-iced stages)
@@ -25,11 +33,11 @@
 #
 # Wall-clock budget: the cheap `policy` gate runs first and fails before any
 # compile-heavy job spends runner time. Once it passes, `lint`, `test`, `docs`,
-# and `linux` run in parallel, so successful PR feedback waits for the slowest
-# job instead of the sum of every stage. Each job owns its rust-cache line.
-# The release-smoke job keeps the job id `linux` because rust-cache keys by
-# job id — that id is what lets packaging.yml's `linux` release job restore
-# the dependency cache this job warmed on the same commit.
+# `semver`, and `linux` run in parallel, so successful PR feedback waits for
+# the slowest job instead of the sum of every stage. Each job owns its
+# rust-cache line. The release-smoke job keeps the job id `linux` because
+# rust-cache keys by job id — that id is what lets packaging.yml's `linux`
+# release job restore the dependency cache this job warmed on the same commit.
 #
 # Compile-time budget (env changes here MUST stay aligned with
 # portability.yml and packaging.yml: rust-cache hashes every CARGO*/RUST*
@@ -268,6 +276,83 @@ jobs:
       # symbol references, public docs linking to private items, and unclosed
       # HTML tags in doc comments are all CI failures.
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
+
+  # The public-API semver gate is its own job on purpose.
+  #
+  # Why not inside an existing job:
+  #  - The gate is the heaviest job by construction: it emits rustdoc JSON for
+  #    every publishable crate twice (the current tree and the baseline tree),
+  #    so folding it into `lint`, `test` or `docs` would silently inflate that
+  #    job's budget and make its failure attribution ambiguous (a rustdoc
+  #    failure and an API break would share one step).
+  #  - It needs a full-history checkout (`fetch-depth: 0`) and a pinned
+  #    third-party tool; neither belongs to a job that does something else.
+  #  - Quota: as a separate `needs: policy` job it runs in parallel with
+  #    `lint`/`test`/`docs`/`linux`, so the PR wall-clock critical path stays
+  #    at the slowest existing job (the 60-minute `test` job) instead of
+  #    growing. `needs: policy` keeps the fast-fail order: the cheap policy
+  #    gate still rejects a bad PR before any compile-heavy job spends
+  #    minutes.
+  #
+  # The `policy` job deliberately does NOT install cargo-semver-checks: the
+  # quick-tier `semver-checks` stage of scripts/quality/local-gates.sh skips
+  # itself when the tool is absent (that is the tool's documented "not
+  # available" exit code), and the real, blocking run happens here.
+  semver:
+    name: Linux (public API semver gate)
+    needs: policy
+    runs-on: ubuntu-26.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The baseline is a git revision, not a crates.io release: the
+          # publishable crates are not published yet, so the tool builds the
+          # baseline rustdoc from the local history. A shallow clone cannot
+          # resolve that revision.
+          fetch-depth: 0
+      - name: Install Linux GUI system deps and mold
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y --no-install-recommends
+          libfontconfig1-dev libxkbcommon-dev mold
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - name: Fetch private shared UI kit dependency
+        env:
+          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
+        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
+      # cargo-semver-checks 0.51.0 is the current stable release. It needs a
+      # rustc >= 1.93 (this repository pins 1.99.0) and ships prebuilt Linux
+      # binaries, so `fallback: none` keeps the install deterministic instead
+      # of silently compiling the tool from source.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks@0.51.0
+          fallback: none
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
+      # A pull request is compared against the base branch it targets; a push
+      # to main is compared against the commit it replaced. The revision is
+      # always an expression, never a hard-coded sha. The checkout already
+      # carries the full history (`fetch-depth: 0`); the explicit fetch is the
+      # fallback for a revision that is not reachable from a fetched ref.
+      - name: Resolve the semver baseline revision
+        env:
+          SEMVER_BASELINE_REV: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD^' }}
+        run: |
+          if ! git rev-parse --verify "${SEMVER_BASELINE_REV}^{commit}"; then
+            echo "the baseline revision is not in the checkout; fetching it explicitly"
+            git fetch --no-tags origin "$SEMVER_BASELINE_REV"
+            git rev-parse --verify "${SEMVER_BASELINE_REV}^{commit}"
+          fi
+      # The same script the local quick gate runs as its `semver-checks`
+      # stage. It fails the job when a publishable crate breaks its public
+      # API; a missing baseline or a missing tool is the only skippable case.
+      - name: Public API semver gate
+        env:
+          SEMVER_BASELINE_REV: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD^' }}
+        run: timeout --kill-after=30s 2700s bash scripts/quality/semver-api-gate.sh
 
   # Job id `linux` is load-bearing: rust-cache keys by job id, and
   # packaging.yml's `linux` release job restores the dependency cache this

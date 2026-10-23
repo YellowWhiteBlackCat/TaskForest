@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-accessibility-linux"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.99.0"
 license = "Apache-2.0"
@@ -27,3 +27,7 @@ accesskit_consumer = "0.38"
 [lib]
 name = "taskmanager_accessibility_linux"
 path = "src/lib.rs"
+
+# Lint 事实源：根 `Cargo.toml` 的 `[workspace.lints]`（见 ADR-056）。
+[lints]
+workspace = true

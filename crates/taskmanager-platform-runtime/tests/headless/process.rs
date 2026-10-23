@@ -393,6 +393,7 @@ fn wait_event(handle: &PlatformHandle) -> EventEnvelope<PlatformEvent> {
 fn shared_process_runtime_routes_batch_intent_and_typed_completion() {
     let (handle, state) = spawn_fixture(FixtureState::default());
     let intent = ProcessBatchIntent {
+        collateral: Default::default(),
         action: ProcessBatchAction::Suspend,
         scope: Default::default(),
         targets: vec![frozen_process()],

@@ -23,6 +23,23 @@ pub(crate) const MAIN_GRAPH_MIN_WIDTH_PX: f32 = 360.0;
 /// never paint a partial final row at the window edge.
 pub(crate) const CPU_CORE_GRID_MIN_WINDOW_HEIGHT_PX: f32 = 920.0;
 
+/// The height of one performance chart slot, in rem.
+///
+/// The device curves and the GPU metric curve share one slot budget, so the
+/// measured canvas and the card that hosts it can never disagree. The slot
+/// rides the rem axis: a UI-size choice re-scales the chart together with the
+/// surface around it (the Standard step still measures 64 logical px).
+pub(crate) const PERFORMANCE_CHART_SLOT_HEIGHT_REM: f32 = 4.0;
+
+/// The width of one centered modal panel, in rem.
+///
+/// The confirmation gate and the CPU affinity dialog are the product's two
+/// centered dialogs, so they share one panel width: a user who has learned
+/// the shape of one has learned the other's. The width rides the rem axis
+/// with the surface around it (the Standard step still measures 460 logical
+/// px).
+pub(crate) const MODAL_PANEL_WIDTH_REM: f32 = 28.75;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum PerformanceLayoutMode {
     #[default]

@@ -164,6 +164,7 @@ fn completed_result_is_consumed_once_into_history() {
         .expect("fixture identity");
     let result = ProcessBatchResult {
         intent: ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::End,
             scope: Default::default(),
             targets: vec![identity.clone()],
@@ -215,6 +216,7 @@ fn typed_failures_drive_actionable_batch_feedback() {
         .expect("fixture identity");
     let result = ProcessBatchResult {
         intent: ProcessBatchIntent {
+            collateral: Default::default(),
             action: ProcessBatchAction::End,
             scope: Default::default(),
             targets: vec![gone.clone(), blocked.clone()],

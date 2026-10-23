@@ -18,7 +18,7 @@ if a registry entry points at a component that does not exist.
 - `primitives/` — button, icon_button, label, selectable_text, badge, divider, spinner,
   progress, tooltip, scrollbar, pill, toolbar, state_panel, card_surface
 - `layout.rs` — bounded page viewport/frame/scaffold and scroll-region contracts
-- `data/` — table, column resize, virtual list, tree, highlighter, data row, key/value row
+- `data/` — table, column resize, virtual list, tree, data row, key/value row
 - `inputs/` — switch, slider, checkbox, text_input, search_input
 - `overlays/` — layer_stack, dialog, popup, context_menu, dropdown_menu, toast
 - `styled.rs` — palette-driven style helpers (no hand-written colors)
@@ -47,7 +47,7 @@ src/primitives.rs                 foundational UI primitives
 src/data.rs                       data display components
 │   ├── table/                    columns, interaction, model, render, resize
 │   ├── tree.rs  virtual_list/    hierarchical tree and virtualized list
-│   ├── highlighter.rs  row.rs  key_value_row.rs
+│   ├── row.rs  key_value_row.rs
 src/inputs.rs                     input components
 │   ├── checkbox.rs  select.rs  slider.rs  switch.rs
 │   ├── text_input/  search_input.rs

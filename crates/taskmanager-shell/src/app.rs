@@ -204,6 +204,15 @@ pub struct SystemProjectionStore {
     /// application-side capability lane rather than one of the six fixed
     /// system domains, so accepted aggregate samples live beside that lane.
     pub npu_usage_history: std::collections::VecDeque<f32>,
+    /// Bounded auxiliary NPU-power history: the aggregate accelerator power
+    /// draw in watts, paired with the instant the inventory that carried it
+    /// was observed.
+    ///
+    /// The buffer is EMPTY while no accelerator reports the capability: the
+    /// absence of the power counter is the absence of the series, never a
+    /// flat zero line and never a value borrowed from the utilization
+    /// curve. A frontend reads this buffer; it never owns one.
+    pub npu_power_history: std::collections::VecDeque<(u64, f32)>,
     /// Latest filesystem-health facts and their independent provider status.
     storage_health: Option<FilesystemHealthSnapshot>,
     storage_health_source: Option<Vec<SourceStatus>>,
@@ -894,6 +903,10 @@ impl ShellApp {
         self.sync_application_selection();
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/headless/startup_sort.rs"]
+mod startup_sort_tests;
 
 #[cfg(test)]
 #[path = "../tests/headless/app.rs"]

@@ -9,6 +9,8 @@ use taskmanager_ipc::transport::{FramedReader, FramedWriter, IpcEndpoint};
 
 #[cfg(not(windows))]
 use taskmanager_ipc::transport::{bind_transport, connect_transport};
+#[cfg(not(windows))]
+use taskmanager_test_support::unix_socket::socket_temp_root;
 
 #[test]
 fn framed_read_write_roundtrip() {
@@ -75,7 +77,13 @@ fn endpoint_default_platform_resolution() {
 #[cfg(not(windows))]
 #[test]
 fn transport_listener_accept_and_stream_clone() {
-    let temp_dir = tempfile::tempdir().unwrap();
+    // The socket path must fit `sockaddr_un`'s 108-byte `sun_path`: the local
+    // gate exports a LONG `TMPDIR`, so the throwaway socket is anchored at
+    // the system's short temp root (see `taskmanager_test_support::unix_socket`).
+    let temp_dir = tempfile::Builder::new()
+        .prefix("s")
+        .tempdir_in(socket_temp_root())
+        .unwrap();
     let socket_path = temp_dir.path().join("transport_test.sock");
     let endpoint = IpcEndpoint::Unix(socket_path);
 

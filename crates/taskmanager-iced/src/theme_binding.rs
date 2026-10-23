@@ -63,12 +63,17 @@ pub fn ui_font_weight(theme: &Theme, weight: Weight) -> iced::Font {
 /// 1. **Platform compensation** — the weight flows through
 ///    [`effective_weight`] first, exactly like the gpui binding, so the
 ///    DirectWrite 450→500 density compensation applies to both toolkits.
-/// 2. **Ladder quantization, ties toward the denser step** — iced's
+/// 2. **Ladder quantization, ties toward the LIGHTER step** — iced's
 ///    `font::Weight` is an enum (100..900 in 100s) and cannot express the
 ///    fractional weights the neutral tokens author (body text is 450). A
-///    tie (450 between 400 and 500) rounds UP because the token ladder's
-///    fractional weights intend extra density; rounding down would visibly
-///    thin against the reference render on every platform.
+///    tie (450 between 400 and 500) resolves DOWNWARD, onto the Normal
+///    step, because the neutral ladder pairs `BODY` (450) with `MEDIUM`
+///    (500) as two DISTINCT grayscale roles: rounding the tie UP collapsed
+///    both roles onto the same Medium step, so body text rendered as heavy
+///    as the Medium emphasis (the "neutral weight reads too bold" report)
+///    and the Normal/Medium grayscale distinction was lost. Keeping the
+///    tie on the lighter step restores that distinction: `BODY` renders on
+///    Normal, `MEDIUM` renders on Medium.
 #[must_use]
 pub fn font_weight(weight: Weight) -> iced::font::Weight {
     font_weight_over(weight, WeightCompensationAxis::target())
@@ -78,29 +83,86 @@ pub fn font_weight(weight: Weight) -> iced::font::Weight {
 /// that lets every host test both platform columns of the paired matrix.
 #[must_use]
 pub fn font_weight_over(weight: Weight, axis: WeightCompensationAxis) -> iced::font::Weight {
+    font_weight_mapping(weight, axis).step
+}
+
+/// One neutral weight's complete mapping decision: the authored value, the
+/// platform-compensated value, the ladder step the frontend can actually
+/// render, the numeric `wght` value that step applies, and the signed
+/// quantization error between the compensated and the rendered value.
+///
+/// The seam exists so the weight mapping is AUDITABLE instead of implied:
+/// the neutral tokens author fractional weights (450), iced's `font::Weight`
+/// enum can only render 100-step values, and the difference between those
+/// two numbers is exactly the "how much density did the render lose or
+/// gain" question the Windows/Linux grayscale acceptance asks about.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontWeightMapping {
+    /// The authored neutral weight (the token value).
+    pub requested: u16,
+    /// The weight after the shared platform compensation.
+    pub compensated: u16,
+    /// The ladder step the frontend renders.
+    pub step: iced::font::Weight,
+    /// The numeric `wght` value the rendered step applies.
+    pub rendered: u16,
+    /// The signed distance between the compensated and the rendered value.
+    pub error: i32,
+}
+
+/// The numeric `wght` value each ladder step applies, ascending with the
+/// step's density. The numeric column is the one the rasterizer actually
+/// applies to a variable font, so it is the value the mapping audit and the
+/// capture metadata report.
+const LADDER: [(u16, iced::font::Weight); 9] = [
+    (100, iced::font::Weight::Thin),
+    (200, iced::font::Weight::ExtraLight),
+    (300, iced::font::Weight::Light),
+    (400, iced::font::Weight::Normal),
+    (500, iced::font::Weight::Medium),
+    (600, iced::font::Weight::Semibold),
+    (700, iced::font::Weight::Bold),
+    (800, iced::font::Weight::ExtraBold),
+    (900, iced::font::Weight::Black),
+];
+
+/// The full mapping decision for one neutral weight on one platform axis.
+///
+/// The compensation is the SHARED platform decision ([`effective_weight`]);
+/// the quantization is iced's own, because iced's `font::Weight` is an enum
+/// and cannot carry a fractional weight. A tie between two ladder steps
+/// resolves toward the LIGHTER step (see [`font_weight`] for why).
+#[must_use]
+pub fn font_weight_mapping(weight: Weight, axis: WeightCompensationAxis) -> FontWeightMapping {
+    let requested = weight.0.round().clamp(0.0, u16::MAX as f32) as u16;
     let compensated = effective_weight(weight, axis).0;
-    // LADDER ascends and `<=` keeps the LATER step on a tie, so a tie
-    // resolves toward the denser weight.
-    const LADDER: [(f32, iced::font::Weight); 9] = [
-        (100.0, iced::font::Weight::Thin),
-        (200.0, iced::font::Weight::ExtraLight),
-        (300.0, iced::font::Weight::Light),
-        (400.0, iced::font::Weight::Normal),
-        (500.0, iced::font::Weight::Medium),
-        (600.0, iced::font::Weight::Semibold),
-        (700.0, iced::font::Weight::Bold),
-        (800.0, iced::font::Weight::ExtraBold),
-        (900.0, iced::font::Weight::Black),
-    ];
+    let compensated = compensated.round().clamp(0.0, u16::MAX as f32) as u16;
+    // LADDER ascends and the strict `<` comparison keeps the EARLIER (and so
+    // the lighter) step on a tie.
     let mut best = LADDER[0];
     for step in LADDER {
-        if (step.0 - compensated).abs() <= (best.0 - compensated).abs() {
+        let distance = step.0.abs_diff(compensated);
+        let best_distance = best.0.abs_diff(compensated);
+        if distance < best_distance {
             best = step;
         }
     }
-    best.1
+    FontWeightMapping {
+        requested,
+        compensated,
+        step: best.1,
+        rendered: best.0,
+        error: i32::from(best.0) - i32::from(compensated),
+    }
+}
+
+/// The numeric `wght` value the frontend renders for one neutral weight on
+/// one platform axis — the value a variable font's weight axis receives.
+#[must_use]
+pub fn font_weight_value(weight: Weight, axis: WeightCompensationAxis) -> u16 {
+    font_weight_mapping(weight, axis).rendered
 }
 
 #[cfg(test)]
-#[path = "../tests/headless/theme_binding.rs"]
+#[path = "../tests/headless/theme_binding_weights.rs"]
 mod tests;

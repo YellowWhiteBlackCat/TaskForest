@@ -17,10 +17,14 @@
 
 pub mod chart;
 pub mod controls;
+pub(crate) mod easing;
+pub(crate) mod focus_ring;
 pub(crate) mod history_controls;
 pub mod layout;
 pub mod menu;
 pub(crate) mod scene_paint;
+pub mod scrollbar;
+pub mod switch;
 pub mod table;
 
 #[cfg(test)]

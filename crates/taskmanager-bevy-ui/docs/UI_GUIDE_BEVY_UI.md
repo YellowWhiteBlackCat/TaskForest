@@ -89,7 +89,8 @@ Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单�
   适配器不得收裸数字尺寸）与 `scripts/quality/bevy_scene_gate.py`（共享包
   `zhuge-ui-kit` 随 crate 发布的唯一执行器，UIK-REM-001 禁硬编码非零 px 字面量、
   UIK-REM-002 字号必须 rem）都已注册进 `scripts/quality/local-gates.sh` 与 CI；
-  存量 85 处硬编码 px 字面量记在 `scripts/quality/bevy_scene_ratchet.json` 棘轮台账，
+  存量 85 处硬编码 px 字面量已于 2026-10-22 全部出清（BEVY-178），
+  `scripts/quality/bevy_scene_ratchet.json` 棘轮台账已重切为**空账**，
   台账外新增立即失败。
 - **rem 轴写法（新增控件照此写）**：
   - 控件/行高写 `rem(palette.control_height_rem)`（需要比例时

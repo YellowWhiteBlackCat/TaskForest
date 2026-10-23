@@ -7,7 +7,7 @@ use super::{SelectableText, State};
 use crate::app::{IcedApp, Message};
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::Headless;
-use iced::advanced::text::Paragraph;
+
 use iced::advanced::widget::Tree;
 use iced::advanced::{Clipboard, Shell};
 use iced::keyboard::key::{NativeCode, Physical};
@@ -98,12 +98,14 @@ impl Harness {
         let bounds = Layout::new(&node).bounds();
         let state = self.tree.state.downcast_ref::<State>();
         let caret = state
-            .paragraph
-            .raw()
-            .grapheme_position(0, byte_offset)
-            .expect("the live paragraph has the requested caret");
+            .measured
+            .lines()
+            .first()
+            .and_then(|line| line.carets.get(byte_offset))
+            .copied()
+            .expect("the measured line has the requested caret");
 
-        Point::new(bounds.x + caret.x, bounds.y + bounds.height * 0.5)
+        Point::new(bounds.x + caret, bounds.y + bounds.height * 0.5)
     }
 
     /// Put the click within the requested ASCII grapheme using the live
@@ -112,16 +114,23 @@ impl Harness {
         let node = self.layout();
         let bounds = Layout::new(&node).bounds();
         let state = self.tree.state.downcast_ref::<State>();
-        let paragraph = state.paragraph.raw();
-        let start = paragraph
-            .grapheme_position(0, byte_offset)
-            .expect("the live paragraph has the requested grapheme");
-        let end = paragraph
-            .grapheme_position(0, byte_offset + 1)
-            .expect("the live paragraph has the next caret");
+        let carets = &state
+            .measured
+            .lines()
+            .first()
+            .expect("the measured run has a line")
+            .carets;
+        let start = carets
+            .get(byte_offset)
+            .copied()
+            .expect("the measured line has the requested grapheme");
+        let end = carets
+            .get(byte_offset + 1)
+            .copied()
+            .expect("the measured line has the next caret");
 
         Point::new(
-            bounds.x + start.x + (end.x - start.x) * 0.5,
+            bounds.x + start + (end - start) * 0.5,
             bounds.y + bounds.height * 0.5,
         )
     }

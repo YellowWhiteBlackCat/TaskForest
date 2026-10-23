@@ -20,6 +20,10 @@ fn timeline_evidence() -> StartupBootEvidenceSnapshot {
         critical_chain_state: healthy,
         failed_units_failure: None,
         critical_chain_failure: None,
+        // The fixture carries no boot phase split.
+        phase_timeline_state: healthy,
+        phase_timeline_failure: None,
+        phase_timeline: None,
         failed_units: Vec::new(),
         critical_chain: vec![
             StartupCriticalChainNode {

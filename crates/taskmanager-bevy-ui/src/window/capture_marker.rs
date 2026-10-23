@@ -219,12 +219,27 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 }
                 return;
             }
+            // The dimmed zero wears the CALIBRATED muted ink, not the raw
+            // dim token: the table paints zeros with
+            // `calibrate_muted_ink(...)` so a dim value stays readable on
+            // every surface it can sit on. The capture criterion therefore
+            // asks for the same ink the painter uses — comparing against the
+            // raw token would fail on every skin whose dim ink needs the
+            // calibration.
+            let muted = crate::widgets::table::contrast::calibrate_muted_ink(
+                access.palette.inner.dim_color,
+                access.palette.inner.body_color,
+                &[
+                    access.palette.inner.content_bg,
+                    access.palette.inner.nav_active_bg,
+                ],
+            );
             if !access.zero_cells.iter().any(|(zero, text, node, color)| {
                 zero.0
                     && text.0 == "0.0%"
                     && node.size().x > 0.0
                     && node.size().y > 0.0
-                    && color.0 == access.palette.inner.dim_color
+                    && color.0 == muted
             }) {
                 return;
             }
@@ -492,19 +507,24 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             else {
                 return;
             };
-            if !access.state.hardware_scroll_requested {
-                for (node, transform, mut scroll) in &mut access.bodies {
-                    let maximum = ((node.content_size().y - node.size().y)
-                        * node.inverse_scale_factor())
-                    .max(0.0);
-                    let delta = (center.y - size.y / 2.0 - transform.translation.y
-                        + node.size().y / 2.0)
-                        * node.inverse_scale_factor();
-                    scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
-                }
-                access.state.hardware_scroll_requested = true;
-                return;
+            // Bring the anchored card into view. The correction is re-issued
+            // EVERY frame until the anchor sits inside the body's rect: the
+            // marker runs in `PostUpdate` while the layout that applies the
+            // scroll lands in the next frame's layout pass, and a repaint
+            // that re-lays the content moves the anchor again. A one-shot
+            // correction therefore stops short — the anchor was measured
+            // before the scroll took effect, so the next correction still
+            // had work to do.
+            for (node, transform, mut scroll) in &mut access.bodies {
+                let maximum = ((node.content_size().y - node.size().y)
+                    * node.inverse_scale_factor())
+                .max(0.0);
+                let delta = (center.y - size.y / 2.0 - transform.translation.y
+                    + node.size().y / 2.0)
+                    * node.inverse_scale_factor();
+                scroll.0.y = (scroll.0.y + delta).clamp(0.0, maximum);
             }
+            access.state.hardware_scroll_requested = true;
             // A compact System page can make this card taller than the body
             // viewport. The body owns vertical scrolling, so prove that the
             // anchored inventory content is actually in view without

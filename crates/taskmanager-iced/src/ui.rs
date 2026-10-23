@@ -63,7 +63,7 @@ mod performance;
 pub(crate) mod process_projection;
 pub(crate) mod process_sparkline;
 pub mod responsive;
-mod saved_views;
+pub(crate) mod saved_views;
 pub(crate) mod service_details;
 mod service_menu;
 mod settings;

@@ -13,6 +13,7 @@ use taskmanager_core::core::startup::{
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 use super::parse_duration_to_millis;
+use super::phases::collect_boot_phase_timeline;
 use crate::engine::services::{InitSystem, ServiceManager};
 
 const STARTUP_EVIDENCE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -91,6 +92,9 @@ pub fn collect_startup_boot_evidence(now_ms: u64) -> StartupBootEvidenceSnapshot
     let mut chain_command = Command::new("systemd-analyze");
     chain_command.args(["--user", "critical-chain", "--no-pager"]);
     let chain = collect_command(chain_command, now_ms, parse_systemd_critical_chain);
+    // The boot-phase split is an independent source: it can succeed while the
+    // critical chain fails, and the other way round.
+    let phases = collect_boot_phase_timeline(now_ms);
     let state = aggregate_state(failed.state, chain.state, now_ms);
     StartupBootEvidenceSnapshot {
         state,
@@ -100,6 +104,9 @@ pub fn collect_startup_boot_evidence(now_ms: u64) -> StartupBootEvidenceSnapshot
         critical_chain_failure: chain.failure,
         failed_units: failed.values,
         critical_chain: chain.values,
+        phase_timeline_state: phases.state,
+        phase_timeline_failure: phases.failure,
+        phase_timeline: phases.timeline,
     }
 }
 
@@ -134,8 +141,10 @@ fn unavailable_for_init(
         state,
         failed_units_state: state,
         critical_chain_state: state,
+        phase_timeline_state: state,
         failed_units_failure: Some(failure),
         critical_chain_failure: Some(failure),
+        phase_timeline_failure: Some(failure),
         ..Default::default()
     })
 }
@@ -147,8 +156,10 @@ pub fn collect_startup_boot_evidence(now_ms: u64) -> StartupBootEvidenceSnapshot
         state,
         failed_units_state: state,
         critical_chain_state: state,
+        phase_timeline_state: state,
         failed_units_failure: Some(StartupEvidenceFailure::Unsupported),
         critical_chain_failure: Some(StartupEvidenceFailure::Unsupported),
+        phase_timeline_failure: Some(StartupEvidenceFailure::Unsupported),
         ..Default::default()
     }
 }
@@ -172,42 +183,54 @@ fn collect_command<T>(
             failure: None,
             values: parser(&String::from_utf8_lossy(&output.stdout)),
         },
-        Ok(output) if permission_denied(&output.stderr) => failed_evidence(
-            StartupEvidenceFailure::PermissionDenied,
-            DeviceStatus::PermissionDenied,
-            now_ms,
-        ),
-        Ok(_) => failed_evidence(
-            StartupEvidenceFailure::Unavailable,
-            DeviceStatus::Stale,
-            now_ms,
-        ),
-        Err(BoundedCommandError::Spawn(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-            failed_evidence(
-                StartupEvidenceFailure::MissingTool,
-                DeviceStatus::MissingTool,
-                now_ms,
-            )
+        Ok(output) => {
+            let (failure, status) = failed_output_failure(&output.stderr);
+            failed_evidence(failure, status, now_ms)
         }
-        Err(BoundedCommandError::Spawn(error))
+        Err(error) => {
+            let (failure, status) = command_failure(error);
+            failed_evidence(failure, status, now_ms)
+        }
+    }
+}
+
+/// The typed failure of a bounded command that could not be started or that
+/// timed out.
+///
+/// Shared with the boot-phase collector so every startup source answers an
+/// unreadable command through the same typed vocabulary.
+#[cfg(target_os = "linux")]
+pub(super) fn command_failure(
+    error: BoundedCommandError,
+) -> (StartupEvidenceFailure, DeviceStatus) {
+    match error {
+        BoundedCommandError::Spawn(error) if error.kind() == std::io::ErrorKind::NotFound => (
+            StartupEvidenceFailure::MissingTool,
+            DeviceStatus::MissingTool,
+        ),
+        BoundedCommandError::Spawn(error)
             if error.kind() == std::io::ErrorKind::PermissionDenied =>
         {
-            failed_evidence(
+            (
                 StartupEvidenceFailure::PermissionDenied,
                 DeviceStatus::PermissionDenied,
-                now_ms,
             )
         }
-        Err(BoundedCommandError::TimedOut) => failed_evidence(
-            StartupEvidenceFailure::TimedOut,
-            DeviceStatus::Stale,
-            now_ms,
-        ),
-        Err(_) => failed_evidence(
-            StartupEvidenceFailure::Unavailable,
-            DeviceStatus::Stale,
-            now_ms,
-        ),
+        BoundedCommandError::TimedOut => (StartupEvidenceFailure::TimedOut, DeviceStatus::Stale),
+        _ => (StartupEvidenceFailure::Unavailable, DeviceStatus::Stale),
+    }
+}
+
+/// The typed failure of a command that ran but did not succeed.
+#[cfg(target_os = "linux")]
+pub(super) fn failed_output_failure(stderr: &[u8]) -> (StartupEvidenceFailure, DeviceStatus) {
+    if permission_denied(stderr) {
+        (
+            StartupEvidenceFailure::PermissionDenied,
+            DeviceStatus::PermissionDenied,
+        )
+    } else {
+        (StartupEvidenceFailure::Unavailable, DeviceStatus::Stale)
     }
 }
 

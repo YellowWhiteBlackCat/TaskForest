@@ -19,6 +19,7 @@ use crate::core::device_state::DeviceState;
 use crate::core::metrics::{ScalarAvailability, ScalarObservation};
 
 use super::isolation::IsolationKind;
+use super::quota::ContainerQuota;
 
 /// One aggregated container cgroup.
 ///
@@ -48,6 +49,11 @@ pub struct ContainerSummary {
     /// `memory.current` for the cgroup, in bytes. Typed unavailable when the
     /// file is absent or unreadable — never a fabricated zero.
     pub memory_bytes: ScalarObservation<u64>,
+    /// The ceilings the container declares for this workload. Every dimension
+    /// is optional: an absent dimension is "not declared", never zero and
+    /// never a cap the frontend may invent on the container's behalf.
+    #[serde(default)]
+    pub quota: ContainerQuota,
     /// Member process ids whose `/proc/<pid>/cgroup` resolved to this cgroup.
     /// Empty when membership could not be enumerated (the cgroup was still
     /// rolled up from its own `cpu.stat`/`memory.current`).

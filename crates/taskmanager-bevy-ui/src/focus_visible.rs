@@ -37,6 +37,7 @@ use bevy::window::PrimaryWindow;
 
 use crate::confirmation::ConfirmationOverlay;
 use crate::pages::processes::properties_modal::ProcessPropertiesOverlay;
+use crate::scene_attach::insert_into;
 use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, WindowPalette};
 
@@ -116,11 +117,22 @@ fn decorate_controls(mut commands: Commands, controls: UndecoratedControls) {
         // Text switches have no opaque fill, so an inset ring remains visible
         // and stays inside the scroll viewport. Filled buttons need an outset.
         let offset = if checkbox || radio { -2.0 } else { 0.0 };
-        commands.entity(entity).insert((
-            FocusRing,
-            TabIndex(0),
-            Outline::new(Val::Px(2.0), Val::Px(offset), bevy::color::Color::NONE),
-        ));
+        insert_into(
+            &mut commands,
+            entity,
+            (
+                FocusRing,
+                TabIndex(0),
+                // The inner ring's width comes from the shared focus-ring
+                // seam (the same 2px the halo layer is measured against) — a
+                // literal here would be a second width authority.
+                Outline::new(
+                    Val::Px(crate::widgets::focus_ring::focus_ring_inner_width()),
+                    Val::Px(offset),
+                    bevy::color::Color::NONE,
+                ),
+            ),
+        );
     }
 }
 
@@ -145,15 +157,15 @@ fn decorate_groups(
     controls: FocusableControls,
 ) {
     for entity in &roots {
-        commands.entity(entity).insert(TabGroup::new(0));
+        insert_into(&mut commands, entity, TabGroup::new(0));
     }
     for entity in &modals {
-        commands.entity(entity).insert(TabGroup::modal());
+        insert_into(&mut commands, entity, TabGroup::modal());
         if let Some(first) = children
             .iter_descendants(entity)
             .find(|child| controls.contains(*child))
         {
-            commands.entity(first).insert(AutoFocus);
+            insert_into(&mut commands, first, AutoFocus);
         }
     }
 }
@@ -178,7 +190,7 @@ fn paint_focus_ring(
             bevy::color::Color::NONE
         };
         if show && visible.is_none() {
-            commands.entity(entity).insert(FocusRingVisible);
+            insert_into(&mut commands, entity, FocusRingVisible);
         } else if !show && visible.is_some() {
             commands.entity(entity).remove::<FocusRingVisible>();
         }

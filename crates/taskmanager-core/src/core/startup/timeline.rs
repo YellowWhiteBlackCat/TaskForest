@@ -42,6 +42,100 @@ pub struct BootTimeline {
     pub untimed_units: Vec<String>,
 }
 
+/// The boot phases a platform can report separately.
+///
+/// The order is the boot order: firmware hands over to the loader, the loader
+/// hands over to the kernel, and the kernel hands over to user space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupPhaseKind {
+    /// Pre-boot firmware time, from power-on to the boot loader.
+    Firmware,
+    /// Boot loader time.
+    Loader,
+    /// Kernel time, from the loader handoff to the init system.
+    Kernel,
+    /// User-space time, from the init system up to the user session.
+    UserSpace,
+}
+
+/// One phase of a measured boot timeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StartupPhase {
+    /// Which boot phase this row is.
+    pub kind: StartupPhaseKind,
+    /// The measured duration in milliseconds.
+    ///
+    /// `None` = the platform did not measure this phase. It never means zero:
+    /// a zero-width bar would claim the phase took no time at all.
+    pub duration_ms: Option<u64>,
+}
+
+/// The measured phase split of one boot.
+///
+/// Every phase is optional. `None` means "this phase was not measured" — the
+/// platform did not publish a duration for it — never zero and never a value
+/// borrowed from a neighbouring phase. A frontend that draws phase bars must
+/// render an explicit "not measured" row for the absent phases instead of a
+/// zero-width bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct StartupTimelineSnapshot {
+    /// Pre-boot firmware time in milliseconds.
+    pub firmware_ms: Option<u64>,
+    /// Boot loader time in milliseconds.
+    pub loader_ms: Option<u64>,
+    /// Kernel time in milliseconds.
+    pub kernel_ms: Option<u64>,
+    /// User-space time in milliseconds.
+    pub user_space_ms: Option<u64>,
+}
+
+impl StartupTimelineSnapshot {
+    /// The phases in boot order with their measured duration.
+    ///
+    /// The order is fixed so every frontend walks the phases the same way.
+    #[must_use]
+    pub fn phases(&self) -> [StartupPhase; 4] {
+        [
+            StartupPhase {
+                kind: StartupPhaseKind::Firmware,
+                duration_ms: self.firmware_ms,
+            },
+            StartupPhase {
+                kind: StartupPhaseKind::Loader,
+                duration_ms: self.loader_ms,
+            },
+            StartupPhase {
+                kind: StartupPhaseKind::Kernel,
+                duration_ms: self.kernel_ms,
+            },
+            StartupPhase {
+                kind: StartupPhaseKind::UserSpace,
+                duration_ms: self.user_space_ms,
+            },
+        ]
+    }
+
+    /// The sum of the MEASURED phases only.
+    ///
+    /// An unmeasured phase contributes nothing: the result is the span the
+    /// platform actually measured, never a span padded with invented zeros.
+    #[must_use]
+    pub fn measured_total_ms(&self) -> u64 {
+        self.phases().iter().fold(0_u64, |total, phase| {
+            total.saturating_add(phase.duration_ms.unwrap_or(0))
+        })
+    }
+
+    /// Whether at least one phase carries a measured duration.
+    #[must_use]
+    pub fn has_measured_phase(&self) -> bool {
+        self.phases()
+            .iter()
+            .any(|phase| phase.duration_ms.is_some())
+    }
+}
+
 /// Per-unit comparison of the current boot's waterfall against a previous
 /// boot's (roadmap #5). Fact-only: the signed difference of two measured
 /// windows, never a causal claim about WHY a unit got slower or faster.
@@ -53,7 +147,6 @@ pub struct BootSegmentDelta {
     /// `current - previous` as a signed value.
     pub delta_ms: i64,
 }
-
 /// Match the two timelines' timed segments by unit and report their deltas in
 /// the CURRENT timeline's order. Units without a measured counterpart in
 /// both boots are skipped: a first-appearance or vanished unit has no honest
@@ -160,3 +253,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../../tests/headless/core_core_startup_timeline_delta_tests.rs"]
 mod delta_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/headless/core_core_startup_phase_timeline_tests.rs"]
+mod phase_tests;

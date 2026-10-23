@@ -3,103 +3,8 @@
 use super::*;
 use bevy::text::{LineBreak, TextLayout};
 
-pub(super) fn boot_timeline_scene(
-    evidence: Option<&StartupBootEvidenceSnapshot>,
-    palette: &UiPalette,
-) -> Option<Box<dyn Scene>> {
-    let evidence = evidence?;
-    if evidence.critical_chain.is_empty() {
-        return None;
-    }
-    let max_duration = evidence
-        .critical_chain
-        .iter()
-        .filter_map(|node| node.duration_ms)
-        .max()
-        .unwrap_or(1)
-        .max(1) as f32;
-
-    let bars: Vec<Box<dyn Scene>> = evidence
-        .critical_chain
-        .iter()
-        .take(6)
-        .filter_map(|node| {
-            let ms = node.duration_ms?;
-            let pct = (ms as f32 / max_duration * 100.0).clamp(5.0, 100.0);
-            let label = node.unit.clone();
-            let duration_text = format!("{ms} ms");
-            let is_slow = ms > 1000;
-            let bar_color = if is_slow {
-                palette.nav_active_bg
-            } else {
-                palette.accent
-            };
-            Some(Box::new(bsn! {
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_8()),
-                    padding: UiRect::vertical(Val::Px(space_2())),
-                }
-                Children [
-
-                        Node {
-                            width: px(160.0),
-                            overflow: Overflow::clip_x(),
-                        }
-                        Children [
-                             Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
-                        ]
-                    --
-
-                        Node {
-                            width: px(200.0),
-                            height: px(8.0),
-                            border_radius: BorderRadius::all(Val::Px(space_2())),
-                            overflow: Overflow::clip_x(),
-                        }
-                        BackgroundColor({ palette.panel_fill })
-                        Children [
-
-                                Node {
-                                    width: percent(pct),
-                                    height: percent(100.0),
-                                    border_radius: BorderRadius::all(Val::Px(space_2())),
-                                }
-                                BackgroundColor(bar_color)
-
-                        ]
-                    --
-
-                        Text(duration_text)
-                        TextRole(Role::Mono)
-                        TextLayout { linebreak: LineBreak::NoWrap }
-
-                ]
-            }) as Box<dyn Scene>)
-        })
-        .collect();
-
-    if bars.is_empty() {
-        return None;
-    }
-
-    Some(Box::new(bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_4()),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-        }
-        BackgroundColor({ palette.content_bg })
-        Children [
-             Text({ t("startup.timeline").to_owned() }) TextRole(Role::Caption) --
-            { bars }
-        ]
-    }))
-}
+use super::impact::impact_badge_cell_scene;
+use super::timeline::boot_timeline_scene;
 
 pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
@@ -167,6 +72,7 @@ pub(super) fn startup_body_scene(
     shell: &ShellApp,
     palette: &UiPalette,
     selection: &StartupSelection,
+    forensics: &forensics::StartupForensicsExpanded,
 ) -> impl Scene + use<> {
     let rows = startup_rows(shell);
     let selected = selected_row(&rows, selection);
@@ -174,14 +80,21 @@ pub(super) fn startup_body_scene(
     let notice = source_notice_text(sources);
     let empty = empty_state_text(sources);
     let evidence = evidence_line(shell);
+    let boot_evidence = shell.projection().startup_boot_evidence.as_ref();
     let mut children = body_children(&rows, selected, notice, evidence, empty, palette);
-    if let Some(timeline) =
-        boot_timeline_scene(shell.projection().startup_boot_evidence.as_ref(), palette)
-    {
+    if let Some(timeline) = boot_timeline_scene(boot_evidence, palette) {
         children.insert(0, timeline);
     }
-    let toolbar = startup_toolbar_scene(selection.target.is_some(), palette);
-    let header = header_scene(shell.startup_sort, palette);
+    // The failed-boot forensics panel is PINNED to the top of the page: a
+    // crashed boot is the reason the page is being read, so it never waits
+    // behind the action row or the inventory.
+    let mut sections: Vec<Box<dyn Scene>> = Vec::new();
+    if let Some(panel) = forensics::forensics_panel_scene(boot_evidence, forensics, palette) {
+        sections.push(panel);
+    }
+    sections.push(startup_toolbar_scene(selection.target.is_some(), palette));
+    sections.push(Box::new(header_scene(shell.startup_sort, palette)) as Box<dyn Scene>);
+    sections.extend(children);
     bsn! {
         Node {
             width: percent(100),
@@ -190,9 +103,7 @@ pub(super) fn startup_body_scene(
             row_gap: Val::Px(space_2()),
         }
         Children [
-             @toolbar --
-             @header --
-            { children }
+            { sections }
         ]
     }
 }
@@ -286,6 +197,7 @@ pub(super) fn startup_row_scene(
     }
     .to_owned();
     let impact = row.impact.clone();
+    let impact_tier = row.impact_tier;
     let source = row.source.clone();
     let exec = row.exec.clone();
     let fill = if selected {
@@ -328,7 +240,7 @@ pub(super) fn startup_row_scene(
                 ]
             --
              @text_cell_scene(name, name_width, Role::Body) --
-             @text_cell_scene(impact, impact_width, Role::Body) --
+             @impact_badge_cell_scene(impact_tier, impact, impact_width, palette) --
              @text_cell_scene(source, source_width, Role::Body) --
              @text_cell_scene(exec, exec_width, Role::Body)
         ]

@@ -6,7 +6,7 @@
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -14,7 +14,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
-    UiRect, Val, percent, px,
+    UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -27,6 +27,18 @@ use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_shell::presentation::service_diagnostics_rows;
+
+/// The service details panel's width, in rem.
+///
+/// The panel is its own dialog contract — it carries long service
+/// identities and diagnostics rows — so it keeps its own width instead of
+/// the shared modal width. The bound rides the rem axis with the surface
+/// around it.
+const SERVICE_DETAILS_PANEL_WIDTH_REM: f32 = 31.25;
+
+/// The fact row's label column width, in rem: the widest caption the
+/// service fact rows carry, so every label starts at the same column.
+const SERVICE_FACT_LABEL_COLUMN_WIDTH_REM: f32 = 7.5;
 
 #[derive(Resource, Default)]
 pub(crate) struct ServiceDetailsModalState {
@@ -61,7 +73,7 @@ fn fact_row_scene(label: &str, value: &str, _palette: &UiPalette) -> Box<dyn Sce
         }
         Children [
 
-                Node { width: px(120.0), flex_shrink: 0.0 }
+                Node { width: rem(SERVICE_FACT_LABEL_COLUMN_WIDTH_REM), flex_shrink: 0.0 }
                 Children [
                      Text({ label.to_owned() }) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
                 ]
@@ -98,7 +110,7 @@ pub(crate) fn service_details_modal_scene(
 
     let panel = Box::new(bsn! {
         Node {
-            width: px(500.0),
+            width: rem(SERVICE_DETAILS_PANEL_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),

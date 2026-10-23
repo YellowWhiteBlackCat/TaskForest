@@ -15,7 +15,7 @@ identity is registered in
 [`docs/PRODUCT_IDENTITY.md`](../../docs/PRODUCT_IDENTITY.md).
 
 All nine routed pages are mounted on the widget substrate, and the structural
-seams (real input, destructive verbs, the polyline chart family and the
+seams (real input, destructive verbs, the continuous canvas chart family and the
 semantic accessibility channel) are live; remaining open surface is declared
 in [`docs/PAGE_SEAMS.md`](docs/PAGE_SEAMS.md), never hidden. Feathers (the
 official skin system) is not adopted — theme tokens are the only skin

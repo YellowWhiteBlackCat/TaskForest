@@ -34,7 +34,9 @@ pub mod privilege_center;
 mod process;
 mod service_exit;
 pub mod smart;
+pub mod smart_tool;
 mod storage;
+pub mod storage_health;
 pub mod system_information;
 pub mod system_timeline;
 mod telemetry;
@@ -733,6 +735,15 @@ pub const fn icon_glyph(icon: IconId) -> &'static str {
         IconId::CircleX => "×",
         IconId::TriangleAlert => "△",
         IconId::History => "⌛",
+        // The session / runtime / lock semantics. The TUI has no bitmap
+        // plates, so every semantic id needs a monochrome fallback here; the
+        // glyphs are distinct from the ones above.
+        IconId::Terminal => "▮",
+        IconId::Display => "▭",
+        IconId::Docker => "◧",
+        IconId::Podman => "◨",
+        IconId::Lock => "▩",
+        IconId::Remote => "☁",
     }
 }
 

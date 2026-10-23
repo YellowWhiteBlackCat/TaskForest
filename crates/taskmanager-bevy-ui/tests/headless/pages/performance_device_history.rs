@@ -17,11 +17,26 @@ use taskmanager_core::core::sensors::SensorReading;
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::widgets::chart::MAX_CHART_POINTS;
+use crate::widgets::chart::geometry::{ChartScale, chart_runs};
 
 use super::tests::{block_keys, headless_perf_app, route_to_performance};
 use super::{
     GpuMetricButton, PerformanceDeviceFocus, PerformanceDeviceTarget, Section, gpu_devices,
 };
+
+/// The segments a ceiling-scaled window draws: one per adjacent finite pair.
+fn scaled_segment_count(samples: &[f32], ceiling: f32) -> usize {
+    chart_runs(
+        samples,
+        100.0,
+        34.0,
+        MAX_CHART_POINTS,
+        ChartScale::Ceiling(ceiling),
+    )
+    .iter()
+    .map(|run| run.vertices.len().saturating_sub(1))
+    .sum()
+}
 
 // ---- battery/fan per-device history (P0-MC-01) -----------------------------
 
@@ -55,7 +70,6 @@ fn battery_and_fan_blocks_paint_their_own_history_curve() {
     use crate::pages::performance::device_curves::{
         DeviceCurve, DeviceCurveKind, DeviceCurveStatus,
     };
-    use crate::widgets::chart::line_segments_scaled;
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::power::{
         BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot,
@@ -156,7 +170,7 @@ fn battery_and_fan_blocks_paint_their_own_history_curve() {
             "the fan block's curve resolves that fan's own window"
         );
         assert_eq!(
-            line_segments_scaled(&samples1, 100.0, 34.0, MAX_CHART_POINTS, 1_650.0).len(),
+            scaled_segment_count(&samples1, 1_650.0),
             2,
             "one polyline segment per adjacent finite sample"
         );
@@ -166,7 +180,7 @@ fn battery_and_fan_blocks_paint_their_own_history_curve() {
             "an unobserved fan channel has no fabricated window"
         );
         assert_eq!(
-            line_segments_scaled(&samples2, 100.0, 34.0, MAX_CHART_POINTS, 100.0).len(),
+            scaled_segment_count(&samples2, 100.0),
             0,
             "an unobserved channel draws no segment"
         );

@@ -49,6 +49,8 @@ pub(crate) use npu::npu_section;
 pub(crate) mod disk;
 pub(crate) use disk::*;
 
+pub(crate) mod range;
+
 pub(crate) mod gpu;
 pub(crate) use gpu::*;
 

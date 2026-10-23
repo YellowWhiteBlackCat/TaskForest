@@ -15,14 +15,15 @@
 | release build | 验证默认 GPUI 发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
 | package stage simulation | 验证 Linux 安装树、权限和 polkit 路径 |
 | workspace nextest | 行为和平台无关契约 |
+| public API semver gate | 拒绝相对基线的 Rust 签名级破坏（基线是 git rev） |
 | doctests / rustdoc | 文档代码和公开 API 链接 |
 | fallback feature matrix | 验证可选 provider 不产生产品 SKU 分叉 |
 | CORE-04 functional matrix | 验证每个产品意图在 GPUI/Iced/TUI/Bevy 都有显式 surface decision |
 | capability delivery registry | 拒绝参考层把语义合同能力声明为已挂载组件（`Reference`）；语义合同须声明 `Ported`，集合只按挂载证据增长 |
 
-CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 1.99.0；`Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
-Windows 原生边界以及 macOS 编译/库测试在每次 PR 与 main push 的 portability workflow 中阻塞运行；
-macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能替代原生 API 或设备证据。
+CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 1.99.0；`Cargo.toml` 的 `rust-version` 仅是兼容性下限。
+所有 Cargo 验证使用锁文件，并行度不超过四。Windows 原生边界以及 macOS 编译/库测试在每次 PR 与 main push 的
+portability workflow 中阻塞运行；macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能替代原生 API 或设备证据。
 
 ## 2. 本地层级
 
@@ -43,7 +44,7 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管），以及 Bevy 场景律法门 `bevy-bsn-guard`（唯一 `bsn!` 构造路线）、`bevy-rem-guard`（rem 尺寸轴：零 `FontSize::Px`、px 派生值不作布局长度、图标适配器不收裸数字尺寸）与 `bevy-scene-gate`（共享包 `zhuge-ui-kit` 随 crate 发布的唯一执行器：禁硬编码非零 px 字面量，存量记在 `bevy_scene_ratchet.json` 棘轮台账，台账外新增即失败）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及公共 API 兼容门禁 `semver-checks`（相对基线的 Rust 签名级破坏即失败），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管），以及 Flatpak 清单门 `flatpak-manifest` 与长效浸泡防泄漏门 `soak-stability`，以及 Bevy 场景律法门 `bevy-bsn-guard`（唯一 `bsn!` 构造路线）、`bevy-rem-guard`（rem 尺寸轴：零 `FontSize::Px`、px 派生值不作布局长度、图标适配器不收裸数字尺寸）与 `bevy-scene-gate`（共享包 `zhuge-ui-kit` 随 crate 发布的唯一执行器：禁硬编码非零 px 字面量，存量记在 `bevy_scene_ratchet.json` 棘轮台账，台账外新增即失败）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
 - `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build、平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
 
@@ -55,20 +56,31 @@ bash scripts/quality/local-gates.sh extended
 `bash scripts/quality/local-gates.sh standard --scope bevy`（Bevy 交互矩阵为 headless，
 scoped 下随 standard 直接运行）。
 
-**共享锁降级**：开发阶段若另一条线正持续改写共享 Cargo.lock，`lock-consistency`
-探针等不到稳定窗口时，本次运行显式降级为不带 `--locked`（summary 记 FALLBACK，
-子脚本经 `TM_CARGO_LOCK` 同步），而不是各阶段以晦涩的锁错误失败；合并前合并
-负责人仍须以 `all` + 锁定模式重跑。
+**共享锁降级**：开发阶段若另一条线正持续改写共享 Cargo.lock，`lock-consistency` 探针等不到稳定窗口时，本次运行
+显式降级为不带 `--locked`（summary 记 FALLBACK，子脚本经 `TM_CARGO_LOCK` 同步），而不是各阶段以晦涩的锁错误
+失败；合并前合并负责人仍须以 `all` + 锁定模式重跑。
 
-默认遇到首个失败即退出；需要一次性收集多个失败时显式追加 `--keep-going`。Linux
-`release/package smoke` 与 CI 使用同一入口，平台不具备 Linux 打包能力时不在 Windows/macOS
-本地门禁中伪造通过。
+默认遇到首个失败即退出；需要一次性收集多个失败时显式追加 `--keep-going`。Linux `release/package smoke` 与 CI 使用
+同一入口，平台不具备 Linux 打包能力时不在 Windows/macOS 本地门禁中伪造通过。
 
 Windows 开发机使用 `scripts/windows/local-gates.sh`，通过 Git Bash 调用同一组可移植门禁；
 Windows telemetry、测试和 helper 不使用 PowerShell 或其他命令解释器采集系统事实。
 
 Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick 与 CI 中检查：
 生产源码不得接收整世界或通过 App、hook、排队闭包绕过显式参数；范围见 [Bevy 章程](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)。
+
+### 依赖解析与 API 兼容门禁
+
+- **公共 API 兼容门禁（semver）**：阶段名 `semver-checks`，属 standard 层（要重建当前树与基线树，放不进
+  quick 的时间预算）；本地缺少 `cargo-semver-checks` 时记 SKIP，CI 必须安装并执行，失败即阻塞。
+  基线是 git rev（`--baseline-rev`）而不是 crates.io 版本，因为这些库尚未发布；基线里不存在的包名按新 crate
+  记 SKIP，但**一个都没比较就判失败**——包改名后基线不含新名，此时应把基线指向含新包名的提交，或先把库发布
+  出去、以 crates.io 版本为基线。通过只表示相对基线没有 Rust 签名级破坏，不证明行为兼容、存档或协议兼容、
+  平台运行正确性。该工具在自带的占位工作区里解析基线侧依赖（0.51.0 无 `--locked`），因此本次扫描的
+  **基线侧不受仓库锁文件钉住**，这是"所有 Cargo 验证使用锁文件"的一条显式例外；当前侧仍走仓库锁文件。
+- **依赖解析与 lint 事实源门禁**：resolver v3（ADR-057）让依赖解析尊重 `rust-version` 下限；根
+  `[workspace.lints]`（ADR-056）是唯一 lint 事实源，业务 crate 继承它，四个 unsafe 信任根 crate 显式声明例外，
+  测试期 unsafe 必须登记。
 
 ## 3. 公开仓库门禁
 
@@ -97,12 +109,9 @@ Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick �
 
 tag 发布必须同时构建并验证（命名约定见 PRODUCT_IDENTITY.md，`<ver>` 为 Cargo 版本）：
 
-- `TaskForest-G-<ver>-x64.deb` 与 `TaskForest-G-<ver>-arm64.deb`：`dpkg-deb --info` 和
-  `--contents`；
-- `TaskForest-G-<ver>-x64.rpm` 与 `TaskForest-G-<ver>-arm64.rpm`：`rpm -qp --info`、
-  `--list` 和 `--requires`；
-- `TaskForest-G-<ver>-x64.msi` 与 `TaskForest-G-<ver>-arm64.msi`：WiX 构建、MSI 数据库反编译和
-  payload 引用检查；
+- `TaskForest-G-<ver>-x64.deb` 与 `TaskForest-G-<ver>-arm64.deb`：`dpkg-deb --info` 和 `--contents`；
+- `TaskForest-G-<ver>-x64.rpm` 与 `TaskForest-G-<ver>-arm64.rpm`：`rpm -qp --info`、`--list` 和 `--requires`；
+- `TaskForest-G-<ver>-x64.msi` 与 `TaskForest-G-<ver>-arm64.msi`：WiX 构建、MSI 数据库反编译和 payload 引用检查；
 - 每个架构独立的 Linux/Windows SHA-256 清单。
 
 Windows 或 Linux 任一打包 job 失败，整个发布失败。所有必需文件验证完成后，单一 publish
@@ -110,21 +119,18 @@ job 才能创建或更新 GitHub Release，避免半成品发布。
 
 ## 6. 截图与真实环境
 
-真实主机截图和回执只保存在忽略的 `.private/` 或 `target/` 中。公开截图必须来自确定性
-演示数据，并检查用户名、进程、网络、设备、路径和元数据。无真实目标环境时只能报告
-SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
+真实主机截图和回执只保存在忽略的 `.private/` 或 `target/` 中。公开截图必须来自确定性演示数据，并检查用户名、
+进程、网络、设备、路径和元数据。无真实目标环境时只能报告 SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 
 捕获后端按能力分类，不得用一个后端的成功替代另一个后端的语义验证：
 
-- nested Niri 已建立 IPC socket，但在客户端映射后 `niri msg` 超时：标记为
-  `BLOCKED (compositor/backend)`。这不是产品 PASS，也不把 TaskForest 判为产品 FAIL；保留本地
-  证据，不更新 accepted screenshots，等待真实 compositor 或后端修复后重跑。
-- gamescope 可以作为单应用、固定输出尺寸的辅助像素捕获后端。只有真实应用 marker、PNG、
-  source manifest 和独立验证器全部通过时，结果才覆盖 standalone 渲染与弹性布局审查。
-- gamescope 即使广播 `zwlr_layer_shell_v1`，也不能单独证明 layer surface 已正确合成。anchor、
-  margin、exclusive zone、keyboard interactivity、output 选择、close/restart 和桌面窗口管理
-  仍必须在目标桌面 compositor 上验证；未建立专用、可复现的 layer-shell capture receipt 前，
-  gamescope 结果只能报告 `SKIP`，不能冒充 Layer-Shell PASS。
+- nested Niri 已建立 IPC socket，但在客户端映射后 `niri msg` 超时：标记为 `BLOCKED (compositor/backend)`。这不是产品
+  PASS，也不把 TaskForest 判为产品 FAIL；保留本地证据，不更新 accepted screenshots，等待真实 compositor 或后端修复后重跑。
+- gamescope 可以作为单应用、固定输出尺寸的辅助像素捕获后端。只有真实应用 marker、PNG、source manifest 和独立验证器
+  全部通过时，结果才覆盖 standalone 渲染与弹性布局审查。
+- gamescope 即使广播 `zwlr_layer_shell_v1`，也不能单独证明 layer surface 已正确合成。anchor、margin、exclusive zone、
+  keyboard interactivity、output 选择、close/restart 和桌面窗口管理仍必须在目标桌面 compositor 上验证；未建立专用、
+  可复现的 layer-shell capture receipt 前，gamescope 结果只能报告 `SKIP`，不能冒充 Layer-Shell PASS。
 
 ## 7. 前端交互与像素证据
 
@@ -145,16 +151,14 @@ Niri `screenshot-window` 写出 PNG；验收脚本拒绝 `TM_CAPTURE_NIRI_BACKGR
 不得把结果写入验收 receipt。
 画面外观是可记录维度：scenario 表新增 `skin` 列（复用 `TM_SKIN` 词表），capture 把请求值传给应用并从 PNG 均值亮度回读 `appearance_rendered`，再按请求模式与回读结果比对得出 `appearance_control`：全部场景一致记 `honored`，任一场景不一致记 `ignored`，其余（含无法量测或不可判定项）记 `unknown`，不伪装成可控；Bevy/Iced/TUI 在 Performance/CPU 页各有 light/dark 成对场景（Bevy `performance`/`performance-dark`、Iced `cpu`/`cpu-light`、TUI 同页切换 `TM_TUI_CAPTURE_SKIN=gnome-light|gnome-dark`），保证同页可比。
 
-每个后台 capture 必须经 `scripts/capture_supervisor.py` 获得随机 Run UUID，并将应用
-binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 与 receipt
-绑定到该 UUID；supervisor 使用用户 cgroup v2 和 detached watchdog 管理完整进程树。
-失败、取消或父进程消失都必须留下可审计 receipt 并回收 runtime；`latest` 只能由通过
-独立 validator 的完整 run 在 `flock` 下以原子 pointer 发布。并发隔离由
-`scripts/test_capture_isolation.py` 证明：A/B 同时运行、窗口互不可见、单独终止 A 不得
-影响 B，主机 D-Bus/Wayland/KWin 状态不变，最终两个 run 都无进程和 runtime 残留。
-正式 RC7 本地收口必须以 `TM_CAPTURE_ISOLATION_GATE=1 bash scripts/quality/local-gates.sh
-standard` 重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形
-runner 只能报告环境性 SKIP，不能把它记为隔离 PASS。
+每个后台 capture 必须经 `scripts/capture_supervisor.py` 获得随机 Run UUID，并将应用 binary、KWin 的
+runtime/config/data/cache/state、Niri socket、D-Bus session 与 receipt 绑定到该 UUID；supervisor 使用用户 cgroup v2
+和 detached watchdog 管理完整进程树。失败、取消或父进程消失都必须留下可审计 receipt 并回收 runtime；`latest` 只能由
+通过独立 validator 的完整 run 在 `flock` 下以原子 pointer 发布。并发隔离由 `scripts/test_capture_isolation.py` 证明：
+A/B 同时运行、窗口互不可见、单独终止 A 不得影响 B，主机 D-Bus/Wayland/KWin 状态不变，最终两个 run 都无进程和
+runtime 残留。正式 RC7 本地收口必须以 `TM_CAPTURE_ISOLATION_GATE=1 bash scripts/quality/local-gates.sh standard`
+重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形 runner 只能报告环境性 SKIP，
+不能把它记为隔离 PASS。
 
 Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 bevy 投影）由机械发现驱动：脚本先对 lib 目标做
 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
@@ -162,39 +166,35 @@ nextest discovery，矩阵中的每个命名测试必须真实存在，然后完
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
 UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按真实渲染消费面路由：合同测试树、声明模块与 dev-only 前端测试树只要求 headless 交互矩阵，不索取像素回执；被真实渲染消费的合同输入模块与产品前端才在 `--require-capture` 下按消费端要求新鲜回执，未列出的 `ui-contract` 路径保持四端 fail-closed。`locales/*` 不再只按路径粗判：`scripts/quality/locale_keyset_classifier.py` 读取目录**内容**——仅当整键增删、无存活键值变更、目录文件集与跨目录键关系不变时才判为 key-set-only（只走 headless）；任一已存键值改变、形状/对称变化、目录不可解析、缺失一侧，或改动集含非目录路径，都 fail-closed 到四端。路径分类表与内容分类器均由 `scripts/quality/ui_evidence_route_guard.py` 机械钉住（quick）。
 
-真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与
-worktree clean/dirty 三元组；捕获期间工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，
-dirty 状态下三元组不变即通过：捕获必须单跑并等待安静的稳定窗口，失败后在同一稳定状态重跑，不修改 validator。
+真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与 worktree clean/dirty 三元组；捕获期间
+工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，dirty 状态下三元组不变即通过：捕获必须单跑并等待安静的稳定
+窗口，失败后在同一稳定状态重跑，不修改 validator。
 
 ### 7.1 弹性布局收口协议
 
 所有响应式、密集详情、图表分组或固定 viewport 改动必须先遵循
-[ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)：先从根预算推导完整 slot footprint，
-再按 mandatory/elastic/optional 分配；lower band 只能整组准入、摘要或隐藏，底部安全带和
-右侧 label/value bounds 必须有 headless 断言。完成后必须运行当前构建的真实 capture 并通过
-独立 validator，且逐页检查最小、正常、tall、wide-short、窄宽和长文本状态；单张截图、fixture
-或编译通过不得替代这套证据。
+[ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)：先从根预算推导完整 slot footprint，再按
+mandatory/elastic/optional 分配；lower band 只能整组准入、摘要或隐藏，底部安全带和右侧 label/value bounds 必须有
+headless 断言。完成后必须运行当前构建的真实 capture 并通过独立 validator，且逐页检查最小、正常、tall、wide-short、
+窄宽和长文本状态；单张截图、fixture 或编译通过不得替代这套证据。
 
 ## 8. 验证器质量
 
 验证器必须自动发现范围、执行目标、检查结果和副作用，并在范围为空、解析失败或回执不完整
 时 fail-closed。禁止用源码字符串存在性、恒真断言、固定测试数量或 `echo PASS` 证明行为。
 
-- 静态策略守卫的禁用 token 列表按（去行注释后的）精确子串匹配生产源，夹具文本必须避开；
-  发生碰撞时修改夹具（例如改用真实设备节点名），不得放宽或绕过守卫。
+- 静态策略守卫的禁用 token 列表按（去行注释后的）精确子串匹配生产源，夹具文本必须避开；发生碰撞时修改夹具（例如改用真实设备节点名），不得放宽或绕过守卫。
 
 ## 9. 并行隔离验证与视觉对等（标准，2026-08-29 起）
 
-**并行隔离验证**（`scripts/verify-isolated.sh <line> [gate]`，各行通用）：行门禁只在
-本行自己的差异上跑——脚本按本行足迹清单（`scripts/isolated-paths/<line>.txt`）把本行
-未提交改动（含 intent-to-add 未跟踪文件）应用到 HEAD 私有 worktree 内执行 fmt/clippy/
-nextest/capture，主 checkout 永不被验证流程改动。这样兄弟线在共享 checkout 里的未提交
-重构（哪怕暂时编译不过）永远不阻塞本行门禁；本行也不得因他行撕裂而宣布 SKIP。足迹清单
-是行声明：本行拥有或改动的路径（含共享 crate 的行内改动）必须全部列入，隔离验证才携带
-全部本线事实。Cargo 锁回退沿用全仓约定（`TM_CARGO_LOCK` 空值 = 解锁，未设 = `--locked`）。
+**并行隔离验证**（`scripts/verify-isolated.sh <line> [gate]`，各行通用）：行门禁只在本行自己的差异上跑——脚本按本行
+足迹清单（`scripts/isolated-paths/<line>.txt`）把本行未提交改动（含 intent-to-add 未跟踪文件）应用到 HEAD 私有
+worktree 内执行 fmt/clippy/nextest/capture，主 checkout 永不被验证流程改动。这样兄弟线在共享 checkout 里的未提交
+重构（哪怕暂时编译不过）永远不阻塞本行门禁；本行也不得因他行撕裂而宣布 SKIP。足迹清单是行声明：本行拥有或改动的
+路径（含共享 crate 的行内改动）必须全部列入，隔离验证才携带全部本线事实。Cargo 锁回退沿用全仓约定（`TM_CARGO_LOCK`
+空值 = 解锁，未设 = `--locked`）。
 
-**视觉对等目检**（渲染行收口门禁）：绿色门禁只证明行为与来源，不证明观感。渲染行每轮
-收口必须把本行捕获与参考行捕获逐页并排目检，差距逐条记账——修掉的进提交，暂缓的写入
-该行公开文档的"已知边界/存异"清单（如 `crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md`）。装饰禁止用文本
-字形冒充（嵌入字体无该字形即渲染 tofu）；图标走语义注册表（`IconId` → 共享 SVG → 各
-toolkit 材质化），行门禁须含机械反字形扫描与有界行单行契约测试。
+**视觉对等目检**（渲染行收口门禁）：绿色门禁只证明行为与来源，不证明观感。渲染行每轮收口必须把本行捕获与参考行捕获
+逐页并排目检，差距逐条记账——修掉的进提交，暂缓的写入该行公开文档的"已知边界/存异"清单（如
+`crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md`）。装饰禁止用文本字形冒充（嵌入字体无该字形即渲染 tofu）；图标走
+语义注册表（`IconId` → 共享 SVG → 各 toolkit 材质化），行门禁须含机械反字形扫描与有界行单行契约测试。

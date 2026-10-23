@@ -21,6 +21,7 @@ use taskmanager_core::core::sensors::{
 };
 
 use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_theme::Theme;
 
 use super::device_chart;
 use super::perf_devices::DeviceBlockContext;
@@ -36,6 +37,50 @@ use crate::trend_strip::finite_peak;
 /// parity): an idle or all-gap window keeps a neutral 1000-RPM axis instead
 /// of a degenerate zero.
 const FAN_RPM_SCALE_FLOOR: f32 = 1000.0;
+
+/// The fan RPM gauge's compact height: a gauge frame, one notch below the
+/// shared secondary-chart height (the shared full-ladder threshold), so
+/// the shared scale-text tier drops the dense midpoint subdivision and the
+/// gauge keeps only the main ticks and the hover pointer (GPUI's compact
+/// gauge parity).
+pub(super) const FAN_RPM_COMPACT_GAUGE_HEIGHT: f32 = 120.0;
+
+/// The fan RPM gauge's height for this frame.
+///
+/// The compact (strip) presentation renders a gauge, not a full-height
+/// graph: at [`FAN_RPM_COMPACT_GAUGE_HEIGHT`] the shared scale-text tier
+/// keeps only the MAIN ticks (the maximum and the baseline) and drops the
+/// dense midpoint subdivision, so a compact window shows no stacked scale
+/// text. The wide presentation keeps the primary height, where the full
+/// ladder stays legible.
+///
+/// The compact rung is resolved THROUGH the shared tier policy, so the
+/// gauge's height and the scale text it may carry can never disagree.
+pub(super) fn fan_rpm_gauge_height(rpm_max: f32, compact: bool) -> f32 {
+    if !compact {
+        return device_chart::DEVICE_CHART_HEIGHT;
+    }
+    let height = FAN_RPM_COMPACT_GAUGE_HEIGHT;
+    // A gauge that would still carry the dense subdivision is not a compact
+    // gauge: the compact frame keeps the full primary graph rather than a
+    // gauge that still stacks three numbers.
+    if fan_rpm_scale_ticks(rpm_max, height).len() > 2 {
+        return device_chart::DEVICE_CHART_HEIGHT;
+    }
+    height
+}
+
+/// The scale ladder the fan RPM gauge may carry at `gauge_height`: the main
+/// ticks (the maximum and the baseline) on a compact gauge, the full ladder
+/// on a tall one. The dense midpoint subdivision is dropped on a compact
+/// gauge so the numbers never stack.
+#[must_use]
+pub(super) fn fan_rpm_scale_ticks(rpm_max: f32, gauge_height: f32) -> Vec<f32> {
+    crate::perf_chart::y_axis_scale_ticks(
+        &crate::perf_chart::y_axis_tick_values(rpm_max),
+        gauge_height,
+    )
+}
 
 /// The Performance-page per-fan panel: one block per fan channel in the shared
 /// sensor snapshot, each block topped by a per-fan RPM mini-graph (auto-scaled
@@ -176,6 +221,53 @@ fn fan_pwm_percent(sensors: &SensorCenterSnapshot, fan: &SensorReading) -> Optio
         )
 }
 
+/// The fan's RPM gauge: the per-fan RPM window plotted in the device
+/// family's color with the hover readout enabled (the pointer).
+///
+/// The compact (strip) presentation renders the gauge at
+/// [`FAN_RPM_COMPACT_GAUGE_HEIGHT`], so a narrow window shows a gauge — not
+/// a full-height graph — and the shared scale-text tier keeps only the main
+/// ticks. The wide presentation gives the gauge the remaining column
+/// height, where the full ladder stays legible.
+fn fan_rpm_gauge(
+    samples: Rc<[f32]>,
+    color: iced::Color,
+    rpm_max: f32,
+    theme_snapshot: &Theme,
+    compact: bool,
+    smooth: bool,
+) -> iced::Element<'static, Message, iced::Theme, iced::Renderer> {
+    let prefs = device_chart::GraphPrefs {
+        smooth,
+        max_override: Some(rpm_max),
+        // The RPM main graph is hover-interactive; the temperature graph
+        // below keeps hover off.
+        hover: true,
+    };
+    let caption = t("fan.rpm").to_string();
+    if compact {
+        device_chart::device_mini_graph_with_height(
+            samples,
+            device_chart::DeviceMetricScale::Rpm,
+            color,
+            caption,
+            theme_snapshot,
+            fan_rpm_gauge_height(rpm_max, compact),
+            prefs,
+        )
+    } else {
+        device_chart::device_mini_graph_fill(
+            samples,
+            device_chart::DeviceMetricScale::Rpm,
+            color,
+            caption,
+            theme_snapshot,
+            compact,
+            prefs,
+        )
+    }
+}
+
 /// One fan's rendered block: the device title line, a per-fan RPM mini-graph
 /// (the device's OWN window, auto-scaled to its floored finite peak), the
 /// same-device temperature secondary chart while the Full chart inventory
@@ -198,20 +290,13 @@ fn fan_block<'a>(
     // GPUI parity: the RPM dynamic scale floors at 1000 so an idle window
     // keeps a neutral axis.
     let rpm_max = finite_peak(&samples).max(FAN_RPM_SCALE_FLOOR);
-    let mut graphs = vec![device_chart::device_mini_graph_fill(
+    let mut graphs = vec![fan_rpm_gauge(
         samples,
-        device_chart::DeviceMetricScale::Rpm,
         color,
-        t("fan.rpm").to_string(),
+        rpm_max,
         theme_snapshot,
         compact,
-        device_chart::GraphPrefs {
-            smooth,
-            max_override: Some(rpm_max),
-            // The RPM main graph is hover-interactive; the temperature graph
-            // below keeps hover off.
-            hover: true,
-        },
+        smooth,
     )];
     let temperature_samples = sensors
         .readings
@@ -259,3 +344,7 @@ fn fan_block<'a>(
         super::perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )
 }
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/fan_gauge_tests.rs"]
+mod fan_gauge_tests;

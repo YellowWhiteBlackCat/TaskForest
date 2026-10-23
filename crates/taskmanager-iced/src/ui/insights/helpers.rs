@@ -1,6 +1,6 @@
 //! Formatting and layout helpers for Process Insights in Iced.
 
-use iced::widget::{column, row, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
@@ -61,6 +61,24 @@ pub(crate) fn kv_row<'a, V: iced::advanced::text::IntoFragment<'a>>(
     row![
         text(label).width(Length::Fixed(150.0)).color(muted),
         text(value).width(Length::Fill),
+    ]
+    .spacing(8)
+    .width(Length::Fill)
+    .into()
+}
+
+/// One label/value row whose value is a composed element (a semantic pill, a
+/// row of monospace chips) instead of plain text. The label slot keeps the
+/// shared 150px width, so both row grammars align.
+pub(crate) fn kv_row_element<'a>(
+    theme_snapshot: &'a Theme,
+    label: String,
+    value: Element<'a, Message, iced::Theme, iced::Renderer>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let muted = theme::muted_text_color(theme_snapshot);
+    row![
+        text(label).width(Length::Fixed(150.0)).color(muted),
+        container(value).width(Length::Fill),
     ]
     .spacing(8)
     .width(Length::Fill)

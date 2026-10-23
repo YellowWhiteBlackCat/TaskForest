@@ -88,11 +88,15 @@ and [`docs/WIRE_INGRESS.md`](https://github.com/YellowWhiteBlackCat/TaskForest/t
 ```text
 src/core.rs                     owner-module index for every fact below
 ├── metrics/                    domain measurements and availability joins
+│   ├── sample.rs               the measured sample: value, measurement instant, gap
 │   └── */wire.rs               private ingress DTOs (legacy payloads canonicalize here)
 ├── process/                    process facts: identity.rs, aggregate.rs, group_aggregate.rs
+│   └── collateral.rs           the frozen tree closure: root, members, depth
 ├── process_telemetry/          per-process GPU/network/resource telemetry facts
+│   └── quota.rs                the container's declared cgroup ceilings (absent = undeclared)
 ├── process_batch_history.rs    batched process history snapshots
 ├── services/  startup/         service and startup-item facts
+│   └── startup/timeline.rs     the per-phase boot split (each phase optional)
 ├── alerts/                     alert rules, active-set transitions, bounded event export
 ├── export/                     typed export formatting (CSV and friends)
 ├── sensors/                    thermal and fan sensor facts

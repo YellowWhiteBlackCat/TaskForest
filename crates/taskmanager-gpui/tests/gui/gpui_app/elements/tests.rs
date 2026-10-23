@@ -190,46 +190,54 @@ mod highlighted_text_tests {
     use std::ops::Range;
 
     use taskmanager_core::core::text::match_ranges_ascii_ci;
-    use taskmanager_ui::data::highlighter::find_matches;
 
-    /// The GPUI search-highlight geometry now comes from the shared
-    /// `match_ranges_ascii_ci` engine (ADR-020); the legacy `find_matches`
-    /// remains only as the old reference. Both must agree — byte ranges,
-    /// non-overlapping, case-insensitive — for every category the legacy
-    /// engine was relied on for: ASCII case folding, multi-segment (repeated /
-    /// adjacent) matches, no-match haystacks, and multi-byte (Chinese) text
-    /// whose ranges never split a character.
+    /// One engine case: the haystack, the needle and the expected match
+    /// windows (start, end).
+    type MatchCase = (&'static str, &'static str, &'static [(usize, usize)]);
+
+    /// The search-highlight geometry comes from the contract's SINGLE engine
+    /// (`match_ranges_ascii_ci`, ADR-020). The shared crate's own matcher is
+    /// gone, so the engine that every frontend reads is the only one: byte
+    /// ranges, non-overlapping, case-insensitive — covering ASCII case
+    /// folding, multi-segment (repeated / adjacent) matches, no-match
+    /// haystacks, and multi-byte (Chinese) text whose ranges never split a
+    /// character.
     #[test]
-    fn shared_and_legacy_matchers_produce_identical_ranges() {
-        let cases: [(&str, &str); 9] = [
+    fn the_contract_engine_reports_the_expected_ranges() {
+        let cases: [MatchCase; 6] = [
             // Case-insensitive ASCII folding.
-            ("Firefox", "fire"),
-            ("firefox", "FIRE"),
-            ("Hello hello HELLO", "hello"),
+            ("Firefox", "fire", &[(0, 4)]),
+            // The engine matches a byte window of the NEEDLE's length, so the
+            // range covers the matched run, not the whole word.
+            ("firefox", "FIRE", &[(0, 4)]),
             // Multi-segment / adjacent non-overlapping matches.
-            ("abcABCabc", "abc"),
-            ("aaaa", "aa"),
+            ("abcABCabc", "abc", &[(0, 3), (3, 6), (6, 9)]),
+            ("aaaa", "aa", &[(0, 2), (2, 4)]),
             // No match (including a needle longer than the haystack).
-            ("systemd-resolved", "plasma"),
-            ("short", "much longer needle"),
-            // Multi-byte (Chinese) text: byte-aligned, never split.
-            ("中文搜索中文", "中文"),
-            ("Réseau", "seau"),
+            ("systemd-resolved", "plasma", &[]),
+            ("short", "much longer needle", &[]),
         ];
-        for (text, query) in cases {
-            let legacy: Vec<Range<usize>> = find_matches(text, query, false)
-                .into_iter()
-                .map(|m| m.range)
-                .collect();
+        for (text, query, expected) in cases {
             let shared = match_ranges_ascii_ci(text, query);
+            let expected: Vec<Range<usize>> =
+                expected.iter().map(|(start, end)| *start..*end).collect();
             assert_eq!(
-                shared, legacy,
-                "shared matcher diverged from the legacy engine for ({text:?}, {query:?})"
+                shared, expected,
+                "the contract engine's ranges changed for ({text:?}, {query:?})"
             );
             for range in &shared {
                 assert!(text.is_char_boundary(range.start));
                 assert!(text.is_char_boundary(range.end));
             }
+        }
+        // Multi-byte (Chinese) text: byte-aligned, never split.
+        // The engine matches the needle's BYTES: the second 中文 starts at
+        // byte 12 (after 搜索), so the ranges are byte-exact.
+        let chinese = match_ranges_ascii_ci("中文搜索中文", "中文");
+        assert_eq!(chinese, vec![0..6, 12..18]);
+        for range in &chinese {
+            assert!("中文搜索中文".is_char_boundary(range.start));
+            assert!("中文搜索中文".is_char_boundary(range.end));
         }
     }
 

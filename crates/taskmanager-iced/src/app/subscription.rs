@@ -41,7 +41,15 @@ impl IcedApp {
 }
 
 pub(crate) fn message_for_window_event(event: iced::window::Event) -> Option<Message> {
-    matches!(event, iced::window::Event::Unfocused).then_some(Message::WindowUnfocused)
+    match event {
+        iced::window::Event::Unfocused => Some(Message::WindowUnfocused),
+        // The window's DPI scale factor: the chart's sub-pixel alignment is
+        // exact only against the product with the app render scale.
+        iced::window::Event::Rescaled(scale_factor) => {
+            Some(Message::WindowScaleFactorChanged(scale_factor))
+        }
+        _ => None,
+    }
 }
 
 fn message_for_keyboard_event(event: iced::keyboard::Event) -> Message {

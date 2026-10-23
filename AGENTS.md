@@ -69,4 +69,9 @@ the lower document layers.
 - Before completion, run the quick gate, verify the Eight Closure Questions (STANDARDS.md § 8), and report pass/fail/skip with relevant evidence.
 - Every visible layout change must complete the elastic-layout playbook: derive slot budgets, admit
   lower content as whole groups, protect bottom/right edges, and run headless bounds plus real capture.
+- New or changed crates inherit the workspace lint table (`[lints] workspace = true`, ADR-056); only the
+  four audited unsafe trust roots carry an explicit table, and any new lint exemption must use the
+  scoped `cfg_attr(...)` form with a reason (bare `#[allow]`/`#[expect]` is a census violation).
+  Public API changes to publishable crates must pass the `semver-checks` gate against its recorded
+  baseline (QUALITY_GATES.md § 2).
 - Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

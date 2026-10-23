@@ -25,13 +25,31 @@
 //! palette-owned roles (accent/scrim/dim); when `crate::palette::UiPalette`
 //! grows semantic status tokens, `chip_fill` is the one function to
 //! re-target.
+//!
+//! **Page surfaces** (each one owns a named module below):
+//! - `status_dot` — the typed running/stopped/failed dot with its
+//!   breathing pulse;
+//! - `action_glyph` — the semantic marks the lifecycle capsules carry;
+//! - `unit_filter` — the systemd unit-type capsule bar, one horizontally
+//!   sliding row that never folds into the toolbar;
+//! - `deps_tree` — the expandable dependency hierarchy of the opened unit;
+//! - `log_text` / `log_follow` — the log line's RFC3339 stamp, its
+//!   level-keyword highlighting and the follow lock with its "return to
+//!   latest" capsule.
+//!
+//! **Layout budget**: the page column owns the title, the summary row, the
+//! unit-filter bar, the table body, the dependencies panel and the log panel.
+//! The filter bar is a fixed-height row of its own; the table body and the
+//! two panels keep their own bounded viewports, so a narrow window slides
+//! the capsules sideways instead of pushing the action toolbar out of the
+//! page.
 
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
-use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
@@ -63,12 +81,18 @@ use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
 use taskmanager_ui_contract::IconId;
 
+pub(crate) mod action_glyph;
 pub(crate) mod dependencies_panel;
+pub(crate) mod deps_tree;
 pub(crate) mod details_modal;
+pub(crate) mod log_follow;
 pub(crate) mod log_panel;
+pub(crate) mod log_text;
 pub(crate) mod menu;
 mod paint;
 mod scene;
+pub(crate) mod status_dot;
+pub(crate) mod unit_filter;
 
 use scene::{services_body_scene, services_search_input_scene};
 use taskmanager_shell::service_cycle_members;
@@ -88,6 +112,16 @@ pub(crate) struct ServiceRowModel {
 /// Project the table's whole material through the shared sort order and query filter.
 pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRowModel> {
     service_rows_filtered(shell, &shell.query)
+}
+
+/// The rows the table shows under the active query AND the active unit-type
+/// filter. The filter is page-owned: the shell owns the inventory, never the
+/// unit-type slice of it.
+pub(crate) fn service_rows_for(
+    shell: &ShellApp,
+    filter: unit_filter::ServiceUnitFilter,
+) -> Vec<ServiceRowModel> {
+    unit_filter::filter_unit_rows(service_rows(shell), filter)
 }
 
 pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<ServiceRowModel> {
@@ -121,13 +155,14 @@ pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<Servic
 
 /// Semantic status chip for one row. Pure; the fill mapping lives in
 /// [`chip_fill`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum StatusChip {
     /// Running (TUI `good` parity): active attention.
     Positive,
     /// Failed (TUI `danger` parity): blocked attention.
     Negative,
     /// Inactive/unknown: idle.
+    #[default]
     Idle,
 }
 
@@ -359,6 +394,17 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 ]
             --
 
+                // The systemd unit-type filter bar. It owns its own row so a
+                // narrow window slides the capsules sideways instead of
+                // folding them into the action toolbar above.
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(space_2()),
+                }
+                unit_filter::ServiceUnitFilterSlot
+            --
+
                 Node {
                     width: percent(100),
                     height: Val::Auto,
@@ -538,8 +584,12 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<dependencies_panel::ServicesDependenciesRenderState>();
     app.init_resource::<log_panel::ServicesLogRenderState>();
     app.init_resource::<paint::PaintState>();
+    app.init_resource::<deps_tree::ServiceDepsExpansion>();
+    app.init_resource::<log_follow::ServiceLogScrollState>();
+    app.init_resource::<status_dot::ServicePulse>();
     dependencies_panel::register(app);
     log_panel::register(app);
+    unit_filter::register(app);
     app.add_observer(paint::on_repaint_requested);
     app.add_observer(on_services_projection_folded);
     app.add_observer(on_services_sort_clicked);
@@ -553,8 +603,20 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(log_panel::on_log_panel_repaint_required);
     app.add_observer(log_panel::on_log_panel_slot_added);
     app.add_observer(log_panel::on_services_fold_log_gate);
+    app.add_observer(log_follow::on_log_scrolled);
     app.add_observer(on_services_body_added);
     paint::register(app);
+    // The status-dot breathing and the log-run ink land after the window's
+    // role stamp, in the `Last` schedule: the scene entities only exist once
+    // the painter's commands are flushed.
+    app.add_systems(
+        bevy::app::Last,
+        (
+            status_dot::advance_service_pulse,
+            log_text::stamp_log_ink,
+            log_follow::observe_log_scroll,
+        ),
+    );
 }
 
 fn on_services_body_added(_event: On<Add<ServicesBody>>, mut commands: Commands) {
@@ -612,10 +674,11 @@ fn on_services_row_clicked(
 fn on_services_selection_moved(
     movement: On<ServiceSelectionMoved>,
     track: ShellTrack,
+    filter: Res<unit_filter::ServiceUnitFilter>,
     mut selection: ResMut<ServiceSelection>,
     mut commands: Commands,
 ) {
-    let rows = service_rows(track.shell());
+    let rows = service_rows_for(track.shell(), *filter);
     let current = selected_row(&rows, &selection);
     let Some(next) = moved_row(rows.len(), current, movement.event().0) else {
         return;
@@ -646,3 +709,7 @@ mod service_dependencies_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/service_details_modal.rs"]
 mod service_details_modal_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/services_parity.rs"]
+mod services_parity_tests;

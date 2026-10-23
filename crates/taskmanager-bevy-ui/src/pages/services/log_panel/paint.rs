@@ -1,5 +1,6 @@
 //! Coalesced panel publication using the shell projection and owned slots.
 use super::*;
+use crate::scene_attach::attach_child;
 use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::hierarchy::Children;
@@ -46,10 +47,7 @@ fn paint(mut access: PaintAccess) {
             .commands
             .spawn_scene(service_log_panel_scene(shell, &access.palette.inner))
             .id();
-        access
-            .commands
-            .entity(slot)
-            .add_one_related::<ChildOf>(fresh);
+        attach_child(&mut access.commands, slot, fresh);
     }
     access.rendered.rendered = fingerprint;
 }

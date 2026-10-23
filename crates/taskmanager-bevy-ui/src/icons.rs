@@ -32,7 +32,7 @@ use bevy::image::Image;
 use bevy::math::Vec2;
 use bevy::picking::Pickable;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::scene::{EntityCommandsSceneExt, Scene, bsn};
+use bevy::scene::{EntityWorldMutSceneExt, Scene, bsn};
 use bevy::text::{InlineBox, InlineBoxKind};
 use bevy::ui::prelude::{Node, rem};
 use bevy::ui::widget::{ImageNode, InlineImage};
@@ -42,6 +42,7 @@ use taskmanager_icons::path;
 use taskmanager_ui_contract::IconId;
 
 use crate::palette::UiPalette;
+use crate::scene_attach::insert_into;
 
 /// The semantic ids this frontend draws. The list is exhaustive for the
 /// product surface: navigation tabs, the trailing settings/alert affordances,
@@ -63,6 +64,26 @@ pub(crate) const PLATE_ICONS: &[IconId] = &[
     IconId::Gpu,
     IconId::NavigateUp,
     IconId::NavigateDown,
+    // The confirmation and caution glyphs: the export toast's check badge and
+    // the startup forensics panel's warning mark.
+    IconId::CircleCheck,
+    IconId::TriangleAlert,
+    // The health shield: a healthy disk wears the shield, a degraded one the
+    // caution mark.
+    IconId::Health,
+    // The session-family marks: a console session wears the terminal, a
+    // display-server session the monitor.
+    IconId::Terminal,
+    IconId::Display,
+    // A remote session: the globe plate.
+    IconId::Remote,
+    // The container-runtime marks: the runtime column wears the runtime's
+    // own glyph, never a neighbour's.
+    IconId::Docker,
+    IconId::Podman,
+    // The read-only mark: a read-only mount wears the padlock, never the
+    // caution triangle.
+    IconId::Lock,
 ];
 
 /// The embedded bitmap bytes for one semantic icon, through the single
@@ -178,9 +199,17 @@ pub(crate) fn stamp_icon_plate(
     let image = icon
         .and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)))
         .unwrap_or_default();
-    commands.entity(entity).apply_scene(bsn! {
-        ImageNode { color: {ink}, image: {image} }
-    });
+    // The plate scene is applied through a SILENCED queue: the icon observer
+    // fires on the plate's own spawn, and a surface that rebuilds in the same
+    // frame can despawn the plate before the command lands — the raw
+    // `apply_scene` path would turn that race into a production panic.
+    commands
+        .entity(entity)
+        .queue_silenced(move |mut entity: bevy::ecs::world::EntityWorldMut| {
+            let _ = entity.apply_scene(bsn! {
+                ImageNode { color: {ink}, image: {image} }
+            });
+        });
 }
 
 /// Register the bridge: the plate-stamp observer. The handle store's startup
@@ -290,5 +319,5 @@ pub(crate) fn stamp_inline_icon(
         height: Some(extent),
         ..InlineImage::default()
     };
-    commands.entity(entity).insert(plate);
+    insert_into(&mut commands, entity, plate);
 }

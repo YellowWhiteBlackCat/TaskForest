@@ -1,5 +1,7 @@
 //! Iced Canvas program implementation for the Performance chart.
 
+use std::time::Instant;
+
 use super::*;
 use iced::{Renderer, Theme};
 
@@ -44,7 +46,8 @@ impl canvas::Program<Message> for PerfChart {
         // TWO physically separate caches (the round-1 process_sparkline pattern,
         // extended to a hover chart):
         //  - DATA cache: grid + two series. Cleared only when the data
-        //    fingerprint changes (new sample / window shift / smooth toggle).
+        //    fingerprint changes (new sample / window shift / smooth toggle)
+        //    or while a slide is in flight (the curve moves every frame).
         //    Cursor motion NEVER busts this — it's the expensive geometry.
         //  - OVERLAY cache: hover readout pill. Cleared when the hover index OR
         //    the data fingerprint changes — so a moved pill never shows a stale
@@ -64,6 +67,28 @@ impl canvas::Program<Message> for PerfChart {
             state.overlay_cache.clear();
         }
 
+        // The slide transitions advance with the frame clock: a new sample
+        // generation restarts the slide, so the curve eases from the outgoing
+        // frame into the incoming one instead of jumping once per second.
+        let now = Instant::now();
+        let (cpu_phase, memory_phase) = {
+            let mut slide = state.slide.borrow_mut();
+            (
+                slide.cpu.advance(&self.cpu, now),
+                slide.memory.advance(&self.memory, now),
+            )
+        };
+        // A slide moves the curve on every frame, so the data cache is
+        // rebuilt while one is in flight (and once more when it settles).
+        let slide_key = (
+            cpu_phase.progress().to_bits(),
+            memory_phase.progress().to_bits(),
+        );
+        if *state.slide_fingerprint.borrow() != slide_key {
+            *state.slide_fingerprint.borrow_mut() = slide_key;
+            state.data_cache.clear();
+        }
+
         // `Cache::draw` invokes the closure synchronously. Borrow the owned
         // series instead of cloning both history windows on every repaint;
         // the cache already controls when geometry work runs.
@@ -73,15 +98,27 @@ impl canvas::Program<Message> for PerfChart {
         let memory_color = self.memory_color;
         let grid_color = self.grid_color;
         let smooth = self.smooth;
+        let scale_factor = self.scale_factor;
+        let slide = state.slide.borrow();
         let data_geometry = state.data_cache.draw(renderer, bounds.size(), |frame| {
             let size = frame.size();
             draw_grid_opts(frame, size, grid_color, ChartOpts::PERFORMANCE);
             // CPU first (drawn under memory), then memory, so the upper series
             // sits on top at any crossing. Each series is drawn from its own
             // samples — a partial buffer never fabricates points for the other.
-            draw_series(frame, cpu, size, cpu_color, smooth);
-            draw_series(frame, memory, size, memory_color, smooth);
+            let mut cpu_runs = series_runs(&slide.cpu, cpu_phase, cpu, size);
+            let mut memory_runs = series_runs(&slide.memory, memory_phase, memory, size);
+            draw_series(frame, &mut cpu_runs, size, cpu_color, smooth, scale_factor);
+            draw_series(
+                frame,
+                &mut memory_runs,
+                size,
+                memory_color,
+                smooth,
+                scale_factor,
+            );
         });
+        drop(slide);
 
         let hover_index = state.hover.index;
         let readout = self.readout;
@@ -90,6 +127,16 @@ impl canvas::Program<Message> for PerfChart {
         let latest = latest_readout_text(cpu, memory);
         let latest_anchor = latest_readout_anchor(cpu, memory);
         let latest_sample_count = cpu.len().max(memory.len());
+        // While a slide is in flight the crosshair follows the CURVE, not the
+        // settled slot grid, so it never points beside the sample it reads.
+        let slide_x = match (hover_index, cpu_phase) {
+            (Some(index), SlidePhase::Sliding { progress }) => state
+                .slide
+                .borrow()
+                .cpu
+                .sample_position(cpu.len(), bounds.width, progress, index),
+            _ => None,
+        };
         let overlay_geometry = state.overlay_cache.draw(renderer, bounds.size(), |frame| {
             let size = frame.size();
             let Some(index) = hover_index else {
@@ -104,6 +151,7 @@ impl canvas::Program<Message> for PerfChart {
                         memory_color,
                         grid_color,
                         readout,
+                        scale_factor,
                     },
                 );
                 return;
@@ -113,8 +161,12 @@ impl canvas::Program<Message> for PerfChart {
                 size,
                 index,
                 &[(cpu.as_ref(), cpu_color), (memory.as_ref(), memory_color)],
-                grid_color,
-                readout,
+                super::HoverReadoutStyle {
+                    grid_color,
+                    readout,
+                    scale_factor,
+                    slide_x,
+                },
             );
         });
 

@@ -22,6 +22,20 @@
 //! and snapshot. Budgets are measured value x >=5x headroom, recorded with
 //! the measurement date, so a loaded CI machine cannot flake them.
 
+// ADR-056: the workspace lint table denies `unsafe_code` for every package, and
+// a process-global `#[global_allocator]` cannot be expressed without
+// `unsafe impl GlobalAlloc`. The exception is scoped to this file only: this
+// binary is a standalone integration-test crate (its own `[[test]]` target),
+// it is never part of the `taskmanager-tui` library, it links only the
+// library's public API, and it never ships. The library itself keeps
+// `#![forbid(unsafe_code)]`.
+//
+// The exemption uses the scoped `cfg_attr` form, which is the only shape
+// `scripts/quality/allow_ceiling_guard.py` accepts: a bare `#[allow]` would
+// be a census violation. `cfg(test)` holds because Cargo compiles test
+// targets with rustc's `--test` flag.
+#![cfg_attr(test, allow(unsafe_code))]
+
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 

@@ -10,12 +10,15 @@
 
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::ChildOf;
+
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::{Or, With, Without};
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
+use bevy::picking::events::PointerPress;
 use bevy::picking::hover::PickingInteraction;
+use bevy::picking::pointer::PointerButton;
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 
@@ -24,8 +27,9 @@ use super::{
     ProcessSelectRow, ProcessSelectionChanged, ProcessTableArtifact, TableSurface, rebuild_table,
     selected_identity,
 };
-use crate::app::{Page, Route, ShellTrack};
+use crate::app::{FrontendTrack, Page, Route, ShellTrack};
 use crate::input::ShellInteractionApplied;
+use crate::scene_attach::attach_child;
 use crate::window::WindowPalette;
 use taskmanager_core::core::process::ProcessLiveKey;
 
@@ -155,6 +159,63 @@ fn sync_after_shell_interaction(
 /// lifetime-bound to the rows root like the fold observer. The scroll system
 /// is a plain `Update` system registered by the app shell plugin. Called by
 /// the page bootstrap.
+/// The row a pointer event belongs to: the event's own entity, or the
+/// closest ancestor that carries the row link (the pointer usually lands on
+/// a cell, not on the row wrapper itself).
+fn row_link_of(
+    entity: Entity,
+    links: &Query<&ProcessRowLink>,
+    parents: &Query<&ChildOf>,
+) -> Option<usize> {
+    let mut current = entity;
+    for _ in 0..16 {
+        if let Ok(link) = links.get(current) {
+            return Some(link.0);
+        }
+        let Ok(parent) = parents.get(current) else {
+            return None;
+        };
+        current = parent.parent();
+    }
+    None
+}
+
+/// Secondary click on a row: copy that row's summary through the shared
+/// clipboard port (the same port the keyboard copy path uses, so the system
+/// clipboard write and its feedback stay one path).
+///
+/// The row under the pointer becomes the shell's selection first, so the
+/// copied summary is the row the user pointed at.
+pub(crate) fn on_row_secondary_pressed(
+    press: On<PointerPress>,
+    links: Query<&ProcessRowLink>,
+    parents: Query<&ChildOf>,
+    mut track: Option<NonSendMut<FrontendTrack>>,
+    mut clipboard: Option<ResMut<crate::text_selection::ClipboardPort>>,
+    mut commands: Commands,
+) {
+    if press.button != PointerButton::Secondary {
+        return;
+    }
+    let Some(index) = row_link_of(press.entity, &links, &parents) else {
+        return;
+    };
+    let Some(track) = track.as_deref_mut() else {
+        return;
+    };
+    let shell = &mut track.shell;
+    if !shell.select_row(index) {
+        return;
+    }
+    let Some(summary) = shell.selected_row_summary() else {
+        return;
+    };
+    if let Some(clipboard) = clipboard.as_deref_mut() {
+        clipboard.request_text(summary, "Selected Row");
+    }
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
+
 /// Mount the input bridges: selection memory plus the re-render observer,
 /// lifetime-bound to the rows root like the fold observer. The scroll system
 /// is a plain `Update` system registered by the app shell plugin. Called by
@@ -164,7 +225,5 @@ pub(crate) fn bootstrap(root: Entity, commands: &mut Commands) {
     let sync_observer = commands
         .spawn(Observer::new(sync_after_shell_interaction))
         .id();
-    commands
-        .entity(root)
-        .add_one_related::<ChildOf>(sync_observer);
+    attach_child(commands, root, sync_observer);
 }

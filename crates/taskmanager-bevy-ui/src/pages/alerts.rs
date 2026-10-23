@@ -37,7 +37,11 @@ use bevy::ui::Overflow;
 use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{ScrollArea, ValueChange};
+pub(crate) mod banner;
 pub(crate) mod editor;
+pub(crate) mod pause;
+pub(crate) mod severity;
+pub(crate) mod toast;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 use taskmanager_core::core::alerts::{
@@ -51,6 +55,21 @@ use crate::drain::ShellProjectionFolded;
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
+
+/// The alerts page module's registration entry point.
+///
+/// The window composition calls [`editor::register`], which delegates here:
+/// every system the alerts page module owns — the banner spring, the export
+/// toast and the global pause overlay — is registered from this one place,
+/// so a page module never leaks its systems into the shared composition.
+pub(crate) fn register(app: &mut bevy::app::App) {
+    banner::register(app);
+    toast::register(app);
+    pause::register(app);
+    // The slider widget keeps its own value in step with the drag; the page
+    // observer turns that value into the canonical rule edit.
+    app.add_observer(bevy::ui_widgets::slider_self_update);
+}
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the
 /// observer component, so the observer's lifetime equals the page content's
@@ -188,33 +207,41 @@ fn severity_label(severity: AlertSeverity) -> &'static str {
     }
 }
 
-/// One active-alert row, formatted per the shared evaluation semantics: an
-/// active alert means `value ≥ threshold`, and it clears only at or below
-/// `threshold − hysteresis` — the clear band is joined from the canonical
-/// rule set by rule id. A rule that left the set omits the band honestly
-/// instead of inventing one.
-pub(crate) fn active_alert_line(alert: &Alert, rules: &[ManagedAlertRule]) -> String {
-    let unit = metric_unit(alert.metric);
-    let clear_band = match rules
+/// The hysteresis clear band joined from the canonical rule set. A rule that
+/// left the set omits the band honestly instead of inventing one.
+fn alert_clear_band(alert: &Alert, rules: &[ManagedAlertRule]) -> String {
+    match rules
         .iter()
         .find(|managed| managed.rule.id == alert.rule_id)
     {
         Some(managed) => format!(
             " (clears ≤ {:.1}{})",
             managed.rule.threshold - managed.rule.hysteresis,
-            unit
+            metric_unit(alert.metric)
         ),
         None => " (rule not in set; clear band unknown)".to_owned(),
-    };
-    format!(
-        "{} · {} — {:.1}{} ≥ {:.1}{}{}",
-        severity_label(alert.severity),
-        alert.target,
-        alert.value,
-        unit,
-        alert.threshold,
-        unit,
-        clear_band
+    }
+}
+
+/// The active-alert banner's two bounded rows: the headline (severity and
+/// target) and the firing detail (the comparison and its clear band). The
+/// banner splits the one-line projection so each row keeps its own bounded
+/// slot instead of one long value wrapping through the whole banner.
+pub(crate) fn active_alert_banner_rows(
+    alert: &Alert,
+    rules: &[ManagedAlertRule],
+) -> (String, String) {
+    let unit = metric_unit(alert.metric);
+    (
+        format!("{} · {}", severity_label(alert.severity), alert.target),
+        format!(
+            "{:.1}{} ≥ {:.1}{}{}",
+            alert.value,
+            unit,
+            alert.threshold,
+            unit,
+            alert_clear_band(alert, rules)
+        ),
     )
 }
 
@@ -287,7 +314,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         active_alerts
             .iter()
             .map(|alert| {
-                Box::new(active_row_scene(active_alert_line(alert, rules))) as Box<dyn Scene>
+                let (headline, detail) = active_alert_banner_rows(alert, rules);
+                Box::new(banner::scene(alert, headline, detail, context.palette)) as Box<dyn Scene>
             })
             .collect()
     };
@@ -310,6 +338,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             .map(|event| Box::new(event_row_scene(event_history_line(event))) as Box<dyn Scene>)
             .collect()
     };
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(context.palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
     bsn! {
         Node {
             width: percent(100),
@@ -323,11 +353,17 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
              Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) --
              Text(summary) TextRole(Role::Caption) --
             @{ toolbar } --
-            Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_shrink: 1.0, flex_direction: FlexDirection::Column, overflow: Overflow::clip() }
-            ScrollArea
+            // The viewport wrapper owns the scroll area AND the floating
+            // rail: the rail is a sibling of the scroll area, so it never
+            // scrolls with the content and never takes layout space away
+            // from it.
+            Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_shrink: 1.0, flex_direction: FlexDirection::Column }
             Children [
-            Node { width: percent(100), flex_direction: FlexDirection::Column, row_gap: px(space_8()) }
-            Children [
+                Node { width: percent(100), height: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_shrink: 1.0, flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: { lane } }
+                ScrollArea
+                Children [
+                Node { width: percent(100), flex_direction: FlexDirection::Column, row_gap: px(space_8()) }
+                Children [
              Text("Active alerts") TextRole(Role::Caption) --
             { active_rows }--
              Text("Rules") TextRole(Role::Caption) --
@@ -336,8 +372,11 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             { event_rows }
             ]
             ] --
+            @{ rail }
+            ] --
             { EntityScene(page_observer(alerts_fold_observer)) }--
-            { EntityScene(page_observer(rule_toggle_observer)) }
+            { EntityScene(page_observer(rule_toggle_observer)) }--
+            { EntityScene(page_observer(editor::threshold_slider_observer)) }
         ]
     }
 }
@@ -369,15 +408,6 @@ fn empty_active_scene() -> impl Scene + use<> {
     }
 }
 
-fn active_row_scene(line: String) -> impl Scene + use<> {
-    bsn! {
-        Node { width: percent(100), height: Val::Auto }
-        Children [
-             Text(line) TextRole(Role::Body)
-        ]
-    }
-}
-
 /// One rule row per canonical rule: an official `Checkbox` primitive whose
 /// `Checked` marker mirrors the canonical enabled state, plus the row text.
 /// The two shapes (checked/unchecked) differ by one marker component, so the
@@ -392,6 +422,26 @@ fn rule_rows(rules: &[ManagedAlertRule], palette: &UiPalette) -> Vec<Box<dyn Sce
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/banner.rs"]
+mod banner_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/slider.rs"]
+mod slider_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/toast.rs"]
+mod toast_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/severity.rs"]
+mod severity_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/alerts/pause.rs"]
+mod pause_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts/effects.rs"]
