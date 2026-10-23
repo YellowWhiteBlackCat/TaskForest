@@ -14,7 +14,7 @@ fn measured(text: &str) -> f32 {
 
 #[test]
 fn a_long_mount_path_is_middle_ellipsized_inside_its_slot() {
-    let mount = "/run/media/very-long-user-name/Some Volume Name";
+    let mount = "/run/media/<user>/Some Very Long Volume Name";
     let elided = middle_ellipsize(mount, MOUNT_SLOT_WIDTH);
     assert!(
         elided.contains('\u{2026}'),
@@ -51,7 +51,7 @@ fn a_mount_path_that_fits_is_left_untouched() {
 fn the_partition_identity_keeps_the_volume_name_and_the_filesystem() {
     let partition = DiskPartitionFixtureBuilder::new()
         .name("nvme0n1p2".into())
-        .mount_point("/run/media/very-long-user-name/Some Volume Name".into())
+        .mount_point("/run/media/<user>/Some Very Long Volume Name".into())
         .build();
     let label = partition_label(&partition, MOUNT_SLOT_WIDTH);
     assert!(
