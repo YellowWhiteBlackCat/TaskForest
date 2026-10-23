@@ -41,6 +41,8 @@ jobs:
     name: macOS (compile + lib tests; no packaging)
     runs-on: macos-latest
     timeout-minutes: 120
+    env:
+      RUSTFLAGS: -D warnings -C link-arg=-Wl,-no_compact_unwind
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.99.0

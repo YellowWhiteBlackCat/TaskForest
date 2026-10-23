@@ -44,3 +44,7 @@ gates-test = "nextest run -p taskmanager-gates --test logic --test performance -
 
 [net]
 git-fetch-with-cli = true
+
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-Wl,-no_compact_unwind"]
+
