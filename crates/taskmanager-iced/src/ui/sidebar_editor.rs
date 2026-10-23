@@ -1,11 +1,11 @@
 //! Fixed editor actions around one bounded, scrollable device list.
 
-use super::components::IcedElement;
+use super::components::{IcedElement, styled_scrollable};
 use super::overlays::bounded_modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use iced::Length;
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, row, text};
 use taskmanager_application::i18n::t;
 
 pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
@@ -62,7 +62,7 @@ pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
     bounded_modal_overlay(
         app,
         t("sidebar.edit_devices"),
-        scrollable(body)
+        styled_scrollable(body)
             .height(Length::Fill)
             .width(Length::Fill)
             .into(),

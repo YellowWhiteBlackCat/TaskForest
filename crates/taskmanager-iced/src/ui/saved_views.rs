@@ -7,14 +7,14 @@
 //! own bounds, so the table's view stays still while the pointer is over
 //! the ribbon.
 
-use super::components::IcedElement;
+use super::components::{IcedElement, styled_scrollable};
 use super::overlays::bounded_modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use iced::Length;
 use iced::advanced::widget::{self, Tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout};
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, row, text};
 use iced::{Element, Event, Rectangle, Size};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::saved_views::{feedback_text, review_rows};
@@ -199,7 +199,7 @@ pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
         // gesture the region cannot consume (at its end) never scrolls the
         // page behind the modal.
         wheel_guard(
-            scrollable(body)
+            styled_scrollable(body)
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .into(),

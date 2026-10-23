@@ -3,7 +3,7 @@
 use super::*;
 use crate::IcedApp;
 use crate::saved_views::{PresetsRibbonState, presets_ribbon};
-use iced::widget::scrollable::{Direction, Scrollbar};
+use iced::widget::scrollable::Direction;
 use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
 use taskmanager_core::core::process::ProcessBatchAction;
@@ -198,8 +198,8 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         table_body,
         Length::Fixed(table_extent),
         Direction::Both {
-            vertical: Scrollbar::default(),
-            horizontal: Scrollbar::default(),
+            vertical: crate::theme::scrollbar(),
+            horizontal: crate::theme::scrollbar(),
         },
         Message::ApplicationsScrolled,
     );
@@ -343,7 +343,8 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                 // table retains a real row viewport. The full action vocabulary
                 // remains reachable through its own horizontal scroll axis.
                 scrollable(row(actions).spacing(8))
-                    .direction(Direction::Horizontal(Scrollbar::default()))
+                    .direction(Direction::Horizontal(crate::theme::scrollbar()))
+                    .style(crate::theme::scrollbar_style)
                     .height(Length::Fixed(40.0))
                     .width(Length::Fill)
                     .into()

@@ -97,7 +97,7 @@ pub(crate) fn performance_page(
             (CompactDetailViewport::Scrollable, DeviceNavigationPresentation::Sidebar)
             | (CompactDetailViewport::Elastic, _) => perf_detail(app, selected, budget),
             (CompactDetailViewport::Scrollable, DeviceNavigationPresentation::Strip) => {
-                scrollable(perf_detail(app, selected, budget))
+                crate::ui::components::styled_scrollable(perf_detail(app, selected, budget))
                     .width(iced::Length::Fill)
                     .height(iced::Length::Fill)
                     .into()
@@ -334,8 +334,9 @@ fn performance_sidebar<'a>(
             scrollable(body)
                 .id(app.performance_rail_scroll_id())
                 .direction(iced::widget::scrollable::Direction::Horizontal(
-                    iced::widget::scrollable::Scrollbar::default(),
+                    theme::scrollbar(),
                 ))
+                .style(theme::scrollbar_style)
                 .height(iced::Length::Fixed(44.0))
                 .width(iced::Length::Fill)
                 .on_scroll(Message::PerformanceRailScrolled)
@@ -361,14 +362,9 @@ fn performance_sidebar<'a>(
             ))
             .id(app.performance_rail_scroll_id())
             .direction(iced::widget::scrollable::Direction::Vertical(
-                // The nested rail scrollbar is thinned to the stats-rail
-                // gauge (4px): a default-width bar inside the card stack read
-                // as a broken double-segment element against the outer page
-                // scrollbar (ICED-024 目检项 21).
-                iced::widget::scrollable::Scrollbar::new()
-                    .width(4)
-                    .scroller_width(4),
+                theme::compact_scrollbar(),
             ))
+            .style(theme::compact_scrollbar_style)
             .height(iced::Length::Fill)
             .width(iced::Length::Fill)
             .on_scroll(Message::PerformanceRailScrolled)

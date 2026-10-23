@@ -14,7 +14,7 @@
 //! hardcoding a terminal/desktop literal.
 
 use crate::theme_binding::color;
-use iced::widget::{button, container};
+use iced::widget::{button, container, scrollable};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{Color, Theme, tokens};
@@ -461,6 +461,176 @@ pub fn row_padding(compact: bool) -> iced::Padding {
 #[must_use]
 pub fn table_column_spacing() -> f32 {
     f32::from(tokens::SPACE_8)
+}
+
+/// Standard scrollbar for full-page and inventory views (BEVY/GPUI parity):
+/// 6.0px width, 2.0px margin from outer edge, 2.0px spacing.
+/// Floating, capsule-proportioned layout affordance.
+#[must_use]
+pub fn scrollbar() -> scrollable::Scrollbar {
+    scrollable::Scrollbar::new()
+        .width(6.0)
+        .scroller_width(6.0)
+        .margin(2.0)
+        .spacing(2.0)
+}
+
+/// Compact scrollbar for nested cards (Performance panels, small embedded lists):
+/// 4.0px width, 1.0px margin, 1.0px spacing.
+#[must_use]
+pub fn compact_scrollbar() -> scrollable::Scrollbar {
+    scrollable::Scrollbar::new()
+        .width(4.0)
+        .scroller_width(4.0)
+        .margin(1.0)
+        .spacing(1.0)
+}
+
+/// Product-owned scrollable style: translucent floating track + capsule thumb.
+/// Fully token-derived, matching the Bevy UI and GPUI component layers.
+#[must_use]
+pub fn scrollbar_style(theme: &iced::Theme, status: scrollable::Status) -> scrollable::Style {
+    build_scrollbar_style(theme, status, 3.0, 0.08, 0.38)
+}
+
+/// Compact scrollable style with tighter capsule radii for dense card viewports.
+#[must_use]
+pub fn compact_scrollbar_style(
+    theme: &iced::Theme,
+    status: scrollable::Status,
+) -> scrollable::Style {
+    build_scrollbar_style(theme, status, 2.0, 0.08, 0.38)
+}
+
+fn build_scrollbar_style(
+    theme: &iced::Theme,
+    status: scrollable::Status,
+    radius: f32,
+    rail_alpha: f32,
+    thumb_alpha: f32,
+) -> scrollable::Style {
+    let palette = theme.palette();
+    let (is_v_disabled, is_h_disabled, is_v_interacted, is_h_interacted) = match status {
+        scrollable::Status::Active {
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+        } => (
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+            false,
+            false,
+        ),
+        scrollable::Status::Hovered {
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+            is_vertical_scrollbar_hovered,
+            is_horizontal_scrollbar_hovered,
+        } => (
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+            is_vertical_scrollbar_hovered,
+            is_horizontal_scrollbar_hovered,
+        ),
+        scrollable::Status::Dragged {
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+            is_vertical_scrollbar_dragged,
+            is_horizontal_scrollbar_dragged,
+        } => (
+            is_vertical_scrollbar_disabled,
+            is_horizontal_scrollbar_disabled,
+            is_vertical_scrollbar_dragged,
+            is_horizontal_scrollbar_dragged,
+        ),
+    };
+
+    let v_thumb_alpha = if is_v_interacted {
+        (thumb_alpha * 1.5).min(0.75)
+    } else {
+        thumb_alpha
+    };
+    let v_rail_alpha = if is_v_interacted {
+        (rail_alpha * 1.6).min(0.20)
+    } else {
+        rail_alpha
+    };
+
+    let h_thumb_alpha = if is_h_interacted {
+        (thumb_alpha * 1.5).min(0.75)
+    } else {
+        thumb_alpha
+    };
+    let h_rail_alpha = if is_h_interacted {
+        (rail_alpha * 1.6).min(0.20)
+    } else {
+        rail_alpha
+    };
+
+    let v_rail = scrollable::Rail {
+        background: if is_v_disabled {
+            None
+        } else {
+            Some(iced::Background::Color(iced::Color {
+                a: v_rail_alpha,
+                ..palette.text
+            }))
+        },
+        border: iced::Border {
+            radius: radius.into(),
+            ..iced::Border::default()
+        },
+        scroller: scrollable::Scroller {
+            background: if is_v_disabled {
+                iced::Background::Color(iced::Color::TRANSPARENT)
+            } else {
+                iced::Background::Color(iced::Color {
+                    a: v_thumb_alpha,
+                    ..palette.text
+                })
+            },
+            border: iced::Border {
+                radius: radius.into(),
+                ..iced::Border::default()
+            },
+        },
+    };
+
+    let h_rail = scrollable::Rail {
+        background: if is_h_disabled {
+            None
+        } else {
+            Some(iced::Background::Color(iced::Color {
+                a: h_rail_alpha,
+                ..palette.text
+            }))
+        },
+        border: iced::Border {
+            radius: radius.into(),
+            ..iced::Border::default()
+        },
+        scroller: scrollable::Scroller {
+            background: if is_h_disabled {
+                iced::Background::Color(iced::Color::TRANSPARENT)
+            } else {
+                iced::Background::Color(iced::Color {
+                    a: h_thumb_alpha,
+                    ..palette.text
+                })
+            },
+            border: iced::Border {
+                radius: radius.into(),
+                ..iced::Border::default()
+            },
+        },
+    };
+
+    scrollable::Style {
+        container: container::Style::default(),
+        vertical_rail: v_rail,
+        horizontal_rail: h_rail,
+        gap: None,
+        auto_scroll: scrollable::default(theme, status).auto_scroll,
+    }
 }
 
 #[cfg(test)]

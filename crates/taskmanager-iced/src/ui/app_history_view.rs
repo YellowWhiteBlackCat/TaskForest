@@ -3,9 +3,10 @@
 use super::*;
 use crate::app::AppHistoryRowModel;
 use crate::app_history_chart::{SPARK_HEIGHT, Sparkline};
+use crate::ui::components::styled_scrollable;
 use crate::{focus, theme};
 use iced::Length;
-use iced::widget::{canvas, column, container, row, scrollable, text};
+use iced::widget::{canvas, column, container, row, text};
 use std::rc::Rc;
 use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus};
 use taskmanager_core::core::history::HistoryWindow;
@@ -103,7 +104,7 @@ pub(super) fn app_history_page(
     )
     .width(Length::Fill)
     .style(move |_| theme::panel_style(theme_snapshot));
-    let panel = scrollable(panel)
+    let panel = styled_scrollable(panel)
         .id(app.app_history_scroll_id())
         .height(Length::Fill)
         .width(Length::Fill)

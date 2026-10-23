@@ -5,7 +5,7 @@
 //! advertises exactly the keybindings wired by the shared router and the
 //! frontend-local `F1` / `?` opener.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{CommandHelp, PageHelp, command_help, page_help};
@@ -14,6 +14,7 @@ use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration,
 
 use crate::app::Message;
 use crate::theme;
+use crate::ui::components::styled_scrollable;
 
 /// The Iced frontend's binding-surface declaration (contract:
 /// `taskmanager_ui_contract` keybindings matrix — every contract command
@@ -80,7 +81,7 @@ pub(crate) fn help_overlay<'a>(
         theme_snapshot,
         t("settings.keyboard"),
         t("settings.keyboard_subtitle"),
-        scrollable(body)
+        styled_scrollable(body)
             .height(Length::Fixed(380.0))
             .width(Length::Fill)
             .into(),

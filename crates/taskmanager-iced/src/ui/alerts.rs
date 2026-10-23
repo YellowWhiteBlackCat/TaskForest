@@ -9,7 +9,7 @@
 //! `alert.*` catalog keys the TUI suggestions overlay and the GPUI rule
 //! manager already consume.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::i18n::t;
@@ -22,6 +22,7 @@ mod editor;
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use crate::ui::components::styled_scrollable;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -104,7 +105,9 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
     column![
         heading,
-        scrollable(body).width(Length::Fill).height(Length::Fill)
+        styled_scrollable(body)
+            .width(Length::Fill)
+            .height(Length::Fill)
     ]
     .spacing(f32::from(tokens::SPACE_8))
     .height(Length::Fill)

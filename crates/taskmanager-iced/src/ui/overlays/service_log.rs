@@ -1,6 +1,6 @@
 //! Service log overlay for Iced.
 
-use iced::widget::{column, row, scrollable, text};
+use iced::widget::{column, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::services::{
@@ -13,6 +13,7 @@ use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::focus;
+use crate::ui::components::styled_scrollable;
 use taskmanager_theme::Theme;
 
 /// Render the shared service-log feed as an Iced modal.
@@ -103,7 +104,7 @@ pub(crate) fn service_log_overlay<'a>(
         ))
         .size(f32::from(tokens::FONT_13)),
         controls,
-        scrollable(column(lines).spacing(4))
+        styled_scrollable(column(lines).spacing(4))
             .height(Length::Fixed(330.0))
             .width(Length::Fill),
     ]

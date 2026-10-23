@@ -1,6 +1,6 @@
 //! Review the frozen sanitized plan before explicit background publication.
 
-use iced::widget::{column, scrollable, text};
+use iced::widget::{column, text};
 use iced::{Element, Length};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
@@ -12,6 +12,7 @@ use taskmanager_theme::tokens;
 use super::bounded_modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
+use crate::ui::components::styled_scrollable;
 
 pub(crate) fn diagnostic_bundle_overlay<'a>(
     app: &'a crate::IcedApp,
@@ -36,7 +37,7 @@ pub(crate) fn diagnostic_bundle_overlay<'a>(
         DiagnosticBundleUiState::Failed(error) => diagnostic_failure_message(error),
     };
     body = body.push(
-        scrollable(text(contents).size(f32::from(tokens::FONT_BODY)))
+        styled_scrollable(text(contents).size(f32::from(tokens::FONT_BODY)))
             .height(Length::Fill)
             .width(Length::Fill),
     );

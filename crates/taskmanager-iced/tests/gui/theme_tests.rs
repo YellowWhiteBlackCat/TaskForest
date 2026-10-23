@@ -337,3 +337,79 @@ fn high_contrast_mode_strengthens_iced_borders_and_text() {
     );
     assert_eq!(hc_border.a, 1.0, "high contrast border is fully opaque");
 }
+
+#[test]
+fn scrollbar_geometry_contract_aligns_with_bevy_and_gpui() {
+    let std_bar = scrollbar();
+    // 6px width + 2px margin + 2px end spacing for full-page views
+    let compact_bar = compact_scrollbar();
+    // 4px width + 1px margin + 1px end spacing for nested cards
+    assert_ne!(std_bar, compact_bar);
+}
+
+#[test]
+fn scrollbar_style_implements_capsule_and_translucent_rail() {
+    let theme = Theme::build(
+        Skin::Gnome,
+        LightDark::Dark,
+        HighContrast::Off,
+        ResolvedFonts::system_for(Skin::Gnome),
+    );
+    let iced = iced_theme(&theme);
+
+    // Active state with overflowing content (both enabled)
+    let active_status = scrollable::Status::Active {
+        is_vertical_scrollbar_disabled: false,
+        is_horizontal_scrollbar_disabled: false,
+    };
+    let style = scrollbar_style(&iced, active_status);
+
+    // Both rails and scrollers wear the 3.0px capsule radius
+    assert_eq!(style.vertical_rail.border.radius, 3.0.into());
+    assert_eq!(style.vertical_rail.scroller.border.radius, 3.0.into());
+    assert_eq!(style.horizontal_rail.border.radius, 3.0.into());
+    assert_eq!(style.horizontal_rail.scroller.border.radius, 3.0.into());
+
+    // Rails float with a subtle translucent wash
+    let v_bg = style
+        .vertical_rail
+        .background
+        .expect("active rail has background");
+    match v_bg {
+        iced::Background::Color(c) => {
+            assert!(
+                c.a > 0.0 && c.a <= 0.15,
+                "rail must be quiet and translucent"
+            );
+        }
+        _ => panic!("rail background should be solid color"),
+    }
+
+    // Scroller thumb is translucent and legible
+    match style.vertical_rail.scroller.background {
+        iced::Background::Color(c) => {
+            assert!(
+                c.a >= 0.25 && c.a <= 0.60,
+                "thumb must have moderate translucency"
+            );
+        }
+        _ => panic!("scroller background should be solid color"),
+    }
+
+    // Disabled state (no overflowing content) hides rail and scroller
+    let disabled_status = scrollable::Status::Active {
+        is_vertical_scrollbar_disabled: true,
+        is_horizontal_scrollbar_disabled: true,
+    };
+    let disabled_style = scrollbar_style(&iced, disabled_status);
+    assert!(disabled_style.vertical_rail.background.is_none());
+    assert_eq!(
+        disabled_style.vertical_rail.scroller.background,
+        iced::Background::Color(iced::Color::TRANSPARENT)
+    );
+
+    // Compact style wears a 2.0px radius for 4px tracks
+    let compact = compact_scrollbar_style(&iced, active_status);
+    assert_eq!(compact.vertical_rail.border.radius, 2.0.into());
+    assert_eq!(compact.vertical_rail.scroller.border.radius, 2.0.into());
+}

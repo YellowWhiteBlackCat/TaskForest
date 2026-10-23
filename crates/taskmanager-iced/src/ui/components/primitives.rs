@@ -14,7 +14,7 @@
 //! state-panel icon tile) stay commented cross-frontend layout contracts.
 
 use iced::widget::{column, container, row, text};
-use iced::{Alignment, Border, Length};
+use iced::{Alignment, Border, Element, Length};
 use taskmanager_theme::color::on_accent;
 use taskmanager_theme::{Color, Theme, tokens};
 use taskmanager_ui_contract::IconId;
@@ -350,6 +350,31 @@ fn state_panel_style(theme: &Theme, tone: iced::Color) -> container::Style {
     let mut style = theme::panel_style(theme);
     style.border.color = tone;
     style
+}
+
+/// A product-styled scrollable with capsule thumb, translucent floating rail,
+/// and safe margins (GPUI/Bevy parity).
+#[must_use]
+pub(crate) fn styled_scrollable<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
+) -> iced::widget::Scrollable<'a, Message, iced::Theme, iced::Renderer> {
+    iced::widget::scrollable(content)
+        .direction(iced::widget::scrollable::Direction::Vertical(
+            theme::scrollbar(),
+        ))
+        .style(theme::scrollbar_style)
+}
+
+/// A compact product-styled scrollable for nested cards or tight viewports.
+#[must_use]
+pub(crate) fn styled_compact_scrollable<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
+) -> iced::widget::Scrollable<'a, Message, iced::Theme, iced::Renderer> {
+    iced::widget::scrollable(content)
+        .direction(iced::widget::scrollable::Direction::Vertical(
+            theme::compact_scrollbar(),
+        ))
+        .style(theme::compact_scrollbar_style)
 }
 
 #[cfg(test)]

@@ -6,6 +6,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.4.1] — 2026-10-23
+
+### 改进
+
+- **Iced 前端（I）滚动条全景美化与视觉对齐**：
+  - **几何与尺寸规范**：在 `taskmanager-iced::theme` 中新增统一的 `scrollbar()` 与 `compact_scrollbar()` 构造工厂，将贴边 10px 粗条升级为 6px/4px 紧凑型胶囊滚动条，并附带 2px 视口安全留白（margin）与两端间距（spacing），与 Bevy UI（0.5rem / 8px）及 GPUI（6px 静止 / 10px 悬停加粗）的精致度全面对齐。
+  - **主题与状态驱动质感**：实现 `scrollbar_style` 与 `compact_scrollbar_style`，为滚动条引入全胶囊圆角（3.0px / 2.0px）、半透明浮动轨道底色（0.08 alpha）以及哑光胶囊滑块（0.38 alpha）；支持基于 `scrollable::Status` 的指针悬停与拖拽交互高亮反馈（0.55 ~ 0.70 alpha），无溢出内容时自动隐藏轨道与滑块。
+  - **全量业务视口覆盖**：新增 `styled_scrollable` 与 `styled_compact_scrollable` 封装，全仓替换进程、服务、启动项、用户四大虚拟数据表格，以及设置中心、系统硬件信息、导航轨道、性能监控与设备卡片、多核矩阵视图、容器页、告警中心、CPU亲和性面板、服务日志与各类浮层对话框中的原生贴边滚动条。
+  - **契约与测试覆盖**：更新 Iced 能力契约声明并新增主题滚动条几何与样式自动化单元测试，确保各状态下圆角半径与透明度严格符合设计约束。
+
 ## [0.4.0] — 2026-10-22
 
 > 本次为**破坏性次版本**：0.x 阶段的次版本号承载破坏性变更。本版本对已发布 crate 的

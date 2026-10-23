@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry};
-use iced::widget::{Space, column, container, row, scrollable, stack, text};
+use iced::widget::{Space, column, container, row, stack, text};
 use iced::{Color, Length, Point, Rectangle, Size};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -38,6 +38,7 @@ use taskmanager_theme::{Theme, tokens};
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_runs};
 use crate::theme;
+use crate::ui::components::styled_scrollable;
 use taskmanager_core::core::hardware::CpuType;
 
 /// Cells per row in the grid.
@@ -230,7 +231,7 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
     // The chart card and stats rail retain their fixed outer bounds. The
     // complete core matrix owns the bounded residual viewport so every
     // logical core stays reachable even when the 300px headline is pinned.
-    scrollable(
+    styled_scrollable(
         container(column(vec![
             row(header_items)
                 .spacing(8)

@@ -1,11 +1,11 @@
 //! Independent review of cached system information, with complete-value copies.
 
-use super::components::IcedElement;
+use super::components::{IcedElement, styled_scrollable};
 use super::overlays::bounded_modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use iced::Length;
-use iced::widget::{column, scrollable, text};
+use iced::widget::{column, text};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::system_information::SystemInformationGroup;
 
@@ -30,7 +30,7 @@ pub(super) fn render<'a>(
             );
         }
     }
-    let body = scrollable(body)
+    let body = styled_scrollable(body)
         .height(Length::Fill)
         .width(Length::Fill)
         .into();
