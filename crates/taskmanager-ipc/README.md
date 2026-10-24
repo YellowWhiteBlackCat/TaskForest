@@ -21,7 +21,7 @@ enforces a 16 MiB ceiling against memory exhaustion.
 Deterministic behavior is verified via headless integration tests covering UDS handshake,
 bi-directional telemetry streaming, and high-frequency throughput.
 
-## Module Map
+## Module map
 
 ```text
 src/

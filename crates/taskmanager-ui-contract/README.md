@@ -51,16 +51,14 @@ src/feature_coverage.rs          FeatureId/FeatureArea coverage registry and the
 src/feature_coverage/            delivery semantic specs, per-feature platform
                                  binding, and the read-only three-axis ledger fold
 src/accessibility/               neutral accessibility model and snapshots
+src/conformance.rs               conformance suite contracts and test helpers
 ```
 
 ## Docs
 
 - [`docs/CAPABILITY_REGISTRY.md`](docs/CAPABILITY_REGISTRY.md) — capability semantic specs,
   navigation vocabulary and the feature-coverage ledger.
+- [`docs/ACCESSIBILITY_PROCESS_ROWS.md`](docs/ACCESSIBILITY_PROCESS_ROWS.md) — typed process
+  observations, aggregate coverage, and tree action identity.
 - [`UI_COMPONENT_ARCHITECTURE`](../../docs/UI_COMPONENT_ARCHITECTURE.md) and
   [ADR-046](../../adr/046-bevy-fourth-shared-contract-shape.md) — shared contract shape.
-
-
-## Process row semantic inputs
-
-See [`docs/ACCESSIBILITY_PROCESS_ROWS.md`](docs/ACCESSIBILITY_PROCESS_ROWS.md) for typed process observations, aggregate coverage, and tree action identity.

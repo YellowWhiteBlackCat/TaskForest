@@ -32,17 +32,17 @@ crates/*/docs/*.md       crate 专题章程：单个 crate 的深层细节，由
 | 新增/修改领域事实、标量或可选语义 | [SCALAR_AVAILABILITY](SCALAR_AVAILABILITY.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[WIRE_DOMAIN_BOUNDARIES](WIRE_DOMAIN_BOUNDARIES.md)、[core README](../crates/taskmanager-core/README.md) | 015 016 011 |
 | 改平台采集 / 新增数据源 | [CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 对应能力行、[platform-contract](../crates/taskmanager-platform-contract/README.md)、对应平台 adapter README | 006 007 009 010 011 013 043 044 |
 | 改调度 / 并发 / 事件投递 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[platform-runtime README](../crates/taskmanager-platform-runtime/README.md) | 008 033 |
-| 改历史 / 图表数据 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[telemetry-store](../crates/taskmanager-telemetry-store/README.md)、[history-store](../crates/taskmanager-history-store/README.md) | 014 036 |
+| 改历史 / 图表数据 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[telemetry-store](../crates/taskmanager-telemetry-store/README.md)、[history-store](../crates/taskmanager-history-store/README.md) | 014 036 055 |
 | 改前端交互 / UI 组件 | [ARCH](ARCH.md) §8、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、[SHARED_UI_PACKAGES](SHARED_UI_PACKAGES.md)、shell / ui / ui-contract / 对应前端 README | 017 020 026 027 028 038 039 042 046 051 |
 | 改弹性布局 / 密集详情 / 响应式预算 | [ELASTIC_LAYOUT_PLAYBOOK](ELASTIC_LAYOUT_PLAYBOOK.md)、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、[QUALITY_GATES](QUALITY_GATES.md) | 038 039 |
-| 动权限 / unsafe / helper | [PERMISSION_MODEL](PERMISSION_MODEL.md)、[escalation](../crates/taskmanager-escalation/README.md) 与对应 helper README | 018 019 022 023 024 025 031 035 048 049 |
+| 动权限 / unsafe / helper | [PERMISSION_MODEL](PERMISSION_MODEL.md)、[escalation](../crates/taskmanager-escalation/README.md) 与对应 helper README | 018 019 022 023 024 025 031 035 048 049 055 056 |
 | 改宿主组合 / 窗口 / 托盘 | [HOST_ARCHITECTURE](HOST_ARCHITECTURE.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[app-host](../crates/taskmanager-app-host/README.md)、[platform-native](../crates/taskmanager-platform-native/README.md) | 029 032 037 040 051 |
 | 改配置 / saved-view / 启动流程 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[application README](../crates/taskmanager-application/README.md) | 036 040 |
-| 改打包 / 安装 / 发布 | [RELEASE](RELEASE.md)、[SYSTEM_INSTALL_MANIFEST](SYSTEM_INSTALL_MANIFEST.md)、[PRODUCT_IDENTITY](PRODUCT_IDENTITY.md) | 006 029 044 045 051 |
+| 改打包 / 安装 / 发布 | [RELEASE](RELEASE.md)、[SYSTEM_INSTALL_MANIFEST](SYSTEM_INSTALL_MANIFEST.md)、[PRODUCT_IDENTITY](PRODUCT_IDENTITY.md) | 006 044 045 051 |
 | 新增前端 / 改产品组合 | [ARCH](ARCH.md) §2/§6、[taskmanager-cli README](../crates/taskmanager-cli/README.md)、对应前端 README | 051 |
-| 四端语义对等与验收 | [ARCH.md](ARCH.md)、[UI_PARITY_AUDIT.md](UI_PARITY_AUDIT.md)、[QUALITY_GATES.md](QUALITY_GATES.md) | 004 016 027 051 |
+| 四端语义对等与验收 | [ARCH.md](ARCH.md)、[UI_PARITY_AUDIT.md](UI_PARITY_AUDIT.md)、[QUALITY_GATES.md](QUALITY_GATES.md) | 016 027 051 053 054 |
 | 新增测试 / 改测试布局 | [TEST_LAYOUT](TEST_LAYOUT.md)、[STANDARDS](STANDARDS.md) §3 | — |
-| 改文档 / 流程 / 门禁 | 本页、[QUALITY_GATES](QUALITY_GATES.md) | — |
+| 改文档 / 流程 / 门禁 | 本页、[QUALITY_GATES](QUALITY_GATES.md) | 056 057 058 |
 
 任何代码改动最终都要过 [QUALITY_GATES.md](QUALITY_GATES.md) 的本地门禁；文档与公开
 边界的机械检查见其 §3、§4。

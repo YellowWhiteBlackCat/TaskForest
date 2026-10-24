@@ -40,7 +40,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [032](032-tray-neutral-contract-and-multi-adapter.md) | Tray-neutral contract, multi-adapter | Tray vocabulary is a neutral core contract; Linux uses ksni, Windows/macOS share tray-muda. | UI, Platform |
 | [033](033-bevy-ecs-runtime-scheduling-kernel.md) | Bevy ECS scheduling kernel | Bevy ECS schedules capability work only inside platform-runtime; ports and lanes are unchanged. | Runtime |
 | [035](035-windows-uac-foreign-process-control-transport.md) | Windows UAC control transport | Foreign-process control uses `ShellExecuteExW("runas")` launching the fixed helper each time with creation-token revalidation; no fifth unsafe boundary. | Privilege, Process |
-| [036](036-in-process-history-persistence.md) | In-process opt-in history persistence | The enabled frontend session owns the history writer (current writer-ownership decision); opt-in, default off; no standalone collector or service. | History |
+| [036](036-in-process-history-persistence.md) | In-process opt-in history persistence | The enabled frontend session owns the history writer in standalone fallback mode; extended by ADR-055 daemon architecture. | History |
 | [037](037-parallel-frontend-hosts-and-layer-shell-contract.md) | Parallel hosts and layer-shell contract | Every graphical frontend keeps parallel standalone and layer-shell host paths; the neutral surface contract lives in app-host. | Frontend, Layering |
 | [038](038-gpui-frame-content-budget.md) | GPUI frame content budget | The GPUI root computes an immutable FrameBudget per frame minus real shell areas; ContentBudget drives page strategies. | Frontend, Perf |
 | [039](039-performance-page-composition-root.md) | Performance page composition root | `perf_views::layout` is the single Performance composition root; ChartSpec+ChartTier define card contracts; three parallel page shells are retired. | Frontend, Perf |
@@ -68,14 +68,15 @@ existing ADRs: cross-references and history depend on stable numbers.
 
 - ADR-011 supersedes ADR-007's provisional statement about a cohesive system-snapshot
   cadence; ADR-007's facet/registry rules remain in force.
-- ADR-036 is the current writer-ownership decision for opt-in history persistence and
-  replaces the earlier standalone-collector arrangement; ADR-014's refresh-policy
-  ownership still stands.
+- ADR-036 defines the standalone in-process writer-ownership fallback; ADR-055
+  extends Rule 6 by introducing `taskforest-daemon` as the background persistence
+  service; ADR-014's refresh-policy ownership still stands.
 - ADR-039 is the current Performance-page composition root and retires the three
   parallel page shells.
 - ADR-042 is the current data-page composition decision and retires per-page outer
   wrappers; the chart-page root stays ADR-039 and page identity stays ADR-027.
-- ADR-046 keeps ADR-029's one-binary contract unchanged while adding Bevy.
+- ADR-046 adds Bevy as the fourth peer frontend (its one-binary clause was
+  subsequently superseded by ADR-051's four-product binary model).
 - ADR-051 supersedes ADR-029's feature matrix and one-binary dispatch (the unified CLI
   survives in `taskmanager-cli`) and amends ADR-026's feature-gated-bindings clause;
   ADR-046's Bevy peer-crate model becomes the pattern for every frontend.

@@ -10,17 +10,13 @@ systemd/OpenRC, SMART, hwmon, DRM, cgroup and Linux controls.
 The crate translates Linux facts into platform contracts; it never exposes
 Linux paths, raw handles or provider choice to core/application/frontends.
 Privilege flows through escalation helpers and stable identity checks.
+`src/backend/` groups application-port implementations, `src/engine/` owns bounded
+I/O engines, and `src/provider/` registers implementations into the platform SPI.
 
 Display, compositor, package, GPU and capture enrichments are
 capability-optional and never fabricate support; their rules and the
 Linux-not-cross-platform-evidence rule live in
 [`docs/CAPABILITY_ENRICHMENTS.md`](docs/CAPABILITY_ENRICHMENTS.md).
-
-## Key modules
-
-- `src/backend/` groups application-port implementations by capability family.
-- `src/engine/` owns bounded `/proc`, `/sys`, command, hardware and control engines.
-- `src/provider/` registers the Linux implementations and translates them into the platform SPI.
 
 ## Contract and verification
 

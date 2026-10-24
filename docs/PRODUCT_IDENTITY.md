@@ -26,7 +26,7 @@ typed 缺席作答（`CapabilityId::EXPECTED_SURFACE`，机制见
 ## 程序与兼容名称
 
 仓库和 crate 仍使用 `taskmanager` / `taskmanager-*` 内部名称，以保持配置、包和升级兼容。
-Linux 发行包安装的主桌面可执行文件是 `taskforest-g`；兼容 CLI 名称为 `taskmanager`。
+Linux 发行包安装各前端对应的可执行文件（`taskforest-g`、`taskforest-i`、`taskforest-t`、`taskforest-b`）；兼容 CLI 名称为 `taskmanager`。
 
 公开安装与产品说明只使用上表中的 TaskForest 标识；兼容名称只保留在必要的内部实现边界。
 
@@ -82,7 +82,7 @@ PNG、ICNS、ICO 和内嵌 RGBA 都是派生产物，不允许手工维护平台
 - Wayland `app_id` 与 `.desktop` 文件名及 reverse-DNS 图标全量一致；
 - 桌面包同时安装可执行文件、desktop entry、AppStream metadata 和 hicolor 阶梯图标；
 - macOS 只把完整 `.app` bundle 视为安装形态；
-- Windows MSI 使用固定 UpgradeCode，并为 GPUI 可执行文件建立开始菜单入口；
+- Windows MSI 使用固定 UpgradeCode，并为对应前端可执行文件建立开始菜单入口；
 - 用户级开发安装与系统包由不同所有权回执管理，不能互相删除文件。
 
 产品 URL 统一为 `https://github.com/YellowWhiteBlackCat/TaskForest`。

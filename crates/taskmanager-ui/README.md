@@ -2,7 +2,7 @@
 
 ## Role
 
-TaskForest's own GPUI component layer (ADR-017 Phase 3/4): primitives,
+TaskForest's own GPUI component layer (ADR-017): primitives,
 inputs, and overlays built on GPUI Kit's GPUI re-export, taskmanager-theme (`Palette`),
 taskmanager-icons, and taskmanager-ui-contract. No `gpui_component`.
 

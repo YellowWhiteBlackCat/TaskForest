@@ -12,7 +12,7 @@
 | cargo-deny | 拒绝已知漏洞、不允许的许可证和依赖策略违规 |
 | Python/Shell 政策门 | 检查安装清单、自动化安全、模块边界和测试布局 |
 | rustfmt / clippy / production-config | 格式、warning-free 编译与不带 test-support 的生产配置 |
-| release build | 验证默认 GPUI 发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
+| release build | 验证四端独立前端产品发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
 | package stage simulation | 验证 Linux 安装树、权限和 polkit 路径 |
 | workspace nextest | 行为和平台无关契约 |
 | public API semver gate | 拒绝相对基线的 Rust 签名级破坏（基线是 git rev） |
@@ -107,12 +107,12 @@ Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick �
 
 ## 5. 发布物门禁
 
-tag 发布必须同时构建并验证（命名约定见 PRODUCT_IDENTITY.md，`<ver>` 为 Cargo 版本）：
+tag 发布必须同时构建并验证全量 28 项产物（四端各 4 个 DEB/RPM 与 2 架构 MSI，加 Common 数据包）：
 
-- `TaskForest-G-<ver>-x64.deb` 与 `TaskForest-G-<ver>-arm64.deb`：`dpkg-deb --info` 和 `--contents`；
-- `TaskForest-G-<ver>-x64.rpm` 与 `TaskForest-G-<ver>-arm64.rpm`：`rpm -qp --info`、`--list` 和 `--requires`；
-- `TaskForest-G-<ver>-x64.msi` 与 `TaskForest-G-<ver>-arm64.msi`：WiX 构建、MSI 数据库反编译和 payload 引用检查；
-- 每个架构独立的 Linux/Windows SHA-256 清单。
+- 四端（G/I/T/B）与 Common 的 DEB 包：`dpkg-deb --info` 和 `--contents` 完整校验；
+- 四端（G/I/T/B）与 Common 的 RPM 包：`rpm -qp --info`、`--list` 和 `--requires` 完整校验；
+- 四端（G/I/T/B）Windows MSI 安装包：WiX 构建、MSI 数据库反编译和 payload 引用检查；
+- 每个架构独立的 Linux/Windows SHA-256 清单（共 4 份清单）。
 
 Windows 或 Linux 任一打包 job 失败，整个发布失败。所有必需文件验证完成后，单一 publish
 job 才能创建或更新 GitHub Release，避免半成品发布。

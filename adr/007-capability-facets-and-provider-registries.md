@@ -1,6 +1,6 @@
 # ADR-007: Capability facets and runtime provider registries
 
-Status: accepted
+Status: accepted (snapshot-cadence note superseded by ADR-011)
 
 ## Context
 

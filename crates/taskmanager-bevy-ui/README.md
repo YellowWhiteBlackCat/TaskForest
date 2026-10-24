@@ -21,21 +21,6 @@ in [`docs/PAGE_SEAMS.md`](docs/PAGE_SEAMS.md), never hidden. Feathers (the
 official skin system) is not adopted — theme tokens are the only skin
 authority.
 
-## Module map
-
-- `src/app.rs` — frontend route model (nine pages), nav rail, page mounting, `ShellTrack`.
-- `src/input.rs` — real-input seam: shell routers, route chords, action menus, effect bridge.
-- `src/window_surface.rs`, `first_run_modal.rs`, `about_modal.rs`,
-  `system_information_modal.rs` — the single modal surface family.
-- `src/text_selection.rs`, `confirmation.rs`, `focus_visible.rs`, `semantic.rs` — clipboard,
-  destructive gate, focus ring and accessibility seams.
-- `src/window.rs` — the bsn! app shell and font roles; the bsn! idiom reference.
-- `src/drain.rs`, `palette.rs`, `input_contract.rs`, `runtime.rs` — event drain, theme
-  adapter, key normalization and the process-wide platform client.
-- `src/pages.rs` + `src/pages/` — nine mounted pages plus `process_tree.rs` and
-  `history.rs`; `src/widgets.rs` + `src/widgets/` — the owned component layer.
-- Per-module detail: [`docs/MODULE_NOTES.md`](docs/MODULE_NOTES.md).
-
 ## Boundary
 
 Systems and observers declare specific resources and component queries. The
@@ -83,6 +68,20 @@ axis); guard details,
 headless suite and capture flow live in
 [`docs/VERIFICATION.md`](docs/VERIFICATION.md) and
 [`docs/QUALITY_GATES.md`](../../docs/QUALITY_GATES.md).
+
+## Module map
+
+- `src/app.rs` (+ `src/app/`) — frontend route model (nine pages), nav rail, page mounting, `ShellTrack`.
+- `src/input.rs` (+ `src/input/`), `input_contract.rs`, `navigation.rs` — real-input seam, shell routers, route chords, action menus, effect bridge.
+- `src/window_surface.rs`, `first_run_modal.rs`, `about_modal.rs`, `system_information_modal.rs`, `menu_modal.rs` — the single modal surface family.
+- `src/text_selection.rs`, `confirmation.rs`, `focus_visible.rs`, `semantic.rs`, `tooltip.rs` — clipboard, destructive gate, focus ring, accessibility and tooltip seams.
+- `src/window.rs` (+ `src/window/`), `scene_attach.rs` — the bsn! app shell, font roles and scene attachment.
+- `src/drain.rs`, `palette.rs`, `runtime.rs`, `tray.rs` — event drain, theme adapter, platform client and tray adapter.
+- `src/capabilities.rs`, `functional.rs`, `bindings.rs`, `feature_coverage.rs` — capability and surface parity declarations.
+- `src/saved_views.rs`, `export.rs`, `snapshot_export.rs`, `event_center.rs` — saved views, typed data exports and event center tracking.
+- `src/demo_fixture.rs` (+ `src/demo_fixture/`), `capture.rs` — deterministic demo fixtures and window capture seams.
+- `src/pages.rs` + `src/pages/` — nine mounted pages plus `process_tree.rs` and `history.rs`; `src/widgets.rs` + `src/widgets/` — the owned component layer; `icons.rs` — icon scenes.
+- Per-module detail: [`docs/MODULE_NOTES.md`](docs/MODULE_NOTES.md).
 
 ## Docs
 

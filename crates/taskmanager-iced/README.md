@@ -33,15 +33,21 @@ changes require the current Iced matrix and validator; headless changes require 
 ## Module map
 
 ```text
+src/main.rs  run.rs            entrypoint and application runner
 src/a11y.rs                    accessibility bridge
-src/app.rs                     IcedApp root
-src/app/navigation.rs  input_state.rs  focus_*    navigation, input and focus
-src/app/projection.rs  projection_caches.rs      immutable projections and render caches
-src/app/refresh.rs  config_sync.rs  configuration_state.rs  preferences.rs
-                               refresh scheduling and atomic config/theme substitution
-src/app/menus.rs  process_menu.rs  column_menu.rs
-src/app/performance_state.rs  alerts.rs  history_*   page state
-src/app/affinity.rs  motion.rs  pointer_capture.rs
+src/app.rs (+ app/)            IcedApp root, navigation, input_state, refresh, projection
+src/ui.rs (+ ui/)              page layouts, modal dialogues, and responsive scaffolds
+src/focus.rs (+ focus/)        focus ring management and navigation focus models
+src/keys.rs  input_modality.rs keyboard event normalization and input modality state
+src/perf_chart.rs  perf_history.rs  app_history_chart.rs  trend_strip.rs
+                               canvas charts, historical series and mini sparklines
+src/capabilities.rs  functional.rs  feature_coverage.rs
+                               parity registry, surface decisions and capability declarations
+src/theme.rs  theme_binding.rs  font_catalog.rs  text_metrics.rs
+                               palette bindings, typography, font catalog and metrics
+src/icons.rs  tray.rs  i18n.rs  icons resolution, system tray and locale helpers
+src/saved_views.rs  export.rs  saved view state and tabular data export
+src/capture.rs  capture_windows.rs  headless capture and screenshot routines
 ```
 
 ## Docs

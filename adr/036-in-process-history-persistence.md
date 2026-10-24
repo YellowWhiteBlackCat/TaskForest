@@ -1,8 +1,9 @@
 # ADR-036: In-process opt-in history persistence
 
-Status: accepted. This is the current writer-ownership decision for opt-in
-history persistence; storage format, retention policy and typed history
-vocabulary are defined by the implementation and current state contract.
+Status: accepted (extended by ADR-055: daemon owns background persistence, while
+ADR-036 is the standalone in-process fallback writer-ownership model; storage
+format, retention policy and typed history vocabulary are defined by the
+implementation and current state contract).
 
 ## Context
 
@@ -32,6 +33,9 @@ not stop. It also meant the GUI was only a read-only client of its own history.
 6. Recording while every frontend is closed is intentionally not provided by
    this ADR. A future cross-frontend session owner or IPC design requires a
    separate trust-boundary ADR and must not reintroduce an implicit collector.
+   (Extended by ADR-055: `taskforest-daemon` provides continuous background
+   persistence as an optional system service, retaining ADR-036 as the standalone
+   in-process fallback.)
 
 ## Consequences
 

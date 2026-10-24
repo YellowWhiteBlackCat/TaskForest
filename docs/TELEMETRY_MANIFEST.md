@@ -63,7 +63,7 @@ zram 深度事实的三条出口使用同一 typed 真值（`optional_observatio
 swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守卫压缩比）、以及 store 实占
 内存（`mem_used_total`，含元数据）。`mem_used_total` 在导出 JSON 中固定为
 `optional_observations.compression.compressed_swap_memory_used_bytes`，并由 core 导出行为测试
-钉名（不可用时绝不伪报 present 零值）；GPUI/Iced/TUI 的内存读出与 swap 标签均以
+钉名（不可用时绝不伪报 present 零值）；四端（GPUI/Iced/TUI/Bevy）的内存读出与 swap 标签均以
 `mem.zram_ram_used` 标签独立展示该事实，`/proc/swaps` 口径与 `mm_stat` 口径不得互相冒充。
 | **内存增长/释放压力速率 (Pressure Rate)** | • `taskmanager-platform-*` 内置时序环样本差值计算 (MiB/s) | • `taskmanager-platform-windows` 内置时序环样本差值计算 (MiB/s) | • 时序环样本差值计算 | **User** (纯算法推导，时钟倒流时标记 `IdentityChange`) |
 

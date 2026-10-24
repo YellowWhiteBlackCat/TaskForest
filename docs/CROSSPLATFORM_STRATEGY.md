@@ -75,7 +75,7 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 默认启动不需要 root/setcap/setuid。单项能力在用户明确请求后经：
 
 - Linux polkit/pkexec helper；
-- Windows UAC/native helper（尚未接线；当前 foreign-process control 为 typed `Unsupported`）；
+- Windows UAC/native helper（ADR-035 Stage 2 接线：MSI 内置 helper，未配置或缺失时诚实返回 typed `HelperUnavailable`，不伪造提权）；
 - macOS 原生授权 seam。
 
 授权、拒绝、超时、helper 缺失和恢复必须转为 UI 可见的 typed outcome；主程序不能因为一项
@@ -95,21 +95,13 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 
 ---
 
-## 跨平台全覆盖与独立库发布铁律（后人戒条）
+## 跨平台全覆盖与独立库发布铁律
 
-TaskForest 始终是「一后端三平台多前端UI」的系统级工程，必须在全维度实现 **100% 完整覆盖：架构（x86_64, aarch64）× 操作系统（Linux, Windows, macOS）× 前端UI（GPUI, Iced, TUI, Bevy）**。任何演进若只偏向单一平台，就是根本性架构事故。
+TaskForest 始终是「一后端三平台多前端UI」的系统级工程，必须在全维度实现 **100% 完整覆盖：架构（x86_64, aarch64）× 操作系统（Linux, Windows, macOS）× 前端UI（GPUI, Iced, TUI, Bevy）**。
 
-面向 crates.io 发行的所有独立底层库，必须无条件遵循以下戒条：
-
-1. **绝对平台无关律（Platform-Neutrality）**：
-   - 领域事实与算法库（如 `taskforest-core`、`taskforest-contract`）必须是 `#![forbid(unsafe_code)]` 的纯 safe-Rust 库；
-   - 零系统 I/O、不碰系统时钟；在 Linux、Windows、macOS 以及 Wasm / 嵌入式等任意 target 下，**保证 100% 行为确定性一致**。
-2. **三平台对等平权律（Tri-Platform Parity）**：
-   - 涉及操作系统交互与通信的服务库（如 `taskforest-ipc`、`taskforest-daemon`），必须对 **Linux、Windows、macOS 三大主流桌面操作系统提供完全对称、平权的生产级实现**（Linux/macOS 走 UDS，Windows 走 Named Pipe；`start_on_thread` 等 API 语义严格对齐）；
-   - 严禁“Linux 独占、其他平台抛空/抛 panic”的半吊子实现；四端在无服务时必须自动平滑保底降级为 Standalone 单进程直采。
-3. **平台小尾巴特化律（Platform-Suffixed Seams）**：
-   - 只有显式带有平台后缀命名（如 `-linux`、`-windows`、`-macos`）的底层适配层，才允许限定在单一目标系统，且必须通过目标编译期选择（`cfg(target_os)`）或条件编译隔离，绝不污染上层通用库。
-4. **crates.io 独占命名矩阵防重名铁律**：
-   - 对外发布的独立库统一收敛于专属且已全网验证干净可用的 `taskforest-*` 命名矩阵（`taskforest-core`、`taskforest-contract`、`taskforest-ipc`、`taskforest-telemetry`、`taskforest-daemon`），彻底弃用泛化易冲突的前缀。
-5. **强制交叉编译门禁**：
-   - 任何改动必须通过 Linux (`x86_64-unknown-linux-gnu`)、Windows (`x86_64-pc-windows-gnu`)、macOS (`aarch64-apple-darwin` / `x86_64-apple-darwin`) 的交叉编译与无警告检查，任何单一平台 warning/error 直接判定门禁失败。
+面向 crates.io 发行的所有独立底层库（`taskforest-core`、`taskforest-contract`、`taskforest-ipc`、`taskforest-telemetry`、`taskforest-daemon`），必须无条件恪守 [STANDARDS.md §7](STANDARDS.md) 规定的五条发布铁律：
+1. **绝对平台无关律**（纯 safe-Rust、零系统 I/O、跨 target 100% 确定性行为一致）；
+2. **三平台对等平权律**（三主流系统对称平权实现，无服务时自动回退 Standalone）；
+3. **平台小尾巴特化律**（仅 `-linux`/`-windows`/`-macos` 后缀适配层允许平台隔离特化）；
+4. **统一命名空间矩阵**（独占使用已验证的 `taskforest-*` 专属命名空间）；
+5. **CI 强制三平台交叉编译门禁**（Linux、Windows、macOS 交叉编译与零警告检查）。

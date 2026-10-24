@@ -175,10 +175,10 @@ the shared icon, its receipt, and an index recorded as managed. The public
 installer owns only current TaskForest entries and never removes shared assets
 it did not record.
 
-History persistence is deliberately absent from the installation manifest. The
-active frontend session owns its writer and replay worker at runtime; developer
-and distribution installs create no service, activation link, LaunchAgent, or
-registry value for history.
+In standalone mode (ADR-036 fallback), history persistence is owned by the
+active frontend session without background service activation. The optional 7×24
+continuous background telemetry service is provided separately by the dedicated
+`taskforest-daemon` package (ADR-055), which installs systemd service units.
 
 The current writer emits receipt schema 2. Its reader accepts schema 1 receipts
 only for the same hash verification and removal rules; installation does not

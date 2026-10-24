@@ -11,11 +11,8 @@ composition owner that folds correlated telemetry into the single bounded
 
 Shell folds `PlatformEventBatch` into shared projections but owns no OS I/O,
 GPUI Entity, Ratatui widget, Iced widget or native provider selection.
-
-## Key modules
-
-- `src/app.rs` owns the per-track `SystemProjectionStore`; `src/app/batch_fold/`
-  folds platform batches through typed phases into shared projections.
+`src/app.rs` owns the per-track `SystemProjectionStore`; `src/app/batch_fold/`
+folds platform batches through typed phases into shared projections.
 
 ## Contract and verification
 
@@ -55,6 +52,7 @@ src/app/service_log.rs              service log feed lifecycle
 src/app/session_control.rs          session control state
 src/app/system_telemetry.rs         system telemetry fold
 src/app/on_demand.rs  local_keys.rs  row_summary.rs
+src/saved_views.rs  system_timeline.rs   saved view definitions and system timeline state
 src/presentation.rs                 renderer-neutral presentation helpers
 src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
@@ -79,13 +77,9 @@ src/fixture/ (cpu_topology dashboard_history inventory process_insights setup sm
   process-control availability seams.
 - [`docs/PRESENTATION.md`](docs/PRESENTATION.md) — saved views, presentation projections,
   privilege center, GPU chart metric session and the system timeline adapter.
+- [`docs/SEMANTIC_ROWS.md`](docs/SEMANTIC_ROWS.md) — ordered shell-to-ui-contract adapter,
+  row identity behavior, and typed process measurement handoff.
+- [`docs/DEVICE_ROWS.md`](docs/DEVICE_ROWS.md) — family-qualified identity, lifecycle admission,
+  generation, and row revision behavior.
 - [`STATE_OWNERSHIP`](../../docs/STATE_OWNERSHIP.md) — cross-crate state ledger;
   [ADR-027](../../adr/027-renderer-independent-shell-state.md) — renderer-independent shell state.
-
-## Shared semantic rows
-
-See [`docs/SEMANTIC_ROWS.md`](docs/SEMANTIC_ROWS.md) for the ordered shell-to-ui-contract adapter, row identity behavior, and typed process measurement handoff.
-
-## Device row identities
-
-See [`docs/DEVICE_ROWS.md`](docs/DEVICE_ROWS.md) for family-qualified identity, lifecycle admission, generation, and row revision behavior.
