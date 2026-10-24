@@ -71,27 +71,45 @@
 - **服务生命周期控制**：顶栏工具条完整挂载启动（`Start`）、停止（`Stop`）、
   重启（`Restart`）按钮，并由观察者直接投递到 shell 门控，摆脱纯只读状态。
 
-## 5. 锚定证据边界
+## 5. 证据分层与测试避坑守则（警醒后人）
 
-Bevy 可在 headless `App` 中 `spawn_scene` 后查询 `Text` 组件。Swap 单元格锚点因此
-在投影断言之外，把每个投影行的生产 `row_scene` 挂载并回读 `Text`，证明单元格文本
-进入绘制场景图；像素等价仍由 Wayland capture 矩阵承担。需要"场景及其全部子孙就绪"
-这一时刻时，观察 0.20 的 `Ready` 事件（见 §6），不要按组件 `Add` 逐个探测。
+- **测试三层体系**：
+  1. **纯无渲染 ECS 契约（`MinimalPlugins`）**：验证投影折叠、路由模型、键盘状态机、
+     确认门控与无障碍树（AccessKit），不碰真实窗口或 GPU；
+  2. **无头排版与几何约束**：验证弹性断点、视口裁切与滚动导轨几何（如 `scroll_and_motion_parity.rs`）。
+     通过 `UiPlugin` + `TextPlugin` + 无头 Camera/Window 实体驱动，回读 `ComputedNode` 尺寸与
+     `UiGlobalTransform`，并显式注入 `TimeUpdateStrategy::ManualDuration(16ms)` 消除墙钟竞态；
+  3. **真实合成器像素捕获**：嵌套私有 Wayland（KWin + Niri）中运行真实 `taskforest-b` 二进制，
+     验证真实 DPI、字体光栅化与窗口呈现（`capture-bevy.sh`）。
+- **生命周期与调度提交边界**：
+  - `commands().trigger(...)` 与 `Commands::spawn` 随命令在 ApplyDeferred 边界生效。断言前
+    必须显式推进 `app.update()`（级联反应需推进两次），严禁在同一帧直接 query 新状态；
+  - 严禁为了“求稳”滥用 `world.flush()` 打破正式调度；
+  - `run_system_once` 仅限用于单次窄输入（如向 `MessageWriter<KeyboardInput>` 写入测试按键），
+    严禁连续调用其测试带 `Local`、变化检测（Change Detection）或计时器的系统。
+- **严禁预写终态（Anti-False-Pass）**：
+  - 严禁直接向 World 写入“已授权/已确认/已销毁”伪造成功状态；
+  - 破坏性操作必须从 `KeyboardInput` / `PointerPress` 进入，经共享 Gate 挂起与确认闭环；
+  - 浮层外部点击（Outside Click）必须向背景节点分发真实 `PointerPress`，证明点击未被遮罩截胡。
+- **场景挂载以 `Ready` 事件为准**：
+  - 场景声明期实体尚不存在，必须观察 0.20 的自底向上 `Ready` 事件作为装配就绪点，禁止按组件 `Add` 逐个探测。
+- **时间推进策略**：
+  - 涉及动画、过渡曲线（Easing）、进度推进或告警超时的测试，必须使用 `TimeUpdateStrategy::ManualDuration`
+    固定步进，严禁依赖系统墙钟 `std::time::Instant`。
 
-## 6. Bevy 0.20 正式版模式（2026-10-11 起）
+## 6. Bevy 0.20 规范
 
 - **rem 尺寸轴**：类型阶梯长度（控件高度、图标、字号、行高）一律
   `rem(...)`/`FontSize::Rem`，禁止为它们新增 `px(...)` 字面量或硬编码比例；
   px 只属于真实几何合同（边框、半径、固定窗口几何）。`RemSize` 由 palette 的
   UI-size 档位驱动，文本无关节点的 `EmSize` 由 `sync_node_em_size` 兜底。
-  **机械强制（2026-10-20 起）**：`scripts/quality/bevy_rem_guard.py`（BEVY-REM-001
+  **机械强制**：`scripts/quality/bevy_rem_guard.py`（BEVY-REM-001
   字号零 `FontSize::Px`、BEVY-REM-002 px 派生值不得作布局长度、BEVY-REM-003 图标
   适配器不得收裸数字尺寸）与 `scripts/quality/bevy_scene_gate.py`（共享包
   `zhuge-ui-kit` 随 crate 发布的唯一执行器，UIK-REM-001 禁硬编码非零 px 字面量、
   UIK-REM-002 字号必须 rem）都已注册进 `scripts/quality/local-gates.sh` 与 CI；
-  存量 85 处硬编码 px 字面量已于 2026-10-22 全部出清（BEVY-178），
-  `scripts/quality/bevy_scene_ratchet.json` 棘轮台账已重切为**空账**，
-  台账外新增立即失败。
+  `scripts/quality/bevy_scene_ratchet.json` 棘轮台账维持零容忍**空账**，
+  台账外新增非零 px 字面量立即失败。
 - **rem 轴写法（新增控件照此写）**：
   - 控件/行高写 `rem(palette.control_height_rem)`（需要比例时
     `rem(palette.control_height_rem * 2.8)`，比例必须挂在 palette 档位上）；

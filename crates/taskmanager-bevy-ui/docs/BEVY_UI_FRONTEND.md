@@ -27,8 +27,7 @@
   状态变更经 typed observer/system 同步更新其明确拥有的资源；实体变更由 `Commands` 提交。
   Bevy 应用的组合入口只负责注册资源、系统与插件；业务不能通过 `App::world()` /
   `App::world_mut()` 借回整个世界。测试夹具可操作测试 App，但不能成为生产业务入口。
-- Bevy 锁定 `=0.20.0`（2026-10-11 经架构与发布评审从 `0.20.0-rc.2` 升级到正式版；
-  仓库场景已写在新语法上，源码零改动通过编译），与 `taskmanager-platform-runtime`
+- Bevy 锁定 `=0.20.0`，与 `taskmanager-platform-runtime`
   的 `bevy_app`/`bevy_ecs` 保持单一 workspace 解析；后续升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
@@ -46,7 +45,7 @@
   loading/empty/error 变体）全部由 `bsn!` 场景组合并经 `spawn_scene` 挂载；
   禁止命令式 `Node`/`Children`/`with_children` 另起 UI 树。ECS 系统只更新
   场景实体的 typed 组件、接线事件/焦点，或以新场景替换有界子树。
-- **100% `bsn!` 场景法——判据**（2026-09-29 对齐相邻仓库的 BSN 红线）：
+- **100% `bsn!` 场景法——判据**：
   - 能声明的应用尽用。运行时值用字段表达式直写（`TextLayout { linebreak:
     LineBreak::NoWrap }`、`UiTransform { rotation: Rot2::radians(r) }`）、
     元组组件带 payload 直写（`AccessibilityNode({ node })`）、动态列表用
@@ -68,7 +67,7 @@
     `insert`；反向封死即正向保证。`scripts/quality/bevy_bsn_guard.py`
     机械强制（001 UI 构造出景 / 002 手动挂子 / 003 直接 spawn / 004 括号
     失衡 / 005 template_value 硬零 / 006 创建链 insert）。
-- **rem 尺寸轴铁律（2026-10-20 起）**：类型阶梯（控件/行高、图标尺寸、
+- **rem 尺寸轴铁律**：类型阶梯（控件/行高、图标尺寸、
   字号、行高）只走 rem 轴——`rem(palette.control_height_rem …)`、
   `rem(palette.icon_rem)`、`FontSize::Rem`。palette 的 px 派生值
   （`control_height_px` / `icon_size_px`）是**纯算术专用**（行计数、虚拟窗口、
@@ -79,10 +78,9 @@
   `FontSize::Px` / BEVY-REM-002 px 派生值不作布局长度，含直接写入、`let`
   绑定与跨函数传参三条路径 / BEVY-REM-003 图标适配器不得收裸数字尺寸）；
   `scripts/quality/bevy_scene_gate.py`（共享包 `zhuge-ui-kit` 随 crate 发布的
-  唯一执行器）禁硬编码非零 px 字面量；存量 85 处已于 2026-10-22 全部出清
-  （BEVY-178：布局长度归一为 rem / palette 间距 token，图表几何与发丝线保留
-  为具名 px 合同），`scripts/quality/bevy_scene_ratchet.json` 棘轮台账已重切为
-  **空账**，台账外新增立即失败。
+  唯一执行器）禁硬编码非零 px 字面量（布局长度归一为 rem / palette 间距 token，
+  图表几何与发丝线保留为具名 px 合同），`scripts/quality/bevy_scene_ratchet.json`
+  棘轮台账维持零容忍**空账**，台账外新增非零 px 字面量立即失败。
   两者均注册进 `scripts/quality/local-gates.sh` 与 CI。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。

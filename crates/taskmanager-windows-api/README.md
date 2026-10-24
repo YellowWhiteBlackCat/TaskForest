@@ -63,7 +63,7 @@ src/topology.rs                  CPU topology and cache
 src/npu.rs                       SetupAPI compute-accelerator (NPU) inventory
 src/open_files.rs                handle-table open-files lane
 src/icons.rs                     process icon extraction
-src/known_folders.rs  time_zones.rs  single_instance.rs  msg_pump.rs
+src/known_folders.rs  time_zones.rs  single_instance.rs  msg_pump.rs  named_pipe.rs
 src/runas.rs                     UAC ShellExecuteExW(\"runas\") (ADR-035)
 src/wsl.rs                       LXss registry WSL distribution inventory
 ```

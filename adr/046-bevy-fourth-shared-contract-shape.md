@@ -30,8 +30,10 @@ pass its own frontend tests without being represented in shared coverage.
    declaration never claims GPUI reference ownership.
 4. Shared registries remain free of Bevy types. Bevy-native input, scene,
    accessibility, and widget state stay in `taskmanager-bevy-ui`.
-5. Bevy scoped gates run its declarations, behavior tests, and capture route;
-   the release artifact matrix continues to package GPUI only.
+5. Bevy scoped gates run its declarations, behavior tests, and capture route.
+   (Note: the initial GPUI-only release constraint was subsequently superseded
+   by ADR-051 and RELEASE.md, which package and distribute all four frontends as
+   first-class release artifacts.)
 
 ## Consequences
 

@@ -67,7 +67,7 @@ layer-shell 请求默认允许回退到 standalone；严格模式可以选择 ty
 Wayland、没有 layer-shell global、协议版本不满足或 compositor 关闭 surface 时，均不能
 伪造 layer-shell 已生效。
 
-Windows、macOS、X11 和不提供该 global 的 Wayland compositor 继续使用各自 standalone
+Windows、macOS 以及不提供该 global 的 Wayland compositor 继续使用各自 standalone
 host。layer-shell namespace 是 layer surface 的身份；普通窗口的 app-id 规则不能替代它。
 
 ## 6. 当前 GPUI vertical slice

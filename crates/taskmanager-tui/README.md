@@ -1,4 +1,4 @@
-# TaskForest TUI
+# taskmanager-tui
 
 ## Role
 
@@ -59,10 +59,11 @@ src/ui.rs                                     page rendering root
 │   ├── confirmations.rs  header.rs  footer.rs  frame_plan.rs
 │   ├── sparkline.rs  chart_cursor.rs  highlight.rs  table_hit.rs  text.rs  units.rs
 src/command_palette/  (+ surface_protocol.rs) command palette
-src/bindings.rs  capabilities.rs  functional.rs  keys, capabilities, CORE-04
+src/bindings.rs  capabilities.rs  functional.rs  feature_coverage.rs  keys, capabilities, CORE-04
 src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs  sidebar.rs
-src/demo.rs  diagnostic_bundle.rs  snapshot_export.rs
-src/history_runtime.rs  menus.rs  process_view.rs
+src/alert_editor.rs  first_run.rs  health_review.rs  information.rs  smart_self_test.rs
+src/saved_views.rs  window_capture.rs  snapshot_export.rs  diagnostic_bundle.rs
+src/demo.rs  history_runtime.rs  menus.rs  process_view.rs
 src/service_log.rs  startup_control.rs  theme.rs
 ```
 

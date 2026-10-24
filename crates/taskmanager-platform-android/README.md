@@ -18,15 +18,11 @@ This crate has no Android SDK/JNI dependency, native ABI, windowing backend,
 tray implementation, or UI dependency. It must not depend on the Linux,
 OpenHarmony, GPUI, Iced, Ratatui, Wayland, or desktop privilege adapters.
 
-## Android source contract
+## Contract and verification
 
 An Android provider may publish a capability only after its source,
 permission, identity, lifecycle, timeout, and failure mapping are verified on
-a target device. The candidate source-family table and composition rules
-live in [`docs/ANDROID_SOURCE_CONTRACT.md`](docs/ANDROID_SOURCE_CONTRACT.md).
-
-## Contract and verification
-
+a target device ([`docs/ANDROID_SOURCE_CONTRACT.md`](docs/ANDROID_SOURCE_CONTRACT.md)).
 The provider is not connected to `taskmanager-platform-native`, the desktop
 app-host, or a frontend. An Android Activity/Service and APK packaging layer
 must own Android lifecycle and context/path injection before product wiring.

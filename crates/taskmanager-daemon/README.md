@@ -21,10 +21,11 @@ The daemon implements ADR-055's dual-mode background tier.
 Verification covers socket lifecycle, connection handling, multi-client subscription aggregation,
 and graceful shutdown without resource leakage or lock orphaning.
 
-## Module Map
+## Module map
 
 ```text
 src/
+├── collector.rs      // Background metric collection loops and platform collector abstraction
 ├── config.rs         // Daemon runtime configuration and defaults
 ├── state.rs          // Active subscription state and cadence arbitrator
 ├── persistence.rs    // Background history persistence integration

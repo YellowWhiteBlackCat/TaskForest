@@ -17,18 +17,9 @@ platform or runtime types to this layer.
 Removed device-owner authority is retained as a bounded newest tombstone tail,
 preserving recent cross-partition conflict protection without an ever-growing
 identity map.
-
-## Key modules
-
-- `src/command.rs` defines user intent and typed effects.
-- `src/control.rs` and `src/refresh.rs` own live application-facing flows.
-- `src/lib.rs` exposes only application-owned commands, reducers, ports,
-  lifecycles and projections. Domain facts and platform contracts are imported
-  from `taskmanager-core` and `taskmanager-platform-contract` at their actual
-  owners; this crate has no model-forwarding facade. Cohesive algorithm
-  namespaces (`history_decimation`, `process_category_projection`,
-  `process_details_vm`, `process_sort` and `snapshot_export`) remain public
-  only through their named module. Adapter selection remains outside this crate.
+Domain facts and platform contracts are imported directly from `taskmanager-core` and
+`taskmanager-platform-contract` at their actual owner modules; this crate maintains no
+model-forwarding facade.
 
 ## Contract and verification
 
@@ -55,6 +46,7 @@ core's shared outer-cardinality ceiling without truncating the authoritative
 
 ```text
 src/command.rs (+ command/spec.rs)         shared command vocabulary, one entry per intent
+src/first_run.rs                           first-run onboarding session state
 src/interaction.rs                         danger-confirmation state machine
 src/request_session.rs (+ request_session/*)  typed request sessions per target
 src/config_runtime.rs (+ publication.rs)   bounded configuration worker
@@ -66,6 +58,7 @@ src/alert_center.rs  alert_dispatch.rs     alert evaluation and dispatch
 src/alert_suggestion_window.rs             bounded evidence windows for alert/SMART
 src/managed_alert_rules.rs                 full managed-rule list and typed reducer
 src/history_replay.rs  history_decimation.rs  application history projections
+src/system_timeline.rs (+ system_timeline/*) system timeline event history and projection
 src/application_history_projection.rs      joined application read model
 src/performance_history_projection.rs      performance read model for all frontends
 src/history_replay_samples.rs              shared timestamp-aware gap kernel

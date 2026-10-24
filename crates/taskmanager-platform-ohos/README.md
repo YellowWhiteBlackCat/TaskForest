@@ -9,22 +9,17 @@ targets expose `target_os = "linux"` together with `target_env = "ohos"`, so
 
 ## Boundary
 
-This first milestone contains no provider, native ABI, command execution,
+This crate contains no provider, native ABI, command execution,
 windowing backend, or UI dependency. `OhosPlatformRuntime::spawn()` returns the
 shared capability-absent handle. Requests therefore produce the existing typed
 unsupported outcome instead of claiming Linux data sources or fabricating
-telemetry.
+telemetry. CPU and memory telemetry are explicitly deferred per ADR-043
+(details in [`docs/TELEMETRY_STATUS.md`](docs/TELEMETRY_STATUS.md)).
 
 The shared `taskmanager-core`, application contracts, and runtime remain the
 only reusable lower layers. An OHOS provider may be added here only after its
 native source, permission behavior, identity rules, and failure mapping are
 verified on the target device.
-
-## Telemetry status
-
-CPU and memory telemetry are explicitly deferred (ADR-043); the deferral
-reasons, admission rule and verification commands live in
-[`docs/TELEMETRY_STATUS.md`](docs/TELEMETRY_STATUS.md).
 
 ## Contract and verification
 

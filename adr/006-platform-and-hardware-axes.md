@@ -1,4 +1,4 @@
-# ADR 006: Separate platform builds from hardware capability
+# ADR-006: Separate platform builds from hardware capability
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted.
 
 ## Context
 
-TaskManager produces native application versions for different operating
+TaskForest produces native application versions for different operating
 systems. That platform boundary does not imply separate Intel, AMD, NVIDIA, ATA,
 NVMe, or other hardware editions. Requiring users to select a GPU-specific Cargo
 feature would make hardware support a packaging choice, prevent one binary from

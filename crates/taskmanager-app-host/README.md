@@ -23,17 +23,12 @@ lanes; frontends only submit immutable typed requests and drain correlated
 completions. Worker boundaries, the local-time cache and the current capture
 adapters live in [`docs/HOST_WORKERS.md`](docs/HOST_WORKERS.md).
 
-## Surface presentation contract
-
-The `WindowPresentation` contract — definition, per-surface role rules, the
-`LayerShellSpec` value set and the current GPUI desktop-widget profile — is
-specified in [`docs/WINDOW_PRESENTATION.md`](docs/WINDOW_PRESENTATION.md).
-
 ## Contract and verification
 
 Cross-crate cache and lifecycle ownership is defined by
 [`docs/STATE_OWNERSHIP.md`](../../docs/STATE_OWNERSHIP.md); this crate expands
-only the app-host workers and startup-cache policy.
+only the app-host workers, startup-cache policy and the `WindowPresentation` contract
+([`docs/WINDOW_PRESENTATION.md`](docs/WINDOW_PRESENTATION.md)).
 
 Composition must be deterministic, typed and portable across target OSes.
 Keep platform selection here rather than in core or a renderer; verify all

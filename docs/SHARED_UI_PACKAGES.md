@@ -9,10 +9,9 @@
 | `zhuge-ui-kit-iced` | Iced surface、badge、富文本、虚拟列表 body |
 | `zhuge-ui-kit-bevy` | Bevy BSN surface、官方 headless button 基础场景 |
 
-权威远端是私有仓库 `YellowWhiteBlackCat/zhuge-ui-kit`，四个包独立版本。
-根 Cargo.toml 统一声明 Git URL、完整 rev 和版本范围；子 crate 通过 workspace 继承。
-同一产品的四个包使用同一 rev，产品各自提交 Cargo.lock，保留独立发布周期。
-其他设备只需远端读取权限，无须固定的兄弟目录布局。
+共享包发布于 crates.io（源码托管于 `YellowWhiteBlackCat/zhuge-ui-kit` 单 workspace），四个包独立发版。
+根 Cargo.toml 统一在 `[workspace.dependencies]` 声明版本（如 `zhuge-ui-core = "0.1.3"`）；子 crate 通过 `workspace = true` 继承。
+产品各自提交 Cargo.lock，保留独立依赖锁定与发布周期。
 
 ## 产品开发流程
 
@@ -33,15 +32,13 @@
 公开类型、工具包版本、MSRV、feature、平台支持以及布局/焦点/滚动变化均需兼容性评估。
 共享包发布要求由其仓库的 `docs/EVOLUTION.md` 持有；产品升级前阅读迁移说明。
 
-本地联调使用共享仓库的 `scripts/local_patch.py enable/disable/status`，
-只修改本机 Cargo 配置中的同 URL patch，不提交产品 path 覆盖。
-提交前关闭 patch，运行 `cargo metadata --format-version 1` 恢复 Git 来源的锁文件，
-再用 `--locked` 检查；构建与捕获证据必须纳入实际 Git checkout 或 patch 源码。
-私有源码认证与联调细则见共享仓库的 `docs/GIT_WORKFLOW.md`，认证信息不得入库。
-Git rev 升级由各产品决定，不迫使所有产品同步升级；CI 接入另行安排。
+本地联调使用共享仓库的 `scripts/local_patch.py enable/disable/status` 或本地 Cargo `[patch.crates-io]`，
+只修改本机开发配置，不提交产品 path 覆盖。
+提交前关闭 patch，使用 `--locked` 检查；构建与捕获证据必须与锁文件版本一致。
+包版本升级由各产品按需决定，不迫使所有产品同步升级。
 
 验证要覆盖受影响构建、行为/几何测试、仓库门禁和真实界面。
-截图必须绑定实际二进制与源码；没有目标平台证据就记录未验证，不能以桌面结果代替 Android。
+截图必须绑定实际二进制与源码；没有目标平台证据就记录未验证，不能以编译通过代替真实运行实证。
 
 本产品完成前运行 `bash scripts/quality/local-gates.sh quick`；前端捕获和布局规则
 由 [UI 组件章程](UI_COMPONENT_ARCHITECTURE.md) 与受影响 crate 的文档展开。

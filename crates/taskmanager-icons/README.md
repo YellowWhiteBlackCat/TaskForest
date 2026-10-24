@@ -2,7 +2,7 @@
 
 ## Role
 
-Toolkit-neutral semantic icon registry (ADR-017 Phase 2, ADR-051). The crate
+Toolkit-neutral semantic icon registry (ADR-017, ADR-051). The crate
 compiles zero toolkit code on every target; each frontend materializes icons
 in its own crate.
 
